@@ -45,7 +45,7 @@ class TestCheckMinimumAppVersion:
                 app.config.pop('MOBILE_MIN_APP_VERSION', None)
                 # Patch via module import path used inside the function
                 with patch(
-                    'app.services.app_settings_service.get_mobile_min_app_version',
+                    'app.services.platform.app_settings_service.get_mobile_min_app_version',
                     return_value=None,
                 ):
                     result = _check_minimum_app_version()
@@ -57,7 +57,7 @@ class TestCheckMinimumAppVersion:
 
         with app.test_request_context('/api/mobile/v1/test', headers={}):
             with patch(
-                'app.services.app_settings_service.get_mobile_min_app_version',
+                'app.services.platform.app_settings_service.get_mobile_min_app_version',
                 return_value='2.0.0',
             ):
                 result = _check_minimum_app_version()
@@ -72,7 +72,7 @@ class TestCheckMinimumAppVersion:
             headers={'X-App-Version': '2.1.0'},
         ):
             with patch(
-                'app.services.app_settings_service.get_mobile_min_app_version',
+                'app.services.platform.app_settings_service.get_mobile_min_app_version',
                 return_value='2.0.0',
             ):
                 result = _check_minimum_app_version()
@@ -87,7 +87,7 @@ class TestCheckMinimumAppVersion:
             headers={'X-App-Version': '1.9.0'},
         ):
             with patch(
-                'app.services.app_settings_service.get_mobile_min_app_version',
+                'app.services.platform.app_settings_service.get_mobile_min_app_version',
                 return_value='2.0.0',
             ):
                 result = _check_minimum_app_version()
@@ -110,7 +110,7 @@ class TestCheckMinimumAppVersion:
                 headers={'X-App-Version': '2.0.0'},
             ):
                 with patch(
-                    'app.services.app_settings_service.get_mobile_min_app_version',
+                    'app.services.platform.app_settings_service.get_mobile_min_app_version',
                     side_effect=RuntimeError('db down'),
                 ):
                     result = _check_minimum_app_version()
@@ -131,7 +131,7 @@ class TestCheckMinimumAppVersion:
         app.config.pop('MOBILE_MIN_APP_VERSION', None)
         with app.test_request_context('/api/mobile/v1/test', headers={}):
             with patch(
-                'app.services.app_settings_service.get_mobile_min_app_version',
+                'app.services.platform.app_settings_service.get_mobile_min_app_version',
                 side_effect=RuntimeError('db down'),
             ):
                 result = _check_minimum_app_version()
@@ -146,7 +146,7 @@ class TestCheckMinimumAppVersion:
             headers={'X-App-Version': '2.0.0'},
         ):
             with patch(
-                'app.services.app_settings_service.get_mobile_min_app_version',
+                'app.services.platform.app_settings_service.get_mobile_min_app_version',
                 return_value='2.0.0',
             ):
                 result = _check_minimum_app_version()

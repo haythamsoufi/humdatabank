@@ -266,7 +266,7 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
         """Populates the form fields from an IndicatorBank instance."""
         self._populate_choices()
 
-        from app.services.indicator_measurement_sync import (
+        from app.services.indicators.measurement_sync import (
             resolve_type_id_for_legacy_string,
             resolve_unit_id_for_legacy_string,
         )

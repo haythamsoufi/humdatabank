@@ -11,7 +11,7 @@ from sqlalchemy import func, desc, case
 from app.models.api_key_management import APIKey, APIKeyUsage
 from app.forms.system.api_key_forms import APIKeyForm, APIKeyEditForm, APIKeyRevokeForm
 from app.routes.admin.shared import admin_permission_required
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.api_responses import json_ok, json_ok_result, json_server_error
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow

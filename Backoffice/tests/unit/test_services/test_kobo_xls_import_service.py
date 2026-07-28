@@ -77,7 +77,7 @@ class FakeFile:
 
 class TestParseStr:
     def _call(self, val):
-        from app.services.kobo_xls_import_service import _parse_str
+        from app.services.imports.kobo_xls_import_service import _parse_str
         return _parse_str(val)
 
     def test_none_returns_empty(self):
@@ -98,7 +98,7 @@ class TestParseStr:
 
 class TestGetLabelFromRow:
     def _call(self, row, name_fallback=""):
-        from app.services.kobo_xls_import_service import _get_label_from_row
+        from app.services.imports.kobo_xls_import_service import _get_label_from_row
         return _get_label_from_row(row, name_fallback)
 
     def test_uses_label_key(self):
@@ -127,7 +127,7 @@ class TestGetLabelFromRow:
 
 class TestGetTypeFromRow:
     def _call(self, row):
-        from app.services.kobo_xls_import_service import _get_type_from_row
+        from app.services.imports.kobo_xls_import_service import _get_type_from_row
         return _get_type_from_row(row)
 
     def test_type_key(self):
@@ -148,7 +148,7 @@ class TestGetTypeFromRow:
 
 class TestParseRepeatCount:
     def _call(self, val):
-        from app.services.kobo_xls_import_service import _parse_repeat_count
+        from app.services.imports.kobo_xls_import_service import _parse_repeat_count
         return _parse_repeat_count(val)
 
     def test_none(self):
@@ -183,7 +183,7 @@ class TestParseRepeatCount:
 
 class TestParseFloat:
     def _call(self, val):
-        from app.services.kobo_xls_import_service import _parse_float
+        from app.services.imports.kobo_xls_import_service import _parse_float
         return _parse_float(val)
 
     def test_none_returns_zero(self):
@@ -212,7 +212,7 @@ class TestParseFloat:
 class TestReadFormTitle:
     def test_reads_form_title(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["form_title", "other_col"])
@@ -222,7 +222,7 @@ class TestReadFormTitle:
 
     def test_returns_none_when_no_form_title_col(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["title", "other"])
@@ -232,7 +232,7 @@ class TestReadFormTitle:
 
     def test_returns_none_when_empty_value(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["form_title"])
@@ -244,7 +244,7 @@ class TestReadFormTitle:
 class TestLoadChoices:
     def test_loads_choices(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["list_name", "name", "label"])
@@ -258,7 +258,7 @@ class TestLoadChoices:
 
     def test_missing_required_columns(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["list_name", "name"])  # missing label
@@ -268,7 +268,7 @@ class TestLoadChoices:
 
     def test_skips_rows_without_list_or_name(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["list_name", "name", "label"])
@@ -281,7 +281,7 @@ class TestLoadChoices:
 
     def test_label_fallback_to_name(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["list_name", "name", "label"])
@@ -293,7 +293,7 @@ class TestLoadChoices:
 class TestParseSurveySheet:
     def test_parses_survey(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["type", "name", "label"])
@@ -304,7 +304,7 @@ class TestParseSurveySheet:
 
     def test_empty_type_skipped(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["type", "name", "label"])
@@ -315,7 +315,7 @@ class TestParseSurveySheet:
 
     def test_no_type_column_returns_empty(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.append(["name", "label"])  # no type column
@@ -326,7 +326,7 @@ class TestParseSurveySheet:
 
 class TestMapKoboRowToItem:
     def _call(self, row, choices_by_list=None, warnings=None):
-        from app.services.kobo_xls_import_service import KoboXlsImportService
+        from app.services.imports.kobo_xls_import_service import KoboXlsImportService
         if choices_by_list is None:
             choices_by_list = {}
         if warnings is None:
@@ -427,7 +427,7 @@ class TestImportKoboXls:
 
     def test_missing_survey_sheet(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             wb.active.title = "not-survey"
             buf = io.BytesIO()
@@ -439,7 +439,7 @@ class TestImportKoboXls:
 
     def test_empty_survey_sheet(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             ws.title = "survey"
@@ -452,17 +452,17 @@ class TestImportKoboXls:
 
     def test_invalid_excel_file(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             result = KoboXlsImportService.import_kobo_xls(FakeFile(io.BytesIO(b"not-an-excel")), owned_by=1)
             assert result['success'] is False
 
     def test_no_owner_fails(self, app):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[{"type": "text", "name": "q1", "label": "Q1"}],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = False
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf))
             assert result['success'] is False
@@ -470,14 +470,14 @@ class TestImportKoboXls:
 
     def test_simple_form_import(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "text", "name": "name_q", "label": "Your name"},
                     {"type": "integer", "name": "age_q", "label": "Your age"},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -486,7 +486,7 @@ class TestImportKoboXls:
 
     def test_form_with_groups(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "begin_group", "name": "personal_info", "label": "Personal Info"},
@@ -495,7 +495,7 @@ class TestImportKoboXls:
                     {"type": "end_group", "name": "", "label": ""},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -503,7 +503,7 @@ class TestImportKoboXls:
 
     def test_form_with_repeat(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "begin_repeat", "name": "household", "label": "Household Members", "repeat_count": "3"},
@@ -511,7 +511,7 @@ class TestImportKoboXls:
                     {"type": "end_repeat", "name": "", "label": ""},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -519,7 +519,7 @@ class TestImportKoboXls:
 
     def test_form_with_choices(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "select_one gender_list", "name": "gender", "label": "Gender"},
@@ -529,7 +529,7 @@ class TestImportKoboXls:
                     {"list_name": "gender_list", "name": "female", "label": "Female"},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -537,12 +537,12 @@ class TestImportKoboXls:
 
     def test_form_title_from_settings(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[{"type": "text", "name": "q", "label": "Question"}],
                 settings_rows=[{"form_title": "My Survey Title"}],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -550,12 +550,12 @@ class TestImportKoboXls:
 
     def test_template_name_override(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[{"type": "text", "name": "q", "label": "Q"}],
                 settings_rows=[{"form_title": "Original Title"}],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(
@@ -566,13 +566,13 @@ class TestImportKoboXls:
     def test_root_level_items_get_main_section(self, app, db_session, kobo_owner):
         """Items without a group should be placed in auto-created 'Main' section."""
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "text", "name": "standalone_q", "label": "Standalone Question"},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -581,7 +581,7 @@ class TestImportKoboXls:
     def test_unclosed_group_treated_as_root_section(self, app, db_session, kobo_owner):
         """Unclosed begin_group should still produce a section."""
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "begin_group", "name": "grp1", "label": "Unclosed Group"},
@@ -589,7 +589,7 @@ class TestImportKoboXls:
                     # Missing end_group
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -598,11 +598,11 @@ class TestImportKoboXls:
     def test_openpyxl_none_returns_error(self, app):
         """If openpyxl is not installed, should return error dict."""
         with app.app_context():
-            import app.services.kobo_xls_import_service as module
+            import app.services.imports.kobo_xls_import_service as module
             original = module.openpyxl
             module.openpyxl = None
             try:
-                from app.services.kobo_xls_import_service import KoboXlsImportService
+                from app.services.imports.kobo_xls_import_service import KoboXlsImportService
                 result = KoboXlsImportService.import_kobo_xls(MagicMock(), owned_by=1)
                 assert result['success'] is False
                 assert 'openpyxl' in result['message'].lower()
@@ -611,14 +611,14 @@ class TestImportKoboXls:
 
     def test_skipped_types_generate_warnings(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "geopoint", "name": "loc", "label": "Location"},
                     {"type": "text", "name": "q", "label": "Q"},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)
@@ -627,7 +627,7 @@ class TestImportKoboXls:
 
     def test_nested_groups(self, app, db_session, kobo_owner):
         with app.app_context():
-            from app.services.kobo_xls_import_service import KoboXlsImportService
+            from app.services.imports.kobo_xls_import_service import KoboXlsImportService
             buf = _make_kobo_xls(
                 survey_rows=[
                     {"type": "begin_group", "name": "outer", "label": "Outer Group"},
@@ -637,7 +637,7 @@ class TestImportKoboXls:
                     {"type": "end_group", "name": "", "label": ""},
                 ],
             )
-            with patch("app.services.kobo_xls_import_service.current_user") as mock_cu:
+            with patch("app.services.imports.kobo_xls_import_service.current_user") as mock_cu:
                 mock_cu.is_authenticated = True
                 mock_cu.id = kobo_owner.id
                 result = KoboXlsImportService.import_kobo_xls(FakeFile(buf), owned_by=kobo_owner.id)

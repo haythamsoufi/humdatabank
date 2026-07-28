@@ -781,7 +781,7 @@ def _update_item_config(form_item, form, request_form):
     carry_forward_enabled = 'carry_forward' in request_form
     form_item.config['carry_forward'] = carry_forward_enabled
 
-    from app.services.carry_forward_service import CarryForwardService
+    from app.services.forms.carry_forward_service import CarryForwardService
 
     if carry_forward_enabled:
         carry_forward_sources_raw = request_form.get('carry_forward_sources', '[]')

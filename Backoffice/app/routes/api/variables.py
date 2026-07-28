@@ -22,8 +22,8 @@ from app.utils.api_responses import require_json_keys
 # Import models and services
 from app.models import FormTemplate
 from app.models.assignments import AssignmentEntityStatus
-from app.services.variable_resolution_service import VariableResolutionService
-from app.services.authorization_service import AuthorizationService
+from app.services.forms.variable_resolution_service import VariableResolutionService
+from app.services.organization.authorization_service import AuthorizationService
 from app.utils.request_validation import enforce_csrf_json
 
 

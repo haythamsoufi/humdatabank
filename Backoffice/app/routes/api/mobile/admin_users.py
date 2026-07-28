@@ -72,8 +72,8 @@ def update_user(user_id):
     """Update user profile fields and/or RBAC roles (admin). Mirrors /admin/api/users/<id> JSON PATCH."""
     from app.models import User
     from app.models.rbac import RbacRole, RbacUserRole
-    from app.services.authorization_service import AuthorizationService
-    from app.services.user_analytics_service import log_admin_action
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.platform.user_analytics_service import log_admin_action
     from app.routes.admin.user_management.helpers import (
         _set_user_rbac_roles,
         _filter_requested_admin_roles_for_actor,
@@ -260,7 +260,7 @@ def activate_user(user_id):
     directions, matching the web admin convention.
     """
     from app.models import User
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     user = User.query.get(user_id)
     if not user:
@@ -287,7 +287,7 @@ def activate_user(user_id):
 def deactivate_user(user_id):
     """Deactivate a user account (admin)."""
     from app.models import User
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     user = User.query.get(user_id)
     if not user:

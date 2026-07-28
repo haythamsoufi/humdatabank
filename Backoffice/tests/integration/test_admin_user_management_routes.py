@@ -293,7 +293,7 @@ class TestAccessRequestsListRoute:
 
     def test_digest_settings_post_system_manager(self, logged_in_sm_client, db_session, app):
         with app.app_context():
-            from app.services.app_settings_service import get_fds_access_request_digest_settings
+            from app.services.platform.app_settings_service import get_fds_access_request_digest_settings
 
             resp = _admin_post(
                 logged_in_sm_client,

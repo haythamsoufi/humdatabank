@@ -471,7 +471,7 @@ class TestExtractEntityIntoContext:
             ctx = {}
 
             with patch("app.models.assignments.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.entity_service.EntityService") as mock_svc:
+                 patch("app.services.organization.entity_service.EntityService") as mock_svc:
                 mock_cls.query.get.return_value = mock_aes
                 mock_svc.get_entity_display_name.return_value = "Test Country"
 
@@ -508,7 +508,7 @@ class TestExtractEntityIntoContext:
             mock_aes.country = MagicMock(id=5, name="Country A")
 
             with patch("app.models.assignments.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.entity_service.EntityService") as mock_svc:
+                 patch("app.services.organization.entity_service.EntityService") as mock_svc:
                 mock_cls.query.get.return_value = mock_aes
                 mock_svc.get_entity_display_name.return_value = "Country A"
                 _extract_entity_into_context(app, req, ctx)
@@ -579,7 +579,7 @@ class TestExtractEntityIntoContext:
             ctx = {}
 
             with patch("app.models.assignments.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.entity_service.EntityService") as mock_svc:
+                 patch("app.services.organization.entity_service.EntityService") as mock_svc:
                 mock_cls.query.get.return_value = mock_aes
                 mock_svc.get_entity_display_name.return_value = "Alias Country"
                 _extract_entity_into_context(app, req, ctx)
@@ -649,7 +649,7 @@ class TestTrackActivityDecorator:
         with app.test_request_context("/admin/test"):
             with patch("app.middleware.activity_middleware.current_user") as mock_user, \
                  patch("app.middleware.activity_middleware.log_admin_action") as mock_admin_log, \
-                 patch("app.services.authorization_service.AuthorizationService.is_admin",
+                 patch("app.services.organization.authorization_service.AuthorizationService.is_admin",
                        return_value=True):
                 mock_user.is_authenticated = True
 
@@ -666,7 +666,7 @@ class TestTrackActivityDecorator:
             with patch("app.middleware.activity_middleware.current_user") as mock_user, \
                  patch("app.middleware.activity_middleware.log_admin_action") as mock_admin_log, \
                  patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
-                 patch("app.services.authorization_service.AuthorizationService.is_admin",
+                 patch("app.services.organization.authorization_service.AuthorizationService.is_admin",
                        return_value=False):
                 mock_user.is_authenticated = True
 
@@ -819,7 +819,7 @@ class TestDecoratorAliases:
         with app.test_request_context("/admin/"):
             with patch("app.middleware.activity_middleware.current_user") as mock_user, \
                  patch("app.middleware.activity_middleware.log_admin_action") as mock_admin, \
-                 patch("app.services.authorization_service.AuthorizationService.is_admin",
+                 patch("app.services.organization.authorization_service.AuthorizationService.is_admin",
                        return_value=True):
                 mock_user.is_authenticated = True
 
@@ -882,7 +882,7 @@ class TestActivityLogger:
         with app.test_request_context("/admin/"):
             with patch("app.middleware.activity_middleware.current_user") as mock_user, \
                  patch("app.middleware.activity_middleware.log_admin_action") as mock_admin, \
-                 patch("app.services.authorization_service.AuthorizationService.is_admin",
+                 patch("app.services.organization.authorization_service.AuthorizationService.is_admin",
                        return_value=True):
                 mock_user.is_authenticated = True
 

@@ -11,7 +11,7 @@ from app.models.rbac import (
 )
 from app.models import User, FormTemplate, AssignedForm
 from app.routes.admin.shared import admin_required, admin_permission_required, system_manager_required
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.error_handling import handle_json_view_exception

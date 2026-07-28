@@ -134,7 +134,7 @@ def sectors_subsectors():
 @mobile_rate_limit(requests_per_minute=60)
 def public_indicator_bank():
     """Public indicator bank listing (mirrors /api/v1/indicator-bank)."""
-    from app.services.indicator_bank_service import IndicatorBankFilters, get_indicator_list
+    from app.services.indicators.bank_service import IndicatorBankFilters, get_indicator_list
 
     page, per_page = validate_pagination_params(
         request.args, default_per_page=500, max_per_page=2000
@@ -164,7 +164,7 @@ def public_indicator_bank():
 def public_indicator_detail(indicator_id):
     """Single indicator detail (public) — fully localized."""
     from app.models import IndicatorBank
-    from app.services.indicator_bank_service import serialize_indicator_list
+    from app.services.indicators.bank_service import serialize_indicator_list
 
     indicator = IndicatorBank.query.get(indicator_id)
     if not indicator:
@@ -382,7 +382,7 @@ def mobile_periods():
             if period_name:
                 periods_set.add(period_name)
 
-        from app.services.reporting_period_service import sort_period_names
+        from app.services.forms.reporting_period_service import sort_period_names
 
         sorted_periods = sort_period_names(list(periods_set))
         return mobile_ok(data={'periods': sorted_periods})
@@ -521,7 +521,7 @@ def mobile_disaggregation_overview():
     """
     from app.models import FormData, FormItem, Country, AssignedForm, PublicSubmission
     from app.models.assignments import AssignmentEntityStatus
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.utils.mobile_disaggregation import (
         aggregate_disaggregation_rows,
         can_view_disaggregation_country_details,
@@ -769,7 +769,7 @@ def public_resources():
     )
 
     base_url = request.host_url.rstrip('/')
-    from app.services import storage_service as storage
+    from app.services.platform import storage_service as storage
 
     if grouped and not search:
         max_resources = 400

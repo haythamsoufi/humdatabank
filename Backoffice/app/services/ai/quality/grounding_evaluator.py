@@ -365,7 +365,7 @@ def _resolve_llm_judge_config() -> Tuple[bool, str]:
     )
 
     try:
-        from app.services.app_settings_service import get_ai_settings
+        from app.services.platform.app_settings_service import get_ai_settings
         ai_db = get_ai_settings()
         raw_enabled = ai_db.get("AI_GROUNDING_LLM_ENABLED")
         if raw_enabled is not None:

@@ -14,7 +14,7 @@ from datetime import timedelta
 from threading import Thread
 import importlib
 
-import app.services.presence_store as _mod
+import app.services.platform.presence_store as _mod
 
 
 def _reset_globals():

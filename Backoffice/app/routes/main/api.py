@@ -33,7 +33,7 @@ def api_users_profile_summary():
         emails = [str(e).strip().lower() for e in emails_raw if str(e).strip()]
         parsed_user_ids = parse_int_user_ids(user_ids_raw)
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         is_privileged = bool(
             AuthorizationService.is_system_manager(current_user) or
             AuthorizationService.has_rbac_permission(current_user, "admin.users.view")

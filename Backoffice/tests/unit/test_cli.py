@@ -143,7 +143,7 @@ class TestSyncIndicatorEmbeddingsCommand:
         mock_svc.sync_all.return_value = (42, 0.0123)
 
         with patch(
-            "app.services.indicator_resolution_service.IndicatorResolutionService",
+            "app.services.indicators.resolution_service.IndicatorResolutionService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["sync-indicator-embeddings"])
@@ -157,7 +157,7 @@ class TestSyncIndicatorEmbeddingsCommand:
         mock_svc.sync_all.return_value = (10, 0.0050)
 
         with patch(
-            "app.services.indicator_resolution_service.IndicatorResolutionService",
+            "app.services.indicators.resolution_service.IndicatorResolutionService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["sync-indicator-embeddings", "--batch-size", "50"])
@@ -167,7 +167,7 @@ class TestSyncIndicatorEmbeddingsCommand:
 
     def test_exception_raises_and_echoes(self, runner):
         with patch(
-            "app.services.indicator_resolution_service.IndicatorResolutionService",
+            "app.services.indicators.resolution_service.IndicatorResolutionService",
             side_effect=RuntimeError("API down"),
         ):
             result = runner.invoke(args=["sync-indicator-embeddings"])
@@ -389,7 +389,7 @@ class TestWorkflowsSyncCommand:
         }
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "sync"])
@@ -409,7 +409,7 @@ class TestWorkflowsSyncCommand:
         }
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "sync"])
@@ -423,7 +423,7 @@ class TestWorkflowsSyncCommand:
         mock_svc.get_all_workflows.return_value = []
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "sync"])
@@ -432,14 +432,14 @@ class TestWorkflowsSyncCommand:
         assert "No workflows found" in result.output
 
     def test_sync_import_error(self, runner):
-        with patch.dict("sys.modules", {"app.services.workflow_docs_service": None}):
+        with patch.dict("sys.modules", {"app.services.documentation.workflow_docs_service": None}):
             result = runner.invoke(args=["workflows", "sync"])
 
         assert result.exit_code != 0
 
     def test_sync_general_exception(self, runner):
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             side_effect=RuntimeError("vector store down"),
         ):
             result = runner.invoke(args=["workflows", "sync"])
@@ -458,7 +458,7 @@ class TestWorkflowsSyncCommand:
         }
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "sync"])
@@ -478,7 +478,7 @@ class TestWorkflowsListCommand:
         mock_svc.get_all_workflows.return_value = [wf1, wf2]
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "list"])
@@ -494,7 +494,7 @@ class TestWorkflowsListCommand:
         mock_svc.get_all_workflows.return_value = [wf]
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "list"])
@@ -507,7 +507,7 @@ class TestWorkflowsListCommand:
         mock_svc.get_all_workflows.return_value = []
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "list"])
@@ -517,7 +517,7 @@ class TestWorkflowsListCommand:
 
     def test_list_exception(self, runner):
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             side_effect=Exception("fs error"),
         ):
             result = runner.invoke(args=["workflows", "list"])
@@ -545,7 +545,7 @@ class TestWorkflowsShowCommand:
         mock_svc.get_workflow_by_id.return_value = wf
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "show", "add-user"])
@@ -564,7 +564,7 @@ class TestWorkflowsShowCommand:
         mock_svc.get_workflow_by_id.return_value = wf
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "show", "simple-wf"])
@@ -578,7 +578,7 @@ class TestWorkflowsShowCommand:
         mock_svc.get_workflow_by_id.return_value = None
 
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             return_value=mock_svc,
         ):
             result = runner.invoke(args=["workflows", "show", "missing-id"])
@@ -588,7 +588,7 @@ class TestWorkflowsShowCommand:
 
     def test_show_exception(self, runner):
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             side_effect=Exception("svc crashed"),
         ):
             result = runner.invoke(args=["workflows", "show", "any"])
@@ -628,7 +628,7 @@ class TestWorkflowsGenerateStaticCommand:
             }
         )
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
             result = runner.invoke(args=["workflows", "generate-static"])
 
         assert result.exit_code == 0
@@ -649,7 +649,7 @@ class TestWorkflowsGenerateStaticCommand:
         monkeypatch.setattr(app, "root_path", str(tmp_path))
         mock_svc = self._mock_service(workflows=[])
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
             result = runner.invoke(args=["workflows", "generate-static"])
 
         assert result.exit_code == 0
@@ -662,8 +662,8 @@ class TestWorkflowsGenerateStaticCommand:
         mock_storage = MagicMock()
         mock_storage.public_cdn_enabled.return_value = True
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
-             patch("app.services.storage_service", mock_storage):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
+             patch("app.services.platform.storage_service", mock_storage):
             result = runner.invoke(args=["workflows", "generate-static"])
 
         assert result.exit_code == 0
@@ -679,8 +679,8 @@ class TestWorkflowsGenerateStaticCommand:
         mock_storage = MagicMock()
         mock_storage.public_cdn_enabled.return_value = False
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
-             patch("app.services.storage_service", mock_storage):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
+             patch("app.services.platform.storage_service", mock_storage):
             result = runner.invoke(args=["workflows", "generate-static"])
 
         assert result.exit_code == 0
@@ -695,8 +695,8 @@ class TestWorkflowsGenerateStaticCommand:
         mock_storage.public_cdn_enabled.return_value = True
         mock_storage.publish_to_static_cdn.side_effect = RuntimeError("blob unreachable")
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
-             patch("app.services.storage_service", mock_storage):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc), \
+             patch("app.services.platform.storage_service", mock_storage):
             result = runner.invoke(args=["workflows", "generate-static"])
 
         assert result.exit_code == 0
@@ -706,7 +706,7 @@ class TestWorkflowsGenerateStaticCommand:
 
     def test_generate_static_general_exception(self, runner):
         with patch(
-            "app.services.workflow_docs_service.WorkflowDocsService",
+            "app.services.documentation.workflow_docs_service.WorkflowDocsService",
             side_effect=RuntimeError("svc crashed"),
         ):
             result = runner.invoke(args=["workflows", "generate-static"])
@@ -728,7 +728,7 @@ class TestRbacSeedCommand:
             "deleted_role_permission_links": 5,
         }
         with patch(
-            "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
             return_value=stats,
         ):
             result = runner.invoke(args=["rbac", "seed"])

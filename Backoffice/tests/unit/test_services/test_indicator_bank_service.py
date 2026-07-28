@@ -2,7 +2,7 @@ import pytest
 
 from app.models import IndicatorBank
 from app.models.forms import DynamicIndicatorData, FormData, RepeatGroupData, RepeatGroupInstance
-from app.services.indicator_bank_service import (
+from app.services.indicators.bank_service import (
     IndicatorBankFilters,
     attach_indicator_usage_cache,
     batch_data_value_counts,

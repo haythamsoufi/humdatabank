@@ -11,7 +11,7 @@ from app.forms.auth_forms import RequestCountryAccessForm
 from flask_babel import _
 from app.utils.datetime_helpers import utcnow
 from app.utils.transactions import request_transaction_rollback
-from app.services.app_settings_service import is_organization_email
+from app.services.platform.app_settings_service import is_organization_email
 
 from app.routes.main import bp
 
@@ -33,7 +33,7 @@ def reopen_assignment(aes_id):
     unchanged — only the closed-round exception flag is set.
     Uses AuthorizationService for granular RBAC checks.
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
 
@@ -129,7 +129,7 @@ def approve_assignment(aes_id):
     Approves an assignment by changing its status to 'approved'.
     Uses AuthorizationService for granular RBAC checks.
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
 
@@ -184,7 +184,7 @@ def approve_assignment(aes_id):
 @login_required
 def return_assignment_for_revision(aes_id):
     """Delegation returns a sent-for-review assignment to NS focal points for changes."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.services.notification.core import notify_assignment_returned_for_revision
 
     assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
@@ -317,7 +317,7 @@ def request_country_access():
                             continue
 
                         # Check auto-approve setting
-                        from app.services.app_settings_service import get_auto_approve_access_requests
+                        from app.services.platform.app_settings_service import get_auto_approve_access_requests
                         auto_approve = get_auto_approve_access_requests()
 
                         access_request = CountryAccessRequest(

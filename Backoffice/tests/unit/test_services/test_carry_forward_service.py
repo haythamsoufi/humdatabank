@@ -47,14 +47,14 @@ def _make_form_data(*, value=None, disagg_data=None, data_not_available=False, n
 
 class TestCarryForwardService:
     def test_skips_when_current_aes_has_reported_data(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = _make_item()
         current_fd = _make_form_data(disagg_data={'61_Planned': 10})
         current_fd.form_item_id = 1434
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = [current_fd]
 
             result = CarryForwardService.resolve_for_aes(aes, [item])
@@ -62,7 +62,7 @@ class TestCarryForwardService:
         assert result == {}
 
     def test_resolve_references_returns_data_even_when_current_aes_has_reported_data(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = _make_item()
@@ -71,7 +71,7 @@ class TestCarryForwardService:
         prev_aes = SimpleNamespace(id=3221, assigned_form=SimpleNamespace(template_id=23, period_name='2025 Midyear'))
         prev_fd = _make_form_data(disagg_data={'61_Planned': 456})
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = [current_fd]
             fd_model.query.filter_by.return_value.order_by.return_value.first.return_value = prev_fd
 
@@ -81,14 +81,14 @@ class TestCarryForwardService:
         assert result[1434]['disagg_data'] == {'61_Planned': 456}
 
     def test_defaults_to_current_template_and_item_when_sources_empty(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = _make_item(item_id=1434, sources=[])
         prev_aes = SimpleNamespace(id=3221, assigned_form=SimpleNamespace(template_id=23, period_name='2025 Midyear'))
         prev_fd = _make_form_data(disagg_data={'61_Planned': 456})
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = []
             fd_model.query.filter_by.return_value.order_by.return_value.first.return_value = prev_fd
 
@@ -101,7 +101,7 @@ class TestCarryForwardService:
         assert result[1434]['disagg_data'] == {'61_Planned': 456}
 
     def test_configured_cross_template_source_is_used(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = _make_item(
@@ -111,7 +111,7 @@ class TestCarryForwardService:
         prev_aes = SimpleNamespace(id=3001, assigned_form=SimpleNamespace(template_id=22, period_name='2026 Planning'))
         prev_fd = _make_form_data(disagg_data={'61_Planned': 99})
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = []
             fd_model.query.filter_by.return_value.order_by.return_value.first.return_value = prev_fd
 
@@ -124,7 +124,7 @@ class TestCarryForwardService:
         assert result[1434]['disagg_data'] == {'61_Planned': 99}
 
     def test_first_configured_source_wins_when_priority_is_source(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = _make_item(
@@ -150,7 +150,7 @@ class TestCarryForwardService:
         planning_fd = _make_form_data(disagg_data={'61_Planned': 99})
         annual_fd = _make_form_data(disagg_data={'61_Planned': 456})
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = []
 
             def _find_side_effect(*args, **kwargs):
@@ -172,7 +172,7 @@ class TestCarryForwardService:
     def test_most_recent_assignment_wins_when_priority_is_assignment(self):
         from datetime import datetime
 
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = _make_item(
@@ -196,7 +196,7 @@ class TestCarryForwardService:
             assigned_form=SimpleNamespace(template_id=23, period_name='2025 Annual'),
         )
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = []
 
             def _find_side_effect(*args, **kwargs):
@@ -222,7 +222,7 @@ class TestCarryForwardService:
         assert result[1434]['disagg_data'] == {'61_Planned': 99}
 
     def test_scalar_indicator_carry_forward(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         aes = _make_aes()
         item = SimpleNamespace(
@@ -234,7 +234,7 @@ class TestCarryForwardService:
         prev_aes = SimpleNamespace(id=900, assigned_form=SimpleNamespace(template_id=23, period_name='2025'))
         prev_fd = _make_form_data(value='42')
 
-        with patch('app.services.carry_forward_service.FormData') as fd_model:
+        with patch('app.services.forms.carry_forward_service.FormData') as fd_model:
             fd_model.query.filter.return_value.all.return_value = []
             fd_model.query.filter_by.return_value.order_by.return_value.first.return_value = prev_fd
 
@@ -245,7 +245,7 @@ class TestCarryForwardService:
         assert result[500]['value'] == '42'
 
     def test_normalize_source_for_storage_accepts_current_sentinels(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         assert CarryForwardService.normalize_source_for_storage({
             'template_id': '__current__',
@@ -258,14 +258,14 @@ class TestCarryForwardService:
         }) == {'template_id': 22, 'item_id': '__current__'}
 
     def test_normalize_priority_for_storage(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         assert CarryForwardService.normalize_priority_for_storage('assignment') == 'assignment'
         assert CarryForwardService.normalize_priority_for_storage('source') == 'source'
         assert CarryForwardService.normalize_priority_for_storage('invalid') == 'source'
 
     def test_iter_carry_forward_items_collects_flagged_fields(self):
-        from app.services.carry_forward_service import CarryForwardService
+        from app.services.forms.carry_forward_service import CarryForwardService
 
         flagged = SimpleNamespace(id=1, config={'carry_forward': True})
         plain = SimpleNamespace(id=2, config={})

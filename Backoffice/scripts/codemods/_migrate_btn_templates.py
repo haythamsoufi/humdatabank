@@ -2,7 +2,7 @@
 import re
 import pathlib
 
-root = pathlib.Path(__file__).resolve().parents[1] / "app" / "templates"
+root = pathlib.Path(__file__).resolve().parents[2] / "app" / "templates"
 pat = re.compile(
     r"<(button|a)\b[^>]*class=\"([^\"]{10,600})\"",
     re.I,

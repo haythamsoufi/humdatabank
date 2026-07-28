@@ -23,9 +23,9 @@ class TestIssueTokensDirect:
             data=json.dumps({'email': 'direct-mobile@example.com', 'password': 'MobilePass123!'}),
             content_type='application/json',
         ):
-            with patch('app.services.user_analytics_service.log_login_attempt'), \
-                 patch('app.services.user_analytics_service.start_user_session'), \
-                 patch('app.services.user_analytics_service.log_user_activity'):
+            with patch('app.services.platform.user_analytics_service.log_login_attempt'), \
+                 patch('app.services.platform.user_analytics_service.start_user_session'), \
+                 patch('app.services.platform.user_analytics_service.log_user_activity'):
                 resp = issue_tokens()
         if isinstance(resp, tuple):
             body, status = resp
@@ -100,7 +100,7 @@ class TestRefreshTokenDirect:
             data=json.dumps({'refresh_token': tokens['refresh_token']}),
             content_type='application/json',
         ):
-            with patch('app.services.user_analytics_service.log_user_activity'):
+            with patch('app.services.platform.user_analytics_service.log_user_activity'):
                 resp = refresh_token()
 
         if isinstance(resp, tuple):
@@ -169,8 +169,8 @@ class TestExchangeSessionDirect:
         ):
             login_user(user)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_user_activity'), \
-                 patch('app.services.user_analytics_service.start_user_session'):
+                 patch('app.services.platform.user_analytics_service.log_user_activity'), \
+                 patch('app.services.platform.user_analytics_service.start_user_session'):
                 resp = exchange_session_for_tokens()
         if isinstance(resp, tuple):
             body, status = resp
@@ -216,10 +216,10 @@ class TestMobileLogoutDirect:
             method='POST',
             headers={'Authorization': f'Bearer {tokens["access_token"]}'},
         ):
-            with patch('app.services.user_analytics_service.add_session_to_blacklist'), \
-                 patch('app.services.user_analytics_service.end_user_session'), \
-                 patch('app.services.user_analytics_service.log_user_activity_for_user'), \
-                 patch('app.services.user_analytics_service.get_client_info', return_value=self._client_info()):
+            with patch('app.services.platform.user_analytics_service.add_session_to_blacklist'), \
+                 patch('app.services.platform.user_analytics_service.end_user_session'), \
+                 patch('app.services.platform.user_analytics_service.log_user_activity_for_user'), \
+                 patch('app.services.platform.user_analytics_service.get_client_info', return_value=self._client_info()):
                 resp = mobile_logout()
         if isinstance(resp, tuple):
             _, status = resp
@@ -239,10 +239,10 @@ class TestMobileLogoutDirect:
             method='POST',
             headers={'Authorization': f'Bearer {tokens["access_token"]}'},
         ):
-            with patch('app.services.user_analytics_service.add_session_to_blacklist'), \
-                 patch('app.services.user_analytics_service.end_user_session', side_effect=RuntimeError('db down')), \
-                 patch('app.services.user_analytics_service.log_user_activity_for_user'), \
-                 patch('app.services.user_analytics_service.get_client_info', return_value=self._client_info()):
+            with patch('app.services.platform.user_analytics_service.add_session_to_blacklist'), \
+                 patch('app.services.platform.user_analytics_service.end_user_session', side_effect=RuntimeError('db down')), \
+                 patch('app.services.platform.user_analytics_service.log_user_activity_for_user'), \
+                 patch('app.services.platform.user_analytics_service.get_client_info', return_value=self._client_info()):
                 resp = mobile_logout()
         if isinstance(resp, tuple):
             _, status = resp
@@ -271,9 +271,9 @@ class TestMobileLogoutDirect:
             method='POST',
             headers={'Authorization': f'Bearer {tokens["access_token"]}'},
         ):
-            with patch('app.services.user_analytics_service.add_session_to_blacklist'), \
-                 patch('app.services.user_analytics_service.end_user_session'), \
-                 patch('app.services.user_analytics_service.get_client_info', return_value=self._client_info()):
+            with patch('app.services.platform.user_analytics_service.add_session_to_blacklist'), \
+                 patch('app.services.platform.user_analytics_service.end_user_session'), \
+                 patch('app.services.platform.user_analytics_service.get_client_info', return_value=self._client_info()):
                 resp = mobile_logout()
         if isinstance(resp, tuple):
             _, status = resp
@@ -322,7 +322,7 @@ class TestMobileProfileDirect:
         ):
             login_user(user)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_user_activity'):
+                 patch('app.services.platform.user_analytics_service.log_user_activity'):
                 resp = mobile_update_profile()
         if isinstance(resp, tuple):
             _, status = resp

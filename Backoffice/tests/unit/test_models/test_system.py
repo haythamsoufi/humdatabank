@@ -514,7 +514,7 @@ class TestEntityActivityLog:
             )
             db_session.add(log)
             db_session.commit()
-            with patch('app.services.entity_service.EntityService.get_entity', return_value=country):
+            with patch('app.services.organization.entity_service.EntityService.get_entity', return_value=country):
                 entity = log.entity
                 assert entity is not None
 

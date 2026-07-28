@@ -25,15 +25,15 @@ from sqlalchemy.orm import joinedload
 from datetime import datetime, timedelta
 import json
 from app.services import get_platform_stats
-from app.services.authorization_service import AuthorizationService
-from app.services.user_analytics_service import (
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.platform.user_analytics_service import (
     bot_user_agent_explanation,
     effective_session_active_duration_minutes,
     effective_session_duration_minutes,
     session_log_device_icon_classes,
     user_session_log_active_duration_minutes_sql,
 )
-from app.services.audit_trail_session_query import count_audit_visible_entries_for_session
+from app.services.audit.trail_session_query import count_audit_visible_entries_for_session
 from app.utils.page_view_paths import distinct_page_view_path_count
 
 
@@ -294,7 +294,7 @@ def session_logs_list_api():
 def end_session_api(session_id):
     """End a user session and blacklist it (JSON for admin clients)."""
 
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         add_session_to_blacklist,
         end_user_session,
         log_admin_action,
@@ -344,7 +344,7 @@ def end_session_api(session_id):
 
         db.session.flush()
 
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         log_admin_action(
             action_type='end_user_session',
             description=f'Manually ended session for user {user_email} (forced logout)',

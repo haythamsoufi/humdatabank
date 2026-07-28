@@ -40,7 +40,7 @@ def sync_workflow_docs():
     for semantic search by the chatbot.
     """
     try:
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         service = WorkflowDocsService()
         service.reload()  # Force reload from disk
@@ -68,11 +68,11 @@ def list_workflow_docs():
     Filters by user role if not admin.
     """
     try:
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         service = WorkflowDocsService()
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         role = AuthorizationService.access_level(current_user)
 
         if role in ['admin', 'system_manager']:
@@ -101,7 +101,7 @@ def get_workflow_doc(workflow_id: str):
         return json_not_found('Workflow not found')
 
     try:
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         service = WorkflowDocsService()
         workflow = service.get_workflow_by_id(workflow_id)
@@ -109,7 +109,7 @@ def get_workflow_doc(workflow_id: str):
         if not workflow:
             return json_not_found(f'Workflow "{workflow_id}" not found')
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         role = AuthorizationService.access_level(current_user)
         if role not in ['admin', 'system_manager']:
             if role not in workflow.roles and 'all' not in workflow.roles:
@@ -141,7 +141,7 @@ def get_workflow_tour(workflow_id: str):
         return json_not_found('Tour not found')
 
     try:
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         language = request.args.get('lang', 'en')
 
@@ -197,7 +197,7 @@ def search_workflow_docs():
     - category: Filter by category (optional)
     """
     try:
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         query = request.args.get('q', '').strip()
         category = request.args.get('category', '').strip() or None
@@ -207,7 +207,7 @@ def search_workflow_docs():
 
         service = WorkflowDocsService()
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         role = AuthorizationService.access_level(current_user)
         if role in ['admin', 'system_manager']:
             role = None

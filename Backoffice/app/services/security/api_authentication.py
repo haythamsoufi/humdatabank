@@ -385,7 +385,7 @@ def authenticate_api_request():
             if not user or not user.check_password(submitted_password):
                 # Send Basic challenge for browsers/clients
                 resp = api_error("Invalid credentials", 401)
-                from app.services.app_settings_service import get_organization_name
+                from app.services.platform.app_settings_service import get_organization_name
                 org_name = get_organization_name()
                 resp.headers['WWW-Authenticate'] = f'Basic realm="{org_name} API", charset="UTF-8"'
                 return resp
@@ -398,7 +398,7 @@ def authenticate_api_request():
                 401,
                 extra={"hint": "Use Authorization: Bearer YOUR_API_KEY, ?api_key= (Power Query), or HTTP Basic auth (email/password)"},
             )
-            from app.services.app_settings_service import get_organization_name
+            from app.services.platform.app_settings_service import get_organization_name
             org_name = get_organization_name()
             resp.headers['WWW-Authenticate'] = f'Basic realm="{org_name} API", charset="UTF-8"'
             return resp
@@ -422,7 +422,7 @@ def get_user_allowed_template_ids(user_id):
 
 def _get_user_allowed_country_ids(auth_user):
     """Return set of country IDs the user may access, or None if unrestricted."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if AuthorizationService.is_system_manager(auth_user):
         return None
     if AuthorizationService.has_rbac_permission(auth_user, "admin.countries.view"):
@@ -446,7 +446,7 @@ def apply_user_template_scoping(
     assigned_form_data_query = queries['assigned']
     public_form_data_query = queries['public']
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if AuthorizationService.is_system_manager(auth_user):
         return queries
 

@@ -20,7 +20,7 @@ import time
 import types
 from typing import Any, Dict, List, Optional
 
-from app.services.data_retrieval_service import (
+from app.services.data_retrieval.service import (
     get_upr_kpi_value as get_upr_kpi_value_service,
     get_upr_kpi_timeseries as get_upr_kpi_timeseries_service,
     get_upr_kpi_values_for_all_countries as get_upr_kpi_values_for_all_countries_service,

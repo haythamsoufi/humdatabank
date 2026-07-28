@@ -3,7 +3,7 @@ from flask_login import current_user
 from app.models import Country, FormItem
 from app.models.core import UserEntityPermission
 from app.models.enums import AssignmentEntityStatusValue, EntityType
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.utils.form_localization import (
     get_localized_national_society_name as _get_localized_national_society_name,
@@ -1108,7 +1108,7 @@ def assignment_status_workflow_steps(assignment_entity_status=None):
     if assignment_entity_status is None:
         return steps
 
-    from app.services.assignment_workflow_service import review_enabled
+    from app.services.assignments.workflow_service import review_enabled
 
     current = _assignment_entity_status_value(assignment_entity_status)
 

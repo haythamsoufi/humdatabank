@@ -13,7 +13,7 @@ def _mock_render(text="ok"):
 
 
 def _perm_patch():
-    return patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=True)
+    return patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=True)
 
 
 class TestValidationRulesAdmin:
@@ -34,7 +34,7 @@ class TestValidationRulesAdmin:
         assert resp.status_code == 200
 
     def test_denied_without_permission(self, logged_in_client, db_session, app):
-        with patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
             resp = logged_in_client.get("/admin/validation-rules")
         assert resp.status_code in (302, 403)
 

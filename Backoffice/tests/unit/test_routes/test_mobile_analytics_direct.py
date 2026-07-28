@@ -136,7 +136,7 @@ class TestScreenView:
             with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch(
-                     'app.services.user_analytics_service'
+                     'app.services.platform.user_analytics_service'
                      '.increment_session_page_views_without_activity_log_deferred'
                  ) as mock_incr:
                 resp = screen_view()
@@ -177,7 +177,7 @@ class TestScreenView:
             with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch(
-                     'app.services.user_analytics_service'
+                     'app.services.platform.user_analytics_service'
                      '.increment_session_page_views_without_activity_log_deferred'
                  ) as mock_incr:
                 resp = screen_view()
@@ -204,7 +204,7 @@ class TestScreenView:
             with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch(
-                     'app.services.user_analytics_service'
+                     'app.services.platform.user_analytics_service'
                      '.increment_session_page_views_without_activity_log_deferred'
                  ):
                 resp = screen_view()
@@ -233,7 +233,7 @@ class TestScreenView:
             with patch('app.utils.mobile_auth._try_jwt_auth', return_value=True), \
                  patch('app.utils.rate_limiting.mobile_rate_limit', side_effect=lambda **kw: lambda f: f), \
                  patch(
-                     'app.services.user_analytics_service'
+                     'app.services.platform.user_analytics_service'
                      '.increment_session_page_views_without_activity_log_deferred',
                      side_effect=RuntimeError('crash'),
                  ):

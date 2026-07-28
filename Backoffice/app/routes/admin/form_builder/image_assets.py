@@ -6,7 +6,7 @@ from flask import abort, current_app, request
 from flask_login import current_user
 
 from app.routes.admin.shared import permission_required
-from app.services import storage_service as storage
+from app.services.platform import storage_service as storage
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.template_image_assets import (
     TEMPLATE_ASSETS,

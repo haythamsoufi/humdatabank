@@ -269,7 +269,7 @@ class TestMobileAuthRoutesExtended:
             'email': 'mobile@test.com', 'password': 'MobilePass123!',
         })
         refresh_token = login_resp.get_json()['data']['refresh_token']
-        with patch('app.services.user_analytics_service.is_session_blacklisted', return_value=True):
+        with patch('app.services.platform.user_analytics_service.is_session_blacklisted', return_value=True):
             resp = client.post(f'{PREFIX}/auth/refresh', json={'refresh_token': refresh_token})
         assert resp.status_code == 401
 
@@ -303,7 +303,7 @@ class TestMobileAuthRoutesExtended:
         assert resp.get_json()['success'] is True
 
     def test_logout_blacklist_failure_still_succeeds(self, client, jwt_headers, db_session, app):
-        with patch('app.services.user_analytics_service.add_session_to_blacklist', side_effect=RuntimeError('redis down')):
+        with patch('app.services.platform.user_analytics_service.add_session_to_blacklist', side_effect=RuntimeError('redis down')):
             resp = client.post(f'{PREFIX}/auth/logout', headers=jwt_headers)
         assert resp.status_code == 200
 

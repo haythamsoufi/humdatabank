@@ -10,7 +10,7 @@ UPR context:
 - For most countries and years there is typically a Plan, Midyear report, and Annual report.
 - These PDFs are infographic-heavy, with repeated visuals expected on pages 1–5.
 - Because normal OCR/table chunking is unreliable for infographics, upstream chunking attaches
-  structured JSON under `metadata["upr"]` (see `app.services.upr_visual_chunking`).
+  structured JSON under `metadata["upr"]` (see `app.services.upr.visual_chunking`).
 
 Keeping this separate prevents `routes/ai_documents.py` from accumulating
 UPR-only logic and makes it easier to evolve UPR handling independently.

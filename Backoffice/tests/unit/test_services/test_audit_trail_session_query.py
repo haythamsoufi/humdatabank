@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from app.services.audit_trail_session_query import (
+from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 
 @pytest.mark.unit
@@ -32,7 +32,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=False):
                 aes = self._aes()
                 assert AuthorizationService.can_edit_assignment(aes, self._user()) is False
 
@@ -40,7 +40,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=True):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=True):
                 aes = self._aes()
                 assert AuthorizationService.can_edit_assignment(aes, self._user('del@ifrc.org')) is True
 
@@ -48,7 +48,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=True):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=True):
                 aes = self._aes()
                 assert AuthorizationService.can_submit_assignment(aes, self._user('del@ifrc.org')) is True
 
@@ -56,7 +56,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=False):
                 aes = self._aes()
                 assert AuthorizationService.can_submit_assignment(aes, self._user()) is False
 
@@ -64,7 +64,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=False):
                 aes = self._aes(status=AssignmentEntityStatusValue.in_progress)
                 assert AuthorizationService.can_send_for_review(aes, self._user()) is True
 
@@ -73,7 +73,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=False):
                 aes = self._aes(status=AssignmentEntityStatusValue.pending)
                 assert AuthorizationService.can_send_for_review(aes, self._user()) is True
 
@@ -82,7 +82,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=False):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=False):
                 aes = self._aes(status=AssignmentEntityStatusValue.pending)
                 assert AuthorizationService.can_submit_assignment(aes, self._user()) is False
 
@@ -90,7 +90,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=True):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=True):
                 aes = self._aes(status=AssignmentEntityStatusValue.in_progress)
                 assert AuthorizationService.can_send_for_review(aes, self._user('del@ifrc.org')) is False
 
@@ -98,7 +98,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'is_system_manager', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=True):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=True):
                 aes = self._aes(status=AssignmentEntityStatusValue.in_progress)
                 assert AuthorizationService.can_send_for_review(aes, self._user('admin@ifrc.org')) is False
 
@@ -106,7 +106,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=True):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=True):
                 aes = self._aes()
                 assert AuthorizationService.can_return_for_revision(aes, self._user('del@ifrc.org')) is True
 
@@ -114,7 +114,7 @@ class TestAssignmentNsReviewAuthorization:
         with app.app_context():
             with patch.object(AuthorizationService, 'can_access_assignment', return_value=True), \
                  patch.object(AuthorizationService, 'has_rbac_permission', return_value=True), \
-                 patch('app.services.assignment_workflow_service.is_organization_email', return_value=True):
+                 patch('app.services.assignments.workflow_service.is_organization_email', return_value=True):
                 aes = self._aes(status=AssignmentEntityStatusValue.in_progress)
                 assert AuthorizationService.can_return_for_revision(aes, self._user('del@ifrc.org')) is False
 

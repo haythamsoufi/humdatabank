@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
-from app.services.validation_dashboard_service import (
+from app.services.validation.dashboard_service import (
     _format_display_number,
     _format_value,
     _history_year_columns,
@@ -82,7 +82,7 @@ class TestFormatValue:
     def test_numeric_value_path(self):
         entry = MagicMock()
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=500.0,
         ):
             result = _format_value(entry)
@@ -92,7 +92,7 @@ class TestFormatValue:
         entry = MagicMock()
         entry.total_value = "1234"
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             result = _format_value(entry)
@@ -102,7 +102,7 @@ class TestFormatValue:
         entry = MagicMock()
         entry.total_value = ""
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             result = _format_value(entry)
@@ -112,7 +112,7 @@ class TestFormatValue:
         entry = MagicMock()
         entry.total_value = None
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             result = _format_value(entry)
@@ -238,7 +238,7 @@ class TestTemplatesWithValidation:
         tpl.id = 1
         tpl.name = "FDRS"
         with patch(
-            "app.services.validation_dashboard_service.FormTemplate.query"
+            "app.services.validation.dashboard_service.FormTemplate.query"
         ) as mock_q:
             mock_q.join.return_value.filter.return_value.order_by.return_value.all.return_value = [tpl]
             result = _templates_with_validation()
@@ -251,10 +251,10 @@ class TestTemplateOptions:
         tpl.id = 21
         tpl.name = "FDRS"
         with patch(
-            "app.services.validation_dashboard_service._templates_with_validation",
+            "app.services.validation.dashboard_service._templates_with_validation",
             return_value=[tpl],
         ), patch(
-            "app.services.validation_dashboard_service.FormTemplate.query"
+            "app.services.validation.dashboard_service.FormTemplate.query"
         ) as mock_q:
             mock_q.filter.return_value.all.return_value = []
             result = template_options()
@@ -274,10 +274,10 @@ class TestTemplateOptions:
         planning.id = 24
         planning.name = "Unified Country Plan"
         with patch(
-            "app.services.validation_dashboard_service._templates_with_validation",
+            "app.services.validation.dashboard_service._templates_with_validation",
             return_value=[fdrs, legacy],
         ), patch(
-            "app.services.validation_dashboard_service.FormTemplate.query"
+            "app.services.validation.dashboard_service.FormTemplate.query"
         ) as mock_q:
             mock_q.filter.return_value.all.return_value = [reporting, planning]
             flat = template_options()
@@ -301,7 +301,7 @@ class TestTemplateOptions:
 class TestGlobalPeriodsForTemplate:
     def test_returns_sorted_periods(self):
         with patch(
-            "app.services.validation_dashboard_service.db"
+            "app.services.validation.dashboard_service.db"
         ) as mock_db:
             mock_db.session.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
                 ("FDRS 2023",), ("FDRS 2024",), ("FDRS 2022",)
@@ -312,7 +312,7 @@ class TestGlobalPeriodsForTemplate:
 
     def test_filters_none_periods(self):
         with patch(
-            "app.services.validation_dashboard_service.db"
+            "app.services.validation.dashboard_service.db"
         ) as mock_db:
             mock_db.session.query.return_value.filter.return_value.distinct.return_value.all.return_value = [
                 (None,), ("FDRS 2024",)
@@ -326,9 +326,9 @@ class TestGlobalPeriodsForTemplate:
 class TestListCountriesForPeriod:
     def test_returns_empty_when_no_resolved(self):
         with patch(
-            "app.services.validation_dashboard_service.db"
+            "app.services.validation.dashboard_service.db"
         ) as mock_db, patch(
-            "app.services.validation_dashboard_service.resolve_assignment_aes",
+            "app.services.validation.dashboard_service.resolve_assignment_aes",
             return_value=(None, None),
         ):
             mock_db.session.query.return_value.join.return_value.join.return_value.filter.return_value.distinct.return_value.all.return_value = [
@@ -343,9 +343,9 @@ class TestListCountriesForPeriod:
         aes.id = 10
 
         with patch(
-            "app.services.validation_dashboard_service.db"
+            "app.services.validation.dashboard_service.db"
         ) as mock_db, patch(
-            "app.services.validation_dashboard_service.resolve_assignment_aes",
+            "app.services.validation.dashboard_service.resolve_assignment_aes",
             return_value=(aes, "FDRS 2024"),
         ):
             counts_query = MagicMock()
@@ -388,7 +388,7 @@ class TestPersistedQuestionsMap:
         q2.asked_at.timestamp.return_value = 200
 
         with patch(
-            "app.services.validation_dashboard_service.ValidationQuestion.query"
+            "app.services.validation.dashboard_service.ValidationQuestion.query"
         ) as mock_q:
             mock_q.filter_by.return_value.all.return_value = [q1, q2]
             result = _persisted_questions_map(1, "country", 1, "2024")
@@ -428,7 +428,7 @@ class TestBuildIndicatorPreviewRows:
             ]
         )
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             rows = build_indicator_preview_rows(evaluation)
@@ -442,7 +442,7 @@ class TestBuildIndicatorPreviewRows:
             ]
         )
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             rows = build_indicator_preview_rows(evaluation)
@@ -454,7 +454,7 @@ class TestBuildIndicatorPreviewRows:
     def test_indicator_rows_include_history(self):
         evaluation = self._evaluation()
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             rows = build_indicator_preview_rows(evaluation)
@@ -475,7 +475,7 @@ class TestBuildIndicatorPreviewRows:
             history_by_kpi={},
         )
         with patch(
-            "app.services.validation_dashboard_service.numeric_value",
+            "app.services.validation.dashboard_service.numeric_value",
             return_value=None,
         ):
             rows = build_indicator_preview_rows(evaluation)
@@ -495,16 +495,16 @@ class TestPreviewCountryValidation:
         mock_evaluation.history_by_kpi = {}
 
         with patch(
-            "app.services.validation_dashboard_service.evaluate_validation_checks",
+            "app.services.validation.dashboard_service.evaluate_validation_checks",
             return_value=mock_evaluation,
         ), patch(
-            "app.services.validation_dashboard_service._persisted_questions_map",
+            "app.services.validation.dashboard_service._persisted_questions_map",
             return_value={},
         ), patch(
-            "app.services.validation_dashboard_service.build_indicator_preview_rows",
+            "app.services.validation.dashboard_service.build_indicator_preview_rows",
             return_value=[{"flagged": True, "severity": "error", "row_type": "indicator"}],
         ), patch(
-            "app.services.validation_dashboard_service.parse_period_year",
+            "app.services.validation.dashboard_service.parse_period_year",
             return_value=2024,
         ):
             result = preview_country_validation(21, "FDRS 2024", 1)
@@ -543,7 +543,7 @@ class TestSummarizePeriod:
             },
         ]
         with patch(
-            "app.services.validation_dashboard_service.list_countries_for_period",
+            "app.services.validation.dashboard_service.list_countries_for_period",
             return_value=countries,
         ):
             result = summarize_period(21, "2024")
@@ -567,8 +567,8 @@ class TestListCountriesForPeriodLineCoverage:
         aes = MagicMock()
         aes.id = 10
 
-        with patch("app.services.validation_dashboard_service.db") as mock_db, patch(
-            "app.services.validation_dashboard_service.resolve_assignment_aes",
+        with patch("app.services.validation.dashboard_service.db") as mock_db, patch(
+            "app.services.validation.dashboard_service.resolve_assignment_aes",
             return_value=(aes, "FDRS 2024"),
         ):
             countries_query = MagicMock()
@@ -597,8 +597,8 @@ class TestListCountriesForPeriodLineCoverage:
 
     def test_country_not_in_resolved_is_skipped(self):
         """line 145: continue fires when country_id is not in resolved_by_country."""
-        with patch("app.services.validation_dashboard_service.db") as mock_db, patch(
-            "app.services.validation_dashboard_service.resolve_assignment_aes",
+        with patch("app.services.validation.dashboard_service.db") as mock_db, patch(
+            "app.services.validation.dashboard_service.resolve_assignment_aes",
             return_value=(None, None),
         ):
             countries_query = MagicMock()
@@ -638,8 +638,8 @@ class TestListCountriesForPeriodLineCoverage:
                 return (aes, "FDRS 2024")
             return (None, None)
 
-        with patch("app.services.validation_dashboard_service.db") as mock_db, patch(
-            "app.services.validation_dashboard_service.resolve_assignment_aes",
+        with patch("app.services.validation.dashboard_service.db") as mock_db, patch(
+            "app.services.validation.dashboard_service.resolve_assignment_aes",
             side_effect=mock_resolve,
         ):
             countries_query = MagicMock()

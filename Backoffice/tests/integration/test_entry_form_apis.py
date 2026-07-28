@@ -761,7 +761,7 @@ class TestEntryFormFormsApiEntryBootstrap:
             db_session.commit()
 
             with patch(
-                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables"
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables"
             ) as mock_resolve:
                 resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")
 
@@ -915,10 +915,10 @@ class TestEntryFormFormsApiEntryBootstrap:
             }
 
             with patch(
-                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables",
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables",
                 return_value=assignment_level_resolved,
             ) as mock_resolve, patch(
-                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables_batch",
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables_batch",
                 return_value=batch_resolve_result,
             ) as mock_batch:
                 resp = client.get(f"/api/forms/assignment/{aes.id}/entry-bootstrap")

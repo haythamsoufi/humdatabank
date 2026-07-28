@@ -67,7 +67,7 @@ COPY . /app
 # code in the image, even when developers forget to commit updated .po files
 # before building — preventing newly-added strings from being incorrectly
 # marked as obsolete by sync_persistent_translations.py on next deploy.
-RUN python scripts/extract_update_translations.py --compile && \
+RUN python scripts/i18n/extract_update_translations.py --compile && \
     cp -a /app/translations /app/translations_base
 
 # Ensure static files are properly accessible

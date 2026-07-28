@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.validation_tracker_service import (
+from app.services.validation.tracker_service import (
     TRACKER_DOCUMENT_SPECS,
     TRACKER_SECTION_SPECS,
     _bulk_kpi_data_by_aes,
@@ -31,7 +31,7 @@ from app.services.validation_tracker_service import (
 class TestDocumentFieldMap:
     def test_returns_empty_lists_when_no_items(self):
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_q:
             mock_q.filter.return_value.all.return_value = []
             result = _document_field_map(21)
@@ -46,9 +46,9 @@ class TestDocumentFieldMap:
         item.label = "Annual Report"
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_q, patch(
-            "app.services.validation_tracker_service.fdrs_compliance_doc_label_matches",
+            "app.services.validation.tracker_service.fdrs_compliance_doc_label_matches",
             side_effect=lambda label, spec_label: label == spec_label,
         ):
             mock_q.filter.return_value.all.return_value = [item]
@@ -62,9 +62,9 @@ class TestDocumentFieldMap:
         item.label = "Something Else"
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_q, patch(
-            "app.services.validation_tracker_service.fdrs_compliance_doc_label_matches",
+            "app.services.validation.tracker_service.fdrs_compliance_doc_label_matches",
             return_value=False,
         ):
             mock_q.filter.return_value.all.return_value = [item]
@@ -79,9 +79,9 @@ class TestDocumentFieldMap:
         item.label = "   "
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_q, patch(
-            "app.services.validation_tracker_service.fdrs_compliance_doc_label_matches",
+            "app.services.validation.tracker_service.fdrs_compliance_doc_label_matches",
             return_value=False,
         ):
             mock_q.filter.return_value.all.return_value = [item]
@@ -115,9 +115,9 @@ class TestBulkKpiDataByAes:
         form_data.form_item_id = 10
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_fi, patch(
-            "app.services.validation_tracker_service.FormData.query"
+            "app.services.validation.tracker_service.FormData.query"
         ) as mock_fd:
             fi_chain = MagicMock()
             fi_chain.filter.return_value = fi_chain
@@ -146,9 +146,9 @@ class TestBulkKpiDataByAes:
         item.indicator_bank = bank
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_fi, patch(
-            "app.services.validation_tracker_service.FormData.query"
+            "app.services.validation.tracker_service.FormData.query"
         ) as mock_fd:
             fi_chain = MagicMock()
             fi_chain.filter.return_value = fi_chain
@@ -182,9 +182,9 @@ class TestBulkKpiDataByAes:
         item_no_match.indicator_bank = bank
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_fi, patch(
-            "app.services.validation_tracker_service.FormData.query"
+            "app.services.validation.tracker_service.FormData.query"
         ) as mock_fd:
             fi_chain = MagicMock()
             fi_chain.filter.return_value = fi_chain
@@ -209,9 +209,9 @@ class TestBulkKpiDataByAes:
         item.indicator_bank = None
 
         with patch(
-            "app.services.validation_tracker_service.FormItem.query"
+            "app.services.validation.tracker_service.FormItem.query"
         ) as mock_fi, patch(
-            "app.services.validation_tracker_service.FormData.query"
+            "app.services.validation.tracker_service.FormData.query"
         ) as mock_fd:
             fi_chain = MagicMock()
             fi_chain.filter.return_value = fi_chain
@@ -236,14 +236,14 @@ class TestBulkKpiDataByAes:
 
 
 class TestBuildTrackerDataNoAssignment:
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
-    @patch("app.services.validation_tracker_service.active_country_map_query")
-    @patch("app.services.validation_tracker_service.AssignedForm")
-    @patch("app.services.validation_tracker_service.AssignmentEntityStatus")
-    @patch("app.services.validation_tracker_service._bulk_kpi_data_by_aes")
-    @patch("app.services.validation_tracker_service._document_field_map")
-    @patch("app.services.validation_tracker_service.SubmittedDocument")
-    @patch("app.services.validation_tracker_service.resolve_assignment_aes")
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.active_country_map_query")
+    @patch("app.services.validation.tracker_service.AssignedForm")
+    @patch("app.services.validation.tracker_service.AssignmentEntityStatus")
+    @patch("app.services.validation.tracker_service._bulk_kpi_data_by_aes")
+    @patch("app.services.validation.tracker_service._document_field_map")
+    @patch("app.services.validation.tracker_service.SubmittedDocument")
+    @patch("app.services.validation.tracker_service.resolve_assignment_aes")
     def test_fallback_when_no_assignment(
         self,
         mock_resolve,
@@ -287,14 +287,14 @@ class TestBuildTrackerDataNoAssignment:
         assert len(payload["rows"]) == 1
         assert payload["rows"][0]["status"] == "pending"
 
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
-    @patch("app.services.validation_tracker_service.active_country_map_query")
-    @patch("app.services.validation_tracker_service.AssignedForm")
-    @patch("app.services.validation_tracker_service.AssignmentEntityStatus")
-    @patch("app.services.validation_tracker_service._bulk_kpi_data_by_aes")
-    @patch("app.services.validation_tracker_service._document_field_map")
-    @patch("app.services.validation_tracker_service.SubmittedDocument")
-    @patch("app.services.validation_tracker_service.resolve_assignment_aes")
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.active_country_map_query")
+    @patch("app.services.validation.tracker_service.AssignedForm")
+    @patch("app.services.validation.tracker_service.AssignmentEntityStatus")
+    @patch("app.services.validation.tracker_service._bulk_kpi_data_by_aes")
+    @patch("app.services.validation.tracker_service._document_field_map")
+    @patch("app.services.validation.tracker_service.SubmittedDocument")
+    @patch("app.services.validation.tracker_service.resolve_assignment_aes")
     def test_country_skipped_when_no_aes_resolved(
         self,
         mock_resolve,
@@ -338,13 +338,13 @@ class TestBuildTrackerDataNoAssignment:
 
 
 class TestBuildTrackerDataDocuments:
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
-    @patch("app.services.validation_tracker_service.active_country_map_query")
-    @patch("app.services.validation_tracker_service.AssignedForm")
-    @patch("app.services.validation_tracker_service.AssignmentEntityStatus")
-    @patch("app.services.validation_tracker_service._bulk_kpi_data_by_aes")
-    @patch("app.services.validation_tracker_service._document_field_map")
-    @patch("app.services.validation_tracker_service.SubmittedDocument")
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.active_country_map_query")
+    @patch("app.services.validation.tracker_service.AssignedForm")
+    @patch("app.services.validation.tracker_service.AssignmentEntityStatus")
+    @patch("app.services.validation.tracker_service._bulk_kpi_data_by_aes")
+    @patch("app.services.validation.tracker_service._document_field_map")
+    @patch("app.services.validation.tracker_service.SubmittedDocument")
     def test_docs_both_required_counted(
         self,
         mock_submitted_doc,
@@ -407,13 +407,13 @@ class TestBuildTrackerDataDocuments:
 
         assert payload["stats"]["documents_both_required_count"] == 1
 
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
-    @patch("app.services.validation_tracker_service.active_country_map_query")
-    @patch("app.services.validation_tracker_service.AssignedForm")
-    @patch("app.services.validation_tracker_service.AssignmentEntityStatus")
-    @patch("app.services.validation_tracker_service._bulk_kpi_data_by_aes")
-    @patch("app.services.validation_tracker_service._document_field_map")
-    @patch("app.services.validation_tracker_service.SubmittedDocument")
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.active_country_map_query")
+    @patch("app.services.validation.tracker_service.AssignedForm")
+    @patch("app.services.validation.tracker_service.AssignmentEntityStatus")
+    @patch("app.services.validation.tracker_service._bulk_kpi_data_by_aes")
+    @patch("app.services.validation.tracker_service._document_field_map")
+    @patch("app.services.validation.tracker_service.SubmittedDocument")
     def test_kpi_data_fallback_to_load_form_data(
         self,
         mock_submitted_doc,
@@ -458,7 +458,7 @@ class TestBuildTrackerDataDocuments:
         mock_submitted_doc.query.filter.return_value.all.return_value = []
 
         with patch(
-            "app.services.validation_tracker_service.load_form_data_by_kpi",
+            "app.services.validation.tracker_service.load_form_data_by_kpi",
             return_value={},
         ) as mock_load:
             payload = build_tracker_data(21, "2024")
@@ -472,13 +472,13 @@ class TestBuildTrackerDataDocuments:
 
 
 class TestBuildTrackerDataDelegationReview:
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
-    @patch("app.services.validation_tracker_service.active_country_map_query")
-    @patch("app.services.validation_tracker_service.AssignedForm")
-    @patch("app.services.validation_tracker_service.AssignmentEntityStatus")
-    @patch("app.services.validation_tracker_service._bulk_kpi_data_by_aes")
-    @patch("app.services.validation_tracker_service._document_field_map")
-    @patch("app.services.validation_tracker_service.SubmittedDocument")
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.active_country_map_query")
+    @patch("app.services.validation.tracker_service.AssignedForm")
+    @patch("app.services.validation.tracker_service.AssignmentEntityStatus")
+    @patch("app.services.validation.tracker_service._bulk_kpi_data_by_aes")
+    @patch("app.services.validation.tracker_service._document_field_map")
+    @patch("app.services.validation.tracker_service.SubmittedDocument")
     def test_submitted_count_includes_sent_for_review_when_delegation_enabled(
         self,
         mock_submitted_doc,
@@ -535,7 +535,7 @@ class TestBuildTrackerDataDelegationReview:
 class TestTrackerPeriodsForTemplate:
     def test_delegates_to_global_periods_for_template(self):
         with patch(
-            "app.services.validation_tracker_service.global_periods_for_template",
+            "app.services.validation.tracker_service.global_periods_for_template",
             return_value=["2024", "2023"],
         ) as mock_gp:
             result = tracker_periods_for_template(21)
@@ -549,7 +549,7 @@ class TestTrackerPeriodsForTemplate:
 
 
 class TestReportingSectionRatiosExtended:
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.5)
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.5)
     def test_finance_ratio_with_income_and_expenditure(self, _mock_income_ratio):
         from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
 
@@ -562,10 +562,10 @@ class TestReportingSectionRatiosExtended:
         }
 
         with patch(
-            "app.services.validation_tracker_service.is_reported_value",
+            "app.services.validation.tracker_service.is_reported_value",
             return_value=True,
         ), patch(
-            "app.services.validation_tracker_service.numeric_value",
+            "app.services.validation.tracker_service.numeric_value",
             return_value=100_000.0,
         ):
             ratios = _reporting_section_ratios(
@@ -574,17 +574,17 @@ class TestReportingSectionRatiosExtended:
 
         assert ratios["finance"] > 0
 
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
     def test_reach_ratio_with_all_reported(self, _mock_income_ratio):
         from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
 
         kpi_data = {code: (MagicMock(), MagicMock()) for code in cat.REACH_KPI_CODES}
 
         with patch(
-            "app.services.validation_tracker_service.is_reported_value",
+            "app.services.validation.tracker_service.is_reported_value",
             return_value=True,
         ), patch(
-            "app.services.validation_tracker_service.numeric_value",
+            "app.services.validation.tracker_service.numeric_value",
             return_value=None,
         ):
             ratios = _reporting_section_ratios(
@@ -593,17 +593,17 @@ class TestReportingSectionRatiosExtended:
 
         assert ratios["reach"] == 1.0
 
-    @patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
+    @patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
     def test_governance_ratio_with_all_reported(self, _mock_income_ratio):
         from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
 
         kpi_data = {code: (MagicMock(), MagicMock()) for code in cat.GOVERNANCE_KPI_CODES}
 
         with patch(
-            "app.services.validation_tracker_service.is_reported_value",
+            "app.services.validation.tracker_service.is_reported_value",
             return_value=True,
         ), patch(
-            "app.services.validation_tracker_service.numeric_value",
+            "app.services.validation.tracker_service.numeric_value",
             return_value=None,
         ):
             ratios = _reporting_section_ratios(
@@ -681,22 +681,22 @@ class TestBuildTrackerDataCompleteSections:
         country.name = "Testland"
 
         with patch(
-            "app.services.validation_tracker_service.AssignedForm.query"
+            "app.services.validation.tracker_service.AssignedForm.query"
         ) as mock_af_q, patch(
-            "app.services.validation_tracker_service.active_country_map_query"
+            "app.services.validation.tracker_service.active_country_map_query"
         ) as mock_country_q, patch(
-            "app.services.validation_tracker_service._document_field_map",
+            "app.services.validation.tracker_service._document_field_map",
             return_value={spec["key"]: [] for spec in TRACKER_DOCUMENT_SPECS},
         ), patch(
-            "app.services.validation_tracker_service._bulk_kpi_data_by_aes",
+            "app.services.validation.tracker_service._bulk_kpi_data_by_aes",
             return_value={100: {}},  # aes.id=100, return empty KPI data so no DB hit
         ), patch(
-            "app.services.validation_tracker_service._reporting_section_ratios",
+            "app.services.validation.tracker_service._reporting_section_ratios",
             return_value={"section_a": 1.0},  # ratio=1.0 → 'complete'
         ), patch(
-            "app.services.validation_tracker_service.AssignmentEntityStatus.query"
+            "app.services.validation.tracker_service.AssignmentEntityStatus.query"
         ) as mock_aes_q, patch(
-            "app.services.validation_tracker_service.SubmittedDocument.query"
+            "app.services.validation.tracker_service.SubmittedDocument.query"
         ) as mock_sd_q:
             mock_af_q.filter.return_value.first.return_value = assignment
             mock_country_q.return_value.options.return_value.all.return_value = [country]

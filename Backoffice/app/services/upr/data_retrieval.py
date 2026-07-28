@@ -36,7 +36,7 @@ def _effective_user_role_and_id() -> Dict[str, Any]:
     user_role = None
     user_id = None
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if getattr(current_user, "is_authenticated", False):
             user_role = AuthorizationService.access_level(current_user)
             user_id = int(getattr(current_user, "id", 0) or 0) or None
@@ -67,7 +67,7 @@ def _dialect_name() -> str:
 
 
 def _user_allowed_country_ids():
-    from app.services.data_retrieval_shared import user_allowed_country_ids
+    from app.services.data_retrieval.shared import user_allowed_country_ids
     return user_allowed_country_ids()
 
 
@@ -102,7 +102,7 @@ def get_upr_kpi_value(
         if metric_norm not in _VALID_METRICS:
             return service_error(f"Unsupported metric: {metric}", metric=metric)
 
-        from app.services.data_retrieval_country import resolve_country
+        from app.services.data_retrieval.country import resolve_country
         country = resolve_country(country_identifier)
         if not country or not getattr(country, "id", None):
             return service_error(f"Country not found: {country_identifier}")
@@ -293,7 +293,7 @@ def get_upr_kpi_timeseries(
             "staff": "Number of staff",
         }
 
-        from app.services.data_retrieval_country import resolve_country
+        from app.services.data_retrieval.country import resolve_country
         country = resolve_country(country_identifier)
         if not country or not getattr(country, "id", None):
             return service_error(f"Country not found: {country_identifier}", series=[])

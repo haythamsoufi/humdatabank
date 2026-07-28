@@ -13,7 +13,7 @@ from flask import Blueprint, abort, make_response, render_template, send_from_di
 from flask_babel import _
 from flask_login import current_user, login_required
 
-from app.services import documentation_service as docs
+from app.services.documentation import service as docs
 
 
 bp = Blueprint("help_docs", __name__, url_prefix="/help/docs")
@@ -59,7 +59,7 @@ def export_pdf_index():
     root = docs.docs_root()
     if not root.exists():
         abort(404)
-    from app.services.documentation_pdf_service import send_doc_pdf
+    from app.services.documentation.pdf_service import send_doc_pdf
 
     return send_doc_pdf(
         root=root,
@@ -85,7 +85,7 @@ def export_pdf_doc(doc_path: str):
     if requested.lower().endswith(".md") or requested.lower() in ("readme", "readme.md"):
         abort(404)
 
-    from app.services.documentation_pdf_service import send_doc_pdf
+    from app.services.documentation.pdf_service import send_doc_pdf
 
     return send_doc_pdf(
         root=root,

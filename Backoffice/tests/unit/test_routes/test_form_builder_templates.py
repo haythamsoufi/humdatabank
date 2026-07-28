@@ -470,7 +470,7 @@ class TestGetTemplateDeleteInfo:
         from tests.factories import create_test_template
         template = create_test_template(db_session, name='Not Mine')
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=False,
         ):
             resp = logged_in_client.get(f'/admin/templates/{template.id}/delete-info')

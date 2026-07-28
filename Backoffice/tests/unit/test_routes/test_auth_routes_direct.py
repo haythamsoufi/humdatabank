@@ -193,7 +193,7 @@ class TestAccountSettingsRouteDirect:
                  patch('app.forms.auth_forms.RequestCountryAccessForm'), \
                  patch('app.routes.auth.render_template', return_value=_mock_html_response()) as mock_render, \
                  patch('app.routes.auth.user_has_ai_beta_access', return_value=False), \
-                 patch('app.services.notification_service.NotificationService.get_notification_preferences', return_value={}), \
+                 patch('app.services.notification.service.NotificationService.get_notification_preferences', return_value={}), \
                  patch('app.routes.notifications.get_notification_types_for_user', return_value={'for_user': []}), \
                  patch('app.routes.notifications.get_notification_type_labels', return_value={}):
                 _, status = _view_result(account_settings())

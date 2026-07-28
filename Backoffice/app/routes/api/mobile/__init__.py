@@ -28,7 +28,7 @@ def _parse_version(version_str):
 @mobile_bp.before_request
 def _check_minimum_app_version():
     try:
-        from app.services.app_settings_service import get_mobile_min_app_version
+        from app.services.platform.app_settings_service import get_mobile_min_app_version
 
         min_version = get_mobile_min_app_version()
     except Exception:

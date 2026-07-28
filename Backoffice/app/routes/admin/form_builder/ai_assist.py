@@ -26,7 +26,7 @@ from . import bp
 def _ai_beta_denied_response():
     """Return a JSON denial when AI beta access blocks this user."""
     try:
-        from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+        from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
 
         if not is_ai_beta_restricted():
             return None
@@ -280,7 +280,7 @@ def ai_restore_structure(template_id):
     if denied is not None:
         return denied
 
-    from app.services.form_template_ai_service import FormTemplateAIError, FormTemplateAIService
+    from app.services.forms.template_ai_service import FormTemplateAIError, FormTemplateAIService
 
     payload = request.get_json(silent=True) or {}
     structure = payload.get("structure")

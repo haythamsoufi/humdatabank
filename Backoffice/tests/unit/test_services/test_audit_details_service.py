@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.audit_details_service import (
+from app.services.audit.details_service import (
     _MAX_ENTITY_ACCESS_LINES,
     _MAX_PERMISSION_LINES,
     _audit_detail_cell_value,
@@ -558,7 +558,7 @@ class TestFormatUserUpdateAuditDetails:
         with app.app_context():
             # Create fake role ids and mock the internal lookup to return many perms
             with patch(
-                "app.services.audit_details_service._permissions_for_role_ids"
+                "app.services.audit.details_service._permissions_for_role_ids"
             ) as mock_perms:
                 mock_perms.return_value = [f"perm_{i}" for i in range(200)]
                 result = format_user_update_audit_details(
@@ -573,7 +573,7 @@ class TestFormatUserUpdateAuditDetails:
     def test_entity_lines_included(self, app):
         with app.app_context():
             with patch(
-                "app.services.audit_details_service._format_entity_permission_entries"
+                "app.services.audit.details_service._format_entity_permission_entries"
             ) as mock_ep:
                 mock_ep.return_value = ["ns_branch: Algeria"]
                 result = format_user_update_audit_details(
@@ -650,7 +650,7 @@ class TestFormatEntityPermissionEntries:
 
     def test_valid_entry_with_mocked_service(self, app):
         with app.app_context():
-            with patch("app.services.entity_service.EntityService") as MockES:
+            with patch("app.services.organization.entity_service.EntityService") as MockES:
                 MockES.get_entity_display_name.return_value = "Algeria"
                 MockES.get_entity_type_label.return_value = "National Society"
                 result = _format_entity_permission_entries(["ns_branch:1"])
@@ -658,14 +658,14 @@ class TestFormatEntityPermissionEntries:
 
     def test_service_exception_falls_back_to_raw(self, app):
         with app.app_context():
-            with patch("app.services.entity_service.EntityService") as MockES:
+            with patch("app.services.organization.entity_service.EntityService") as MockES:
                 MockES.get_entity_display_name.side_effect = Exception("boom")
                 result = _format_entity_permission_entries(["ns_branch:1"])
                 assert "ns_branch:1" in result[0]
 
     def test_truncation_at_max_lines(self, app):
         with app.app_context():
-            with patch("app.services.entity_service.EntityService") as MockES:
+            with patch("app.services.organization.entity_service.EntityService") as MockES:
                 MockES.get_entity_display_name.return_value = "Entity"
                 MockES.get_entity_type_label.return_value = "Type"
                 entries = [f"ns_branch:{i}" for i in range(_MAX_ENTITY_ACCESS_LINES + 10)]
@@ -675,7 +675,7 @@ class TestFormatEntityPermissionEntries:
 
     def test_label_with_no_display_name_uses_raw(self, app):
         with app.app_context():
-            with patch("app.services.entity_service.EntityService") as MockES:
+            with patch("app.services.organization.entity_service.EntityService") as MockES:
                 MockES.get_entity_display_name.return_value = None
                 MockES.get_entity_type_label.return_value = "Type"
                 result = _format_entity_permission_entries(["ns_branch:42"])
@@ -688,25 +688,25 @@ class TestFormatEntityPermissionEntries:
 class TestCountryNamesWithMocking:
     def test_empty_list_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _country_names
+            from app.services.audit.details_service import _country_names
 
             assert _country_names([]) == []
 
     def test_none_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _country_names
+            from app.services.audit.details_service import _country_names
 
             assert _country_names(None) == []
 
     def test_all_none_ids_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _country_names
+            from app.services.audit.details_service import _country_names
 
             assert _country_names([None, None]) == []
 
     def test_missing_id_shows_hash_fallback(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _country_names
+            from app.services.audit.details_service import _country_names
 
             with patch("app.models.Country") as MockCountry:
                 MockCountry.query.filter.return_value.all.return_value = []
@@ -715,7 +715,7 @@ class TestCountryNamesWithMocking:
 
     def test_found_country_returns_name(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _country_names
+            from app.services.audit.details_service import _country_names
 
             mock_country = MagicMock()
             mock_country.id = 1
@@ -727,7 +727,7 @@ class TestCountryNamesWithMocking:
 
     def test_exception_falls_back_to_str(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _country_names
+            from app.services.audit.details_service import _country_names
 
             with patch("app.models.Country") as MockCountry:
                 MockCountry.query.filter.side_effect = Exception("db error")
@@ -738,25 +738,25 @@ class TestCountryNamesWithMocking:
 class TestRoleLabelsWithMocking:
     def test_empty_list_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             assert _role_labels([]) == []
 
     def test_none_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             assert _role_labels(None) == []
 
     def test_all_none_ids_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             assert _role_labels([None]) == []
 
     def test_found_role_returns_name(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             mock_role = MagicMock()
             mock_role.id = 5
@@ -769,7 +769,7 @@ class TestRoleLabelsWithMocking:
 
     def test_role_with_no_name_uses_code(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             mock_role = MagicMock()
             mock_role.id = 5
@@ -782,7 +782,7 @@ class TestRoleLabelsWithMocking:
 
     def test_role_with_neither_name_nor_code_uses_hash(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             mock_role = MagicMock()
             mock_role.id = 7
@@ -795,7 +795,7 @@ class TestRoleLabelsWithMocking:
 
     def test_missing_role_shows_hash_fallback(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             with patch("app.models.rbac.RbacRole") as MockRole:
                 MockRole.query.filter.return_value.all.return_value = []
@@ -804,7 +804,7 @@ class TestRoleLabelsWithMocking:
 
     def test_exception_falls_back_to_str(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _role_labels
+            from app.services.audit.details_service import _role_labels
 
             with patch("app.models.rbac.RbacRole") as MockRole:
                 MockRole.query.filter.side_effect = Exception("db error")
@@ -815,19 +815,19 @@ class TestRoleLabelsWithMocking:
 class TestPermissionsForRoleIdsWithMocking:
     def test_empty_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _permissions_for_role_ids
+            from app.services.audit.details_service import _permissions_for_role_ids
 
             assert _permissions_for_role_ids([]) == []
 
     def test_none_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _permissions_for_role_ids
+            from app.services.audit.details_service import _permissions_for_role_ids
 
             assert _permissions_for_role_ids(None) == []
 
     def test_returns_sorted_permission_labels(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _permissions_for_role_ids
+            from app.services.audit.details_service import _permissions_for_role_ids
 
             mock_perm1 = MagicMock()
             mock_perm1.name = "Write"
@@ -845,13 +845,13 @@ class TestPermissionsForRoleIdsWithMocking:
 
     def test_all_none_ids_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _permissions_for_role_ids
+            from app.services.audit.details_service import _permissions_for_role_ids
 
             assert _permissions_for_role_ids([None]) == []
 
     def test_exception_returns_empty(self, app):
         with app.app_context():
-            from app.services.audit_details_service import _permissions_for_role_ids
+            from app.services.audit.details_service import _permissions_for_role_ids
 
             with patch("app.models.rbac.RbacRole", side_effect=Exception):
                 result = _permissions_for_role_ids([1])

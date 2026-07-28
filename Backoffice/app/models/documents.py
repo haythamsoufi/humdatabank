@@ -101,7 +101,7 @@ class SubmittedDocument(db.Model):
         if self.country:
             return self.country
         if self.linked_entity_type and self.linked_entity_id:
-            from app.services.entity_service import EntityService
+            from app.services.organization.entity_service import EntityService
             return EntityService.get_country_for_entity(
                 self.linked_entity_type, self.linked_entity_id
             )
@@ -113,7 +113,7 @@ class SubmittedDocument(db.Model):
         if self.assignment_entity_status_id or self.public_submission_id:
             return None
         if self.linked_entity_type and self.linked_entity_id:
-            from app.services.entity_service import EntityService
+            from app.services.organization.entity_service import EntityService
             return EntityService.get_entity_display_name(
                 self.linked_entity_type, self.linked_entity_id
             )

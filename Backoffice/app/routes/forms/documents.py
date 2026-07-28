@@ -5,7 +5,7 @@ from flask import abort, current_app, flash, redirect, request, url_for
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
 
-from app.services.document_service import DocumentService
+from app.services.documents.service import DocumentService
 from app.utils.redirect_utils import is_safe_redirect_url
 
 

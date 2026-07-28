@@ -38,7 +38,7 @@ def _make_excel_bytes(headers, data_rows):
 
 class TestS:
     def _call(self, val):
-        from app.services.kobo_data_import_service import _s
+        from app.services.imports.kobo_data_import_service import _s
         return _s(val)
 
     def test_none_returns_empty(self):
@@ -57,7 +57,7 @@ class TestS:
 
 class TestIsDate:
     def _call(self, v):
-        from app.services.kobo_data_import_service import _is_date
+        from app.services.imports.kobo_data_import_service import _is_date
         return _is_date(v)
 
     def test_datetime(self):
@@ -79,7 +79,7 @@ class TestIsDate:
 
 class TestIsNumeric:
     def _call(self, v):
-        from app.services.kobo_data_import_service import _is_numeric
+        from app.services.imports.kobo_data_import_service import _is_numeric
         return _is_numeric(v)
 
     def test_int(self):
@@ -110,7 +110,7 @@ class TestIsNumeric:
 
 class TestClassifyHeader:
     def _call(self, header):
-        from app.services.kobo_data_import_service import _classify_header
+        from app.services.imports.kobo_data_import_service import _classify_header
         return _classify_header(header)
 
     def test_empty_header(self):
@@ -172,7 +172,7 @@ class TestClassifyHeader:
 
 class TestDetectDisagg:
     def _call(self, header):
-        from app.services.kobo_data_import_service import _detect_disagg
+        from app.services.imports.kobo_data_import_service import _detect_disagg
         return _detect_disagg(header)
 
     def test_no_disagg_flat_header(self):
@@ -201,7 +201,7 @@ class TestDetectDisagg:
 
 class TestDetectDataType:
     def _call(self, values):
-        from app.services.kobo_data_import_service import _detect_data_type
+        from app.services.imports.kobo_data_import_service import _detect_data_type
         return _detect_data_type(values)
 
     def test_empty_values(self):
@@ -246,7 +246,7 @@ class TestDetectDataType:
 
 class TestExtractGroupAndLabel:
     def _call(self, header):
-        from app.services.kobo_data_import_service import _extract_group_and_label
+        from app.services.imports.kobo_data_import_service import _extract_group_and_label
         return _extract_group_and_label(header)
 
     def test_no_slash(self):
@@ -271,7 +271,7 @@ class TestExtractGroupAndLabel:
 
 class TestFindValidationStatusColumn:
     def _call(self, headers):
-        from app.services.kobo_data_import_service import _find_validation_status_column
+        from app.services.imports.kobo_data_import_service import _find_validation_status_column
         return _find_validation_status_column(headers)
 
     def test_exact_match(self):
@@ -300,7 +300,7 @@ class TestFindValidationStatusColumn:
 
 class TestHasKoboStructuralMarkers:
     def _call(self, headers):
-        from app.services.kobo_data_import_service import _has_kobo_structural_markers
+        from app.services.imports.kobo_data_import_service import _has_kobo_structural_markers
         return _has_kobo_structural_markers(headers)
 
     def test_underscore_id_gives_meta(self):
@@ -350,7 +350,7 @@ class TestHasKoboStructuralMarkers:
 
 class TestKoboValidationBucket:
     def _call(self, val):
-        from app.services.kobo_data_import_service import _kobo_validation_bucket
+        from app.services.imports.kobo_data_import_service import _kobo_validation_bucket
         return _kobo_validation_bucket(val)
 
     def test_empty(self):
@@ -394,7 +394,7 @@ class TestKoboValidationBucket:
 
 class TestIsKoboSubmissionApproved:
     def _call(self, val):
-        from app.services.kobo_data_import_service import _is_kobo_submission_approved
+        from app.services.imports.kobo_data_import_service import _is_kobo_submission_approved
         return _is_kobo_submission_approved(val)
 
     def test_approved(self):
@@ -411,7 +411,7 @@ class TestIsKoboSubmissionApproved:
 
 class TestRowMatchesSubmissionFilter:
     def _call(self, cell_val, sf):
-        from app.services.kobo_data_import_service import _row_matches_submission_filter
+        from app.services.imports.kobo_data_import_service import _row_matches_submission_filter
         return _row_matches_submission_filter(cell_val, sf)
 
     def test_all_filter_always_true(self):
@@ -455,7 +455,7 @@ class TestRowMatchesSubmissionFilter:
 
 class TestEligibleRowIndices:
     def _call(self, data_rows, submission_filter="all", validation_col=None):
-        from app.services.kobo_data_import_service import _eligible_row_indices
+        from app.services.imports.kobo_data_import_service import _eligible_row_indices
         return _eligible_row_indices(data_rows, submission_filter=submission_filter, validation_col=validation_col)
 
     def test_all_filter(self):
@@ -485,7 +485,7 @@ class TestEligibleRowIndices:
 
 class TestPickDuplicateWinner:
     def _call(self, indices, data_rows, sub_time_col=None, duplicate_strategy="latest", validation_col=None):
-        from app.services.kobo_data_import_service import _pick_duplicate_winner
+        from app.services.imports.kobo_data_import_service import _pick_duplicate_winner
         return _pick_duplicate_winner(
             indices,
             data_rows=data_rows,
@@ -562,7 +562,7 @@ class TestPickDuplicateWinner:
 
 class TestResolveImportRowIndices:
     def _call(self, data_rows, headers, entity_col=0, duplicate_strategy="latest", submission_filter="all", sub_time_col=None, val_col=None):
-        from app.services.kobo_data_import_service import _resolve_import_row_indices
+        from app.services.imports.kobo_data_import_service import _resolve_import_row_indices
         return _resolve_import_row_indices(
             data_rows, headers,
             entity_column_index=entity_col,
@@ -626,7 +626,7 @@ class TestResolveImportRowIndices:
 
 class TestSlugifySexCategory:
     def _call(self, s):
-        from app.services.kobo_data_import_service import _slugify_sex_category
+        from app.services.imports.kobo_data_import_service import _slugify_sex_category
         return _slugify_sex_category(s)
 
     def test_basic(self):
@@ -646,7 +646,7 @@ class TestSlugifySexCategory:
 
 class TestNormalizeColumnToItemMapping:
     def _call(self, raw):
-        from app.services.kobo_data_import_service import _normalize_column_to_item_mapping
+        from app.services.imports.kobo_data_import_service import _normalize_column_to_item_mapping
         return _normalize_column_to_item_mapping(raw)
 
     def test_empty(self):
@@ -681,7 +681,7 @@ class TestNormalizeColumnToItemMapping:
 
 class TestMatchEntityToCountry:
     def _call(self, entity_name, countries_by_name=None, ns_by_name=None):
-        from app.services.kobo_data_import_service import _match_entity_to_country
+        from app.services.imports.kobo_data_import_service import _match_entity_to_country
         if countries_by_name is None:
             countries_by_name = {}
         if ns_by_name is None:
@@ -722,7 +722,7 @@ class TestMatchEntityToCountry:
 class TestKoboDataImportServiceValidateDataExport:
     def test_valid_data_export(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             # Include KoBo system columns so the structural check passes
             file_bytes = _make_excel_bytes(
                 headers=["start", "end", "National Society", "Q1 Value", "_id"],
@@ -735,7 +735,7 @@ class TestKoboDataImportServiceValidateDataExport:
 
     def test_empty_workbook_invalid(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             wb = openpyxl.Workbook()
             buf = io.BytesIO()
             wb.save(buf)
@@ -744,7 +744,7 @@ class TestKoboDataImportServiceValidateDataExport:
 
     def test_headers_only_invalid(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(headers=["National Society"], data_rows=[])
             result = KoboDataImportService.validate_data_export(file_bytes)
             assert result['valid'] is False
@@ -752,7 +752,7 @@ class TestKoboDataImportServiceValidateDataExport:
 
     def test_xlsform_rejected(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             wb = openpyxl.Workbook()
             wb.active.title = 'survey'
             wb.active.append(['type', 'name', 'label'])
@@ -766,7 +766,7 @@ class TestKoboDataImportServiceValidateDataExport:
     def test_plain_spreadsheet_no_markers_rejected(self, app):
         """A random spreadsheet with no KoBo markers must be rejected."""
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["Name", "Department", "Score", "Notes"],
                 data_rows=[
@@ -781,7 +781,7 @@ class TestKoboDataImportServiceValidateDataExport:
     def test_underscore_meta_column_passes(self, app):
         """A file with _uuid (even no group headers) is accepted."""
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["_uuid", "National Society", "Q1"],
                 data_rows=[["uuid-1", "Kenya", 100]],
@@ -792,7 +792,7 @@ class TestKoboDataImportServiceValidateDataExport:
     def test_group_path_headers_pass(self, app):
         """A file with Group/Question path headers (no system cols) is accepted."""
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "section1/q1", "section1/q2", "section2/q3"],
                 data_rows=[
@@ -806,7 +806,7 @@ class TestKoboDataImportServiceValidateDataExport:
     def test_system_exact_columns_pass(self, app):
         """start / end / today column is enough to pass the structural check."""
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["start", "end", "today", "National Society", "Q1"],
                 data_rows=[
@@ -824,7 +824,7 @@ class TestKoboDataImportServiceValidateDataExport:
 class TestKoboDataImportServiceAnalyze:
     def test_empty_file(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             wb = openpyxl.Workbook()
             ws = wb.active
             # Only headers, no data rows
@@ -837,7 +837,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_no_header_row(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             wb = openpyxl.Workbook()
             buf = io.BytesIO()
             wb.save(buf)
@@ -846,7 +846,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_basic_analysis(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             # _uuid column acts as the KoBo structural marker
             file_bytes = _make_excel_bytes(
                 headers=["_uuid", "National Society", "Q1 Value", "Q2 Text"],
@@ -863,7 +863,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_entity_candidates_detected(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             # _uuid + start/end give the required KoBo structural markers
             ns_values = [f"NS_{i}" for i in range(10)]
             headers = ["start", "end", "_uuid", "National Society"] + [f"Q{i}" for i in range(5)]
@@ -878,7 +878,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_system_columns_skipped(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["start", "end", "National Society", "Q1"],
                 data_rows=[
@@ -895,7 +895,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_grouped_columns(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "demographics/age", "demographics/gender"],
                 data_rows=[
@@ -910,14 +910,14 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_invalid_file(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             result = KoboDataImportService.analyze(b"not an excel file")
             assert result['success'] is False
 
     def test_plain_spreadsheet_no_markers_rejected(self, app):
         """analyze() also rejects files with no KoBo structural markers."""
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["Name", "Department", "Score"],
                 data_rows=[
@@ -932,7 +932,7 @@ class TestKoboDataImportServiceAnalyze:
     def test_analyze_returns_marker_flags(self, app):
         """Successful analyze() includes has_kobo_meta / has_group_headers flags."""
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["_uuid", "NS", "section/q1"],
                 data_rows=[["uuid-1", "Kenya", "Answer"]],
@@ -944,11 +944,11 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_openpyxl_none_returns_error(self, app):
         with app.app_context():
-            import app.services.kobo_data_import_service as module
+            import app.services.imports.kobo_data_import_service as module
             original = module.openpyxl
             module.openpyxl = None
             try:
-                from app.services.kobo_data_import_service import KoboDataImportService
+                from app.services.imports.kobo_data_import_service import KoboDataImportService
                 result = KoboDataImportService.analyze(b"anything")
                 assert result['success'] is False
             finally:
@@ -956,7 +956,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_validation_status_detected(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "Q1", "_validation_status"],
                 data_rows=[
@@ -970,7 +970,7 @@ class TestKoboDataImportServiceAnalyze:
 
     def test_calculated_columns_skipped(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["_uuid", "NS", "total_beneficiaries", "Q1"],
                 data_rows=[
@@ -991,7 +991,7 @@ class TestKoboDataImportServiceAnalyze:
 class TestExtractUniqueEntities:
     def test_basic_entities(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "Q1"],
                 data_rows=[
@@ -1007,7 +1007,7 @@ class TestExtractUniqueEntities:
 
     def test_respects_submission_filter(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "_validation_status"],
                 data_rows=[
@@ -1025,11 +1025,11 @@ class TestExtractUniqueEntities:
 
     def test_openpyxl_none_returns_empty(self, app):
         with app.app_context():
-            import app.services.kobo_data_import_service as module
+            import app.services.imports.kobo_data_import_service as module
             original = module.openpyxl
             module.openpyxl = None
             try:
-                from app.services.kobo_data_import_service import KoboDataImportService
+                from app.services.imports.kobo_data_import_service import KoboDataImportService
                 result = KoboDataImportService.extract_unique_entities(b"anything", 0)
                 assert result == []
             finally:
@@ -1037,7 +1037,7 @@ class TestExtractUniqueEntities:
 
     def test_invalid_col_index_returns_empty(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS"],
                 data_rows=[["Kenya"], ["Uganda"]],
@@ -1048,7 +1048,7 @@ class TestExtractUniqueEntities:
 
     def test_skips_null_entity_values(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "Q1"],
                 data_rows=[
@@ -1063,7 +1063,7 @@ class TestExtractUniqueEntities:
 
     def test_filter_no_validation_col(self, app):
         with app.app_context():
-            from app.services.kobo_data_import_service import KoboDataImportService
+            from app.services.imports.kobo_data_import_service import KoboDataImportService
             file_bytes = _make_excel_bytes(
                 headers=["NS", "Q1"],
                 data_rows=[["Kenya", 100], ["Uganda", 200]],
@@ -1082,7 +1082,7 @@ class TestExtractUniqueEntities:
 
 class TestSubTimeSortValue:
     def _call(self, data_rows, ri, sub_time_col):
-        from app.services.kobo_data_import_service import _sub_time_sort_value
+        from app.services.imports.kobo_data_import_service import _sub_time_sort_value
         return _sub_time_sort_value(data_rows, ri, sub_time_col)
 
     def test_none_col_returns_datetime_min(self):
@@ -1109,7 +1109,7 @@ class TestSubTimeSortValue:
 
 class TestKoboValidationBucketEdgeCases:
     def _call(self, val):
-        from app.services.kobo_data_import_service import _kobo_validation_bucket
+        from app.services.imports.kobo_data_import_service import _kobo_validation_bucket
         return _kobo_validation_bucket(val)
 
     def test_flagged_for_removal_is_always_rejected(self):

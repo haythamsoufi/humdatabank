@@ -196,7 +196,7 @@ class TestDeletePublicSubmission:
 
         with patch("app.routes.forms.submission.PublicSubmission.query") as mock_q, \
              patch("app.routes.forms.submission.db") as mock_db, \
-             patch("app.services.storage_service") as mock_ss:
+             patch("app.services.platform.storage_service") as mock_ss:
             mock_sub = _make_mock_submission(1)
             mock_sub.submitted_documents = []
             mock_q.get_or_404.return_value = mock_sub
@@ -217,8 +217,8 @@ class TestDeletePublicSubmission:
             mock_sub.submitted_documents = [doc]
             mock_q.get_or_404.return_value = mock_sub
 
-            with patch("app.services.storage_service.delete") as mock_delete, \
-                 patch("app.services.storage_service.submitted_document_rel_storage_category", return_value="docs"):
+            with patch("app.services.platform.storage_service.delete") as mock_delete, \
+                 patch("app.services.platform.storage_service.submitted_document_rel_storage_category", return_value="docs"):
                 resp = client.post("/forms/public-submission/1/delete")
 
         assert resp.status_code == 302
@@ -235,7 +235,7 @@ class TestDeletePublicSubmission:
             mock_sub.submitted_documents = [doc]
             mock_q.get_or_404.return_value = mock_sub
 
-            with patch("app.services.storage_service") as mock_ss:
+            with patch("app.services.platform.storage_service") as mock_ss:
                 mock_ss.delete.side_effect = Exception("storage error")
                 mock_ss.submitted_document_rel_storage_category.return_value = "docs"
 

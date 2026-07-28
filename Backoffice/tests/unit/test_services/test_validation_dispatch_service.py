@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from app.services.validation_dispatch_service import (
+from app.services.validation.dispatch_service import (
     DispatchPreview,
     _questions_query,
     build_validation_email_html,
@@ -21,7 +21,7 @@ from app.services.validation_dispatch_service import (
 class TestQuestionsQuery:
     def test_filters_by_template_and_period(self):
         with patch(
-            "app.services.validation_dispatch_service.ValidationQuestion.query"
+            "app.services.validation.dispatch_service.ValidationQuestion.query"
         ) as mock_q:
             chain = MagicMock()
             mock_q.filter_by.return_value = chain
@@ -38,7 +38,7 @@ class TestQuestionsQuery:
 
     def test_adds_entity_filter_when_provided(self):
         with patch(
-            "app.services.validation_dispatch_service.ValidationQuestion.query"
+            "app.services.validation.dispatch_service.ValidationQuestion.query"
         ) as mock_q:
             chain = MagicMock()
             mock_q.filter_by.return_value = chain
@@ -52,7 +52,7 @@ class TestQuestionsQuery:
 
     def test_adds_question_ids_filter_when_provided(self):
         with patch(
-            "app.services.validation_dispatch_service.ValidationQuestion.query"
+            "app.services.validation.dispatch_service.ValidationQuestion.query"
         ) as mock_q:
             chain = MagicMock()
             mock_q.filter_by.return_value = chain
@@ -66,7 +66,7 @@ class TestQuestionsQuery:
 
     def test_uses_custom_status(self):
         with patch(
-            "app.services.validation_dispatch_service.ValidationQuestion.query"
+            "app.services.validation.dispatch_service.ValidationQuestion.query"
         ) as mock_q:
             chain = MagicMock()
             mock_q.filter_by.return_value = chain
@@ -90,7 +90,7 @@ class TestQuestionsQuery:
 class TestPreviewDispatch:
     def test_returns_empty_preview_when_no_questions(self):
         with patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq:
             chain = MagicMock()
             chain.all.return_value = []
@@ -114,14 +114,14 @@ class TestPreviewDispatch:
         q1.context = {"foo": "bar"}
 
         with patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[1, 2],
         ), patch(
-            "app.services.validation_dispatch_service.User.query"
+            "app.services.validation.dispatch_service.User.query"
         ) as mock_user, patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ) as mock_es:
             chain = MagicMock()
             chain.all.return_value = [q1]
@@ -157,14 +157,14 @@ class TestPreviewDispatch:
         q1.context = {f"key_{i}": f"val_{i}" for i in range(10)}
 
         with patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[],
         ), patch(
-            "app.services.validation_dispatch_service.User.query"
+            "app.services.validation.dispatch_service.User.query"
         ) as mock_user, patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ):
             chain = MagicMock()
             chain.all.return_value = [q1]
@@ -288,18 +288,18 @@ class TestSendDispatch:
         template.name = "FDRS"
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ) as mock_db, patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[],
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template
@@ -328,25 +328,25 @@ class TestSendDispatch:
         q = self._make_question()
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ) as mock_db, patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[1, 2],
         ), patch(
-            "app.services.validation_dispatch_service.create_notification"
+            "app.services.validation.dispatch_service.create_notification"
         ) as mock_notify, patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ) as mock_es, patch(
-            "app.services.validation_dispatch_service.url_for",
+            "app.services.validation.dispatch_service.url_for",
             return_value="http://example.com",
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template
@@ -374,25 +374,25 @@ class TestSendDispatch:
         q = self._make_question()
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ) as mock_db, patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[1],
         ), patch(
-            "app.services.validation_dispatch_service.create_notification"
+            "app.services.validation.dispatch_service.create_notification"
         ) as mock_notify, patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ) as mock_es, patch(
-            "app.services.validation_dispatch_service.url_for",
+            "app.services.validation.dispatch_service.url_for",
             side_effect=Exception("no URL"),
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template
@@ -423,21 +423,21 @@ class TestSendDispatch:
         q = self._make_question()
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ) as mock_db, patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[],  # no recipients → failed
         ), patch(
-            "app.services.validation_dispatch_service.EntityService.batch_entity_names",
+            "app.services.validation.dispatch_service.EntityService.batch_entity_names",
             return_value={},
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template
@@ -466,25 +466,25 @@ class TestSendDispatch:
         q = self._make_question()
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ), patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[1],
         ), patch(
-            "app.services.validation_dispatch_service.create_notification"
+            "app.services.validation.dispatch_service.create_notification"
         ), patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ) as mock_es, patch(
-            "app.services.validation_dispatch_service.url_for",
+            "app.services.validation.dispatch_service.url_for",
             side_effect=RuntimeError("routing error"),
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template
@@ -510,25 +510,25 @@ class TestSendDispatch:
         q = self._make_question(entity_type="country", entity_id=99)
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ), patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[1],
         ), patch(
-            "app.services.validation_dispatch_service.create_notification"
+            "app.services.validation.dispatch_service.create_notification"
         ), patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ) as mock_es, patch(
-            "app.services.validation_dispatch_service.url_for",
+            "app.services.validation.dispatch_service.url_for",
             return_value="http://x.com",
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template
@@ -554,25 +554,25 @@ class TestSendDispatch:
         q = self._make_question(severity="error")
 
         with patch(
-            "app.services.validation_dispatch_service.FormTemplate.query"
+            "app.services.validation.dispatch_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_dispatch_service.ValidationDispatchBatch"
+            "app.services.validation.dispatch_service.ValidationDispatchBatch"
         ) as mock_batch_cls, patch(
-            "app.services.validation_dispatch_service._questions_query"
+            "app.services.validation.dispatch_service._questions_query"
         ) as mock_qq, patch(
-            "app.services.validation_dispatch_service.db"
+            "app.services.validation.dispatch_service.db"
         ), patch(
-            "app.services.validation_dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
+            "app.services.validation.dispatch_service.get_assignment_editor_submitter_user_ids_for_entity",
             return_value=[1],
         ), patch(
-            "app.services.validation_dispatch_service.create_notification"
+            "app.services.validation.dispatch_service.create_notification"
         ) as mock_notify, patch(
-            "app.services.validation_dispatch_service.EntityService"
+            "app.services.validation.dispatch_service.EntityService"
         ) as mock_es, patch(
-            "app.services.validation_dispatch_service.url_for",
+            "app.services.validation.dispatch_service.url_for",
             return_value="http://x.com",
         ), patch(
-            "app.services.validation_dispatch_service.utcnow",
+            "app.services.validation.dispatch_service.utcnow",
             return_value=MagicMock(),
         ):
             mock_tpl.get_or_404.return_value = template

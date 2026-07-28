@@ -17,7 +17,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import app.services.app_settings_service as svc
+import app.services.platform.app_settings_service as svc
 
 
 # ---------------------------------------------------------------------------
@@ -628,7 +628,7 @@ class TestUserHasAiBetaAccess:
             user = MagicMock()
             user.is_authenticated = True
             user.id = 1
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
+            with patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth:
                 mock_auth.is_system_manager.return_value = True
                 assert svc.user_has_ai_beta_access(user) is False
 
@@ -639,7 +639,7 @@ class TestUserHasAiBetaAccess:
             user = MagicMock()
             user.is_authenticated = True
             user.id = 1
-            with patch("app.services.authorization_service.AuthorizationService") as mock_auth:
+            with patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth:
                 mock_auth.is_system_manager.return_value = True
                 assert svc.user_has_ai_beta_access(user) is True
 

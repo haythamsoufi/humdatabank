@@ -16,10 +16,10 @@ from app.models import (
     FormSection, PublicSubmission, PublicSubmissionStatus, QuestionType,
     RepeatGroupInstance, RepeatGroupData, DynamicIndicatorData, DynamicSectionContext,
 )
-from app.services.authorization_service import AuthorizationService
-from app.services.entity_service import EntityService
-from app.services.form_data_service import FormDataService
-from app.services.form_processing_service import get_form_items_for_section, slugify_age_group
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.organization.entity_service import EntityService
+from app.services.forms.data_service import FormDataService
+from app.services.forms.processing_service import get_form_items_for_section, slugify_age_group
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.constants import SELF_REPORT_PERIOD_NAME
@@ -111,7 +111,7 @@ def register_submission_routes(bp):
             try:
                 country_name = submission.country.name if submission.country else 'N/A'
 
-                from app.services import storage_service as _ss
+                from app.services.platform import storage_service as _ss
                 for doc in submission.submitted_documents:
                     try:
                         _ss.delete(

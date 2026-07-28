@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Union
 
 from flask import current_app, url_for
 
-from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
+from app.services.platform.app_settings_service import EMAIL_TEMPLATE_KEYS
 from app.services.email.rendering import _datetimeformat_filter
 from app.utils.datetime_helpers import utcnow
 from app.utils.organization_helpers import get_org_copyright_year, get_org_name, get_org_team_email
@@ -201,7 +201,7 @@ def get_campaign_email_template_preview_context(
     template_key: str, template_language: Optional[str] = None
 ) -> Dict[str, Any]:
     """Sample Jinja context for campaign email template preview."""
-    from app.services.campaign_email_templates_service import CAMPAIGN_EMAIL_TEMPLATE_KEYS
+    from app.services.communication.campaign_email_templates_service import CAMPAIGN_EMAIL_TEMPLATE_KEYS
 
     if template_key not in CAMPAIGN_EMAIL_TEMPLATE_KEYS:
         return {}

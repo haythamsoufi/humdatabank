@@ -27,7 +27,7 @@ from app.utils.request_utils import is_json_request, parse_ids_from_request
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
-from app.services import storage_service as _storage
+from app.services.platform import storage_service as _storage
 
 logger = logging.getLogger(__name__)
 
@@ -1758,7 +1758,7 @@ def list_system_documents():
                     )
                     storage_path = (doc.storage_path or '').strip()
                     file_path = None
-                    from app.services import storage_service as _ai_storage
+                    from app.services.platform import storage_service as _ai_storage
                     if os.path.isabs(storage_path):
                         file_path = storage_path
                     else:
@@ -1832,7 +1832,7 @@ def _is_llm_quality_judge_enabled() -> bool:
 
     fallback = _to_bool(current_app.config.get("AI_GROUNDING_LLM_ENABLED", False), False)
     try:
-        from app.services.app_settings_service import get_ai_settings
+        from app.services.platform.app_settings_service import get_ai_settings
 
         ai_db = get_ai_settings()
         raw = ai_db.get("AI_GROUNDING_LLM_ENABLED")

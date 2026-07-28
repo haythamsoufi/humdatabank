@@ -28,7 +28,7 @@ class TestGetWorkflowTourCacheHeaders:
             "language": "en",
         }
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
             resp = logged_in_client.get("/api/ai/documents/workflows/YWRkLXVzZXI/tour?lang=en")
 
         assert resp.status_code == 200
@@ -40,7 +40,7 @@ class TestGetWorkflowTourCacheHeaders:
         mock_svc.get_workflow_for_tour.return_value = None
         mock_svc.get_workflow_by_id.return_value = None
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
             resp = logged_in_client.get("/api/ai/documents/workflows/bm9wZQ/tour?lang=en")
 
         assert resp.status_code == 404
@@ -55,7 +55,7 @@ class TestListWorkflowDocsCacheHeaders:
         mock_svc = MagicMock()
         mock_svc.get_all_workflows.return_value = [_mock_workflow()]
 
-        with patch("app.services.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
+        with patch("app.services.documentation.workflow_docs_service.WorkflowDocsService", return_value=mock_svc):
             resp = logged_in_client.get("/api/ai/documents/workflows")
 
         assert resp.status_code == 200

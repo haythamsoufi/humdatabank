@@ -76,7 +76,7 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
               return_value=None))
 
     # AuthorizationService is locally imported:
-    # `from app.services.authorization_service import AuthorizationService`
+    # `from app.services.organization.authorization_service import AuthorizationService`
     auth = MagicMock()
     auth.can_access_assignment.return_value = True
     auth.can_edit_assignment.return_value = can_edit
@@ -86,7 +86,7 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
     auth.is_system_manager.return_value = False
     auth.has_rbac_permission.return_value = False
     mocks["AuthorizationService"] = stack.enter_context(
-        patch("app.services.authorization_service.AuthorizationService", auth))
+        patch("app.services.organization.authorization_service.AuthorizationService", auth))
 
     # TemplatePreparationService is a module-level import in entry.py → patch there
     tps = MagicMock()
@@ -97,12 +97,12 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
         patch("app.routes.forms.entry.TemplatePreparationService", tps))
 
     # is_delegation_user / review_enabled are locally imported:
-    # `from app.services.assignment_workflow_service import is_delegation_user, review_enabled`
+    # `from app.services.assignments.workflow_service import is_delegation_user, review_enabled`
     mocks["is_delegation_user"] = stack.enter_context(
-        patch("app.services.assignment_workflow_service.is_delegation_user",
+        patch("app.services.assignments.workflow_service.is_delegation_user",
               return_value=False))
     mocks["review_enabled"] = stack.enter_context(
-        patch("app.services.assignment_workflow_service.review_enabled",
+        patch("app.services.assignments.workflow_service.review_enabled",
               return_value=False))
     mocks["load_existing"] = stack.enter_context(
         patch("app.routes.forms.entry._load_existing_data_for_assignment",
@@ -396,7 +396,7 @@ class TestHandleAssignmentFormGet:
                     patch("app.utils.form_authorization.redirect_if_assignment_entry_blocked",
                           return_value=None))
                 mock_auth = stack.enter_context(
-                    patch("app.services.authorization_service.AuthorizationService"))
+                    patch("app.services.organization.authorization_service.AuthorizationService"))
                 mock_entity = stack.enter_context(
                     patch("app.routes.forms.entry.EntityService"))
                 mock_flash = stack.enter_context(patch("app.routes.forms.entry.flash"))
@@ -870,7 +870,7 @@ class TestPreviewTemplateImpl:
         auth.is_admin.return_value = True
         auth.is_system_manager.return_value = True
         mocks["auth"] = stack.enter_context(
-            patch("app.services.authorization_service.AuthorizationService", auth))
+            patch("app.services.organization.authorization_service.AuthorizationService", auth))
 
         # check_template_access locally imported
         mocks["check_access"] = stack.enter_context(
@@ -937,7 +937,7 @@ class TestPreviewTemplateImpl:
         mock_vrs.resolve_variables.return_value = {}
         mock_vrs.replace_variables_in_text.side_effect = lambda t, *a, **kw: t
         mocks["VariableResolutionService"] = stack.enter_context(
-            patch("app.services.variable_resolution_service.VariableResolutionService",
+            patch("app.services.forms.variable_resolution_service.VariableResolutionService",
                   mock_vrs))
 
         # db for session queries

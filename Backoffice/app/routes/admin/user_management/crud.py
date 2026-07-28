@@ -10,7 +10,7 @@ from flask_login import current_user
 
 from app import db
 from app.models import User, Country, UserEntityPermission, CountryAccessRequest
-from app.services.country_access_request_service import (
+from app.services.organization.country_access_request_service import (
     count_pending_country_access_requests_needing_action,
     pending_country_access_requests_query,
     processed_country_access_requests_query,
@@ -20,7 +20,7 @@ from app.models.enums import EntityType
 from app.forms.system import UserForm
 from app.routes.admin.shared import permission_required, permission_required_any
 from app.utils.form_localization import get_localized_country_name
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_forbidden, json_ok
 from app.utils.error_handling import handle_json_view_exception
@@ -176,9 +176,9 @@ def manage_users():
 @permission_required_any('admin.access_requests.view', 'admin.users.edit')
 def access_requests():
     """List and manage country access requests."""
-    from app.services.app_settings_service import get_auto_approve_access_requests
-    from app.services.country_access_request_service import AUTO_RESOLVED_ADMIN_NOTE
-    from app.services.country_service import (
+    from app.services.platform.app_settings_service import get_auto_approve_access_requests
+    from app.services.organization.country_access_request_service import AUTO_RESOLVED_ADMIN_NOTE
+    from app.services.organization.country_service import (
         get_fds_member_filter_options,
         user_is_fds_member,
     )
@@ -218,8 +218,8 @@ def access_requests():
         current_user.id if user_is_fds_member(current_user.id) else None
     )
 
-    from app.services.authorization_service import AuthorizationService
-    from app.services.app_settings_service import get_fds_access_request_digest_settings
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.platform.app_settings_service import get_fds_access_request_digest_settings
     from app.services.email.fds_access_request_digest import (
         get_fds_access_request_digest_last_sent_summary,
     )
@@ -258,7 +258,7 @@ def access_requests():
 @permission_required_any('admin.access_requests.view', 'admin.users.edit')
 def send_access_requests_digest_now():
     """Manually trigger FDS access request digest emails (system managers only)."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.services.email.fds_access_request_digest import run_fds_access_request_digest_job
 
     if not AuthorizationService.is_system_manager(current_user):
@@ -295,8 +295,8 @@ def send_access_requests_digest_now():
 @permission_required_any('admin.access_requests.view', 'admin.users.edit')
 def update_access_requests_digest_settings():
     """Update FDS access request digest schedule (system managers only)."""
-    from app.services.authorization_service import AuthorizationService
-    from app.services.app_settings_service import set_fds_access_request_digest_settings
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.platform.app_settings_service import set_fds_access_request_digest_settings
 
     if not AuthorizationService.is_system_manager(current_user):
         flash("Only system managers can change digest email settings.", "danger")
@@ -610,7 +610,7 @@ def new_user():
     form = UserForm()
     enabled_entity_groups = get_enabled_entity_groups()
     allowed_non_country_entity_types = _get_allowed_non_country_entity_types()
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.models.rbac import RbacRole
     azure_sso_enabled = _is_azure_sso_enabled()
     current_is_sys_mgr = AuthorizationService.is_system_manager(current_user)
@@ -838,7 +838,7 @@ def edit_user(user_id):
     form = UserForm()
     enabled_entity_groups = get_enabled_entity_groups()
     allowed_non_country_entity_types = _get_allowed_non_country_entity_types()
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.models.rbac import RbacRole
     azure_sso_enabled = _is_azure_sso_enabled()
 
@@ -1329,7 +1329,7 @@ def remove_device(user_id, device_id):
 @permission_required('admin.users.delete')
 def delete_user(user_id):
     # Only system managers can delete users
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if not current_user.is_authenticated or not AuthorizationService.is_system_manager(current_user):
         flash("Only system managers can delete users.", "danger")
         return redirect(url_for("user_management.manage_users"))
@@ -1378,7 +1378,7 @@ def delete_user(user_id):
 @permission_required('admin.users.delete')
 def user_deletion_preview(user_id):
     """Return a JSON preview of relational data that will be deleted or unassigned if this user is deleted."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if not current_user.is_authenticated or not AuthorizationService.is_system_manager(current_user):
         return json_forbidden('Only system managers can delete users.')
     user = User.query.get_or_404(user_id)
@@ -1393,7 +1393,7 @@ def user_deletion_preview(user_id):
 @permission_required('admin.users.deactivate')
 def archive_user(user_id):
     """Deactivate/Reactivate a user account (soft toggle)."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     user = User.query.get_or_404(user_id)
     if user.id == current_user.id:
         flash("You cannot deactivate your own account.", "danger")

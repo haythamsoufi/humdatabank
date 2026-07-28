@@ -19,7 +19,7 @@ def list_access_requests():
     from app.models import CountryAccessRequest, Country
     from app.models import User as UserModel
     from sqlalchemy.orm import joinedload
-    from app.services.country_access_request_service import (
+    from app.services.organization.country_access_request_service import (
         pending_country_access_requests_query,
         processed_country_access_requests_query,
         reconcile_fulfilled_pending_country_access_requests,
@@ -118,7 +118,7 @@ def approve_all_access_requests():
     """Bulk-approve all pending access requests."""
     from app.models import CountryAccessRequest, Country
     from app.models import User as UserModel
-    from app.services.country_access_request_service import (
+    from app.services.organization.country_access_request_service import (
         pending_country_access_requests_query,
         reconcile_fulfilled_pending_country_access_requests,
     )

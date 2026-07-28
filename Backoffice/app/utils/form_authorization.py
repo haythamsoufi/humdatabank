@@ -34,7 +34,7 @@ def has_country_access(user, country_id: int) -> bool:
     Returns:
         bool: True if user has access, False otherwise
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     return AuthorizationService.has_country_access(user, country_id)
 
 
@@ -49,7 +49,7 @@ def can_edit_assignment(assignment_entity_status, user) -> bool:
     Returns:
         bool: True if user can edit, False otherwise
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     return AuthorizationService.can_edit_assignment(assignment_entity_status, user)
 
 
@@ -72,9 +72,9 @@ def check_assignment_access(f):
                 return blocked
 
             # Check entity access (supports all entity types)
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if not AuthorizationService.can_access_assignment(aes, current_user):
-                from app.services.entity_service import EntityService
+                from app.services.organization.entity_service import EntityService
                 entity_name = EntityService.get_entity_display_name(aes.entity_type, aes.entity_id)
                 current_app.logger.warning(
                     f"Access denied for user {current_user.email} to AssignmentEntityStatus {aes_id} "
@@ -111,9 +111,9 @@ def check_assignment_edit_access(f):
                 return blocked
 
             # Check entity access (supports all entity types)
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if not AuthorizationService.can_access_assignment(aes, current_user):
-                from app.services.entity_service import EntityService
+                from app.services.organization.entity_service import EntityService
                 entity_name = EntityService.get_entity_display_name(aes.entity_type, aes.entity_id)
                 current_app.logger.warning(
                     f"Access denied for user {current_user.email} to AssignmentEntityStatus {aes_id} "
@@ -181,7 +181,7 @@ def check_document_access(f):
                     return blocked
 
                 # Check assignment access for all entity types (not just countries).
-                from app.services.authorization_service import AuthorizationService
+                from app.services.organization.authorization_service import AuthorizationService
                 if not AuthorizationService.can_access_assignment(aes, current_user):
                     flash("You are not authorized to access this document.", "warning")
                     return redirect(url_for("main.dashboard"))
@@ -220,7 +220,7 @@ def validate_country_list_access(user, country_ids: List[int]) -> List[int]:
     Returns:
         List of country IDs the user has access to
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     return AuthorizationService.validate_country_list_access(user, country_ids)
 
 
@@ -235,5 +235,5 @@ def check_self_report_access(assignment_entity_status, user) -> bool:
     Returns:
         bool: True if user has access, False otherwise
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     return AuthorizationService.check_self_report_access(assignment_entity_status, user)

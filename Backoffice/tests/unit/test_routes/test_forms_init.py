@@ -39,7 +39,7 @@ class TestGetFrontendUrlGlobal:
         with app.app_context():
             with patch(
                 "app.routes.forms.get_frontend_url_global.__wrapped__"
-                if False else "app.services.app_settings_service.get_frontend_url",
+                if False else "app.services.platform.app_settings_service.get_frontend_url",
                 return_value="https://example.com",
                 create=True,
             ):
@@ -49,12 +49,12 @@ class TestGetFrontendUrlGlobal:
                 assert fn is not None
 
                 with patch(
-                    "app.routes.forms.__init__" if False else "app.services.app_settings_service",
+                    "app.routes.forms.__init__" if False else "app.services.platform.app_settings_service",
                     create=True,
                 ):
                     # Patch get_frontend_url inside the closure's import
                     with patch(
-                        "app.services.app_settings_service.get_frontend_url",
+                        "app.services.platform.app_settings_service.get_frontend_url",
                         return_value="https://frontend.example.com",
                     ):
                         result = fn()
@@ -69,7 +69,7 @@ class TestGetFrontendUrlGlobal:
             assert fn is not None
 
             with patch(
-                "app.services.app_settings_service.get_frontend_url",
+                "app.services.platform.app_settings_service.get_frontend_url",
                 return_value=None,
             ):
                 result = fn()
@@ -84,7 +84,7 @@ class TestGetFrontendUrlGlobal:
             assert fn is not None
 
             with patch(
-                "app.services.app_settings_service.get_frontend_url",
+                "app.services.platform.app_settings_service.get_frontend_url",
                 side_effect=RuntimeError("service unavailable"),
             ):
                 result = fn()

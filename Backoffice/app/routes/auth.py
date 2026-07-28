@@ -19,7 +19,7 @@ import json
 import jwt
 from jwt.algorithms import RSAAlgorithm
 from app.utils.datetime_helpers import utcnow, ensure_utc
-from app.services.user_analytics_service import (
+from app.services.platform.user_analytics_service import (
     log_login_attempt, log_logout, start_user_session, log_user_activity, log_user_activity_for_user,
     create_security_event, get_client_ip, get_client_info, add_session_to_blacklist,
 )
@@ -34,12 +34,12 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from flask import current_app
 from app.extensions import mail, csrf
 from app.services.email.client import send_email
-from app.services.app_settings_service import get_organization_name, is_organization_email, user_has_ai_beta_access
+from app.services.platform.app_settings_service import get_organization_name, is_organization_email, user_has_ai_beta_access
 from app.utils.constants import PASSWORD_RESET_TOKEN_MAX_AGE_SECONDS
 from app.utils.request_utils import clear_mobile_app_embed_cookie
 from app.utils.azure_b2c_config import is_azure_b2c_configured
 from app.utils.csp_nonce import get_style_nonce
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 bp = Blueprint("auth", __name__)
 
@@ -991,7 +991,7 @@ def azure_callback():
     # Prevent session fixation: clear pre-auth session data before binding user
     session.clear()
 
-    from app.services.oauth_callback_guard import resolve_azure_b2c_login_session
+    from app.services.platform.oauth_callback_guard import resolve_azure_b2c_login_session
 
     client_info = get_client_info()
     session_id, created_new_session = resolve_azure_b2c_login_session(
@@ -1492,8 +1492,8 @@ def account_settings():
     from app.models.core import UserEntityPermission
     from app.models.enums import EntityType
     from app.models.system import CountryAccessRequestStatus
-    from app.services.authorization_service import AuthorizationService
-    from app.services.entity_service import EntityService
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.organization.entity_service import EntityService
     from app.forms.auth_forms import RequestCountryAccessForm
     from app.services.translation_review.assignment_service import user_has_manage_translations
 
@@ -1586,7 +1586,7 @@ def account_settings():
     all_access_requests = []
     pending_access_requests = []
     try:
-        from app.services.country_access_request_service import (
+        from app.services.organization.country_access_request_service import (
             is_auto_resolved_country_access_request,
             reconcile_fulfilled_pending_country_access_requests,
         )
@@ -1617,7 +1617,7 @@ def account_settings():
         pending_access_requests = []
 
     from app.routes.notifications import get_notification_type_labels, get_notification_types_for_user
-    from app.services.notification_service import NotificationService
+    from app.services.notification.service import NotificationService
 
     notification_types_info = get_notification_types_for_user(current_user)
     notification_preferences = NotificationService.get_notification_preferences(current_user.id)

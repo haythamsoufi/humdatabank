@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
-if str(scripts_dir) not in sys.path:
-    sys.path.insert(0, str(scripts_dir))
+imports_dir = Path(__file__).resolve().parents[2] / "scripts" / "imports"
+if str(imports_dir) not in sys.path:
+    sys.path.insert(0, str(imports_dir))
 
 from import_upr_excel_data import (  # noqa: E402
     UprImportContext,

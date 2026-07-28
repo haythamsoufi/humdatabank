@@ -8,7 +8,7 @@ from flask import current_app
 from sqlalchemy import and_
 
 from app.models import Notification, NotificationPreferences, User
-from app.services.campaign_email_templates_service import (
+from app.services.communication.campaign_email_templates_service import (
     get_campaign_email_template,
     normalize_campaign_email_template_key,
 )

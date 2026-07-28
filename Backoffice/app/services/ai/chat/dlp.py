@@ -191,7 +191,7 @@ def log_dlp_audit_event(
         from app.extensions import db
         from app.models import SecurityEvent
         from app.utils.datetime_helpers import utcnow
-        from app.services.user_analytics_service import get_client_ip
+        from app.services.platform.user_analytics_service import get_client_ip
 
         high_kinds = {"jwt", "bearer_token", "private_key", "password", "api_key_or_secret", "payment_card", "iban"}
         kinds = {f.kind for f in findings if getattr(f, "kind", None)}

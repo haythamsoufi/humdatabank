@@ -95,7 +95,7 @@ class TestEntryFormVariablesResolveApi:
             db_session.commit()
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=False,
             ):
                 resp = client.post(
@@ -131,7 +131,7 @@ class TestEntryFormVariablesResolveApi:
             db_session.commit()
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=True,
             ):
                 resp = client.post(
@@ -172,7 +172,7 @@ class TestEntryFormVariablesResolveApi:
             db_session.commit()
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=True,
             ):
                 resp = client.post(
@@ -209,10 +209,10 @@ class TestEntryFormVariablesResolveApi:
             db_session.commit()
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=True,
             ), patch(
-                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables",
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables",
                 return_value={"FOO": "bar"},
             ) as mock_resolve:
                 resp = client.post(
@@ -250,10 +250,10 @@ class TestEntryFormVariablesResolveApi:
             db_session.commit()
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=True,
             ), patch(
-                "app.services.variable_resolution_service.VariableResolutionService.resolve_variables_batch",
+                "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables_batch",
                 return_value={1: {"FOO": "bar"}, 2: {"FOO": "baz"}},
             ):
                 resp = client.post(

@@ -38,7 +38,7 @@ def _get_helpers(app, user):
 
 
 # Convenience shorthand for the authorization service patch target
-_AUTH_SVC = "app.services.authorization_service.AuthorizationService"
+_AUTH_SVC = "app.services.organization.authorization_service.AuthorizationService"
 
 
 # ---------------------------------------------------------------------------

@@ -14,7 +14,7 @@ from app.models import IndicatorBank, IndicatorSuggestion, AssignedForm, PublicS
 from app.models import APIKey
 from app.models.assignments import AssignmentEntityStatus
 from app.models.core import UserEntityPermission
-from app.services.secretariat_regional_office_service import (
+from app.services.organization.secretariat_regional_office_service import (
     assign_country_secretariat_regional_office,
     ensure_secretariat_regional_offices,
 )
@@ -490,7 +490,7 @@ def _ensure_reporting_period_catalog(db_session, period_name: str) -> None:
     """Ensure a catalog row exists for common test period labels."""
     from datetime import date
 
-    from app.services.reporting_period_service import get_reporting_period, upsert_reporting_period
+    from app.services.forms.reporting_period_service import get_reporting_period, upsert_reporting_period
 
     label = (period_name or "").strip()
     if not label or get_reporting_period(label):
@@ -528,7 +528,7 @@ def create_test_assignment_entity_status(
         **{k: v for k, v in kwargs.items() if k in ("is_active", "unique_token", "is_public_active")},
     )
     _ensure_reporting_period_catalog(db_session, period_name)
-    from app.services.reporting_period_service import sync_assigned_form_reporting_period
+    from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
     sync_assigned_form_reporting_period(assigned_form)
     db_session.add(assigned_form)
     db_session.flush()
@@ -648,7 +648,7 @@ def create_test_public_submission(
         is_active=True,
     )
     _ensure_reporting_period_catalog(db_session, period_name)
-    from app.services.reporting_period_service import sync_assigned_form_reporting_period
+    from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
     sync_assigned_form_reporting_period(assigned_form)
     db_session.add(assigned_form)
     db_session.flush()

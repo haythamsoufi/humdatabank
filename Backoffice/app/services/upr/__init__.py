@@ -24,6 +24,8 @@ Sub-modules (import directly when you need specific pieces):
     upr.ux                   – step labels, tool humanisation, source qualifiers
     upr.config               – AI_UPR_* configuration reader
     upr.focus_area_analysis  – fast-path for Unified Plans focus-area review
+    upr.country_reporting_excel_service – UPR country reporting Excel templates
+    upr.excel_import_service – bulk UPR Excel import pipeline
 """
 
 from __future__ import annotations

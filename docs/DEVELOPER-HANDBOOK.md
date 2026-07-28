@@ -224,7 +224,7 @@ Entity answers are stored in three data tables, all keyed by either `assignment_
 
 **Value / disaggregation invariant (F7):** When `disagg_data` is set for standard disaggregation (`mode` + `values` keys), `value` is a denormalized string cache of the numeric total. Matrix and plugin payloads may use `disagg_data` without `mode`/`values`. Always use `total_value` for reads and `set_simple_value` / `set_disaggregated_data` for writes — never mutate `disagg_data` in-place.
 
-**Pre-migration integrity checks:** Run `python scripts/check_data_submission_integrity.py` from `Backoffice/` before applying submission-data migrations (duplicate rows, orphan parents, malformed disagg shapes).
+**Pre-migration integrity checks:** Run `python scripts/ops/check_data_submission_integrity.py` from `Backoffice/` before applying submission-data migrations (duplicate rows, orphan parents, malformed disagg shapes).
 
 ### Key Models Relationships
 - **User ↔ Country**: Many-to-many (user_countries table)
@@ -303,21 +303,21 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 python scripts/check_db_migration.py
 
 # Import/export testing
-python scripts/import_FDRS_data.py
+python scripts/imports/import_fdrs_form_data.py
 
 # AI review queue (terminal triage packets)
-python scripts/trigger_automated_trace_review.py --status pending --limit 5 --format text
+python scripts/ai/trigger_automated_trace_review.py --status pending --limit 5 --format text
 
 # Seed deterministic low-quality review item for queue testing
-python scripts/seed_low_quality_review.py
-python scripts/seed_low_quality_review.py --trace-id 99999999 --create-trace-if-missing
+python scripts/ai/seed_low_quality_review.py
+python scripts/ai/seed_low_quality_review.py --trace-id 99999999 --create-trace-if-missing
 ```
 
 ### AI review queue scripts (Backoffice)
-- `scripts/trigger_automated_trace_review.py` – exports pending/in-review trace packets from `ai_trace_reviews`/`ai_reasoning_traces` for automated terminal processing (`text` or `jsonl`), with paging and optional `--claim-in-review`.
-- `scripts/seed_low_quality_review.py` – marks a trace as low-quality (`llm_needs_review=True`) and creates/resets a pending review row; use for deterministic end-to-end testing of review queue workflows.
+- `scripts/ai/trigger_automated_trace_review.py` – exports pending/in-review trace packets from `ai_trace_reviews`/`ai_reasoning_traces` for automated terminal processing (`text` or `jsonl`), with paging and optional `--claim-in-review`.
+- `scripts/ai/seed_low_quality_review.py` – marks a trace as low-quality (`llm_needs_review=True`) and creates/resets a pending review row; use for deterministic end-to-end testing of review queue workflows.
 - `scripts/archive/` – completed one-offs (record-specific probes, incident scripts); not used in CI.
-- `scripts/codemods/` – template/JS bulk refactors; CI guardrails remain in `scripts/check_*` and `scripts/gate_template_console_calls.py`.
+- `scripts/codemods/` – template/JS bulk refactors; CI guardrails remain in `scripts/ci/`.
 
 ### Website Testing  
 ```bash
@@ -540,8 +540,9 @@ Detailed runbook: [Incidents → Scenario F (502/504)](Backoffice/docs/runbooks/
 - **Admin (Backoffice UI routes)**: `Backoffice/app/routes/admin/` (pick the closest module)
 - **Form builder frontend JS**: `Backoffice/app/static/js/form_builder/`
 - **Entry form rendering + client behavior**: `Backoffice/app/templates/forms/entry_form/` and `Backoffice/app/static/js/forms/`
-- **AI endpoints + request handling**: `Backoffice/app/routes/ai.py`, `Backoffice/app/services/ai_chat_request.py`
-- **RAG / embeddings / vector store**: `Backoffice/app/services/ai_embedding_service.py`, `Backoffice/app/services/ai_vector_store.py`
+- **AI endpoints + request handling**: `Backoffice/app/routes/ai.py`, `Backoffice/app/services/ai/chat/`
+- **RAG / embeddings / vector store**: `Backoffice/app/services/ai/documents/`, `Backoffice/app/services/ai/providers/`
+- **Business services (by domain)**: `Backoffice/app/services/` — subpackages include `forms/`, `data_retrieval/`, `organization/`, `validation/`, `platform/`, `upr/`, etc.
 - **Translations / localization**: `Backoffice/app/utils/form_localization.py`, `Backoffice/translations/`, `Backoffice/app/services/translation_review/`
 - **Button styles / design system**: `Backoffice/app/static/css/theme.css` (CSS variables), `Backoffice/app/static/css/components.css` (`.btn` system), `Backoffice/app/static/css/executive-header.css` (`.professional-action-btn` page-header variants)
 - **Mobile app (Flutter)**: `MobileApp/` — routes: `lib/config/routes.dart`, `lib/config/app_router.dart`; DI: `lib/di/service_locator.dart`; API constants: `lib/config/app_config.dart` (no inline `/api/mobile/v1/...` strings in providers). Shared UI: `lib/widgets/loading_indicator.dart`, `lib/widgets/error_state.dart`, `lib/widgets/async/async_body.dart`, `lib/widgets/mobile_screen_scaffold.dart`. JSON helpers: `lib/utils/mobile_api_json.dart`. iOS CocoaPods / `Podfile.lock` without a Mac: **Regenerate iOS Podfile.lock** workflow (see **Mobile App (Flutter)** in Local Development Quickstart).
@@ -767,7 +768,7 @@ FormItem.by_stable_key(template_id, stable_key).all()
 Operational scripts (run from `Backoffice/`):
 
 - `python scripts/template_version_scale_inventory.py` — per-template row counts before large deploys
-- `python scripts/backfill_stable_keys.py --dry-run` — one-time backfill for existing rows (run before first deploy migration in each environment)
+- `python scripts/ops/backfill_stable_keys.py --dry-run` — one-time backfill for existing rows (run before first deploy migration in each environment)
 
 See also [`Backoffice/docs/template-version-submission-identity.md`](../Backoffice/docs/template-version-submission-identity.md).
 

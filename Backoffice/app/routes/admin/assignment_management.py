@@ -36,9 +36,9 @@ from sqlalchemy.orm import joinedload
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.country_utils import get_countries_by_region
-from app.services.entity_service import EntityService
-from app.services.country_service import fds_member_user_display_name
-from app.services.reporting_period_service import sync_assigned_form_reporting_period
+from app.services.organization.entity_service import EntityService
+from app.services.organization.country_service import fds_member_user_display_name
+from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField
 from wtforms.validators import Optional, DataRequired
@@ -50,7 +50,7 @@ bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
 def _supported_language_codes():
     """Return configured ISO language codes (includes 'en')."""
     try:
-        from app.services.app_settings_service import get_supported_languages
+        from app.services.platform.app_settings_service import get_supported_languages
 
         return list(get_supported_languages(default=Config.LANGUAGES) or [])
     except Exception:
@@ -552,7 +552,7 @@ def edit_assignment(assignment_id):
     assignment_entities = assignment.entity_statuses.all()
     countries_by_region = get_countries_by_region()
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
 
     aes_name_map = EntityService.batch_entity_names(
         [(aes.entity_type, aes.entity_id) for aes in assignment_entities],

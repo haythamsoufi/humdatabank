@@ -103,7 +103,7 @@ class TestExcelRoutes:
         aes = _AES(id=123, status="submitted")
 
         with patch("app.routes.excel.get_aes_with_joins", return_value=aes), patch(
-            "app.services.authorization_service.AuthorizationService.is_admin", return_value=False
+            "app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=False
         ):
             resp = logged_in_client.post(
                 f"/excel/assignment/{aes.id}/import",

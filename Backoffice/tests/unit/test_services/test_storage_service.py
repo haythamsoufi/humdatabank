@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-import app.services.storage_service as svc
+import app.services.platform.storage_service as svc
 
 
 # ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@ from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.datetime_helpers import utcnow
 from app.routes.api.mobile import mobile_bp
 from app.utils.page_view_paths import distinct_page_view_path_count
-from app.services.audit_trail_display_service import create_consistent_description
+from app.services.audit.trail_display_service import create_consistent_description
 from app.services.notification.push import PushNotificationService
 
 
@@ -207,7 +207,7 @@ def dashboard_activity():
 def login_logs():
     """Paginated login logs."""
     from app.models import UserLoginLog
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         bot_user_agent_explanation, session_log_device_icon_classes,
     )
 
@@ -282,13 +282,13 @@ def login_logs():
 def session_logs():
     """Paginated user session logs."""
     from app.models import User, UserSessionLog
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         effective_session_active_duration_minutes,
         effective_session_duration_minutes,
         session_log_device_icon_classes,
         user_session_log_active_duration_minutes_sql,
     )
-    from app.services.audit_trail_session_query import count_audit_visible_entries_for_session
+    from app.services.audit.trail_session_query import count_audit_visible_entries_for_session
 
     try:
         if not _has_table(UserSessionLog.__tablename__):
@@ -364,7 +364,7 @@ def end_session(session_id):
     """End a user session and blacklist it (admin)."""
     from flask import g
     from app.models.core import UserSessionLog
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         add_session_to_blacklist, end_user_session, log_admin_action,
     )
 
@@ -419,7 +419,7 @@ def end_session(session_id):
 def audit_trail():
     """Paginated audit trail (user activity logs with endpoint noise filtered out)."""
     from app.models import UserActivityLog
-    from app.services.audit_trail_session_query import apply_audit_trail_user_activity_noise_filters
+    from app.services.audit.trail_session_query import apply_audit_trail_user_activity_noise_filters
 
     page, per_page = validate_pagination_params(request.args, default_per_page=50, max_per_page=200)
     activity_type_filter = request.args.get('activity_type')

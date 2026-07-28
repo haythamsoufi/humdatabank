@@ -8,9 +8,9 @@ from datetime import datetime
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_error
-from app.services import storage_service as storage
+from app.services.platform import storage_service as storage
 
-from app.services.form_processing_service import slugify_age_group
+from app.services.forms.processing_service import slugify_age_group
 
 bp = Blueprint("public", __name__)
 

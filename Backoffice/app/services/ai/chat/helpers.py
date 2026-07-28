@@ -14,7 +14,7 @@ from contextlib import suppress
 from app.models.assignments import AssignmentEntityStatus
 from app.extensions import db
 from app.middleware.api_tracker import track_api_usage
-from app.services.data_retrieval_service import (
+from app.services.data_retrieval.service import (
     get_user_profile as svc_get_user_profile,
     get_country_info as svc_get_country_info,
     get_indicator_details as svc_get_indicator_details,
@@ -25,7 +25,7 @@ from app.services.data_retrieval_service import (
 from app.services.ai.chat.fastpath import try_answer_value_question
 from app.services.ai.chat.integration import AIChatIntegration
 from app.services.ai.chat.telemetry import track_chatbot_interaction, get_chatbot_analytics
-from app.services.app_settings_service import get_organization_name
+from app.services.platform.app_settings_service import get_organization_name
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.sql_utils import safe_ilike_pattern
 from markupsafe import escape
@@ -39,7 +39,7 @@ def _get_workflow_service():
     global _workflow_service
     if _workflow_service is None:
         try:
-            from app.services.workflow_docs_service import WorkflowDocsService
+            from app.services.documentation.workflow_docs_service import WorkflowDocsService
             _workflow_service = WorkflowDocsService()
             # Force load workflows immediately to verify it works
             workflows = _workflow_service.get_all_workflows()
@@ -2422,7 +2422,7 @@ def format_countries(countries):
 def _user_allowed_country_ids():
     """Return set of country IDs the current user may access (admin => all via None)."""
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if AuthorizationService.is_admin(current_user):
             return None  # sentinel meaning do not restrict
         if hasattr(current_user, 'countries') and hasattr(current_user.countries, 'all'):

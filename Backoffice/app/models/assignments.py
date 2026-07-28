@@ -373,7 +373,7 @@ class AssignmentEntityStatus(db.Model):
     @property
     def entity(self):
         """Get the actual entity object based on entity_type and entity_id."""
-        from app.services.entity_service import EntityService
+        from app.services.organization.entity_service import EntityService
         return EntityService.get_entity(self.entity_type, self.entity_id)
 
     @property
@@ -384,7 +384,7 @@ class AssignmentEntityStatus(db.Model):
         Returns the actual Country object if entity_type is 'country', or the parent
         country for NS branches/departments.
         """
-        from app.services.entity_service import EntityService
+        from app.services.organization.entity_service import EntityService
         return EntityService.get_country_for_entity(self.entity_type, self.entity_id)
 
     @property

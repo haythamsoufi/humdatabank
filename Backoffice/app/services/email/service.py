@@ -6,7 +6,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.organization_helpers import (
     get_org_name, get_org_short_name, get_org_copyright_year, get_org_team_email
 )
-from app.services.app_settings_service import get_email_template
+from app.services.platform.app_settings_service import get_email_template
 import logging
 from contextlib import suppress
 from markupsafe import escape

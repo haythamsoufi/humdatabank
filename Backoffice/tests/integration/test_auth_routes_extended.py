@@ -108,7 +108,7 @@ class TestAccountSettingsAndDevices:
     def test_account_settings_get(self, logged_in_client, app, test_user):
         with patch('app.routes.auth.render_template', return_value=('settings', 200)) as mock_render, \
              patch('app.routes.auth.user_has_ai_beta_access', return_value=False), \
-             patch('app.services.notification_service.NotificationService.get_notification_preferences', return_value={}), \
+             patch('app.services.notification.service.NotificationService.get_notification_preferences', return_value={}), \
              patch('app.routes.notifications.get_notification_types_for_user', return_value={'for_user': []}), \
              patch('app.routes.notifications.get_notification_type_labels', return_value={}):
             resp = logged_in_client.get('/account-settings')
@@ -304,7 +304,7 @@ class TestLoginRouteCoverage:
     def test_login_user_fetch_error(self, client, app):
         with patch('app.routes.auth.render_template', return_value=_mock_html_response()), \
              patch(
-                 'app.services.user_service.UserService.get_by_email',
+                 'app.services.platform.user_service.UserService.get_by_email',
                  side_effect=[None, RuntimeError('db down')],
              ):
             resp = client.post('/login', data={

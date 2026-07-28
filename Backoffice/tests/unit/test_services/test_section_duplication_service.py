@@ -12,7 +12,7 @@ import pytest
 
 from app import db
 from app.models import FormItem, FormSection
-from app.services.section_duplication_service import SectionDuplicationService
+from app.services.forms.section_duplication_service import SectionDuplicationService
 from tests.factories import (
     create_test_item,
     create_test_section,

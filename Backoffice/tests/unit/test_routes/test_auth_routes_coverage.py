@@ -450,7 +450,7 @@ class TestAccountSettingsPost:
                  patch("app.routes.auth.url_for", return_value="/account-settings"), \
                  patch("app.routes.auth.log_user_activity"), \
                  patch("app.routes.auth.user_has_ai_beta_access", return_value=False), \
-                 patch("app.services.notification_service.NotificationService.get_notification_preferences", return_value={}), \
+                 patch("app.services.notification.service.NotificationService.get_notification_preferences", return_value={}), \
                  patch("app.routes.notifications.get_notification_types_for_user", return_value={"for_user": []}), \
                  patch("app.routes.notifications.get_notification_type_labels", return_value={}):
                 account_settings()
@@ -476,7 +476,7 @@ class TestAccountSettingsPost:
                  patch("app.routes.auth.db") as mock_db, \
                  patch("app.routes.auth.render_template", return_value=_mock_html_response()) as mock_render, \
                  patch("app.routes.auth.user_has_ai_beta_access", return_value=False), \
-                 patch("app.services.notification_service.NotificationService.get_notification_preferences", return_value={}), \
+                 patch("app.services.notification.service.NotificationService.get_notification_preferences", return_value={}), \
                  patch("app.routes.notifications.get_notification_types_for_user", return_value={"for_user": []}), \
                  patch("app.routes.notifications.get_notification_type_labels", return_value={}):
                 mock_db.session.flush.side_effect = Exception("flush error")

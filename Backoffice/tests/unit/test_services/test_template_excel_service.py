@@ -17,7 +17,7 @@ from flask_login import login_user
 
 from app import db
 from app.models import FormTemplate, FormTemplateVersion, FormPage, FormSection, FormItem
-from app.services.template_excel_service import TemplateExcelService
+from app.services.templates.excel_service import TemplateExcelService
 from tests.factories import (
     create_test_admin,
     create_test_template,
@@ -478,7 +478,7 @@ class TestHelperMethods:
 
     def test_get_type_options_from_database_exception_returns_defaults(self, app):
         with app.app_context():
-            with patch("app.services.template_excel_service.db") as mock_db:
+            with patch("app.services.templates.excel_service.db") as mock_db:
                 mock_db.session.query.side_effect = Exception("DB error")
                 opts = TemplateExcelService._get_type_options_from_database()
                 assert 'Number' in opts

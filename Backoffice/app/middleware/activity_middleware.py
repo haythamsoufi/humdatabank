@@ -11,7 +11,7 @@ from functools import wraps
 from flask import request, g, session, current_app
 from flask_login import current_user
 from app.utils.request_utils import is_static_asset_request
-from app.services.user_analytics_service import (
+from app.services.platform.user_analytics_service import (
     log_user_activity,
     log_admin_action,
     increment_session_page_views_without_activity_log,
@@ -305,7 +305,7 @@ def track_activity(activity_type=None, description=None, admin_action=False, ris
                         context_data['form_data'] = redact_activity_form_data(request.form.items())
 
                     # Log as admin action if specified
-                    from app.services.authorization_service import AuthorizationService
+                    from app.services.organization.authorization_service import AuthorizationService
                     if admin_action and AuthorizationService.is_admin(current_user):
                         log_admin_action(
                             action_type=act_type,
@@ -375,7 +375,7 @@ def _extract_entity_into_context(app, req, context_data):
         """Resolve an AssignmentEntityStatus row and populate context_data."""
         try:
             from app.models.assignments import AssignmentEntityStatus
-            from app.services.entity_service import EntityService
+            from app.services.organization.entity_service import EntityService
             aes = AssignmentEntityStatus.query.get(int(aes_id))
             if not aes:
                 return False
@@ -510,7 +510,7 @@ def init_activity_tracking(app):
                     method = request.method
                     url_path = request.path
                     referrer = request.referrer
-                    from app.services.user_analytics_service import get_client_ip
+                    from app.services.platform.user_analytics_service import get_client_ip
                     ip_address = get_client_ip()
                     user_agent = request.headers.get('User-Agent')
 
@@ -722,7 +722,7 @@ class ActivityLogger:
             self.context_data['error_type'] = exc_type.__name__
 
         if current_user.is_authenticated:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if self.admin_action and AuthorizationService.is_admin(current_user):
                 log_admin_action(
                     action_type=self.activity_type,

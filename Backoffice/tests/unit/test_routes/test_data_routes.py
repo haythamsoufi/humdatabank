@@ -183,7 +183,7 @@ class TestGetData:
              patch("app.routes.api.data.query_form_data", return_value=MagicMock()), \
              patch("app.routes.api.data.get_form_data_queries", return_value=(mock_aq, mock_pq)), \
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager",
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False):
             resp = client.get(self.URL)
         assert resp.status_code == 200
@@ -226,7 +226,7 @@ class TestGetData:
              patch("app.routes.api.data.query_form_data", return_value=MagicMock()), \
              patch("app.routes.api.data.get_form_data_queries", return_value=(mock_aq, mock_pq)), \
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager",
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False):
             resp = client.get(f"{self.URL}?submission_type=invalid")
         assert resp.status_code == 200
@@ -241,7 +241,7 @@ class TestGetData:
              patch("app.routes.api.data.query_form_data", return_value=MagicMock()), \
              patch("app.routes.api.data.get_form_data_queries", return_value=(mock_aq, mock_pq)), \
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager",
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False):
             resp = client.get(f"{self.URL}?item_type=invalid_type")
         assert resp.status_code == 200
@@ -262,7 +262,7 @@ class TestGetData:
              patch("app.routes.api.data.query_form_data", return_value=MagicMock()), \
              patch("app.routes.api.data.get_form_data_queries", return_value=(mock_aq, mock_pq)), \
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager",
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False), \
              patch("app.utils.country_utils.resolve_country_from_iso", return_value=(1, None)):
             resp = client.get(f"{self.URL}?country_iso2=AF")
@@ -278,7 +278,7 @@ class TestGetData:
              patch("app.routes.api.data.query_form_data", return_value=MagicMock()), \
              patch("app.routes.api.data.get_form_data_queries", return_value=(mock_aq, mock_pq)), \
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager",
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False):
             resp = client.get(f"{self.URL}?country_iso2=12")
         assert resp.status_code == 200
@@ -355,7 +355,7 @@ class TestGetDataTables:
              patch("app.routes.api.data.query_form_data", return_value=MagicMock()), \
              patch("app.routes.api.data.get_form_data_queries", return_value=(mock_aq, mock_pq)), \
              patch("app.routes.api.data.apply_user_template_scoping", return_value=MagicMock()), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager",
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                    return_value=False):
             resp = client.get(self.URL)
         assert resp.status_code == 200

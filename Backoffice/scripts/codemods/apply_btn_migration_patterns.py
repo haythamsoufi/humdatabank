@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parents[1] / "app" / "templates"
+ROOT = pathlib.Path(__file__).resolve().parents[2] / "app" / "templates"
 
 # (old_substring, new_substring) — order matters (longest/specific first).
 REPLACEMENTS: list[tuple[str, str]] = [

@@ -6,7 +6,7 @@ Targets 100% coverage of app/services/assignment_service.py.
 import pytest
 from werkzeug.exceptions import NotFound
 
-from app.services.assignment_service import AssignmentService
+from app.services.assignments.service import AssignmentService
 from tests.factories import (
     create_test_assignment_entity_status,
     create_test_country,

@@ -36,7 +36,7 @@ def search_documents():
         JSON with matching document chunks
     """
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         data = get_json_safe()
         query = data.get('query', '').strip()
         query_preview = (query[:200] + '...') if len(query) > 200 else query

@@ -36,7 +36,7 @@ jobs:
           python-version: '3.11'
 
       - name: Block __consoleSaved.* in Jinja templates
-        run: python Backoffice/scripts/check_no_console_saved_bypass.py
+        run: python Backoffice/scripts/ci/check_no_console_saved_bypass.py
 
       - name: No inline JS / CSP-risk patterns in diff
         run: |
@@ -49,7 +49,7 @@ jobs:
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
             echo "::warning::No base SHA available (first push to branch?) — skipping diff check"
           else
-            python Backoffice/scripts/check_no_inline_js_in_diff.py --base-ref "$BASE"
+            python Backoffice/scripts/ci/check_no_inline_js_in_diff.py --base-ref "$BASE"
           fi
 
       - name: No unsafe gettext embedding in template diff
@@ -63,14 +63,14 @@ jobs:
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
             echo "::warning::No base SHA available (first push to branch?) — skipping gettext embed check"
           else
-            python Backoffice/scripts/check_unsafe_gettext_embedding.py --base-ref "$BASE"
+            python Backoffice/scripts/ci/check_unsafe_gettext_embedding.py --base-ref "$BASE"
           fi
 
       - name: Translations catalog is current and all .po files compile cleanly
         working-directory: Backoffice
         run: |
           pip install polib babel --quiet
-          python scripts/check_translations_current.py
+          python scripts/ci/check_translations_current.py
 
   # ── Bandit static security analysis ────────────────────────────────────────
   bandit:

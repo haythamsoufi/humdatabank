@@ -9,7 +9,7 @@ from flask_login import current_user
 from app import db
 from app.models import User, Country, UserEntityPermission, CountryAccessRequest, UserSessionLog
 from app.routes.admin.shared import permission_required, permission_required_any
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
 from app.utils.error_handling import handle_json_view_exception
@@ -80,7 +80,7 @@ def api_user_update(user_id):
     """JSON API: profile fields and/or rbac_role_ids for admin clients."""
     try:
         from app.models.rbac import RbacRole, RbacUserRole
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         user = User.query.get(user_id)
         if not user:
@@ -468,7 +468,7 @@ def api_users_profile_summary():
 def api_access_requests_count():
     """API endpoint to get pending access requests count"""
     try:
-        from app.services.country_access_request_service import (
+        from app.services.organization.country_access_request_service import (
             count_pending_country_access_requests_needing_action,
         )
 
@@ -484,8 +484,8 @@ def api_access_requests_list():
     """JSON list of pending and recently processed country access requests (mobile app)."""
     try:
         from sqlalchemy.orm import joinedload
-        from app.services.app_settings_service import get_auto_approve_access_requests
-        from app.services.country_access_request_service import (
+        from app.services.platform.app_settings_service import get_auto_approve_access_requests
+        from app.services.organization.country_access_request_service import (
             pending_country_access_requests_query,
             processed_country_access_requests_query,
             reconcile_fulfilled_pending_country_access_requests,
@@ -625,7 +625,7 @@ def api_reject_access_request(request_id):
 @permission_required('admin.access_requests.approve')
 def api_approve_all_access_requests():
     """Approve all pending country access requests (JSON)."""
-    from app.services.country_access_request_service import (
+    from app.services.organization.country_access_request_service import (
         pending_country_access_requests_query,
         reconcile_fulfilled_pending_country_access_requests,
     )
@@ -685,7 +685,7 @@ def api_approve_all_access_requests():
 @permission_required('admin.users.delete')
 def api_user_deletion_preview(user_id):
     """API endpoint to get user deletion preview in JSON format"""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if not current_user.is_authenticated or not AuthorizationService.is_system_manager(current_user):
         return json_forbidden('Only system managers can delete users.')
     user = User.query.get_or_404(user_id)
@@ -701,7 +701,7 @@ def api_user_deletion_preview(user_id):
 def api_activate_user(user_id):
     """API endpoint to activate a user"""
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         user = User.query.get_or_404(user_id)
         if user.id == current_user.id:
             return json_bad_request('You cannot activate your own account')
@@ -732,7 +732,7 @@ def api_activate_user(user_id):
 def api_deactivate_user(user_id):
     """API endpoint to deactivate a user"""
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         user = User.query.get_or_404(user_id)
         if user.id == current_user.id:
             return json_bad_request('You cannot deactivate your own account')

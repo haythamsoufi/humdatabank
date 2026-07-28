@@ -1256,7 +1256,7 @@ class TestEntryBootstrapMatrixCandidates:
         with patch(
             "app.routes.api.assignments._resolve_auto_load_entities_inner", return_value=fake_result
         ) as mock_inner, patch(
-            "app.services.variable_resolution_service.VariableResolutionService._resolve_effective_period",
+            "app.services.forms.variable_resolution_service.VariableResolutionService._resolve_effective_period",
             return_value='2024',
         ):
             result = _entry_bootstrap_matrix_candidates(
@@ -1317,7 +1317,7 @@ class TestEntryBootstrapMatrixCandidates:
         variable_configs = {'rev_var': {'entity_scope': 'entities_containing'}}
 
         with patch(
-            "app.services.variable_resolution_service.VariableResolutionService.resolve_variables"
+            "app.services.forms.variable_resolution_service.VariableResolutionService.resolve_variables"
         ) as mock_resolve:
             result = _entry_bootstrap_matrix_candidates(
                 aes=MagicMock(), matrix_item=item, variable_configs=variable_configs,

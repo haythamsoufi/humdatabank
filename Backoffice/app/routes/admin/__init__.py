@@ -18,7 +18,7 @@ from app.utils.request_utils import is_json_request
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, inspect, select
 from app.services import get_platform_stats
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 # Import all admin module blueprints
 from app.routes.admin.form_builder import bp as form_builder_bp
@@ -195,7 +195,7 @@ def admin_dashboard():
     kobo_data_import_url = _kobo_data_import_url_for_dashboard()
     data_sync_url = _data_sync_url_for_dashboard()
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         can_view_analytics = AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(current_user, 'admin.analytics.view')
         can_view_assignments = AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(current_user, 'admin.assignments.view')
@@ -335,7 +335,7 @@ def admin_dashboard():
         security_audit_widget = {"high_risk_actions_30d": 0, "suspicious_logins_30d": 0, "failed_login_rate_30d": 0.0}
         if can_view_analytics:
             try:
-                from app.services.governance_metrics_service import _get_security_audit_metrics
+                from app.services.platform.governance_metrics_service import _get_security_audit_metrics
                 security_audit_widget = _get_security_audit_metrics()
                 db.session.rollback()
             except Exception as e:
@@ -398,7 +398,7 @@ def user_has_permission(permission_name):
     """Template global for checking permissions"""
     if not current_user.is_authenticated:
         return False
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     return AuthorizationService.has_rbac_permission(current_user, permission_name)
 
 # Template global for getting localized sector name (from shared module)

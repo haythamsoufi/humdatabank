@@ -8,9 +8,9 @@ import sys
 import pytest
 
 BACKOFFICE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SCRIPTS_DIR = os.path.join(BACKOFFICE_DIR, "scripts")
-if SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, SCRIPTS_DIR)
+IMPORTS_DIR = os.path.join(BACKOFFICE_DIR, "scripts", "imports")
+if IMPORTS_DIR not in sys.path:
+    sys.path.insert(0, IMPORTS_DIR)
 
 from upr_country_reporting_excel_template import (  # noqa: E402
     INDICATOR_APPLICABLE_VALUE,

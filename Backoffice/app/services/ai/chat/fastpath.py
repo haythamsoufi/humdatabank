@@ -18,7 +18,7 @@ from app.extensions import db
 from app.models import Country
 
 logger = logging.getLogger(__name__)
-from app.services.data_retrieval_service import get_value_breakdown as svc_get_value_breakdown
+from app.services.data_retrieval.service import get_value_breakdown as svc_get_value_breakdown
 from app.utils.sql_utils import safe_ilike_pattern
 
 

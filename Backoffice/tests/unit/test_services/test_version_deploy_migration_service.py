@@ -4,7 +4,7 @@ import pytest
 
 from app import db
 from app.models import FormData, FormItem, FormSection, FormTemplateVersion
-from app.services.version_deploy_migration_service import VersionDeployMigrationService
+from app.services.platform.version_deploy_migration_service import VersionDeployMigrationService
 from app.utils.stable_key import generate_stable_key
 from tests.factories import (
     create_test_item,
@@ -192,7 +192,7 @@ def test_build_field_comparison_suggested_on_label_change(db_session, admin_user
 
 def test_precondition_aborts_when_draft_has_section_submission_rows(db_session, admin_user):
     from app.models import RepeatGroupInstance
-    from app.services.version_deploy_migration_service import VersionDeployMigrationError
+    from app.services.platform.version_deploy_migration_service import VersionDeployMigrationError
     from tests.factories import create_test_assignment_entity_status
 
     template, published, draft = _make_published_with_draft(db_session, admin_user)

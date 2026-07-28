@@ -7,7 +7,7 @@ from flask_login import login_user
 
 from app.models import TemplateShare
 from app.models.enums import AssignmentEntityStatusValue
-from app.services.authorization_service import (
+from app.services.organization.authorization_service import (
     AuthorizationService,
     _rbac_cache_get,
     _rbac_cache_set,
@@ -259,7 +259,7 @@ class TestAuthorizationServiceDecorators:
 
         with app.test_request_context():
             with patch(
-                'app.services.authorization_service.AssignmentEntityStatus.query.get_or_404',
+                'app.services.organization.authorization_service.AssignmentEntityStatus.query.get_or_404',
                 side_effect=RuntimeError('boom'),
             ):
                 result = view(1)
@@ -307,7 +307,7 @@ class TestAuthorizationServiceDecorators:
 
         with app.test_request_context():
             with patch(
-                'app.services.authorization_service.AssignmentEntityStatus.query.get_or_404',
+                'app.services.organization.authorization_service.AssignmentEntityStatus.query.get_or_404',
                 side_effect=RuntimeError('boom'),
             ):
                 result = view(1)

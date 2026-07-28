@@ -8,9 +8,9 @@ from flask import current_app
 from app import db
 from app.models.core import User, UserEntityPermission
 from app.services.email.client import send_email
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from app.utils.organization_helpers import is_org_email
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 
 def get_entity_contacts(entity_type: str, entity_id: int) -> List[User]:

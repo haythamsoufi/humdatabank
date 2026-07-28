@@ -253,7 +253,7 @@ class TestGetSubmittedDocuments:
             ))
             db_session.commit()
 
-        with patch("app.services.storage_service.exists", return_value=False):
+        with patch("app.services.platform.storage_service.exists", return_value=False):
             resp = client.get(_api("/submitted-documents"), headers=auth_headers)
         data = resp.get_json()
         assert len(data["documents"]) >= 1
@@ -270,14 +270,14 @@ class TestServeSectorLogo:
     """Tests for GET /api/v1/uploads/sectors/<filename>."""
 
     def test_missing_file_returns_404(self, client, db_session):
-        with patch("app.services.storage_service.stream_response", side_effect=Exception("not found")):
+        with patch("app.services.platform.storage_service.stream_response", side_effect=Exception("not found")):
             resp = client.get(_api("/uploads/sectors/missing.png"))
         assert resp.status_code == 404
 
     def test_serves_file(self, client, db_session):
         mock_response = MagicMock()
         mock_response.status_code = 200
-        with patch("app.services.storage_service.stream_response", return_value=mock_response) as mock_sr:
+        with patch("app.services.platform.storage_service.stream_response", return_value=mock_response) as mock_sr:
             resp = client.get(_api("/uploads/sectors/logo.png"))
         mock_sr.assert_called_once()
 
@@ -287,7 +287,7 @@ class TestServeSectorLogo:
         def capture(*args, **kwargs):
             calls.append(args)
             raise Exception("stop")
-        with patch("app.services.storage_service.stream_response", side_effect=capture):
+        with patch("app.services.platform.storage_service.stream_response", side_effect=capture):
             client.get(_api("/uploads/sectors/../../etc/passwd"))
         if calls:
             # The path used must be just the basename, not the traversal path
@@ -306,17 +306,17 @@ class TestServeBrandingAsset:
         # Empty path is not a valid route, but test with a space-only name
         with patch("app.utils.branding_visual_assets.SYSTEM_BRANDING_REL_PREFIX", "branding"), \
              patch("app.utils.branding_visual_assets.safe_branding_download_filename", return_value=""), \
-             patch("app.services.storage_service.stream_response", side_effect=Exception("not found")):
+             patch("app.services.platform.storage_service.stream_response", side_effect=Exception("not found")):
             resp = client.get(_api("/uploads/branding/ "))
         assert resp.status_code == 404
 
     def test_missing_file_returns_404(self, client, db_session):
-        with patch("app.services.storage_service.stream_response", side_effect=Exception("not found")):
+        with patch("app.services.platform.storage_service.stream_response", side_effect=Exception("not found")):
             resp = client.get(_api("/uploads/branding/logo.png"))
         assert resp.status_code == 404
 
     def test_serves_branding_file(self, client, db_session):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        with patch("app.services.storage_service.stream_response", return_value=mock_resp):
+        with patch("app.services.platform.storage_service.stream_response", return_value=mock_resp):
             client.get(_api("/uploads/branding/logo.png"))

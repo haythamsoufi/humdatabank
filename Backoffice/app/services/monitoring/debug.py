@@ -217,7 +217,7 @@ class DebugManager:
         # LOG_MODE=debug a single form load generates 20-50+ messages. Cap at INFO so debug
         # mode remains usable; the WARNING-level messages (missing config, unknown scope) are
         # still surfaced.
-        logging.getLogger('app.services.variable_resolution_service').setLevel(logging.INFO)
+        logging.getLogger('app.services.forms.variable_resolution_service').setLevel(logging.INFO)
 
         # Transaction rollbacks on every 4xx/exception are expected; keep warnings/errors only.
         for _txn_logger in (

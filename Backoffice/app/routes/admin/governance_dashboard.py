@@ -9,7 +9,7 @@ and flags with links to the right admin screens.
 
 from flask import Blueprint, render_template, request
 from app.routes.admin.shared import permission_required
-from app.services.governance_metrics_service import get_governance_metrics
+from app.services.platform.governance_metrics_service import get_governance_metrics
 from app.utils.api_responses import json_ok
 
 bp = Blueprint("governance_dashboard", __name__, url_prefix="/admin")

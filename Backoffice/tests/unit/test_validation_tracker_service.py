@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from app.services.validation_tracker_service import (
+from app.services.validation.tracker_service import (
     TRACKER_DOCUMENT_SPECS,
     TRACKER_SECTION_SPECS,
     _overall_completion_rate,
@@ -29,7 +29,7 @@ def test_status_value_from_enum():
     assert _status_value(aes) == "submitted"
 
 
-@patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
+@patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
 def test_reporting_section_ratios_empty_kpi_data(_mock_income_ratio):
     ratios = _reporting_section_ratios({}, aes_id=1, template_id=21, version_id=None)
     assert set(ratios.keys()) == {"governance", "finance", "reach"}
@@ -42,13 +42,13 @@ def test_overall_completion_rate_averages_sections():
     assert _overall_completion_rate({}) == 0.0
 
 
-@patch("app.services.validation_tracker_service.compute_income_sources_ratio", return_value=0.0)
-@patch("app.services.validation_tracker_service.active_country_map_query")
-@patch("app.services.validation_tracker_service.AssignedForm")
-@patch("app.services.validation_tracker_service.AssignmentEntityStatus")
-@patch("app.services.validation_tracker_service._bulk_kpi_data_by_aes")
-@patch("app.services.validation_tracker_service._document_field_map")
-@patch("app.services.validation_tracker_service.SubmittedDocument")
+@patch("app.services.validation.tracker_service.compute_income_sources_ratio", return_value=0.0)
+@patch("app.services.validation.tracker_service.active_country_map_query")
+@patch("app.services.validation.tracker_service.AssignedForm")
+@patch("app.services.validation.tracker_service.AssignmentEntityStatus")
+@patch("app.services.validation.tracker_service._bulk_kpi_data_by_aes")
+@patch("app.services.validation.tracker_service._document_field_map")
+@patch("app.services.validation.tracker_service.SubmittedDocument")
 def test_build_tracker_data_shapes(
     mock_submitted_doc,
     mock_doc_map,

@@ -210,9 +210,9 @@ class TestInjectDynamicLocaleSettings:
     def test_returns_supported_languages(self, app):
         """Should return SUPPORTED_LANGUAGES from DB-backed service."""
         with app.test_request_context('/'):
-            with patch('app.services.app_settings_service.get_supported_languages',
+            with patch('app.services.platform.app_settings_service.get_supported_languages',
                        return_value=['en', 'fr', 'ar']), \
-                 patch('app.services.app_settings_service.get_show_language_flags',
+                 patch('app.services.platform.app_settings_service.get_show_language_flags',
                        return_value=True):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -226,7 +226,7 @@ class TestInjectDynamicLocaleSettings:
     def test_returns_empty_dict_on_exception(self, app):
         """Exception in get_supported_languages should return empty dict {}."""
         with app.test_request_context('/'):
-            with patch('app.services.app_settings_service.get_supported_languages',
+            with patch('app.services.platform.app_settings_service.get_supported_languages',
                        side_effect=Exception("db error")):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -252,15 +252,15 @@ class TestInjectOrgBranding:
                  patch('app.utils.organization_helpers.get_org_short_name', return_value='TO'), \
                  patch('app.utils.organization_helpers.get_org_email_domain', return_value='test.org'), \
                  patch('app.utils.organization_helpers.get_org_domain', return_value='test.org'), \
-                 patch('app.services.app_settings_service.get_organization_branding', return_value={}), \
-                 patch('app.services.app_settings_service.get_organization_logo_path', return_value='logo.svg'), \
-                 patch('app.services.app_settings_service.get_organization_email_domain', return_value='test.org'), \
-                 patch('app.services.app_settings_service.get_organization_domain', return_value='test.org'), \
-                 patch('app.services.app_settings_service.get_chatbot_name', return_value='Bot'), \
-                 patch('app.services.app_settings_service.get_chatbot_org_only', return_value=False), \
-                 patch('app.services.app_settings_service.is_organization_email', return_value=lambda e: False), \
-                 patch('app.services.app_settings_service.user_has_ai_beta_access', return_value=lambda u: True), \
-                 patch('app.services.app_settings_service.user_is_explicit_beta_tester', return_value=lambda u: False):
+                 patch('app.services.platform.app_settings_service.get_organization_branding', return_value={}), \
+                 patch('app.services.platform.app_settings_service.get_organization_logo_path', return_value='logo.svg'), \
+                 patch('app.services.platform.app_settings_service.get_organization_email_domain', return_value='test.org'), \
+                 patch('app.services.platform.app_settings_service.get_organization_domain', return_value='test.org'), \
+                 patch('app.services.platform.app_settings_service.get_chatbot_name', return_value='Bot'), \
+                 patch('app.services.platform.app_settings_service.get_chatbot_org_only', return_value=False), \
+                 patch('app.services.platform.app_settings_service.is_organization_email', return_value=lambda e: False), \
+                 patch('app.services.platform.app_settings_service.user_has_ai_beta_access', return_value=lambda u: True), \
+                 patch('app.services.platform.app_settings_service.user_is_explicit_beta_tester', return_value=lambda u: False):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
                     try:
@@ -294,7 +294,7 @@ class TestInjectRbacHelpers:
     def test_has_permission_returns_false_when_no_auth_service(self, app):
         """If AuthorizationService import fails, has_permission returns False."""
         with app.test_request_context('/'):
-            with patch('app.services.authorization_service.AuthorizationService',
+            with patch('app.services.organization.authorization_service.AuthorizationService',
                        side_effect=Exception("import error")):
                 processors = app.template_context_processors.get(None, [])
                 for proc in processors:
@@ -531,7 +531,7 @@ class TestSessionFilters:
             mock_log.user_agent = 'Mozilla/5.0'
             mock_log.device_type = 'desktop'
             mock_log.operating_system = 'Windows'
-            with patch('app.services.user_analytics_service.session_log_device_icon_classes',
+            with patch('app.services.platform.user_analytics_service.session_log_device_icon_classes',
                        return_value='fas fa-desktop'):
                 result = fn(mock_log)
                 assert result == 'fas fa-desktop'
@@ -608,10 +608,10 @@ class TestInjectPendingAccessRequestsCount:
         mock_user.is_authenticated = True
         with app.test_request_context("/"):
             with patch("flask_login.utils._get_user", return_value=mock_user), patch(
-                "app.services.authorization_service.AuthorizationService.is_system_manager",
+                "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                 return_value=False,
             ), patch(
-                "app.services.authorization_service.AuthorizationService.has_rbac_permission",
+                "app.services.organization.authorization_service.AuthorizationService.has_rbac_permission",
                 return_value=False,
             ):
                 assert self._pending_count_result(app)["pending_access_requests_count"] == 0
@@ -621,10 +621,10 @@ class TestInjectPendingAccessRequestsCount:
         mock_user.is_authenticated = True
         with app.test_request_context("/"):
             with patch("flask_login.utils._get_user", return_value=mock_user), patch(
-                "app.services.authorization_service.AuthorizationService.is_system_manager",
+                "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
                 return_value=True,
             ), patch(
-                "app.services.country_access_request_service.count_pending_country_access_requests_needing_action",
+                "app.services.organization.country_access_request_service.count_pending_country_access_requests_needing_action",
                 return_value=3,
             ):
                 assert self._pending_count_result(app)["pending_access_requests_count"] == 3

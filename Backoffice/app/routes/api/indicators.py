@@ -37,8 +37,8 @@ from app import db
 from app.utils.api_helpers import json_response, api_error, get_json_safe
 from app.utils.api_responses import require_json_data, require_json_keys
 from app.utils.form_localization import get_localized_indicator_type, get_localized_indicator_unit
-from app.services.authorization_service import AuthorizationService
-from app.services.indicator_bank_service import (
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.indicators.bank_service import (
     IndicatorBankFilters,
     build_sector_subsector_names as _build_sector_subsector_names,
     get_indicator_list,

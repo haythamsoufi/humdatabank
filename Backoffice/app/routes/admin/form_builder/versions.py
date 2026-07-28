@@ -9,7 +9,7 @@ from . import bp
 from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormPage, FormTemplateVersion
 from app.routes.admin.shared import permission_required, check_template_access
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
 from app.utils.request_utils import get_request_data, is_json_request
@@ -93,7 +93,7 @@ def deploy_template_version(template_id):
         template.published_version_id = version.id
 
         if prev_version_id:
-            from app.services.version_deploy_migration_service import (
+            from app.services.platform.version_deploy_migration_service import (
                 VersionDeployMigrationError,
                 VersionDeployMigrationService,
             )
@@ -114,7 +114,7 @@ def deploy_template_version(template_id):
         # Evict cached section/item data for this template so the next form load
         # picks up the freshly published structure instead of stale rows.
         try:
-            from app.services.template_preparation_service import invalidate_sections_cache
+            from app.services.templates.preparation_service import invalidate_sections_cache
             invalidate_sections_cache(template.id)
         except Exception as _ce:
             current_app.logger.debug("Section cache invalidation skipped: %s", _ce)
@@ -195,7 +195,7 @@ def deploy_template_preflight(template_id):
         if prev and prev.status == 'published':
             prev_version_id = prev.id
 
-    from app.services.version_deploy_migration_service import VersionDeployMigrationService
+    from app.services.platform.version_deploy_migration_service import VersionDeployMigrationService
     from flask import current_app as app_ctx
 
     if not prev_version_id:
@@ -260,7 +260,7 @@ def field_mapping_review(template_id, version_id):
         return redirect(url_for('form_builder.edit_template', template_id=template.id))
 
     prev_version_id = _resolve_prev_published_version_id(template, draft_version.id)
-    from app.services.version_deploy_migration_service import VersionDeployMigrationService
+    from app.services.platform.version_deploy_migration_service import VersionDeployMigrationService
 
     comparison_rows = []
     mapping_summary = {}

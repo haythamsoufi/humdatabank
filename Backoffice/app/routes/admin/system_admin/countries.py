@@ -8,7 +8,7 @@ from app.routes.admin.shared import permission_required
 from app.utils.request_utils import is_json_request
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error, json_form_errors, json_bad_request
-from app.services.country_service import (
+from app.services.organization.country_service import (
     assign_country_fds_member_user,
     fds_member_user_display_name,
     get_fds_member_user_options_for_country,

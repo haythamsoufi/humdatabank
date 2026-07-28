@@ -56,7 +56,7 @@ def enqueue_submitted_document_ai_processing(
     """
     from app.models import AIDocument, SubmittedDocument
     from app.routes.ai_documents.upload import _run_import_process_in_thread
-    from app.services import storage_service as _ai_storage
+    from app.services.platform import storage_service as _ai_storage
     from app.services.ai.documents.processor import AIDocumentProcessor
 
     submitted_doc = SubmittedDocument.query.get(submitted_doc_id)

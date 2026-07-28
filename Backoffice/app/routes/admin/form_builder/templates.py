@@ -20,9 +20,9 @@ from app.routes.admin.shared import (admin_required, admin_permission_required, 
     permission_required_any, system_manager_required, check_template_access)
 from app.utils.request_utils import is_json_request, get_request_data, _is_json_body
 from app.services.security.api_authentication import get_user_allowed_template_ids
-from app.services.user_analytics_service import log_admin_action
-from app.services.template_excel_service import TemplateExcelService
-from app.services.kobo_xls_import_service import KoboXlsImportService
+from app.services.platform.user_analytics_service import log_admin_action
+from app.services.templates.excel_service import TemplateExcelService
+from app.services.imports.kobo_xls_import_service import KoboXlsImportService
 from app.utils.error_handling import handle_view_exception, handle_json_view_exception
 from app.utils.transactions import request_transaction_rollback
 from app.utils.datetime_helpers import utcnow
@@ -64,7 +64,7 @@ def manage_templates():
     from flask_babel import gettext as _gettext, ngettext as _ngettext
 
     # System managers can see all templates regardless of ownership and sharing
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if AuthorizationService.is_system_manager(current_user):
         templates_query = FormTemplate.query.options(
             db.joinedload(FormTemplate.owned_by_user),
@@ -194,7 +194,7 @@ def manage_templates():
 def _build_template_grid_row_dict(template, *, template_data_counts=None, template_version_counts=None):
     """Build one AG Grid row dict (same shape as templates.html ``templatesData``)."""
     from app.utils.form_localization import get_localized_template_name
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from flask_babel import gettext as _gettext, ngettext as _ngettext
 
     template_data_counts = template_data_counts or {}
@@ -266,7 +266,7 @@ def _build_template_grid_row_dict(template, *, template_data_counts=None, templa
 @permission_required("admin.templates.view")
 def template_grid_row(template_id):
     """Return a single templates-list AG Grid row (for live refresh after AI create)."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     template = FormTemplate.query.options(
         db.joinedload(FormTemplate.owned_by_user),
@@ -411,7 +411,7 @@ def new_template():
 
     # Get available templates for cloning (same logic as manage_templates)
     # System managers can clone from any template
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if AuthorizationService.is_system_manager(current_user):
         templates_query = FormTemplate.query.options(
             db.joinedload(FormTemplate.owned_by_user),
@@ -839,7 +839,7 @@ def create_template_from_indicator_bank():
         return json_bad_request('At least one section with indicators is required')
 
     group_by = (data.get('group_by') or '').strip().lower() or None
-    from app.services.indicator_bank_service import sort_indicator_bank_wizard_sections
+    from app.services.indicators.bank_service import sort_indicator_bank_wizard_sections
 
     sections_payload = sort_indicator_bank_wizard_sections(
         sections_payload,
@@ -895,7 +895,7 @@ def create_template_from_indicator_bank():
     if not indicators_by_id:
         return json_bad_request('No valid indicators found')
 
-    from app.services.indicator_bank_service import (
+    from app.services.indicators.bank_service import (
         indicator_bank_supports_disaggregation,
         normalize_disaggregation_options,
     )
@@ -1576,7 +1576,7 @@ def edit_template(template_id):
         and selected_version.status == 'draft'
     ):
         from app.routes.admin.form_builder.helpers.field_mapping import published_picker_items
-        from app.services.version_deploy_migration_service import VersionDeployMigrationService
+        from app.services.platform.version_deploy_migration_service import VersionDeployMigrationService
 
         published_items_for_js = published_picker_items(template)
         comparison_rows = VersionDeployMigrationService.build_field_comparison(
@@ -1630,7 +1630,7 @@ def edit_template(template_id):
 @admin_permission_required('admin.templates.delete')
 def get_template_delete_info(template_id):
     """Get detailed information about what will be deleted when deleting a template."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     template = FormTemplate.query.get_or_404(template_id)
 
@@ -1705,7 +1705,7 @@ def get_template_delete_info(template_id):
 @bp.route("/templates/delete/<int:template_id>", methods=["POST"])
 @admin_permission_required('admin.templates.delete')
 def delete_template(template_id):
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     template = FormTemplate.query.get_or_404(template_id)
 

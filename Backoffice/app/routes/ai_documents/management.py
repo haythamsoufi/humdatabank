@@ -11,7 +11,7 @@ from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
-from app.services import storage_service as _storage
+from app.services.platform import storage_service as _storage
 
 from . import ai_docs_bp
 from .helpers import _ai_doc_storage_delete, _ai_doc_source_ready, _validate_ifrc_fetch_url
@@ -42,7 +42,7 @@ def list_documents():
 
         query = AIDocument.query
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_manage_docs = (
             AuthorizationService.is_admin(current_user)
             or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
@@ -85,7 +85,7 @@ def get_document(document_id: int):
     try:
         doc = AIDocument.query.get_or_404(document_id)
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_manage_docs = (
             AuthorizationService.is_admin(current_user)
             or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
@@ -118,7 +118,7 @@ def update_document(document_id: int):
     try:
         doc = AIDocument.query.get_or_404(document_id)
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_manage_docs = (
             AuthorizationService.is_admin(current_user)
             or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
@@ -162,7 +162,7 @@ def download_document(document_id: int):
     try:
         doc = AIDocument.query.get_or_404(document_id)
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_manage_docs = (
             AuthorizationService.is_admin(current_user)
             or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")
@@ -225,7 +225,7 @@ def delete_document(document_id: int):
     try:
         doc = AIDocument.query.get_or_404(document_id)
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_manage_docs = (
             AuthorizationService.is_admin(current_user)
             or AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage")

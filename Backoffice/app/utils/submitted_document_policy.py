@@ -19,7 +19,7 @@ def user_may_delete_or_replace_submitted_document_file(user, doc: Any) -> bool:
     """
     if not submitted_document_is_approved(doc):
         return True
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     return AuthorizationService.is_system_manager(user) or AuthorizationService.has_rbac_permission(
         user, "admin.documents.manage"

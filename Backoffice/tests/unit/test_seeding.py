@@ -11,7 +11,7 @@ We must patch them at their source module paths:
   - app.models.organization.NationalSociety
   - app.models.system.SystemSettings
   - app.models.rbac.RbacRole / RbacUserRole
-  - app.services.app_settings_service.*
+  - app.services.platform.app_settings_service.*
   - app.utils.organization_helpers.get_org_email_domain
 """
 
@@ -161,11 +161,11 @@ class TestSystemSettingsInit:
                         with patch("app.models.User", mock_user_cls):
                             with patch("app.models.organization.NationalSociety", mock_ns_cls):
                                 with patch("app.models.system.SystemSettings", mock_sys_settings):
-                                    with patch("app.services.app_settings_service.set_supported_languages") as sl:
-                                        with patch("app.services.app_settings_service.set_document_types") as dt:
-                                            with patch("app.services.app_settings_service.set_age_groups") as ag:
-                                                with patch("app.services.app_settings_service.set_sex_categories") as sc:
-                                                    with patch("app.services.app_settings_service.set_enabled_entity_types") as et:
+                                    with patch("app.services.platform.app_settings_service.set_supported_languages") as sl:
+                                        with patch("app.services.platform.app_settings_service.set_document_types") as dt:
+                                            with patch("app.services.platform.app_settings_service.set_age_groups") as ag:
+                                                with patch("app.services.platform.app_settings_service.set_sex_categories") as sc:
+                                                    with patch("app.services.platform.app_settings_service.set_enabled_entity_types") as et:
                                                         with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
                                                             with patch("app.models.rbac.RbacRole"):
                                                                 with patch("app.models.rbac.RbacUserRole"):
@@ -217,7 +217,7 @@ class TestSystemSettingsInit:
                                     with patch("app.utils.organization_helpers.get_org_email_domain", return_value="example.com"):
                                         with patch("app.models.rbac.RbacRole"):
                                             with patch("app.models.rbac.RbacUserRole"):
-                                                with patch("app.services.app_settings_service.set_supported_languages") as sl:
+                                                with patch("app.services.platform.app_settings_service.set_supported_languages") as sl:
                                                     create_default_data(app)
 
         sl.assert_not_called()

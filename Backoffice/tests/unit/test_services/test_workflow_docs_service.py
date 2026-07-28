@@ -12,7 +12,7 @@ the bug is specifically about how real translation files parse.
 """
 import pytest
 
-from app.services.workflow_docs_service import WorkflowDocsService
+from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
 pytestmark = [pytest.mark.unit]
 

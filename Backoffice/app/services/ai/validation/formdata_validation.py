@@ -499,7 +499,7 @@ class AIFormDataValidationService:
                 return None
             if not context.get("country_id"):
                 return None
-            from app.services.data_retrieval_service import get_upr_kpi_value as get_upr_kpi_value_service
+            from app.services.data_retrieval.service import get_upr_kpi_value as get_upr_kpi_value_service
 
             upr = get_upr_kpi_value_service(
                 country_identifier=int(context["country_id"]),
@@ -2103,7 +2103,7 @@ class AIFormDataValidationService:
         user_role = None
         try:
             # Use same access-level naming used by vector store
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             from flask_login import current_user
 
             user_id = int(current_user.id) if getattr(current_user, "is_authenticated", False) else None
@@ -2766,7 +2766,7 @@ class AIFormDataValidationService:
                 upr = context.get("upr_kpi")
                 upr_value_int = _parse_int_number((upr or {}).get("value"))
             elif upr_metric and context.get("country_id"):
-                from app.services.data_retrieval_service import get_upr_kpi_value as get_upr_kpi_value_service
+                from app.services.data_retrieval.service import get_upr_kpi_value as get_upr_kpi_value_service
 
                 upr = get_upr_kpi_value_service(
                     country_identifier=int(context["country_id"]),

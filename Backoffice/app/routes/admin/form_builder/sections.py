@@ -10,11 +10,11 @@ from app.models import FormTemplate, FormSection, FormItem, FormPage, FormTempla
 from app.forms.form_builder import FormSectionForm
 from app.routes.admin.shared import permission_required
 from app.utils.request_utils import is_json_request, get_request_data
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
-from app.services.section_duplication_service import SectionDuplicationService
+from app.services.forms.section_duplication_service import SectionDuplicationService
 from config.config import Config
 from .helpers import (_update_version_timestamp, _ensure_template_access_or_redirect,
     _get_descendant_section_ids, _delete_or_archive_one_section)

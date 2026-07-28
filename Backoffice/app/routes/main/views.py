@@ -7,7 +7,7 @@ import os
 from flask_babel import _
 from contextlib import suppress
 from app.extensions import limiter
-from app.services.app_settings_service import user_has_ai_beta_access
+from app.services.platform.app_settings_service import user_has_ai_beta_access
 
 from app.routes.main import bp
 
@@ -143,7 +143,7 @@ def chat_immersive(conversation_id=None):
         flash(_("AI is currently in beta and available only to selected users."), "warning")
         return redirect(url_for("main.dashboard"))
     try:
-        from app.services.app_settings_service import get_chatbot_org_only, is_organization_email
+        from app.services.platform.app_settings_service import get_chatbot_org_only, is_organization_email
         if get_chatbot_org_only() and not is_organization_email(getattr(current_user, "email", "")):
             flash(_("Chat is only available to organization users."), "warning")
             return redirect(url_for("main.dashboard"))
@@ -151,7 +151,7 @@ def chat_immersive(conversation_id=None):
         pass
     websocket_enabled = bool(current_app.config.get("WEBSOCKET_ENABLED", True))
     try:
-        from app.services.app_settings_service import get_chatbot_name
+        from app.services.platform.app_settings_service import get_chatbot_name
         chatbot_name = get_chatbot_name(default="")
     except Exception as e:
         current_app.logger.debug("get_chatbot_name failed: %s", e)
@@ -170,7 +170,7 @@ def download_submission_pdf(submission_id):
     """Generate and serve a PDF of the public submission using the exact HTML template."""
     submission = PublicSubmission.query.get_or_404(submission_id)
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if not AuthorizationService.is_admin(current_user):
         if not any(
             perm.entity_type == "country" and perm.entity_id == submission.country_id
@@ -448,7 +448,7 @@ def manage_ns_hierarchy():
     """Manage National Society hierarchy (branches, sub-branches, local units)"""
     from app.models import NSBranch, NSSubBranch, NSLocalUnit
     from flask import abort
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     is_sys_mgr = AuthorizationService.is_system_manager(current_user)
     is_org_admin = AuthorizationService.has_rbac_permission(current_user, 'admin.organization.manage') or AuthorizationService.has_rbac_permission(current_user, 'admin.countries.view')
@@ -494,7 +494,7 @@ def manage_ns_hierarchy():
 @bp.route('/manifest.webmanifest')
 def manifest():
     """Serve dynamic web app manifest with organization branding"""
-    from app.services.app_settings_service import (
+    from app.services.platform.app_settings_service import (
         get_organization_name,
         get_organization_short_name,
         get_organization_logo_path,

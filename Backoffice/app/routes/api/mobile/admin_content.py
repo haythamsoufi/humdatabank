@@ -87,7 +87,7 @@ def delete_template(template_id):
         return mobile_not_found('Template not found')
 
     try:
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         template_name = template.name
         db.session.delete(template)
         db.session.flush()
@@ -155,7 +155,7 @@ def list_assignments():
 def get_assignment(assignment_id):
     """Return one assignment with entity rows and deadline-related fields."""
     from app.models import AssignedForm, AssignmentEntityStatus
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
 
     a = AssignedForm.query.options(
         db.joinedload(AssignedForm.template),
@@ -229,7 +229,7 @@ def delete_assignment(assignment_id):
         db.session.delete(assignment)
         db.session.flush()
 
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         log_admin_action(
             action_type='delete_assignment',
             description=f'Deleted assignment "{period}" via mobile API',
@@ -348,7 +348,7 @@ def get_submitted_document_file(document_id):
         _check_document_access,
         _storage_category_for_submitted_document,
     )
-    from app.services import storage_service as storage
+    from app.services.platform import storage_service as storage
 
     document = db.session.get(SubmittedDocument, document_id)
     if not document:
@@ -394,7 +394,7 @@ def delete_document(document_id):
         db.session.delete(doc)
         db.session.flush()
 
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         log_admin_action(
             action_type='delete_document',
             description=f'Deleted document "{file_name}" via mobile API',
@@ -467,7 +467,7 @@ def get_resource_file(resource_id):
     import mimetypes
 
     from app.models import Resource, ResourceTranslation
-    from app.services import storage_service as storage
+    from app.services.platform import storage_service as storage
 
     resource = db.session.get(Resource, resource_id)
     if not resource:
@@ -527,7 +527,7 @@ def delete_resource(resource_id):
         db.session.delete(resource)
         db.session.flush()
 
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         log_admin_action(
             action_type='delete_resource',
             description=f'Deleted resource "{title}" via mobile API',
@@ -752,7 +752,7 @@ def get_indicator(indicator_id):
     dt = indicator.definition_translations if isinstance(
         getattr(indicator, 'definition_translations', None), dict) else None
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     can_archive = (
         AuthorizationService.is_system_manager(current_user)
         or AuthorizationService.has_rbac_permission(
@@ -787,7 +787,7 @@ def get_indicator(indicator_id):
 def edit_indicator(indicator_id):
     """Update an indicator (full parity with web: translations, sector levels, FDRS, etc.)."""
     from app.models import IndicatorBank
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     indicator = db.session.get(IndicatorBank, indicator_id)
     if not indicator:
@@ -811,7 +811,7 @@ def edit_indicator(indicator_id):
     try:
         db.session.add(indicator)
         db.session.flush()
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         log_admin_action(
             action_type='update_indicator',
             description=f'Updated indicator "{indicator.name}" (id {indicator_id}) via mobile API',
@@ -842,7 +842,7 @@ def delete_indicator(indicator_id):
         db.session.delete(indicator)
         db.session.flush()
 
-        from app.services.user_analytics_service import log_admin_action
+        from app.services.platform.user_analytics_service import log_admin_action
         log_admin_action(
             action_type='delete_indicator',
             description=f'Deleted indicator "{name}" via mobile API',

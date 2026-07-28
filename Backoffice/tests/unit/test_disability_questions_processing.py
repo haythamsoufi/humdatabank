@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from app.services.form_processing_service import FormItemProcessor
+from app.services.forms.processing_service import FormItemProcessor
 
 
 def _indicator(**config_overrides):

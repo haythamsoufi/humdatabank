@@ -9,7 +9,7 @@ from app.services.validation.types import (
     ValidationEvaluationResult,
     ValidationQuestionDraft,
 )
-from app.services.validation_check_service import (
+from app.services.validation.check_service import (
     ValidationContext,
     _load_history,
     _resolve_country_id,
@@ -34,7 +34,7 @@ class TestResolveCountryId:
         country_mock = MagicMock()
         country_mock.id = 99
         with patch(
-            "app.services.entity_service.EntityService.get_country_for_entity",
+            "app.services.organization.entity_service.EntityService.get_country_for_entity",
             return_value=country_mock,
         ):
             result = _resolve_country_id("ns", 5)
@@ -42,7 +42,7 @@ class TestResolveCountryId:
 
     def test_returns_none_when_no_country_found(self):
         with patch(
-            "app.services.entity_service.EntityService.get_country_for_entity",
+            "app.services.organization.entity_service.EntityService.get_country_for_entity",
             return_value=None,
         ):
             result = _resolve_country_id("ns", 5)
@@ -61,9 +61,9 @@ class TestLoadHistory:
 
     def test_returns_empty_when_no_assignments(self):
         with patch(
-            "app.services.validation_check_service.AssignmentEntityStatus"
+            "app.services.validation.check_service.AssignmentEntityStatus"
         ) as mock_aes, patch(
-            "app.services.validation_check_service.AssignedForm"
+            "app.services.validation.check_service.AssignedForm"
         ):
             mock_aes.query.join.return_value.filter.return_value.all.return_value = []
             result = _load_history(1, "country", 1, "FDRS 2024", {})
@@ -81,16 +81,16 @@ class TestLoadHistory:
         item.id = 5
 
         with patch(
-            "app.services.validation_check_service.AssignmentEntityStatus"
+            "app.services.validation.check_service.AssignmentEntityStatus"
         ) as mock_aes_cls, patch(
-            "app.services.validation_check_service.AssignedForm"
+            "app.services.validation.check_service.AssignedForm"
         ), patch(
-            "app.services.validation_check_service.FormData"
+            "app.services.validation.check_service.FormData"
         ) as mock_fd, patch(
-            "app.services.validation_check_service.numeric_value",
+            "app.services.validation.check_service.numeric_value",
             return_value=100.0,
         ), patch(
-            "app.services.validation_check_service.parse_period_year",
+            "app.services.validation.check_service.parse_period_year",
             side_effect=lambda p: 2024 if "2024" in str(p) else 2023 if "2023" in str(p) else None,
         ):
             mock_aes_cls.query.join.return_value.filter.return_value.all.return_value = [aes]
@@ -108,13 +108,13 @@ class TestLoadHistory:
         aes.assigned_form.period_name = "FDRS 2024"
 
         with patch(
-            "app.services.validation_check_service.AssignmentEntityStatus"
+            "app.services.validation.check_service.AssignmentEntityStatus"
         ) as mock_aes_cls, patch(
-            "app.services.validation_check_service.AssignedForm"
+            "app.services.validation.check_service.AssignedForm"
         ), patch(
-            "app.services.validation_check_service.FormData"
+            "app.services.validation.check_service.FormData"
         ) as mock_fd, patch(
-            "app.services.validation_check_service.parse_period_year",
+            "app.services.validation.check_service.parse_period_year",
             return_value=2024,
         ):
             mock_aes_cls.query.join.return_value.filter.return_value.all.return_value = [aes]
@@ -135,16 +135,16 @@ class TestLoadHistory:
         item.id = 5
 
         with patch(
-            "app.services.validation_check_service.AssignmentEntityStatus"
+            "app.services.validation.check_service.AssignmentEntityStatus"
         ) as mock_aes_cls, patch(
-            "app.services.validation_check_service.AssignedForm"
+            "app.services.validation.check_service.AssignedForm"
         ), patch(
-            "app.services.validation_check_service.FormData"
+            "app.services.validation.check_service.FormData"
         ) as mock_fd, patch(
-            "app.services.validation_check_service.numeric_value",
+            "app.services.validation.check_service.numeric_value",
             return_value=None,
         ), patch(
-            "app.services.validation_check_service.parse_period_year",
+            "app.services.validation.check_service.parse_period_year",
             side_effect=lambda p: 2024 if "2024" in str(p) else 2023 if "2023" in str(p) else None,
         ):
             mock_aes_cls.query.join.return_value.filter.return_value.all.return_value = [aes]
@@ -162,7 +162,7 @@ class TestLoadHistory:
 class TestEvaluateValidationChecks:
     def test_raises_when_template_not_found(self):
         with patch(
-            "app.services.validation_check_service.FormTemplate.query"
+            "app.services.validation.check_service.FormTemplate.query"
         ) as mock_tpl:
             mock_tpl.get.return_value = None
             with pytest.raises(ValueError, match="not found"):
@@ -171,9 +171,9 @@ class TestEvaluateValidationChecks:
     def test_raises_when_no_rule_pack(self):
         template = MagicMock()
         with patch(
-            "app.services.validation_check_service.FormTemplate.query"
+            "app.services.validation.check_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_check_service.get_rule_pack_for_template",
+            "app.services.validation.check_service.get_rule_pack_for_template",
             return_value=None,
         ):
             mock_tpl.get.return_value = template
@@ -183,15 +183,15 @@ class TestEvaluateValidationChecks:
     def test_raises_when_no_assignment_found(self):
         template = MagicMock()
         with patch(
-            "app.services.validation_check_service.FormTemplate.query"
+            "app.services.validation.check_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_check_service.get_rule_pack_for_template",
+            "app.services.validation.check_service.get_rule_pack_for_template",
             return_value="fdrs_matrix_v1",
         ), patch(
-            "app.services.validation_check_service.resolve_assignment_aes",
+            "app.services.validation.check_service.resolve_assignment_aes",
             return_value=(None, "2024"),
         ), patch(
-            "app.services.validation_check_service.list_assignment_periods",
+            "app.services.validation.check_service.list_assignment_periods",
             return_value=["FDRS 2023", "FDRS 2022"],
         ):
             mock_tpl.get.return_value = template
@@ -201,15 +201,15 @@ class TestEvaluateValidationChecks:
     def test_raises_when_no_assignment_no_periods(self):
         template = MagicMock()
         with patch(
-            "app.services.validation_check_service.FormTemplate.query"
+            "app.services.validation.check_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_check_service.get_rule_pack_for_template",
+            "app.services.validation.check_service.get_rule_pack_for_template",
             return_value="fdrs_matrix_v1",
         ), patch(
-            "app.services.validation_check_service.resolve_assignment_aes",
+            "app.services.validation.check_service.resolve_assignment_aes",
             return_value=(None, "2024"),
         ), patch(
-            "app.services.validation_check_service.list_assignment_periods",
+            "app.services.validation.check_service.list_assignment_periods",
             return_value=[],
         ):
             mock_tpl.get.return_value = template
@@ -227,27 +227,27 @@ class TestEvaluateValidationChecks:
         )
 
         with patch(
-            "app.services.validation_check_service.FormTemplate.query"
+            "app.services.validation.check_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_check_service.get_rule_pack_for_template",
+            "app.services.validation.check_service.get_rule_pack_for_template",
             return_value="fdrs_matrix_v1",
         ), patch(
-            "app.services.validation_check_service.resolve_assignment_aes",
+            "app.services.validation.check_service.resolve_assignment_aes",
             return_value=(aes, "FDRS 2024"),
         ), patch(
-            "app.services.validation_check_service.load_form_data_by_kpi",
+            "app.services.validation.check_service.load_form_data_by_kpi",
             return_value={},
         ), patch(
-            "app.services.validation_check_service._load_history",
+            "app.services.validation.check_service._load_history",
             return_value={},
         ), patch(
-            "app.services.validation_check_service._resolve_country_id",
+            "app.services.validation.check_service._resolve_country_id",
             return_value=1,
         ), patch(
-            "app.services.validation_check_service.run_fdrs_matrix_rules",
+            "app.services.validation.check_service.run_fdrs_matrix_rules",
             return_value=[check_result],
         ), patch(
-            "app.services.validation_check_service._results_to_drafts",
+            "app.services.validation.check_service._results_to_drafts",
             return_value=[],
         ):
             mock_tpl.get.return_value = template
@@ -264,24 +264,24 @@ class TestEvaluateValidationChecks:
         aes.id = 10
 
         with patch(
-            "app.services.validation_check_service.FormTemplate.query"
+            "app.services.validation.check_service.FormTemplate.query"
         ) as mock_tpl, patch(
-            "app.services.validation_check_service.get_rule_pack_for_template",
+            "app.services.validation.check_service.get_rule_pack_for_template",
             return_value="some_other_pack",
         ), patch(
-            "app.services.validation_check_service.resolve_assignment_aes",
+            "app.services.validation.check_service.resolve_assignment_aes",
             return_value=(aes, "FDRS 2024"),
         ), patch(
-            "app.services.validation_check_service.load_form_data_by_kpi",
+            "app.services.validation.check_service.load_form_data_by_kpi",
             return_value={},
         ), patch(
-            "app.services.validation_check_service._load_history",
+            "app.services.validation.check_service._load_history",
             return_value={},
         ), patch(
-            "app.services.validation_check_service._resolve_country_id",
+            "app.services.validation.check_service._resolve_country_id",
             return_value=None,
         ), patch(
-            "app.services.validation_check_service._results_to_drafts",
+            "app.services.validation.check_service._results_to_drafts",
             return_value=[],
         ):
             mock_tpl.get.return_value = template
@@ -308,10 +308,10 @@ class TestRunValidationChecks:
             drafts=[],
         )
         with patch(
-            "app.services.validation_check_service.evaluate_validation_checks",
+            "app.services.validation.check_service.evaluate_validation_checks",
             return_value=evaluation,
         ), patch(
-            "app.services.validation_check_service.AssignmentEntityStatus.query"
+            "app.services.validation.check_service.AssignmentEntityStatus.query"
         ) as mock_aes_q:
             mock_aes_q.get.return_value = None
             with pytest.raises(ValueError, match="999"):
@@ -331,18 +331,18 @@ class TestRunValidationChecks:
             kpi_data={},
             drafts=[],
         )
-        from app.services.validation_check_service import ValidationRunResult
+        from app.services.validation.check_service import ValidationRunResult
 
         with patch(
-            "app.services.validation_check_service.evaluate_validation_checks",
+            "app.services.validation.check_service.evaluate_validation_checks",
             return_value=evaluation,
         ), patch(
-            "app.services.validation_check_service.AssignmentEntityStatus.query"
+            "app.services.validation.check_service.AssignmentEntityStatus.query"
         ) as mock_aes_q, patch(
-            "app.services.validation_check_service._evaluation_to_context",
+            "app.services.validation.check_service._evaluation_to_context",
             return_value=MagicMock(),
         ), patch(
-            "app.services.validation_check_service._upsert_questions",
+            "app.services.validation.check_service._upsert_questions",
             return_value=ValidationRunResult(created=1),
         ):
             mock_aes_q.get.return_value = aes
@@ -378,10 +378,10 @@ class TestResultsToDrafts:
             context={},
         )
         with patch(
-            "app.services.validation_check_service.assemble_question_for_kpi",
+            "app.services.validation.check_service.assemble_question_for_kpi",
             return_value=draft,
         ), patch(
-            "app.services.validation_check_service.FormItem.query"
+            "app.services.validation.check_service.FormItem.query"
         ) as mock_fi:
             mock_fi.get.return_value = MagicMock(
                 indicator_bank=MagicMock(definition="Def text", __bool__=lambda _: True)
@@ -404,7 +404,7 @@ class TestResultsToDrafts:
             context={},
         )
         with patch(
-            "app.services.validation_check_service.assemble_question_for_kpi",
+            "app.services.validation.check_service.assemble_question_for_kpi",
             return_value=draft,
         ):
             drafts = _results_to_drafts(results, ctx)
@@ -421,10 +421,10 @@ class TestResultsToDrafts:
         results = [CheckResult(rule_code="not_reported", form_item_id=2, fired=False)]
         ctx = self._make_ctx()
         with patch(
-            "app.services.validation_check_service.assemble_question_for_kpi",
+            "app.services.validation.check_service.assemble_question_for_kpi",
             return_value=None,
         ), patch(
-            "app.services.validation_check_service.FormItem.query"
+            "app.services.validation.check_service.FormItem.query"
         ) as mock_fi:
             mock_fi.get.return_value = None
             drafts = _results_to_drafts(results, ctx)
@@ -467,9 +467,9 @@ class TestUpsertQuestions:
         aes.assigned_form_id = 5
 
         with patch(
-            "app.services.validation_check_service.ValidationQuestion.query"
+            "app.services.validation.check_service.ValidationQuestion.query"
         ) as mock_vq, patch(
-            "app.services.validation_check_service.db"
+            "app.services.validation.check_service.db"
         ) as mock_db:
             filter_q = MagicMock()
             filter_q.filter.return_value.first.return_value = None
@@ -492,11 +492,11 @@ class TestUpsertQuestions:
         existing_q.form_item_id = 1
 
         with patch(
-            "app.services.validation_check_service.ValidationQuestion.query"
+            "app.services.validation.check_service.ValidationQuestion.query"
         ) as mock_vq, patch(
-            "app.services.validation_check_service.db"
+            "app.services.validation.check_service.db"
         ) as mock_db, patch(
-            "app.services.validation_check_service.mark_drafted"
+            "app.services.validation.check_service.mark_drafted"
         ) as mock_mark:
             filter_q = MagicMock()
             filter_q.filter.return_value.first.return_value = existing_q
@@ -518,9 +518,9 @@ class TestUpsertQuestions:
         stale_q.status = "open"
 
         with patch(
-            "app.services.validation_check_service.ValidationQuestion.query"
+            "app.services.validation.check_service.ValidationQuestion.query"
         ) as mock_vq, patch(
-            "app.services.validation_check_service.db"
+            "app.services.validation.check_service.db"
         ) as mock_db:
             filter_q = MagicMock()
             filter_q.filter.return_value.first.return_value = None
@@ -554,13 +554,13 @@ class TestLoadHistoryFormItemNotInKpiBank:
         item.id = 5  # maps to a DIFFERENT id than form_data.form_item_id
 
         with patch(
-            "app.services.validation_check_service.AssignmentEntityStatus"
+            "app.services.validation.check_service.AssignmentEntityStatus"
         ) as mock_aes_cls, patch(
-            "app.services.validation_check_service.AssignedForm"
+            "app.services.validation.check_service.AssignedForm"
         ), patch(
-            "app.services.validation_check_service.FormData"
+            "app.services.validation.check_service.FormData"
         ) as mock_fd, patch(
-            "app.services.validation_check_service.parse_period_year",
+            "app.services.validation.check_service.parse_period_year",
             side_effect=lambda p: 2024 if "2024" in str(p) else 2023 if "2023" in str(p) else None,
         ):
             mock_aes_cls.query.join.return_value.filter.return_value.all.return_value = [aes]
@@ -578,7 +578,7 @@ class TestLoadHistoryFormItemNotInKpiBank:
 
 class TestEvaluationToContext:
     def test_builds_validation_context_from_evaluation(self):
-        from app.services.validation_check_service import _evaluation_to_context
+        from app.services.validation.check_service import _evaluation_to_context
 
         form_item = MagicMock()
         evaluation = ValidationEvaluationResult(
@@ -595,10 +595,10 @@ class TestEvaluationToContext:
         aes = MagicMock()
 
         with patch(
-            "app.services.validation_check_service._load_history",
+            "app.services.validation.check_service._load_history",
             return_value={"MY_KPI": {2023: 100.0}},
         ), patch(
-            "app.services.validation_check_service._resolve_country_id",
+            "app.services.validation.check_service._resolve_country_id",
             return_value=5,
         ):
             ctx = _evaluation_to_context(evaluation, aes)
@@ -614,7 +614,7 @@ class TestEvaluationToContext:
 
     def test_filters_none_form_items_from_kpi_to_item(self):
         """kpi_data entries with None form_item are excluded from kpi_to_item."""
-        from app.services.validation_check_service import _evaluation_to_context
+        from app.services.validation.check_service import _evaluation_to_context
 
         evaluation = ValidationEvaluationResult(
             template_id=2,
@@ -630,10 +630,10 @@ class TestEvaluationToContext:
         aes = MagicMock()
 
         with patch(
-            "app.services.validation_check_service._load_history",
+            "app.services.validation.check_service._load_history",
             return_value={},
         ) as mock_load, patch(
-            "app.services.validation_check_service._resolve_country_id",
+            "app.services.validation.check_service._resolve_country_id",
             return_value=7,
         ):
             _evaluation_to_context(evaluation, aes)

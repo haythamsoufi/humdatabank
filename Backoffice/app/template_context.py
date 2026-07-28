@@ -138,7 +138,7 @@ def register_template_context(app, config_class):
         a POST wrote the DB but failed a later validation (so config was not refreshed),
         or the process never reloaded. Templates must match ``system_settings``."""
         try:
-            from app.services.app_settings_service import get_show_language_flags, get_supported_languages
+            from app.services.platform.app_settings_service import get_show_language_flags, get_supported_languages
 
             langs = list(get_supported_languages(default=Config.LANGUAGES) or [])
             return {
@@ -176,7 +176,7 @@ def register_template_context(app, config_class):
     # Organization branding
     def get_org_branding():
         try:
-            from app.services.app_settings_service import get_organization_branding
+            from app.services.platform.app_settings_service import get_organization_branding
             return get_organization_branding()
         except Exception as e:
             current_app.logger.debug("get_organization_branding failed, using defaults: %s", e)
@@ -195,7 +195,7 @@ def register_template_context(app, config_class):
     def inject_org_branding():
         try:
             from app.utils.organization_helpers import get_org_name, get_org_short_name, get_org_email_domain, get_org_domain
-            from app.services.app_settings_service import (
+            from app.services.platform.app_settings_service import (
                 get_organization_branding,
                 get_organization_logo_path,
                 get_organization_email_domain,
@@ -241,7 +241,7 @@ def register_template_context(app, config_class):
     @app.context_processor
     def inject_rbac_helpers():
         try:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
         except Exception as e:
             current_app.logger.debug("AuthorizationService import failed: %s", e)
             AuthorizationService = None
@@ -350,14 +350,14 @@ def register_template_context(app, config_class):
             if not current_user.is_authenticated:
                 return {"pending_access_requests_count": 0}
 
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
 
             can_review = AuthorizationService.can_view_access_requests(current_user)
             if not can_review:
                 return {"pending_access_requests_count": 0}
 
             from app.models import CountryAccessRequest
-            from app.services.country_access_request_service import (
+            from app.services.organization.country_access_request_service import (
                 count_pending_country_access_requests_needing_action,
             )
 
@@ -370,7 +370,7 @@ def register_template_context(app, config_class):
     @app.context_processor
     def inject_docs_pdf_export_enabled():
         try:
-            from app.services.documentation_service import is_pdf_export_enabled
+            from app.services.documentation.service import is_pdf_export_enabled
 
             return {"docs_pdf_export_enabled": is_pdf_export_enabled()}
         except Exception as e:
@@ -427,13 +427,13 @@ def register_template_context(app, config_class):
         return _build_map(app, request.url_root)
     app.jinja_env.globals['forms_module_import_map'] = forms_module_import_map
 
-    from app.services.app_settings_service import organization_visual_asset_href
+    from app.services.platform.app_settings_service import organization_visual_asset_href
     app.jinja_env.globals['org_visual_asset_url'] = organization_visual_asset_href
 
-    from app.services.form_processing_service import slugify_age_group
+    from app.services.forms.processing_service import slugify_age_group
     app.jinja_env.globals['slugify_age_group'] = slugify_age_group
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     app.jinja_env.globals['EntityService'] = EntityService
 
     from app.utils.csp_nonce import get_csp_nonce, get_style_nonce
@@ -513,19 +513,19 @@ def register_template_context(app, config_class):
     @app.template_filter('session_effective_duration_minutes')
     def session_effective_duration_minutes_filter(session_log):
         """Wall-clock session length: login to close (includes idle after last activity)."""
-        from app.services.user_analytics_service import effective_session_duration_minutes
+        from app.services.platform.user_analytics_service import effective_session_duration_minutes
         return effective_session_duration_minutes(session_log)
 
     @app.template_filter('session_effective_active_duration_minutes')
     def session_effective_active_duration_minutes_filter(session_log):
         """Minutes from session start to last activity (excludes post-last-idle until close)."""
-        from app.services.user_analytics_service import effective_session_active_duration_minutes
+        from app.services.platform.user_analytics_service import effective_session_active_duration_minutes
         return effective_session_active_duration_minutes(session_log)
 
     @app.template_filter('session_device_icon')
     def session_device_icon_filter(session_log):
         """Font Awesome classes for device/OS icon in session lists."""
-        from app.services.user_analytics_service import session_log_device_icon_classes
+        from app.services.platform.user_analytics_service import session_log_device_icon_classes
         if not session_log:
             return 'fas fa-question-circle text-gray-400'
         return session_log_device_icon_classes(

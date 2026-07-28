@@ -4,7 +4,7 @@ import pytest
 
 from app.models import CountryAccessRequest, UserEntityPermission
 from app.models.enums import CountryAccessRequestStatusValue, EntityType
-from app.services.country_access_request_service import (
+from app.services.organization.country_access_request_service import (
     AUTO_RESOLVED_ADMIN_NOTE,
     count_pending_country_access_requests_needing_action,
     is_auto_resolved_country_access_request,
@@ -93,7 +93,7 @@ class TestCountryAccessRequestReconciliation:
         )
 
         db_session.refresh(req)
-        from app.services.country_access_request_service import processed_country_access_requests_query
+        from app.services.organization.country_access_request_service import processed_country_access_requests_query
 
         processed_ids = {r.id for r in processed_country_access_requests_query().all()}
         assert req.id in processed_ids

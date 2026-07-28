@@ -61,7 +61,7 @@ if [ -n "$TRANSLATIONS_PERSISTENT_PATH" ]; then
   echo "TRANSLATIONS_PERSISTENT_PATH: $TRANSLATIONS_PERSISTENT_PATH"
   echo "=========================================="
   mkdir -p "$TRANSLATIONS_PERSISTENT_PATH"
-  python scripts/sync_persistent_translations.py "$TRANSLATIONS_PERSISTENT_PATH"
+  python scripts/i18n/sync_persistent_translations.py "$TRANSLATIONS_PERSISTENT_PATH"
   export BACKOFFICE_TRANSLATIONS_COMPILED=1
 
   # Point /app/translations at the persistent path.  When the persistent
@@ -240,7 +240,7 @@ PY
       echo "=========================================="
       echo "Seeding test data (development)"
       echo "=========================================="
-      PYTHONPATH=/app python scripts/init_data.py 2>&1 || echo "WARN: Test data seeding failed (continuing)"
+      PYTHONPATH=/app python scripts/seeding/init_data.py 2>&1 || echo "WARN: Test data seeding failed (continuing)"
     fi
   fi
 

@@ -8,7 +8,7 @@ Supports localized organization names based on current locale.
 from typing import Dict, Optional
 from flask import has_request_context, request
 from flask_babel import get_locale
-from app.services.app_settings_service import (
+from app.services.platform.app_settings_service import (
     get_organization_branding,
     get_organization_domain,
     get_organization_email_domain,

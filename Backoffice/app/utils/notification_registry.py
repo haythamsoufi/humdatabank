@@ -301,7 +301,7 @@ def build_notification_settings_delivery_rows(
 
     ``gettext_fn`` should be ``flask_babel.gettext`` (or equivalent) for translated UI strings.
     """
-    from app.services.notification_service import NotificationService
+    from app.services.notification.service import NotificationService
     from app.services.notification.core import get_default_icon_for_notification_type
     from app.models.enums import NotificationType
 

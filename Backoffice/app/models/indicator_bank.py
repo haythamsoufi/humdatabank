@@ -382,7 +382,7 @@ class IndicatorBank(db.Model):
         """Content-bearing submission rows for this indicator across all data tables."""
         if hasattr(self, '_cached_data_value_count'):
             return self._cached_data_value_count
-        from app.services.indicator_bank_service import get_indicator_data_value_count
+        from app.services.indicators.bank_service import get_indicator_data_value_count
         return get_indicator_data_value_count(self.id)
 
     @property

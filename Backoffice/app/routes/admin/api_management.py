@@ -18,8 +18,8 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_ok, json_server_error
 from app.utils.sql_utils import safe_ilike_pattern
-from app.services.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
-from app.services.reporting_period_service import period_chronology_sort_key
+from app.services.platform.api_usage_stats import bulk_endpoint_usage_stats, chart_stats_for_period, endpoint_path_prefix
+from app.services.forms.reporting_period_service import period_chronology_sort_key
 from sqlalchemy.orm import joinedload
 
 

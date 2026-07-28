@@ -108,7 +108,7 @@ def rewrite_document_search_query(query: str) -> Dict[str, str]:
     # Terminology expansion (IFRC glossary + Indicator Bank aliases)
     exp_terms: List[str] = []
     try:
-        from app.services.ifrc_terminology_service import get_query_expansion_terms
+        from app.services.translation.terminology_service import get_query_expansion_terms
 
         exp_terms = get_query_expansion_terms(raw, max_terms=10)
     except Exception as exc:
@@ -193,7 +193,7 @@ def resolve_country_search_filters(country_hint, filters):
     if not country_hint:
         return
     try:
-        from app.services.data_retrieval_service import resolve_country
+        from app.services.data_retrieval.service import resolve_country
         country = resolve_country(country_hint)
         if country and getattr(country, "id", None):
             filters["country_id"] = int(country.id)

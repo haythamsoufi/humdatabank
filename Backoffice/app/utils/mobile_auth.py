@@ -55,7 +55,7 @@ def _try_jwt_auth() -> bool:
     # Honour admin force-logout: if the session embedded in this token has been
     # blacklisted (e.g. by an admin via the sessions UI), reject the token.
     if claims.sid:
-        from app.services.user_analytics_service import should_block_mobile_jwt_session
+        from app.services.platform.user_analytics_service import should_block_mobile_jwt_session
         if should_block_mobile_jwt_session(claims.sid):
             return False
 
@@ -152,7 +152,7 @@ def mobile_auth_required(
                 sid = getattr(g, '_mobile_jwt_sid', None)
                 if sid:
                     try:
-                        from app.services.user_analytics_service import _update_session_activity_explicit
+                        from app.services.platform.user_analytics_service import _update_session_activity_explicit
                         # Use 'action' (touch-only): refreshes last_activity without
                         # incrementing actions_performed. Screen navigations are tracked
                         # via POST /analytics/screen-view; we avoid counting every API

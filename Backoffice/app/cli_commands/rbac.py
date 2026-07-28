@@ -19,7 +19,7 @@ def register_rbac_commands(app) -> None:
         app-startup auto-seed always apply exactly the same permission catalog
         and role definitions.
         """
-        from app.services.rbac_seed_service import seed_rbac_permissions_and_roles
+        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
         result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
         if result.get("skipped_due_to_lock"):
             click.echo("RBAC seed skipped (advisory lock held by another process).")

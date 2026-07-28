@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from app.plugins.db_config import DbPluginConfig
-from app.services import storage_service
+from app.services.platform import storage_service
 from plugins.pb_progress.versions import (
     DEFAULT_VERSION,
     LEGACY_EXCEL_REL_PATH,

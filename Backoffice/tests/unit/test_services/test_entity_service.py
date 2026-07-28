@@ -8,7 +8,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 
 from app.models.enums import EntityType
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from tests.factories import (
     create_test_admin,
     create_test_country,

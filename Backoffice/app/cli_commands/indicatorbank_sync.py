@@ -57,7 +57,7 @@ def register_indicatorbank_commands(app):
         - `Sector` and `SubSector` records by name (and links subsectors to sector when possible)
         - `IndicatorBank` records with sector/subsector JSON fields storing local IDs.
         """
-        from app.services.indicatorbank_remote_sync_service import sync_remote_indicator_bank
+        from app.services.indicators.remote_sync_service import sync_remote_indicator_bank
 
         if not api_key:
             raise click.ClickException(

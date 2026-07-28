@@ -8,7 +8,7 @@ from app.utils.api_responses import json_error
 from app.utils.request_utils import is_json_request
 from collections import defaultdict, deque
 import threading
-from app.services.user_analytics_service import get_client_ip
+from app.services.platform.user_analytics_service import get_client_ip
 
 # In-memory rate limiting storage.
 # SECURITY NOTE: This storage is per-process. In multi-worker deployments (e.g.

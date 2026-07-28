@@ -4,7 +4,7 @@ from app.models import db, User, AssignedForm, Country, SubmittedDocument
 from app.models.documents import submitted_document_countries
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import EntityType
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from sqlalchemy import and_, or_, literal
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from datetime import datetime
@@ -31,8 +31,8 @@ def documents_submit():
     (same session keys as the dashboard), including uploads by any user on that entity's
     assignments and standalone library rows linked to that entity.
     """
-    from app.services.authorization_service import AuthorizationService
-    from app.services.app_settings_service import get_document_types
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.platform.app_settings_service import get_document_types
     from app.routes.admin.content_management import _row_with_focal_entity_access
 
     if AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(

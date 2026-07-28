@@ -180,7 +180,7 @@ class TestIndicatorBankNeuralMapData:
         ) as mock_scatter:
             # patch import inside route
             with patch.dict("sys.modules", {
-                "app.services.indicator_neural_map": MagicMock(
+                "app.services.indicators.neural_map": MagicMock(
                     build_embedding_scatter=lambda **kw: {"nodes": [], "groups": [], "count": 0}
                 )
             }):
@@ -189,7 +189,7 @@ class TestIndicatorBankNeuralMapData:
 
     def test_exception_returns_server_error(self, logged_in_client, db_session):
         with patch(
-            "app.services.indicator_neural_map.build_embedding_scatter",
+            "app.services.indicators.neural_map.build_embedding_scatter",
             side_effect=Exception("no embeddings"),
         ):
             resp = logged_in_client.get("/admin/indicator_bank/neural_map/data")
@@ -211,7 +211,7 @@ class TestIndicatorBankNeuralMapProbe:
 
     def test_exception_returns_500(self, logged_in_client, db_session):
         with patch(
-            "app.services.indicator_neural_map.probe_query_embedding",
+            "app.services.indicators.neural_map.probe_query_embedding",
             side_effect=Exception("embedding error"),
         ):
             resp = logged_in_client.post(
@@ -229,10 +229,10 @@ class TestIndicatorBankNeuralMapProbe:
 class TestSyncIndicatorBankRemote:
     def test_sync_returns_ok_on_success(self, logged_in_client, db_session):
         with patch(
-            "app.services.indicatorbank_remote_sync_service.start_remote_sync",
+            "app.services.indicators.remote_sync_service.start_remote_sync",
             return_value=(True, "Sync started"),
         ), patch(
-            "app.services.indicatorbank_remote_sync_service.get_remote_sync_state",
+            "app.services.indicators.remote_sync_service.get_remote_sync_state",
             return_value={"status": "running"},
         ):
             resp = logged_in_client.post(
@@ -244,10 +244,10 @@ class TestSyncIndicatorBankRemote:
 
     def test_sync_returns_400_on_failure(self, logged_in_client, db_session):
         with patch(
-            "app.services.indicatorbank_remote_sync_service.start_remote_sync",
+            "app.services.indicators.remote_sync_service.start_remote_sync",
             return_value=(False, "Already running"),
         ), patch(
-            "app.services.indicatorbank_remote_sync_service.get_remote_sync_state",
+            "app.services.indicators.remote_sync_service.get_remote_sync_state",
             return_value={"status": "running"},
         ):
             resp = logged_in_client.post(
@@ -265,7 +265,7 @@ class TestSyncIndicatorBankRemote:
 class TestSyncIndicatorBankRemoteStatus:
     def test_returns_sync_state(self, logged_in_client, db_session):
         with patch(
-            "app.services.indicatorbank_remote_sync_service.get_remote_sync_state",
+            "app.services.indicators.remote_sync_service.get_remote_sync_state",
             return_value={"status": "idle"},
         ):
             resp = logged_in_client.get("/admin/indicator_bank/sync_remote/status")
@@ -559,7 +559,7 @@ class TestUpdateIndicatorTranslations:
 class TestSessionCleanup:
     def test_cleanup_sessions_success(self, logged_in_client, db_session):
         with patch(
-            "app.services.user_analytics_service.cleanup_inactive_sessions",
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
             return_value=5,
         ):
             resp = logged_in_client.post(
@@ -570,7 +570,7 @@ class TestSessionCleanup:
 
     def test_cleanup_sessions_exception(self, logged_in_client, db_session):
         with patch(
-            "app.services.user_analytics_service.cleanup_inactive_sessions",
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
             side_effect=Exception("cleanup error"),
         ):
             resp = logged_in_client.post(

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import migrate_template_js as mig
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 template = ROOT / "app/templates/components/auto_translate_modal_js.html"
 html = template.read_text(encoding="utf-8")
 scripts = mig.extract_scripts(html)

@@ -23,7 +23,7 @@ def issue_tokens():
     """Issue JWT access + refresh tokens for mobile clients."""
     import uuid as _uuid
     from app.utils.mobile_jwt import issue_token_pair
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         log_login_attempt, start_user_session, log_user_activity,
     )
     from app.services import UserService
@@ -103,12 +103,12 @@ def refresh_token():
             claims.jti, claims.user_id, claims.sid,
         )
         if claims.sid:
-            from app.services.user_analytics_service import add_session_to_blacklist
+            from app.services.platform.user_analytics_service import add_session_to_blacklist
             add_session_to_blacklist(claims.sid)
         return mobile_auth_error('Refresh token has already been used. Please log in again.')
 
     if claims.sid:
-        from app.services.user_analytics_service import should_block_mobile_jwt_session
+        from app.services.platform.user_analytics_service import should_block_mobile_jwt_session
         if should_block_mobile_jwt_session(claims.sid):
             return mobile_auth_error('Session has been revoked.')
 
@@ -124,7 +124,7 @@ def refresh_token():
     if session_id:
         old_session = UserSessionLog.query.filter_by(session_id=session_id).first()
         if old_session is None or not old_session.is_active:
-            from app.services.user_analytics_service import start_user_session, log_user_activity
+            from app.services.platform.user_analytics_service import start_user_session, log_user_activity
             previous_sid = session_id
             session_id = str(_uuid.uuid4())
             start_user_session(user, session_id)
@@ -162,7 +162,7 @@ def exchange_session_for_tokens():
     """Exchange a valid Flask session cookie for a JWT token pair (Azure SSO bridge)."""
     import uuid as _uuid
     from app.utils.mobile_jwt import issue_token_pair
-    from app.services.user_analytics_service import start_user_session, log_user_activity
+    from app.services.platform.user_analytics_service import start_user_session, log_user_activity
     from flask import session as flask_session
 
     jwt_session_id = flask_session.get('session_id') or str(_uuid.uuid4())
@@ -214,7 +214,7 @@ def mobile_logout():
     is still verified — only the expiry check is relaxed — so the endpoint
     cannot be abused to blacklist arbitrary sessions with a forged token.
     """
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         log_user_activity_for_user, end_user_session,
         add_session_to_blacklist, get_client_info,
     )
@@ -332,7 +332,7 @@ def mobile_change_password():
         current_user.set_password(new_password)
         db.session.flush()
 
-        from app.services.user_analytics_service import log_user_activity
+        from app.services.platform.user_analytics_service import log_user_activity
         log_user_activity(
             activity_type='password_change',
             description=f'User {current_user.email} changed password via mobile API',
@@ -350,7 +350,7 @@ def mobile_change_password():
 @mobile_auth_required
 def mobile_profile():
     """Return the current user's profile data."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     user = current_user
     role_codes = AuthorizationService.get_role_codes(user)
@@ -390,7 +390,7 @@ def mobile_update_profile():
     try:
         db.session.flush()
 
-        from app.services.user_analytics_service import log_user_activity
+        from app.services.platform.user_analytics_service import log_user_activity
         log_user_activity(
             activity_type='profile_update',
             description=f'User {current_user.email} updated profile via mobile API',

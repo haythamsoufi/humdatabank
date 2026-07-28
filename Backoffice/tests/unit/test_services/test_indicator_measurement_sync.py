@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from app.services.indicator_measurement_sync import (
+from app.services.indicators.measurement_sync import (
     _NS_UNIT_STRING_ALIASES,
     backfill_fk_from_strings_bank,
     backfill_fk_from_strings_item,
@@ -47,7 +47,7 @@ class TestResolveTypeIdForLegacyString:
             mock_row = MagicMock()
             mock_row.id = 5
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankType") as MockType:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankType") as MockType:
                 MockType.query.filter.return_value.first.return_value = mock_row
                 result = resolve_type_id_for_legacy_string("output")
                 assert result == 5
@@ -58,7 +58,7 @@ class TestResolveTypeIdForLegacyString:
             mock_row.id = 7
             mock_row.code = "number"
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankType") as MockType:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankType") as MockType:
                 # First query (exact) returns nothing
                 MockType.query.filter.return_value.first.return_value = None
                 # Second query (active scan) returns the row
@@ -72,7 +72,7 @@ class TestResolveTypeIdForLegacyString:
             mock_row.id = 9
             mock_row.code = "yes_no"  # normalized: "yesno"
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankType") as MockType:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankType") as MockType:
                 MockType.query.filter.return_value.first.return_value = None
                 MockType.query.filter_by.return_value.all.return_value = [mock_row]
                 # "yes no" → normalized "yesno" matches "yes_no" stripped of _
@@ -81,7 +81,7 @@ class TestResolveTypeIdForLegacyString:
 
     def test_no_match_returns_none(self, app):
         with app.app_context():
-            with patch("app.services.indicator_measurement_sync.IndicatorBankType") as MockType:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankType") as MockType:
                 MockType.query.filter.return_value.first.return_value = None
                 MockType.query.filter_by.return_value.all.return_value = []
                 result = resolve_type_id_for_legacy_string("does_not_exist_xyz")
@@ -109,7 +109,7 @@ class TestResolveUnitIdForLegacyString:
             mock_row = MagicMock()
             mock_row.id = 3
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankUnit") as MockUnit:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankUnit") as MockUnit:
                 MockUnit.query.filter.return_value.first.return_value = mock_row
                 result = resolve_unit_id_for_legacy_string("number")
                 assert result == 3
@@ -119,7 +119,7 @@ class TestResolveUnitIdForLegacyString:
             mock_name_row = MagicMock()
             mock_name_row.id = 11
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankUnit") as MockUnit:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankUnit") as MockUnit:
                 # First (code) → None; second (name) → row
                 MockUnit.query.filter.return_value.first.side_effect = [None, mock_name_row]
                 result = resolve_unit_id_for_legacy_string("National Society")
@@ -131,7 +131,7 @@ class TestResolveUnitIdForLegacyString:
             mock_ns_row = MagicMock()
             mock_ns_row.id = 99
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankUnit") as MockUnit:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankUnit") as MockUnit:
                 # code and name lookups both return None
                 MockUnit.query.filter.return_value.first.side_effect = [None, None]
                 # ns alias lookup returns the row
@@ -145,7 +145,7 @@ class TestResolveUnitIdForLegacyString:
             mock_ns_row = MagicMock()
             mock_ns_row.id = 50
 
-            with patch("app.services.indicator_measurement_sync.IndicatorBankUnit") as MockUnit:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankUnit") as MockUnit:
                 call_count = 0
 
                 def mock_first():
@@ -163,7 +163,7 @@ class TestResolveUnitIdForLegacyString:
 
     def test_no_match_returns_none(self, app):
         with app.app_context():
-            with patch("app.services.indicator_measurement_sync.IndicatorBankUnit") as MockUnit:
+            with patch("app.services.indicators.measurement_sync.IndicatorBankUnit") as MockUnit:
                 MockUnit.query.filter.return_value.first.return_value = None
                 result = resolve_unit_id_for_legacy_string("totally_unknown_unit_xyz")
                 assert result is None
@@ -198,7 +198,7 @@ class TestBackfillFkFromStringsBank:
             bank.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string",
+                "app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string",
                 return_value=7,
             ):
                 backfill_fk_from_strings_bank(bank)
@@ -213,7 +213,7 @@ class TestBackfillFkFromStringsBank:
             bank.unit = "number"
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string",
+                "app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string",
                 return_value=3,
             ):
                 backfill_fk_from_strings_bank(bank)
@@ -227,7 +227,7 @@ class TestBackfillFkFromStringsBank:
             bank.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string"
+                "app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string"
             ) as mock_resolve:
                 backfill_fk_from_strings_bank(bank)
                 mock_resolve.assert_not_called()
@@ -240,7 +240,7 @@ class TestBackfillFkFromStringsBank:
             bank.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string"
+                "app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string"
             ) as mock_resolve:
                 backfill_fk_from_strings_bank(bank)
                 mock_resolve.assert_not_called()
@@ -253,7 +253,7 @@ class TestBackfillFkFromStringsBank:
             bank.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string",
+                "app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string",
                 return_value=None,
             ):
                 backfill_fk_from_strings_bank(bank)
@@ -271,7 +271,7 @@ class TestBackfillFkFromStringsItem:
             item.is_indicator = False
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string"
+                "app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string"
             ) as mock_resolve:
                 backfill_fk_from_strings_item(item)
                 mock_resolve.assert_not_called()
@@ -285,7 +285,7 @@ class TestBackfillFkFromStringsItem:
             item.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string",
+                "app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string",
                 return_value=8,
             ):
                 backfill_fk_from_strings_item(item)
@@ -300,7 +300,7 @@ class TestBackfillFkFromStringsItem:
             item.unit = "number"
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string",
+                "app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string",
                 return_value=4,
             ):
                 backfill_fk_from_strings_item(item)
@@ -315,7 +315,7 @@ class TestBackfillFkFromStringsItem:
             item.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string"
+                "app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string"
             ) as mock_resolve:
                 backfill_fk_from_strings_item(item)
                 mock_resolve.assert_not_called()
@@ -329,7 +329,7 @@ class TestBackfillFkFromStringsItem:
             item.unit = None
 
             with patch(
-                "app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string"
+                "app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string"
             ) as mock_resolve:
                 backfill_fk_from_strings_item(item)
                 mock_resolve.assert_not_called()

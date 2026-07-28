@@ -131,7 +131,7 @@ class TestNotificationsAuthGuard:
 
 class TestNotificationsCenter:
     def test_renders(self, logged_in_client, db_session):
-        with patch("app.services.app_settings_service.get_merged_notification_audience_rules", return_value={}):
+        with patch("app.services.platform.app_settings_service.get_merged_notification_audience_rules", return_value={}):
             resp = logged_in_client.get("/notifications/")
         _assert_status(resp, 200, 302)
 
@@ -139,7 +139,7 @@ class TestNotificationsCenter:
         mock_rules = {
             "admin_message": {"admin_users": True, "focal_points": False, "system_managers": True}
         }
-        with patch("app.services.app_settings_service.get_merged_notification_audience_rules", return_value=mock_rules):
+        with patch("app.services.platform.app_settings_service.get_merged_notification_audience_rules", return_value=mock_rules):
             resp = logged_in_client.get("/notifications/")
         _assert_status(resp, 200, 302)
 
@@ -158,20 +158,20 @@ class TestMarkNotificationsRead:
         _assert_status(resp, 400)
 
     def test_valid_ids_success(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.mark_as_read", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=5):
+        with patch("app.services.notification.service.NotificationService.mark_as_read", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=5):
             resp = logged_in_client.post("/notifications/mark-read", json={"notification_ids": [1, 2, 3]})
         _assert_status(resp, 200)
         data = _get_json(resp)
         assert data.get("success") is True
 
     def test_mark_read_service_failure(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.mark_as_read", return_value=False), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=5), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=10):
+        with patch("app.services.notification.service.NotificationService.mark_as_read", return_value=False), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=5), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=10):
             resp = logged_in_client.post("/notifications/mark-read", json={"notification_ids": [1]})
         _assert_status(resp, 500)
 
@@ -185,10 +185,10 @@ class TestMarkNotificationsRead:
 
     def test_ids_as_string_comma_separated(self, logged_in_client, db_session):
         """String IDs should be parsed and handled."""
-        with patch("app.services.notification_service.NotificationService.mark_as_read", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=1):
+        with patch("app.services.notification.service.NotificationService.mark_as_read", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=1):
             resp = logged_in_client.post(
                 "/notifications/mark-read",
                 json={"notification_ids": "1,2,3"},
@@ -196,10 +196,10 @@ class TestMarkNotificationsRead:
         _assert_status(resp, 200)
 
     def test_device_token_header(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.mark_as_read", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=1), \
+        with patch("app.services.notification.service.NotificationService.mark_as_read", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=1), \
              patch("app.services.notification.push.PushNotificationService.update_device_activity"):
             resp = logged_in_client.post(
                 "/notifications/mark-read",
@@ -219,28 +219,28 @@ class TestMarkNotificationsUnread:
         _assert_status(resp, 400)
 
     def test_valid_ids_success(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.mark_as_unread", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=2), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=5):
+        with patch("app.services.notification.service.NotificationService.mark_as_unread", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=2), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=5):
             resp = logged_in_client.post("/notifications/mark-unread", json={"notification_ids": [1]})
         _assert_status(resp, 200)
         data = _get_json(resp)
         assert data.get("success") is True
 
     def test_service_failure(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.mark_as_unread", return_value=False), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=5), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=10):
+        with patch("app.services.notification.service.NotificationService.mark_as_unread", return_value=False), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=5), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=10):
             resp = logged_in_client.post("/notifications/mark-unread", json={"notification_ids": [1]})
         _assert_status(resp, 500)
 
     def test_non_list_ids(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.mark_as_unread", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=1):
+        with patch("app.services.notification.service.NotificationService.mark_as_unread", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=1):
             resp = logged_in_client.post("/notifications/mark-unread", json={"notification_ids": 1})
         _assert_status(resp, 200)
 
@@ -252,18 +252,18 @@ class TestMarkNotificationsUnread:
 class TestApiGetNotifications:
     def _mock_service(self):
         return (
-            patch("app.services.notification_service.NotificationService.get_user_notifications",
+            patch("app.services.notification.service.NotificationService.get_user_notifications",
                   return_value=([], 0)),
-            patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0),
-            patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0),
-            patch("app.services.notification_service.NotificationService.get_all_count", return_value=0),
+            patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0),
+            patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0),
+            patch("app.services.notification.service.NotificationService.get_all_count", return_value=0),
         )
 
     def test_basic_list(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api")
         _assert_status(resp, 200)
         data = _get_json(resp)
@@ -271,68 +271,68 @@ class TestApiGetNotifications:
         assert "notifications" in data
 
     def test_unread_only(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?unread_only=true")
         _assert_status(resp, 200)
 
     def test_with_type_filter(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?type=admin_message")
         _assert_status(resp, 200)
 
     def test_with_include_archived(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?include_archived=true")
         _assert_status(resp, 200)
 
     def test_with_archived_only(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?archived_only=true")
         _assert_status(resp, 200)
 
     def test_with_date_filters(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get(
                 "/notifications/api?date_from=2024-01-01T00:00:00&date_to=2024-12-31T23:59:59"
             )
         _assert_status(resp, 200)
 
     def test_invalid_date_filters_ignored(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?date_from=not-a-date")
         _assert_status(resp, 200)
 
     def test_with_tags_filter(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?tags=important,urgent")
         _assert_status(resp, 200)
 
     def test_pagination(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get("/notifications/api?page=2&per_page=10")
         _assert_status(resp, 200)
 
@@ -341,18 +341,18 @@ class TestApiGetNotifications:
             supported = app.config.get("SUPPORTED_LANGUAGES", ["en", "fr", "ar"])
             lang = supported[0] if supported else "en"
 
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.get(f"/notifications/api?language={lang}")
         _assert_status(resp, 200)
 
     def test_device_token_header(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications", return_value=([], 0)), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0), \
+        with patch("app.services.notification.service.NotificationService.get_user_notifications", return_value=([], 0)), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0), \
              patch("app.services.notification.push.PushNotificationService.update_device_activity"):
             resp = logged_in_client.get(
                 "/notifications/api", headers={"X-Device-Token": "tok123"}
@@ -366,14 +366,14 @@ class TestApiGetNotifications:
 
 class TestApiGetNotificationCount:
     def test_returns_count(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_unread_count", return_value=7):
+        with patch("app.services.notification.service.NotificationService.get_unread_count", return_value=7):
             resp = logged_in_client.get("/notifications/api/count")
         _assert_status(resp, 200)
         data = _get_json(resp)
         assert data.get("unread_count") == 7
 
     def test_with_device_token(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_unread_count", return_value=3), \
+        with patch("app.services.notification.service.NotificationService.get_unread_count", return_value=3), \
              patch("app.services.notification.push.PushNotificationService.update_device_activity"):
             resp = logged_in_client.get(
                 "/notifications/api/count",
@@ -424,10 +424,10 @@ class TestApiArchiveNotifications:
         _assert_status(resp, 400)
 
     def test_archive_success(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.archive_notifications", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=1), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=1):
+        with patch("app.services.notification.service.NotificationService.archive_notifications", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=1), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=1):
             resp = logged_in_client.post(
                 "/notifications/api/archive", json={"notification_ids": [1]}
             )
@@ -436,7 +436,7 @@ class TestApiArchiveNotifications:
         assert data.get("success") is True
 
     def test_archive_failure(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.archive_notifications", return_value=False):
+        with patch("app.services.notification.service.NotificationService.archive_notifications", return_value=False):
             resp = logged_in_client.post(
                 "/notifications/api/archive", json={"notification_ids": [1]}
             )
@@ -453,10 +453,10 @@ class TestApiDeleteNotifications:
         _assert_status(resp, 400)
 
     def test_delete_success(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.delete_notifications", return_value=True), \
-             patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_archived_count", return_value=0), \
-             patch("app.services.notification_service.NotificationService.get_all_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.delete_notifications", return_value=True), \
+             patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_archived_count", return_value=0), \
+             patch("app.services.notification.service.NotificationService.get_all_count", return_value=0):
             resp = logged_in_client.delete(
                 "/notifications/api/delete", json={"notification_ids": [1]}
             )
@@ -465,7 +465,7 @@ class TestApiDeleteNotifications:
         assert data.get("success") is True
 
     def test_delete_failure(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.delete_notifications", return_value=False):
+        with patch("app.services.notification.service.NotificationService.delete_notifications", return_value=False):
             resp = logged_in_client.delete(
                 "/notifications/api/delete", json={"notification_ids": [1]}
             )
@@ -479,7 +479,7 @@ class TestApiDeleteNotifications:
 class TestApiGetNotificationPreferences:
     def test_get_preferences(self, logged_in_client, db_session):
         mock_prefs = _make_mock_prefs()
-        with patch("app.services.notification_service.NotificationService.get_notification_preferences",
+        with patch("app.services.notification.service.NotificationService.get_notification_preferences",
                    return_value=mock_prefs):
             resp = logged_in_client.get("/notifications/api/preferences")
         _assert_status(resp, 200)
@@ -494,7 +494,7 @@ class TestApiGetNotificationPreferences:
         mock_prefs.digest_day = "monday"
         mock_prefs.digest_time = "09:00"
         mock_prefs.timezone = "UTC"
-        with patch("app.services.notification_service.NotificationService.get_notification_preferences",
+        with patch("app.services.notification.service.NotificationService.get_notification_preferences",
                    return_value=mock_prefs):
             resp = logged_in_client.get("/notifications/api/preferences")
         _assert_status(resp, 200)
@@ -511,7 +511,7 @@ class TestApiGetNotificationPreferences:
 class TestApiUpdateNotificationPreferences:
     def test_update_preferences_json(self, logged_in_client, db_session):
         mock_prefs = _make_mock_prefs()
-        with patch("app.services.notification_service.NotificationService.update_notification_preferences",
+        with patch("app.services.notification.service.NotificationService.update_notification_preferences",
                    return_value=mock_prefs):
             resp = logged_in_client.post(
                 "/notifications/api/preferences",
@@ -523,7 +523,7 @@ class TestApiUpdateNotificationPreferences:
         assert data.get("success") is True
 
     def test_update_preferences_service_returns_none(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.update_notification_preferences",
+        with patch("app.services.notification.service.NotificationService.update_notification_preferences",
                    return_value=None):
             resp = logged_in_client.post(
                 "/notifications/api/preferences",
@@ -544,7 +544,7 @@ class TestApiUpdateNotificationPreferences:
     def test_update_preferences_with_push_types(self, logged_in_client, db_session):
         mock_prefs = _make_mock_prefs()
         mock_prefs.push_notification_types_enabled = ["admin_message"]
-        with patch("app.services.notification_service.NotificationService.update_notification_preferences",
+        with patch("app.services.notification.service.NotificationService.update_notification_preferences",
                    return_value=mock_prefs):
             resp = logged_in_client.post(
                 "/notifications/api/preferences",
@@ -693,7 +693,7 @@ class TestApiNotificationAction:
         ]
         from app.models import Notification
         with patch.object(Notification, "query") as mock_query, \
-             patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=False):
+             patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=False):
             mock_query.filter_by.return_value.first.return_value = mock_notif
             resp = logged_in_client.post(
                 "/notifications/api/999/action", json={"action": "approve"}
@@ -707,7 +707,7 @@ class TestApiNotificationAction:
         ]
         from app.models import Notification
         with patch.object(Notification, "query") as mock_query, \
-             patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True), \
              patch("app.services.notification.core.validate_action_button_endpoint", return_value=True):
             mock_query.filter_by.return_value.first.return_value = mock_notif
             resp = logged_in_client.post(
@@ -803,7 +803,7 @@ class TestApiScheduleNotification:
 
 class TestApiSearchNotifications:
     def test_search_no_query(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get("/notifications/api/search")
         _assert_status(resp, 200)
@@ -811,19 +811,19 @@ class TestApiSearchNotifications:
         assert data.get("success") is True
 
     def test_search_with_query(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get("/notifications/api/search?q=hello")
         _assert_status(resp, 200)
 
     def test_search_with_type_filter(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get("/notifications/api/search?q=test&type=admin_message")
         _assert_status(resp, 200)
 
     def test_search_with_date_filters(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get(
                 "/notifications/api/search?date_from=2024-01-01T00:00:00Z&date_to=2024-12-31T23:59:59Z"
@@ -831,7 +831,7 @@ class TestApiSearchNotifications:
         _assert_status(resp, 200)
 
     def test_search_invalid_date_ignored(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get("/notifications/api/search?date_from=bad")
         _assert_status(resp, 200)
@@ -843,7 +843,7 @@ class TestApiSearchNotifications:
 
 class TestApiExportNotifications:
     def test_export_json(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get("/notifications/api/export?format=json")
         _assert_status(resp, 200)
@@ -856,14 +856,14 @@ class TestApiExportNotifications:
             {"id": 1, "title": "T1", "message": "M1", "type": "admin_message",
              "priority": "normal", "is_read": False, "created_at": "2024-01-01", "related_url": ""}
         ]
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=(sample, 1)):
             resp = logged_in_client.get("/notifications/api/export?format=csv")
         _assert_status(resp, 200)
         assert "text/csv" in resp.content_type or resp.status_code == 200
 
     def test_export_with_date_filters(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get(
                 "/notifications/api/export?date_from=2024-01-01T00:00:00&date_to=2024-12-31T23:59:59"
@@ -871,7 +871,7 @@ class TestApiExportNotifications:
         _assert_status(resp, 200)
 
     def test_export_default_format_is_json(self, logged_in_client, db_session):
-        with patch("app.services.notification_service.NotificationService.get_user_notifications",
+        with patch("app.services.notification.service.NotificationService.get_user_notifications",
                    return_value=([], 0)):
             resp = logged_in_client.get("/notifications/api/export")
         _assert_status(resp, 200)
@@ -968,7 +968,7 @@ class TestGetNotificationTypesForUser:
                 user = MagicMock()
                 user.id = 1
 
-            with patch("app.services.app_settings_service.get_merged_notification_audience_rules", return_value={}):
+            with patch("app.services.platform.app_settings_service.get_merged_notification_audience_rules", return_value={}):
                 result = get_notification_types_for_user(user)
 
         assert "all" in result
@@ -982,7 +982,7 @@ class TestGetNotificationTypesForUser:
             rules = {
                 "admin_message": {"admin_users": True, "focal_points": False, "system_managers": False}
             }
-            with patch("app.services.app_settings_service.get_merged_notification_audience_rules", return_value=rules):
+            with patch("app.services.platform.app_settings_service.get_merged_notification_audience_rules", return_value=rules):
                 result = get_notification_types_for_user(user)
 
         assert "admin_message" in result["for_user"]
@@ -995,6 +995,6 @@ class TestGetNotificationTypesForUser:
 class TestGetCurrentUserId:
     def test_returns_user_id(self, logged_in_client, db_session, app):
         """When logged in, count endpoint shows _get_current_user_id works."""
-        with patch("app.services.notification_service.NotificationService.get_unread_count", return_value=0):
+        with patch("app.services.notification.service.NotificationService.get_unread_count", return_value=0):
             resp = logged_in_client.get("/notifications/api/count")
         _assert_status(resp, 200)

@@ -372,7 +372,7 @@ class AIChatIntegration:
         page_context: Optional[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Build user context dictionary for agent."""
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         user_id = resolve_ai_trace_user_id(platform_context)
         access_level = None

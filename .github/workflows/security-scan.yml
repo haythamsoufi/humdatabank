@@ -96,8 +96,8 @@ jobs:
 
       - name: Run Custom Scanner
         run: |
-          python Backoffice/scripts/scan_secrets.py --path . --fail-on critical --json > scan-results.json || exit_code=$?
-          python Backoffice/scripts/scan_secrets.py --path . --fix
+          python Backoffice/scripts/ci/scan_secrets.py --path . --fail-on critical --json > scan-results.json || exit_code=$?
+          python Backoffice/scripts/ci/scan_secrets.py --path . --fix
           exit ${exit_code:-0}
 
       - name: Upload Scan Results

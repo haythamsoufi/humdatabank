@@ -35,7 +35,7 @@ from app.forms.system import IndicatorBankForm, CommonWordForm
 from app.routes.admin.shared import permission_required, user_has_permission
 from app.utils.request_utils import get_json_or_form, is_json_request, get_request_data
 from sqlalchemy import func, or_, cast, String
-from app.services.indicator_neural_map import build_embedding_scatter, probe_query_embedding
+from app.services.indicators.neural_map import build_embedding_scatter, probe_query_embedding
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from io import BytesIO
@@ -233,7 +233,7 @@ def manage_indicator_bank():
         subsectors = SubSector.query.filter(SubSector.id.in_(subsector_ids)).all()
         subsectors_dict = {subsector.id: subsector for subsector in subsectors}
 
-    from app.services.indicator_bank_service import attach_indicator_usage_cache
+    from app.services.indicators.bank_service import attach_indicator_usage_cache
     attach_indicator_usage_cache(indicators)
 
     for indicator in indicators:
@@ -422,7 +422,7 @@ def indicator_bank_neural_map_probe():
 @permission_required("admin.indicator_bank.edit")
 def sync_indicator_bank_remote():
     """Trigger background sync from the external IFRC Indicator Bank platform."""
-    from app.services.indicatorbank_remote_sync_service import start_remote_sync, get_remote_sync_state
+    from app.services.indicators.remote_sync_service import start_remote_sync, get_remote_sync_state
 
     api_key = os.getenv("IFRC_INDICATORBANK_API_KEY", "").strip()
     api_url = os.getenv("IFRC_INDICATORBANK_API_URL", "https://ifrc-indicatorbank.azurewebsites.net/api/indicator").strip()
@@ -443,7 +443,7 @@ def sync_indicator_bank_remote():
 @permission_required("admin.indicator_bank.edit")
 def sync_indicator_bank_remote_status():
     """Fetch background sync status/result."""
-    from app.services.indicatorbank_remote_sync_service import get_remote_sync_state
+    from app.services.indicators.remote_sync_service import get_remote_sync_state
     return json_ok(state=get_remote_sync_state())
 
 @bp.route("/indicator_bank/view/<int:id>", methods=["GET"])
@@ -458,7 +458,7 @@ def view_indicator_bank(id):
 @permission_required('admin.indicator_bank.create')
 def add_indicator_bank():
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_archive = (
             AuthorizationService.is_system_manager(current_user)
             or AuthorizationService.has_rbac_permission(current_user, 'admin.indicator_bank.archive')
@@ -525,7 +525,7 @@ def edit_indicator_bank(id):
     indicator = IndicatorBank.query.get_or_404(id)
 
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         can_archive = (
             AuthorizationService.is_system_manager(current_user)
             or AuthorizationService.has_rbac_permission(current_user, 'admin.indicator_bank.archive')
@@ -842,7 +842,7 @@ def update_indicator_translations(id):
 def cleanup_sessions():
     """Cleanup inactive sessions"""
     try:
-        from app.services.user_analytics_service import cleanup_inactive_sessions
+        from app.services.platform.user_analytics_service import cleanup_inactive_sessions
         count = cleanup_inactive_sessions()
         flash(f"Successfully cleaned up {count} inactive sessions.", "success")
     except Exception as e:
@@ -1318,7 +1318,7 @@ def get_filtered_indicator_count():
 
         if include_indicators:
             try:
-                from app.services.indicator_bank_service import serialize_wizard_indicator
+                from app.services.indicators.bank_service import serialize_wizard_indicator
 
                 indicators = (
                     query.options(

@@ -14,7 +14,7 @@ from app.models.enums import DocumentStatus
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.api_helpers import json_response, api_error
-from app.services import storage_service as storage
+from app.services.platform import storage_service as storage
 
 
 @api_bp.route('/submitted-documents', methods=['GET'])

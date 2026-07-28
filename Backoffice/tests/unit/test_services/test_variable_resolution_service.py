@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.variable_resolution_service import VariableResolutionService
+from app.services.forms.variable_resolution_service import VariableResolutionService
 
 
 def test_evaluate_formula_with_basic_operations():

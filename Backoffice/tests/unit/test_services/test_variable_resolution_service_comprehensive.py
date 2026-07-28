@@ -11,7 +11,7 @@ import pytest
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-from app.services.variable_resolution_service import VariableResolutionService
+from app.services.forms.variable_resolution_service import VariableResolutionService
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ class TestResolveEffectivePeriod:
         aes.assigned_form = assigned_form
         return aes
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_same_year_maps_reporting_label_to_planning_year(self, mock_af):
         current = self._assigned_form(
             period_name='Jan-Jun 2026',
@@ -159,7 +159,7 @@ class TestResolveEffectivePeriod:
         )
         assert result == '2026'
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_same_year_uses_year_from_period_name_when_dates_missing(self, mock_af):
         current = self._assigned_form(period_name='Annual reporting 2027', template_id=23)
         planning_2027 = self._assigned_form(period_name='2027', template_id=22)
@@ -170,7 +170,7 @@ class TestResolveEffectivePeriod:
         )
         assert result == '2027'
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_same_year_returns_none_when_no_matching_source(self, mock_af):
         current = self._assigned_form(period_name='Jan-Jun 2026', template_id=23)
         mock_af.query.filter_by.return_value.all.return_value = [
@@ -182,7 +182,7 @@ class TestResolveEffectivePeriod:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_previous_cross_template_uses_period_dates(self, mock_af):
         current = self._assigned_form(
             period_name='Jan-Jun 2026',
@@ -211,7 +211,7 @@ class TestResolveEffectivePeriod:
         )
         assert result == '2025'
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_previous_same_period_name_on_source(self, mock_af):
         current = self._assigned_form(
             period_name='2026',
@@ -722,13 +722,13 @@ class TestResolveMetadataVariable:
 
     def test_entity_name(self):
         aes = self._aes()
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', return_value='France'):
+        with patch('app.services.organization.entity_service.EntityService.get_localized_entity_name', return_value='France'):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'entity_name'}, aes, None)
         assert result == 'France'
 
     def test_entity_name_hierarchy(self):
         aes = self._aes()
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', return_value='EU > France'):
+        with patch('app.services.organization.entity_service.EntityService.get_localized_entity_name', return_value='EU > France'):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'entity_name_hierarchy'}, aes, None)
         assert result == 'EU > France'
 
@@ -801,21 +801,21 @@ class TestResolveMetadataVariable:
     def test_national_society_name_with_country(self):
         aes = self._aes()
         mock_country = MagicMock()
-        with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=mock_country), \
+        with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=mock_country), \
              patch('app.utils.form_localization.get_localized_national_society_name', return_value='French Red Cross'):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'national_society_name'}, aes, None)
         assert result == 'French Red Cross'
 
     def test_national_society_name_no_country(self):
         aes = self._aes()
-        with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=None):
+        with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=None):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'national_society_name'}, aes, None)
         assert result is None
 
     def test_national_society_name_ns_name_none(self):
         aes = self._aes()
         mock_country = MagicMock()
-        with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=mock_country), \
+        with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=mock_country), \
              patch('app.utils.form_localization.get_localized_national_society_name', return_value=None):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'national_society_name'}, aes, None)
         assert result is None
@@ -827,7 +827,7 @@ class TestResolveMetadataVariable:
 
     def test_entity_name_exception_returns_none(self):
         aes = self._aes()
-        with patch('app.services.entity_service.EntityService.get_localized_entity_name', side_effect=Exception("DB error")):
+        with patch('app.services.organization.entity_service.EntityService.get_localized_entity_name', side_effect=Exception("DB error")):
             result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'entity_name'}, aes, None)
         assert result is None
 
@@ -871,7 +871,7 @@ class TestGetEntityStatusesForScope:
         aes.entity_id = entity_id
         return aes
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_same_scope_found(self, mock_aes_cls):
         af = self._af()
         cur_aes = self._cur_aes()
@@ -881,7 +881,7 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'same', {})
         assert result == [mock_status]
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_same_scope_not_found(self, mock_aes_cls):
         af = self._af()
         cur_aes = self._cur_aes()
@@ -889,7 +889,7 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'same', {})
         assert result == []
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_any_scope_returns_all(self, mock_aes_cls):
         af = self._af()
         cur_aes = self._cur_aes()
@@ -898,7 +898,7 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'any', {})
         assert result == mock_statuses
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_specific_scope_found(self, mock_aes_cls):
         af = self._af()
         cur_aes = self._cur_aes()
@@ -908,7 +908,7 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'specific', config)
         assert result == [mock_status]
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_specific_scope_not_found(self, mock_aes_cls):
         af = self._af()
         cur_aes = self._cur_aes()
@@ -937,7 +937,7 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'unknown_scope', {})
         assert result == []
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_entities_containing_no_source_form_item_id(self, mock_aes_cls):
         af = self._af()
         cur_aes = self._cur_aes(entity_id=88)
@@ -945,8 +945,8 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'entities_containing', {})
         assert result == []
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_entities_containing_scope_matches_correct_entities(self, mock_aes_cls, mock_fd_cls):
         af = self._af()
         cur_aes = self._cur_aes(entity_id=88)
@@ -974,8 +974,8 @@ class TestGetEntityStatusesForScope:
         assert aes1 in result
         assert aes2 not in result
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_entities_containing_no_disagg_data(self, mock_aes_cls, mock_fd_cls):
         af = self._af()
         cur_aes = self._cur_aes(entity_id=88)
@@ -993,8 +993,8 @@ class TestGetEntityStatusesForScope:
         result = VariableResolutionService._get_entity_statuses_for_scope(af, cur_aes, 'entities_containing', config)
         assert result == []
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
     def test_entities_containing_non_dict_disagg_data(self, mock_aes_cls, mock_fd_cls):
         af = self._af()
         cur_aes = self._cur_aes(entity_id=88)
@@ -1032,7 +1032,7 @@ class TestResolveEntitiesContaining:
         result = VariableResolutionService._resolve_entities_containing([], {})
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_auto_load_format_default(self, mock_fd_cls):
         entity_statuses = self._aes_list([10, 20])
         fd = MagicMock()
@@ -1046,7 +1046,7 @@ class TestResolveEntitiesContaining:
         assert parsed['entity_type'] == 'ns'
         assert len(parsed['entities']) == 2
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_auto_load_format_no_disagg(self, mock_fd_cls):
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
@@ -1056,7 +1056,7 @@ class TestResolveEntitiesContaining:
         parsed = json.loads(result)
         assert parsed['entity_type'] is None
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_ids_comma_format(self, mock_fd_cls):
         entity_statuses = self._aes_list([10, 20])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
@@ -1064,7 +1064,7 @@ class TestResolveEntitiesContaining:
         result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == '10, 20'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_ids_json_format(self, mock_fd_cls):
         entity_statuses = self._aes_list([10, 20])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
@@ -1072,43 +1072,43 @@ class TestResolveEntitiesContaining:
         result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert json.loads(result) == [10, 20]
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_names_comma_format(self, mock_fd_cls):
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'names_comma'}
-        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={("country", 10): "France"}):
+        with patch('app.services.organization.entity_service.EntityService.batch_entity_names', return_value={("country", 10): "France"}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == 'France'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_names_comma_format_fallback_when_name_none(self, mock_fd_cls):
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'names_comma'}
-        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={}):
+        with patch('app.services.organization.entity_service.EntityService.batch_entity_names', return_value={}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == 'Entity 10'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_ids_and_names_comma_with_name(self, mock_fd_cls):
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'ids_and_names_comma'}
-        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={("country", 10): "France"}):
+        with patch('app.services.organization.entity_service.EntityService.batch_entity_names', return_value={("country", 10): "France"}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == '10 (France)'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_ids_and_names_comma_no_name(self, mock_fd_cls):
         entity_statuses = self._aes_list([10])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
         config = {'source_form_item_id': 5, 'return_format': 'ids_and_names_comma'}
-        with patch('app.services.entity_service.EntityService.batch_entity_names', return_value={}):
+        with patch('app.services.organization.entity_service.EntityService.batch_entity_names', return_value={}):
             result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == '10'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_unknown_return_format_defaults_to_ids(self, mock_fd_cls):
         entity_statuses = self._aes_list([10, 20])
         mock_fd_cls.query.filter_by.return_value.order_by.return_value.first.return_value = None
@@ -1116,7 +1116,7 @@ class TestResolveEntitiesContaining:
         result = VariableResolutionService._resolve_entities_containing(entity_statuses, config)
         assert result == '10, 20'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_no_source_form_item_id_auto_load(self, mock_fd_cls):
         entity_statuses = self._aes_list([10])
         config = {'return_format': 'auto_load_format'}
@@ -1168,7 +1168,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 1
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_row_entity_not_in_list_returns_zero(self, mock_fd_cls):
         aes = MagicMock()
         aes.entity_id = 99
@@ -1180,7 +1180,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_found_numeric_cell_value(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1198,7 +1198,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 1.0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_no_form_data_returns_zero(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1213,7 +1213,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_no_disagg_data_returns_zero(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1231,7 +1231,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_key_not_found_in_matrix_returns_zero(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1249,7 +1249,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_row_total_mode(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1267,7 +1267,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 8.0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_row_total_mode_no_data_returns_zero(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1285,7 +1285,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 0
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_non_numeric_cell_value_returned(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1303,7 +1303,7 @@ class TestResolveEntitiesContainingForMatrixCell:
         )
         assert result == 'yes'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_non_dict_disagg_returns_zero(self, mock_fd_cls):
         aes = MagicMock()
         aes.id = 1
@@ -1355,7 +1355,7 @@ class TestResolveSingleVariable:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_no_assigned_form_returns_none(self, mock_af):
         aes = self._aes()
         mock_af.query.filter_by.return_value.first.return_value = None
@@ -1364,8 +1364,8 @@ class TestResolveSingleVariable:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_no_entity_statuses_returns_none(self, mock_af, mock_aes_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1378,9 +1378,9 @@ class TestResolveSingleVariable:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_no_form_data_returns_none(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1396,9 +1396,9 @@ class TestResolveSingleVariable:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_indicator_numeric_value(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1420,9 +1420,9 @@ class TestResolveSingleVariable:
         )
         assert result == 42.0
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_indicator_comma_formatted_value(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1444,9 +1444,9 @@ class TestResolveSingleVariable:
         )
         assert result == 1234.0
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_indicator_non_numeric_value_returned_as_is(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1468,9 +1468,9 @@ class TestResolveSingleVariable:
         )
         assert result == 'N/A'
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_indicator_disagg_sum(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1492,9 +1492,9 @@ class TestResolveSingleVariable:
         )
         assert result == 30.0
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_indicator_empty_disagg_returns_none(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1518,9 +1518,9 @@ class TestResolveSingleVariable:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_question_value_returned(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1541,9 +1541,9 @@ class TestResolveSingleVariable:
         )
         assert result == "text answer"
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_matrix_cell_lookup(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1565,9 +1565,9 @@ class TestResolveSingleVariable:
         )
         assert result == 99.0
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_matrix_row_total(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1588,8 +1588,8 @@ class TestResolveSingleVariable:
         )
         assert result == 30.0
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_entities_containing_no_row_entity_id(self, mock_af, mock_aes_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1604,8 +1604,8 @@ class TestResolveSingleVariable:
             )
         assert result == 'result'
 
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_entities_containing_with_row_entity_id(self, mock_af, mock_aes_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1620,9 +1620,9 @@ class TestResolveSingleVariable:
             )
         assert result == 1
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignmentEntityStatus')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignmentEntityStatus')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_disagg_values_non_numeric_skipped(self, mock_af, mock_aes_cls, mock_fd_cls):
         aes = self._aes()
         af = MagicMock()
@@ -1668,7 +1668,7 @@ class TestResolveSingleVariableCached:
         result = VariableResolutionService._resolve_single_variable_cached(config, aes)
         assert result is None
 
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_no_assigned_form_returns_none(self, mock_af):
         aes = self._aes()
         mock_af.query.filter_by.return_value.first.return_value = None
@@ -1739,7 +1739,7 @@ class TestResolveSingleVariableCached:
             result = VariableResolutionService._resolve_single_variable_cached(config, aes)
         assert result == 'ids_result'
 
-    @patch('app.services.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.FormData')
     def test_cache_miss_fallback_to_query(self, mock_fd_cls):
         aes = self._aes()
         mock_af = MagicMock()
@@ -1962,7 +1962,7 @@ class TestResolveVariablesBatch:
                     'source_assignment_period': '2024', 'source_form_item_id': 5}
         }
         with patch.object(VariableResolutionService, '_resolve_builtin_metadata_variables', return_value={}), \
-             patch('app.services.variable_resolution_service.AssignedForm') as mock_af:
+             patch('app.services.forms.variable_resolution_service.AssignedForm') as mock_af:
             mock_af.query.filter_by.return_value.first.return_value = None
             result = VariableResolutionService.resolve_variables_batch(tv, aes, [1])
         assert 'EO1' not in result.get(1, {})
@@ -2007,8 +2007,8 @@ class TestResolveVariablesBatch:
         assert result[5]['custom'] == '1'
         assert result[5]['entity_name'] == 'France'
 
-    @patch('app.services.variable_resolution_service.FormData')
-    @patch('app.services.variable_resolution_service.AssignedForm')
+    @patch('app.services.forms.variable_resolution_service.FormData')
+    @patch('app.services.forms.variable_resolution_service.AssignedForm')
     def test_batch_prefetches_form_data(self, mock_af, mock_fd_cls):
         aes = self._aes()
         tv = MagicMock()
@@ -2090,7 +2090,7 @@ class TestResolveVariableByIndicatorBank:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_no_template_returns_none(self, mock_tmpl_cls):
         aes = self._aes()
         item = MagicMock()
@@ -2102,7 +2102,7 @@ class TestResolveVariableByIndicatorBank:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_no_published_version_id_returns_none(self, mock_tmpl_cls):
         aes = self._aes()
         item = MagicMock()
@@ -2116,8 +2116,8 @@ class TestResolveVariableByIndicatorBank:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormItem')
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormItem')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_no_matching_form_item_returns_none(self, mock_tmpl_cls, mock_fi_cls):
         aes = self._aes()
         item = MagicMock()
@@ -2132,8 +2132,8 @@ class TestResolveVariableByIndicatorBank:
         )
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormItem')
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormItem')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_successful_resolution(self, mock_tmpl_cls, mock_fi_cls):
         aes = self._aes()
         item = MagicMock()
@@ -2151,8 +2151,8 @@ class TestResolveVariableByIndicatorBank:
             )
         assert result == 42
 
-    @patch('app.services.variable_resolution_service.FormItem')
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormItem')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_entities_containing_scope_changed_to_same(self, mock_tmpl_cls, mock_fi_cls):
         aes = self._aes()
         item = MagicMock()
@@ -2176,8 +2176,8 @@ class TestResolveVariableByIndicatorBank:
             )
         assert captured[0]['entity_scope'] == 'same'
 
-    @patch('app.services.variable_resolution_service.FormItem')
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormItem')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_cache_reused_on_second_call(self, mock_tmpl_cls, mock_fi_cls):
         aes = self._aes()
         item = MagicMock()
@@ -2204,13 +2204,13 @@ class TestResolveVariableByIndicatorBank:
         item.indicator_bank_id = 5
         config = {'source_template_id': 1, 'source_assignment_period': '2023'}
 
-        with patch('app.services.variable_resolution_service.FormTemplate') as mock_tmpl_cls:
+        with patch('app.services.forms.variable_resolution_service.FormTemplate') as mock_tmpl_cls:
             mock_tmpl_cls.query.get.side_effect = Exception("DB error")
             result = VariableResolutionService.resolve_variable_by_indicator_bank(config, aes, item)
         assert result is None
 
-    @patch('app.services.variable_resolution_service.FormItem')
-    @patch('app.services.variable_resolution_service.FormTemplate')
+    @patch('app.services.forms.variable_resolution_service.FormItem')
+    @patch('app.services.forms.variable_resolution_service.FormTemplate')
     def test_invalid_cache_treated_as_empty(self, mock_tmpl_cls, mock_fi_cls):
         aes = self._aes()
         item = MagicMock()

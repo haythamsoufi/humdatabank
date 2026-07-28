@@ -6,7 +6,7 @@ import pytest
 
 from app.models import AIJob
 from app.models.forms import FormData
-from app.services.async_import_job_store import (
+from app.services.imports.async_import_job_store import (
     UPR_EXCEL_IMPORT_JOB_TYPE,
     create_import_job,
     get_import_job,

@@ -590,7 +590,7 @@ class TestScheduledJobInnerFunctions:
         fn = jobs.get("cleanup_inactive_sessions")
         assert fn is not None
 
-        with patch("app.services.user_analytics_service.cleanup_inactive_sessions", return_value=3):
+        with patch("app.services.platform.user_analytics_service.cleanup_inactive_sessions", return_value=3):
             fn()
 
     def test_cleanup_sessions_exception(self, app):
@@ -598,7 +598,7 @@ class TestScheduledJobInnerFunctions:
         fn = jobs.get("cleanup_inactive_sessions")
 
         with patch(
-            "app.services.user_analytics_service.cleanup_inactive_sessions",
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
             side_effect=Exception("session table missing"),
         ):
             fn()  # should be caught

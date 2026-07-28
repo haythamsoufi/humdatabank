@@ -23,16 +23,16 @@ from app.models import (
     QuestionType, RepeatGroupData, RepeatGroupInstance, SubmittedDocument,
 )
 from app.models.enums import EntityType
-from app.services.entity_service import EntityService
-from app.services.form_data_service import FormDataService
-from app.services.form_processing_service import get_form_items_for_section, slugify_age_group, _create_dynamic_indicator_object
+from app.services.organization.entity_service import EntityService
+from app.services.forms.data_service import FormDataService
+from app.services.forms.processing_service import get_form_items_for_section, slugify_age_group, _create_dynamic_indicator_object
 from app.services.monitoring.debug import debug_manager, performance_monitor
 from app.services.notification.core import (
     log_entity_activity,
     notify_assignment_sent_for_review,
     notify_assignment_submitted,
 )
-from app.services.template_preparation_service import TemplatePreparationService
+from app.services.templates.preparation_service import TemplatePreparationService
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
@@ -134,7 +134,7 @@ def handle_assignment_form(aes_id):
     if blocked is not None:
         return blocked
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
         entity_type = assignment_entity_status.entity_type
@@ -148,7 +148,7 @@ def handle_assignment_form(aes_id):
         return redirect(url_for("main.dashboard"))
 
     can_edit = AuthorizationService.can_edit_assignment(assignment_entity_status, current_user)
-    from app.services.assignment_workflow_service import is_delegation_user, review_enabled
+    from app.services.assignments.workflow_service import is_delegation_user, review_enabled
 
     review_enabled_flag = review_enabled(assignment_entity_status)
     is_delegation_user_flag = is_delegation_user(current_user)
@@ -168,7 +168,7 @@ def handle_assignment_form(aes_id):
     )
     _entry_lap("template_prep")
 
-    from app.services.variable_resolution_service import VariableResolutionService
+    from app.services.forms.variable_resolution_service import VariableResolutionService
     from app.models import FormTemplateVersion
 
     template_version = None
@@ -273,7 +273,7 @@ def handle_assignment_form(aes_id):
                     for s in all_sections
                 )
                 if has_eo_placeholder:
-                    from app.services.emergency_section_binding import resolve_eo_variables
+                    from app.services.forms.emergency_section_binding import resolve_eo_variables
                     eo_vars = resolve_eo_variables(assignment_entity_status)
                     if not isinstance(resolved_variables, dict):
                         resolved_variables = {}
@@ -460,7 +460,7 @@ def handle_assignment_form(aes_id):
 
     # FormPage rows are immutable once published.
     # The cache stores plain page-ID lists (session-safe); re-query on hit.
-    from app.services.template_preparation_service import _pages_cache_key, _template_cache_get
+    from app.services.templates.preparation_service import _pages_cache_key, _template_cache_get
     _pc_key = _pages_cache_key(form_template.id, form_template.published_version_id)
     _cached_page_ids = _template_cache_get(_pc_key)
     if _cached_page_ids is not None:
@@ -486,7 +486,7 @@ def handle_assignment_form(aes_id):
     )
     _entry_lap("existing_data_load")
 
-    from app.services.carry_forward_service import CarryForwardService
+    from app.services.forms.carry_forward_service import CarryForwardService
 
     cf_items = CarryForwardService.iter_carry_forward_items(all_sections)
     if cf_items:
@@ -1091,7 +1091,7 @@ def handle_assignment_form(aes_id):
                     break
         section.display_name = translated_name if translated_name else getattr(section, 'name', '')
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     documents_library_url = None
     if getattr(current_user, "is_authenticated", False):
         if AuthorizationService.is_system_manager(current_user) or AuthorizationService.has_rbac_permission(
@@ -1181,7 +1181,7 @@ def handle_assignment_form(aes_id):
 
 def _preview_template_impl(template_id):
     """Preview a form template using existing form processing logic."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.routes.admin.shared import check_template_access
     if not AuthorizationService.has_rbac_permission(current_user, "admin.templates.view"):
         flash(_("Access denied."), "warning")
@@ -1419,7 +1419,7 @@ def _preview_template_impl(template_id):
 
     variable_configs = {}
     try:
-        from app.services.variable_resolution_service import VariableResolutionService
+        from app.services.forms.variable_resolution_service import VariableResolutionService
         if selected_version:
             variable_configs = getattr(selected_version, "variables", None) or {}
             resolved_variables = VariableResolutionService.resolve_variables(
@@ -1523,7 +1523,7 @@ def _preview_template_impl(template_id):
 
     section_statuses = {section.name: 'Not Started' for section in all_sections}
 
-    from app.services.variable_resolution_service import VariableResolutionService
+    from app.services.forms.variable_resolution_service import VariableResolutionService
 
     form_features = build_entry_form_features(all_sections, template)
 

@@ -11,7 +11,7 @@ from flask import Blueprint, redirect, render_template, request, send_file, curr
 from flask_login import current_user
 
 from app.routes.admin.shared import admin_permission_required, system_manager_required
-from app.services.upr_excel_import_service import UprExcelImportService
+from app.services.upr.excel_import_service import UprExcelImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_accepted, json_bad_request, json_ok, json_server_error
@@ -23,7 +23,7 @@ from app.routes.admin.data_sync_imputation import (
     _cleanup_data_sync_jobs_locked,
     _get_data_sync_cancel_event,
 )
-from app.services.async_import_job_store import (
+from app.services.imports.async_import_job_store import (
     UPR_EXCEL_IMPORT_JOB_TYPE,
     create_import_job,
     get_import_job,

@@ -857,7 +857,7 @@ def retry_email_delivery_log(log):
             return result or log.status == 'sent'
 
         if orphan_kind == 'fds_access_request_digest':
-            from app.services.country_access_request_service import (
+            from app.services.organization.country_access_request_service import (
                 pending_country_access_requests_by_fds_member,
             )
             from app.services.email.fds_access_request_digest import (

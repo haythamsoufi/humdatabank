@@ -42,7 +42,7 @@ class TestDeviceRoutes:
         assert resp.status_code == 400
 
     @patch('app.services.notification.push.PushNotificationService.update_device_activity')
-    @patch('app.services.user_analytics_service._update_session_activity_explicit')
+    @patch('app.services.platform.user_analytics_service._update_session_activity_explicit')
     def test_heartbeat(self, mock_session, mock_update, client, jwt_headers, db_session):
         mock_update.return_value = True
         resp = client.post(f'{PREFIX}/devices/heartbeat', headers=jwt_headers,

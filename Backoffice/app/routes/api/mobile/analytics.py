@@ -34,7 +34,7 @@ def _is_duplicate(user_id: int, screen_name: str, route_path: str | None) -> boo
 @mobile_auth_required
 def screen_view():
     """Update session page-view histogram for a mobile screen (no UserActivityLog row)."""
-    from app.services.user_analytics_service import (
+    from app.services.platform.user_analytics_service import (
         increment_session_page_views_without_activity_log_deferred,
     )
 

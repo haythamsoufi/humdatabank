@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from app.models import CountryAccessRequest, EmailDeliveryLog
-from app.services.country_access_request_service import (
+from app.services.organization.country_access_request_service import (
     FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX,
     pending_country_access_requests_by_fds_member,
 )

@@ -11,7 +11,7 @@ from app.models import Country, FormData, FormItem, IndicatorBank, AssignmentEnt
 from app.models.enums import DocumentStatus
 from app.models.forms import FormSection
 from app.models.validation import ValidationQuestion
-from app.services.reporting_period_service import sort_period_names
+from app.services.forms.reporting_period_service import sort_period_names
 
 
 def parse_period_year(period_name: str) -> int | None:

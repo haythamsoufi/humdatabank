@@ -33,7 +33,7 @@ def _build_ai_groups():
     ``is_set`` is 'db' when the value comes from the database, 'env' when it comes
     from an environment variable / Config, or '' when using the code default.
     """
-    from app.services.app_settings_service import get_ai_settings, AI_SENSITIVE_KEYS
+    from app.services.platform.app_settings_service import get_ai_settings, AI_SENSITIVE_KEYS
 
     ai_db = get_ai_settings()
 
@@ -654,7 +654,7 @@ def _notification_audience_rules_from_post(data) -> dict:
 @admin_permission_required('admin.settings.manage')
 def manage_settings():
     """Admin settings page. Currently supports managing supported languages."""
-    from app.services.app_settings_service import (
+    from app.services.platform.app_settings_service import (
         get_supported_languages,
         set_supported_languages,
         get_show_language_flags,
@@ -711,7 +711,7 @@ def manage_settings():
     org_short_name_translations_json = json.dumps(org_short_name_translations or {}, ensure_ascii=False)
     current_email_templates = get_all_email_templates()
 
-    from app.services.campaign_email_templates_service import (
+    from app.services.communication.campaign_email_templates_service import (
         get_all_campaign_email_templates,
         get_campaign_template_metadata,
     )
@@ -1061,7 +1061,7 @@ def manage_settings():
             # Email templates (multilingual: each key → {lang: content})
             templates_ok = True
             if data.get("email_templates_present") == "1":
-                from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
+                from app.services.platform.app_settings_service import EMAIL_TEMPLATE_KEYS
                 email_templates_data: dict = {}
                 for tpl_key in EMAIL_TEMPLATE_KEYS:
                     translations_field = f"{tpl_key}_translations"
@@ -1118,7 +1118,7 @@ def manage_settings():
             # AI Settings
             ai_ok = True
             if data.get("ai_settings_present") == "1":
-                from app.services.app_settings_service import get_ai_settings, set_ai_settings, AI_SENSITIVE_KEYS
+                from app.services.platform.app_settings_service import get_ai_settings, set_ai_settings, AI_SENSITIVE_KEYS
                 existing_ai = dict(get_ai_settings())
                 # Sensitive keys are env-only; do not save from form
                 existing_ai = {k: v for k, v in existing_ai.items() if k not in AI_SENSITIVE_KEYS}
@@ -1255,7 +1255,7 @@ def manage_settings():
                 # Apply saved AI settings to live config
                 if ai_ok and data.get("ai_settings_present") == "1":
                     with suppress(Exception):
-                        from app.services.app_settings_service import apply_ai_settings_to_config
+                        from app.services.platform.app_settings_service import apply_ai_settings_to_config
                         apply_ai_settings_to_config(current_app)
                 # Optionally refresh Babel context
                 with suppress(Exception):
@@ -1420,7 +1420,7 @@ def branding_assets_upload():
 @admin_permission_required("admin.settings.manage")
 def api_ai_settings_reset():
     """Clear all DB-stored AI settings, reverting to env/code defaults."""
-    from app.services.app_settings_service import set_ai_settings, apply_ai_settings_to_config
+    from app.services.platform.app_settings_service import set_ai_settings, apply_ai_settings_to_config
     try:
         ok = set_ai_settings({}, user_id=getattr(current_user, 'id', None))
         if ok:
@@ -1444,7 +1444,7 @@ def api_settings_email_templates():
       }
     """
     from flask_login import current_user
-    from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS, set_all_email_templates
+    from app.services.platform.app_settings_service import EMAIL_TEMPLATE_KEYS, set_all_email_templates
 
     data = get_json_safe()
     templates_b64 = data.get("email_templates_b64") or {}
@@ -1520,7 +1520,7 @@ def api_settings_email_template_preview():
 
     *template_language* (e.g. ar, fr) is used to resolve localized org branding in preview.
     """
-    from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
+    from app.services.platform.app_settings_service import EMAIL_TEMPLATE_KEYS
     from app.services.email.preview_context import get_email_template_preview_context
     from app.services.email.rendering import (
         render_admin_email_template_for_preview,
@@ -1728,7 +1728,7 @@ def api_settings_email_template_test_send():
     Accepts the same JSON shape as :func:`api_settings_email_template_preview` (flat or
     ``payload`` / ``payload_b64`` wrapper).
     """
-    from app.services.app_settings_service import EMAIL_TEMPLATE_KEYS
+    from app.services.platform.app_settings_service import EMAIL_TEMPLATE_KEYS
     from app.services.email.client import send_email
     from app.services.email.preview_context import (
         get_email_template_preview_context,
@@ -1843,7 +1843,7 @@ def api_settings_email_templates_seed():
 @admin_permission_required('admin.settings.manage')
 def api_languages_settings():
     """JSON API to get/update supported languages (for AJAX forms)."""
-    from app.services.app_settings_service import get_supported_languages, set_supported_languages, get_show_language_flags
+    from app.services.platform.app_settings_service import get_supported_languages, set_supported_languages, get_show_language_flags
 
     if request.method == "POST":
         previous_supported = set(current_app.config.get('SUPPORTED_LANGUAGES') or [])

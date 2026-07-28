@@ -96,7 +96,7 @@ class TestEntryFormDocumentRoutes:
 
             filename = "hello.txt"
             with patch(
-                "app.services.document_service.DocumentService.stream_download_response",
+                "app.services.documents.service.DocumentService.stream_download_response",
             ) as mock_stream:
                 mock_response = Response(b"hello", mimetype="text/plain")
                 mock_response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -113,7 +113,7 @@ class TestEntryFormDocumentRoutes:
             _login(client, user.id)
 
             with patch(
-                "app.services.document_service.DocumentService.delete_assignment_document",
+                "app.services.documents.service.DocumentService.delete_assignment_document",
                 return_value="deleted.pdf",
             ):
                 resp = client.post(
@@ -149,7 +149,7 @@ class TestEntryFormExportAndMatrixRoutes:
             db_session.commit()
 
             _login(client, user_id)
-            with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+            with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
                 resp = client.get(f"/forms/assignment_status/{aes_id}/export_pdf", follow_redirects=False)
                 assert resp.status_code in (301, 302, 308)
 
@@ -214,7 +214,7 @@ class TestEntryFormPreviewAndPublicSubmissionRoutes:
 
             _login(client, admin_id)
             with patch(
-                "app.services.authorization_service.AuthorizationService.check_template_access",
+                "app.services.organization.authorization_service.AuthorizationService.check_template_access",
                 return_value=True,
             ):
                 resp = client.get(f"/forms/templates/preview/{template_id}")
@@ -300,7 +300,7 @@ class TestEntryFormPublicFormPost:
             country_id = country.id
             assigned_form_id = assigned_form.id
 
-            from app.services.form_data_service import FormDataService
+            from app.services.forms.data_service import FormDataService
 
             with patch.object(
                 FormDataService,
@@ -366,7 +366,7 @@ class TestEntryFormPublicSubmissionEdit:
             submission_id = submission.id
             admin = create_test_admin(db_session)
 
-            from app.services.form_data_service import FormDataService
+            from app.services.forms.data_service import FormDataService
 
             _login(client, admin.id)
             with patch.object(
@@ -411,7 +411,7 @@ class TestEntryFormValidationSummary:
             _login(client, user.id)
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=True,
             ):
                 resp = client.get(f"/forms/assignment_status/{aes_id}/validation_summary")
@@ -426,7 +426,7 @@ class TestEntryFormValidationSummary:
             _login(client, user.id)
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=True,
             ):
                 resp = client.post(
@@ -447,8 +447,8 @@ class TestEntryFormSendForReview:
         self, logged_in_focal_client, focal_point_user, app, db_session
     ):
         from app.models.enums import AssignmentEntityStatusValue
-        from app.services.authorization_service import AuthorizationService
-        from app.services.form_data_service import FormDataService
+        from app.services.organization.authorization_service import AuthorizationService
+        from app.services.forms.data_service import FormDataService
         from flask_wtf import FlaskForm
 
         with app.app_context():

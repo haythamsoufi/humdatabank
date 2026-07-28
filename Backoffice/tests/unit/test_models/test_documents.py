@@ -91,7 +91,7 @@ class TestSubmittedDocument:
                 linked_entity_id=999
             )
             db_session.refresh(doc)
-            with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=None):
+            with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=None):
                 result = doc.document_country
                 assert result is None
 
@@ -134,7 +134,7 @@ class TestSubmittedDocument:
                 linked_entity_id=999
             )
             db_session.refresh(doc)
-            with patch('app.services.entity_service.EntityService.get_entity_display_name', return_value='Test Entity'):
+            with patch('app.services.organization.entity_service.EntityService.get_entity_display_name', return_value='Test Entity'):
                 result = doc.standalone_linked_display
                 assert result == 'Test Entity'
 

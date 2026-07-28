@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 from werkzeug.datastructures import FileStorage
 
-from app.services.validation_question_lifecycle import apply_answer_outcome
-from app.services.validation_questions_excel_service import (
+from app.services.validation.question_lifecycle import apply_answer_outcome
+from app.services.validation.questions_excel_service import (
     EXPORT_COLUMNS,
     apply_manual_question_update,
     import_question_updates,
@@ -159,11 +159,11 @@ def test_import_question_updates_answered(monkeypatch):
             return store.get(qid)
 
     monkeypatch.setattr(
-        "app.services.validation_questions_excel_service.ValidationQuestion.query",
+        "app.services.validation.questions_excel_service.ValidationQuestion.query",
         FakeQuery(),
     )
-    monkeypatch.setattr("app.services.validation_questions_excel_service.db.session.commit", lambda: None)
-    monkeypatch.setattr("app.services.validation_questions_excel_service.db.session.rollback", lambda: None)
+    monkeypatch.setattr("app.services.validation.questions_excel_service.db.session.commit", lambda: None)
+    monkeypatch.setattr("app.services.validation.questions_excel_service.db.session.rollback", lambda: None)
 
     file = _excel_file([{"ID": 42, "Status": "answered", "Answer Text": "Fixed in source data."}])
     result = import_question_updates(file, "import.xlsx", updated_by_user_id=7)
@@ -183,11 +183,11 @@ def test_import_question_updates_requires_answer_for_answered_status(monkeypatch
             return question if qid == 5 else None
 
     monkeypatch.setattr(
-        "app.services.validation_questions_excel_service.ValidationQuestion.query",
+        "app.services.validation.questions_excel_service.ValidationQuestion.query",
         FakeQuery(),
     )
-    monkeypatch.setattr("app.services.validation_questions_excel_service.db.session.commit", lambda: None)
-    monkeypatch.setattr("app.services.validation_questions_excel_service.db.session.rollback", lambda: None)
+    monkeypatch.setattr("app.services.validation.questions_excel_service.db.session.commit", lambda: None)
+    monkeypatch.setattr("app.services.validation.questions_excel_service.db.session.rollback", lambda: None)
 
     file = _excel_file([{"ID": 5, "Status": "answered", "Answer Text": ""}])
     result = import_question_updates(file, "import.xlsx")

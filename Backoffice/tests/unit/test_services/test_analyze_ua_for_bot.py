@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.user_analytics_service import analyze_ua_for_bot
+from app.services.platform.user_analytics_service import analyze_ua_for_bot
 
 
 @pytest.mark.unit

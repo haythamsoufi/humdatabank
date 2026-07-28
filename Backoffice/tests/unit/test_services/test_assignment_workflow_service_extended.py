@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue
-from app.services.assignment_workflow_service import (
+from app.services.assignments.workflow_service import (
     _status_value,
     delegation_review_source_statuses,
     is_delegation_user,
@@ -37,19 +37,19 @@ class TestIsDelegationUser:
     def test_none_user_returns_false(self):
         assert is_delegation_user(None) is False
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=True)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=True)
     def test_delegation_user_with_org_email(self, _):
         user = MagicMock()
         user.email = "person@ifrc.org"
         assert is_delegation_user(user) is True
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_non_delegation_user(self, _):
         user = MagicMock()
         user.email = "fp@ns.org"
         assert is_delegation_user(user) is False
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_user_without_email_attribute(self, _):
         user = MagicMock(spec=[])  # No attributes at all
         assert is_delegation_user(user) is False
@@ -75,31 +75,31 @@ class TestStatusValue:
 # ---------------------------------------------------------------------------
 
 class TestResolveSubmitActionEdgeCases:
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_save_action_returns_save(self, _):
         aes = _aes(requires_delegation_review=True)
         user = MagicMock()
         assert resolve_submit_action(aes, user, "save") == "save"
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_send_for_review_action_returns_send_for_review(self, _):
         aes = _aes(requires_delegation_review=True)
         user = MagicMock()
         assert resolve_submit_action(aes, user, "send_for_review") == "send_for_review"
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_empty_action_defaults_to_save(self, _):
         aes = _aes()
         user = MagicMock()
         assert resolve_submit_action(aes, user, "") == "save"
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_none_action_defaults_to_save(self, _):
         aes = _aes()
         user = MagicMock()
         assert resolve_submit_action(aes, user, None) == "save"
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_unknown_action_returned_as_is(self, _):
         """An unrecognised action that is not 'submit' should be returned verbatim."""
         aes = _aes(requires_delegation_review=True)
@@ -107,7 +107,7 @@ class TestResolveSubmitActionEdgeCases:
         # 'approve' is not 'save', 'send_for_review', or 'submit' → returned unchanged
         assert resolve_submit_action(aes, user, "approve") == "approve"
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_ns_user_approved_status_submit_stays_submit(self, _):
         """If review enabled but status is approved (not in source statuses), stays submit."""
         aes = _aes(
@@ -124,12 +124,12 @@ class TestResolveSubmitActionEdgeCases:
 # ---------------------------------------------------------------------------
 
 class TestShouldApplySentForReviewDisabled:
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_review_not_enabled_send_for_review_is_false(self, _):
         aes = _aes(requires_delegation_review=False)
         assert should_apply_sent_for_review(aes, "send_for_review") is False
 
-    @patch("app.services.assignment_workflow_service.is_organization_email", return_value=False)
+    @patch("app.services.assignments.workflow_service.is_organization_email", return_value=False)
     def test_save_action_always_false(self, _):
         aes = _aes(requires_delegation_review=True)
         assert should_apply_sent_for_review(aes, "save") is False

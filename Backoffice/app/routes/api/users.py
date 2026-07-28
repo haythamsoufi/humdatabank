@@ -25,13 +25,13 @@ from app.models.assignments import AssignmentEntityStatus, PublicSubmission
 from app.models.core import UserEntityPermission
 from app.models.enums import EntityType
 from app.models.documents import SubmittedDocument
-from app.services.assignment_completion_service import AssignmentCompletionService
+from app.services.assignments.completion_service import AssignmentCompletionService
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 from app.utils.entity_groups import get_allowed_entity_type_codes, get_enabled_entity_groups
 from app.utils.form_localization import get_localized_template_name
 from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from app.utils.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS, get_json_safe
 from app.utils.dashboard_focal_points import get_focal_points_for_country
 from app.utils.request_validation import enforce_csrf_json
@@ -247,7 +247,7 @@ def get_current_user_profile():
                 country_ids = []
 
         try:
-            from app.services.app_settings_service import user_is_explicit_beta_tester
+            from app.services.platform.app_settings_service import user_is_explicit_beta_tester
 
             _ai_beta_tester_badge = bool(user_is_explicit_beta_tester(user))
         except Exception as e:
@@ -396,7 +396,7 @@ def update_current_user_profile():
 
         # Return updated profile
         try:
-            from app.services.app_settings_service import user_is_explicit_beta_tester
+            from app.services.platform.app_settings_service import user_is_explicit_beta_tester
 
             _ai_beta_tester_badge = bool(user_is_explicit_beta_tester(user))
         except Exception as e:

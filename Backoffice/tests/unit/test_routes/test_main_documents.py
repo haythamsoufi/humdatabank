@@ -22,8 +22,8 @@ from tests.helpers import login_session, assert_redirect
 pytestmark = [pytest.mark.unit]
 
 # AuthorizationService and get_document_types are imported lazily inside the route function.
-_AUTH_SVC = "app.services.authorization_service.AuthorizationService"
-_DOC_TYPES = "app.services.app_settings_service.get_document_types"
+_AUTH_SVC = "app.services.organization.authorization_service.AuthorizationService"
+_DOC_TYPES = "app.services.platform.app_settings_service.get_document_types"
 # _row_with_focal_entity_access is imported lazily inside the route function.
 _ROW_WITH_FOCAL = "app.routes.admin.content_management._row_with_focal_entity_access"
 

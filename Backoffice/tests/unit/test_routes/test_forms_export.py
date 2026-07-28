@@ -113,7 +113,7 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/dashboard"):
@@ -148,9 +148,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -188,9 +188,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -230,9 +230,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -299,9 +299,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -375,9 +375,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -456,9 +456,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -533,9 +533,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -607,9 +607,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -675,9 +675,9 @@ class TestExportPdfImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.DynamicIndicatorData") as mock_did, \
@@ -736,7 +736,7 @@ class TestExportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/dashboard"):
@@ -763,9 +763,9 @@ class TestExportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.get_localized_page_name", return_value="Sheet1"), \
@@ -821,9 +821,9 @@ class TestExportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.get_localized_page_name", return_value="Sheet1"), \
@@ -874,9 +874,9 @@ class TestExportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.get_localized_page_name", return_value="Sheet1"), \
@@ -925,9 +925,9 @@ class TestExportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.get_localized_page_name", return_value="Sheet1"), \
@@ -962,9 +962,9 @@ class TestExportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.models.FormTemplateVersion") as mock_ftv, \
-                 patch("app.services.variable_resolution_service.VariableResolutionService") as mock_vrs, \
+                 patch("app.services.forms.variable_resolution_service.VariableResolutionService") as mock_vrs, \
                  patch("app.routes.forms.export.FormItem") as mock_fi, \
                  patch("app.routes.forms.export.FormData") as mock_fd, \
                  patch("app.routes.forms.export.get_localized_page_name", return_value="Page"), \
@@ -1001,7 +1001,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"):
@@ -1025,7 +1025,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
                  patch("app.routes.forms.export.url_for", return_value="/forms/assignment/1"):
@@ -1054,7 +1054,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1084,7 +1084,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1116,7 +1116,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1148,7 +1148,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1182,7 +1182,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1218,7 +1218,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1255,7 +1255,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1294,7 +1294,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1338,7 +1338,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \
@@ -1381,7 +1381,7 @@ class TestImportExcelImpl:
             with _country_patch(), \
                  patch("app.routes.forms.export.db"), \
                  patch("app.routes.forms.export.AssignmentEntityStatus") as mock_cls, \
-                 patch("app.services.authorization_service.AuthorizationService") as mock_auth, \
+                 patch("app.services.organization.authorization_service.AuthorizationService") as mock_auth, \
                  patch("app.routes.forms.export.request") as mock_req, \
                  patch("app.routes.forms.export.flash") as mock_flash, \
                  patch("app.routes.forms.export.redirect", side_effect=_redirect) as mock_redir, \

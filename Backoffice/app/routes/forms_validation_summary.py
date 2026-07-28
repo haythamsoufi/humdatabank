@@ -71,7 +71,7 @@ def register_validation_summary_routes(bp) -> None:
     def _ai_beta_denied_json():
         """Return JSON denial response when AI beta access is restricted."""
         try:
-            from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+            from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
 
             if not is_ai_beta_restricted():
                 return None
@@ -460,7 +460,7 @@ def register_validation_summary_routes(bp) -> None:
         """
         assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
             flash("You are not authorized to view this assignment.", "warning")
             return redirect(url_for("main.dashboard"))
@@ -750,7 +750,7 @@ def register_validation_summary_routes(bp) -> None:
         """
         assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
             return json_forbidden("Access denied", success=False)
 
@@ -770,7 +770,7 @@ def register_validation_summary_routes(bp) -> None:
         """
         assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
             return Response("event: error\ndata: " + json.dumps({"error": "Access denied"}) + "\n\n", mimetype="text/event-stream")
 
@@ -1081,7 +1081,7 @@ def register_validation_summary_routes(bp) -> None:
         try:
             assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
 
             if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
                 flash("You are not authorized to export data for this assignment and country.", "warning")
@@ -1580,7 +1580,7 @@ def register_validation_summary_routes(bp) -> None:
 
             assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             from app.models.ai_validation import AIFormDataValidation
 
             if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
@@ -1669,7 +1669,7 @@ def register_validation_summary_routes(bp) -> None:
 
             assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             from app.models.ai_validation import AIFormDataValidation
             from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 
@@ -1890,7 +1890,7 @@ def register_validation_summary_routes(bp) -> None:
 
         assignment_entity_status = _load_assignment_or_404(int(aes_id))
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         from app.models.ai_validation import AIFormDataValidation
         from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 

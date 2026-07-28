@@ -220,7 +220,7 @@ def init_scheduler(app, is_reloader):
                         cleanup_old_notifications()
 
                     def _cleanup_sessions():
-                        from app.services.user_analytics_service import cleanup_inactive_sessions
+                        from app.services.platform.user_analytics_service import cleanup_inactive_sessions
                         cleanup_inactive_sessions()
 
                     # Automatic email retries removed — admins retry from Communication Center.

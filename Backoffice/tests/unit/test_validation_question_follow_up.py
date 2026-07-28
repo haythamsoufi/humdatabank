@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.validation_question_follow_up import (
+from app.services.validation.question_follow_up import (
     can_create_follow_up,
     create_follow_up,
     parent_ids_with_open_follow_up,
@@ -46,7 +46,7 @@ def test_can_create_follow_up_requires_answered_status(monkeypatch):
             return None
 
     monkeypatch.setattr(
-        "app.services.validation_question_follow_up.ValidationQuestion.query",
+        "app.services.validation.question_follow_up.ValidationQuestion.query",
         FakeQuery(),
     )
     assert can_create_follow_up(_FakeQuestion(status="answered")) is True
@@ -64,7 +64,7 @@ def test_can_create_follow_up_blocks_when_open_child_exists(monkeypatch):
             return _FakeQuestion(id=11, status="open", parent_question_id=10)
 
     monkeypatch.setattr(
-        "app.services.validation_question_follow_up.ValidationQuestion.query",
+        "app.services.validation.question_follow_up.ValidationQuestion.query",
         FakeQuery(),
     )
     assert can_create_follow_up(parent) is False
@@ -82,11 +82,11 @@ def test_create_follow_up_links_parent_and_increments_round(monkeypatch):
             return None
 
     monkeypatch.setattr(
-        "app.services.validation_question_follow_up.ValidationQuestion.query",
+        "app.services.validation.question_follow_up.ValidationQuestion.query",
         FakeQuery(),
     )
     monkeypatch.setattr(
-        "app.services.validation_question_follow_up.db.session.add",
+        "app.services.validation.question_follow_up.db.session.add",
         lambda obj: added.append(obj),
     )
 
@@ -110,7 +110,7 @@ def test_create_follow_up_requires_question_text(monkeypatch):
             return None
 
     monkeypatch.setattr(
-        "app.services.validation_question_follow_up.ValidationQuestion.query",
+        "app.services.validation.question_follow_up.ValidationQuestion.query",
         FakeQuery(),
     )
     with pytest.raises(ValueError, match="question_text is required"):
@@ -128,7 +128,7 @@ def test_parent_ids_with_open_follow_up():
         def all(self):
             return [(5,), (8,)]
 
-    import app.services.validation_question_follow_up as mod
+    import app.services.validation.question_follow_up as mod
 
     original = mod.ValidationQuestion.query
     mod.ValidationQuestion.query = FakeQuery()

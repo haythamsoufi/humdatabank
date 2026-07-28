@@ -1,6 +1,6 @@
 """Tests for session page_view_path_counts aggregation (admin page path analytics)."""
 
-from app.services.user_analytics_service import (
+from app.services.platform.user_analytics_service import (
     merge_page_view_path_histograms,
     format_page_path_histogram_csv,
 )

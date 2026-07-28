@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.campaign_email_templates_service import (
+from app.services.communication.campaign_email_templates_service import (
     CAMPAIGN_EMAIL_TEMPLATE_KEYS,
     get_all_campaign_email_templates,
     get_campaign_compose_templates,
@@ -67,11 +67,11 @@ class TestCampaignEmailTemplatesService:
             return dict(storage)
 
         monkeypatch.setattr(
-            "app.services.campaign_email_templates_service.read_settings",
+            "app.services.communication.campaign_email_templates_service.read_settings",
             fake_read,
         )
         monkeypatch.setattr(
-            "app.services.campaign_email_templates_service.write_settings",
+            "app.services.communication.campaign_email_templates_service.write_settings",
             fake_write,
         )
 

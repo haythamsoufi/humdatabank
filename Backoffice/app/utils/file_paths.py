@@ -123,7 +123,7 @@ def resolve_submission_file(rel_path: str) -> str:
 
 def resolve_submitted_document_file(rel_path: str) -> str:
     """Resolve ``SubmittedDocument`` storage_path to an absolute filesystem path (local provider)."""
-    from app.services import storage_service as ss
+    from app.services.platform import storage_service as ss
 
     rel = normalize_stored_relative_path(rel_path)
     cat = ss.submitted_document_rel_storage_category(rel)
@@ -192,7 +192,7 @@ def save_submission_document(
         entity_type: Entity slug (e.g. ``country``)
         entity_id: Entity primary key
     """
-    from app.services import storage_service as _ss
+    from app.services.platform import storage_service as _ss
 
     if entity_type is None or entity_id is None:
         raise ValueError("entity_type and entity_id are required for submission document storage")
@@ -252,7 +252,7 @@ def save_sector_logo(file_storage, item_name: str) -> str:
 
     stored_filename = f"{secure_filename(item_name)}{ext}"
 
-    from app.services import storage_service as _ss
+    from app.services.platform import storage_service as _ss
     _ss.upload(_ss.SYSTEM, f"sectors/{stored_filename}", file_storage)
     _ss.publish_system_logo_to_cdn("sectors", stored_filename)
     return stored_filename

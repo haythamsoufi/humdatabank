@@ -368,7 +368,7 @@ class TestUserCanAccessAes:
             with app.app_context():
                 user = User.query.get(int(admin_user.id))
             login_user(user)
-            with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True):
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True):
                 result = _user_can_access_aes(mock_aes)
         assert result is True
 

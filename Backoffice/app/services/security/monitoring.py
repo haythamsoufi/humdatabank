@@ -332,7 +332,7 @@ class SecurityMonitor:
     def _check_admin_activity():
         """Check for unusual admin activity patterns."""
         try:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if current_user.is_authenticated and AuthorizationService.is_admin(current_user):
                 # Check for high-risk admin actions in the last hour
                 one_hour_ago = utcnow() - timedelta(hours=1)

@@ -23,7 +23,7 @@ from app.models import (
     UserLoginLog, UserActivityLog, UserSessionLog, AdminActionLog,
     SecurityEvent, User, Country
 )
-from app.services.user_analytics_service import (
+from app.services.platform.user_analytics_service import (
     get_user_login_analytics, get_user_activity_analytics,
     get_security_events_summary, get_session_analytics, get_active_sessions_count,
     log_admin_action,
@@ -35,13 +35,13 @@ from app.middleware.activity_middleware import track_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_ok
-from app.services.audit_details_service import format_admin_action_details
-from app.services.audit_trail_session_query import (
+from app.services.audit.details_service import format_admin_action_details
+from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,
 )
-from app.services.audit_trail_display_service import (
+from app.services.audit.trail_display_service import (
     build_form_context_lookups_from_activity_logs,
     consolidate_activity_type,
     create_consistent_description,
@@ -612,7 +612,7 @@ def get_session_statistics(days=30):
 @permission_required('admin.analytics.view')
 def cleanup_sessions():
     """Manual cleanup of inactive sessions."""
-    from app.services.user_analytics_service import cleanup_inactive_sessions
+    from app.services.platform.user_analytics_service import cleanup_inactive_sessions
 
     try:
         count = cleanup_inactive_sessions()
@@ -646,7 +646,7 @@ def cleanup_sessions():
 @permission_required('admin.analytics.view')
 def end_session(session_id):
     """End a specific user session manually and force logout the user."""
-    from app.services.user_analytics_service import end_user_session
+    from app.services.platform.user_analytics_service import end_user_session
     from flask import session as flask_session
     from flask_login import logout_user
     import os
@@ -671,7 +671,7 @@ def end_session(session_id):
 
         # Force logout: Add the session to a blacklist for immediate termination
         # We'll store force-logout sessions in a simple way that the before_request handler can check
-        from app.services.user_analytics_service import add_session_to_blacklist
+        from app.services.platform.user_analytics_service import add_session_to_blacklist
         add_session_to_blacklist(session_id)
 
         # If this is the current user's own session, log them out immediately
@@ -1165,7 +1165,7 @@ def audit_trail():
         except (ValueError, TypeError):
             pass
 
-    from app.services.audit_trail_page_data import (
+    from app.services.audit.trail_page_data import (
         build_audit_trail_grid_rows,
         build_audit_trail_multiselect_data,
     )

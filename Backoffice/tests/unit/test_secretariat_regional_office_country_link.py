@@ -2,7 +2,7 @@
 
 from app.models.core import Country
 from app.models.organization import SecretariatRegionalOffice
-from app.services.secretariat_regional_office_service import (
+from app.services.organization.secretariat_regional_office_service import (
     assign_country_secretariat_regional_office,
     ensure_secretariat_regional_offices,
     normalize_region_label,

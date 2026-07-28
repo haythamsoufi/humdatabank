@@ -11,7 +11,7 @@ from app.utils.api_responses import json_auth_required
 from app.utils.redirect_utils import get_current_relative_url
 from datetime import datetime, timezone
 from config import Config
-from app.services.user_analytics_service import (
+from app.services.platform.user_analytics_service import (
     end_user_session,
     remove_session_from_blacklist,
     is_session_blacklisted,

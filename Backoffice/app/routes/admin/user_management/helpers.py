@@ -230,7 +230,7 @@ def _get_missing_rbac_role_codes_for_display(current_is_sys_mgr: bool) -> list:
     if not current_is_sys_mgr:
         return []
     try:
-        from app.services.rbac_seed_service import get_missing_baseline_role_codes
+        from app.services.organization.rbac_seed_service import get_missing_baseline_role_codes
         return get_missing_baseline_role_codes()
     except Exception as e:
         current_app.logger.debug("_get_missing_rbac_role_codes_for_display failed: %s", e)
@@ -291,7 +291,7 @@ def _compute_role_type_for_user_id(user_id: int, *, check_admin_grants: bool = F
             return "admin"
 
         if check_admin_grants:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
 
             target_user = User.query.get(user_id)
             if target_user and AuthorizationService.is_admin(target_user):
@@ -780,7 +780,7 @@ def build_admin_user_detail_dict(user_id: int) -> dict | None:
 
     from app.models.enums import EntityType
     from app.models.rbac import RbacRole, RbacUserRole
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
 
     user = User.query.get(user_id)
     if not user:
@@ -884,7 +884,7 @@ def _get_translator_form_context(user=None):
     """Template context for per-language translator grants on the user form."""
     from flask_login import current_user
     from app.models.rbac import RbacRole
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.services.translation_review.assignment_service import get_assigned_language_codes
 
     translatable = list(current_app.config.get('TRANSLATABLE_LANGUAGES') or [])

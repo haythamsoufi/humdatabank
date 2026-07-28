@@ -702,7 +702,7 @@ class TestCheckAdminActivity:
                 with (
                     patch("app.services.security.monitoring.current_user", mock_user),
                     patch(
-                        "app.services.authorization_service.AuthorizationService.is_admin",
+                        "app.services.organization.authorization_service.AuthorizationService.is_admin",
                         return_value=False,
                     ),
                     patch.object(SecurityMonitor, "log_security_event") as mock_log,
@@ -725,7 +725,7 @@ class TestCheckAdminActivity:
                 with (
                     patch("app.services.security.monitoring.current_user", mock_user),
                     patch(
-                        "app.services.authorization_service.AuthorizationService.is_admin",
+                        "app.services.organization.authorization_service.AuthorizationService.is_admin",
                         return_value=True,
                     ),
                     patch("app.services.security.monitoring.AdminActionLog.query", mock_query),
@@ -751,7 +751,7 @@ class TestCheckAdminActivity:
                 with (
                     patch("app.services.security.monitoring.current_user", mock_user),
                     patch(
-                        "app.services.authorization_service.AuthorizationService.is_admin",
+                        "app.services.organization.authorization_service.AuthorizationService.is_admin",
                         return_value=True,
                     ),
                     patch("app.services.security.monitoring.AdminActionLog.query", mock_query),

@@ -26,11 +26,11 @@ from app.utils.api_helpers import service_error, GENERIC_ERROR_MESSAGE
 from app.utils.constants import DEFAULT_LIMIT_PERIODS, MAX_LIMIT_PERIODS
 from app.utils.datetime_helpers import utcnow
 from app.utils.form_localization import get_localized_country_name, get_localized_indicator_name
-from app.services.app_settings_service import get_organization_name
+from app.services.platform.app_settings_service import get_organization_name
 from app.utils.sql_utils import safe_ilike_pattern
 from flask_babel import gettext as _
 
-from app.services.data_retrieval_shared import (
+from app.services.data_retrieval.shared import (
     get_effective_request_user,
     can_view_non_public_form_items,
     form_item_privacy_is_public_expr,
@@ -38,8 +38,8 @@ from app.services.data_retrieval_shared import (
     get_indicator_candidates_by_keyword,
     score_indicator_relevance,
 )
-from app.services.data_retrieval_country import check_country_access, resolve_country, get_country_info
-from app.services.data_retrieval_form_helpers import (
+from app.services.data_retrieval.country import check_country_access, resolve_country, get_country_info
+from app.services.data_retrieval.form_helpers import (
     extract_numeric_from_formdata,
     breakdown_from_disagg,
     formdata_has_value_filters,
@@ -597,7 +597,7 @@ def get_value_breakdown(
             ident = (indicator_identifier or "").strip()
             # Try semantic/LLM resolution first when configured (vector or vector_then_llm)
             try:
-                from app.services.indicator_resolution_service import resolve_indicator_identifier
+                from app.services.indicators.resolution_service import resolve_indicator_identifier
                 indicator = resolve_indicator_identifier(indicator_identifier, user_query=None)
                 if indicator is not None:
                     logger.debug(
@@ -1301,7 +1301,7 @@ def resolve_indicator_to_primary_id(
     # --- Layer 1: Vector candidates ---
     vector_pairs: List[tuple] = []
     try:
-        from app.services.indicator_resolution_service import get_indicator_candidates
+        from app.services.indicators.resolution_service import get_indicator_candidates
         vector_pairs = get_indicator_candidates(indicator_name, top_k=10)
     except Exception as e:
         logger.debug("resolve_indicator_to_primary_id: vector candidates failed for %r: %s", indicator_name, e)
@@ -1520,7 +1520,7 @@ def get_indicator_values_for_all_countries(
         else:
             # Vector candidates
             try:
-                from app.services.indicator_resolution_service import get_indicator_candidates
+                from app.services.indicators.resolution_service import get_indicator_candidates
                 vector_pairs = get_indicator_candidates(indicator_name, top_k=10)
                 candidates = [c for c, _ in vector_pairs]
                 similarity_map = {int(c.id): float(s) for c, s in vector_pairs}
@@ -2247,7 +2247,7 @@ def get_form_field_value(
         section_label_display = section_label
         if records:
             try:
-                from app.services.variable_resolution_service import VariableResolutionService
+                from app.services.forms.variable_resolution_service import VariableResolutionService
                 aes = records[0].assignment_entity_status
                 assigned_form = getattr(aes, 'assigned_form', None) if aes else None
                 form_template = getattr(assigned_form, 'template', None) if assigned_form else None

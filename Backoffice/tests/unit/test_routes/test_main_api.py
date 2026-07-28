@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.unit]
 
 # AuthorizationService is imported *inside* the route functions, so we must
 # patch at the source class, not the route module.
-_AUTH_SVC = "app.services.authorization_service.AuthorizationService"
+_AUTH_SVC = "app.services.organization.authorization_service.AuthorizationService"
 # NotificationService is also imported lazily inside route functions.
 _NOTIF_SVC = "app.services.notification.service.NotificationService"
 

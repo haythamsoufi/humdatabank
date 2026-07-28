@@ -52,7 +52,7 @@ def load_dynamic_settings(app, config_class, startup_start):
         app.logger.debug("Skipped dynamic settings DB load in TESTING mode")
         return
 
-    from app.services.app_settings_service import ALLOWED_ENTITY_TYPE_GROUPS, read_settings
+    from app.services.platform.app_settings_service import ALLOWED_ENTITY_TYPE_GROUPS, read_settings
 
     try:
         settings_start = time.time()
@@ -143,7 +143,7 @@ def load_dynamic_settings(app, config_class, startup_start):
         )
 
         try:
-            from app.services.app_settings_service import apply_ai_settings_to_config
+            from app.services.platform.app_settings_service import apply_ai_settings_to_config
             apply_ai_settings_to_config(app)
             app.logger.debug(
                 "AI settings applied from database (elapsed: %.3fs)",
@@ -157,7 +157,7 @@ def load_dynamic_settings(app, config_class, startup_start):
         app.logger.warning("Dynamic settings failed, using defaults: %s", e)
 
     try:
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if AuthorizationService.rbac_enabled() and not AuthorizationService._permissions_seeded():
             app.logger.warning(
                 "RBAC permissions are not seeded. Admin permission checks may fail for non-system-managers. "

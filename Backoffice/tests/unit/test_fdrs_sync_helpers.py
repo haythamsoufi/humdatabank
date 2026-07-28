@@ -7,8 +7,8 @@ import sys
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 backoffice_dir = os.path.dirname(os.path.dirname(script_dir))
-scripts_dir = os.path.join(backoffice_dir, "scripts")
-for p in (backoffice_dir, scripts_dir):
+imports_dir = os.path.join(backoffice_dir, "scripts", "imports")
+for p in (backoffice_dir, imports_dir):
     if p not in sys.path:
         sys.path.insert(0, p)
 

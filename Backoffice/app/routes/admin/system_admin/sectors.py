@@ -18,7 +18,7 @@ from app.utils.api_responses import (
 from app.utils.request_utils import is_json_request
 from sqlalchemy.orm.attributes import flag_modified
 from app.utils.sector_logo_urls import sector_logo_url
-from app.services import storage_service as storage
+from app.services.platform import storage_service as storage
 from app.routes.admin.system_admin import bp
 from app.routes.admin.system_admin.helpers import (
     _save_logo_file, _delete_logo_file, _safe_logo_mimetype,
@@ -400,7 +400,7 @@ def new_ns_branch():
     from app.models import NSBranch, Country
 
     form = NSBranchForm()
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     is_focal_point_only = AuthorizationService.has_role(current_user, "assignment_editor_submitter") and not AuthorizationService.is_admin(current_user)
     if is_focal_point_only:
         countries = list(current_user.countries)
@@ -453,7 +453,7 @@ def edit_ns_branch(branch_id):
 
     branch = NSBranch.query.get_or_404(branch_id)
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     is_focal_point_only = AuthorizationService.has_role(current_user, "assignment_editor_submitter") and not AuthorizationService.is_admin(current_user)
     if is_focal_point_only:
         user_country_ids = [country.id for country in current_user.countries]
@@ -510,7 +510,7 @@ def delete_ns_branch(branch_id):
 
     branch = NSBranch.query.get_or_404(branch_id)
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     is_focal_point_only = AuthorizationService.has_role(current_user, "assignment_editor_submitter") and not AuthorizationService.is_admin(current_user)
     if is_focal_point_only:
         user_country_ids = [country.id for country in current_user.countries]

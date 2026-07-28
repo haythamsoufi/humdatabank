@@ -23,7 +23,7 @@ from app.services.ai.documents.embedding import EmbeddingError
 from app.services.ai.documents.vector_store import AIVectorStore
 from app.utils.ai_utils import openai_model_supports_sampling_params
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.services import storage_service as _storage
+from app.services.platform import storage_service as _storage
 from app.services.upr.query_detection import query_prefers_upr_documents as _query_prefers_upr_documents
 
 logger = logging.getLogger(__name__)

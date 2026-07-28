@@ -33,7 +33,7 @@ def _create_data_sync_test_job(
     download_ready=False,
     preview_path=None,
 ):
-    from app.services.async_import_job_store import (
+    from app.services.imports.async_import_job_store import (
         FDRS_DATA_SYNC_JOB_TYPE,
         create_import_job,
         update_import_job,
@@ -974,7 +974,7 @@ class TestDataSyncDownload:
 
 class TestInternalHelpers:
     def test_utc_iso_returns_string(self):
-        from app.services.async_import_job_store import utc_iso
+        from app.services.imports.async_import_job_store import utc_iso
         result = utc_iso()
         assert isinstance(result, str)
         assert "T" in result
@@ -984,7 +984,7 @@ class TestInternalHelpers:
 
         from app.models import AIJob
         from app.routes.admin.data_sync_imputation import _cleanup_data_sync_jobs_locked
-        from app.services.async_import_job_store import FDRS_DATA_SYNC_JOB_TYPE, IMPORT_JOB_TTL_SECONDS
+        from app.services.imports.async_import_job_store import FDRS_DATA_SYNC_JOB_TYPE, IMPORT_JOB_TTL_SECONDS
 
         job_id = uuid.uuid4().hex
         old_created = datetime.utcnow() - timedelta(seconds=IMPORT_JOB_TTL_SECONDS + 100)
@@ -1006,7 +1006,7 @@ class TestInternalHelpers:
     def test_cleanup_data_sync_jobs_locked_preserves_fresh_jobs(self, db_session, admin_user):
         from app.models import AIJob
         from app.routes.admin.data_sync_imputation import _cleanup_data_sync_jobs_locked
-        from app.services.async_import_job_store import FDRS_DATA_SYNC_JOB_TYPE
+        from app.services.imports.async_import_job_store import FDRS_DATA_SYNC_JOB_TYPE
 
         job_id = uuid.uuid4().hex
         db_session.add(

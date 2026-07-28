@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 def resolve_indicator_by_name(identifier: str) -> Optional[IndicatorBank]:
     """Resolve an indicator by id or name (delegates to data retrieval layer)."""
-    from app.services.data_retrieval_service import get_indicator_details
+    from app.services.data_retrieval.service import get_indicator_details
 
     ident = (identifier or "").strip()
     if not ident:

@@ -123,7 +123,7 @@ class TestSessionLogsListApi:
 
 class TestEndSessionApi:
     def test_session_not_found(self, logged_in_client, db_session):
-        with patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/api/analytics/end-session/nonexistent-session-xyz"
             )
@@ -143,7 +143,7 @@ class TestEndSessionApi:
             )
             db_session.add(session_log)
             db_session.commit()
-        with patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/api/analytics/end-session/api-inactive-session-123"
             )
@@ -160,9 +160,9 @@ class TestEndSessionApi:
             )
             db_session.add(session_log)
             db_session.commit()
-        with patch("app.services.user_analytics_service.end_user_session"), \
-             patch("app.services.user_analytics_service.add_session_to_blacklist"), \
-             patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.end_user_session"), \
+             patch("app.services.platform.user_analytics_service.add_session_to_blacklist"), \
+             patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/api/analytics/end-session/api-active-session-456"
             )
@@ -180,9 +180,9 @@ class TestEndSessionApi:
             db_session.add(session_log)
             db_session.commit()
         with patch(
-            "app.services.user_analytics_service.end_user_session",
+            "app.services.platform.user_analytics_service.end_user_session",
             side_effect=Exception("test error"),
-        ), patch("app.services.user_analytics_service.log_admin_action"):
+        ), patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/api/analytics/end-session/api-error-session-789"
             )

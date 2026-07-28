@@ -120,7 +120,7 @@ class TestManageSettingsGet:
         }
         with _auth(), _mock_render() as mock_rt, \
              patch("app.routes.admin.settings._build_ai_groups", return_value=[]), \
-             patch("app.services.app_settings_service.get_supported_languages", return_value=["en"]):
+             patch("app.services.platform.app_settings_service.get_supported_languages", return_value=["en"]):
             resp = logged_in_client.get("/admin/settings")
         assert resp.status_code == 200
 
@@ -371,8 +371,8 @@ class TestBrandingAssetsUpload:
 class TestAISettingsReset:
     def test_ai_reset_success(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_ai_settings", return_value=True), \
-             patch("app.services.app_settings_service.apply_ai_settings_to_config"):
+             patch("app.services.platform.app_settings_service.set_ai_settings", return_value=True), \
+             patch("app.services.platform.app_settings_service.apply_ai_settings_to_config"):
             resp = logged_in_client.post(
                 "/admin/api/settings/ai-reset",
                 headers=_json_headers(),
@@ -383,7 +383,7 @@ class TestAISettingsReset:
 
     def test_ai_reset_failure(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_ai_settings", return_value=False):
+             patch("app.services.platform.app_settings_service.set_ai_settings", return_value=False):
             resp = logged_in_client.post(
                 "/admin/api/settings/ai-reset",
                 headers=_json_headers(),
@@ -392,7 +392,7 @@ class TestAISettingsReset:
 
     def test_ai_reset_exception(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_ai_settings", side_effect=Exception("db error")):
+             patch("app.services.platform.app_settings_service.set_ai_settings", side_effect=Exception("db error")):
             resp = logged_in_client.post(
                 "/admin/api/settings/ai-reset",
                 headers=_json_headers(),
@@ -416,7 +416,7 @@ class TestEmailTemplates:
 
     def test_save_email_templates_success(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_all_email_templates", return_value=True):
+             patch("app.services.platform.app_settings_service.set_all_email_templates", return_value=True):
             resp = logged_in_client.post(
                 "/admin/api/settings/email-templates",
                 json={"email_templates_b64": self._valid_b64_templates()},
@@ -694,7 +694,7 @@ class TestEmailTemplatesSeed:
 class TestLanguagesSettings:
     def test_get_languages(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.get_supported_languages", return_value=["en", "fr"]):
+             patch("app.services.platform.app_settings_service.get_supported_languages", return_value=["en", "fr"]):
             resp = logged_in_client.get("/admin/api/settings/languages")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -702,9 +702,9 @@ class TestLanguagesSettings:
 
     def test_post_languages_valid(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_supported_languages", return_value=True), \
-             patch("app.services.app_settings_service.get_supported_languages", return_value=["en"]), \
-             patch("app.services.app_settings_service.get_show_language_flags", return_value=False):
+             patch("app.services.platform.app_settings_service.set_supported_languages", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_supported_languages", return_value=["en"]), \
+             patch("app.services.platform.app_settings_service.get_show_language_flags", return_value=False):
             resp = logged_in_client.post(
                 "/admin/api/settings/languages",
                 json={"languages": ["en", "fr"]},
@@ -725,7 +725,7 @@ class TestLanguagesSettings:
 
     def test_post_languages_save_fails(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_supported_languages", return_value=False):
+             patch("app.services.platform.app_settings_service.set_supported_languages", return_value=False):
             resp = logged_in_client.post(
                 "/admin/api/settings/languages",
                 json={"languages": ["en"]},
@@ -735,9 +735,9 @@ class TestLanguagesSettings:
 
     def test_post_languages_with_flag_prefetch(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("app.services.app_settings_service.set_supported_languages", return_value=True), \
-             patch("app.services.app_settings_service.get_supported_languages", return_value=["en", "de"]), \
-             patch("app.services.app_settings_service.get_show_language_flags", return_value=True), \
+             patch("app.services.platform.app_settings_service.set_supported_languages", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_supported_languages", return_value=["en", "de"]), \
+             patch("app.services.platform.app_settings_service.get_show_language_flags", return_value=True), \
              patch("app.utils.language_flags.prefetch_language_flags_to_local_cache"):
             resp = logged_in_client.post(
                 "/admin/api/settings/languages",
@@ -932,7 +932,7 @@ class TestSettingsInternalHelpers:
     def test_build_ai_groups_returns_list(self, app):
         with app.app_context():
             from app.routes.admin.settings import _build_ai_groups
-            with patch("app.services.app_settings_service.get_ai_settings", return_value={}):
+            with patch("app.services.platform.app_settings_service.get_ai_settings", return_value={}):
                 result = _build_ai_groups()
             assert isinstance(result, list)
 

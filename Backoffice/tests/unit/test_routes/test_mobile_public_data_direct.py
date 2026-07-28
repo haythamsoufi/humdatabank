@@ -83,7 +83,7 @@ class TestPublicIndicatorBank:
 
         with app.test_request_context('/api/mobile/v1/data/indicator-bank', method='GET'):
             with patch(
-                'app.services.indicator_bank_service.get_indicator_list',
+                'app.services.indicators.bank_service.get_indicator_list',
                 return_value=([], 0, 1, 20),
             ):
                 resp = public_indicator_bank()
@@ -100,7 +100,7 @@ class TestPublicIndicatorBank:
             method='GET',
         ):
             with patch(
-                'app.services.indicator_bank_service.get_indicator_list',
+                'app.services.indicators.bank_service.get_indicator_list',
                 return_value=([], 0, 1, 20),
             ):
                 resp = public_indicator_bank()
@@ -136,7 +136,7 @@ class TestPublicIndicatorDetail:
             f'/api/mobile/v1/data/indicator-bank/{ib.id}', method='GET'
         ):
             with patch(
-                'app.services.indicator_bank_service.serialize_indicator_list',
+                'app.services.indicators.bank_service.serialize_indicator_list',
                 return_value=[{'id': ib.id, 'name': ib.name}],
             ):
                 resp = public_indicator_detail(ib.id)

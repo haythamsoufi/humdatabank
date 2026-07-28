@@ -43,7 +43,7 @@ def register_device():
     )
     if result.get('success'):
         if result.get('message') == 'Device registered':
-            from app.services.user_analytics_service import log_user_activity
+            from app.services.platform.user_analytics_service import log_user_activity
             log_user_activity(
                 activity_type='device_registered',
                 description='New device registered for push notifications',
@@ -80,7 +80,7 @@ def unregister_device():
 def device_heartbeat():
     """Lightweight heartbeat to update device last_active_at."""
     from app.services.notification.push import PushNotificationService
-    from app.services.user_analytics_service import _update_session_activity_explicit
+    from app.services.platform.user_analytics_service import _update_session_activity_explicit
     from flask import session as flask_session, g
 
     data = get_json_safe()

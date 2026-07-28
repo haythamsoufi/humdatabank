@@ -9,4 +9,4 @@ python scripts/codemods/migrate_template_js.py app/templates/...
 python scripts/codemods/fix_unsafe_gettext_embedding.py --apply
 ```
 
-CI guardrails for templates live in the parent `scripts/` folder (`check_no_inline_js_in_diff.py`, `check_unsafe_gettext_embedding.py`, `gate_template_console_calls.py`).
+CI guardrails for templates live in `scripts/ci/` (`check_no_inline_js_in_diff.py`, `check_unsafe_gettext_embedding.py`, `gate_template_console_calls.py`).

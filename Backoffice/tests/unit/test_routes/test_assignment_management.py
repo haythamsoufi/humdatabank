@@ -191,7 +191,7 @@ class TestNewAssignment:
 
     def test_post_with_entity_permissions(self, logged_in_client, db_session, app):
         with patch("app.services.notification.core.notify_assignment_created"), \
-             patch("app.services.entity_service.EntityService.get_entity", return_value=MagicMock()):
+             patch("app.services.organization.entity_service.EntityService.get_entity", return_value=MagicMock()):
             with app.app_context():
                 template = create_test_template(db_session)
                 template_id = template.id
@@ -456,8 +456,8 @@ class TestGetAssignmentEntities:
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
             assignment_id = aes.assigned_form_id
-        with patch("app.services.entity_service.EntityService.get_entity", return_value=MagicMock()), \
-             patch("app.services.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
+        with patch("app.services.organization.entity_service.EntityService.get_entity", return_value=MagicMock()), \
+             patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
             resp = logged_in_client.get(f"/admin/assignments/{assignment_id}/entities")
         assert resp.status_code in (200, 302)
 
@@ -483,7 +483,7 @@ class TestAddEntityToAssignment:
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
             assignment_id = aes.assigned_form_id
-        with patch("app.services.entity_service.EntityService.get_entity", return_value=None):
+        with patch("app.services.organization.entity_service.EntityService.get_entity", return_value=None):
             resp = logged_in_client.post(
                 f"/admin/assignments/{assignment_id}/entities/add",
                 json={"entity_type": "country", "entity_id": 99999},
@@ -496,7 +496,7 @@ class TestAddEntityToAssignment:
             aes = create_test_assignment_entity_status(db_session, country=country)
             assignment_id = aes.assigned_form_id
             country_id = country.id
-        with patch("app.services.entity_service.EntityService.get_entity", return_value=MagicMock()):
+        with patch("app.services.organization.entity_service.EntityService.get_entity", return_value=MagicMock()):
             resp = logged_in_client.post(
                 f"/admin/assignments/{assignment_id}/entities/add",
                 json={"entity_type": "country", "entity_id": country_id},
@@ -511,8 +511,8 @@ class TestAddEntityToAssignment:
                 aes = create_test_assignment_entity_status(db_session, country=country)
                 assignment_id = aes.assigned_form_id
                 new_country_id = new_country.id
-            with patch("app.services.entity_service.EntityService.get_entity", return_value=MagicMock()), \
-                 patch("app.services.entity_service.EntityService.get_entity_name", return_value="New Country"):
+            with patch("app.services.organization.entity_service.EntityService.get_entity", return_value=MagicMock()), \
+                 patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="New Country"):
                 resp = logged_in_client.post(
                     f"/admin/assignments/{assignment_id}/entities/add",
                     json={"entity_type": "country", "entity_id": new_country_id, "due_date": "2025-12-31"},
@@ -527,8 +527,8 @@ class TestAddEntityToAssignment:
                 aes = create_test_assignment_entity_status(db_session, country=country)
                 assignment_id = aes.assigned_form_id
                 new_country_id = new_country.id
-            with patch("app.services.entity_service.EntityService.get_entity", return_value=MagicMock()), \
-                 patch("app.services.entity_service.EntityService.get_entity_name", return_value="New Country"):
+            with patch("app.services.organization.entity_service.EntityService.get_entity", return_value=MagicMock()), \
+                 patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="New Country"):
                 resp = logged_in_client.post(
                     f"/admin/assignments/{assignment_id}/entities/add",
                     json={"entity_type": "country", "entity_id": new_country_id, "due_date": "not-a-date"},
@@ -779,7 +779,7 @@ class TestEditAssignmentEntityStatus:
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
             aes_id = aes.id
-        with patch("app.services.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
+        with patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
             resp = logged_in_client.post(
                 f"/admin/assignment_entity_status/edit/{aes_id}",
                 data={"status": "in_progress"},
@@ -792,7 +792,7 @@ class TestEditAssignmentEntityStatus:
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
             aes_id = aes.id
-        with patch("app.services.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
+        with patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
             resp = logged_in_client.post(
                 f"/admin/assignment_entity_status/edit/{aes_id}",
                 data={"status": "approved"},
@@ -805,7 +805,7 @@ class TestEditAssignmentEntityStatus:
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
             aes_id = aes.id
-        with patch("app.services.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
+        with patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
             resp = logged_in_client.post(
                 f"/admin/assignment_entity_status/edit/{aes_id}",
                 data={"status": "submitted"},
@@ -818,7 +818,7 @@ class TestEditAssignmentEntityStatus:
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
             aes_id = aes.id
-        with patch("app.services.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
+        with patch("app.services.organization.entity_service.EntityService.get_entity_name", return_value="Test Entity"):
             resp = logged_in_client.post(
                 f"/admin/assignment_entity_status/edit/{aes_id}",
                 data={"status": "sent_for_review"},

@@ -19,10 +19,10 @@ from app.utils.sql_utils import safe_ilike_pattern
 from flask import Blueprint, render_template, request, redirect, url_for, current_app, flash, session
 from flask_login import login_required, current_user
 from app.extensions import db, limiter
-from app.services.notification_service import NotificationService
+from app.services.notification.service import NotificationService
 from app.services.notification.push import PushNotificationService
 from app.services.notification.analytics import NotificationAnalytics
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 # WebSocket implementation - see app/routes/notifications_ws.py
 from app.utils.transactions import no_auto_transaction, request_transaction_rollback
 from app.services.notification.core import create_notification
@@ -94,7 +94,7 @@ def get_notification_types_for_user(user):
             'for_user': list of notification types relevant to the user's role,
         }
     """
-    from app.services.app_settings_service import get_merged_notification_audience_rules
+    from app.services.platform.app_settings_service import get_merged_notification_audience_rules
 
     all_types = [nt.value for nt in NotificationType]
     merged_rules = get_merged_notification_audience_rules()
@@ -751,7 +751,7 @@ def api_notification_action(notification_id):
 
         # Authorization check: Verify user has permission to perform this action.
         # Actions like 'approve', 'reject' require admin privileges.
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if action in ('approve', 'reject') and not AuthorizationService.is_admin(current_user):
             current_app.logger.warning(
                 f"User {current_user.id} attempted unauthorized action '{action}' "
@@ -1236,7 +1236,7 @@ def api_admin_send_push():
         send_push = data.get('send_push', False)  # Default to False - must be explicitly enabled
         category = data.get('category')  # Optional category
         tags = data.get('tags')  # Optional tags (list or comma-separated string)
-        from app.services.campaign_email_templates_service import normalize_campaign_email_template_key
+        from app.services.communication.campaign_email_templates_service import normalize_campaign_email_template_key
         email_template_key = normalize_campaign_email_template_key(data.get('email_template_key'))
         email_template_html = (data.get('email_template_html') or '').strip() or None
 
@@ -2078,7 +2078,7 @@ def api_admin_get_entity_types():
     """Get list of entity types for bulk selection (admin only)"""
     try:
         from app.models.enums import EntityType
-        from app.services.entity_service import EntityService
+        from app.services.organization.entity_service import EntityService
 
         entity_types = []
         for entity_type in EntityType:
@@ -2351,7 +2351,7 @@ def api_create_campaign():
 
         # Create campaign
         user_selection_type = data.get('user_selection_type', 'manual')
-        from app.services.campaign_email_templates_service import (
+        from app.services.communication.campaign_email_templates_service import (
             merge_campaign_email_attachment_config,
         )
 
@@ -2437,7 +2437,7 @@ def api_get_campaign(campaign_id):
     try:
         campaign = NotificationCampaign.query.get_or_404(campaign_id)
 
-        from app.services.campaign_email_templates_service import (
+        from app.services.communication.campaign_email_templates_service import (
             get_email_template_html_from_attachment_config,
             get_email_template_key_from_attachment_config,
         )
@@ -2549,7 +2549,7 @@ def api_update_campaign(campaign_id):
             or 'email_template_html' in data
             or 'attachment_config' in data
         ):
-            from app.services.campaign_email_templates_service import (
+            from app.services.communication.campaign_email_templates_service import (
                 merge_campaign_email_attachment_config,
             )
 
@@ -2891,7 +2891,7 @@ def api_send_campaign(campaign_id):
                 )
 
         # Send notifications using existing admin send endpoint logic
-        from app.services.campaign_email_templates_service import (
+        from app.services.communication.campaign_email_templates_service import (
             get_email_template_html_from_attachment_config,
             get_email_template_key_from_attachment_config,
         )

@@ -44,7 +44,7 @@ class TestTryJwtAuth:
         headers = _make_jwt_headers(app, user, session_id=sid)
         token = headers['Authorization'].split(' ', 1)[1]
         with app.test_request_context(headers={'Authorization': f'Bearer {token}'}):
-            with patch('app.services.user_analytics_service.should_block_mobile_jwt_session', return_value=True):
+            with patch('app.services.platform.user_analytics_service.should_block_mobile_jwt_session', return_value=True):
                 assert _try_jwt_auth() is False
 
     def test_inactive_user_rejected(self, app, db_session):
@@ -105,7 +105,7 @@ class TestMobileAuthRequiredDecorator:
             user = create_test_user(db_session, email='jwt-track@test.com', password='Pass123!')
         headers = _make_jwt_headers(app, user)
         with app.test_request_context(headers=headers):
-            with patch('app.services.user_analytics_service._update_session_activity_explicit') as mock_track:
+            with patch('app.services.platform.user_analytics_service._update_session_activity_explicit') as mock_track:
                 result = view()
             mock_track.assert_called_once()
         assert result == {'ok': True}
@@ -122,7 +122,7 @@ class TestMobileAuthRequiredDecorator:
         headers = _make_jwt_headers(app, user)
         with app.test_request_context(headers=headers):
             with patch(
-                'app.services.user_analytics_service._update_session_activity_explicit',
+                'app.services.platform.user_analytics_service._update_session_activity_explicit',
                 side_effect=RuntimeError('tracking down'),
             ):
                 result = view()
@@ -195,7 +195,7 @@ class TestMobileAuthRequiredDecorator:
             }
             token = pyjwt.encode(payload, _jwt_secret(), algorithm=MOBILE_TOKEN_ALGORITHM)
         with app.test_request_context(headers={'Authorization': f'Bearer {token}'}):
-            with patch('app.services.user_analytics_service._update_session_activity_explicit') as mock_track:
+            with patch('app.services.platform.user_analytics_service._update_session_activity_explicit') as mock_track:
                 result = view()
             mock_track.assert_not_called()
         assert result == {'ok': True}
@@ -211,7 +211,7 @@ class TestMobileAuthRequiredDecorator:
             user = create_test_user(db_session, email='no-track@test.com', password='Pass123!')
         headers = _make_jwt_headers(app, user)
         with app.test_request_context(method='GET', headers=headers):
-            with patch('app.services.user_analytics_service._update_session_activity_explicit') as mock_track:
+            with patch('app.services.platform.user_analytics_service._update_session_activity_explicit') as mock_track:
                 result = view()
             mock_track.assert_not_called()
         assert result == {'ok': True}

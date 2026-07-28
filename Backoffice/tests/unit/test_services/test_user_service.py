@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.services.user_service import UserService
+from app.services.platform.user_service import UserService
 
 
 # ---------------------------------------------------------------------------
@@ -46,14 +46,14 @@ class TestHandleDbError:
 
     def test_rollback_called_on_error(self, app):
         with app.app_context():
-            with patch("app.services.user_service.db") as mock_db:
+            with patch("app.services.platform.user_service.db") as mock_db:
                 UserService._handle_db_error(Exception("oops"), "op")
                 mock_db.session.rollback.assert_called_once()
 
     def test_rollback_failure_closes_session(self, app):
         """When rollback itself raises, the session should be closed."""
         with app.app_context():
-            with patch("app.services.user_service.db") as mock_db:
+            with patch("app.services.platform.user_service.db") as mock_db:
                 mock_db.session.rollback.side_effect = Exception("rollback exploded")
                 mock_db.session.close = MagicMock()
                 # Should not raise
@@ -63,7 +63,7 @@ class TestHandleDbError:
     def test_rollback_failure_close_also_fails(self, app):
         """If both rollback and close fail, suppress(Exception) swallows it."""
         with app.app_context():
-            with patch("app.services.user_service.db") as mock_db:
+            with patch("app.services.platform.user_service.db") as mock_db:
                 mock_db.session.rollback.side_effect = Exception("rollback exploded")
                 mock_db.session.close.side_effect = Exception("close also exploded")
                 # Must not raise
@@ -92,15 +92,15 @@ class TestGetById:
 
     def test_sqlalchemy_error_returns_none(self, app):
         with app.app_context():
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.get.side_effect = SQLAlchemyError("DB")
-                with patch("app.services.user_service.db"):
+                with patch("app.services.platform.user_service.db"):
                     result = UserService.get_by_id(1)
                     assert result is None
 
     def test_unexpected_exception_returns_none(self, app):
         with app.app_context():
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.get.side_effect = RuntimeError("unexpected")
                 result = UserService.get_by_id(1)
                 assert result is None
@@ -152,23 +152,23 @@ class TestGetByEmail:
                     raise SQLAlchemyError("first attempt fails")
                 return expected_user
 
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.return_value.first.side_effect = first_side_effect
-                with patch("app.services.user_service.db"):
+                with patch("app.services.platform.user_service.db"):
                     result = UserService.get_by_email("retry@example.com")
                     assert result is expected_user
 
     def test_sqlalchemy_error_retry_also_fails_returns_none(self, app):
         with app.app_context():
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.return_value.first.side_effect = SQLAlchemyError("persistent")
-                with patch("app.services.user_service.db"):
+                with patch("app.services.platform.user_service.db"):
                     result = UserService.get_by_email("fail@example.com")
                     assert result is None
 
     def test_unexpected_exception_returns_none(self, app):
         with app.app_context():
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.return_value.first.side_effect = RuntimeError("boom")
                 result = UserService.get_by_email("boom@example.com")
                 assert result is None
@@ -215,9 +215,9 @@ class TestGetByIds:
                 m.count.return_value = 0
                 return m
 
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter.side_effect = filter_side_effect
-                with patch("app.services.user_service.db"):
+                with patch("app.services.platform.user_service.db"):
                     # Non-empty list triggers the in_() path
                     result = UserService.get_by_ids([1, 2])
                     # The error-handler path was exercised
@@ -233,7 +233,7 @@ class TestGetByIds:
                     raise RuntimeError("unexpected")
                 return MagicMock()
 
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter.side_effect = filter_side_effect
                 result = UserService.get_by_ids([1, 2])
                 assert call_count[0] == 2
@@ -258,14 +258,14 @@ class TestExists:
 
     def test_sqlalchemy_error_returns_false(self, app):
         with app.app_context():
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.return_value.first.side_effect = SQLAlchemyError("DB")
-                with patch("app.services.user_service.db"):
+                with patch("app.services.platform.user_service.db"):
                     assert UserService.exists("x@x.com") is False
 
     def test_unexpected_exception_returns_false(self, app):
         with app.app_context():
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.return_value.first.side_effect = RuntimeError("boom")
                 assert UserService.exists("x@x.com") is False
 
@@ -302,9 +302,9 @@ class TestGetAllActive:
                     raise SQLAlchemyError("DB")
                 return MagicMock()
 
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.side_effect = filter_by_side
-                with patch("app.services.user_service.db"):
+                with patch("app.services.platform.user_service.db"):
                     result = UserService.get_all_active()
                     assert result is not None
                     assert call_count[0] == 2
@@ -319,7 +319,7 @@ class TestGetAllActive:
                     raise RuntimeError("boom")
                 return MagicMock()
 
-            with patch("app.services.user_service.User") as MockUser:
+            with patch("app.services.platform.user_service.User") as MockUser:
                 MockUser.query.filter_by.side_effect = filter_by_side
                 result = UserService.get_all_active()
                 assert result is not None
@@ -362,8 +362,8 @@ class TestGetAll:
             query = _RaisingQueryDesc()
 
         with app.app_context():
-            with patch("app.services.user_service.User", MockUser):
-                with patch("app.services.user_service.db"):
+            with patch("app.services.platform.user_service.User", MockUser):
+                with patch("app.services.platform.user_service.db"):
                     result = UserService.get_all()
                     assert result is not None
                     assert _desc_count[0] == 2  # tried once, handler tried again
@@ -384,7 +384,7 @@ class TestGetAll:
             query = _RaisingQueryDesc()
 
         with app.app_context():
-            with patch("app.services.user_service.User", MockUser):
+            with patch("app.services.platform.user_service.User", MockUser):
                 result = UserService.get_all()
                 assert result is not None
                 assert _desc_count[0] == 2

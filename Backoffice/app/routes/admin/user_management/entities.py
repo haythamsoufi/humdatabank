@@ -11,7 +11,7 @@ from app.models import User, Country, UserEntityPermission, NSBranch, NSSubBranc
 from app.models.organization import SecretariatRegionalOffice, SecretariatClusterOffice
 from app.models.enums import EntityType
 from app.routes.admin.shared import permission_required
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_bad_request, json_not_found, json_ok, json_ok_result, json_server_error, json_error, require_json_keys
 from app.utils.error_handling import handle_json_view_exception
@@ -137,7 +137,7 @@ def add_user_entity(user_id):
         db.session.flush()
 
         if entity_type == EntityType.country.value:
-            from app.services.country_access_request_service import (
+            from app.services.organization.country_access_request_service import (
                 reconcile_fulfilled_pending_country_access_requests,
             )
 

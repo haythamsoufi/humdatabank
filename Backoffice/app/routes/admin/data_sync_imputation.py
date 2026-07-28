@@ -4,8 +4,8 @@ import tempfile
 from app.models import db, FormTemplate, FormItem, FormSection, FormPage, AssignedForm, FormData, Country, TemplateShare
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import admin_permission_required, check_template_access
-from app.services.imputation_service import ImputationService
-from app.services.reporting_period_service import sort_period_names
+from app.services.forms.imputation_service import ImputationService
+from app.services.forms.reporting_period_service import sort_period_names
 import io
 import os
 import sys
@@ -25,7 +25,7 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
-from app.services.async_import_job_store import (
+from app.services.imports.async_import_job_store import (
     FDRS_DATA_SYNC_JOB_TYPE,
     create_import_job,
     cleanup_expired_import_jobs,
@@ -248,7 +248,7 @@ _UPR_EXCEL_TEMPLATE_IDS: frozenset = frozenset({22, 23, 24, 33})
 
 def _accessible_templates_for_user(user) -> List[Dict[str, Any]]:
     """Templates the user may open in the data sync & imputation tool."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.services.security.api_authentication import get_user_allowed_template_ids
 
     if AuthorizationService.is_system_manager(user):
@@ -276,9 +276,13 @@ def _sections_with_items_for_template(template: FormTemplate) -> List[Dict[str, 
     )
 
 
+def _fdrs_imports_dir() -> str:
+    return os.path.normpath(os.path.join(current_app.root_path, "..", "scripts", "imports"))
+
+
 def _template_has_data_sync(template_id: int) -> bool:
-    scripts_dir = os.path.join(current_app.root_path, "..", "scripts")
-    sync_script_available = os.path.isfile(os.path.join(scripts_dir, "import_fdrs_form_data.py"))
+    imports_dir = _fdrs_imports_dir()
+    sync_script_available = os.path.isfile(os.path.join(imports_dir, "import_fdrs_form_data.py"))
     return (template_id in _TEMPLATES_WITH_DATA_SYNC) and sync_script_available
 
 
@@ -1262,9 +1266,9 @@ def run_data_sync(template_id: int):
             except ValueError:
                 return json_bad_request("Invalid fdrs_years: use comma-separated integers")
 
-        scripts_dir = os.path.join(current_app.root_path, "..", "scripts")
-        if scripts_dir not in sys.path:
-            sys.path.insert(0, scripts_dir)
+        imports_dir = _fdrs_imports_dir()
+        if imports_dir not in sys.path:
+            sys.path.insert(0, imports_dir)
         from import_fdrs_form_data import run_import
 
         preview_path = None

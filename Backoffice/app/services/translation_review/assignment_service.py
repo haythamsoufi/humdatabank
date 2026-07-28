@@ -10,7 +10,7 @@ from flask_login import AnonymousUserMixin
 from app.extensions import db
 from app.i18n import resolve_supported_language
 from app.models.rbac import RbacAccessGrant, RbacPermission, RbacRole, RbacUserRole
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 
 TRANSLATOR_ROLE_CODE = 'translator'

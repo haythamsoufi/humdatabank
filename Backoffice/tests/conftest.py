@@ -391,7 +391,7 @@ def reset_aes_access_light_cache():
     """
     yield
     try:
-        from app.services.data_retrieval_service import clear_aes_access_light_cache
+        from app.services.data_retrieval.service import clear_aes_access_light_cache
         clear_aes_access_light_cache()
     except Exception:
         pass

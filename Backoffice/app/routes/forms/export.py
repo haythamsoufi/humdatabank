@@ -26,8 +26,8 @@ from app.models import (
     FormData, FormItem, FormPage, FormSection, QuestionType,
     SubmittedDocument,
 )
-from app.services.excel_service import ExcelService
-from app.services.form_processing_service import slugify_age_group
+from app.services.imports.excel_service import ExcelService
+from app.services.forms.processing_service import slugify_age_group
 from app.utils.datetime_helpers import utcnow
 from app.utils.form_localization import (
     get_localized_country_name,
@@ -78,7 +78,7 @@ def _export_pdf_impl(aes_id):
             db.joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template)
         ).get_or_404(aes_id)
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
             flash("You are not authorized to export data for this assignment and country.", "warning")
             return redirect(url_for("main.dashboard"))
@@ -88,7 +88,7 @@ def _export_pdf_impl(aes_id):
         country = _country_for_aes(assignment_entity_status)
         form_template_for_export = assignment.template
 
-        from app.services.variable_resolution_service import VariableResolutionService
+        from app.services.forms.variable_resolution_service import VariableResolutionService
         from app.models import FormTemplateVersion
 
         template_version = None
@@ -107,7 +107,7 @@ def _export_pdf_impl(aes_id):
             try:
                 # Binding-aware resolution: keeps EO1/EO2/EO3 in the export aligned with the appeal
                 # codes the data was actually entered against (see emergency_section_binding).
-                from app.services.emergency_section_binding import resolve_eo_variables
+                from app.services.forms.emergency_section_binding import resolve_eo_variables
                 eo_vars = resolve_eo_variables(assignment_entity_status)
                 for key, value in eo_vars.items():
                     resolved_variables[key] = value or ''
@@ -812,7 +812,7 @@ def _export_excel_impl(aes_id):
         db.joinedload(AssignmentEntityStatus.assigned_form).joinedload(AssignedForm.template)
     ).get_or_404(aes_id)
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
          flash("You are not authorized to export data for this assignment and country.", "warning")
          return redirect(url_for("main.dashboard"))
@@ -822,7 +822,7 @@ def _export_excel_impl(aes_id):
     country = _country_for_aes(assignment_entity_status)
     form_template_for_export = assignment.template
 
-    from app.services.variable_resolution_service import VariableResolutionService
+    from app.services.forms.variable_resolution_service import VariableResolutionService
     from app.models import FormTemplateVersion
 
     template_version = None
@@ -1143,7 +1143,7 @@ def _import_excel_impl(aes_id):
 
     assignment_entity_status = AssignmentEntityStatus.query.get_or_404(aes_id)
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     if not AuthorizationService.can_edit_assignment(assignment_entity_status, current_user):
         flash("You are not authorized to import data for this assignment or it's not in an editable state.", "warning")
         return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))

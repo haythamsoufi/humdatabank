@@ -68,5 +68,5 @@ def slugify_age_group(age_group):
     Returns:
         str: A slugified version (e.g., '0_4', '5_17', '18_')
     """
-    from app.services.form_processing_service import slugify_age_group as _canonical_slugify
+    from app.services.forms.processing_service import slugify_age_group as _canonical_slugify
     return _canonical_slugify(age_group)

@@ -2,7 +2,7 @@
 import re
 from pathlib import Path
 
-p = Path(__file__).resolve().parents[1] / "app/static/js/admin/audit-trail.js"
+p = Path(__file__).resolve().parents[2] / "app/static/js/admin/audit-trail.js"
 js = p.read_text(encoding="utf-8")
 js = re.sub(r'">\s*\+\s*cfg\.t\.(\w+)\s*\+\s*</', r">' + cfg.t.\1 + '</", js)
 js = re.sub(

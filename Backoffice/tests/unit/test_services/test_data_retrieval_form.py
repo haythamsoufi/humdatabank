@@ -183,11 +183,11 @@ class TestNumericFromFormdataValue:
 class TestQueryFormData:
     def test_returns_dict_with_assigned_and_public(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
+            from app.services.data_retrieval.form import query_form_data
             mock_user = MagicMock()
             mock_user.is_authenticated = False
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=False):
                 result = query_form_data()
                 assert "assigned" in result
@@ -195,10 +195,10 @@ class TestQueryFormData:
 
     def test_with_template_id_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
+            from app.services.data_retrieval.form import query_form_data
             template = create_test_template(db_session)
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(template_id=template.id)
                 assert result["assigned"] is not None
@@ -206,111 +206,111 @@ class TestQueryFormData:
 
     def test_with_country_id_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
+            from app.services.data_retrieval.form import query_form_data
             country = create_test_country(db_session)
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(country_id=country.id)
                 assert result["assigned"] is not None
 
     def test_with_period_name_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(period_name="2024")
                 assert result["assigned"] is not None
 
     def test_with_submission_id_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(submission_id=1)
                 assert result["assigned"] is not None
 
     def test_with_item_id_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(item_id=1)
                 assert result["assigned"] is not None
 
     def test_with_item_type_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(item_type="indicator")
                 assert result["assigned"] is not None
 
     def test_with_indicator_bank_id_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
+            from app.services.data_retrieval.form import query_form_data
             ind = _make_indicator(db_session, "Test IB SVC10")
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(indicator_bank_id=ind.id)
                 assert result["assigned"] is not None
 
     def test_with_indicator_bank_ids_filter(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
+            from app.services.data_retrieval.form import query_form_data
             ind1 = _make_indicator(db_session, "Test IB SVC11a")
             ind2 = _make_indicator(db_session, "Test IB SVC11b")
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(indicator_bank_ids=[ind1.id, ind2.id])
                 assert result["assigned"] is not None
 
     def test_submission_type_public_only(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(submission_type="public")
                 assert result["assigned"] is None
 
     def test_submission_type_assigned_only(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(submission_type="assigned")
                 assert result["public"] is None
 
     def test_preload_true(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(preload=True)
                 assert result["assigned"] is not None
 
     def test_period_name_with_year_range(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(period_name="2023-2024")
                 assert result["assigned"] is not None
 
     def test_exception_returns_empty_queries(self, app):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
-            with patch("app.services.data_retrieval_form.FormData") as mock_fd:
+            from app.services.data_retrieval.form import query_form_data
+            with patch("app.services.data_retrieval.form.FormData") as mock_fd:
                 mock_fd.query.side_effect = Exception("fail")
                 result = query_form_data()
                 # Should return fallback empty queries
@@ -326,7 +326,7 @@ class TestQueryFormData:
 class TestGetFormDataQueries:
     def test_none_values_return_empty_queries(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import get_form_data_queries
+            from app.services.data_retrieval.form import get_form_data_queries
             result = get_form_data_queries({"assigned": None, "public": None})
             assigned_q, public_q = result
             # Should be valid query objects (not None)
@@ -335,7 +335,7 @@ class TestGetFormDataQueries:
 
     def test_valid_queries_returned_as_is(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import get_form_data_queries
+            from app.services.data_retrieval.form import get_form_data_queries
             assigned_q = FormData.query
             public_q = FormData.query
             result = get_form_data_queries({"assigned": assigned_q, "public": public_q})
@@ -345,7 +345,7 @@ class TestGetFormDataQueries:
 
     def test_partial_none_returns_fallback(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import get_form_data_queries
+            from app.services.data_retrieval.form import get_form_data_queries
             assigned_q = FormData.query
             result = get_form_data_queries({"assigned": assigned_q, "public": None})
             r_assigned, r_public = result
@@ -364,7 +364,7 @@ class TestGetValueBreakdown:
             from app.services.ai.data.form_retrieval import get_value_breakdown
             country = create_test_country(db_session)
             with patch("app.services.ai.data.form_retrieval.check_country_access", return_value=True), \
-                 patch("app.services.indicator_resolution_service.resolve_indicator_identifier",
+                 patch("app.services.indicators.resolution_service.resolve_indicator_identifier",
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[]):
@@ -390,7 +390,7 @@ class TestGetValueBreakdown:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.indicator_resolution_service.resolve_indicator_identifier",
+                 patch("app.services.indicators.resolution_service.resolve_indicator_identifier",
                        return_value=None):
                 result = get_value_breakdown(country.id, ind.id)
                 assert "error" not in result or result.get("total", 0) >= 0
@@ -420,7 +420,7 @@ class TestGetValueBreakdown:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.indicator_resolution_service.resolve_indicator_identifier",
+                 patch("app.services.indicators.resolution_service.resolve_indicator_identifier",
                        return_value=None):
                 result = get_value_breakdown(country.id, ind.id, period="2024")
                 assert isinstance(result, dict)
@@ -431,7 +431,7 @@ class TestGetValueBreakdown:
             country = create_test_country(db_session)
             template = create_test_template(db_session, name="FDRS Template VBTest")
             with patch("app.services.ai.data.form_retrieval.check_country_access", return_value=True), \
-                 patch("app.services.indicator_resolution_service.resolve_indicator_identifier",
+                 patch("app.services.indicators.resolution_service.resolve_indicator_identifier",
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[]):
@@ -450,7 +450,7 @@ class TestGetValueBreakdown:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.indicator_resolution_service.resolve_indicator_identifier",
+                 patch("app.services.indicators.resolution_service.resolve_indicator_identifier",
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind1, ind2]):
@@ -466,13 +466,13 @@ class TestGetValueBreakdown:
 class TestQueryFormDataIntegration:
     def test_returns_formdata_with_all_filters(self, app, db_session):
         with app.app_context():
-            from app.services.data_retrieval_form import query_form_data
+            from app.services.data_retrieval.form import query_form_data
             country, template, section, ind, item, af, aes, fd = _make_full_setup(
                 db_session, status="submitted", value="100"
             )
-            with patch("app.services.data_retrieval_form.get_effective_request_user",
+            with patch("app.services.data_retrieval.form.get_effective_request_user",
                        return_value=None), \
-                 patch("app.services.data_retrieval_form.can_view_non_public_form_items",
+                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
                        return_value=True):
                 result = query_form_data(
                     template_id=template.id,
@@ -497,7 +497,7 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=False), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None):
                 result = get_indicator_values_for_all_countries("")
                 assert "error" in result or result.get("success") is False
@@ -509,11 +509,11 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=False), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[]), \
-                 patch("app.services.indicator_resolution_service.get_indicator_candidates",
+                 patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        return_value=[]):
                 result = get_indicator_values_for_all_countries("Unknown Indicator 99999XYZ")
                 assert result.get("success") is False or "error" in result
@@ -526,7 +526,7 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None):
                 result = get_indicator_values_for_all_countries(str(ind.id))
                 assert "rows" in result
@@ -539,9 +539,9 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None), \
-                 patch("app.services.indicator_resolution_service.get_indicator_candidates",
+                 patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind]):
@@ -556,9 +556,9 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None), \
-                 patch("app.services.indicator_resolution_service.get_indicator_candidates",
+                 patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind]):
@@ -573,9 +573,9 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None), \
-                 patch("app.services.indicator_resolution_service.get_indicator_candidates",
+                 patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind]):
@@ -593,9 +593,9 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=True), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value=None), \
-                 patch("app.services.indicator_resolution_service.get_indicator_candidates",
+                 patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind]):
@@ -613,9 +613,9 @@ class TestGetIndicatorValuesForAllCountries:
                        return_value=None), \
                  patch("app.services.ai.data.form_retrieval.can_view_non_public_form_items",
                        return_value=False), \
-                 patch("app.services.data_retrieval_form_helpers.user_allowed_country_ids",
+                 patch("app.services.data_retrieval.form_helpers.user_allowed_country_ids",
                        return_value={country.id}), \
-                 patch("app.services.indicator_resolution_service.get_indicator_candidates",
+                 patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind]):
@@ -1151,7 +1151,7 @@ class TestResolveIndicatorToPrimaryId:
         with app.app_context():
             from app.services.ai.data.form_retrieval import resolve_indicator_to_primary_id
             ind = _make_indicator(db_session, "Number of volunteers unique RI SVC51")
-            with patch("app.services.indicator_resolution_service.get_indicator_candidates",
+            with patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[ind]):
@@ -1167,7 +1167,7 @@ class TestResolveIndicatorToPrimaryId:
     def test_no_candidates_returns_none(self, app, db_session):
         with app.app_context():
             from app.services.ai.data.form_retrieval import resolve_indicator_to_primary_id
-            with patch("app.services.indicator_resolution_service.get_indicator_candidates",
+            with patch("app.services.indicators.resolution_service.get_indicator_candidates",
                        side_effect=Exception("no vector")), \
                  patch("app.services.ai.data.form_retrieval.get_indicator_candidates_by_keyword",
                        return_value=[]):

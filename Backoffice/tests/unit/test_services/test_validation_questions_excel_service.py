@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.validation_questions_excel_service import (
+from app.services.validation.questions_excel_service import (
     EXPORT_COLUMNS,
     IMPORT_COLUMNS,
     VALID_SEVERITIES,
@@ -81,7 +81,7 @@ class TestQueryValidationQuestions:
 
     def test_no_filters(self):
         with patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             chain = self._make_query_chain()
             mock_q.order_by.return_value = chain
@@ -92,7 +92,7 @@ class TestQueryValidationQuestions:
 
     def test_with_template_filter(self):
         with patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             chain = self._make_query_chain()
             mock_q.filter_by.return_value = chain
@@ -101,7 +101,7 @@ class TestQueryValidationQuestions:
 
     def test_with_country_id_filter(self):
         with patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             chain = self._make_query_chain()
             mock_q.filter_by.return_value = chain
@@ -111,7 +111,7 @@ class TestQueryValidationQuestions:
 
     def test_all_filters_combined(self):
         with patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             chain = self._make_query_chain()
             mock_q.filter_by.return_value = chain
@@ -149,9 +149,9 @@ class TestFormItemLabelsForQuestions:
         item.id = 7
 
         with patch(
-            "app.services.validation_questions_excel_service.FormItem.query"
+            "app.services.validation.questions_excel_service.FormItem.query"
         ) as mock_fi, patch(
-            "app.services.validation_questions_excel_service.form_item_label",
+            "app.services.validation.questions_excel_service.form_item_label",
             return_value="My Indicator",
         ):
             mock_fi.options.return_value.filter.return_value.all.return_value = [item]
@@ -245,10 +245,10 @@ class TestSerializeValidationQuestionGridRow:
     def test_uses_lazy_country_names_when_not_provided(self):
         q = _make_validation_question(entity_type="country", entity_id=5)
         with patch(
-            "app.services.validation_questions_excel_service._country_names",
+            "app.services.validation.questions_excel_service._country_names",
             return_value={5: "LazyLand"},
         ), patch(
-            "app.services.validation_questions_excel_service._template_names",
+            "app.services.validation.questions_excel_service._template_names",
             return_value={21: "FDRS"},
         ):
             row = serialize_validation_question_grid_row(q)
@@ -277,7 +277,7 @@ class TestSerializeQuestionRow:
     def test_all_expected_columns_present(self):
         q = _make_validation_question()
         with patch(
-            "app.services.validation_questions_excel_service.format_lifecycle_timestamp",
+            "app.services.validation.questions_excel_service.format_lifecycle_timestamp",
             return_value="",
         ):
             row = serialize_question_row(
@@ -291,7 +291,7 @@ class TestSerializeQuestionRow:
     def test_non_country_entity_shows_type_id(self):
         q = _make_validation_question(entity_type="ns", entity_id=5)
         with patch(
-            "app.services.validation_questions_excel_service.format_lifecycle_timestamp",
+            "app.services.validation.questions_excel_service.format_lifecycle_timestamp",
             return_value="",
         ):
             row = serialize_question_row(q, countries={0: "unused"}, templates={0: "unused"})
@@ -327,19 +327,19 @@ class TestBuildWorkbookBytes:
 class TestExportQuestionsWorkbook:
     def test_returns_bytesio(self):
         with patch(
-            "app.services.validation_questions_excel_service.query_validation_questions",
+            "app.services.validation.questions_excel_service.query_validation_questions",
             return_value=[],
         ), patch(
-            "app.services.validation_questions_excel_service._country_names",
+            "app.services.validation.questions_excel_service._country_names",
             return_value={},
         ), patch(
-            "app.services.validation_questions_excel_service._template_names",
+            "app.services.validation.questions_excel_service._template_names",
             return_value={},
         ), patch(
-            "app.services.validation_questions_excel_service.form_item_labels_for_questions",
+            "app.services.validation.questions_excel_service.form_item_labels_for_questions",
             return_value={},
         ), patch(
-            "app.services.validation_questions_excel_service.build_workbook_bytes",
+            "app.services.validation.questions_excel_service.build_workbook_bytes",
             return_value=io.BytesIO(b"test"),
         ) as mock_wb:
             result = export_questions_workbook()
@@ -412,9 +412,9 @@ class TestApplyManualQuestionUpdate:
     def test_open_status_clears_answer(self):
         q = self._make_q(status="answered")
         with patch(
-            "app.services.validation_questions_excel_service.clear_answer_received"
+            "app.services.validation.questions_excel_service.clear_answer_received"
         ) as mock_clear_a, patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ) as mock_clear_r:
             apply_manual_question_update(
                 q, question_text="Q?", status="open", severity="warning"
@@ -428,9 +428,9 @@ class TestApplyManualQuestionUpdate:
     def test_answered_status_sets_answer(self):
         q = self._make_q()
         with patch(
-            "app.services.validation_questions_excel_service.mark_answer_received"
+            "app.services.validation.questions_excel_service.mark_answer_received"
         ) as mock_mark, patch(
-            "app.services.validation_questions_excel_service.apply_answer_outcome"
+            "app.services.validation.questions_excel_service.apply_answer_outcome"
         ):
             apply_manual_question_update(
                 q,
@@ -447,7 +447,7 @@ class TestApplyManualQuestionUpdate:
     def test_answered_status_updates_user_when_already_answered(self):
         q = self._make_q(answered_at=MagicMock())
         with patch(
-            "app.services.validation_questions_excel_service.apply_answer_outcome"
+            "app.services.validation.questions_excel_service.apply_answer_outcome"
         ):
             apply_manual_question_update(
                 q,
@@ -463,9 +463,9 @@ class TestApplyManualQuestionUpdate:
     def test_waived_status(self):
         q = self._make_q()
         with patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ), patch(
-            "app.services.validation_questions_excel_service.apply_answer_outcome"
+            "app.services.validation.questions_excel_service.apply_answer_outcome"
         ):
             apply_manual_question_update(
                 q,
@@ -481,7 +481,7 @@ class TestApplyManualQuestionUpdate:
     def test_resolved_status(self):
         q = self._make_q()
         with patch(
-            "app.services.validation_questions_excel_service.apply_answer_outcome"
+            "app.services.validation.questions_excel_service.apply_answer_outcome"
         ):
             apply_manual_question_update(
                 q,
@@ -495,9 +495,9 @@ class TestApplyManualQuestionUpdate:
     def test_definition_text_stripped_or_none(self):
         q = self._make_q()
         with patch(
-            "app.services.validation_questions_excel_service.clear_answer_received"
+            "app.services.validation.questions_excel_service.clear_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ):
             apply_manual_question_update(
                 q,
@@ -526,7 +526,7 @@ class TestImportQuestionUpdates:
     def _run(self, rows, filename="test.xlsx"):
         file_mock = MagicMock()
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(list(rows[0].keys()) if rows else [], rows),
         ):
             return import_question_updates(file_mock, filename)
@@ -551,10 +551,10 @@ class TestImportQuestionUpdates:
 
     def test_error_when_question_not_found(self):
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(["id", "status", "answer text"], [{"id": 999, "status": "open", "answer text": ""}]),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             mock_q.get.return_value = None
             file_mock = MagicMock()
@@ -565,10 +565,10 @@ class TestImportQuestionUpdates:
     def test_error_on_invalid_status(self):
         q = MagicMock()
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(["id", "status"], [{"id": 1, "status": "invalid"}]),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -579,13 +579,13 @@ class TestImportQuestionUpdates:
     def test_error_answered_without_answer_text(self):
         q = MagicMock()
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "status", "answer text"],
                 [{"id": 1, "status": "answered", "answer text": ""}],
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -599,17 +599,17 @@ class TestImportQuestionUpdates:
         q.answer_text = None
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "status", "answer text"],
                 [{"id": 1, "status": "answered", "answer text": "My answer"}],
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.mark_answer_received"
+            "app.services.validation.questions_excel_service.mark_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -625,19 +625,19 @@ class TestImportQuestionUpdates:
         q.status = "open"
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "status"],
                 [{"id": 1, "status": "waived"}],
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.clear_answer_received"
+            "app.services.validation.questions_excel_service.clear_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -651,16 +651,16 @@ class TestImportQuestionUpdates:
         q.status = "answered"
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(["id", "status"], [{"id": 1, "status": "open"}]),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.clear_answer_received"
+            "app.services.validation.questions_excel_service.clear_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -675,17 +675,17 @@ class TestImportQuestionUpdates:
         q.status = "open"
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "answer text"],
                 [{"id": 1, "answer text": "Response here"}],
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.mark_answer_received"
+            "app.services.validation.questions_excel_service.mark_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -698,12 +698,12 @@ class TestImportQuestionUpdates:
         q = MagicMock()
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(["id"], [{"id": 1}]),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -717,19 +717,19 @@ class TestImportQuestionUpdates:
         q.answer_text = None
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "status", "answer text"],
                 [{"id": 1, "status": "waived", "answer text": "Won't fix"}],
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.clear_answer_received"
+            "app.services.validation.questions_excel_service.clear_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -743,19 +743,19 @@ class TestImportQuestionUpdates:
         q.status = "open"
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "status"],
                 [{"id": 1.0, "status": "open"}],  # float ID from Excel
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.clear_answer_received"
+            "app.services.validation.questions_excel_service.clear_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.clear_review_state"
+            "app.services.validation.questions_excel_service.clear_review_state"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ):
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -770,17 +770,17 @@ class TestImportQuestionUpdates:
         q.status = "open"
 
         with patch(
-            "app.services.validation_questions_excel_service.parse_csv_or_excel_to_rows",
+            "app.services.validation.questions_excel_service.parse_csv_or_excel_to_rows",
             return_value=(
                 ["id", "status", "answer"],
                 [{"id": 1, "status": "answered", "answer": "Reply here"}],
             ),
         ), patch(
-            "app.services.validation_questions_excel_service.ValidationQuestion.query"
+            "app.services.validation.questions_excel_service.ValidationQuestion.query"
         ) as mock_q, patch(
-            "app.services.validation_questions_excel_service.mark_answer_received"
+            "app.services.validation.questions_excel_service.mark_answer_received"
         ), patch(
-            "app.services.validation_questions_excel_service.db"
+            "app.services.validation.questions_excel_service.db"
         ) as mock_db:
             mock_q.get.return_value = q
             file_mock = MagicMock()
@@ -798,26 +798,26 @@ class TestImportQuestionUpdates:
 
 class TestCountryAndTemplateNames:
     def test_country_names_returns_id_to_name_map(self):
-        from app.services.validation_questions_excel_service import _country_names
+        from app.services.validation.questions_excel_service import _country_names
 
         c1 = MagicMock()
         c1.id = 1
         c1.name = "Testland"
         with patch(
-            "app.services.validation_questions_excel_service.Country"
+            "app.services.validation.questions_excel_service.Country"
         ) as mock_country:
             mock_country.query.all.return_value = [c1]
             result = _country_names()
         assert result == {1: "Testland"}
 
     def test_template_names_returns_id_to_name_map(self):
-        from app.services.validation_questions_excel_service import _template_names
+        from app.services.validation.questions_excel_service import _template_names
 
         t1 = MagicMock()
         t1.id = 10
         t1.name = "Test Template"
         with patch(
-            "app.services.validation_questions_excel_service.FormTemplate"
+            "app.services.validation.questions_excel_service.FormTemplate"
         ) as mock_tmpl:
             mock_tmpl.query.all.return_value = [t1]
             result = _template_names()
@@ -849,7 +849,7 @@ class TestSerializeWithFormItemId:
 
     def test_grid_row_uses_form_item_labels_when_form_item_id_set(self):
         """Line 120: indicator_name = form_item_labels.get(question.form_item_id, '')"""
-        from app.services.validation_questions_excel_service import (
+        from app.services.validation.questions_excel_service import (
             serialize_validation_question_grid_row,
         )
 
@@ -865,7 +865,7 @@ class TestSerializeWithFormItemId:
 
     def test_serialize_row_uses_form_item_labels_when_form_item_id_set(self):
         """Line 171: indicator_name = form_item_labels.get(question.form_item_id, '')"""
-        from app.services.validation_questions_excel_service import serialize_question_row
+        from app.services.validation.questions_excel_service import serialize_question_row
 
         q = self._make_question(form_item_id=99)
         form_item_labels = {99: "My Indicator"}

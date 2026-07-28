@@ -75,7 +75,7 @@ class TestDeleteTemplate:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_admin_action'):
+                 patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = delete_template(template.id)
 
         _, status = _parse(resp)
@@ -92,7 +92,7 @@ class TestDeleteTemplate:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_admin_action',
+                 patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
                  patch('app.utils.transactions.request_transaction_rollback'):
                 resp = delete_template(template.id)
@@ -203,7 +203,7 @@ class TestDeleteAssignment:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_admin_action'):
+                 patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = delete_assignment(af.id)
 
         _, status = _parse(resp)
@@ -225,7 +225,7 @@ class TestDeleteAssignment:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_admin_action',
+                 patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
                  patch('app.utils.transactions.request_transaction_rollback'):
                 resp = delete_assignment(af.id)
@@ -467,7 +467,7 @@ class TestDeleteDocument:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_admin_action'):
+                 patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = delete_document(doc.id)
 
         _, status = _parse(resp)
@@ -487,7 +487,7 @@ class TestDeleteDocument:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.services.user_analytics_service.log_admin_action',
+                 patch('app.services.platform.user_analytics_service.log_admin_action',
                        side_effect=RuntimeError('db error')), \
                  patch('app.utils.transactions.request_transaction_rollback'):
                 resp = delete_document(doc.id)
@@ -797,7 +797,7 @@ class TestUpdateTranslation:
                  patch('app.extensions.resolve_translations_directory', return_value='/tmp/fake'), \
                  patch('os.path.exists', return_value=True), \
                  patch('polib.pofile', return_value=mock_po_file), \
-                 patch('app.services.user_analytics_service.log_admin_action'):
+                 patch('app.services.platform.user_analytics_service.log_admin_action'):
                 resp = update_translation()
 
         _, status = _parse(resp)

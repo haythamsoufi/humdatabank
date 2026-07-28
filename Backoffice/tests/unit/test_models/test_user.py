@@ -3,7 +3,7 @@ Unit tests for User model.
 """
 import pytest
 from tests.factories import create_test_user
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 
 @pytest.mark.unit

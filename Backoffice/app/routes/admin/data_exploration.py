@@ -22,7 +22,7 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.services.security.api_authentication import get_user_allowed_template_ids
 from app.utils.datetime_helpers import utcnow
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import (
     CORE_DATA_EXPLORER_PERMISSIONS,
     explore_tab_access_flags,
@@ -67,7 +67,7 @@ def _data_explorer_permissions() -> list[str]:
 def _ai_beta_denied_response():
     """Return a JSON error response when AI beta access is restricted for this user."""
     try:
-        from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+        from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
 
         if not is_ai_beta_restricted():
             return None

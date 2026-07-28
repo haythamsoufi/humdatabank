@@ -2,7 +2,7 @@
 Unit tests for country service.
 """
 import pytest
-from app.services.country_service import CountryService
+from app.services.organization.country_service import CountryService
 from tests.factories import create_test_country
 
 

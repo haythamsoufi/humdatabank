@@ -34,7 +34,7 @@ from datetime import datetime
 import base64
 import re
 import json
-from app.services.presence_store import (
+from app.services.platform.presence_store import (
     get_active_presence,
     record_presence,
     remove_presence,
@@ -45,12 +45,14 @@ from app.models import (
     AssignmentEntityStatus, AssignedForm, FormTemplate, FormTemplateVersion,
     FormItem, FormData,
 )
-from app.services import check_aes_access_light, check_country_access, ensure_aes_access
+from app.services import check_aes_access_light
+from app.services import check_country_access
+from app.services import ensure_aes_access
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.api_responses import json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error, require_json_keys
 from app.utils.error_handling import handle_json_view_exception
-from app.services.form_processing_service import _create_dynamic_indicator_object
+from app.services.forms.processing_service import _create_dynamic_indicator_object
 from app.routes.forms.helpers import existing_data_for_dynamic_assignment, render_dynamic_indicator_item_html
 
 # Create the API blueprint
@@ -117,7 +119,7 @@ def _build_presence_users(presence_map, exclude_user_id=None):
 
 
 from app.models.assignments import AssignmentEntityStatus
-from app.services.form_processing_service import slugify_age_group
+from app.services.forms.processing_service import slugify_age_group
 
 
 @bp.route('/indicator-bank/search')
@@ -1038,7 +1040,7 @@ def api_assignment_completion_rate(aes_id):
         if not published_version_id:
             return json_ok(completion_rate=0.0)
 
-        from app.services.assignment_completion_service import AssignmentCompletionService
+        from app.services.assignments.completion_service import AssignmentCompletionService
         metrics = AssignmentCompletionService.compute_for_assignment(
             aes_id, template_id, published_version_id
         )
@@ -1074,7 +1076,7 @@ def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assig
     with a reverse variable re-computed this independently).
     """
     from app.routes.api.assignments import _resolve_auto_load_entities_inner
-    from app.services.variable_resolution_service import VariableResolutionService
+    from app.services.forms.variable_resolution_service import VariableResolutionService
 
     cfg = matrix_item.config if isinstance(matrix_item.config, dict) else {}
     mc = cfg.get('matrix_config') if isinstance(cfg.get('matrix_config'), dict) else cfg
@@ -1216,8 +1218,8 @@ def api_assignment_entry_bootstrap(aes_id):
         if not published_version_id:
             return json_ok(completion_rate=0.0, auto_load={}, resolved_variables={})
 
-        from app.services.assignment_completion_service import AssignmentCompletionService
-        from app.services.variable_resolution_service import VariableResolutionService
+        from app.services.assignments.completion_service import AssignmentCompletionService
+        from app.services.forms.variable_resolution_service import VariableResolutionService
 
         metrics = AssignmentCompletionService.compute_for_assignment(
             aes_id, template_id, published_version_id

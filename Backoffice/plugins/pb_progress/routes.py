@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import logging
 
-from flask import render_template, request, url_for
+from flask import render_template, request, send_from_directory, url_for
 from werkzeug.exceptions import NotFound
 
 from flask_login import current_user
 
-from plugins.pb_progress import bp
+from plugins.pb_progress import bp, _PLUGIN_DIR
 from plugins.pb_progress.db_source import (
     DbSourceError,
     import_config_from_excel,
@@ -20,12 +20,19 @@ from plugins.pb_progress.plugin_data_store import PBProgressDataStore
 from plugins.pb_progress.service import PBProgressService
 from plugins.pb_progress.versions import DEFAULT_VERSION, REPORT_VERSIONS, VERSION_ORDER, validate_version
 from app.routes.admin.shared import permission_required, system_manager_required
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 
 logger = logging.getLogger(__name__)
 
 _ADMIN_SUBTABS = frozenset({"build", "mapping", "translations", "section-order"})
+
+
+@bp.route("/pb-progress/static/<path:filename>", methods=["GET"])
+@permission_required("admin.data_explore.pb_progress")
+def static(filename: str):
+    """Plugin JS/CSS — same permission as the P&B Progress explorer tab."""
+    return send_from_directory(str(_PLUGIN_DIR / "static"), filename)
 
 
 @bp.route("/pb-progress/manage", methods=["GET"])

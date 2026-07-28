@@ -136,7 +136,7 @@ When adding or changing a logged admin action, update this table in the same PR.
 Risk levels are assigned when logging admin actions using the `log_admin_action()` function:
 
 ```python
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 
 log_admin_action(
     action_type='template_delete',

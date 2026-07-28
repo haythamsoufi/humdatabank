@@ -56,7 +56,7 @@ def get_data_explorer_nav_permissions() -> tuple[str, ...]:
 
 
 def explore_tab_access_flags(user, plugin_manager: "PluginManager") -> dict[str, bool]:
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     is_sm = AuthorizationService.is_system_manager(user)
     flags: dict[str, bool] = {}

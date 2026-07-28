@@ -142,7 +142,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary"
             )
@@ -153,7 +153,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?hidden_fields=1,2,3"
             )
@@ -164,7 +164,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?hidden_sections=10,20"
             )
@@ -175,7 +175,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?include_non_reported=1"
             )
@@ -186,7 +186,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary"
             )
@@ -197,7 +197,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?run_id=test-run-123"
             )
@@ -208,7 +208,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?run_mode=all"
             )
@@ -219,7 +219,7 @@ class TestValidationSummaryProgressPage:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?ai_sources=historical,system_documents"
             )
@@ -236,7 +236,7 @@ class TestValidationSummaryCancel:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/cancel",
                 json={},
@@ -248,7 +248,7 @@ class TestValidationSummaryCancel:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/cancel",
                 json={"run_id": "test-run-id-123"},
@@ -263,7 +263,7 @@ class TestValidationSummaryCancel:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/cancel",
                 json={"run_id": "test-run-id"},
@@ -275,7 +275,7 @@ class TestValidationSummaryCancel:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/cancel",
                 json={"run_id": "  "},
@@ -293,7 +293,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events"
             )
@@ -307,7 +307,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0"
             )
@@ -320,7 +320,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0&include_non_reported=1"
             )
@@ -332,7 +332,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0&run_mode=all"
             )
@@ -343,7 +343,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0&concurrency=4"
             )
@@ -354,7 +354,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0&run_id=my-run"
             )
@@ -365,7 +365,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0&hidden_fields=1,2"
             )
@@ -376,7 +376,7 @@ class TestValidationSummaryEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0&hidden_sections=5,6"
             )
@@ -393,7 +393,7 @@ class TestValidationSummaryPdf:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary_pdf"
             )
@@ -405,7 +405,7 @@ class TestValidationSummaryPdf:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary_pdf"
             )
@@ -417,7 +417,7 @@ class TestValidationSummaryPdf:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary_pdf?run=0&run_mode=missing"
             )
@@ -428,7 +428,7 @@ class TestValidationSummaryPdf:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary_pdf?include_non_reported=1"
             )
@@ -445,7 +445,7 @@ class TestValidationSummaryOpinions:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions"
             )
@@ -456,7 +456,7 @@ class TestValidationSummaryOpinions:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions"
             )
@@ -471,9 +471,9 @@ class TestValidationSummaryOpinions:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
-             patch("app.services.app_settings_service.is_ai_beta_restricted", return_value=True), \
-             patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.platform.app_settings_service.is_ai_beta_restricted", return_value=True), \
+             patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=False):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions"
             )
@@ -490,7 +490,7 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={},
@@ -502,7 +502,7 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.ai.validation.formdata_validation.AIFormDataValidationService.upsert_validation", return_value=(MagicMock(), None)), \
              patch("app.services.ai.validation.formdata_validation.AIFormDataValidationService.upsert_missing_assigned_validation", return_value=(MagicMock(), None)):
             resp = logged_in_client.post(
@@ -518,7 +518,7 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={"mode": "all"},
@@ -530,7 +530,7 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={"hidden_fields": [1, 2, 3], "hidden_sections": [4, 5]},
@@ -542,7 +542,7 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={"sources": ["historical", "system_documents"]},
@@ -554,7 +554,7 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={"include_non_reported": True},
@@ -566,9 +566,9 @@ class TestValidationSummaryOpinionsRun:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
-             patch("app.services.app_settings_service.is_ai_beta_restricted", return_value=True), \
-             patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.platform.app_settings_service.is_ai_beta_restricted", return_value=True), \
+             patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=False):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={},
@@ -586,7 +586,7 @@ class TestValidationSummaryOpinionsEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/events"
             )
@@ -598,7 +598,7 @@ class TestValidationSummaryOpinionsEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/events"
             )
@@ -611,7 +611,7 @@ class TestValidationSummaryOpinionsEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/events?run_mode=all"
             )
@@ -622,7 +622,7 @@ class TestValidationSummaryOpinionsEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/events"
                 "?hidden_fields=1,2&hidden_sections=3"
@@ -634,7 +634,7 @@ class TestValidationSummaryOpinionsEvents:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/events"
                 "?include_non_reported=0"
@@ -672,7 +672,7 @@ class TestInternalHelpers:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?hidden_fields=abc,,1,,2"
             )
@@ -683,7 +683,7 @@ class TestInternalHelpers:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary"
                 "?ai_sources=historical,upr_documents,upr_documents"  # duplicate dropped
@@ -695,7 +695,7 @@ class TestInternalHelpers:
             aes = _make_aes(db_session)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary?ai_sources=badvalue"
             )
@@ -707,7 +707,7 @@ class TestInternalHelpers:
                 aes = _make_aes(db_session)
                 aes_id = aes.id
 
-            with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+            with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
                 resp = logged_in_client.get(
                     f"/forms/assignment_status/{aes_id}/validation_summary?include_non_reported={val}"
                 )
@@ -729,7 +729,7 @@ class TestCancelFlagModule:
 
         run_id = "cancel-test-run-99"
         # First cancel the run_id
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             cancel_resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/cancel",
                 json={"run_id": run_id},
@@ -737,7 +737,7 @@ class TestCancelFlagModule:
         _assert_status(cancel_resp, 200)
 
         # Then hit the events endpoint – it should honour the cancelled flag
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             ev_resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events"
                 f"?run=0&run_id={run_id}"
@@ -756,7 +756,7 @@ class TestWithFormData:
             aes = create_test_assignment_entity_status(db_session, template=template)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary"
             )
@@ -769,7 +769,7 @@ class TestWithFormData:
             aes = create_test_assignment_entity_status(db_session, template=template)
             aes_id = aes.id
 
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary/events?run=0"
             )
@@ -782,7 +782,7 @@ class TestWithFormData:
             aes_id = aes.id
 
         # Patch the template to be None on the assigned form
-        with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.models.AssignedForm.template", new_callable=PropertyMock, return_value=None):
             resp = logged_in_client.get(
                 f"/forms/assignment_status/{aes_id}/validation_summary_pdf"

@@ -1499,11 +1499,11 @@ def extract_update_translations():
 
         # Get the backoffice root directory (parent of app/)
         backoffice_root = os.path.abspath(os.path.join(current_app.root_path, '..'))
-        scripts_dir = os.path.join(backoffice_root, 'scripts')
+        scripts_dir = os.path.join(backoffice_root, 'scripts', 'i18n')
         script_path = os.path.join(scripts_dir, 'extract_update_translations.py')
 
         if not os.path.exists(script_path):
-            flash(_('Extraction script not found. Please ensure scripts/extract_update_translations.py exists.'), 'danger')
+            flash(_('Extraction script not found. Please ensure scripts/i18n/extract_update_translations.py exists.'), 'danger')
             return redirect(url_for('utilities.manage_translations'))
 
         # Run the extraction script
@@ -1586,7 +1586,7 @@ def api_auto_translate():
             translate_template_name_auto,
             translate_email_template_html_auto,
         )
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         data = get_json_safe()
         err = require_json_data(data)
@@ -2043,7 +2043,7 @@ def api_auto_translate_summary():
         if context:
             description += f" in {context}"
 
-        from app.services.user_analytics_service import log_user_activity
+        from app.services.platform.user_analytics_service import log_user_activity
         log_user_activity(
             activity_type='request',
             description=description,

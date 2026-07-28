@@ -175,7 +175,7 @@ class TestAuthorization:
             sess['_fresh'] = True
 
         # Try to access user management; enforce denial via patched RBAC check
-        with patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
             response = client.get('/admin/users')
             assert response.status_code in [302, 403]
 

@@ -33,7 +33,7 @@ def create_default_data(app_instance):
         try:
             if inspector.has_table("system_settings"):
                 from app.models.system import SystemSettings
-                from app.services.app_settings_service import (
+                from app.services.platform.app_settings_service import (
                     set_age_groups,
                     set_document_types,
                     set_enabled_entity_types,

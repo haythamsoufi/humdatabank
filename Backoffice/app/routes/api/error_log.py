@@ -28,7 +28,7 @@ from app.routes.api import api_bp
 
 # Import utilities
 from app.services.security.monitoring import SecurityMonitor
-from app.services.user_analytics_service import get_client_ip
+from app.services.platform.user_analytics_service import get_client_ip
 from app.services.monitoring.platform_error_diagnostics import (
     attach_platform_5xx_diagnostics,
     is_platform_5xx,

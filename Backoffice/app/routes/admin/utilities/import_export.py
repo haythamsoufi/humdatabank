@@ -33,7 +33,7 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.file_parsing import EXCEL_EXTENSIONS
 from app.utils.transactions import request_transaction_rollback
-from app.services.indicator_measurement_sync import backfill_fk_from_strings_bank
+from app.services.indicators.measurement_sync import backfill_fk_from_strings_bank
 
 logger = logging.getLogger(__name__)
 

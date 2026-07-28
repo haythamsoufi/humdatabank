@@ -173,7 +173,7 @@ def _is_country_rows(d: dict) -> bool:
 
 
 def _matrix_share_column_defs(d: dict) -> List[Dict[str, Any]]:
-    from app.services.data_retrieval_form_helpers import slugify_matrix_row_label
+    from app.services.data_retrieval.form_helpers import slugify_matrix_row_label
 
     columns: List[Dict[str, Any]] = [
         {"key": "country_name", "label": _("Country"), "sortable": True, "type": "text"},

@@ -278,7 +278,7 @@ class TestConvenienceResolvers:
         mock_ss.SUBMISSIONS = "submissions"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
         mock_ss.submitted_document_rel_storage_category.return_value = "submissions"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = resolve_submitted_document_file("some/file.pdf")
         assert "submissions" in result
 
@@ -288,7 +288,7 @@ class TestConvenienceResolvers:
         mock_ss.SUBMISSIONS = "submissions"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
         mock_ss.submitted_document_rel_storage_category.return_value = "entity_repo"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = resolve_submitted_document_file("some/file.pdf")
         assert os.path.isabs(result)
 
@@ -298,7 +298,7 @@ class TestConvenienceResolvers:
         mock_ss.SUBMISSIONS = "submissions"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
         mock_ss.submitted_document_rel_storage_category.return_value = "admin_documents"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = resolve_submitted_document_file("admin/doc.pdf")
         assert "admin_documents" in result
 
@@ -380,7 +380,7 @@ class TestSaveSubmissionDocument:
         mock_ss = MagicMock()
         mock_ss.normalize_standalone_entity_type_slug.return_value = "country"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             with pytest.raises(ValueError, match="form_id"):
                 save_submission_document(
                     self._make_file(), 1, "file.txt",
@@ -394,7 +394,7 @@ class TestSaveSubmissionDocument:
         mock_ss.normalize_standalone_entity_type_slug.return_value = "country"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
         mock_ss.upload.return_value = "country/1/5/file_abc12345.txt"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = save_submission_document(
                 self._make_file(), 5, "file.txt",
                 entity_type="country", entity_id=1
@@ -409,7 +409,7 @@ class TestSaveSubmissionDocument:
         mock_ss.normalize_standalone_entity_type_slug.return_value = "country"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
         mock_ss.upload.return_value = "country/1/public/10/20/file_abc12345.txt"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = save_submission_document(
                 self._make_file(), 0, "file.txt",
                 is_public=True, form_id=10, submission_id=20,
@@ -425,7 +425,7 @@ class TestSaveSubmissionDocument:
         mock_ss.normalize_standalone_entity_type_slug.return_value = "country"
         mock_ss.ENTITY_REPO_ROOT = "entity_repo"
         mock_ss.upload.return_value = "country/1/5/doc_abc12345.pdf"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             save_submission_document(
                 self._make_file(), 5, "doc.pdf",
                 entity_type="country", entity_id=1
@@ -473,7 +473,7 @@ class TestSaveSectorLogo:
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.png"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = save_sector_logo(f, "MySector")
         assert result.endswith(".png")
         call_args = mock_ss.upload.call_args
@@ -486,7 +486,7 @@ class TestSaveSectorLogo:
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.webp"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = save_sector_logo(f, "MySector")
         assert result.endswith(".webp")
 
@@ -497,7 +497,7 @@ class TestSaveSectorLogo:
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.gif"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = save_sector_logo(f, "MySector")
         assert result.endswith(".gif")
 
@@ -508,6 +508,6 @@ class TestSaveSectorLogo:
         mock_ss = MagicMock()
         mock_ss.SYSTEM = "system"
         mock_ss.upload.return_value = "sectors/MySector.jpeg"
-        with patch("app.services.storage_service", mock_ss):
+        with patch("app.services.platform.storage_service", mock_ss):
             result = save_sector_logo(f, "MySector")
         assert result.endswith(".jpeg")

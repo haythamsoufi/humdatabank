@@ -34,7 +34,7 @@ python -m flask db migrate -m "descriptive message"
 python -m flask db heads   # confirm still ONE head after generating
 
 # CI script — check templates do not bypass console logging guard
-python Backoffice/scripts/check_no_console_saved_bypass.py
+python Backoffice/scripts/ci/check_no_console_saved_bypass.py
 ```
 
 ### CSS rebuild (always do this if templates changed)

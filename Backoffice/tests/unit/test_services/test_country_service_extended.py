@@ -13,7 +13,7 @@ Supplements test_country_service.py to cover:
 import pytest
 from unittest.mock import MagicMock, patch
 
-from app.services.country_service import (
+from app.services.organization.country_service import (
     CountryService,
     assign_country_fds_member_user,
     countries_with_fds_member_query,

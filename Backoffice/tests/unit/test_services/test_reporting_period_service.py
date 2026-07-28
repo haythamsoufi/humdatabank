@@ -5,7 +5,7 @@ from datetime import date, datetime
 import pytest
 
 from app.models.assignments import AssignedForm, ReportingPeriod
-from app.services.reporting_period_service import (
+from app.services.forms.reporting_period_service import (
     backfill_assigned_forms_missing_period,
     dashboard_assignment_period_sort_key,
     get_reporting_period,

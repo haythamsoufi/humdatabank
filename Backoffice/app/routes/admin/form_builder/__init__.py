@@ -35,13 +35,13 @@ from app.routes.admin.shared import (
 )
 from app.utils.request_utils import is_json_request
 from app.services.security.api_authentication import get_user_allowed_template_ids
-from app.services.user_analytics_service import log_admin_action
-from app.services.template_excel_service import TemplateExcelService
-from app.services.kobo_xls_import_service import KoboXlsImportService
-from app.services.kobo_data_import_service import KoboDataImportService
+from app.services.platform.user_analytics_service import log_admin_action
+from app.services.templates.excel_service import TemplateExcelService
+from app.services.imports.kobo_xls_import_service import KoboXlsImportService
+from app.services.imports.kobo_data_import_service import KoboDataImportService
 from app.utils.error_handling import handle_view_exception, handle_json_view_exception
-from app.services.section_duplication_service import SectionDuplicationService
-from app.services.item_duplication_service import ItemDuplicationService
+from app.services.forms.section_duplication_service import SectionDuplicationService
+from app.services.forms.item_duplication_service import ItemDuplicationService
 from flask import send_file
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, cast, String, select, inspect, literal

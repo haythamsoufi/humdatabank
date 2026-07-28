@@ -20,7 +20,7 @@ ai_docs_bp = Blueprint('ai_documents', __name__, url_prefix='/api/ai/documents')
 def _enforce_ai_beta_access():
     """Restrict AI document endpoints when AI beta mode is enabled."""
     try:
-        from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+        from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
 
         if not is_ai_beta_restricted():
             return None

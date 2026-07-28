@@ -412,7 +412,7 @@ class EntityActivityLog(db.Model):
     @property
     def entity(self):
         """Get the actual entity object based on entity_type and entity_id."""
-        from app.services.entity_service import EntityService
+        from app.services.organization.entity_service import EntityService
         return EntityService.get_entity(self.entity_type, self.entity_id)
 
     def __repr__(self):

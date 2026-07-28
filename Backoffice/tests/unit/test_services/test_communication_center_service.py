@@ -7,7 +7,7 @@ import pytest
 
 from app import db
 from app.models import EmailDeliveryLog, Notification, NotificationType, User
-from app.services.communication_center_service import (
+from app.services.communication.center_service import (
     RECORD_TYPE_BOTH,
     RECORD_TYPE_EMAIL,
     RECORD_TYPE_NOTIFICATION,
@@ -18,7 +18,7 @@ from app.services.communication_center_service import (
     get_orphan_email_delivery_logs_for_grid,
 )
 from app.services.email.delivery import get_email_delivery_logs_needing_attention
-from app.services.notification_service import NotificationService
+from app.services.notification.service import NotificationService
 from app.utils.datetime_helpers import utcnow
 
 

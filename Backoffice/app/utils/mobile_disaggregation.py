@@ -147,8 +147,8 @@ def can_view_disaggregation_country_details(user) -> bool:
     if not user or not getattr(user, 'is_authenticated', False):
         return False
 
-    from app.services.authorization_service import AuthorizationService
-    from app.services.data_retrieval_shared import can_view_non_public_form_items
+    from app.services.organization.authorization_service import AuthorizationService
+    from app.services.data_retrieval.shared import can_view_non_public_form_items
 
     if can_view_non_public_form_items(user):
         return True
@@ -181,7 +181,7 @@ def get_disaggregation_country_scope(user) -> Optional[Set[int]]:
     if not can_view_disaggregation_country_details(user):
         return set()
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     if AuthorizationService.is_admin(user) or AuthorizationService.is_system_manager(user):
         return None
@@ -190,7 +190,7 @@ def get_disaggregation_country_scope(user) -> Optional[Set[int]]:
     if AuthorizationService.has_rbac_permission(user, 'admin.countries.edit'):
         return None
 
-    from app.services.app_settings_service import is_organization_email
+    from app.services.platform.app_settings_service import is_organization_email
 
     if getattr(user, 'email', None) and is_organization_email(user.email):
         return None

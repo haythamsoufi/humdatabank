@@ -10,10 +10,10 @@ from . import bp
 from app import db
 from app.models import FormTemplate, FormSection, FormItem, FormTemplateVersion
 from app.models.core import Country
-from app.services.kobo_data_import_service import KoboDataImportService
+from app.services.imports.kobo_data_import_service import KoboDataImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.file_parsing import EXCEL_EXTENSIONS
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.routes.admin.shared import admin_required, system_manager_required
@@ -230,7 +230,7 @@ def kobo_data_import_preview():
     except Exception as e:
         return json_server_error(f'Cannot read uploaded file: {e}')
 
-    from app.services.kobo_data_import_service import KoboDataImportService
+    from app.services.imports.kobo_data_import_service import KoboDataImportService
     result = KoboDataImportService.generate_preview(
         file_bytes,
         entity_column_index=data.get('entity_column_index'),

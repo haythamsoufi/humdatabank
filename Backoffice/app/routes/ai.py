@@ -53,7 +53,7 @@ from app.services.ai.chat.fastpath import try_answer_value_question
 
 # Telemetry tracking
 from app.services.ai.chat.telemetry import ChatbotTelemetryService, ChatbotMetrics
-from app.services.user_analytics_service import get_client_ip
+from app.services.platform.user_analytics_service import get_client_ip
 
 # AI Agent integration (RAG + agentic reasoning)
 # Lazy-loaded to avoid import errors if dependencies are missing
@@ -114,7 +114,7 @@ def _is_allowed_public_proxy_request() -> bool:
 def _ai_beta_denied_response(identity):
     """Return a JSON denial response when AI beta access restriction blocks this identity."""
     try:
-        from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+        from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
 
         if not is_ai_beta_restricted():
             return None
@@ -179,7 +179,7 @@ def _ai_chat_daily_user_limit() -> str:
     try:
         identity = resolve_ai_identity()
         if identity.is_authenticated and identity.user:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if AuthorizationService.is_system_manager(identity.user):
                 # Effectively exempt (Flask-Limiter does not provide a reliable "disable limit"
                 # signal via dynamic strings; use a very high ceiling instead).
@@ -542,7 +542,7 @@ def _build_access_context(identity) -> Dict[str, Any]:
         }
 
     user = identity.user
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     # Permissions: store a small, stable set of RBAC permission checks for downstream tool gating.
     perms = {
@@ -815,11 +815,11 @@ def issue_token():
     Conversation persistence is for logged-in users only, so tokens are required for that.
     """
     try:
-        from app.services.app_settings_service import user_has_ai_beta_access
+        from app.services.platform.app_settings_service import user_has_ai_beta_access
 
         if not user_has_ai_beta_access(current_user):
             return json_forbidden("AI beta access is limited to selected users.")
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         token_role = "system_manager" if AuthorizationService.is_system_manager(current_user) else ("admin" if AuthorizationService.is_admin(current_user) else "user")
         token = issue_ai_token(user_id=int(current_user.id), role=token_role)
         current_app.logger.debug(f"Issued AI token for user {current_user.id}")

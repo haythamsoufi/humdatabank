@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.models.rbac import RbacAccessGrant
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 from tests.factories import (
     create_test_user,
     create_test_admin,

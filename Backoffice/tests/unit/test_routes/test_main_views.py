@@ -246,8 +246,8 @@ class TestChatImmersive:
 
     def test_redirects_when_user_chatbot_disabled(self, logged_in_client, db_session, admin_user, app):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", return_value=False):
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", return_value=False):
             # Patch current_user.chatbot_enabled = False
             with patch("flask_login.utils._get_user") as mock_get_user:
                 mock_user = MagicMock()
@@ -260,23 +260,23 @@ class TestChatImmersive:
 
     def test_redirects_when_no_ai_beta_access(self, logged_in_client, app):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=False):
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=False):
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 302
 
     def test_redirects_org_only_non_org_user(self, logged_in_client, app, admin_user):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", return_value=True), \
-             patch("app.services.app_settings_service.is_organization_email", return_value=False):
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", return_value=True), \
+             patch("app.services.platform.app_settings_service.is_organization_email", return_value=False):
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 302
 
     def test_renders_chat_for_valid_user(self, logged_in_client, app):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", return_value=False), \
-             patch("app.services.app_settings_service.get_chatbot_name", return_value="AI Helper"), \
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", return_value=False), \
+             patch("app.services.platform.app_settings_service.get_chatbot_name", return_value="AI Helper"), \
              patch("app.routes.main.views.render_template", return_value="<html>chat</html>") as mock_rt:
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 200
@@ -285,27 +285,27 @@ class TestChatImmersive:
         import uuid
         conv_id = str(uuid.uuid4())
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", return_value=False), \
-             patch("app.services.app_settings_service.get_chatbot_name", return_value=""), \
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", return_value=False), \
+             patch("app.services.platform.app_settings_service.get_chatbot_name", return_value=""), \
              patch("app.routes.main.views.render_template", return_value="<html>chat</html>"):
             resp = logged_in_client.get(f"/chat/{conv_id}")
         assert resp.status_code == 200
 
     def test_chatbot_name_exception_ignored(self, logged_in_client, app):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", return_value=False), \
-             patch("app.services.app_settings_service.get_chatbot_name", side_effect=Exception("name fail")), \
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", return_value=False), \
+             patch("app.services.platform.app_settings_service.get_chatbot_name", side_effect=Exception("name fail")), \
              patch("app.routes.main.views.render_template", return_value="<html>chat</html>"):
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 200
 
     def test_org_only_check_exception_ignored(self, logged_in_client, app):
         app.config["CHATBOT_ENABLED"] = True
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", side_effect=Exception("org check fail")), \
-             patch("app.services.app_settings_service.get_chatbot_name", return_value=""), \
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", side_effect=Exception("org check fail")), \
+             patch("app.services.platform.app_settings_service.get_chatbot_name", return_value=""), \
              patch("app.routes.main.views.render_template", return_value="<html>chat</html>"):
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 200
@@ -318,9 +318,9 @@ class TestChatImmersive:
     def test_chatbot_default_enabled(self, logged_in_client, app):
         """When CHATBOT_ENABLED not set, defaults to True."""
         app.config.pop("CHATBOT_ENABLED", None)
-        with patch("app.services.app_settings_service.user_has_ai_beta_access", return_value=True), \
-             patch("app.services.app_settings_service.get_chatbot_org_only", return_value=False), \
-             patch("app.services.app_settings_service.get_chatbot_name", return_value="Bot"), \
+        with patch("app.services.platform.app_settings_service.user_has_ai_beta_access", return_value=True), \
+             patch("app.services.platform.app_settings_service.get_chatbot_org_only", return_value=False), \
+             patch("app.services.platform.app_settings_service.get_chatbot_name", return_value="Bot"), \
              patch("app.routes.main.views.render_template", return_value="<html>chat</html>"):
             resp = logged_in_client.get("/chat")
         assert resp.status_code == 200
@@ -347,7 +347,7 @@ class TestDownloadSubmissionPdf:
         mock_submission.submitter_email = "tester@example.com"
 
         with patch("app.models.PublicSubmission.query") as mock_q, \
-             patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=False):
+             patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=False):
             mock_q.get_or_404.return_value = mock_submission
             # entity_permissions is empty
             mock_submission_user = MagicMock()
@@ -372,7 +372,7 @@ class TestDownloadSubmissionPdf:
         mock_submission.submitted_at.strftime.return_value = "20240101"
 
         with patch("app.models.PublicSubmission.query") as mock_q, \
-             patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.main.views.render_template", return_value="<html/>"), \
              patch.dict("sys.modules", {"weasyprint": None}):
             mock_q.get_or_404.return_value = mock_submission
@@ -394,7 +394,7 @@ class TestDownloadSubmissionPdf:
         mock_submission.submitted_at.strftime.return_value = "20240101"
 
         with patch("app.models.PublicSubmission.query") as mock_q, \
-             patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.main.views.render_template", return_value="<html/>"), \
              patch.dict("sys.modules", {"weasyprint": None}):
             mock_q.get_or_404.return_value = mock_submission
@@ -463,16 +463,16 @@ class TestManageNsHierarchy:
         assert resp.status_code in (302, 401)
 
     def test_forbidden_for_viewer_user(self, logged_in_client, db_session, app, admin_user):
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=False):
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=False):
             resp = logged_in_client.get("/ns_structure")
         assert resp.status_code == 403
 
     def test_system_manager_sees_all_branches(self, logged_in_client, db_session, app, admin_user):
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=True), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=False), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=False), \
              patch("app.models.NSBranch") as mock_branch, \
              patch("app.models.NSSubBranch") as mock_sub, \
              patch("app.models.NSLocalUnit") as mock_lu, \
@@ -485,9 +485,9 @@ class TestManageNsHierarchy:
         mock_rt.assert_called_once()
 
     def test_org_admin_sees_all_branches(self, logged_in_client, db_session, app, admin_user):
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=True), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=False), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=False), \
              patch("app.models.NSBranch") as mock_branch, \
              patch("app.models.NSSubBranch") as mock_sub, \
              patch("app.models.NSLocalUnit") as mock_lu, \
@@ -504,9 +504,9 @@ class TestManageNsHierarchy:
         mock_user.countries = MagicMock()
         mock_user.countries.all.return_value = []
 
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=True), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=True), \
              patch("flask_login.utils._get_user", return_value=mock_user), \
              patch("app.routes.main.views.render_template", return_value="<html>ns</html>") as mock_rt:
             resp = logged_in_client.get("/ns_structure")
@@ -520,9 +520,9 @@ class TestManageNsHierarchy:
         mock_user.countries = MagicMock()
         mock_user.countries.all.return_value = [mock_country]
 
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=True), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=True), \
              patch("flask_login.utils._get_user", return_value=mock_user), \
              patch("app.models.NSBranch") as mock_branch, \
              patch("app.models.NSSubBranch") as mock_sub, \
@@ -544,9 +544,9 @@ class TestManageNsHierarchy:
         mock_user.countries = MagicMock()
         mock_user.countries.all.return_value = [c1, c2]
 
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=True), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=True), \
              patch("flask_login.utils._get_user", return_value=mock_user), \
              patch("app.models.NSBranch") as mock_branch, \
              patch("app.models.NSSubBranch") as mock_sub, \
@@ -565,9 +565,9 @@ class TestManageNsHierarchy:
         mock_user = MagicMock(spec=[])  # no attributes
         mock_user.is_authenticated = True
 
-        with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_role", return_value=True), \
+        with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=True), \
              patch("flask_login.utils._get_user", return_value=mock_user), \
              patch("app.routes.main.views.render_template", return_value="<html>ns</html>"):
             resp = logged_in_client.get("/ns_structure")
@@ -580,11 +580,11 @@ class TestManageNsHierarchy:
 
 class TestManifest:
     def test_manifest_returns_json(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="TestOrg"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="TO"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value=""), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/static/icon.svg"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="TestOrg"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="TO"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/static/icon.svg"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)
@@ -593,11 +593,11 @@ class TestManifest:
         assert "icons" in data
 
     def test_manifest_svg_icon(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="Org"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="O"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value="logo.svg"), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/logo.svg"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="Org"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="O"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value="logo.svg"), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/logo.svg"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)
@@ -606,11 +606,11 @@ class TestManifest:
         assert icon["sizes"] == "any"
 
     def test_manifest_png_icon(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="Org"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="O"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value="logo.png"), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/logo.png"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="Org"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="O"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value="logo.png"), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/logo.png"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)
@@ -618,11 +618,11 @@ class TestManifest:
         assert icon["type"] == "image/png"
 
     def test_manifest_jpeg_icon(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="Org"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="O"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value="logo.jpg"), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/logo.jpg"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="Org"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="O"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value="logo.jpg"), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/logo.jpg"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)
@@ -630,11 +630,11 @@ class TestManifest:
         assert icon["type"] == "image/jpeg"
 
     def test_manifest_unknown_extension_defaults_svg(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="Org"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="O"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value="logo.webp"), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/logo.webp"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="Org"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="O"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value="logo.webp"), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/logo.webp"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)
@@ -643,31 +643,31 @@ class TestManifest:
 
     def test_manifest_short_name_from_org_name_truncated(self, client, app):
         """If short_name is empty, truncates org name to 15 chars."""
-        with patch("app.services.app_settings_service.get_organization_name", return_value="A Very Long Organization Name"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value=""), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value=""), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/icon.svg"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="A Very Long Organization Name"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value=""), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/icon.svg"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)
         assert len(data["short_name"]) <= 15
 
     def test_manifest_content_type(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="Org"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="O"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value=""), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/icon.svg"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="Org"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="O"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/icon.svg"):
             resp = client.get("/manifest.webmanifest")
         assert "manifest" in resp.content_type or "json" in resp.content_type
 
     def test_manifest_jpeg_extension(self, client, app):
-        with patch("app.services.app_settings_service.get_organization_name", return_value="Org"), \
-             patch("app.services.app_settings_service.get_organization_short_name", return_value="O"), \
-             patch("app.services.app_settings_service.get_organization_logo_path", return_value="logo.jpeg"), \
-             patch("app.services.app_settings_service.get_organization_favicon_path", return_value=""), \
-             patch("app.services.app_settings_service.organization_visual_asset_href", return_value="/logo.jpeg"):
+        with patch("app.services.platform.app_settings_service.get_organization_name", return_value="Org"), \
+             patch("app.services.platform.app_settings_service.get_organization_short_name", return_value="O"), \
+             patch("app.services.platform.app_settings_service.get_organization_logo_path", return_value="logo.jpeg"), \
+             patch("app.services.platform.app_settings_service.get_organization_favicon_path", return_value=""), \
+             patch("app.services.platform.app_settings_service.organization_visual_asset_href", return_value="/logo.jpeg"):
             resp = client.get("/manifest.webmanifest")
         assert resp.status_code == 200
         data = json.loads(resp.data)

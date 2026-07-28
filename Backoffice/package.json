@@ -5,7 +5,7 @@
   "scripts": {
     "build:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --minify -c ./assets/tailwind.config.js",
     "watch:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch -c ./assets/tailwind.config.js",
-    "vendor:tinymce": "node ./scripts/vendor-tinymce.cjs",
+    "vendor:tinymce": "node ./scripts/assets/vendor-tinymce.cjs",
     "test:js": "vitest run",
     "test:js:watch": "vitest",
     "test:js:coverage": "vitest run --coverage"

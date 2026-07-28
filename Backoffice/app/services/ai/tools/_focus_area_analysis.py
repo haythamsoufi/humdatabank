@@ -461,7 +461,7 @@ def compile_area_regexes(
     Returns:
         (compiled_area_regexes, compiled_strict_area_regexes)
     """
-    from app.services.ifrc_terminology_service import get_focus_area_aliases
+    from app.services.translation.terminology_service import get_focus_area_aliases
 
     for k in area_keys:
         try:
@@ -566,7 +566,7 @@ def match_focus_areas(
     from sqlalchemy import or_, func
     from app.models.embeddings import AIDocumentChunk
     from app.extensions import db
-    from app.services.ifrc_terminology_service import get_focus_area_semantic_doc_hits
+    from app.services.translation.terminology_service import get_focus_area_semantic_doc_hits
     from flask import current_app
 
     import time as _time

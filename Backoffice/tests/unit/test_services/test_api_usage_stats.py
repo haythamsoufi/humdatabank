@@ -6,7 +6,7 @@ import pytest
 
 from app.models.api_key_management import APIKey
 from app.models.api_usage import APIUsage
-from app.services.api_usage_stats import (
+from app.services.platform.api_usage_stats import (
     bulk_endpoint_usage_stats,
     chart_stats_for_period,
     endpoint_path_prefix,

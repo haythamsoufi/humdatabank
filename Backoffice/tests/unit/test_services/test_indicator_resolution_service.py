@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from app.services.indicator_resolution_service import (
+from app.services.indicators.resolution_service import (
     IndicatorResolutionService,
     _text_for_indicator,
     get_indicator_candidates,
@@ -98,7 +98,7 @@ class TestIndicatorResolutionServiceInit:
         with app.app_context():
             svc = IndicatorResolutionService()
             with patch(
-                "app.services.indicator_resolution_service.AIEmbeddingService"
+                "app.services.indicators.resolution_service.AIEmbeddingService"
             ) as MockEmb:
                 MockEmb.return_value = MagicMock()
                 es = svc.embedding_service
@@ -108,7 +108,7 @@ class TestIndicatorResolutionServiceInit:
         with app.app_context():
             svc = IndicatorResolutionService()
             with patch(
-                "app.services.indicator_resolution_service.AIEmbeddingService"
+                "app.services.indicators.resolution_service.AIEmbeddingService"
             ) as MockEmb:
                 MockEmb.return_value = MagicMock()
                 es1 = svc.embedding_service
@@ -169,7 +169,7 @@ class TestSearchSimilar:
             mock_ind = MagicMock()
             mock_ind.archived = False
 
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.query.return_value.join.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
                     (mock_ind, 0.9)
                 ]
@@ -181,7 +181,7 @@ class TestSearchSimilar:
         with app.app_context():
             svc = IndicatorResolutionService()
 
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.query.side_effect = Exception("vector error")
                 mock_db.session.rollback = MagicMock()
                 result = svc._search_similar([0.1, 0.2])
@@ -191,7 +191,7 @@ class TestSearchSimilar:
         with app.app_context():
             svc = IndicatorResolutionService()
 
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.query.side_effect = Exception("vector error")
                 mock_db.session.rollback = MagicMock(side_effect=Exception("rollback fail"))
                 result = svc._search_similar([0.1, 0.2])
@@ -201,7 +201,7 @@ class TestSearchSimilar:
         with app.app_context():
             svc = IndicatorResolutionService()
 
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 query_chain = MagicMock()
                 mock_db.session.query.return_value = query_chain
                 query_chain.join.return_value = query_chain
@@ -359,7 +359,7 @@ class TestSyncAll:
     def test_no_indicators_returns_zero(self, app):
         with app.app_context():
             svc = IndicatorResolutionService()
-            with patch("app.services.indicator_resolution_service.IndicatorBank") as MockIB:
+            with patch("app.services.indicators.resolution_service.IndicatorBank") as MockIB:
                 MockIB.query.filter.return_value.order_by.return_value.all.return_value = []
                 count, cost = svc.sync_all()
                 assert count == 0
@@ -381,7 +381,7 @@ class TestSyncAll:
             ind.unit = None
             ind.monitoring_questions_list = []
 
-            with patch("app.services.indicator_resolution_service.IndicatorBank") as MockIB:
+            with patch("app.services.indicators.resolution_service.IndicatorBank") as MockIB:
                 MockIB.query.filter.return_value.order_by.return_value.all.return_value = [ind]
                 with pytest.raises(EmbeddingError):
                     svc.sync_all()
@@ -401,9 +401,9 @@ class TestSyncAll:
             ind.unit = None
             ind.monitoring_questions_list = []
 
-            with patch("app.services.indicator_resolution_service.IndicatorBank") as MockIB, \
-                 patch("app.services.indicator_resolution_service.IndicatorBankEmbedding") as MockEmb, \
-                 patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.IndicatorBank") as MockIB, \
+                 patch("app.services.indicators.resolution_service.IndicatorBankEmbedding") as MockEmb, \
+                 patch("app.services.indicators.resolution_service.db") as mock_db:
 
                 MockIB.query.filter.return_value.order_by.return_value.all.return_value = [ind]
                 MockEmb.return_value = MagicMock()
@@ -431,8 +431,8 @@ class TestSyncAll:
 
             existing_emb = MagicMock()
 
-            with patch("app.services.indicator_resolution_service.IndicatorBank") as MockIB, \
-                 patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.IndicatorBank") as MockIB, \
+                 patch("app.services.indicators.resolution_service.db") as mock_db:
 
                 MockIB.query.filter.return_value.order_by.return_value.all.return_value = [ind]
                 mock_db.session.query.return_value.filter_by.return_value.first.return_value = existing_emb
@@ -457,8 +457,8 @@ class TestSyncAll:
             ind.unit = None
             ind.monitoring_questions_list = []
 
-            with patch("app.services.indicator_resolution_service.IndicatorBank") as MockIB, \
-                 patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.IndicatorBank") as MockIB, \
+                 patch("app.services.indicators.resolution_service.db") as mock_db:
 
                 MockIB.query.filter.return_value.order_by.return_value.all.return_value = [ind]
                 mock_db.session.query.return_value.filter_by.return_value.first.return_value = None
@@ -477,21 +477,21 @@ class TestHasEmbeddings:
     def test_returns_true_when_embedding_exists(self, app):
         with app.app_context():
             svc = IndicatorResolutionService()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.query.return_value.limit.return_value.first.return_value = MagicMock()
                 assert svc.has_embeddings() is True
 
     def test_returns_false_when_no_embeddings(self, app):
         with app.app_context():
             svc = IndicatorResolutionService()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.query.return_value.limit.return_value.first.return_value = None
                 assert svc.has_embeddings() is False
 
     def test_exception_returns_false(self, app):
         with app.app_context():
             svc = IndicatorResolutionService()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.query.side_effect = Exception("db error")
                 assert svc.has_embeddings() is False
 
@@ -503,14 +503,14 @@ class TestGetIndicatorCandidates:
     def test_integer_id_direct_lookup(self, app):
         with app.app_context():
             ind = MagicMock()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.get.return_value = ind
                 result = get_indicator_candidates(5)
                 assert result == [(ind, 1.0)]
 
     def test_integer_id_not_found_returns_empty(self, app):
         with app.app_context():
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.get.return_value = None
                 result = get_indicator_candidates(999)
                 assert result == []
@@ -518,7 +518,7 @@ class TestGetIndicatorCandidates:
     def test_numeric_string_direct_lookup(self, app):
         with app.app_context():
             ind = MagicMock()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.get.return_value = ind
                 result = get_indicator_candidates("42")
                 assert result == [(ind, 1.0)]
@@ -538,7 +538,7 @@ class TestGetIndicatorCandidates:
         with app.app_context():
             with patch.dict(app.config, {"AI_INDICATOR_RESOLUTION_METHOD": "vector"}):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = False
@@ -551,7 +551,7 @@ class TestGetIndicatorCandidates:
             ind = MagicMock()
             with patch.dict(app.config, {"AI_INDICATOR_RESOLUTION_METHOD": "vector", "AI_INDICATOR_TOP_K": "5"}):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True
@@ -564,7 +564,7 @@ class TestGetIndicatorCandidates:
         with app.app_context():
             with patch.dict(app.config, {"AI_INDICATOR_RESOLUTION_METHOD": "vector"}):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True
@@ -580,7 +580,7 @@ class TestGetIndicatorCandidates:
                 "AI_INDICATOR_TOP_K": "3",
             }):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True
@@ -597,7 +597,7 @@ class TestResolveIndicatorIdentifier:
     def test_integer_direct_lookup(self, app):
         with app.app_context():
             ind = MagicMock()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.get.return_value = ind
                 result = resolve_indicator_identifier(5)
                 assert result is ind
@@ -605,7 +605,7 @@ class TestResolveIndicatorIdentifier:
     def test_numeric_string_direct_lookup(self, app):
         with app.app_context():
             ind = MagicMock()
-            with patch("app.services.indicator_resolution_service.db") as mock_db:
+            with patch("app.services.indicators.resolution_service.db") as mock_db:
                 mock_db.session.get.return_value = ind
                 result = resolve_indicator_identifier("10")
                 assert result is ind
@@ -620,7 +620,7 @@ class TestResolveIndicatorIdentifier:
         with app.app_context():
             with patch.dict(app.config, {"AI_INDICATOR_RESOLUTION_METHOD": "vector"}):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = False
@@ -632,7 +632,7 @@ class TestResolveIndicatorIdentifier:
         with app.app_context():
             with patch.dict(app.config, {"AI_INDICATOR_RESOLUTION_METHOD": "vector"}):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True
@@ -646,7 +646,7 @@ class TestResolveIndicatorIdentifier:
             ind = MagicMock()
             with patch.dict(app.config, {"AI_INDICATOR_RESOLUTION_METHOD": "vector"}):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True
@@ -664,7 +664,7 @@ class TestResolveIndicatorIdentifier:
                 "AI_INDICATOR_TOP_K": "5",
             }):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True
@@ -686,7 +686,7 @@ class TestResolveIndicatorIdentifier:
                 "AI_INDICATOR_LLM_DISAMBIGUATE": False,
             }):
                 with patch(
-                    "app.services.indicator_resolution_service.IndicatorResolutionService"
+                    "app.services.indicators.resolution_service.IndicatorResolutionService"
                 ) as MockSvc:
                     mock_svc = MagicMock()
                     mock_svc.has_embeddings.return_value = True

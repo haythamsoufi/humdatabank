@@ -33,14 +33,14 @@ from app.models.organization import (
     SecretariatClusterOffice,
 )
 from app.models.enums import EntityType
-from app.services.country_service import (
+from app.services.organization.country_service import (
     assign_country_fds_member_user,
     countries_with_fds_member_query,
     fds_member_user_display_name,
     parse_fds_member_user_id,
     resolve_fds_member_user_id_from_import,
 )
-from app.services.secretariat_regional_office_service import (
+from app.services.organization.secretariat_regional_office_service import (
     assign_country_secretariat_regional_office,
     ensure_secretariat_regional_offices,
 )
@@ -67,7 +67,7 @@ def enforce_organization_rbac():
     """
     try:
         # Avoid importing at module load if extensions aren't ready
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         from flask import request
     except Exception as e:
         import logging

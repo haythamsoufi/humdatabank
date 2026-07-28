@@ -9,12 +9,12 @@ from app.models import FormTemplate, Country
 from app.models.validation import ValidationQuestion
 from app.routes.admin import bp
 from app.routes.admin.shared import VALIDATION_QUESTIONS_PERMISSION, permission_required
-from app.services.validation_dashboard_service import (
+from app.services.validation.dashboard_service import (
     global_periods_for_template,
     list_countries_for_period,
     template_options,
 )
-from app.services.validation_questions_excel_service import (
+from app.services.validation.questions_excel_service import (
     apply_manual_question_update,
     build_import_template_workbook,
     export_filename,
@@ -24,8 +24,8 @@ from app.services.validation_questions_excel_service import (
     query_validation_questions,
     serialize_validation_question_grid_row,
 )
-from app.services.validation_question_follow_up import create_follow_up, parent_ids_with_open_follow_up
-from app.services.validation_question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
+from app.services.validation.question_follow_up import create_follow_up, parent_ids_with_open_follow_up
+from app.services.validation.question_lifecycle import clear_answer_received, clear_review_state, mark_answer_received
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe

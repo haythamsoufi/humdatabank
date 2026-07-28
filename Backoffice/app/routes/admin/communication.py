@@ -15,9 +15,9 @@ from app.utils.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
 from app.utils.request_validation import enforce_api_or_csrf_protection
 from app.services.notification.push import PushNotificationService
-from app.services.notification_service import NotificationService
+from app.services.notification.service import NotificationService
 from app.services.email.client import send_email as send_email_message
-from app.services.communication_center_service import (
+from app.services.communication.center_service import (
     build_communications_center_grid,
     ensure_notifications_for_linked_email_logs,
     get_orphan_email_delivery_logs_for_grid,
@@ -29,9 +29,9 @@ from app.services.email.delivery import (
     mark_email_sent,
     mark_email_failed,
 )
-from app.services.authorization_service import AuthorizationService
-from app.services.app_settings_service import get_email_template
-from app.services.campaign_email_templates_service import (
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.platform.app_settings_service import get_email_template
+from app.services.communication.campaign_email_templates_service import (
     CAMPAIGN_EMAIL_TEMPLATE_KEYS,
     get_all_campaign_email_templates,
     get_campaign_compose_templates,
@@ -233,8 +233,8 @@ def communication_registry():
 
     Mirrors the Activity endpoint catalog pattern (search + optional CSV export).
     """
-    from app.services.app_settings_service import get_notification_priority
-    from app.services.notification_service import NotificationService
+    from app.services.platform.app_settings_service import get_notification_priority
+    from app.services.notification.service import NotificationService
     from app.utils.notification_registry import build_registry_rows
 
     ttl_map = current_app.config.get("NOTIFICATION_TTL_DAYS", {}) or {}

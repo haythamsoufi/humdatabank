@@ -10,7 +10,7 @@ from app.models import User
 from app.utils.redirect_utils import get_current_relative_url
 from app.utils.api_responses import json_auth_required, json_error, json_forbidden
 from app.utils.request_utils import is_json_request
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 
 VALIDATION_DASHBOARD_PERMISSION = "admin.validation.dashboard"
 VALIDATION_QUESTIONS_PERMISSION = "admin.validation.questions"

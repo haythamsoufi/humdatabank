@@ -149,7 +149,7 @@ py -m pytest tests/integration/test_entry_form.py -v
 py -m pytest tests/integration/test_entry_form.py::TestEntryFormHelperFunctions -v
 
 # Run with coverage
-py -m pytest tests/integration/test_entry_form.py --cov=app.routes.forms --cov=app.services.form_data_service --cov=app.utils.form_processing -v
+py -m pytest tests/integration/test_entry_form.py --cov=app.routes.forms --cov=app.services.forms.data_service --cov=app.utils.form_processing -v
 ```
 
 ## Coverage Goals

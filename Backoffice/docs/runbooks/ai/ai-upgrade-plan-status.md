@@ -36,4 +36,4 @@ For configuration (providers, limits, telemetry), see [`../../setup/ai-configura
 - **tests/unit/test_utils/test_ai_pricing.py**: `get_chat_pricing`, `get_embedding_pricing`, `estimate_chat_cost`, config override.
 - **tests/unit/test_utils/test_ai_tracing.py**: `span()` no-op when disabled or no app context, `add_event()` no-op.
 - **tests/unit/test_services/test_ai_providers.py**: `LocalEmbeddingProvider` (generate, batch, empty text), `get_embedding_provider()` (local config, openai requires key).
-- **tests/unit/test_services/test_ai_services.py**: fixture updated to patch `app.services.ai_tools.registry.AIVectorStore` (implementation in package).
+- **tests/unit/test_services/test_ai_services.py**: fixture updated to patch `app.services.ai.tools.registry.AIVectorStore` (implementation in package).

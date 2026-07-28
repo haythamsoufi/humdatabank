@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from app.models.api_usage import APIUsage
-from app.services.api_usage_stats import (
+from app.services.platform.api_usage_stats import (
     _fill_daily_buckets,
     _fill_hourly_buckets,
     _fill_monthly_buckets,

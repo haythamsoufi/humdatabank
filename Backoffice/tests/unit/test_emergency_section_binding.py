@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.emergency_section_binding import _normalize_emops_config
+from app.services.forms.emergency_section_binding import _normalize_emops_config
 
 
 @pytest.mark.unit

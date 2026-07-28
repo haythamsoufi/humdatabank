@@ -16,7 +16,7 @@ register_validation_summary_routes(bp)
 def get_frontend_url_global():
     """Template global for getting frontend URL."""
     try:
-        from app.services.app_settings_service import get_frontend_url as _get_frontend_url
+        from app.services.platform.app_settings_service import get_frontend_url as _get_frontend_url
         url = _get_frontend_url()
         if url is None:
             return "#"
@@ -37,7 +37,7 @@ from .helpers import (  # noqa: E402, F401
     process_numeric_value,
 )
 
-from app.services.form_processing_service import slugify_age_group  # noqa: E402, F401
+from app.services.forms.processing_service import slugify_age_group  # noqa: E402, F401
 from app.utils.route_helpers import get_unified_form_url, get_unified_form_item_id  # noqa: E402, F401
 
 # Register routes from submodules

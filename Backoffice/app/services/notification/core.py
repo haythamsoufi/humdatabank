@@ -26,7 +26,7 @@ import hashlib
 from typing import Optional, Dict, Any, Tuple, List, Union
 from urllib.parse import urlparse
 
-from app.services.app_settings_service import audience_bucket_enabled
+from app.services.platform.app_settings_service import audience_bucket_enabled
 from app.services.notification.audience import (
     collect_entity_admin_audience_recipient_ids,
     get_assignment_editor_submitter_user_ids_for_entity,
@@ -899,7 +899,7 @@ def create_notification(
     """
     try:
         # Resolve priority from settings (Admin > Notifications tab); if not set, default to normal
-        from app.services.app_settings_service import get_notification_priority
+        from app.services.platform.app_settings_service import get_notification_priority
         priority = get_notification_priority(notification_type, default='normal')
 
         # Validate that translation keys are provided (required)
@@ -1891,7 +1891,7 @@ def log_entity_activity(
         user_id (int): User ID (defaults to current user)
     """
     try:
-        from app.services.entity_service import EntityService
+        from app.services.organization.entity_service import EntityService
 
         if not user_id and current_user.is_authenticated:
             user_id = current_user.id
@@ -2451,7 +2451,7 @@ def notify_assignment_created(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -2561,7 +2561,7 @@ def notify_assignment_submitted(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -2627,7 +2627,7 @@ def notify_assignment_submitted(assignment_entity_status):
     )
 
     # Get entity name for the notification message
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True)
     if not entity_name or entity_name.startswith('Unknown'):
         # Fallback to entity type if name not found
@@ -2883,7 +2883,7 @@ def notify_assignment_approved(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -2934,7 +2934,7 @@ def notify_assignment_reopened(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -3022,7 +3022,7 @@ def notify_self_report_created(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.entity_service import EntityService
+    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data

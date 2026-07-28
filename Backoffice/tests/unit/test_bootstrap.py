@@ -117,11 +117,11 @@ class TestLoadDynamicSettings:
             'sex_categories': ['male'],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS',
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS',
                    {'countries', 'ns_structure', 'secretariat'}), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_authsvc:
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_authsvc:
             mock_authsvc.rbac_enabled.return_value = False
             with app.app_context():
                 app.config['TESTING'] = False
@@ -136,7 +136,7 @@ class TestLoadDynamicSettings:
 
         config_class = self._mock_config_class()
 
-        with patch('app.services.app_settings_service.read_settings',
+        with patch('app.services.platform.app_settings_service.read_settings',
                    side_effect=Exception("DB down")):
             with app.app_context():
                 load_dynamic_settings(app, config_class, 0.0)
@@ -157,10 +157,10 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth:
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth:
             mock_auth.rbac_enabled.return_value = False
             with app.app_context():
                 load_dynamic_settings(app, config_class, 0.0)
@@ -180,10 +180,10 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth:
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth:
             mock_auth.rbac_enabled.return_value = False
             with app.app_context():
                 load_dynamic_settings(app, config_class, 0.0)
@@ -203,10 +203,10 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth:
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth:
             mock_auth.rbac_enabled.return_value = False
             with app.app_context():
                 load_dynamic_settings(app, config_class, 0.0)
@@ -226,10 +226,10 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth:
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', {'countries'}), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth:
             mock_auth.rbac_enabled.return_value = False
             with app.app_context():
                 load_dynamic_settings(app, config_class, 0.0)
@@ -251,11 +251,11 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS',
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS',
                    {'countries', 'ns_structure'}), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth:
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth:
             mock_auth.rbac_enabled.return_value = False
             with app.app_context():
                 load_dynamic_settings(app, config_class, 0.0)
@@ -277,10 +277,10 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth:
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth:
             mock_auth.rbac_enabled.return_value = True
             mock_auth._permissions_seeded.return_value = False
             with patch.object(app.logger, 'warning') as mock_warn:
@@ -305,10 +305,10 @@ class TestLoadDynamicSettings:
             'sex_categories': [],
         }
 
-        with patch('app.services.app_settings_service.read_settings', return_value=all_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService',
+        with patch('app.services.platform.app_settings_service.read_settings', return_value=all_settings), \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService',
                    side_effect=Exception("import error")):
             with app.app_context():
                 # Should not raise
@@ -331,11 +331,11 @@ class TestLoadDynamicSettings:
                 'sex_categories': [],
             }
 
-        with patch('app.services.app_settings_service.read_settings',
+        with patch('app.services.platform.app_settings_service.read_settings',
                    side_effect=slow_read_settings), \
-             patch('app.services.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
-             patch('app.services.app_settings_service.apply_ai_settings_to_config'), \
-             patch('app.services.authorization_service.AuthorizationService') as mock_auth, \
+             patch('app.services.platform.app_settings_service.ALLOWED_ENTITY_TYPE_GROUPS', set()), \
+             patch('app.services.platform.app_settings_service.apply_ai_settings_to_config'), \
+             patch('app.services.organization.authorization_service.AuthorizationService') as mock_auth, \
              patch('app.bootstrap.time') as mock_time:
             mock_auth.rbac_enabled.return_value = False
             # Simulate slow load: first call for start, second for elapsed

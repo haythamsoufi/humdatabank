@@ -265,7 +265,7 @@ class TestResolveSecurityEvent:
             return event.id
 
     def test_resolve_event(self, logged_in_client, db_session, app):
-        with patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.log_admin_action"):
             event_id = self._create_security_event(app, db_session)
             resp = logged_in_client.post(
                 f"/admin/analytics/security-events/{event_id}/resolve",
@@ -282,7 +282,7 @@ class TestResolveSecurityEvent:
         _assert_status(resp, 404, 302)
 
     def test_resolve_event_no_notes(self, logged_in_client, db_session, app):
-        with patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.log_admin_action"):
             event_id = self._create_security_event(app, db_session)
             resp = logged_in_client.post(
                 f"/admin/analytics/security-events/{event_id}/resolve",
@@ -360,8 +360,8 @@ class TestChartUserActivity:
 
 class TestCleanupSessions:
     def test_cleanup(self, logged_in_client, db_session):
-        with patch("app.services.user_analytics_service.cleanup_inactive_sessions", return_value=5) as mock_cleanup, \
-             patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.cleanup_inactive_sessions", return_value=5) as mock_cleanup, \
+             patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/analytics/cleanup-sessions",
                 follow_redirects=False,
@@ -370,9 +370,9 @@ class TestCleanupSessions:
 
     def test_cleanup_error(self, logged_in_client, db_session):
         with patch(
-            "app.services.user_analytics_service.cleanup_inactive_sessions",
+            "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
             side_effect=Exception("cleanup error"),
-        ), patch("app.services.user_analytics_service.log_admin_action"):
+        ), patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/analytics/cleanup-sessions",
                 follow_redirects=False,
@@ -386,7 +386,7 @@ class TestCleanupSessions:
 
 class TestEndSession:
     def test_session_not_found(self, logged_in_client, db_session):
-        with patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/analytics/end-session/nonexistent-session-id",
                 follow_redirects=False,
@@ -403,7 +403,7 @@ class TestEndSession:
             )
             db_session.add(session_log)
             db_session.commit()
-        with patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/analytics/end-session/test-session-123",
                 follow_redirects=False,
@@ -421,9 +421,9 @@ class TestEndSession:
             )
             db_session.add(session_log)
             db_session.commit()
-        with patch("app.services.user_analytics_service.end_user_session"), \
-             patch("app.services.user_analytics_service.add_session_to_blacklist"), \
-             patch("app.services.user_analytics_service.log_admin_action"):
+        with patch("app.services.platform.user_analytics_service.end_user_session"), \
+             patch("app.services.platform.user_analytics_service.add_session_to_blacklist"), \
+             patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/analytics/end-session/test-active-session-456",
                 follow_redirects=False,
@@ -442,9 +442,9 @@ class TestEndSession:
             db_session.add(session_log)
             db_session.commit()
         with patch(
-            "app.services.user_analytics_service.end_user_session",
+            "app.services.platform.user_analytics_service.end_user_session",
             side_effect=Exception("test error"),
-        ), patch("app.services.user_analytics_service.log_admin_action"):
+        ), patch("app.services.platform.user_analytics_service.log_admin_action"):
             resp = logged_in_client.post(
                 "/admin/analytics/end-session/test-error-session-789",
                 follow_redirects=False,

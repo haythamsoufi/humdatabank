@@ -5,7 +5,7 @@ import re
 
 import migrate_template_js as mig
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 template = ROOT / "app/templates/admin/api_management.html"
 html = template.read_text(encoding="utf-8")
 

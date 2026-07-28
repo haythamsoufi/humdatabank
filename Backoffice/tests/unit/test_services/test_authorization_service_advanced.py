@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from app.models.enums import AssignmentEntityStatusValue
-from app.services.authorization_service import AuthorizationService, _rbac_cache_set
+from app.services.organization.authorization_service import AuthorizationService, _rbac_cache_set
 from tests.factories import (
     create_test_admin,
     create_test_assignment_entity_status,
@@ -358,8 +358,8 @@ class TestCanEditAssignment:
             aes.assigned_form.requires_delegation_review = True
             aes.status = AssignmentEntityStatusValue.sent_for_review.value
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=True):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=True):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_edit_assignment(aes, user)
         assert result is True
 
@@ -370,8 +370,8 @@ class TestCanEditAssignment:
             aes.assigned_form.requires_delegation_review = True
             aes.status = AssignmentEntityStatusValue.sent_for_review.value
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=False):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=False):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_edit_assignment(aes, user)
         assert result is False
 
@@ -414,8 +414,8 @@ class TestCanSubmitAssignment:
             aes.assigned_form.requires_delegation_review = True
             aes.status = AssignmentEntityStatusValue.sent_for_review.value
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=True):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=True):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_submit_assignment(aes, user)
         assert result is True
 
@@ -426,10 +426,10 @@ class TestCanSubmitAssignment:
             aes.assigned_form.requires_delegation_review = True
             aes.status = AssignmentEntityStatusValue.in_progress.value
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=False):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
-                    from app.services.assignment_workflow_service import delegation_review_source_statuses
-                    with patch("app.services.authorization_service.delegation_review_source_statuses", return_value=delegation_review_source_statuses()):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=False):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
+                    from app.services.assignments.workflow_service import delegation_review_source_statuses
+                    with patch("app.services.organization.authorization_service.delegation_review_source_statuses", return_value=delegation_review_source_statuses()):
                         result = AuthorizationService.can_submit_assignment(aes, user)
         assert result is False
 
@@ -468,8 +468,8 @@ class TestCanSendForReview:
             user, country, aes = create_focal_point_with_country(db_session)
             aes.assigned_form.requires_delegation_review = True
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=True):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=True):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_send_for_review(aes, user)
         assert result is False
 
@@ -479,8 +479,8 @@ class TestCanSendForReview:
             aes = create_test_assignment_entity_status(db_session, status="in_progress")
             aes.assigned_form.requires_delegation_review = True
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=False):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=False):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_send_for_review(aes, sm)
         assert result is True
 
@@ -491,8 +491,8 @@ class TestCanSendForReview:
             aes.assigned_form.requires_delegation_review = True
             aes.status = AssignmentEntityStatusValue.submitted.value
             db_session.commit()
-            with patch("app.services.authorization_service.is_delegation_user", return_value=False):
-                with patch("app.services.authorization_service.review_enabled", return_value=True):
+            with patch("app.services.organization.authorization_service.is_delegation_user", return_value=False):
+                with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
                     result = AuthorizationService.can_send_for_review(aes, user)
         assert result is False
 
@@ -538,7 +538,7 @@ class TestCanReturnForRevision:
             aes.status = AssignmentEntityStatusValue.sent_for_review.value
             aes.assigned_form.requires_delegation_review = False
             db_session.commit()
-            with patch("app.services.authorization_service.review_enabled", return_value=False):
+            with patch("app.services.organization.authorization_service.review_enabled", return_value=False):
                 result = AuthorizationService.can_return_for_revision(aes, user)
         assert result is False
 
@@ -548,8 +548,8 @@ class TestCanReturnForRevision:
             aes.status = AssignmentEntityStatusValue.sent_for_review.value
             aes.assigned_form.requires_delegation_review = True
             db_session.commit()
-            with patch("app.services.authorization_service.review_enabled", return_value=True):
-                with patch("app.services.authorization_service.is_delegation_user", return_value=False):
+            with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
+                with patch("app.services.organization.authorization_service.is_delegation_user", return_value=False):
                     result = AuthorizationService.can_return_for_revision(aes, user)
         assert result is False
 
@@ -560,8 +560,8 @@ class TestCanReturnForRevision:
             aes.status = AssignmentEntityStatusValue.sent_for_review.value
             aes.assigned_form.requires_delegation_review = True
             db_session.commit()
-            with patch("app.services.authorization_service.review_enabled", return_value=True):
-                with patch("app.services.authorization_service.is_delegation_user", return_value=True):
+            with patch("app.services.organization.authorization_service.review_enabled", return_value=True):
+                with patch("app.services.organization.authorization_service.is_delegation_user", return_value=True):
                     result = AuthorizationService.can_return_for_revision(aes, user)
         assert result is True
 

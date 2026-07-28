@@ -300,8 +300,8 @@ class TestIndicatorBankFormPopulateFrom:
             app.config['TRANSLATABLE_LANGUAGES'] = ['fr']
             form = _make_ib_form(app)
             mock_ib = self._make_mock_indicator_bank()
-            with patch('app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
-                 patch('app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
+            with patch('app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
+                 patch('app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
                 form.populate_from_indicator_bank(mock_ib)
             assert form.name.data == 'Test IB'
 
@@ -310,8 +310,8 @@ class TestIndicatorBankFormPopulateFrom:
             form = _make_ib_form(app)
             mock_ib = self._make_mock_indicator_bank()
             mock_ib.indicator_type_id = None
-            with patch('app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string', return_value=1) as mock_resolver, \
-                 patch('app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
+            with patch('app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string', return_value=1) as mock_resolver, \
+                 patch('app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
                 form.populate_from_indicator_bank(mock_ib)
                 mock_resolver.assert_called_once_with(mock_ib.type)
 
@@ -320,8 +320,8 @@ class TestIndicatorBankFormPopulateFrom:
             form = _make_ib_form(app)
             mock_ib = self._make_mock_indicator_bank()
             mock_ib.indicator_unit_id = None
-            with patch('app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
-                 patch('app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string', return_value=2) as mock_unit_resolver:
+            with patch('app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
+                 patch('app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string', return_value=2) as mock_unit_resolver:
                 form.populate_from_indicator_bank(mock_ib)
                 mock_unit_resolver.assert_called_once_with(mock_ib.unit)
 
@@ -331,8 +331,8 @@ class TestIndicatorBankFormPopulateFrom:
             mock_ib = self._make_mock_indicator_bank()
             mock_ib.name_translations = None
             mock_ib.aggregated_label_translations = 'invalid'
-            with patch('app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
-                 patch('app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
+            with patch('app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
+                 patch('app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
                 form.populate_from_indicator_bank(mock_ib)
             # Should not raise, just use empty dict fallback
 
@@ -342,8 +342,8 @@ class TestIndicatorBankFormPopulateFrom:
             mock_ib = self._make_mock_indicator_bank()
             mock_ib.sector = None
             mock_ib.sub_sector = None
-            with patch('app.services.indicator_measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
-                 patch('app.services.indicator_measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
+            with patch('app.services.indicators.measurement_sync.resolve_type_id_for_legacy_string', return_value=1), \
+                 patch('app.services.indicators.measurement_sync.resolve_unit_id_for_legacy_string', return_value=2):
                 form.populate_from_indicator_bank(mock_ib)
             # Should not set sector fields
 

@@ -85,7 +85,7 @@ class TestDeferredStartupCleanup:
 
         with patch("app.startup_tasks.db", mock_db):
             with patch(
-                "app.services.user_analytics_service.cleanup_inactive_sessions",
+                "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
                 return_value=5,
             ):
                 task()
@@ -111,7 +111,7 @@ class TestDeferredStartupCleanup:
 
         with patch("app.startup_tasks.db", mock_db):
             with patch(
-                "app.services.user_analytics_service.cleanup_inactive_sessions",
+                "app.services.platform.user_analytics_service.cleanup_inactive_sessions",
                 return_value=0,
             ):
                 task()
@@ -291,7 +291,7 @@ class TestDeferredRbacSeed:
 
         with patch("app.startup_tasks.db", mock_db):
             with patch(
-                "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+                "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
                 return_value=stats,
             ):
                 task()
@@ -317,7 +317,7 @@ class TestDeferredRbacSeed:
 
         with patch("app.startup_tasks.db", mock_db):
             with patch(
-                "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+                "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
                 return_value={"skipped_due_to_lock": True},
             ):
                 task()
@@ -353,7 +353,7 @@ class TestDeferredRbacSeed:
         with patch("app.startup_tasks.db", mock_db):
             with patch("app.startup_tasks._time.sleep"):
                 with patch(
-                    "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+                    "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
                     return_value={},
                 ):
                     task()

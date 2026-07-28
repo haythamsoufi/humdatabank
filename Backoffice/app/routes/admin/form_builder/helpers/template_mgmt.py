@@ -7,7 +7,7 @@ from app.models import (
     FormTemplate, FormPage, FormSection, FormItem, FormTemplateVersion, TemplateShare, User
 )
 from app.routes.admin.shared import check_template_access
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.datetime_helpers import utcnow
 from sqlalchemy import func
 from config.config import Config
@@ -122,7 +122,7 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
         db.session.flush()
 
         try:
-            from app.services.template_preparation_service import invalidate_sections_cache
+            from app.services.templates.preparation_service import invalidate_sections_cache
             invalidate_sections_cache(template.id)
         except Exception:
             pass

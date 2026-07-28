@@ -47,7 +47,7 @@ class TestClosedAssignmentAuthorization:
 
     def test_focal_point_cannot_edit_closed_assignment(self, app):
         from unittest.mock import MagicMock, patch
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         user = MagicMock()
         user.is_authenticated = True
@@ -64,7 +64,7 @@ class TestClosedAssignmentAuthorization:
 
     def test_assignment_admin_can_edit_closed_assignment(self, app):
         from unittest.mock import MagicMock, patch
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         user = MagicMock()
         user.is_authenticated = True
@@ -81,7 +81,7 @@ class TestClosedAssignmentAuthorization:
 
     def test_entity_reopen_allows_focal_point_edit_while_round_stays_closed(self, app):
         from unittest.mock import MagicMock, patch
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         user = MagicMock()
         user.is_authenticated = True
@@ -98,7 +98,7 @@ class TestClosedAssignmentAuthorization:
 
     def test_can_reopen_closed_round_for_entity_only(self, app):
         from unittest.mock import MagicMock, patch
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
 
         user = MagicMock()
         user.is_authenticated = True

@@ -40,7 +40,7 @@ from app.utils.ws_helpers import (
     log_ws,
     release_request_db_session,
 )
-from app.services.user_analytics_service import get_client_ip
+from app.services.platform.user_analytics_service import get_client_ip
 
 from app.routes.ai import (
     _build_access_context,
@@ -463,7 +463,7 @@ def register_ai_ws(app) -> None:
 
         identity = resolve_ai_identity()
         try:
-            from app.services.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
+            from app.services.platform.app_settings_service import is_ai_beta_restricted, user_has_ai_beta_access
 
             if is_ai_beta_restricted():
                 if not getattr(identity, "is_authenticated", False) or not getattr(identity, "user", None):
@@ -655,7 +655,7 @@ def register_ai_ws(app) -> None:
                 is_system_manager = False
                 try:
                     if identity.is_authenticated and identity.user:
-                        from app.services.authorization_service import AuthorizationService
+                        from app.services.organization.authorization_service import AuthorizationService
                         is_system_manager = bool(AuthorizationService.is_system_manager(identity.user))
                 except Exception as e:
                     logger.debug("is_system_manager check failed: %s", e)
@@ -1419,7 +1419,7 @@ def register_ai_ws(app) -> None:
 
         # Admin-only (matches where this UI is exposed)
         # RBAC-only: legacy `current_user.role` is not authoritative.
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if not getattr(current_user, "is_authenticated", False) or not AuthorizationService.has_rbac_permission(current_user, "admin.ai.manage"):
             try:
                 ws.send(json.dumps({"type": "error", "message": "Unauthorized"}))
@@ -1596,7 +1596,7 @@ def register_ai_ws(app) -> None:
                 if not filters:
                     filters = None
 
-                from app.services.authorization_service import AuthorizationService
+                from app.services.organization.authorization_service import AuthorizationService
                 user_role = (
                     "system_manager"
                     if AuthorizationService.is_system_manager(current_user)

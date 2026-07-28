@@ -15,8 +15,8 @@ from app.models import (
     FormData, FormItem, DynamicIndicatorData, FormSection,
     SubmittedDocument,
 )
-from app.services.assignment_completion_service import AssignmentCompletionService
-from app.services.form_processing_service import (
+from app.services.assignments.completion_service import AssignmentCompletionService
+from app.services.forms.processing_service import (
     get_form_items_for_section,
     _create_dynamic_indicator_object,
     slugify_age_group,

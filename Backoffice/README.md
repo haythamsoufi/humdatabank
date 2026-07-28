@@ -66,9 +66,9 @@ Backoffice/
 - See `docs/README.md` for the full documentation index
 
 ### Scripts
-- `scripts/` – Database migration and maintenance scripts
-  - `scripts/trigger_automated_trace_review.py` – export pending/in-review/completed trace review packets to terminal or JSONL for automated batch triage.
-  - `scripts/seed_low_quality_review.py` – seed deterministic low-quality traces into the review queue for test/repro workflows.
+- `scripts/` – maintenance, import pipelines, and CI guardrails — see [`scripts/README.md`](scripts/README.md)
+  - `scripts/ai/trigger_automated_trace_review.py` – export pending/in-review/completed trace review packets to terminal or JSONL for automated batch triage.
+  - `scripts/ai/seed_low_quality_review.py` – seed deterministic low-quality traces into the review queue for test/repro workflows.
 - `scripts/archive/` – completed one-offs and incident probes (reference only)
 - `scripts/codemods/` – template/JS bulk refactors (inline-JS extraction, button migrations, etc.)
 
@@ -123,16 +123,16 @@ For database migrations use Flask-Migrate (`python -m flask db upgrade`). Option
 
 ```bash
 # Export pending reviews as terminal packets
-python scripts/trigger_automated_trace_review.py --status pending --limit 5 --format text
+python scripts/ai/trigger_automated_trace_review.py --status pending --limit 5 --format text
 
 # Export as JSONL (for automation or batch processing)
-python scripts/trigger_automated_trace_review.py --status pending --limit 20 --format jsonl --output pending_reviews.jsonl
+python scripts/ai/trigger_automated_trace_review.py --status pending --limit 20 --format jsonl --output pending_reviews.jsonl
 
 # Seed a low-quality review item from latest trace
-python scripts/seed_low_quality_review.py
+python scripts/ai/seed_low_quality_review.py
 
 # Seed from specific trace; create synthetic trace if missing
-python scripts/seed_low_quality_review.py --trace-id 99999999 --create-trace-if-missing
+python scripts/ai/seed_low_quality_review.py --trace-id 99999999 --create-trace-if-missing
 ```
 
 ## 📊 Analytics and Indicators

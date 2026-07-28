@@ -1130,7 +1130,7 @@ class TestAssignmentStatusWorkflowSteps:
             mock_aes.status = MagicMock()
             mock_aes.status.value = "pending"
             with patch("app.routes.main.helpers.assignment_status_workflow_steps.__wrapped__", create=True), \
-                 patch("app.services.assignment_workflow_service.review_enabled", return_value=True):
+                 patch("app.services.assignments.workflow_service.review_enabled", return_value=True):
                 steps = assignment_status_workflow_steps(mock_aes)
             assert isinstance(steps, list)
 
@@ -1139,7 +1139,7 @@ class TestAssignmentStatusWorkflowSteps:
         with app.app_context():
             mock_aes = MagicMock()
             mock_aes.status = "pending"
-            with patch("app.services.assignment_workflow_service.review_enabled", return_value=False):
+            with patch("app.services.assignments.workflow_service.review_enabled", return_value=False):
                 steps = assignment_status_workflow_steps(mock_aes)
             # sent_for_review should not be in steps
             assert isinstance(steps, list)
@@ -1149,7 +1149,7 @@ class TestAssignmentStatusWorkflowSteps:
         with app.app_context():
             mock_aes = MagicMock()
             mock_aes.status = "requires_revision"
-            with patch("app.services.assignment_workflow_service.review_enabled", return_value=True):
+            with patch("app.services.assignments.workflow_service.review_enabled", return_value=True):
                 steps = assignment_status_workflow_steps(mock_aes)
             assert "in_progress" not in steps or "requires_revision" in steps
 

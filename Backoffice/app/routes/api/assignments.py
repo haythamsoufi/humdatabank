@@ -15,7 +15,7 @@ from app.utils.sql_utils import safe_ilike_pattern
 # Import models
 from app.models import AssignedForm, FormData, FormItem
 from app.models.assignments import AssignmentEntityStatus
-from app.services.authorization_service import AuthorizationService
+from app.services.organization.authorization_service import AuthorizationService
 from app.utils.auth import require_api_key
 from app.utils.rate_limiting import api_rate_limit
 

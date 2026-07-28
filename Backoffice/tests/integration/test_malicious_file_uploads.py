@@ -15,7 +15,7 @@ from unittest.mock import Mock
 from werkzeug.datastructures import FileStorage
 from flask_login import login_user
 
-from app.services.form_data_service import FormDataService
+from app.services.forms.data_service import FormDataService
 from app.models import (
     FormTemplate, FormSection, FormItem, AssignedForm,
     AssignmentEntityStatus, EntityType

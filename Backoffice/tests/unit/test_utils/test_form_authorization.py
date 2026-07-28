@@ -53,7 +53,7 @@ class TestFormAuthorizationWrappers:
         user.is_authenticated = True
         with app.app_context():
             with patch(
-                'app.services.authorization_service.AuthorizationService.can_edit_assignment',
+                'app.services.organization.authorization_service.AuthorizationService.can_edit_assignment',
                 return_value=True,
             ) as mock_fn:
                 assert can_edit_assignment(aes, user) is True
@@ -70,7 +70,7 @@ class TestFormAuthorizationWrappers:
         user = MagicMock()
         with app.app_context():
             with patch(
-                'app.services.authorization_service.AuthorizationService.check_self_report_access',
+                'app.services.organization.authorization_service.AuthorizationService.check_self_report_access',
                 return_value=False,
             ) as mock_fn:
                 assert check_self_report_access(aes, user) is False
@@ -88,7 +88,7 @@ class TestCheckAssignmentAccessDecorator:
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
             with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
-                 patch('app.services.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
                  patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
@@ -100,7 +100,7 @@ class TestCheckAssignmentAccessDecorator:
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
             with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
-                 patch('app.services.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
                  patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
@@ -124,8 +124,8 @@ class TestCheckAssignmentAccessDecorator:
         decorated = check_assignment_access(self._view)
         with app.test_request_context():
             with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
-                 patch('app.services.authorization_service.AuthorizationService.can_access_assignment', return_value=False), \
-                 patch('app.services.entity_service.EntityService.get_entity_display_name', return_value='Testland'), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=False), \
+                 patch('app.services.organization.entity_service.EntityService.get_entity_display_name', return_value='Testland'), \
                  patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(42)
@@ -156,7 +156,7 @@ class TestCheckAssignmentEditAccessDecorator:
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
             with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
-                 patch('app.services.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
                  patch('app.utils.form_authorization.can_edit_assignment', return_value=True), \
                  patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
@@ -172,7 +172,7 @@ class TestCheckAssignmentEditAccessDecorator:
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
             with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
-                 patch('app.services.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=True), \
                  patch('app.utils.form_authorization.can_edit_assignment', return_value=False), \
                  patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
@@ -197,8 +197,8 @@ class TestCheckAssignmentEditAccessDecorator:
         decorated = check_assignment_edit_access(self._view)
         with app.test_request_context():
             with patch('app.utils.form_authorization.AssignmentEntityStatus.query') as mock_q, \
-                 patch('app.services.authorization_service.AuthorizationService.can_access_assignment', return_value=False), \
-                 patch('app.services.entity_service.EntityService.get_entity_display_name', return_value='Testland'), \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment', return_value=False), \
+                 patch('app.services.organization.entity_service.EntityService.get_entity_display_name', return_value='Testland'), \
                  patch('app.utils.form_authorization.current_user', MagicMock(email='u@test.com')):
                 mock_q.get_or_404.return_value = aes
                 result = decorated(7)

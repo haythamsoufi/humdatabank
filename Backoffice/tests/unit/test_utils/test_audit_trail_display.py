@@ -1,6 +1,6 @@
 """Unit tests for audit trail display helpers (no DB)."""
 
-from app.services.audit_trail_display_service import (
+from app.services.audit.trail_display_service import (
     consolidate_activity_type,
     create_consistent_description,
     refine_activity_row_consolidated_type,
@@ -52,7 +52,7 @@ def test_create_consistent_description_page_view_strip_prefix():
 
 
 def test_create_consistent_description_form_saved_uses_lookups():
-    from app.services.audit_trail_display_service import FormContextLookups
+    from app.services.audit.trail_display_service import FormContextLookups
 
     lookups = FormContextLookups(
         aes_by_id={

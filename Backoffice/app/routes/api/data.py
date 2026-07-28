@@ -65,7 +65,11 @@ from app.utils.api_pagination import (
 from app.utils.api_formatting import format_answer_value, format_form_data_response, serialize_form_data_item
 from app.utils.api_serialization import _wrap_disagg_dict as _normalize_disagg_payload_util
 from app.utils.sql_utils import safe_ilike_pattern
-from app.services import query_form_data, get_form_data_queries, TemplateService, query_dynamic_indicator_data, query_repeat_group_data
+from app.services import query_form_data
+from app.services import get_form_data_queries
+from app.services import TemplateService
+from app.services import query_dynamic_indicator_data
+from app.services import query_repeat_group_data
 from app.utils.api_data_filters import (
     VERSION_SCOPE_PUBLISHED,
     apply_form_data_version_scoping,
@@ -73,7 +77,7 @@ from app.utils.api_data_filters import (
     parse_data_item_filters,
     resolve_template_published_version_id,
 )
-from app.services.data_retrieval_shared import (
+from app.services.data_retrieval.shared import (
     get_effective_request_user,
     can_view_non_public_form_items,
     form_item_privacy_is_public_expr,
@@ -469,7 +473,7 @@ _indicator_bank_table_cache: TTLCache = TTLCache(ttl_seconds=_REFERENCE_TABLE_CA
 
 def _load_full_indicator_bank_table_uncached():
     """Return the full indicator bank dimension (~466 rows, stable size)."""
-    from app.services.indicator_bank_service import IndicatorBankFilters, get_indicator_list
+    from app.services.indicators.bank_service import IndicatorBankFilters, get_indicator_list
     indicators, _total, _page, _per_page = get_indicator_list(IndicatorBankFilters())
     return indicators
 
@@ -595,7 +599,7 @@ def _fetch_extended_data(
         get_user_allowed_template_ids,
         _get_user_allowed_country_ids,
     )
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     from app.models import AssignedForm, PublicSubmission
     from app.models.assignments import AssignmentEntityStatus
     from sqlalchemy import literal
@@ -1049,7 +1053,7 @@ def get_all_data():
 
         analysis_requested = str(request.args.get('analysis', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
         if analysis_requested and not elevated_access and auth_user is not None:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if not (
                 AuthorizationService.is_system_manager(auth_user)
                 or AuthorizationService.has_rbac_permission(auth_user, 'admin.data_explore.analysis')
@@ -1295,7 +1299,7 @@ def get_all_data():
         # ---------- RBAC: if user-authenticated, restrict to templates the user owns or that are shared with them ----------
         if not elevated_access and auth_user is not None:
             # System managers have access to all templates
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             is_system_mgr = AuthorizationService.is_system_manager(auth_user)
 
             if not is_system_mgr:

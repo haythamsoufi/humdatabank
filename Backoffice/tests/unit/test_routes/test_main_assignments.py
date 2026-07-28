@@ -25,10 +25,10 @@ from tests.helpers import login_session, assert_redirect
 pytestmark = [pytest.mark.unit]
 
 # AuthorizationService is imported lazily inside each route function; patch at source.
-_AUTH_SVC = "app.services.authorization_service.AuthorizationService"
+_AUTH_SVC = "app.services.organization.authorization_service.AuthorizationService"
 # Notification functions are also imported lazily inside each route function.
 _NOTIF_CORE = "app.services.notification.core"
-_APP_SETTINGS = "app.services.app_settings_service"
+_APP_SETTINGS = "app.services.platform.app_settings_service"
 _NOTIF_AUDIENCE = "app.services.notification.audience"
 
 

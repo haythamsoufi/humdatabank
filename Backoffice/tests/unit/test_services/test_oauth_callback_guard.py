@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.models import UserSessionLog
-from app.services.oauth_callback_guard import resolve_azure_b2c_login_session
+from app.services.platform.oauth_callback_guard import resolve_azure_b2c_login_session
 from app.utils.datetime_helpers import utcnow
 from tests.factories import create_test_user
 

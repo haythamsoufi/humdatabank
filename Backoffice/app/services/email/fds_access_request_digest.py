@@ -11,18 +11,18 @@ from markupsafe import escape
 
 from app.extensions import db
 from app.models import EmailDeliveryLog, User
-from app.services.app_settings_service import (
+from app.services.platform.app_settings_service import (
     get_auto_approve_access_requests,
     get_email_template,
     get_fds_access_request_digest_enabled,
     get_fds_access_request_digest_local_hour,
 )
-from app.services.country_access_request_service import (
+from app.services.organization.country_access_request_service import (
     FDS_ACCESS_REQUEST_DIGEST_SUBJECT_PREFIX,
     pending_country_access_requests_by_fds_member,
     pending_country_access_requests_query,
 )
-from app.services.country_service import fds_member_user_display_name
+from app.services.organization.country_service import fds_member_user_display_name
 from app.services.email.client import send_email
 from app.services.email.delivery import (
     log_email_attempt,

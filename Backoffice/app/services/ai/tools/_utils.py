@@ -225,7 +225,7 @@ def resolve_ai_user_context():
     if getattr(_cu, "is_authenticated", False):
         user_id = getattr(_cu, "id", None)
         try:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             user_role = AuthorizationService.access_level(_cu)
             is_admin = bool(
                 AuthorizationService.is_admin(_cu)
@@ -370,7 +370,7 @@ def resolve_form_builder_user():
 
 def resolve_form_template_permissions() -> Dict[str, bool]:
     """Resolve form template RBAC permissions for the current AI request user."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     user = resolve_form_builder_user()
     if not user:
@@ -397,7 +397,7 @@ def resolve_indicator_bank_permissions() -> Dict[str, bool]:
     Uses Flask-Login ``current_user`` (including Bearer-authenticated chat sessions).
     """
     from flask_login import current_user as _cu
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     if not getattr(_cu, "is_authenticated", False):
         return {"view": False, "create": False, "edit": False, "archive": False, "suggest": False}
@@ -421,7 +421,7 @@ def resolve_indicator_bank_permissions() -> Dict[str, bool]:
 def require_indicator_bank_permission(permission_code: str) -> None:
     """Raise ToolExecutionError when the current user lacks an Indicator Bank permission."""
     from flask_login import current_user as _cu
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     if not getattr(_cu, "is_authenticated", False):
         raise ToolExecutionError("Authentication required for Indicator Bank management tools.")

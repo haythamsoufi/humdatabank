@@ -8,7 +8,7 @@ import logging
 from datetime import date
 from typing import Any, Optional
 
-from app.services.reporting_period_service import period_chronology_sort_key
+from app.services.forms.reporting_period_service import period_chronology_sort_key
 
 from app.utils.form_localization import get_localized_indicator_name
 from app.utils.api_formatting import format_answer_value

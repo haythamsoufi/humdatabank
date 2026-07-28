@@ -44,7 +44,7 @@ def resolve_ai_identity() -> AIRequestIdentity:
     # 1) Cookie session (Backoffice)
     try:
         if getattr(current_user, "is_authenticated", False):
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             if AuthorizationService.is_system_manager(current_user):
                 level = "system_manager"
             elif AuthorizationService.is_admin(current_user):
@@ -67,7 +67,7 @@ def resolve_ai_identity() -> AIRequestIdentity:
             claims = decode_ai_token(token)
             user = User.query.get(claims.user_id)
             if user and getattr(user, "active", True):
-                from app.services.authorization_service import AuthorizationService
+                from app.services.organization.authorization_service import AuthorizationService
                 if AuthorizationService.is_system_manager(user):
                     level = "system_manager"
                 elif AuthorizationService.is_admin(user):

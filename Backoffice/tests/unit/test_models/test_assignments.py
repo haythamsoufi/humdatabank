@@ -362,7 +362,7 @@ class TestAssignmentEntityStatus:
             aes.entity_id = 999
             db_session.commit()
             # Patch EntityService to avoid real DB calls
-            with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=None):
+            with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=None):
                 result = aes.country_id
                 assert result is None
 
@@ -376,7 +376,7 @@ class TestAssignmentEntityStatus:
             db_session.commit()
             mock_country = MagicMock()
             mock_country.id = country.id
-            with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=mock_country):
+            with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=mock_country):
                 result = aes.country_id
                 assert result == country.id
 
@@ -388,7 +388,7 @@ class TestAssignmentEntityStatus:
             aes.entity_type = 'ns_branch'
             aes.entity_id = 999
             db_session.commit()
-            with patch('app.services.entity_service.EntityService.get_country_for_entity', side_effect=Exception('db error')):
+            with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', side_effect=Exception('db error')):
                 result = aes.country_id
                 assert result is None
 
@@ -422,7 +422,7 @@ class TestAssignmentEntityStatus:
         with app.app_context():
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
-            with patch('app.services.entity_service.EntityService.get_entity', return_value=country) as mock_get:
+            with patch('app.services.organization.entity_service.EntityService.get_entity', return_value=country) as mock_get:
                 entity = aes.entity
                 mock_get.assert_called_once_with('country', country.id)
 
@@ -431,7 +431,7 @@ class TestAssignmentEntityStatus:
         with app.app_context():
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
-            with patch('app.services.entity_service.EntityService.get_country_for_entity', return_value=country):
+            with patch('app.services.organization.entity_service.EntityService.get_country_for_entity', return_value=country):
                 c = aes.country
                 assert c is not None
 

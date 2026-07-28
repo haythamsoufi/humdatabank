@@ -8,7 +8,7 @@ from sqlalchemy import literal
 
 from app import db
 from app.models import FormTemplate, FormTemplateVersion
-from app.services.template_service import TemplateService
+from app.services.templates.service import TemplateService
 from tests.factories import create_test_template
 
 

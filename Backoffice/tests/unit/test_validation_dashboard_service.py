@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
-from app.services.validation_dashboard_service import (
+from app.services.validation.dashboard_service import (
     HISTORY_YEARS_LOOKBACK,
     _history_year_columns,
     _question_row_fields,
@@ -61,7 +61,7 @@ def test_historical_values_limited_to_last_three_years():
 
 
 def test_format_display_number_uses_thousands_separator():
-    from app.services.validation_dashboard_service import _format_display_number
+    from app.services.validation.dashboard_service import _format_display_number
 
     assert _format_display_number(1234567) == "1,234,567"
     assert _format_display_number(1234.5) == "1,234.5"

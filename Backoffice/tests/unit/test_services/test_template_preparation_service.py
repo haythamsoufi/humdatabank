@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock, PropertyMock
 from app import db
 from app.models import FormSection, FormPage
 from app.models.indicator_bank import IndicatorBank, IndicatorBankType, IndicatorBankUnit
-from app.services.template_preparation_service import TemplatePreparationService
+from app.services.templates.preparation_service import TemplatePreparationService
 from tests.factories import (
     create_test_template,
     create_test_section,
@@ -308,7 +308,7 @@ class TestGetIndicatorSectorName:
         with app.app_context():
             indicator = MagicMock()
             indicator.sector = {"primary": 999999}
-            with patch("app.services.template_preparation_service.Sector") as MockSector:
+            with patch("app.services.templates.preparation_service.Sector") as MockSector:
                 MockSector.query.get.return_value = None
                 result = TemplatePreparationService._get_indicator_sector_name(indicator)
                 assert result is None
@@ -318,10 +318,10 @@ class TestGetIndicatorSectorName:
             indicator = MagicMock()
             indicator.sector = {"primary": 1}
             mock_sector = MagicMock()
-            with patch("app.services.template_preparation_service.Sector") as MockSector:
+            with patch("app.services.templates.preparation_service.Sector") as MockSector:
                 MockSector.query.get.return_value = mock_sector
                 with patch(
-                    "app.services.template_preparation_service.get_localized_sector_name",
+                    "app.services.templates.preparation_service.get_localized_sector_name",
                     return_value="Health Sector"
                 ):
                     result = TemplatePreparationService._get_indicator_sector_name(indicator)
@@ -350,7 +350,7 @@ class TestGetIndicatorSubsectorName:
         with app.app_context():
             indicator = MagicMock()
             indicator.sub_sector = {"primary": 999999}
-            with patch("app.services.template_preparation_service.SubSector") as MockSS:
+            with patch("app.services.templates.preparation_service.SubSector") as MockSS:
                 MockSS.query.get.return_value = None
                 result = TemplatePreparationService._get_indicator_subsector_name(indicator)
                 assert result is None
@@ -360,10 +360,10 @@ class TestGetIndicatorSubsectorName:
             indicator = MagicMock()
             indicator.sub_sector = {"primary": 5}
             mock_ss = MagicMock()
-            with patch("app.services.template_preparation_service.SubSector") as MockSS:
+            with patch("app.services.templates.preparation_service.SubSector") as MockSS:
                 MockSS.query.get.return_value = mock_ss
                 with patch(
-                    "app.services.template_preparation_service.get_localized_subsector_name",
+                    "app.services.templates.preparation_service.get_localized_subsector_name",
                     return_value="Prevention"
                 ):
                     result = TemplatePreparationService._get_indicator_subsector_name(indicator)
@@ -386,14 +386,14 @@ class TestApplyTemplateTranslations:
             section_mock.page = page_mock
             section_mock.page.id = 1
 
-            with patch("app.services.template_preparation_service.FormPage") as MockFP:
+            with patch("app.services.templates.preparation_service.FormPage") as MockFP:
                 MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 with patch(
-                    "app.services.template_preparation_service.get_localized_page_name",
+                    "app.services.templates.preparation_service.get_localized_page_name",
                     return_value="Page EN"
                 ) as mock_page_name:
                     with patch(
-                        "app.services.template_preparation_service.get_localized_section_name",
+                        "app.services.templates.preparation_service.get_localized_section_name",
                         return_value="Section EN"
                     ):
                         TemplatePreparationService._apply_template_translations(
@@ -407,10 +407,10 @@ class TestApplyTemplateTranslations:
             section = _make_mock_section()
             section.page = None
 
-            with patch("app.services.template_preparation_service.FormPage") as MockFP:
+            with patch("app.services.templates.preparation_service.FormPage") as MockFP:
                 MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 with patch(
-                    "app.services.template_preparation_service.get_localized_section_name",
+                    "app.services.templates.preparation_service.get_localized_section_name",
                     return_value="My Section"
                 ):
                     TemplatePreparationService._apply_template_translations(
@@ -430,7 +430,7 @@ class TestApplyTemplateTranslations:
             s2 = _make_mock_section(id=2)
             s2.page = shared_page
 
-            with patch("app.services.template_preparation_service.FormPage") as MockFP:
+            with patch("app.services.templates.preparation_service.FormPage") as MockFP:
                 MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 call_count = {"n": 0}
 
@@ -439,11 +439,11 @@ class TestApplyTemplateTranslations:
                     return "Shared Page"
 
                 with patch(
-                    "app.services.template_preparation_service.get_localized_page_name",
+                    "app.services.templates.preparation_service.get_localized_page_name",
                     side_effect=mock_page_name
                 ):
                     with patch(
-                        "app.services.template_preparation_service.get_localized_section_name",
+                        "app.services.templates.preparation_service.get_localized_section_name",
                         return_value="Sec"
                     ):
                         TemplatePreparationService._apply_template_translations(
@@ -502,11 +502,11 @@ class TestPrepareAvailableIndicators:
 
             with _patch_indicator_bank_query([mock_indicator]):
                 with patch(
-                    "app.services.template_preparation_service.get_localized_indicator_name",
+                    "app.services.templates.preparation_service.get_localized_indicator_name",
                     return_value="Indicator Name"
                 ):
                     with patch(
-                        "app.services.template_preparation_service.get_indicator_bank_unit_display",
+                        "app.services.templates.preparation_service.get_indicator_bank_unit_display",
                         return_value=None
                     ):
                         result = TemplatePreparationService._prepare_available_indicators([section])
@@ -618,11 +618,11 @@ class TestPrepareAvailableIndicators:
 
             with _patch_indicator_bank_query([mock_ind]):
                 with patch(
-                    "app.services.template_preparation_service.get_localized_indicator_name",
+                    "app.services.templates.preparation_service.get_localized_indicator_name",
                     return_value="Health Indicator"
                 ):
                     with patch(
-                        "app.services.template_preparation_service.get_indicator_bank_unit_display",
+                        "app.services.templates.preparation_service.get_indicator_bank_unit_display",
                         return_value="Count"
                     ):
                         result = TemplatePreparationService._prepare_available_indicators([section])
@@ -644,11 +644,11 @@ class TestPrepareAvailableIndicators:
 
             with _patch_indicator_bank_query([mock_ind]):
                 with patch(
-                    "app.services.template_preparation_service.get_localized_indicator_name",
+                    "app.services.templates.preparation_service.get_localized_indicator_name",
                     return_value="Text Ind"
                 ):
                     with patch(
-                        "app.services.template_preparation_service.get_indicator_bank_unit_display",
+                        "app.services.templates.preparation_service.get_indicator_bank_unit_display",
                         return_value=None
                     ):
                         result = TemplatePreparationService._prepare_available_indicators([section])
@@ -668,7 +668,7 @@ class TestProcessSection:
             mock_fields = [_make_mock_field(id=1), _make_mock_field(id=2)]
 
             with patch(
-                "app.services.template_preparation_service.get_form_items_for_section",
+                "app.services.templates.preparation_service.get_form_items_for_section",
                 return_value=mock_fields
             ):
                 TemplatePreparationService._process_section(section, None, False)
@@ -681,7 +681,7 @@ class TestProcessSection:
             section.name = "Sub Section"
 
             with patch(
-                "app.services.template_preparation_service.get_form_items_for_section",
+                "app.services.templates.preparation_service.get_form_items_for_section",
                 return_value=[_make_mock_field(id=1, is_question=True, is_indicator=False)]
             ):
                 # Should not raise
@@ -694,7 +694,7 @@ class TestProcessSection:
             section.name = "Empty Section"
 
             with patch(
-                "app.services.template_preparation_service.get_form_items_for_section",
+                "app.services.templates.preparation_service.get_form_items_for_section",
                 return_value=[]
             ):
                 TemplatePreparationService._process_section(section, None, False)
@@ -713,22 +713,22 @@ class TestPrepareTemplateForRendering:
 
             # Mock all external calls so test is self-contained
             with patch(
-                "app.services.template_preparation_service.FormSection"
+                "app.services.templates.preparation_service.FormSection"
             ) as MockFS:
                 MockFS.query.filter.return_value.order_by.return_value.all.return_value = []
                 with patch(
-                    "app.services.template_preparation_service.FormItem"
+                    "app.services.templates.preparation_service.FormItem"
                 ) as MockFI:
                     MockFI.query.filter.return_value.order_by.return_value.all.return_value = []
                     with patch(
-                        "app.services.template_preparation_service.FormItemProcessor"
+                        "app.services.templates.preparation_service.FormItemProcessor"
                     ):
                         with patch(
-                            "app.services.template_preparation_service.FormPage"
+                            "app.services.templates.preparation_service.FormPage"
                         ) as MockFP:
                             MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                             with patch(
-                                "app.services.template_preparation_service.get_localized_section_name",
+                                "app.services.templates.preparation_service.get_localized_section_name",
                                 return_value="S"
                             ):
                                 result = TemplatePreparationService.prepare_template_for_rendering(
@@ -746,19 +746,19 @@ class TestPrepareTemplateForRendering:
             section = create_test_section(db_session, template, name="Real Section", order=1)
 
             with patch(
-                "app.services.template_preparation_service.FormItemProcessor"
+                "app.services.templates.preparation_service.FormItemProcessor"
             ) as MockFIP:
                 MockFIP.setup_form_item_for_template.return_value = MagicMock()
                 with patch(
-                    "app.services.template_preparation_service.get_form_items_for_section",
+                    "app.services.templates.preparation_service.get_form_items_for_section",
                     return_value=[]
                 ):
                     with patch(
-                        "app.services.template_preparation_service.FormPage"
+                        "app.services.templates.preparation_service.FormPage"
                     ) as MockFP:
                         MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                         with patch(
-                            "app.services.template_preparation_service.get_localized_section_name",
+                            "app.services.templates.preparation_service.get_localized_section_name",
                             return_value="Real Section Display"
                         ):
                             tmpl, sections, avail = TemplatePreparationService.prepare_template_for_rendering(
@@ -778,19 +778,19 @@ class TestPrepareTemplateForRendering:
             )
 
             with patch(
-                "app.services.template_preparation_service.FormItemProcessor"
+                "app.services.templates.preparation_service.FormItemProcessor"
             ) as MockFIP:
                 MockFIP.setup_form_item_for_template.return_value = MagicMock()
                 with patch(
-                    "app.services.template_preparation_service.get_form_items_for_section",
+                    "app.services.templates.preparation_service.get_form_items_for_section",
                     return_value=[]
                 ):
                     with patch(
-                        "app.services.template_preparation_service.FormPage"
+                        "app.services.templates.preparation_service.FormPage"
                     ) as MockFP:
                         MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                         with patch(
-                            "app.services.template_preparation_service.get_localized_section_name",
+                            "app.services.templates.preparation_service.get_localized_section_name",
                             return_value="Section"
                         ):
                             tmpl, sections, avail = TemplatePreparationService.prepare_template_for_rendering(
@@ -807,20 +807,20 @@ class TestPrepareTemplateForRendering:
             section = create_test_section(db_session, template, name="Fallback Section", order=1)
 
             with patch(
-                "app.services.template_preparation_service.FormItem"
+                "app.services.templates.preparation_service.FormItem"
             ) as MockFI:
                 # Simulate exception in bulk fetch
                 MockFI.query.filter.side_effect = Exception("DB error")
                 with patch(
-                    "app.services.template_preparation_service.get_form_items_for_section",
+                    "app.services.templates.preparation_service.get_form_items_for_section",
                     return_value=[]
                 ):
                     with patch(
-                        "app.services.template_preparation_service.FormPage"
+                        "app.services.templates.preparation_service.FormPage"
                     ) as MockFP:
                         MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                         with patch(
-                            "app.services.template_preparation_service.get_localized_section_name",
+                            "app.services.templates.preparation_service.get_localized_section_name",
                             return_value="S"
                         ):
                             tmpl, sections, avail = TemplatePreparationService.prepare_template_for_rendering(
@@ -838,19 +838,19 @@ class TestPrepareTemplateForRendering:
             mock_field = _make_mock_field(id=1, is_question=True, is_indicator=False, is_document_field=False)
 
             with patch(
-                "app.services.template_preparation_service.FormItemProcessor"
+                "app.services.templates.preparation_service.FormItemProcessor"
             ) as MockFIP:
                 MockFIP.setup_form_item_for_template.return_value = mock_field
                 with patch(
-                    "app.services.template_preparation_service.get_form_items_for_section",
+                    "app.services.templates.preparation_service.get_form_items_for_section",
                     return_value=[]
                 ):
                     with patch(
-                        "app.services.template_preparation_service.FormPage"
+                        "app.services.templates.preparation_service.FormPage"
                     ) as MockFP:
                         MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                         with patch(
-                            "app.services.template_preparation_service.get_localized_section_name",
+                            "app.services.templates.preparation_service.get_localized_section_name",
                             return_value="S"
                         ):
                             # Should not raise
@@ -874,19 +874,19 @@ class TestPrepareTemplateForRendering:
             mock_dyn_field = _make_mock_field(id=200)
 
             with patch(
-                "app.services.template_preparation_service.FormItemProcessor"
+                "app.services.templates.preparation_service.FormItemProcessor"
             ) as MockFIP:
                 MockFIP.setup_form_item_for_template.return_value = MagicMock()
                 with patch(
-                    "app.services.template_preparation_service._process_dynamic_indicators_for_section",
+                    "app.services.templates.preparation_service._process_dynamic_indicators_for_section",
                     return_value=[mock_dyn_field]
                 ):
                     with patch(
-                        "app.services.template_preparation_service.FormPage"
+                        "app.services.templates.preparation_service.FormPage"
                     ) as MockFP:
                         MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                         with patch(
-                            "app.services.template_preparation_service.get_localized_section_name",
+                            "app.services.templates.preparation_service.get_localized_section_name",
                             return_value="Dynamic"
                         ):
                             with _patch_indicator_bank_query([]):
@@ -908,19 +908,19 @@ class TestPrepareTemplateForRendering:
             mock_acs = MagicMock()
 
             with patch(
-                "app.services.template_preparation_service.FormItemProcessor"
+                "app.services.templates.preparation_service.FormItemProcessor"
             ) as MockFIP:
                 MockFIP.setup_form_item_for_template.return_value = MagicMock()
                 with patch(
-                    "app.services.template_preparation_service._process_dynamic_indicators_for_section",
+                    "app.services.templates.preparation_service._process_dynamic_indicators_for_section",
                     side_effect=Exception("Dynamic error")
                 ):
                     with patch(
-                        "app.services.template_preparation_service.FormPage"
+                        "app.services.templates.preparation_service.FormPage"
                     ) as MockFP:
                         MockFP.query.filter_by.return_value.order_by.return_value.all.return_value = []
                         with patch(
-                            "app.services.template_preparation_service.get_localized_section_name",
+                            "app.services.templates.preparation_service.get_localized_section_name",
                             return_value="S"
                         ):
                             with _patch_indicator_bank_query([]):

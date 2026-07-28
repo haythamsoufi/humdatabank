@@ -207,7 +207,7 @@ class TestMatrixAutoLoadEntities:
         """If user cannot access the assignment, return 403."""
         mock_aes = MagicMock()
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=False):
             resp = logged_in_client.post(
                 _api("/matrix/auto-load-entities"),
                 json=self._VALID_PAYLOAD,
@@ -223,7 +223,7 @@ class TestMatrixAutoLoadEntities:
         mock_query = MagicMock()
         mock_query.filter_by.return_value.first.return_value = None
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query):
             resp = logged_in_client.post(
                 _api("/matrix/auto-load-entities"),
@@ -248,7 +248,7 @@ class TestMatrixAutoLoadEntities:
         mock_query.filter_by.return_value.first.return_value = mock_source_af
 
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query):
             resp = logged_in_client.post(
                 _api("/matrix/auto-load-entities"),
@@ -277,7 +277,7 @@ class TestMatrixAutoLoadEntities:
         mock_query.filter_by.return_value.first.return_value = mock_source_af
 
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = []
@@ -312,7 +312,7 @@ class TestMatrixAutoLoadEntities:
         mock_fd.disagg_data = {"_table": "country", "61_SP1": "value1"}
 
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = [mock_fd]
@@ -353,7 +353,7 @@ class TestMatrixAutoLoadEntities:
             "tick_column_names": ["tick_col"],
         }
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = [mock_fd]
@@ -389,7 +389,7 @@ class TestMatrixAutoLoadEntities:
         mock_fd.disagg_data = {"_table": "country"}  # only _table, no row keys
 
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = [mock_fd]
@@ -442,7 +442,7 @@ class TestMatrixAutoLoadEntities:
             "tick_column_names": ["tick_col"],
         }
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = [mock_fd]
@@ -483,7 +483,7 @@ class TestMatrixAutoLoadEntities:
             "tick_column_names": ["tick_col"],
         }
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = [mock_fd]
@@ -519,7 +519,7 @@ class TestMatrixAutoLoadEntities:
         mock_fd.disagg_data = None  # no disagg_data
 
         with patch("app.services.AssignmentService.get_assignment_entity_status_by_id", return_value=mock_aes), \
-             patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
+             patch("app.services.organization.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
              patch("app.services.AssignmentService.get_assigned_forms_by_template", return_value=mock_query), \
              patch("app.models.FormData.query") as mock_fd_q:
             mock_fd_q.filter.return_value.all.return_value = [mock_fd]

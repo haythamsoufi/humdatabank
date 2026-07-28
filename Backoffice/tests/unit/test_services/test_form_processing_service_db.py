@@ -10,7 +10,7 @@ schema setup in that scenario).
 import pytest
 from unittest.mock import patch
 
-from app.services.form_processing_service import get_form_items_for_section
+from app.services.forms.processing_service import get_form_items_for_section
 from tests.factories import (
     create_test_item,
     create_test_section,

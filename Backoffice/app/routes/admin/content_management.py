@@ -24,7 +24,7 @@ from app.models import (
 )
 from app.models.assignments import AssignmentEntityStatus
 from app.models.enums import DocumentStatus, EntityType
-from app.services.entity_service import EntityService
+from app.services.organization.entity_service import EntityService
 from app.forms.content import ResourceForm
 from app.forms.shared import DeleteForm
 from app.routes.admin.shared import permission_required, permission_required_any, rbac_guard_audit_exempt
@@ -36,7 +36,7 @@ from app.utils.file_paths import (
     get_resource_upload_path,
     save_submission_document,
 )
-from app.services import storage_service as storage
+from app.services.platform import storage_service as storage
 from app.utils.error_handling import handle_json_view_exception, handle_view_exception
 from app.utils.advanced_validation import AdvancedValidator
 from app.utils.datetime_helpers import utcnow
@@ -138,7 +138,7 @@ def _user_country_ids(user) -> set[int]:
 
 def _focal_user_can_access_submitted_document(document: SubmittedDocument, user) -> bool:
     """Whether a non-admin user may access this document (download/delete/edit)."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     if AuthorizationService.is_system_manager(user):
         return True
@@ -189,7 +189,7 @@ def _check_document_access(document: SubmittedDocument, user, *, action: str = "
     Returns ``(allowed, flash_message_or_none)``.  When *allowed* is ``False`` the
     caller should redirect with the provided flash message.
     """
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     is_admin_with_perm = AuthorizationService.has_rbac_permission(user, 'admin.documents.manage')
     is_system_manager = AuthorizationService.is_system_manager(user)
@@ -204,7 +204,7 @@ def _check_document_access(document: SubmittedDocument, user, *, action: str = "
 
 def _row_with_focal_entity_access(row: tuple) -> tuple:
     """Append focal-access flag for documents grid (tuple row from query)."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     doc = row[0]
     if AuthorizationService.has_rbac_permission(current_user, "admin.documents.manage"):
@@ -243,7 +243,7 @@ def _serialize_document_grid_row(
     team_pending_edit: bool = False,
 ) -> dict:
     """Serialize a document row for the admin documents AG Grid."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     doc = doc_row[0]
     status = doc_row[1]
@@ -1204,7 +1204,7 @@ def delete_resource_thumbnail(resource_id, language_code):
 @permission_required("admin.documents.manage")
 def manage_documents():
     """Manage submitted documents (both regular and public)"""
-    from app.services.app_settings_service import get_document_types
+    from app.services.platform.app_settings_service import get_document_types
     from config import Config
 
     # Load document types from database and update config for template access
@@ -1258,7 +1258,7 @@ def manage_documents():
 @permission_required_any("admin.documents.manage", "assignment.documents.upload")
 def standalone_document_entity_options():
     """JSON list of entities for the document upload/edit modal (filtered by user access)."""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     entity_type_raw = (request.args.get("entity_type") or "").strip().lower()
     try:
@@ -1400,7 +1400,7 @@ def upload_document():
     if request.method == 'POST':
         uploaded_paths: list[tuple[str, str]] = []  # (category, rel_path) for cleanup on failure
         try:
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             is_admin_with_perm = AuthorizationService.has_rbac_permission(current_user, 'admin.documents.manage')
             is_system_manager = AuthorizationService.is_system_manager(current_user)
             if not (is_admin_with_perm or is_system_manager):
@@ -1603,7 +1603,7 @@ def edit_document(doc_id):
         flash(msg, "warning")
         return redirect(url_for("main.dashboard"))
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
     is_admin_with_perm = AuthorizationService.has_rbac_permission(current_user, 'admin.documents.manage')
     is_system_manager = AuthorizationService.is_system_manager(current_user)
 

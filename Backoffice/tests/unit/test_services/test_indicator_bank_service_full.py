@@ -23,7 +23,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.indicator_bank_service import (
+from app.services.indicators.bank_service import (
     IndicatorBankFilters,
     _build_measurement_label_translations,
     _collect_sector_subsector_maps,
@@ -168,7 +168,7 @@ class TestBuildMeasurementLabelTranslations:
 
     def test_force_locale_exception_falls_back_to_code(self, app):
         with app.app_context():
-            with patch("app.services.indicator_bank_service.force_locale", side_effect=Exception("locale error")):
+            with patch("app.services.indicators.bank_service.force_locale", side_effect=Exception("locale error")):
                 result = _build_measurement_label_translations(
                     None, "output", lambda x: x, ["en"]
                 )
@@ -205,7 +205,7 @@ class TestGetLocalizedTypeUnit:
             ind.id = 1
             ind.type = "output"
             ind.unit = "number"
-            with patch("app.services.indicator_bank_service.force_locale") as mock_fl:
+            with patch("app.services.indicators.bank_service.force_locale") as mock_fl:
                 mock_fl.return_value.__enter__ = MagicMock(return_value=None)
                 mock_fl.return_value.__exit__ = MagicMock(return_value=False)
                 lt, lu = get_localized_type_unit(ind, "fr")
@@ -218,7 +218,7 @@ class TestGetLocalizedTypeUnit:
             ind.type = "output"
             ind.unit = "ns"
             with patch(
-                "app.services.indicator_bank_service.force_locale",
+                "app.services.indicators.bank_service.force_locale",
                 side_effect=Exception("locale fail"),
             ):
                 lt, lu = get_localized_type_unit(ind, "de")
@@ -435,8 +435,8 @@ class TestLoadMeasurementLookupMaps:
             ind.type = "output"
             ind.unit = "number"
 
-            with patch("app.services.indicator_bank_service.IndicatorBankType") as MockType, \
-                 patch("app.services.indicator_bank_service.IndicatorBankUnit") as MockUnit:
+            with patch("app.services.indicators.bank_service.IndicatorBankType") as MockType, \
+                 patch("app.services.indicators.bank_service.IndicatorBankUnit") as MockUnit:
 
                 mock_type_row = MagicMock()
                 mock_type_row.id = 1

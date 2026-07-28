@@ -1,6 +1,6 @@
 """Unit tests for assignment completion service."""
 
-from app.services.assignment_completion_service import (
+from app.services.assignments.completion_service import (
     CompletionMetrics,
     CompletionPrefetch,
     completion_rate_percent,

@@ -48,7 +48,7 @@ class TestRbacCliCommandsModule:
             "deleted_role_permission_links": 3,
         }
         with patch(
-            "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
             return_value=stats,
         ):
             result = rbac_runner.invoke(args=["rbac", "seed"])
@@ -61,7 +61,7 @@ class TestRbacCliCommandsModule:
 
     def test_rbac_seed_skipped_due_to_lock(self, rbac_runner):
         with patch(
-            "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
             return_value={"skipped_due_to_lock": True},
         ):
             result = rbac_runner.invoke(args=["rbac", "seed"])
@@ -80,7 +80,7 @@ class TestRbacCliCommandsModule:
             "deleted_role_permission_links": 0,
         }
         with patch(
-            "app.services.rbac_seed_service.seed_rbac_permissions_and_roles",
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
             return_value=stats,
         ):
             result = rbac_runner.invoke(args=["rbac", "seed"])
@@ -127,7 +127,7 @@ class TestIndicatorbankSyncCommands:
             "skipped": 1,
         }
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ) as mock_sync:
             result = runner.invoke(
@@ -155,7 +155,7 @@ class TestIndicatorbankSyncCommands:
             "skipped": 0,
         }
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ) as mock_sync:
             result = runner.invoke(
@@ -180,7 +180,7 @@ class TestIndicatorbankSyncCommands:
             "skipped": 0,
         }
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ) as mock_sync:
             result = runner.invoke(
@@ -207,7 +207,7 @@ class TestIndicatorbankSyncCommands:
             "definition_translations_cleared": 2,
         }
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ):
             result = runner.invoke(
@@ -229,7 +229,7 @@ class TestIndicatorbankSyncCommands:
             "name_id_mismatches": 7,
         }
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ):
             result = runner.invoke(
@@ -249,7 +249,7 @@ class TestIndicatorbankSyncCommands:
         }
         custom_url = "https://custom.example.com/api/indicators"
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ) as mock_sync:
             result = runner.invoke(
@@ -281,7 +281,7 @@ class TestIndicatorbankSyncCommands:
             "skipped": 0,
         }
         with patch(
-            "app.services.indicatorbank_remote_sync_service.sync_remote_indicator_bank",
+            "app.services.indicators.remote_sync_service.sync_remote_indicator_bank",
             return_value=stats,
         ):
             result = runner.invoke(

@@ -32,7 +32,7 @@ from plugins.pb_progress.versions import (
     validate_version,
     version_storage_prefix,
 )
-from app.services import storage_service
+from app.services.platform import storage_service
 from app.utils.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)

@@ -128,7 +128,7 @@ def collect_entity_admin_audience_recipient_ids(
     """
     Union recipients enabled by ``admin_users`` and ``system_managers`` toggles for ``notification_type``.
     """
-    from app.services.app_settings_service import audience_bucket_enabled
+    from app.services.platform.app_settings_service import audience_bucket_enabled
 
     if entity_type is None or entity_id is None:
         return []

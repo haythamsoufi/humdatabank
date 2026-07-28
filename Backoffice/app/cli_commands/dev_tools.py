@@ -20,7 +20,7 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def cleanup_sessions():
         """Clean up inactive and expired sessions."""
-        from app.services.user_analytics_service import cleanup_inactive_sessions
+        from app.services.platform.user_analytics_service import cleanup_inactive_sessions
 
         try:
             count = cleanup_inactive_sessions()
@@ -37,7 +37,7 @@ def register_dev_tools_commands(app):
         from datetime import datetime, timedelta
 
         from app.models import UserSessionLog
-        from app.services.user_analytics_service import cleanup_inactive_sessions
+        from app.services.platform.user_analytics_service import cleanup_inactive_sessions
 
         try:
             total_sessions = UserSessionLog.query.count()
@@ -175,7 +175,7 @@ def register_dev_tools_commands(app):
         from datetime import datetime, timedelta
 
         from app.models import UserSessionLog
-        from app.services.user_analytics_service import cleanup_inactive_sessions
+        from app.services.platform.user_analytics_service import cleanup_inactive_sessions
 
         try:
             total_sessions = UserSessionLog.query.count()
@@ -337,7 +337,7 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def migrate_uploads_to_azure(dry_run, category):
         """Migrate files from the local UPLOAD_FOLDER to Azure Blob Storage."""
-        from app.services import storage_service as _ss
+        from app.services.platform import storage_service as _ss
 
         if not _ss.is_azure():
             click.echo(

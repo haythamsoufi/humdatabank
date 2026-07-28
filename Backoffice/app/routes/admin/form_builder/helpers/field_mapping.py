@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from app import db
 from app.models import FormItem, FormSection, FormTemplate, FormTemplateVersion
-from app.services.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.stable_key import generate_stable_key, is_valid_stable_key, normalize_stable_key
 
 

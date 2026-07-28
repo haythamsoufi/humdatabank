@@ -11,8 +11,8 @@ from sqlalchemy.orm import joinedload
 
 from app import db
 from app.models import AssignedForm, FormData, FormItem, FormTemplate
-from app.services.data_retrieval_shared import escape_like_pattern
-from app.services.reporting_period_service import sort_period_names
+from app.services.data_retrieval.shared import escape_like_pattern
+from app.services.forms.reporting_period_service import sort_period_names
 from app.utils.stable_key import normalize_stable_key, resolve_published_form_item_id
 
 VERSION_SCOPE_PUBLISHED = 'published'

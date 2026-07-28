@@ -5,8 +5,8 @@ import uuid
 import pytest
 
 from app.models import FormItem, FormSection, IndicatorBank
-from app.services.item_duplication_service import ItemDuplicationService
-from app.services.section_duplication_service import SectionDuplicationService
+from app.services.forms.item_duplication_service import ItemDuplicationService
+from app.services.forms.section_duplication_service import SectionDuplicationService
 
 from tests.factories import (
     create_test_item,

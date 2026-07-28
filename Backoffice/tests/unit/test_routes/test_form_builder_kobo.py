@@ -41,7 +41,7 @@ def sm_client(logged_in_client, db_session, admin_user, app):
     exercising the route logic beyond the auth gate.
     """
     with patch(
-        'app.services.authorization_service.AuthorizationService.is_system_manager',
+        'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
         return_value=True,
     ):
         yield logged_in_client
@@ -69,7 +69,7 @@ class TestKoboDataImport:
     def test_get_renders_page(self, sm_client, db_session, admin_user, app):
         """GET /admin/kobo-data-import renders the wizard page (system manager)."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = sm_client.get('/admin/kobo-data-import')
@@ -78,7 +78,7 @@ class TestKoboDataImport:
     def test_get_non_system_manager_redirects(self, logged_in_client, db_session, admin_user, app):
         """GET by non-system-manager admin redirects with warning."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=False,
         ):
             resp = logged_in_client.get('/admin/kobo-data-import')
@@ -98,7 +98,7 @@ class TestKoboDataImportValidate:
 
     def test_no_file_returns_400(self, sm_client, db_session, admin_user, app):
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = sm_client.post(
@@ -110,7 +110,7 @@ class TestKoboDataImportValidate:
 
     def test_invalid_file_type_returns_valid_false(self, sm_client, db_session, admin_user, app):
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
@@ -133,7 +133,7 @@ class TestKoboDataImportValidate:
             'preview': {'sheet_name': 'Sheet', 'total_rows': 2, 'total_columns': 3},
         }
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
@@ -162,7 +162,7 @@ class TestKoboDataImportAnalyze:
     def test_no_file_returns_400(self, sm_client, db_session, admin_user, app):
         """POST without file returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = sm_client.post(
@@ -175,7 +175,7 @@ class TestKoboDataImportAnalyze:
     def test_empty_filename_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with empty filename returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = sm_client.post(
@@ -188,7 +188,7 @@ class TestKoboDataImportAnalyze:
     def test_invalid_file_type_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with invalid file type returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
@@ -205,7 +205,7 @@ class TestKoboDataImportAnalyze:
         """POST with file exceeding 50 MB returns 400."""
         big_data = b'\x00' * (51 * 1024 * 1024)
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
@@ -227,7 +227,7 @@ class TestKoboDataImportAnalyze:
         }
         file_content = b'PK\x03\x04excel-data'
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
@@ -252,7 +252,7 @@ class TestKoboDataImportAnalyze:
     def test_analyze_failure_returns_200_with_error(self, sm_client, db_session, admin_user, app):
         """POST where service returns failure still returns 200."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.validate_upload_extension_and_mime',
@@ -279,7 +279,7 @@ class TestKoboDataImportMatch:
     def test_no_data_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with empty body returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.get_json_safe', return_value=None
@@ -291,7 +291,7 @@ class TestKoboDataImportMatch:
     def test_empty_entity_names_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with no entity_names and no file returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -307,7 +307,7 @@ class TestKoboDataImportMatch:
             {'entity_name': 'France', 'country_id': 1, 'country_name': 'France'},
         ]
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'
@@ -325,7 +325,7 @@ class TestKoboDataImportMatch:
     def test_match_with_entity_column_index(self, sm_client, db_session, admin_user, app):
         """POST with entity_column_index extracts unique entities from file."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'
@@ -355,7 +355,7 @@ class TestKoboDataImportPreview:
     def test_no_data_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with empty body returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.get_json_safe', return_value=None
@@ -366,7 +366,7 @@ class TestKoboDataImportPreview:
     def test_expired_session_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with mismatched file_id returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             # No session data -> expired session
@@ -390,7 +390,7 @@ class TestKoboDataImportPreview:
             'total_rows': 1,
         }
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'
@@ -424,7 +424,7 @@ class TestKoboDataImportTemplateStructure:
     def test_missing_template_id_returns_400(self, sm_client, db_session, admin_user, app):
         """POST without template_id returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -437,7 +437,7 @@ class TestKoboDataImportTemplateStructure:
     def test_not_found_template_returns_404(self, sm_client, db_session, admin_user, app):
         """POST with non-existent template_id returns 404."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -452,7 +452,7 @@ class TestKoboDataImportTemplateStructure:
         template = _make_owned_template(db_session, admin_user)
         section = create_test_section(db_session, template)
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -474,7 +474,7 @@ class TestKoboDataImportTemplateStructure:
         db.session.add(t)
         db.session.commit()
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -494,7 +494,7 @@ class TestKoboDataImportMapColumns:
     def test_no_data_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with empty body returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.get_json_safe', return_value=None
@@ -505,7 +505,7 @@ class TestKoboDataImportMapColumns:
     def test_missing_kobo_columns_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with empty kobo_columns returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -521,7 +521,7 @@ class TestKoboDataImportMapColumns:
             {'column': 'col1', 'item_id': 1, 'item_label': 'Item 1', 'score': 0.9},
         ]
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'
@@ -550,7 +550,7 @@ class TestKoboDataImportExecute:
     def test_no_data_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with empty body returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.get_json_safe', return_value=None
@@ -561,7 +561,7 @@ class TestKoboDataImportExecute:
     def test_expired_session_returns_400(self, sm_client, db_session, admin_user, app):
         """POST with mismatched file_id returns 400."""
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ):
             resp = _kobo_post_json(
@@ -579,7 +579,7 @@ class TestKoboDataImportExecute:
         """POST when temp file cannot be read returns 500."""
         file_id = str(uuid.uuid4())
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch('os.path.exists', return_value=True):
             with sm_client.session_transaction() as sess:
@@ -602,7 +602,7 @@ class TestKoboDataImportExecute:
             'message': 'Import complete',
         }
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'
@@ -640,7 +640,7 @@ class TestKoboDataImportExecute:
         file_id = str(uuid.uuid4())
         exec_result = {'success': False, 'message': 'No data'}
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'
@@ -671,7 +671,7 @@ class TestKoboDataImportExecute:
         file_id = str(uuid.uuid4())
         exec_result = {'success': False, 'message': 'No data'}
         with patch(
-            'app.services.authorization_service.AuthorizationService.is_system_manager',
+            'app.services.organization.authorization_service.AuthorizationService.is_system_manager',
             return_value=True,
         ), patch(
             'app.routes.admin.form_builder.kobo.KoboDataImportService'

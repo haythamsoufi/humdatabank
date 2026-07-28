@@ -1,5 +1,5 @@
 from app.utils.file_paths import save_sector_logo
-from app.services import storage_service as storage
+from app.services.platform import storage_service as storage
 from flask import current_app
 from datetime import datetime
 from sqlalchemy import inspect

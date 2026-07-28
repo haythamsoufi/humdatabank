@@ -17,7 +17,7 @@ import pytest
 
 class TestExtractTitleFromMarkdown:
     def _call(self, text, fallback="Fallback"):
-        from app.services.documentation_service import _extract_title_from_markdown
+        from app.services.documentation.service import _extract_title_from_markdown
         return _extract_title_from_markdown(text, fallback)
 
     def test_h1_title(self):
@@ -44,7 +44,7 @@ class TestExtractTitleFromMarkdown:
 
 class TestPrettifyStem:
     def _call(self, stem):
-        from app.services.documentation_service import _prettify_stem
+        from app.services.documentation.service import _prettify_stem
         return _prettify_stem(stem)
 
     def test_basic_hyphen(self):
@@ -72,7 +72,7 @@ class TestPrettifyStem:
 
 class TestDeduplicateHtmlIds:
     def _call(self, html):
-        from app.services.documentation_service import _deduplicate_html_ids
+        from app.services.documentation.service import _deduplicate_html_ids
         return _deduplicate_html_ids(html)
 
     def test_removes_empty_anchor_when_heading_has_same_id(self):
@@ -93,7 +93,7 @@ class TestDeduplicateHtmlIds:
 
 class TestSplitRelLang:
     def _call(self, rel):
-        from app.services.documentation_service import _split_rel_lang
+        from app.services.documentation.service import _split_rel_lang
         return _split_rel_lang(rel)
 
     def test_no_language_suffix(self):
@@ -119,7 +119,7 @@ class TestSplitRelLang:
 
 class TestPickVariant:
     def _call(self, paths_by_lang, lang):
-        from app.services.documentation_service import _pick_variant
+        from app.services.documentation.service import _pick_variant
         return _pick_variant(paths_by_lang, lang)
 
     def test_exact_lang_preferred(self):
@@ -142,7 +142,7 @@ class TestPickVariant:
 
 class TestGetCategoryIcon:
     def _call(self, name):
-        from app.services.documentation_service import get_category_icon
+        from app.services.documentation.service import get_category_icon
         return get_category_icon(name)
 
     def test_known_categories(self):
@@ -160,7 +160,7 @@ class TestGetCategoryIcon:
 
 class TestGetCategoryDisplayName:
     def _call(self, name):
-        from app.services.documentation_service import get_category_display_name
+        from app.services.documentation.service import get_category_display_name
         return get_category_display_name(name)
 
     def test_known_name(self):
@@ -175,7 +175,7 @@ class TestGetCategoryDisplayName:
 
 class TestGetAdminSubgroup:
     def _call(self, filename):
-        from app.services.documentation_service import _get_admin_subgroup
+        from app.services.documentation.service import _get_admin_subgroup
         return _get_admin_subgroup(filename)
 
     def test_user_management_exact(self):
@@ -225,7 +225,7 @@ class TestGetAdminSubgroup:
 
 class TestGetAdminSubgroupDisplayName:
     def _call(self, name):
-        from app.services.documentation_service import _get_admin_subgroup_display_name
+        from app.services.documentation.service import _get_admin_subgroup_display_name
         return _get_admin_subgroup_display_name(name)
 
     def test_known_names(self):
@@ -240,7 +240,7 @@ class TestGetAdminSubgroupDisplayName:
 
 class TestUserGuidesCommonDocRequiresAdmin:
     def _call(self, base_rel):
-        from app.services.documentation_service import user_guides_common_doc_requires_admin
+        from app.services.documentation.service import user_guides_common_doc_requires_admin
         return user_guides_common_doc_requires_admin(base_rel)
 
     def test_restricted_doc(self):
@@ -261,7 +261,7 @@ class TestUserGuidesCommonDocRequiresAdmin:
 
 class TestUserGuidesAiDocRequiresBetaAccess:
     def _call(self, base_rel):
-        from app.services.documentation_service import user_guides_ai_doc_requires_beta_access
+        from app.services.documentation.service import user_guides_ai_doc_requires_beta_access
         return user_guides_ai_doc_requires_beta_access(base_rel)
 
     def test_common_ai_docs(self):
@@ -281,7 +281,7 @@ class TestUserGuidesAiDocRequiresBetaAccess:
 
 class TestIsRootReadmeRequest:
     def _call(self, raw):
-        from app.services.documentation_service import _is_root_readme_request
+        from app.services.documentation.service import _is_root_readme_request
         return _is_root_readme_request(raw)
 
     def test_readme_md(self):
@@ -305,7 +305,7 @@ class TestIsRootReadmeRequest:
 
 class TestShouldMergeUserGuidesCommonFocalNav:
     def _call(self, allowed_groups):
-        from app.services.documentation_service import _should_merge_user_guides_common_focal_nav
+        from app.services.documentation.service import _should_merge_user_guides_common_focal_nav
         return _should_merge_user_guides_common_focal_nav(allowed_groups)
 
     def test_exact_match(self):
@@ -331,7 +331,7 @@ def mock_app(app):
 class TestDocsRoot:
     def test_resolves_parent_of_app(self, app):
         with app.app_context():
-            from app.services.documentation_service import docs_root
+            from app.services.documentation.service import docs_root
             root = docs_root()
             assert root.name == "docs"
             assert root.parent.name == "Backoffice" or "Backoffice" in str(root)
@@ -340,7 +340,7 @@ class TestDocsRoot:
 class TestIsWithinRoot:
     def test_within_root(self, app):
         with app.app_context():
-            from app.services.documentation_service import _is_within_root
+            from app.services.documentation.service import _is_within_root
             root = Path(tempfile.mkdtemp())
             candidate = root / "subdir" / "file.md"
             candidate.parent.mkdir(parents=True, exist_ok=True)
@@ -349,14 +349,14 @@ class TestIsWithinRoot:
 
     def test_outside_root(self, app):
         with app.app_context():
-            from app.services.documentation_service import _is_within_root
+            from app.services.documentation.service import _is_within_root
             root = Path(tempfile.mkdtemp())
             outside = Path(tempfile.mkdtemp()) / "other.md"
             assert _is_within_root(root, outside) is False
 
     def test_traversal_attempt(self, app):
         with app.app_context():
-            from app.services.documentation_service import _is_within_root
+            from app.services.documentation.service import _is_within_root
             root = Path(tempfile.mkdtemp())
             candidate = root / ".." / "etc" / "passwd"
             assert _is_within_root(root, candidate) is False
@@ -365,9 +365,9 @@ class TestIsWithinRoot:
 class TestGetUserLanguage:
     def test_returns_string(self, app):
         with app.app_context():
-            with patch("app.services.documentation_service._get_user_language") as mock_lang:
+            with patch("app.services.documentation.service._get_user_language") as mock_lang:
                 mock_lang.return_value = "en"
-                from app.services.documentation_service import _get_user_language
+                from app.services.documentation.service import _get_user_language
                 # Just ensure the function can be called
                 mock_lang.return_value = "en"
                 assert mock_lang.return_value == "en"
@@ -376,7 +376,7 @@ class TestGetUserLanguage:
 class TestListMarkdownFiles:
     def test_lists_md_files(self, app):
         with app.app_context():
-            from app.services.documentation_service import list_markdown_files
+            from app.services.documentation.service import list_markdown_files
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 (root / "file1.md").write_text("# Title", encoding="utf-8")
@@ -386,7 +386,7 @@ class TestListMarkdownFiles:
 
     def test_skips_hidden_dirs(self, app):
         with app.app_context():
-            from app.services.documentation_service import list_markdown_files
+            from app.services.documentation.service import list_markdown_files
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 hidden = root / "_internal"
@@ -398,7 +398,7 @@ class TestListMarkdownFiles:
 
     def test_skips_hidden_files(self, app):
         with app.app_context():
-            from app.services.documentation_service import list_markdown_files
+            from app.services.documentation.service import list_markdown_files
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 (root / "_private.md").write_text("private", encoding="utf-8")
@@ -408,7 +408,7 @@ class TestListMarkdownFiles:
 
     def test_skips_archive_folder(self, app):
         with app.app_context():
-            from app.services.documentation_service import list_markdown_files
+            from app.services.documentation.service import list_markdown_files
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 archive = root / "archive"
@@ -420,7 +420,7 @@ class TestListMarkdownFiles:
 
     def test_sorted_results(self, app):
         with app.app_context():
-            from app.services.documentation_service import list_markdown_files
+            from app.services.documentation.service import list_markdown_files
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 (root / "z-last.md").write_text("# Z", encoding="utf-8")
@@ -433,7 +433,7 @@ class TestListMarkdownFiles:
 class TestAllowedUserGuidesSubdirsForUser:
     def _call(self, app, user):
         with app.app_context():
-            from app.services.documentation_service import _allowed_user_guides_subdirs_for_user
+            from app.services.documentation.service import _allowed_user_guides_subdirs_for_user
             return _allowed_user_guides_subdirs_for_user(user)
 
     def test_no_user_returns_common(self, app):
@@ -450,8 +450,8 @@ class TestAllowedUserGuidesSubdirsForUser:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=True):
-                from app.services.documentation_service import _allowed_user_guides_subdirs_for_user
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=True):
+                from app.services.documentation.service import _allowed_user_guides_subdirs_for_user
                 result = _allowed_user_guides_subdirs_for_user(user)
                 assert "admin" in result
                 assert "focal-point" in result
@@ -461,9 +461,9 @@ class TestAllowedUserGuidesSubdirsForUser:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False):
-                with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True):
-                    from app.services.documentation_service import _allowed_user_guides_subdirs_for_user
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False):
+                with patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True):
+                    from app.services.documentation.service import _allowed_user_guides_subdirs_for_user
                     result = _allowed_user_guides_subdirs_for_user(user)
                     assert "admin" in result
                     assert "common" in result
@@ -472,10 +472,10 @@ class TestAllowedUserGuidesSubdirsForUser:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False):
-                with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=False):
-                    with patch("app.services.authorization_service.AuthorizationService.has_role", return_value=True):
-                        from app.services.documentation_service import _allowed_user_guides_subdirs_for_user
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False):
+                with patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=False):
+                    with patch("app.services.organization.authorization_service.AuthorizationService.has_role", return_value=True):
+                        from app.services.documentation.service import _allowed_user_guides_subdirs_for_user
                         result = _allowed_user_guides_subdirs_for_user(user)
                         assert "focal-point" in result
 
@@ -483,7 +483,7 @@ class TestAllowedUserGuidesSubdirsForUser:
 class TestUserIsAdminOrSystemManager:
     def _call(self, app, user):
         with app.app_context():
-            from app.services.documentation_service import _user_is_admin_or_system_manager
+            from app.services.documentation.service import _user_is_admin_or_system_manager
             return _user_is_admin_or_system_manager(user)
 
     def test_none_user(self, app):
@@ -498,32 +498,32 @@ class TestUserIsAdminOrSystemManager:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False):
-                with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=True):
-                    from app.services.documentation_service import _user_is_admin_or_system_manager
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False):
+                with patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True):
+                    from app.services.documentation.service import _user_is_admin_or_system_manager
                     assert _user_is_admin_or_system_manager(user) is True
 
     def test_system_manager(self, app):
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=True):
-                from app.services.documentation_service import _user_is_admin_or_system_manager
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=True):
+                from app.services.documentation.service import _user_is_admin_or_system_manager
                 assert _user_is_admin_or_system_manager(user) is True
 
     def test_regular_user(self, app):
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False):
-                with patch("app.services.authorization_service.AuthorizationService.is_admin", return_value=False):
-                    from app.services.documentation_service import _user_is_admin_or_system_manager
+            with patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False):
+                with patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=False):
+                    from app.services.documentation.service import _user_is_admin_or_system_manager
                     assert _user_is_admin_or_system_manager(user) is False
 
 
 class TestSanitizeHtml:
     def _call(self, html):
-        from app.services.documentation_service import _sanitize_html
+        from app.services.documentation.service import _sanitize_html
         return _sanitize_html(html)
 
     def test_removes_script_tags(self):
@@ -567,7 +567,7 @@ class TestSanitizeHtml:
 
 class TestRewriteRelativeLinks:
     def _call(self, root, current_rel, html, doc_builder=None, asset_builder=None):
-        from app.services.documentation_service import rewrite_relative_links
+        from app.services.documentation.service import rewrite_relative_links
         if doc_builder is None:
             doc_builder = lambda rel: f"/docs/{rel}"
         if asset_builder is None:
@@ -653,7 +653,7 @@ class TestRewriteRelativeLinks:
 class TestRenderMarkdownFile:
     def test_renders_markdown(self, app):
         with app.app_context():
-            from app.services.documentation_service import render_markdown_file
+            from app.services.documentation.service import render_markdown_file
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 md_file = root / "test.md"
@@ -672,7 +672,7 @@ class TestRenderMarkdownFile:
 
     def test_handles_read_error(self, app):
         with app.app_context():
-            from app.services.documentation_service import render_markdown_file
+            from app.services.documentation.service import render_markdown_file
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 nonexistent = root / "missing.md"
@@ -688,7 +688,7 @@ class TestRenderMarkdownFile:
 
     def test_translated_doc_mirrors_english_heading_fragments(self, app):
         with app.app_context():
-            from app.services.documentation_service import render_markdown_file
+            from app.services.documentation.service import render_markdown_file
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 (root / "guide.md").write_text(
@@ -717,7 +717,7 @@ class TestRenderMarkdownFile:
 class TestExtractPageTitle:
     def test_extracts_h1(self, app):
         with app.app_context():
-            from app.services.documentation_service import extract_page_title
+            from app.services.documentation.service import extract_page_title
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "my-page.md"
@@ -727,7 +727,7 @@ class TestExtractPageTitle:
 
     def test_fallback_to_stem(self, app):
         with app.app_context():
-            from app.services.documentation_service import extract_page_title
+            from app.services.documentation.service import extract_page_title
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "my-guide.md"
@@ -737,7 +737,7 @@ class TestExtractPageTitle:
 
     def test_read_error_fallback(self, app):
         with app.app_context():
-            from app.services.documentation_service import extract_page_title
+            from app.services.documentation.service import extract_page_title
             # Non-existent file
             title = extract_page_title(Path("/nonexistent/file.md"))
             assert title is not None
@@ -746,16 +746,16 @@ class TestExtractPageTitle:
 class TestEnsureDocPageAccess:
     def _call(self, app, user, base_rel, visible=None):
         with app.app_context():
-            from app.services.documentation_service import ensure_doc_page_access
+            from app.services.documentation.service import ensure_doc_page_access
             ensure_doc_page_access(user, base_rel, visible_top_level_dirs=visible)
 
     def test_allowed_dir(self, app):
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"admin", "common"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"admin", "common"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     # Should not raise
                     ensure_doc_page_access(user, "user-guides/admin/add-user.md", visible_top_level_dirs={"user-guides"})
 
@@ -763,23 +763,23 @@ class TestEnsureDocPageAccess:
         user = MagicMock()
         user.is_authenticated = False
         with app.app_context():
-            from app.services.documentation_service import ensure_doc_page_access
+            from app.services.documentation.service import ensure_doc_page_access
             with pytest.raises(Exception):  # abort(403) raises
                 ensure_doc_page_access(user, "development/secret.md", visible_top_level_dirs={"user-guides"})
 
     def test_user_guides_readme_forbidden_for_non_admin(self, app):
         with app.app_context():
-            with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=False):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=False):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     with pytest.raises(Exception):
                         ensure_doc_page_access(None, "user-guides/README.md")
 
     def test_admin_only_doc_forbidden_for_regular_user(self, app):
         with app.app_context():
-            with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=False):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=False):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     with pytest.raises(Exception):
                         ensure_doc_page_access(None, "user-guides/common/data-governance.md")
 
@@ -787,9 +787,9 @@ class TestEnsureDocPageAccess:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     # Should not raise
                     ensure_doc_page_access(user, "user-guides/common/data-governance.md")
 
@@ -797,9 +797,9 @@ class TestEnsureDocPageAccess:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     # readme.md at root level with admin
                     ensure_doc_page_access(user, "README.md", visible_top_level_dirs={"user-guides"})
 
@@ -807,9 +807,9 @@ class TestEnsureDocPageAccess:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=False):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_can_view_ai_docs", return_value=False):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     with pytest.raises(Exception):
                         ensure_doc_page_access(user, "user-guides/common/ai-chatbot.md")
 
@@ -817,42 +817,42 @@ class TestEnsureDocPageAccess:
         user = MagicMock()
         user.is_authenticated = True
         with app.app_context():
-            with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=True):
-                with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                    from app.services.documentation_service import ensure_doc_page_access
+            with patch("app.services.documentation.service._user_can_view_ai_docs", return_value=True):
+                with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                    from app.services.documentation.service import ensure_doc_page_access
                     ensure_doc_page_access(user, "user-guides/common/ai-chatbot.md")
 
 
 class TestEnsureDocsAssetAccess:
     def test_allowed_asset(self, app):
         with app.app_context():
-            with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                from app.services.documentation_service import ensure_docs_asset_access
+            with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                from app.services.documentation.service import ensure_docs_asset_access
                 # Should not raise
                 ensure_docs_asset_access(None, "user-guides/common/img.png", visible_top_level_dirs={"user-guides"})
 
     def test_empty_path_forbidden(self, app):
         with app.app_context():
-            from app.services.documentation_service import ensure_docs_asset_access
+            from app.services.documentation.service import ensure_docs_asset_access
             with pytest.raises(Exception):
                 ensure_docs_asset_access(None, "", visible_top_level_dirs={"user-guides"})
 
     def test_outside_visible_dirs(self, app):
         with app.app_context():
-            from app.services.documentation_service import ensure_docs_asset_access
+            from app.services.documentation.service import ensure_docs_asset_access
             with pytest.raises(Exception):
                 ensure_docs_asset_access(None, "development/img.png", visible_top_level_dirs={"user-guides"})
 
     def test_readme_forbidden_in_user_guides(self, app):
         with app.app_context():
-            from app.services.documentation_service import ensure_docs_asset_access
+            from app.services.documentation.service import ensure_docs_asset_access
             with pytest.raises(Exception):
                 ensure_docs_asset_access(None, "user-guides/README.md", visible_top_level_dirs={"user-guides"})
 
     def test_forbidden_subdir(self, app):
         with app.app_context():
-            with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                from app.services.documentation_service import ensure_docs_asset_access
+            with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                from app.services.documentation.service import ensure_docs_asset_access
                 with pytest.raises(Exception):
                     ensure_docs_asset_access(None, "user-guides/admin/img.png", visible_top_level_dirs={"user-guides"})
 
@@ -864,9 +864,9 @@ class TestResolveDocPath:
                 root = Path(tmpdir)
                 readme = root / "README.md"
                 readme.write_text("# Docs", encoding="utf-8")
-                with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                    with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                    with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                        from app.services.documentation.service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "README.md")
                         assert path.exists()
 
@@ -875,9 +875,9 @@ class TestResolveDocPath:
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 (root / "guide.md").write_text("# Guide", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                        from app.services.documentation.service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "guide")
                         assert path.name == "guide.md"
 
@@ -885,9 +885,9 @@ class TestResolveDocPath:
         with app.app_context():
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                        from app.services.documentation.service import resolve_doc_path
                         with pytest.raises(Exception):  # abort(404)
                             resolve_doc_path(root, "nonexistent.md")
 
@@ -900,9 +900,9 @@ class TestResolveDocPath:
                     (root / p).mkdir(parents=True, exist_ok=True)
                 landing = root / "getting-started" / "start-here.md"
                 landing.write_text("# Start Here", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=False):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=False):
+                        from app.services.documentation.service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "README.md")
                         assert "start-here" in str(path)
 
@@ -912,9 +912,9 @@ class TestResolveDocPath:
                 root = Path(tmpdir)
                 (root / "guide.md").write_text("# Guide EN", encoding="utf-8")
                 (root / "guide.fr.md").write_text("# Guide FR", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="fr"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="fr"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                        from app.services.documentation.service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "guide.md")
                         assert "fr" in path.name
 
@@ -923,9 +923,9 @@ class TestResolveDocPath:
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 (root / "README.md").write_text("# Docs", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                        from app.services.documentation.service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "")
                         assert path.name == "README.md"
 
@@ -938,9 +938,9 @@ class TestResolveDocPath:
                 landing.mkdir(parents=True)
                 (landing / "start-here.md").write_text("# Start EN", encoding="utf-8")
                 (landing / "start-here.ar.md").write_text("# Start AR", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="ar"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=True):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="ar"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=True):
+                        from app.services.documentation.service import resolve_doc_path
                         path, base_rel = resolve_doc_path(root, "", prefer_user_landing=True)
                         assert path.name == "start-here.ar.md"
                         assert base_rel == "getting-started/start-here.md"
@@ -952,9 +952,9 @@ class TestResolveDocPath:
                 landing = root / "getting-started"
                 landing.mkdir(parents=True)
                 (landing / "start-here.md").write_text("# Start", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=False):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=False):
+                        from app.services.documentation.service import resolve_doc_path
                         path, _ = resolve_doc_path(root, "")
                         assert "start-here" in str(path)
 
@@ -962,9 +962,9 @@ class TestResolveDocPath:
         with app.app_context():
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._user_is_admin_or_system_manager", return_value=False):
-                        from app.services.documentation_service import resolve_doc_path
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._user_is_admin_or_system_manager", return_value=False):
+                        from app.services.documentation.service import resolve_doc_path
                         with pytest.raises(Exception):
                             resolve_doc_path(root, "")
 
@@ -974,9 +974,9 @@ class TestBuildHierarchicalNav:
         with app.app_context():
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                        from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        from app.services.documentation.service import build_hierarchical_nav
                         nav = build_hierarchical_nav(
                             root=root,
                             doc_url_builder=lambda r: f"/docs/{r}",
@@ -990,9 +990,9 @@ class TestBuildHierarchicalNav:
                 api_dir = root / "api"
                 api_dir.mkdir()
                 (api_dir / "README.md").write_text("# API Docs", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                        from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        from app.services.documentation.service import build_hierarchical_nav
                         nav = build_hierarchical_nav(
                             root=root,
                             doc_url_builder=lambda r: f"/docs/{r}",
@@ -1009,9 +1009,9 @@ class TestBuildHierarchicalNav:
                 admin_dir = root / "user-guides" / "admin"
                 admin_dir.mkdir(parents=True)
                 (admin_dir / "add-user.md").write_text("# Add User", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
-                        from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common", "admin"}):
+                        from app.services.documentation.service import build_hierarchical_nav
                         nav = build_hierarchical_nav(
                             root=root,
                             doc_url_builder=lambda r: f"/docs/{r}",
@@ -1036,9 +1036,9 @@ class TestBuildHierarchicalNav:
                 dr_dir = root / "data-reporting"
                 dr_dir.mkdir(parents=True)
                 (dr_dir / "data-guidance-fdrs.md").write_text("# Data Guidance, FDRS", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common", "focal-point"}):
-                        from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common", "focal-point"}):
+                        from app.services.documentation.service import build_hierarchical_nav
                         nav = build_hierarchical_nav(
                             root=root,
                             doc_url_builder=lambda r: f"/docs/{r}",
@@ -1057,9 +1057,9 @@ class TestBuildHierarchicalNav:
                 api_dir.mkdir()
                 (api_dir / "guide.md").write_text("# Guide EN", encoding="utf-8")
                 (api_dir / "guide.fr.md").write_text("# Guide FR", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                        from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        from app.services.documentation.service import build_hierarchical_nav
                         nav = build_hierarchical_nav(
                             root=root,
                             doc_url_builder=lambda r: f"/docs/{r}",
@@ -1081,10 +1081,10 @@ class TestBuildHierarchicalNav:
                 common_dir.mkdir(parents=True)
                 (common_dir / "getting-help.md").write_text("# Getting help", encoding="utf-8")
                 (common_dir / "ai-chatbot.md").write_text("# AI Chatbot", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                        with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=False):
-                            from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        with patch("app.services.documentation.service._user_can_view_ai_docs", return_value=False):
+                            from app.services.documentation.service import build_hierarchical_nav
                             nav = build_hierarchical_nav(
                                 root=root,
                                 doc_url_builder=lambda r: f"/docs/{r}",
@@ -1107,10 +1107,10 @@ class TestBuildHierarchicalNav:
                 common_dir = root / "user-guides" / "common"
                 common_dir.mkdir(parents=True)
                 (common_dir / "ai-chatbot.md").write_text("# AI Chatbot", encoding="utf-8")
-                with patch("app.services.documentation_service._get_user_language", return_value="en"):
-                    with patch("app.services.documentation_service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
-                        with patch("app.services.documentation_service._user_can_view_ai_docs", return_value=True):
-                            from app.services.documentation_service import build_hierarchical_nav
+                with patch("app.services.documentation.service._get_user_language", return_value="en"):
+                    with patch("app.services.documentation.service._allowed_user_guides_subdirs_for_user", return_value={"common"}):
+                        with patch("app.services.documentation.service._user_can_view_ai_docs", return_value=True):
+                            from app.services.documentation.service import build_hierarchical_nav
                             nav = build_hierarchical_nav(
                                 root=root,
                                 doc_url_builder=lambda r: f"/docs/{r}",
@@ -1129,7 +1129,7 @@ class TestBuildHierarchicalNav:
 class TestGetWorkflowIdForDoc:
     def test_readme_returns_none(self, app):
         with app.app_context():
-            from app.services.documentation_service import get_workflow_id_for_doc
+            from app.services.documentation.service import get_workflow_id_for_doc
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 readme = root / "user-guides" / "admin" / "README.md"
@@ -1140,7 +1140,7 @@ class TestGetWorkflowIdForDoc:
 
     def test_non_user_guides_returns_none(self, app):
         with app.app_context():
-            from app.services.documentation_service import get_workflow_id_for_doc
+            from app.services.documentation.service import get_workflow_id_for_doc
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "api" / "guide.md"
@@ -1151,7 +1151,7 @@ class TestGetWorkflowIdForDoc:
 
     def test_workflow_with_steps_returns_id(self, app):
         with app.app_context():
-            from app.services.documentation_service import get_workflow_id_for_doc
+            from app.services.documentation.service import get_workflow_id_for_doc
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "user-guides" / "admin" / "add-user.md"
@@ -1161,13 +1161,13 @@ class TestGetWorkflowIdForDoc:
                 mock_workflow.steps = [MagicMock()]  # Has steps
                 mock_service = MagicMock()
                 mock_service.get_workflow_by_id.return_value = mock_workflow
-                with patch("app.services.documentation_service.WorkflowDocsService", return_value=mock_service):
+                with patch("app.services.documentation.service.WorkflowDocsService", return_value=mock_service):
                     result = get_workflow_id_for_doc(f, root)
                     assert result == "add-user"
 
     def test_workflow_no_steps_returns_none(self, app):
         with app.app_context():
-            from app.services.documentation_service import get_workflow_id_for_doc
+            from app.services.documentation.service import get_workflow_id_for_doc
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "user-guides" / "admin" / "add-user.md"
@@ -1177,13 +1177,13 @@ class TestGetWorkflowIdForDoc:
                 mock_workflow.steps = []  # No steps
                 mock_service = MagicMock()
                 mock_service.get_workflow_by_id.return_value = mock_workflow
-                with patch("app.services.documentation_service.WorkflowDocsService", return_value=mock_service):
+                with patch("app.services.documentation.service.WorkflowDocsService", return_value=mock_service):
                     result = get_workflow_id_for_doc(f, root)
                     assert result is None
 
     def test_no_workflow_returns_none(self, app):
         with app.app_context():
-            from app.services.documentation_service import get_workflow_id_for_doc
+            from app.services.documentation.service import get_workflow_id_for_doc
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "user-guides" / "admin" / "add-user.md"
@@ -1191,18 +1191,18 @@ class TestGetWorkflowIdForDoc:
                 f.write_text("# Add User", encoding="utf-8")
                 mock_service = MagicMock()
                 mock_service.get_workflow_by_id.return_value = None
-                with patch("app.services.documentation_service.WorkflowDocsService", return_value=mock_service):
+                with patch("app.services.documentation.service.WorkflowDocsService", return_value=mock_service):
                     result = get_workflow_id_for_doc(f, root)
                     assert result is None
 
     def test_exception_returns_none(self, app):
         with app.app_context():
-            from app.services.documentation_service import get_workflow_id_for_doc
+            from app.services.documentation.service import get_workflow_id_for_doc
             with tempfile.TemporaryDirectory() as tmpdir:
                 root = Path(tmpdir)
                 f = root / "user-guides" / "admin" / "add-user.md"
                 f.parent.mkdir(parents=True)
                 f.write_text("# Add User", encoding="utf-8")
-                with patch("app.services.documentation_service.WorkflowDocsService", side_effect=Exception("import error")):
+                with patch("app.services.documentation.service.WorkflowDocsService", side_effect=Exception("import error")):
                     result = get_workflow_id_for_doc(f, root)
                     assert result is None

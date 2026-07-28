@@ -14,7 +14,7 @@ import argparse
 import re
 import pathlib
 
-ROOT = pathlib.Path(__file__).resolve().parents[1] / "app" / "templates"
+ROOT = pathlib.Path(__file__).resolve().parents[2] / "app" / "templates"
 
 # Tailwind utilities to remove when converting a filled action control.
 STRIP_TOKENS = [

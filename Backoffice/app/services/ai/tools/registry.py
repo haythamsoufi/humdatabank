@@ -15,7 +15,7 @@ from collections import defaultdict
 from flask import current_app, g, has_request_context
 from flask_login import current_user
 
-from app.services.data_retrieval_service import (
+from app.services.data_retrieval.service import (
     get_indicator_details,
     get_country_info,
     resolve_country,
@@ -554,7 +554,7 @@ class AIToolsRegistry:
         Use when the user asks for the closest/nearest indicator to an outcome phrase or concept,
         not for a country's reported value (use get_indicator_value for values).
         """
-        from app.services.indicator_resolution_service import IndicatorResolutionService
+        from app.services.indicators.resolution_service import IndicatorResolutionService
 
         qtext = (query or "").strip()
         if not qtext:
@@ -574,7 +574,7 @@ class AIToolsRegistry:
 
         # Text-aligned lookup first: exact bank names must win over semantic neighbours.
         try:
-            from app.services.data_retrieval_shared import find_indicator_bank_text_aligned
+            from app.services.data_retrieval.shared import find_indicator_bank_text_aligned
 
             for ind, match_kind, score in find_indicator_bank_text_aligned(search_phrase, limit=tk):
                 if int(ind.id) in seen_ids:
@@ -626,7 +626,7 @@ class AIToolsRegistry:
         # Short-query keyword fallback only (long queries are covered by text-aligned search).
         if len(search_phrase) < 40:
             try:
-                from app.services.data_retrieval_shared import get_indicator_candidates_by_keyword
+                from app.services.data_retrieval.shared import get_indicator_candidates_by_keyword
                 keyword_hits = get_indicator_candidates_by_keyword(qtext, limit=tk)
                 for ind in keyword_hits:
                     if int(ind.id) not in seen_ids and not getattr(ind, "archived", False):
@@ -1601,12 +1601,12 @@ class AIToolsRegistry:
         Returns:
             List of matching workflow documents with steps and tour configs
         """
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         top_k = max(1, min(top_k, 10))
 
         # Get user access level for filtering
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         user_role = AuthorizationService.access_level(current_user) if current_user.is_authenticated else 'public'
 
         service = WorkflowDocsService()
@@ -1655,7 +1655,7 @@ class AIToolsRegistry:
         Returns:
             Complete workflow with steps, tour config, and formatted summary
         """
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         service = WorkflowDocsService()
         workflow = service.get_workflow_by_id(workflow_id)
@@ -1664,7 +1664,7 @@ class AIToolsRegistry:
             raise ToolExecutionError(f"Workflow not found: {workflow_id}")
 
         # Check access level
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         user_role = AuthorizationService.access_level(current_user) if current_user.is_authenticated else 'public'
         if user_role not in ['admin', 'system_manager']:
             if user_role not in workflow.roles and 'all' not in workflow.roles:
@@ -1819,7 +1819,7 @@ class AIToolsRegistry:
 
     @staticmethod
     def _form_template_service():
-        from app.services.form_template_ai_service import FormTemplateAIService
+        from app.services.forms.template_ai_service import FormTemplateAIService
 
         return FormTemplateAIService()
 
@@ -1835,7 +1835,7 @@ class AIToolsRegistry:
         self, template_id: int, version_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Read the full version-scoped structure of a form template."""
-        from app.services.form_template_ai_service import FormTemplateAIError
+        from app.services.forms.template_ai_service import FormTemplateAIError
 
         user = self._require_form_builder_user()
         try:
@@ -1848,7 +1848,7 @@ class AIToolsRegistry:
     @tool_wrapper
     def create_form_template(self, **schema) -> Dict[str, Any]:
         """Create a new form template (as a draft) from a canonical schema."""
-        from app.services.form_template_ai_service import FormTemplateAIError
+        from app.services.forms.template_ai_service import FormTemplateAIError
 
         user = self._require_form_builder_user()
         try:
@@ -1861,7 +1861,7 @@ class AIToolsRegistry:
         self, template_id: int, operations: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Apply edit operations to a template's draft version."""
-        from app.services.form_template_ai_service import FormTemplateAIError
+        from app.services.forms.template_ai_service import FormTemplateAIError
 
         user = self._require_form_builder_user()
         try:
@@ -1874,7 +1874,7 @@ class AIToolsRegistry:
         self, template_id: int, languages: List[str], scope: str = "untranslated"
     ) -> Dict[str, Any]:
         """Machine-translate draft template content into the requested languages."""
-        from app.services.form_template_ai_service import FormTemplateAIError
+        from app.services.forms.template_ai_service import FormTemplateAIError
 
         user = self._require_form_builder_user()
         try:
@@ -1887,7 +1887,7 @@ class AIToolsRegistry:
     @tool_wrapper
     def discard_template_draft(self, template_id: int) -> Dict[str, Any]:
         """Discard the draft version of a template (explicit user request only)."""
-        from app.services.form_template_ai_service import FormTemplateAIError
+        from app.services.forms.template_ai_service import FormTemplateAIError
 
         user = self._require_form_builder_user()
         try:

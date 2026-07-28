@@ -1,19 +1,20 @@
 from flask import Blueprint, send_file, current_app, request, flash, redirect, url_for
 from flask_login import login_required, current_user
 from app.models import db, FormSection, FormItem, FormData
-from app.services.form_data_service import FormDataService
-from app.services import get_aes_with_joins, get_formdata_map
+from app.services.forms.data_service import FormDataService
+from app.services import get_aes_with_joins
+from app.services import get_formdata_map
 from app.services.monitoring.memory import memory_tracker
 import openpyxl
 import io
 import time
-from app.services.excel_service import ExcelService
-from app.services.upr_country_reporting_excel_service import (
+from app.services.imports.excel_service import ExcelService
+from app.services.upr.country_reporting_excel_service import (
     UPR_COUNTRY_REPORTING_LABEL,
     UprCountryReportingExcelService,
 )
-from app.services.authorization_service import AuthorizationService
-from app.services.user_analytics_service import log_user_activity
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.platform.user_analytics_service import log_user_activity
 from app.services.notification.core import log_entity_activity
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok
 from app.utils.request_utils import is_json_request
@@ -128,7 +129,7 @@ def import_assignment_excel(aes_id):
             return json_not_found(error_msg)
         return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
 
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     if aes.status in ["submitted", "approved"] and not AuthorizationService.is_admin(current_user):
         error_msg = "This assignment is no longer in an editable state."

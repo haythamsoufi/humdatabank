@@ -6,8 +6,8 @@ from app.models.core import UserEntityPermission
 from app.models.rbac import RbacUserRole, RbacRole
 from app.models.enums import EntityType
 from app.models.system import CountryAccessRequestStatus
-from app.services.entity_service import EntityService
-from app.services.assignment_completion_service import AssignmentCompletionService, CompletionMetrics
+from app.services.organization.entity_service import EntityService
+from app.services.assignments.completion_service import AssignmentCompletionService, CompletionMetrics
 from sqlalchemy import and_, or_, func, case
 from sqlalchemy.orm import aliased, joinedload
 from app.services import get_user_countries
@@ -15,7 +15,7 @@ from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY, SELF_REPORT_PER
 from app.utils.form_localization import get_localized_country_name, get_localized_national_society_name as _get_localized_national_society_name
 from datetime import datetime
 from app.services.notification.core import get_country_recent_activities, notify_self_report_created
-from app.services.reporting_period_service import (
+from app.services.forms.reporting_period_service import (
     dashboard_assignment_period_sort_key,
     sort_period_names,
     sync_assigned_form_reporting_period,
@@ -32,8 +32,8 @@ from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
-from app.services.app_settings_service import is_organization_email
-from app.services.authorization_service import AuthorizationService
+from app.services.platform.app_settings_service import is_organization_email
+from app.services.organization.authorization_service import AuthorizationService
 from app.plugins.data_explorer import get_data_explorer_nav_permissions
 
 from app.routes.main import bp
@@ -250,7 +250,7 @@ def dashboard():
     all_access_requests = []
     non_org_has_counting_request = False
     try:
-        from app.services.country_access_request_service import (
+        from app.services.organization.country_access_request_service import (
             is_auto_resolved_country_access_request,
             reconcile_fulfilled_pending_country_access_requests,
         )
@@ -1059,7 +1059,7 @@ def load_more_activities():
         user_countries = get_user_countries()  # Uses current_user internally
         country_ids = [c['id'] for c in user_countries]  # Returns list of dicts, not objects
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if not AuthorizationService.has_country_access(current_user, country_id):
             from app.utils.api_responses import json_forbidden
             return json_forbidden('Access denied')

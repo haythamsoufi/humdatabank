@@ -52,8 +52,8 @@ class TestApiData:
         auth_user = MagicMock()
         auth_user.id = 123
         with patch("app.routes.api.data.authenticate_api_request", return_value=(False, auth_user, None)), \
-             patch("app.services.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
-             patch("app.services.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
+             patch("app.services.organization.authorization_service.AuthorizationService.is_system_manager", return_value=False), \
+             patch("app.services.organization.authorization_service.AuthorizationService.has_rbac_permission", return_value=False):
             resp = client.get("/api/v1/data?analysis=true")
 
         assert resp.status_code == 403

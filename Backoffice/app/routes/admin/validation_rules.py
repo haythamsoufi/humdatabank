@@ -6,8 +6,8 @@ from flask_login import login_required
 from app import db
 from app.routes.admin import bp
 from app.routes.admin.shared import VALIDATION_RULES_PERMISSION, permission_required
-from app.services.validation_dashboard_service import template_options
-from app.services.validation_registry_service import (
+from app.services.validation.dashboard_service import template_options
+from app.services.validation.registry_service import (
     delete_check_type,
     delete_threshold,
     list_check_type_rows,

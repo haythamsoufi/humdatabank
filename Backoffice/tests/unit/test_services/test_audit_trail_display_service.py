@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.audit_trail_display_service import (
+from app.services.audit.trail_display_service import (
     FormContextLookups,
     _extract_aes_and_template_ids_from_context,
     _resolve_form_context,
@@ -492,7 +492,7 @@ class TestExtractEntityInfo:
         with app.app_context():
             ctx = {"entity_type": "country", "entity_id": 10}
             # EntityService is lazily imported inside extract_entity_info
-            with patch("app.services.entity_service.EntityService") as MockES:
+            with patch("app.services.organization.entity_service.EntityService") as MockES:
                 MockES.get_entity_display_name.return_value = "Nigeria"
                 etype, eid, ename = extract_entity_info("activity", ctx)
                 assert ename == "Nigeria"
@@ -501,7 +501,7 @@ class TestExtractEntityInfo:
         with app.app_context():
             ctx = {"entity_type": "country", "entity_id": 10}
             with patch(
-                "app.services.entity_service.EntityService",
+                "app.services.organization.entity_service.EntityService",
                 side_effect=Exception,
             ):
                 etype, eid, ename = extract_entity_info("activity", ctx)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.user_analytics_service import _update_session_activity_explicit
+from app.services.platform.user_analytics_service import _update_session_activity_explicit
 
 
 class _FakeSessionLog:
@@ -27,7 +27,7 @@ def test_touch_types_do_not_increment_actions_performed():
     mock_model = MagicMock()
     mock_model.query.filter_by.return_value.first.return_value = fake
 
-    with patch('app.services.user_analytics_service.UserSessionLog', mock_model):
+    with patch('app.services.platform.user_analytics_service.UserSessionLog', mock_model):
         for _ in range(15):
             _update_session_activity_explicit(sid, 'action')
             _update_session_activity_explicit(sid, 'heartbeat')

@@ -16,7 +16,7 @@ def deferred_startup_cleanup(app):
                 with db.engine.connect() as conn:
                     conn.execute(db.text('SELECT 1'))
 
-                from app.services.user_analytics_service import cleanup_inactive_sessions
+                from app.services.platform.user_analytics_service import cleanup_inactive_sessions
 
                 cleanup_count = cleanup_inactive_sessions()
                 if cleanup_count > 0:
@@ -77,7 +77,7 @@ def deferred_rbac_seed(app, selected_config_name, is_reloader):
                 if last_err is not None:
                     raise last_err
 
-                from app.services.rbac_seed_service import seed_rbac_permissions_and_roles
+                from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
 
                 stats = seed_rbac_permissions_and_roles()
                 if stats.get("skipped_due_to_lock"):

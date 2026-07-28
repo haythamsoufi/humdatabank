@@ -308,7 +308,7 @@ class User(UserMixin, db.Model):
 
         permissions = query.all()
 
-        from app.services.entity_service import EntityService
+        from app.services.organization.entity_service import EntityService
 
         pairs = [(perm.entity_type, perm.entity_id) for perm in permissions]
         prefetched = EntityService.prefetch_entities(pairs, include_hierarchy=False)
@@ -588,7 +588,7 @@ class Country(db.Model):
 @event.listens_for(Country, 'before_update')
 def _country_sync_secretariat_regional_office_fields(mapper, connection, target):
     """Link legacy region strings and keep denormalized country.region in sync."""
-    from app.services.secretariat_regional_office_service import (
+    from app.services.organization.secretariat_regional_office_service import (
         assign_country_secretariat_regional_office,
         sync_country_region_fields,
     )

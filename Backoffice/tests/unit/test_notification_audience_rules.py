@@ -3,7 +3,7 @@
 from unittest.mock import patch
 
 from app.models.enums import NotificationType
-from app.services.app_settings_service import (
+from app.services.platform.app_settings_service import (
     DEFAULT_NOTIFICATION_AUDIENCE_RULES,
     audience_bucket_enabled,
     get_merged_notification_audience_rules,
@@ -33,7 +33,7 @@ def test_audience_override_disables_admin_branch_assignment_submitted():
     }
 
     with patch(
-        "app.services.app_settings_service.get_merged_notification_audience_rules",
+        "app.services.platform.app_settings_service.get_merged_notification_audience_rules",
         return_value=custom,
     ):
         nt = NotificationType.assignment_submitted
@@ -44,7 +44,7 @@ def test_audience_override_disables_admin_branch_assignment_submitted():
 
 def test_audience_bucket_enabled_unknown_bucket_false():
     with patch(
-        "app.services.app_settings_service.get_merged_notification_audience_rules",
+        "app.services.platform.app_settings_service.get_merged_notification_audience_rules",
         return_value={k: dict(v) for k, v in DEFAULT_NOTIFICATION_AUDIENCE_RULES.items()},
     ):
         assert audience_bucket_enabled(NotificationType.assignment_created, "not_a_bucket") is False

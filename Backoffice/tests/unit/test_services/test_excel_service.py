@@ -34,7 +34,7 @@ def _workbook_to_bytes(wb):
 
 class TestCalculateLabelRowsNeeded:
     def _call(self, label_text, max_chars_per_row=40, min_rows=1, max_rows=5):
-        from app.services.excel_service import ExcelService
+        from app.services.imports.excel_service import ExcelService
         return ExcelService._calculate_label_rows_needed(
             label_text, max_chars_per_row=max_chars_per_row, min_rows=min_rows, max_rows=max_rows
         )
@@ -74,7 +74,7 @@ class TestCalculateLabelRowsNeeded:
 
 class TestExtractFieldValues:
     def _call(self, workbook):
-        from app.services.excel_service import ExcelService
+        from app.services.imports.excel_service import ExcelService
         return ExcelService.extract_field_values(workbook)
 
     def test_new_form_format_basic(self):
@@ -208,7 +208,7 @@ class TestExtractFieldValues:
 
 class TestLoadWorkbook:
     def test_load_valid_workbook(self):
-        from app.services.excel_service import ExcelService
+        from app.services.imports.excel_service import ExcelService
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.append([1, "test"])
@@ -237,7 +237,7 @@ class TestBulkSaveFieldsWithDisagg:
 
     def test_simple_value_saved(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             field_data = {
                 1: {'value': '42', 'disagg_data': None}
@@ -245,18 +245,18 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry = MagicMock()
             mock_entry.set_simple_value = MagicMock()
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.PublicSubmission") as MockPS:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
                     MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
-                    with patch("app.services.excel_service.db") as mock_db:
+                    with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
                         assert result['success'] is True
                         assert result['updated_count'] >= 1
 
     def test_disagg_data_saved(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             field_data = {
                 1: {
@@ -267,80 +267,80 @@ class TestBulkSaveFieldsWithDisagg:
             mock_entry = MagicMock()
             mock_entry.set_disaggregated_data = MagicMock()
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.PublicSubmission") as MockPS:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
                     MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
-                    with patch("app.services.excel_service.db") as mock_db:
+                    with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
                         assert result['success'] is True
 
     def test_new_entry_created_when_missing(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             field_data = {2: {'value': '100', 'disagg_data': None}}
             mock_entry = MagicMock()
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.PublicSubmission") as MockPS:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
                     MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = None
                     MockFormData.return_value = mock_entry
-                    with patch("app.services.excel_service.db") as mock_db:
+                    with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
                         mock_db.session.add.assert_called()
 
     def test_rollback_on_exception(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             field_data = {1: {'value': '42', 'disagg_data': None}}
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.PublicSubmission") as MockPS:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
                     MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.side_effect = RuntimeError("DB error")
-                    with patch("app.services.excel_service.db") as mock_db:
+                    with patch("app.services.imports.excel_service.db") as mock_db:
                         mock_db.session.commit.side_effect = RuntimeError("commit failed")
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
                         assert result['success'] is False
 
     def test_invalid_disagg_data_structure(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             # disagg_data without mode or values
             field_data = {3: {'value': None, 'disagg_data': {'mode': None, 'values': {}}}}
             mock_entry = MagicMock()
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.PublicSubmission") as MockPS:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
                     MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
-                    with patch("app.services.excel_service.db") as mock_db:
+                    with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
                         assert len(result['errors']) > 0
 
     def test_empty_value_clears_entry(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = self._make_aes()
             field_data = {5: {'value': None, 'disagg_data': None}}
             mock_entry = MagicMock()
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.PublicSubmission") as MockPS:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.PublicSubmission") as MockPS:
                     MockPS.__instancecheck__ = lambda cls, inst: False
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
-                    with patch("app.services.excel_service.db") as mock_db:
+                    with patch("app.services.imports.excel_service.db") as mock_db:
                         result = ExcelService._bulk_save_fields_with_disagg(aes, field_data)
                         assert result['success'] is True
                         mock_entry.set_simple_value.assert_called_with(None)
 
     def test_public_submission_uses_different_filter(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             from app.models.assignments import PublicSubmission
 
             # Create a real PublicSubmission mock that passes isinstance check
@@ -349,8 +349,8 @@ class TestBulkSaveFieldsWithDisagg:
             field_data = {1: {'value': '55', 'disagg_data': None}}
             mock_entry = MagicMock()
 
-            with patch("app.services.excel_service.FormData") as MockFormData:
-                with patch("app.services.excel_service.db") as mock_db:
+            with patch("app.services.imports.excel_service.FormData") as MockFormData:
+                with patch("app.services.imports.excel_service.db") as mock_db:
                     MockFormData.query.filter_by.return_value.first.return_value = mock_entry
                     result = ExcelService._bulk_save_fields_with_disagg(ps, field_data)
                     assert result['success'] is True
@@ -363,7 +363,7 @@ class TestBulkSaveFieldsWithDisagg:
 class TestImportAssignmentData:
     def test_calls_extract_and_bulk_save(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             aes = MagicMock()
             aes.id = 1
 
@@ -386,7 +386,7 @@ class TestImportAssignmentData:
 class TestWriteSection:
     def test_basic_section_written(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             from openpyxl.styles import Alignment, Font, PatternFill
 
             wb = openpyxl.Workbook()
@@ -412,7 +412,7 @@ class TestWriteSection:
 
             entries_map = {}
 
-            with patch("app.services.excel_service.get_unified_form_item_id", return_value=1):
+            with patch("app.services.imports.excel_service.get_unified_form_item_id", return_value=1):
                 section_fill = PatternFill(start_color="FFCC0000", end_color="FFCC0000", fill_type="solid")
                 section_font = Font(name="Arial", size=14, bold=True, color="FFFFFFFF")
                 label_font = Font(name="Arial", size=11, bold=True)
@@ -431,7 +431,7 @@ class TestWriteSection:
 
     def test_section_with_disagg_data(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             from openpyxl.styles import Alignment, Font, PatternFill
 
             wb = openpyxl.Workbook()
@@ -459,7 +459,7 @@ class TestWriteSection:
             mock_entry.value = None
             entries_map = {2: mock_entry}
 
-            with patch("app.services.excel_service.get_unified_form_item_id", return_value=2):
+            with patch("app.services.imports.excel_service.get_unified_form_item_id", return_value=2):
                 section_fill = PatternFill(start_color="FFCC0000", end_color="FFCC0000", fill_type="solid")
                 section_font = Font(name="Arial", size=14, bold=True, color="FFFFFFFF")
                 label_font = Font(name="Arial", size=11, bold=True)
@@ -478,7 +478,7 @@ class TestWriteSection:
 
     def test_section_with_matrix_data(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             from openpyxl.styles import Alignment, Font, PatternFill
 
             wb = openpyxl.Workbook()
@@ -505,7 +505,7 @@ class TestWriteSection:
             mock_entry.value = None
             entries_map = {3: mock_entry}
 
-            with patch("app.services.excel_service.get_unified_form_item_id", return_value=3):
+            with patch("app.services.imports.excel_service.get_unified_form_item_id", return_value=3):
                 section_fill = PatternFill(start_color="FFCC0000", end_color="FFCC0000", fill_type="solid")
                 section_font = Font(name="Arial", size=14, bold=True, color="FFFFFFFF")
                 label_font = Font(name="Arial", size=11, bold=True)
@@ -524,7 +524,7 @@ class TestWriteSection:
 
     def test_document_field_skipped(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             from openpyxl.styles import Alignment, Font, PatternFill
 
             wb = openpyxl.Workbook()
@@ -553,7 +553,7 @@ class TestWriteSection:
             disagg_value_fill = PatternFill(start_color="FFE6F3FF", end_color="FFE6F3FF", fill_type="solid")
             left_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
 
-            with patch("app.services.excel_service.get_unified_form_item_id", return_value=None):
+            with patch("app.services.imports.excel_service.get_unified_form_item_id", return_value=None):
                 end_row = ExcelService._write_section(
                     ws, section, entries_map, value_fill, section_fill, section_font,
                     label_font, value_font, disagg_label_font, disagg_value_fill,
@@ -563,7 +563,7 @@ class TestWriteSection:
 
     def test_section_with_variable_resolution(self, app):
         with app.app_context():
-            from app.services.excel_service import ExcelService
+            from app.services.imports.excel_service import ExcelService
             from openpyxl.styles import Alignment, Font, PatternFill
 
             wb = openpyxl.Workbook()
@@ -584,7 +584,7 @@ class TestWriteSection:
             disagg_value_fill = PatternFill(start_color="FFE6F3FF", end_color="FFE6F3FF", fill_type="solid")
             left_align = Alignment(horizontal="left", vertical="top", wrap_text=True)
 
-            with patch("app.services.excel_service.VariableResolutionService") as mock_vrs:
+            with patch("app.services.imports.excel_service.VariableResolutionService") as mock_vrs:
                 mock_vrs.replace_variables_in_text.return_value = "Kenya Section"
                 end_row = ExcelService._write_section(
                     ws, section, {}, value_fill, section_fill, section_font,

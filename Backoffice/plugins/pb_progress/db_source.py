@@ -15,7 +15,7 @@ from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.models.indicator_bank import IndicatorBank
-from app.services import storage_service
+from app.services.platform import storage_service
 from plugins.pb_progress.plugin_data_store import (
     EXCEL_NAME,
     PBProgressDataStore,

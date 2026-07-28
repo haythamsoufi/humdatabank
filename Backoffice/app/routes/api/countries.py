@@ -21,13 +21,13 @@ from app.models.organization import NationalSociety
 from app.models.assignments import AssignmentEntityStatus
 from app.utils.auth import require_api_key, require_api_key_or_session
 from app.utils.rate_limiting import rate_limit, api_rate_limit
-from app.services.user_analytics_service import get_client_ip
+from app.services.platform.user_analytics_service import get_client_ip
 from app import db
 from sqlalchemy.orm import joinedload
 
 # Import utility functions
 from app.utils.api_helpers import json_response, api_error
-from app.services.reporting_period_service import sort_period_names
+from app.services.forms.reporting_period_service import sort_period_names
 
 # ---------------------------------------------------------------------------
 # Module-level caches (survive across requests, reset on worker restart)

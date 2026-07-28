@@ -25,7 +25,7 @@ def _cache_version(updated_at: Any) -> Optional[str]:
 
 
 def _cdn_logo_url(filename: str, updated_at: Any = None) -> Optional[str]:
-    from app.services import storage_service as storage
+    from app.services.platform import storage_service as storage
 
     if not storage.public_cdn_enabled():
         return None

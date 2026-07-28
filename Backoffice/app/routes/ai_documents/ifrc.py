@@ -772,7 +772,7 @@ def import_ifrc_api_document():
         country_id = data.get('country_id')
         country_name = data.get('country_name', '').strip()
 
-        from app.services.authorization_service import AuthorizationService
+        from app.services.organization.authorization_service import AuthorizationService
         if is_public and not AuthorizationService.is_admin(current_user):
             return json_forbidden('Only admins can create public documents')
 

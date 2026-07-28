@@ -11,16 +11,16 @@ from app.routes.admin.shared import (
     permission_required,
     permission_required_any,
 )
-from app.services.validation_check_service import run_validation_checks
-from app.services.validation_dispatch_service import preview_dispatch, send_dispatch
-from app.services.validation_dashboard_service import (
+from app.services.validation.check_service import run_validation_checks
+from app.services.validation.dispatch_service import preview_dispatch, send_dispatch
+from app.services.validation.dashboard_service import (
     global_periods_for_template,
     list_countries_for_period,
     preview_country_validation,
     summarize_period,
     template_tab_options,
 )
-from app.services.validation_tracker_service import build_tracker_data
+from app.services.validation.tracker_service import build_tracker_data
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.utils.request_validation import enforce_csrf_json

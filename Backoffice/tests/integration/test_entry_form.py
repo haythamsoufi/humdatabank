@@ -29,11 +29,11 @@ from app.routes.forms import (
     handle_public_submission_form,
     preview_template
 )
-from app.services.form_data_service import FormDataService
-from app.services.template_preparation_service import TemplatePreparationService
-from app.services.variable_resolution_service import VariableResolutionService
-from app.services.authorization_service import AuthorizationService
-from app.services.document_service import DocumentService
+from app.services.forms.data_service import FormDataService
+from app.services.templates.preparation_service import TemplatePreparationService
+from app.services.forms.variable_resolution_service import VariableResolutionService
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.documents.service import DocumentService
 from tests.factories import (
     create_test_user, create_test_admin, create_test_country, create_test_template
 )
@@ -436,8 +436,8 @@ class TestEntryFormRoutes:
                 sess['_fresh'] = True
 
             # Mock access/edit checks + template preparation to keep the route fast/stable
-            with patch('app.services.authorization_service.AuthorizationService.can_access_assignment') as mock_access, \
-                 patch('app.services.authorization_service.AuthorizationService.can_edit_assignment') as mock_edit, \
+            with patch('app.services.organization.authorization_service.AuthorizationService.can_access_assignment') as mock_access, \
+                 patch('app.services.organization.authorization_service.AuthorizationService.can_edit_assignment') as mock_edit, \
                  patch('app.routes.forms.entry.TemplatePreparationService.prepare_template_for_rendering') as mock_prep:
                 mock_access.return_value = True
                 mock_edit.return_value = True
@@ -1380,7 +1380,7 @@ class TestFormAuthorization:
     def test_check_assignment_access_admin(self, db_session, app, admin_user):
         """Test assignment access check for admin user."""
         with app.app_context():
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
 
             country = create_test_country(db_session)
             template = create_test_template(db_session)
@@ -1408,7 +1408,7 @@ class TestFormAuthorization:
     def test_check_assignment_access_focal_point(self, db_session, app, test_user):
         """Test assignment access check for focal point user with entity permission."""
         with app.app_context():
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
             from app.models.core import UserEntityPermission
             from app.models.rbac import RbacRole, RbacPermission, RbacRolePermission, RbacUserRole
 
@@ -1463,7 +1463,7 @@ class TestFormAuthorization:
     def test_check_assignment_access_denied(self, db_session, app, test_user):
         """Test assignment access denied for user without country access."""
         with app.app_context():
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
 
             country1 = create_test_country(db_session, name="Country 1")
             country2 = create_test_country(db_session, name="Country 2")
@@ -1522,7 +1522,7 @@ class TestFormAuthorization:
     def test_check_assignment_edit_access_admin_submitted(self, db_session, app, admin_user):
         """Test edit access check for admin when assignment is submitted."""
         with app.app_context():
-            from app.services.authorization_service import AuthorizationService
+            from app.services.organization.authorization_service import AuthorizationService
 
             country = create_test_country(db_session)
             template = create_test_template(db_session)
@@ -1559,7 +1559,7 @@ class TestFormProcessingUtilities:
     def test_form_item_processor_setup_indicator(self, db_session, app):
         """Test FormItemProcessor setup for indicator."""
         with app.app_context():
-            from app.services.form_processing_service import FormItemProcessor
+            from app.services.forms.processing_service import FormItemProcessor
 
             template = create_test_template(db_session)
 
@@ -1613,7 +1613,7 @@ class TestFormProcessingUtilities:
     def test_form_item_processor_setup_question(self, db_session, app):
         """Test FormItemProcessor setup for question."""
         with app.app_context():
-            from app.services.form_processing_service import FormItemProcessor
+            from app.services.forms.processing_service import FormItemProcessor
 
             template = create_test_template(db_session)
 
@@ -1655,7 +1655,7 @@ class TestFormProcessingUtilities:
     def test_get_form_items_for_section(self, db_session, app):
         """Test getting form items for a section."""
         with app.app_context():
-            from app.services.form_processing_service import get_form_items_for_section
+            from app.services.forms.processing_service import get_form_items_for_section
 
             template = create_test_template(db_session)
 
@@ -1929,7 +1929,7 @@ class TestEntryFormPreviewMode:
                 sess["_fresh"] = True
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.check_template_access",
+                "app.services.organization.authorization_service.AuthorizationService.check_template_access",
                 return_value=True,
             ):
                 resp = client.get(f"/forms/templates/preview/{template_id}")
@@ -1986,7 +1986,7 @@ class TestEntryFormPDFExport:
                 sess["_fresh"] = True
 
             with patch(
-                "app.services.authorization_service.AuthorizationService.can_access_assignment",
+                "app.services.organization.authorization_service.AuthorizationService.can_access_assignment",
                 return_value=False,
             ):
                 resp = client.get(f"/forms/assignment_status/{aes_id}/export_pdf", follow_redirects=False)

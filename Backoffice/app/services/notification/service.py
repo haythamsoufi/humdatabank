@@ -425,7 +425,7 @@ class NotificationService:
                         entity_id = message_params.get('_entity_id') or getattr(notification, 'entity_id', None)
                         if entity_type and entity_id:
                             try:
-                                from app.services.entity_service import EntityService
+                                from app.services.organization.entity_service import EntityService
                                 entity_name = EntityService.get_localized_entity_name(
                                     entity_type,
                                     entity_id,
@@ -974,7 +974,7 @@ class NotificationService:
             aes_entity_name_cache = {}
             try:
                 from app.models.assignments import AssignmentEntityStatus
-                from app.services.entity_service import EntityService
+                from app.services.organization.entity_service import EntityService
 
                 aes_pairs = set()
                 for cached in assignment_status_cache.values():
@@ -994,7 +994,7 @@ class NotificationService:
             entity_cache = {}  # {(entity_type, entity_id): entity_name}
             if entity_lookups:
                 try:
-                    from app.services.entity_service import EntityService
+                    from app.services.organization.entity_service import EntityService
                     entity_cache = EntityService.batch_entity_names(
                         list(entity_lookups.keys()),
                         include_hierarchy=True,
@@ -1047,7 +1047,7 @@ class NotificationService:
                 if not entity_name and n.related_object_type == 'assignment' and n.related_object_id:
                     try:
                         from app.models.assignments import AssignmentEntityStatus, AssignedForm
-                        from app.services.entity_service import EntityService
+                        from app.services.organization.entity_service import EntityService
                         from app.models.enums import EntityType
 
                         # First, try direct lookup from cache (batch-loaded)

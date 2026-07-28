@@ -8,7 +8,7 @@ bp = Blueprint("main", __name__)
 @bp.app_context_processor
 def inject_rbac_helpers():
     """Inject RBAC helper functions into all templates"""
-    from app.services.authorization_service import AuthorizationService
+    from app.services.organization.authorization_service import AuthorizationService
 
     def has_permission(permission_code, scope=None):
         """Check if current user has a specific RBAC permission"""

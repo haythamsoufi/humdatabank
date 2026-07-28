@@ -19,7 +19,7 @@ from app.models import (
     FormTemplateVersion,
     IndicatorBank,
 )
-from app.services.form_template_ai_service import (
+from app.services.forms.template_ai_service import (
     FormTemplateAIError,
     FormTemplateAIService,
 )
@@ -32,7 +32,7 @@ from tests.factories import (
 )
 
 
-AUTHZ = "app.services.authorization_service.AuthorizationService"
+AUTHZ = "app.services.organization.authorization_service.AuthorizationService"
 
 
 @pytest.fixture

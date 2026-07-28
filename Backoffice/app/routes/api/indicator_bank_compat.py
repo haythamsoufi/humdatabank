@@ -29,12 +29,12 @@ from app.models import (
     Sector,
     SubSector,
 )
-from app.services.indicator_bank_service import (
+from app.services.indicators.bank_service import (
     build_sector_subsector_names as _build_sector_subsector_names,
     get_localized_type_unit as _get_localized_type_unit,
 )
-from app.services.indicator_resolution_service import IndicatorResolutionService
-from app.services import storage_service as storage
+from app.services.indicators.resolution_service import IndicatorResolutionService
+from app.services.platform import storage_service as storage
 from app.services.security.api_authentication import authenticate_db_api_key_only
 from app.utils.api_helpers import api_error, get_json_safe
 from app.utils.datetime_helpers import utcnow

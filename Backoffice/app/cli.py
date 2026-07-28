@@ -39,7 +39,7 @@ def register_commands(app):
     @with_appcontext
     def sync_sector_logos_cdn():
         """Mirror existing sector logos to the public static CDN container."""
-        from app.services import storage_service as storage
+        from app.services.platform import storage_service as storage
 
         if not storage.public_cdn_enabled():
             click.echo(
@@ -55,7 +55,7 @@ def register_commands(app):
     @with_appcontext
     def sync_indicator_embeddings(batch_size):
         """Build or refresh vector embeddings for Indicator Bank (semantic indicator resolution). Run once after migration, then when indicators change."""
-        from app.services.indicator_resolution_service import IndicatorResolutionService
+        from app.services.indicators.resolution_service import IndicatorResolutionService
         try:
             svc = IndicatorResolutionService()
             count, cost = svc.sync_all(batch_size=batch_size)
@@ -186,7 +186,7 @@ def register_commands(app):
             flask workflows sync
         """
         try:
-            from app.services.workflow_docs_service import WorkflowDocsService
+            from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
             click.echo('Loading workflow documentation...')
             service = WorkflowDocsService()
@@ -231,7 +231,7 @@ def register_commands(app):
             flask workflows list
         """
         try:
-            from app.services.workflow_docs_service import WorkflowDocsService
+            from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
             service = WorkflowDocsService()
             workflows = service.get_all_workflows()
@@ -272,7 +272,7 @@ def register_commands(app):
             flask workflows show add-user
         """
         try:
-            from app.services.workflow_docs_service import WorkflowDocsService
+            from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
             service = WorkflowDocsService()
             workflow = service.get_workflow_by_id(workflow_id)
@@ -334,7 +334,7 @@ def register_commands(app):
         import json
         from pathlib import Path
 
-        from app.services.workflow_docs_service import WorkflowDocsService
+        from app.services.documentation.workflow_docs_service import WorkflowDocsService
 
         try:
             service = WorkflowDocsService()
@@ -354,7 +354,7 @@ def register_commands(app):
             cdn_enabled = False
             storage = None
             try:
-                from app.services import storage_service as storage
+                from app.services.platform import storage_service as storage
                 cdn_enabled = storage.public_cdn_enabled()
             except Exception:
                 cdn_enabled = False
@@ -412,7 +412,7 @@ def register_commands(app):
     @with_appcontext
     def seed_rbac():
         """Seed RBAC permissions and baseline roles (idempotent)."""
-        from app.services.rbac_seed_service import seed_rbac_permissions_and_roles
+        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
 
         stats = seed_rbac_permissions_and_roles()
         click.echo("RBAC seed complete.")

@@ -371,7 +371,7 @@ def _sync_concept_embeddings(concept_aliases: Dict[str, List[str]]) -> None:
     """
     from app.extensions import db
     from app.models.ai_terminology import AITermConcept, AITermConceptEmbedding
-    from app.services.ai_embedding_service import AIEmbeddingService
+    from app.services.ai.documents.embedding import AIEmbeddingService
 
     if not concept_aliases:
         return
@@ -471,7 +471,7 @@ def _semantic_concepts_for_query(query: str, *, top_k: int = 3, min_similarity: 
     """
     from app.extensions import db
     from app.models.ai_terminology import AITermConcept, AITermConceptEmbedding
-    from app.services.ai_embedding_service import AIEmbeddingService
+    from app.services.ai.documents.embedding import AIEmbeddingService
 
     q = _norm(query)
     if not q:

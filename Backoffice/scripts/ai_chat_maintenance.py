@@ -14,7 +14,7 @@ import os
 from app import create_app
 
 logger = logging.getLogger(__name__)
-from app.services.ai_chat_retention import maintain_ai_chat_retention
+from app.services.ai.chat.retention import maintain_ai_chat_retention
 
 
 def main() -> int:

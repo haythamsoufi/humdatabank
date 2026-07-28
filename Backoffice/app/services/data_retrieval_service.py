@@ -10,7 +10,8 @@ This service consolidates data retrieval logic used across:
 Domain modules:
 - data_retrieval_shared: helpers (user, RBAC, escape, indicator scoring, country resolution)
 - data_retrieval_country: country resolution, country info, assignments, user countries
-- data_retrieval_form: form data queries, value breakdown, indicator values, form field value
+- data_retrieval_form: form data query builders (Data API)
+- ai.data.form_retrieval: AI chatbot form indicator / bulk retrieval tools
 """
 
 import json
@@ -50,13 +51,17 @@ from .data_retrieval_country import (
 from .data_retrieval_form import (
     query_form_data,
     get_form_data_queries,
+    query_dynamic_indicator_data,
+    query_repeat_group_data,
+)
+from .ai.data.form_retrieval import (
     get_value_breakdown,
     get_indicator_values_for_all_countries,
+    get_fdrs_income_sources_for_all_countries,
+    get_form_field_values_for_all_countries,
     get_assignment_indicator_values,
     get_form_field_value,
     get_indicator_timeseries,
-    query_dynamic_indicator_data,
-    query_repeat_group_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -638,6 +643,8 @@ __all__ = [
     'get_template_structure',
     'get_value_breakdown',
     'get_indicator_values_for_all_countries',
+    'get_fdrs_income_sources_for_all_countries',
+    'get_form_field_values_for_all_countries',
     'get_assignments_for_country',
     'get_assignment_indicator_values',
     'get_platform_stats',

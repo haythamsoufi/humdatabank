@@ -4,10 +4,40 @@
     display: none !important;
 }
 .form-builder-loading #form-builder-loading {
-    display: flex !important;
+    display: block !important;
 }
 #form-builder-loading {
     display: none;
+}
+
+/* Form builder loading skeleton */
+@keyframes form-builder-skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+
+.form-builder-skeleton {
+    pointer-events: none;
+    user-select: none;
+}
+
+.form-builder-skeleton-bar {
+    background: #e2e8f0;
+    border-radius: 0.375rem;
+}
+
+.form-builder-skeleton-pulse {
+    animation: form-builder-skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.form-builder-skeleton-status {
+    pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .form-builder-skeleton-pulse {
+        animation: none;
+    }
 }
 
 .section-item.section-collapsed .section-body {
@@ -415,8 +445,8 @@ html[dir="rtl"].sidebar-initially-collapsed body:has(#mainContent.content-with-s
    .modal-right-half, toggled by ItemModal.syncRightPanel via the Tailwind
    md:grid-cols-2 class) already produces two equal-width columns once the
    right pane has visible content. For matrix items, ItemModal.syncMatrixConfigPanel
-   moves the Column Codes section into the right column so it naturally
-   triggers that two-column layout instead of stretching a single column. */
+   moves the table config panel (rows + columns) into the right column so it
+   naturally triggers that two-column layout instead of stretching a single column. */
 .item-modal--fill-content .modal-grid-container {
     align-items: start;
 }
@@ -425,8 +455,13 @@ html[dir="rtl"].sidebar-initially-collapsed body:has(#mainContent.content-with-s
     align-self: start;
 }
 
-#matrix-columns-section.matrix-columns-in-right-panel {
+#matrix-table-config-panel.matrix-table-config-in-right-panel {
     margin-top: 0;
+}
+
+#matrix-table-config-panel.matrix-table-config-in-right-panel #matrix-config-rows-section {
+    border-top: 0;
+    padding-top: 0;
 }
 
 /* Properties section: use more of the available width with additional columns

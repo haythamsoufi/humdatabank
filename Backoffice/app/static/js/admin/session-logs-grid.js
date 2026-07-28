@@ -611,7 +611,6 @@
                 var result = AgGridHelper.create('sessionLogsGrid', 'admin-session-logs', columnDefs, rowData, {
                     autoShow: true,
                     gridOptions: {
-                        suppressRowClickSelection: true,
                         getRowClass: function(params) {
                             if (params.data && params.data.is_active) return 'session-log-row--active';
                             return '';

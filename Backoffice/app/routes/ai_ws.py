@@ -50,8 +50,8 @@ from app.routes.ai import (
 )
 
 logger = logging.getLogger(__name__)
-from app.services.ai_dlp import evaluate_ai_message, log_dlp_audit_event
-from app.services.ai_chat_request import (
+from app.services.ai.chat.dlp import evaluate_ai_message, log_dlp_audit_event
+from app.services.ai.chat.request import (
     parse_chat_request,
     resolve_conversation_and_history,
     get_idempotent_reply,
@@ -59,10 +59,10 @@ from app.services.ai_chat_request import (
     load_conversation_history_for_llm,
     replace_conversation_messages,
 )
-from app.services.ai_fastpath import try_answer_value_question
+from app.services.ai.chat.fastpath import try_answer_value_question
 
 # Document RAG (answer endpoint logic, reused for WS streaming)
-from app.services.ai_vector_store import AIVectorStore
+from app.services.ai.documents.vector_store import AIVectorStore
 
 
 class QuotaExceededError(Exception):
@@ -991,7 +991,7 @@ def register_ai_ws(app) -> None:
 
                     # Centralized OpenAI-only chain (agent -> OpenAI)
                     # Emits `step` + `delta` events via callbacks so WS/SSE/HTTP can share behavior.
-                    from app.services.ai_chat_engine import AIChatEngine
+                    from app.services.ai.chat.engine import AIChatEngine
                     
                     # Accumulate deltas server-side so we can reconstruct the final response
                     # even if a provider path only emits deltas (defensive; mirrors SSE behavior).

@@ -1788,7 +1788,7 @@ class FormDataService:
                 if edit_public_key in request.form:
                     doc_to_edit.is_public = request.form[edit_public_key] in ['1', 'true', 'True']
                     try:
-                        from app.services.ai_submitted_document_ingest import (
+                        from app.services.ai.documents.ingest import (
                             sync_ai_document_is_public_from_submitted,
                         )
 

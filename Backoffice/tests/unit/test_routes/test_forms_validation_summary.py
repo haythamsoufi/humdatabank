@@ -503,8 +503,8 @@ class TestValidationSummaryOpinionsRun:
             aes_id = aes.id
 
         with patch("app.services.authorization_service.AuthorizationService.can_access_assignment", return_value=True), \
-             patch("app.services.ai_formdata_validation_service.AIFormDataValidationService.upsert_validation", return_value=(MagicMock(), None)), \
-             patch("app.services.ai_formdata_validation_service.AIFormDataValidationService.upsert_missing_assigned_validation", return_value=(MagicMock(), None)):
+             patch("app.services.ai.validation.formdata_validation.AIFormDataValidationService.upsert_validation", return_value=(MagicMock(), None)), \
+             patch("app.services.ai.validation.formdata_validation.AIFormDataValidationService.upsert_missing_assigned_validation", return_value=(MagicMock(), None)):
             resp = logged_in_client.post(
                 f"/forms/assignment_status/{aes_id}/validation_summary/opinions/run",
                 json={},

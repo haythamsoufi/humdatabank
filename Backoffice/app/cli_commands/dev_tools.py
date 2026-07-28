@@ -441,7 +441,7 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def ai_chat_maintenance(archive_days, purge_days, batch_size, user_id, dry_run):
         """Archive/purge AI chat conversations based on configured retention policy."""
-        from app.services.ai_chat_retention import maintain_ai_chat_retention
+        from app.services.ai.chat.retention import maintain_ai_chat_retention
 
         stats = maintain_ai_chat_retention(
             archive_after_days=archive_days,

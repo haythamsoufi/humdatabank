@@ -253,11 +253,13 @@ export const BlankBodyEditor = {
     },
 
     _getCaption() {
-        return this._editor?.closest('.mb-4')?.querySelector('#item-question-definition-caption')
-            || document.getElementById('item-question-definition-caption');
+        const block = this._editor?.closest('.item-optional-description-block');
+        return block?.querySelector('.item-show-description-label')
+            || document.querySelector('#item-question-fields .item-show-description-label');
     },
 
     _onCaptionClick(e) {
+        if (e.target.closest('.item-show-description-toggle')) return;
         e.preventDefault();
         this._editor?.focus({ preventScroll: true });
     },
@@ -265,9 +267,7 @@ export const BlankBodyEditor = {
     _bindCaptionToEditor() {
         const caption = this._getCaption();
         if (!caption) return;
-        // contenteditable divs are not HTML "labelable" elements, so remove
-        // for= (which still points at the hidden textarea) and focus manually.
-        caption.removeAttribute('for');
+        caption.classList.add('cursor-pointer');
         if (!this._captionClickBound) {
             this._captionClickBound = (e) => this._onCaptionClick(e);
             caption.addEventListener('click', this._captionClickBound);
@@ -277,11 +277,11 @@ export const BlankBodyEditor = {
     _unbindCaptionFromEditor() {
         const caption = this._getCaption();
         if (!caption) return;
+        caption.classList.remove('cursor-pointer');
         if (this._captionClickBound) {
             caption.removeEventListener('click', this._captionClickBound);
             this._captionClickBound = null;
         }
-        caption.setAttribute('for', 'item-question-definition');
     },
 
     // ── Population (called on edit) ──────────────────────────────────────────

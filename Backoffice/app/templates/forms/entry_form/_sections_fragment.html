@@ -203,6 +203,8 @@
                                                             {% endif %}
                                                         </div>
 
+                                                        {% include 'forms/entry_form/partials/_entry_form_item_hint.html' %}
+
                                                         {% if is_plugin_active %}
                                                             {# Generic plugin boot config for the client-side loader (no plugin-specific JS branches). #}
                                                             {% set _ft_cfg = (plugin_manager.get_field_type_config(field.plugin_type) if plugin_manager else None) %}
@@ -454,6 +456,7 @@
                                                                 {% endif %}
                                                             </div>
                                                         </div>
+                                                        {% include 'forms/entry_form/partials/_entry_form_item_hint.html' %}
                                                         {% set item_key = 'field_value[' ~ field.id ~ ']' %}
                                                         {% set existing_entry_data = existing_data.get(item_key) %}
 
@@ -1296,6 +1299,8 @@
                                                             {% endif %}
                                                         </div>
 
+                                                        {% include 'forms/entry_form/partials/_entry_form_item_hint.html' %}
+
                                                         {% if is_plugin_active %}
                                                             {% set _ft_cfg = (plugin_manager.get_field_type_config(field.plugin_type) if plugin_manager else None) %}
                                                             {% set _entry_cfg = (_ft_cfg['entry_form_config'] if _ft_cfg and _ft_cfg.get('entry_form_config') else {}) %}
@@ -1528,6 +1533,7 @@
                                                                         {% endif %}
                                                                     </div>
                                                                 </div>
+                                                        {% include 'forms/entry_form/partials/_entry_form_item_hint.html' %}
                                                         {% set item_key = 'field_value[' ~ field.id ~ ']' %}
                                                         {% set existing_entry_data = existing_data.get(item_key) %}
 

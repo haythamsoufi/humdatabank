@@ -667,9 +667,9 @@ class WorkflowDocsService:
         """
         from app.extensions import db
         from app.models import AIDocument, AIDocumentChunk, AIEmbedding
-        from app.services.ai_embedding_service import AIEmbeddingService
-        from app.services.ai_vector_store import AIVectorStore
-        from app.services.ai_chunking_service import AIChunkingService
+        from app.services.ai.documents.embedding import AIEmbeddingService
+        from app.services.ai.documents.vector_store import AIVectorStore
+        from app.services.ai.documents.chunking import AIChunkingService
         from app.utils.datetime_helpers import utcnow
 
         self._ensure_loaded()
@@ -805,7 +805,7 @@ class WorkflowDocsService:
         Returns:
             List of matching workflow chunks with scores
         """
-        from app.services.ai_vector_store import AIVectorStore
+        from app.services.ai.documents.vector_store import AIVectorStore
 
         vector_store = AIVectorStore()
 

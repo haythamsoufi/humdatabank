@@ -16,11 +16,11 @@ from sqlalchemy import or_, null
 
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk, AIEmbedding, Country
-from app.services.ai_document_processor import AIDocumentProcessor, DocumentProcessingError
-from app.services.ai_chunking_service import AIChunkingService
-from app.services.ai_metadata_extractor import enrich_document_metadata, classify_chunk_semantic_type, build_heading_hierarchy
-from app.services.ai_embedding_service import AIEmbeddingService, EmbeddingError
-from app.services.ai_vector_store import AIVectorStore
+from app.services.ai.documents.processor import AIDocumentProcessor, DocumentProcessingError
+from app.services.ai.documents.chunking import AIChunkingService
+from app.services.ai.documents.metadata import enrich_document_metadata, classify_chunk_semantic_type, build_heading_hierarchy
+from app.services.ai.documents.embedding import AIEmbeddingService, EmbeddingError
+from app.services.ai.documents.vector_store import AIVectorStore
 from app.utils.datetime_helpers import utcnow
 from app.routes.admin.shared import admin_required, permission_required
 from app.utils.advanced_validation import AdvancedValidator
@@ -129,7 +129,7 @@ def upload_document():
             detected_countries = []
             detected_scope = None
             try:
-                from app.services.ai_country_detection import detect_countries
+                from app.services.ai.documents.country_detection import detect_countries
 
                 det = detect_countries(filename=filename, title=title, text=None)
                 detected_country_id = det.primary_country_id
@@ -358,7 +358,7 @@ def _apply_country_detection_to_doc(doc: AIDocument, extracted: dict | None, doc
             if linked_country not in doc.countries:
                 doc.countries.append(linked_country)
         else:
-            from app.services.ai_country_detection import (
+            from app.services.ai.documents.country_detection import (
                 detect_countries,
                 strip_ns_org_references,
             )

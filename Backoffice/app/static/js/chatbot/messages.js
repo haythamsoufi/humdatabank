@@ -43,9 +43,15 @@ const DEFAULT_UI_STRINGS = {
 };
 
 function resolveDefaultUiStrings() {
+    if (typeof window !== 'undefined' && window.CHAT_UI_STRINGS && typeof window.CHAT_UI_STRINGS === 'object') {
+        return { ...DEFAULT_UI_STRINGS, ...window.CHAT_UI_STRINGS };
+    }
+    const translate = (typeof window !== 'undefined' && typeof window.t === 'function')
+        ? window.t
+        : (k) => k;
     const resolved = {};
     for (const [key, val] of Object.entries(DEFAULT_UI_STRINGS)) {
-        resolved[key] = window.t(val);
+        resolved[key] = translate(val);
     }
     return resolved;
 }

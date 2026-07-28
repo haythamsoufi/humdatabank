@@ -81,6 +81,25 @@ class TestTokenPreservationCheck:
         assert not AutoTranslator._all_tokens_preserved(mangled, token_map)
 
 
+class TestFinalizeProtectedTranslation:
+    def test_restores_and_validates_python_format_placeholders(self):
+        original = "Showing the %(loaded)d most recent of %(total)d processed requests."
+        protected, token_map = AutoTranslator._protect_variables(original)
+        tokens = list(token_map.keys())
+        simulated_fr = protected.replace(tokens[0], "le").replace(tokens[1], tokens[1])
+        restored = AutoTranslator._finalize_protected_translation(original, simulated_fr, token_map)
+        assert restored is not None
+        assert "%(loaded)d" in restored
+        assert "%(total)d" in restored
+
+    def test_rejects_when_placeholders_cannot_be_restored(self):
+        original = "%(count)d items"
+        protected, token_map = AutoTranslator._protect_variables(original)
+        restored = AutoTranslator._finalize_protected_translation(original, "articles", token_map)
+        assert restored is not None
+        assert "%(count)d" in restored
+
+
 class TestTranslateTextRejectsMangledTokens:
     def test_falls_back_when_service_mangles_placeholder(self):
         tr = AutoTranslator.__new__(AutoTranslator)

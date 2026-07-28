@@ -20,6 +20,18 @@ import {
     resetCarryForwardState,
     setupCarryForwardListeners,
 } from './carry-forward.js';
+import {
+    populateEntryFormHintFields,
+    resetEntryFormHintState,
+    setupEntryFormHintListeners,
+} from './entry-form-hint.js';
+import {
+    clearDisabledDescriptions,
+    mountEntryFormHintPanel,
+    populateDescriptionVisibility,
+    resetDescriptionVisibility,
+    setupDescriptionHintUI,
+} from './description-hint-ui.js';
 
 export const ItemModal = {
     currentMode: 'add', // 'add' or 'edit'
@@ -115,31 +127,30 @@ export const ItemModal = {
 
     /**
      * In fill-content mode, matrix items split the modal into two main
-     * columns: the left column keeps the row configuration (row mode, row
-     * headers, display options) while the right column holds just the
-     * "Column Codes" section. Outside of fill mode (or for other item
-     * types) that section stays in its normal place, right after
-     * #matrix-columns-anchor.
+     * columns: the left column keeps title, description, hint, and properties
+     * while the right column holds the table config panel (rows then columns).
+     * Outside of fill mode that panel stays in its normal place, right after
+     * #matrix-table-config-anchor.
      */
     syncMatrixConfigPanel: function() {
         if (!this.modalElement) return;
-        const columnsSection = this.modalElement.querySelector('#matrix-columns-section');
-        const anchor = this.modalElement.querySelector('#matrix-columns-anchor');
+        const panel = this.modalElement.querySelector('#matrix-table-config-panel');
+        const anchor = this.modalElement.querySelector('#matrix-table-config-anchor');
         const rightHalf = this.modalElement.querySelector('.modal-right-half');
-        if (!columnsSection || !anchor || !rightHalf) return;
+        if (!panel || !anchor || !rightHalf) return;
 
         const shouldMoveToRight = this.isFillContentMode() && this.currentItemType === 'matrix';
 
         if (shouldMoveToRight) {
-            if (rightHalf.firstElementChild !== columnsSection) {
-                rightHalf.insertBefore(columnsSection, rightHalf.firstChild);
+            if (rightHalf.firstElementChild !== panel) {
+                rightHalf.insertBefore(panel, rightHalf.firstChild);
             }
-            columnsSection.classList.add('matrix-columns-in-right-panel');
+            panel.classList.add('matrix-table-config-in-right-panel');
         } else {
-            if (columnsSection.previousElementSibling !== anchor) {
-                anchor.insertAdjacentElement('afterend', columnsSection);
+            if (panel.previousElementSibling !== anchor) {
+                anchor.insertAdjacentElement('afterend', panel);
             }
-            columnsSection.classList.remove('matrix-columns-in-right-panel');
+            panel.classList.remove('matrix-table-config-in-right-panel');
         }
 
         try { this.syncRightPanel(); } catch (_e) {}
@@ -160,6 +171,8 @@ export const ItemModal = {
         this.cacheRuleToggleDefaults();
         this.modalElement = this.modalElement || Utils.getElementById('item-modal');
         setupCarryForwardListeners(this.modalElement);
+        setupEntryFormHintListeners(this.modalElement);
+        setupDescriptionHintUI(this.modalElement);
     },
 
     showAddModal: function(sectionId, sectionName, itemType = 'indicator', optionalInitialQuestionType = null) {
@@ -332,6 +345,11 @@ export const ItemModal = {
             this.formElement.reset();
         }
         try { resetCarryForwardState(this.modalElement); } catch (_e) {}
+        try { resetEntryFormHintState(this.modalElement); } catch (_e) {}
+        try { resetDescriptionVisibility(this.modalElement); } catch (_e) {}
+        try {
+            mountEntryFormHintPanel(this.modalElement, this.currentItemType);
+        } catch (_e) {}
         try { QuestionItem.resetOptionsState(this.modalElement); } catch (_e) {}
     },
 

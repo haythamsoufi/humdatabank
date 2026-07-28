@@ -1144,8 +1144,8 @@ html[dir="rtl"] #edit-template-details-form-container .flex.justify-end .space-x
     margin-right: 0;
 }
 
-/* RTL Loading Spinner */
-html[dir="rtl"] #form-builder-loading {
+/* RTL form builder loading skeleton status area */
+html[dir="rtl"] #form-builder-loading .form-builder-skeleton-status {
     direction: rtl;
     text-align: center;
 }

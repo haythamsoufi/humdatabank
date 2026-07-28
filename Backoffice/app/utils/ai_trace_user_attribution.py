@@ -39,7 +39,7 @@ def build_user_attribution_diagnostics(
 
     resolved_would_be: Optional[int] = None
     try:
-        from app.services.ai_chat_integration import resolve_ai_trace_user_id
+        from app.services.ai.chat.integration import resolve_ai_trace_user_id
 
         resolved_would_be = resolve_ai_trace_user_id(platform_context)
     except Exception as e:

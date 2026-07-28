@@ -6,7 +6,7 @@ import pytest
 
 from app.models.ai_chat import AIConversation, AIMessage
 from app.utils.ai_tokens import issue_ai_token
-from app.services.ai_chat_retention import archive_conversation
+from app.services.ai.chat.retention import archive_conversation
 from app.utils.datetime_helpers import utcnow
 from tests.factories import create_test_user
 
@@ -163,7 +163,7 @@ def test_ai_chat_stream_returns_sse_meta_and_done(client, app, db_session):
 @pytest.mark.api
 def test_ai_chat_request_parse_helpers(app):
     """Shared parse_chat_request and resolve helpers behave correctly."""
-    from app.services.ai_chat_request import (
+    from app.services.ai.chat.request import (
         parse_chat_request,
         apply_anonymous_rules,
         ChatRequestParsed,

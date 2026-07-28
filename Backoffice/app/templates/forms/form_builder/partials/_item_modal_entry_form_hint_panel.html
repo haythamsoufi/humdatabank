@@ -1,0 +1,35 @@
+{# Entry form hint — mounted after the active item type's description field #}
+<div id="item-entry-form-hint-panel" class="w-full hidden">
+    <div class="item-hint-toggle-row flex items-center gap-2 flex-wrap">
+        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+            <input type="checkbox" id="item-show-entry-form-hint" name="show_hint" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+            <span class="item-show-hint-label text-sm font-medium text-gray-700">{{ _('Hint') }}</span>
+        </label>
+        <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center" aria-label="{{ _('Help')|forceescape }}">
+            <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+            <span class="tooltip-text">{{ _('Shows a highlighted note below the field label in the data entry form.') }}</span>
+        </span>
+        <button type="button" id="item-entry-form-hint-text-translations-btn" class="item-hint-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+        </button>
+        <select id="item-entry-form-hint-style"
+                name="hint_style"
+                class="item-hint-style-control hidden py-1.5 pl-2 pr-7 text-sm border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 shrink-0"
+                aria-label="{{ _('Hint style')|forceescape }}">
+            <option value="normal">{{ _('Normal') }}</option>
+            <option value="info">{{ _('Info') }}</option>
+            <option value="warning" selected>{{ _('Warning') }}</option>
+            <option value="tip">{{ _('Tip') }}</option>
+            <option value="important">{{ _('Important') }}</option>
+        </select>
+    </div>
+    <div id="item-entry-form-hint-text-wrapper" class="mt-4 hidden basis-full w-full">
+        <textarea id="item-entry-form-hint-text"
+                  name="hint_text"
+                  rows="2"
+                  class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                  aria-labelledby="item-show-entry-form-hint"></textarea>
+        <input type="hidden" id="item-entry-form-hint-text-translations" name="hint_text_translations" value="{}">
+    </div>
+</div>
+

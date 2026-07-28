@@ -10,13 +10,13 @@ from unittest.mock import patch
 import pytest
 from flask import g
 
-from app.services.ai_tools import registry as registry_module
-from app.services.ai_tools.form_template_specs import (
+from app.services.ai.tools import registry as registry_module
+from app.services.ai.tools.form_template_specs import (
     FORM_TEMPLATE_TOOL_NAMES,
     FORM_TEMPLATE_TOOL_SPECS,
     FORM_TEMPLATE_WRITE_TOOLS,
 )
-from app.services.ai_tools.registry import AIToolsRegistry, _form_template_allowed_tools
+from app.services.ai.tools.registry import AIToolsRegistry, _form_template_allowed_tools
 
 
 def _registry_instance():

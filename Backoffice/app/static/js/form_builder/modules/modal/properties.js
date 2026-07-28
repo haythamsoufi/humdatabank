@@ -80,14 +80,20 @@ export const PropertiesMixin = {
         try { this.enforceHiddenControlsDisabled(this.modalElement); } catch (_e) {}
     },
 
+    ensureMatrixDisplayProperties: function(itemType) {
+        if (!this.modalElement) return;
+        const block = this.modalElement.querySelector('#item-properties-matrix-display');
+        if (!block) return;
+        block.classList.toggle('hidden', itemType !== 'matrix');
+    },
+
     ensurePrivacyField: function() {
         if (!this.modalElement) return;
         if (this.isDisplayOnlyItemType(this.currentItemType, this.currentQuestionType)) return;
         const propertiesSection = this.modalElement.querySelector('#item-properties-section') || this.modalElement.querySelector('.mb-3.border-t.border-gray-200.pt-4');
         if (!propertiesSection) return;
-        const propertiesContent = propertiesSection.querySelector('#item-properties-content') || propertiesSection.querySelector('.grid.grid-cols-2.gap-6.items-center');
-        if (!propertiesContent) return;
-        const slot = propertiesContent.querySelector('#item-privacy-field') || propertiesContent;
+        const slot = propertiesSection.querySelector('#item-privacy-field');
+        if (!slot) return;
         // Avoid duplicates
         if (slot.querySelector('#item-privacy-select')) {
             return;

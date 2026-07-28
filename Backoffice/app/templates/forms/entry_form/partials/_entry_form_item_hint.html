@@ -1,0 +1,73 @@
+{# Opt-in entry form hint callout — shown below label, above field content #}
+{% set _item_cfg = field.config if field.config is mapping else {} %}
+{% set _tk = (translation_key if translation_key is defined else (session.get('language','en') or 'en')) %}
+{% if _tk is string %}
+  {% set _tk = _tk.split('_', 1)[0] %}
+{% else %}
+  {% set _tk = 'en' %}
+{% endif %}
+
+{% set _show_hint = false %}
+{% set _hint_text = none %}
+{% set _hint_translations = {} %}
+{% set _hint_style = 'warning' %}
+{% set _legacy_matrix_hint = false %}
+
+{% if _item_cfg.get('show_hint') is sameas true %}
+  {% set _show_hint = true %}
+  {% set _hint_text = _item_cfg.get('hint_text') %}
+  {% set _hint_translations = _item_cfg.get('hint_text_translations', {}) or {} %}
+  {% set _style_raw = (_item_cfg.get('hint_style') or 'warning')|lower %}
+  {% if _style_raw in ['normal', 'info', 'warning', 'tip', 'important'] %}
+    {% set _hint_style = _style_raw %}
+  {% endif %}
+{% elif _item_cfg.get('matrix_config') and _item_cfg.matrix_config.get('show_format_hint') is sameas true %}
+  {% set _matrix_config = _item_cfg.matrix_config %}
+  {% set _has_numeric_col = namespace(value=false) %}
+  {% for _col in (_matrix_config.get('columns') or []) %}
+    {% if not (_col is mapping and _col.get('type') == 'tick') %}{% set _has_numeric_col.value = true %}{% endif %}
+  {% endfor %}
+  {% if _has_numeric_col.value %}
+    {% set _show_hint = true %}
+    {% set _legacy_matrix_hint = true %}
+    {% set _hint_text = _matrix_config.get('format_hint_text') %}
+    {% set _hint_translations = _matrix_config.get('format_hint_text_translations', {}) or {} %}
+  {% endif %}
+{% endif %}
+
+{% if _show_hint %}
+  {% set _resolved_hint = none %}
+  {% if _hint_translations %}
+    {% set _cand = _hint_translations.get(_tk) or _hint_translations.get('en') %}
+    {% if _cand and _cand|trim %}{% set _resolved_hint = _cand %}{% endif %}
+  {% endif %}
+  {% if not _resolved_hint or not _resolved_hint|trim %}
+    {% if _hint_text and _hint_text|trim %}
+      {% set _resolved_hint = _hint_text %}
+    {% elif _legacy_matrix_hint %}
+      {% set _resolved_hint = _('Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.') %}
+    {% endif %}
+  {% endif %}
+  {% if _resolved_hint and _resolved_hint|trim %}
+    {% if _hint_style == 'normal' %}
+      {% set _hint_icon_fa = 'fas fa-info-circle' %}
+    {% elif _hint_style == 'info' %}
+      {% set _hint_icon_fa = 'fas fa-info-circle' %}
+    {% elif _hint_style == 'tip' %}
+      {% set _hint_icon_fa = 'fas fa-lightbulb' %}
+    {% elif _hint_style == 'important' %}
+      {% set _hint_icon_fa = 'fas fa-exclamation-circle' %}
+    {% else %}
+      {% set _hint_icon_fa = 'fas fa-exclamation-triangle' %}
+    {% endif %}
+    <div class="entry-form-item-hint entry-form-item-hint--{{ _hint_style }}"
+         id="entry-form-hint-{{ field.id }}"
+         role="note">
+      <span class="entry-form-item-hint__icon" aria-hidden="true">
+        <i class="{{ _hint_icon_fa }}"></i>
+      </span>
+      <span class="entry-form-item-hint__text">{{ _resolved_hint }}</span>
+    </div>
+  {% endif %}
+{% endif %}
+

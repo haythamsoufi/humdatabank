@@ -4,7 +4,7 @@ import pytest
 
 
 def test_heuristic_in_scope_data_queries(app):
-    from app.services.ai_query_rewriter import heuristic_likely_in_platform_scope
+    from app.services.ai.planning.query_rewriter import heuristic_likely_in_platform_scope
 
     with app.app_context():
         assert heuristic_likely_in_platform_scope("volunteers in Syria 2024") is True
@@ -13,7 +13,7 @@ def test_heuristic_in_scope_data_queries(app):
 
 
 def test_heuristic_in_scope_not_generically_true_for_coding_requests(app):
-    from app.services.ai_query_rewriter import heuristic_likely_in_platform_scope
+    from app.services.ai.planning.query_rewriter import heuristic_likely_in_platform_scope
 
     with app.app_context():
         assert heuristic_likely_in_platform_scope("generate a code of a calculator app in python") is False
@@ -21,7 +21,7 @@ def test_heuristic_in_scope_not_generically_true_for_coding_requests(app):
 
 
 def test_is_message_in_platform_scope_respects_disable_flag(app):
-    from app.services.ai_query_rewriter import is_message_in_platform_scope
+    from app.services.ai.planning.query_rewriter import is_message_in_platform_scope
 
     with app.app_context():
         app.config["AI_PLATFORM_SCOPE_ENFORCE_ENABLED"] = False

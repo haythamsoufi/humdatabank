@@ -22,16 +22,16 @@ from unittest.mock import MagicMock, patch
 
 class TestToolExecutionError:
     def test_is_exception_subclass(self):
-        from app.services.ai_tools import ToolExecutionError
+        from app.services.ai.tools import ToolExecutionError
         assert issubclass(ToolExecutionError, Exception)
 
     def test_message_preserved(self):
-        from app.services.ai_tools import ToolExecutionError
+        from app.services.ai.tools import ToolExecutionError
         err = ToolExecutionError("tool failed: bad input")
         assert "bad input" in str(err)
 
     def test_can_be_raised_and_caught(self):
-        from app.services.ai_tools import ToolExecutionError
+        from app.services.ai.tools import ToolExecutionError
         with pytest.raises(ToolExecutionError):
             raise ToolExecutionError("oops")
 
@@ -42,7 +42,7 @@ class TestToolExecutionError:
 
 class TestJsonSanitize:
     def _fn(self, v):
-        from app.services.ai_tools import json_sanitize
+        from app.services.ai.tools import json_sanitize
         return json_sanitize(v)
 
     def test_dict_roundtrip(self):
@@ -77,7 +77,7 @@ class TestJsonSanitize:
 
 class TestTruncateJsonValue:
     def _fn(self, value, max_chars=None):
-        from app.services.ai_tools import truncate_json_value
+        from app.services.ai.tools import truncate_json_value
         if max_chars is None:
             return truncate_json_value(value, max_chars=200_000)
         return truncate_json_value(value, max_chars=max_chars)
@@ -87,7 +87,7 @@ class TestTruncateJsonValue:
         assert self._fn(data) == data
 
     def test_oversized_payload_truncated(self, app):
-        from app.services.ai_tools import truncate_json_value
+        from app.services.ai.tools import truncate_json_value
         large = {"data": "x" * 10_000}
         with app.app_context():
             app.config["AI_TOOL_LOG_MAX_CHARS"] = 100
@@ -104,7 +104,7 @@ class TestTruncateJsonValue:
 
     def test_min_cap_enforced(self):
         # max_chars < 4000 should be clamped to 4000
-        from app.services.ai_tools import truncate_json_value
+        from app.services.ai.tools import truncate_json_value
         result = truncate_json_value({"x": "y"}, max_chars=1)
         # Should not error; payload is tiny so no truncation
         assert result == {"x": "y"}
@@ -119,7 +119,7 @@ class TestTruncateJsonValue:
 
 class TestSplitToolKwForCall:
     def _fn(self, func, kwargs):
-        from app.services.ai_tools import split_tool_kw_for_call
+        from app.services.ai.tools import split_tool_kw_for_call
         return split_tool_kw_for_call(func, kwargs)
 
     def test_callback_stripped_when_not_accepted(self):
@@ -157,14 +157,14 @@ class TestSplitToolKwForCall:
 
 class TestToolWrapper:
     def test_wraps_return_value(self):
-        from app.services.ai_tools import tool_wrapper
+        from app.services.ai.tools import tool_wrapper
         @tool_wrapper
         def add(x, y):
             return x + y
         assert add(2, 3) == 5
 
     def test_non_tool_error_re_raised_as_tool_execution_error(self):
-        from app.services.ai_tools import tool_wrapper, ToolExecutionError
+        from app.services.ai.tools import tool_wrapper, ToolExecutionError
         @tool_wrapper
         def failing():
             raise ValueError("oops")
@@ -172,7 +172,7 @@ class TestToolWrapper:
             failing()
 
     def test_tool_execution_error_passes_through(self):
-        from app.services.ai_tools import tool_wrapper, ToolExecutionError
+        from app.services.ai.tools import tool_wrapper, ToolExecutionError
         @tool_wrapper
         def already_tool_error():
             raise ToolExecutionError("already wrapped")
@@ -180,13 +180,13 @@ class TestToolWrapper:
             already_tool_error()
 
     def test_preserves_function_name(self):
-        from app.services.ai_tools import tool_wrapper
+        from app.services.ai.tools import tool_wrapper
         @tool_wrapper
         def my_named_tool(x): return x
         assert my_named_tool.__name__ == "my_named_tool"
 
     def test_callback_stripped_automatically(self):
-        from app.services.ai_tools import tool_wrapper
+        from app.services.ai.tools import tool_wrapper
         @tool_wrapper
         def strict_tool(x: int): return x * 2
         result = strict_tool(x=5, _progress_callback=lambda: None)
@@ -199,7 +199,7 @@ class TestToolWrapper:
 
 class TestApplyDocumentSourceFilters:
     def _fn(self, filters, sources_cfg, query=None):
-        from app.services.ai_tools import apply_document_source_filters
+        from app.services.ai.tools import apply_document_source_filters
         return apply_document_source_filters(filters, sources_cfg, query=query)
 
     def test_system_only_sets_is_api_import_false(self):
@@ -252,7 +252,7 @@ class TestApplyDocumentSourceFilters:
 
 class TestResolveSourceConfig:
     def test_returns_none_outside_request_context(self):
-        from app.services.ai_tools import resolve_source_config
+        from app.services.ai.tools import resolve_source_config
         result = resolve_source_config()
         assert result is None
 
@@ -263,7 +263,7 @@ class TestResolveSourceConfig:
 
 class TestRewriteDocumentSearchQuery:
     def _fn(self, query):
-        from app.services.ai_tools import rewrite_document_search_query
+        from app.services.ai.tools import rewrite_document_search_query
         return rewrite_document_search_query(query)
 
     def test_empty_query_returns_empty_strings(self):
@@ -298,7 +298,7 @@ class TestRewriteDocumentSearchQuery:
 
 class TestInferCountryIdentifierFromQuery:
     def _fn(self, query):
-        from app.services.ai_tools import infer_country_identifier_from_query
+        from app.services.ai.tools import infer_country_identifier_from_query
         return infer_country_identifier_from_query(query)
 
     def test_empty_returns_none(self):

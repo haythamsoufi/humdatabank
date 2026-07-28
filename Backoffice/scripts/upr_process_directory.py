@@ -33,7 +33,7 @@ if str(_BACKOFFICE_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKOFFICE_ROOT))
 
 from app import create_app
-from app.services.ai_document_processor import AIDocumentProcessor
+from app.services.ai.documents.processor import AIDocumentProcessor
 from app.services.upr.visual_chunking import extract_upr_visual_blocks
 from app.utils.constants import DEFAULT_MAX_COMPLETION_TOKENS
 

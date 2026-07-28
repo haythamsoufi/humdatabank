@@ -1057,29 +1057,158 @@
         // Validate placeholders
         function validatePlaceholders(sourceText, translationText) {
             const sourcePlaceholders = extractPlaceholders(sourceText);
-            if (sourcePlaceholders.length === 0) return { valid: true };
+            if (sourcePlaceholders.length === 0) return { valid: true, missing: [], extra: [] };
 
             const translationPlaceholders = extractPlaceholders(translationText);
             const missing = sourcePlaceholders.filter(p => !translationPlaceholders.includes(p));
+            const extra = translationPlaceholders.filter(p => !sourcePlaceholders.includes(p));
 
-            if (missing.length > 0) {
+            if (missing.length > 0 || extra.length > 0) {
+                const parts = [];
+                if (missing.length > 0) {
+                    parts.push(cfg.t.missingPlaceholders + ': ' + missing.join(', '));
+                }
+                if (extra.length > 0) {
+                    parts.push(cfg.t.unexpectedPlaceholders + ': ' + extra.join(', '));
+                }
                 return {
                     valid: false,
-                    message: cfg.t.missingPlaceholders + ': ' + missing.join(', ') + '. ' + cfg.t.allPlaceholdersMustBePreserved
+                    missing: missing,
+                    extra: extra,
+                    message: parts.join('. ') + '. ' + cfg.t.allPlaceholdersMustBePreserved
                 };
             }
-            return { valid: true };
+            return { valid: true, missing: [], extra: [] };
+        }
+
+        function formatValidationErrorForLanguage(msgid, translationText, langCode) {
+            const validation = validatePlaceholders(msgid, translationText);
+            if (validation.valid) return null;
+            return getLangDisplayName(langCode) + ' (' + langCode + '): ' + validation.message;
+        }
+
+        function fieldNeedsAutoTranslate(msgid, field) {
+            if (!field) return false;
+            const value = field.value.trim();
+            if (!value) return true;
+            return !validatePlaceholders(msgid, value).valid;
+        }
+
+        let editModalLoadToken = 0;
+
+        function getGridRowData(msgid) {
+            if (!window.gridApi || !msgid) return null;
+            let rowData = null;
+            window.gridApi.forEachNode(function(node) {
+                if (!rowData && node.data && node.data.msgid === msgid) {
+                    rowData = node.data;
+                }
+            });
+            return rowData;
+        }
+
+        function translationsFromRowData(rowData) {
+            const translations = {};
+            languages.forEach(function(langCode) {
+                const langBase = String(langCode).toLowerCase().split('_')[0];
+                const value = rowData[langCode] ?? rowData[langBase] ?? '';
+                translations[langBase] = value;
+                translations[langCode] = value;
+            });
+            return translations;
+        }
+
+        function renderTranslationFields(translations) {
+            const container = document.getElementById('edit-translation-fields-container');
+            container.innerHTML = '';
+            container.removeAttribute('aria-busy');
+
+            languages.forEach(langCode => {
+                const langBase = langCode.toLowerCase().split('_')[0];
+                const fieldId = 'msgstr_' + langBase;
+                const value = translations[langBase] || translations[langCode] || '';
+                const langDisplay = getLangDisplayName(langBase);
+                const rtl = isRTL(langBase);
+
+                const fieldDiv = document.createElement('div');
+
+                const label = document.createElement('label');
+                label.setAttribute('for', fieldId);
+                label.className = 'block text-sm font-medium text-gray-700 mb-2';
+                label.textContent = langDisplay + ' ' + cfg.t.translationLabel;
+
+                const textarea = document.createElement('textarea');
+                textarea.id = fieldId;
+                textarea.name = fieldId;
+                textarea.className = 'w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500';
+                textarea.rows = 4;
+                if (rtl) {
+                    textarea.dir = 'rtl';
+                    textarea.style.fontFamily = "'Tajawal', Arial, sans-serif";
+                }
+                textarea.value = value || '';
+
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'placeholder-error mt-1 text-xs text-red-600 hidden';
+
+                fieldDiv.appendChild(label);
+                fieldDiv.appendChild(textarea);
+                fieldDiv.appendChild(errorDiv);
+                container.appendChild(fieldDiv);
+            });
+        }
+
+        function showTranslationFieldsSkeleton() {
+            const container = document.getElementById('edit-translation-fields-container');
+            container.innerHTML = '';
+            container.setAttribute('aria-busy', 'true');
+
+            languages.forEach(function() {
+                const fieldDiv = document.createElement('div');
+                fieldDiv.className = 'animate-pulse';
+
+                const labelBar = document.createElement('div');
+                labelBar.className = 'h-4 bg-gray-200 rounded w-1/3 mb-2';
+
+                const inputBar = document.createElement('div');
+                inputBar.className = 'h-24 bg-gray-200 rounded w-full';
+
+                fieldDiv.appendChild(labelBar);
+                fieldDiv.appendChild(inputBar);
+                container.appendChild(fieldDiv);
+            });
+        }
+
+        function setEditModalFieldsBusy(isBusy) {
+            modal.setAttribute('data-fields-loading', isBusy ? 'true' : 'false');
+            if (saveBtn) saveBtn.disabled = isBusy;
+            var autoB = document.getElementById('modal-auto-translate-btn');
+            var clearB = document.getElementById('modal-clear-translations-btn');
+            if (autoB) autoB.disabled = isBusy;
+            if (clearB) clearB.disabled = isBusy;
+        }
+
+        function fetchTranslationFields(msgid) {
+            var msgidB64 = btoa(unescape(encodeURIComponent(msgid)));
+            return fetch(cfg.urls.editTranslation + '?msgid_b64=' + encodeURIComponent(msgidB64), {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                renderTranslationFields((data && data.translations) || {});
+            });
         }
 
         // Open modal and load translation data
         function openEditModal(msgid) {
             if (!msgid) return;
 
-            // Set msgid in form
             document.getElementById('edit-translation-msgid').value = msgid;
             document.getElementById('edit-translation-msgid-display').value = msgid;
 
-            // Check for placeholders
             const placeholders = extractPlaceholders(msgid);
             const warningDiv = document.getElementById('edit-translation-placeholder-warning');
             if (placeholders.length > 0) {
@@ -1089,64 +1218,32 @@
                 warningDiv.classList.add('hidden');
             }
 
-            // Load translation data (base64 encode msgid to avoid WAF false positives on HTML/SQL-like gettext strings)
-            var msgidB64 = btoa(unescape(encodeURIComponent(msgid)));
-            fetch(cfg.urls.editTranslation + '?msgid_b64=' + encodeURIComponent(msgidB64), {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+            modal.classList.remove('hidden');
+
+            const rowData = getGridRowData(msgid);
+            if (rowData) {
+                setEditModalFieldsBusy(false);
+                renderTranslationFields(translationsFromRowData(rowData));
+                return;
+            }
+
+            const loadToken = ++editModalLoadToken;
+            showTranslationFieldsSkeleton();
+            setEditModalFieldsBusy(true);
+            fetchTranslationFields(msgid)
+            .then(function() {
+                if (loadToken !== editModalLoadToken) return;
             })
-            .then(response => response.json())
-            .then(data => {
-                // Extract translations from JSON response
-                const translations = (data && data.translations) || {};
-
-                // Build translation fields
-                const container = document.getElementById('edit-translation-fields-container');
-                container.innerHTML = '';
-
-                languages.forEach(langCode => {
-                    const langBase = langCode.toLowerCase().split('_')[0];
-                    const fieldId = 'msgstr_' + langBase;
-                    const value = translations[langBase] || translations[langCode] || '';
-                    const langDisplay = getLangDisplayName(langBase);
-                    const rtl = isRTL(langBase);
-
-                    const fieldDiv = document.createElement('div');
-
-                    const label = document.createElement('label');
-                    label.setAttribute('for', fieldId);
-                    label.className = 'block text-sm font-medium text-gray-700 mb-2';
-                    label.textContent = langDisplay + ' ' + cfg.t.translationLabel;
-
-                    const textarea = document.createElement('textarea');
-                    textarea.id = fieldId;
-                    textarea.name = fieldId;
-                    textarea.className = 'w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500';
-                    textarea.rows = 4;
-                    if (rtl) {
-                        textarea.dir = 'rtl';
-                        textarea.style.fontFamily = "'Tajawal', Arial, sans-serif";
-                    }
-                    textarea.value = value || '';
-
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'placeholder-error mt-1 text-xs text-red-600 hidden';
-
-                    fieldDiv.appendChild(label);
-                    fieldDiv.appendChild(textarea);
-                    fieldDiv.appendChild(errorDiv);
-                    container.appendChild(fieldDiv);
-                });
-
-                // Show modal
-                modal.classList.remove('hidden');
-            })
-            .catch(error => {
+            .catch(function(error) {
+                if (loadToken !== editModalLoadToken) return;
                 console.error('Error loading translation:', error);
+                closeEditModal();
                 if (window.showAlert) window.showAlert(cfg.t.failedToLoadData, 'error');
                 else console.error('Failed to load translation data');
+            })
+            .finally(function() {
+                if (loadToken !== editModalLoadToken) return;
+                setEditModalFieldsBusy(false);
             });
         }
 
@@ -1179,9 +1276,13 @@
         // Close modal
         function closeEditModal() {
             if (modal.getAttribute('aria-busy') === 'true') return;
+            editModalLoadToken++;
+            setEditModalFieldsBusy(false);
             modal.classList.add('hidden');
             form.reset();
-            document.getElementById('edit-translation-fields-container').innerHTML = '';
+            const fieldsContainer = document.getElementById('edit-translation-fields-container');
+            fieldsContainer.innerHTML = '';
+            fieldsContainer.removeAttribute('aria-busy');
         }
 
         function updateGridRowTranslations(msgid, payloadObj) {
@@ -1314,15 +1415,15 @@
                 translationFields.forEach(field => {
                     const translationText = field.value.trim();
                     if (translationText) {
-                        const validation = validatePlaceholders(msgid, translationText);
-                        if (!validation.valid) {
+                        const langCode = field.id.replace('msgstr_', '');
+                        const errorText = formatValidationErrorForLanguage(msgid, translationText, langCode);
+                        if (errorText) {
                             hasErrors = true;
-                            const langCode = field.id.replace('msgstr_', '');
-                            errors.push(langCode.toUpperCase() + ': ' + validation.message);
+                            errors.push(errorText);
                             field.classList.add('border-red-500');
                             const errorDiv = field.parentElement.querySelector('.placeholder-error');
                             if (errorDiv) {
-                                errorDiv.textContent = validation.message;
+                                errorDiv.textContent = validatePlaceholders(msgid, translationText).message;
                                 errorDiv.classList.remove('hidden');
                             }
                         } else {
@@ -1355,13 +1456,17 @@
                 credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken }
             })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                throw new Error(cfg.t.failedToSave);
+            .then(function(response) {
+                return window.responseAsResult ? window.responseAsResult(response) : response.json().then(function(data) {
+                    return { ok: response.ok, data: data };
+                });
             })
-            .then(data => {
+            .then(function(result) {
+                if (!result.ok) {
+                    const serverMsg = (result.data && (result.data.message || result.data.error)) || cfg.t.failedToSave;
+                    throw new Error(serverMsg);
+                }
+                const data = result.data;
                 if (data.success) {
                     updateGridRowTranslations(msgid, payloadObj);
                     setEditModalSaving(false);
@@ -1418,10 +1523,7 @@
                         .map(el => el.id.replace(/^msgstr_/, '').trim())
                         .filter(code => code && code !== 'en')
                         .filter((code, idx, arr) => arr.indexOf(code) === idx)
-                        .filter(code => {
-                            const el = document.getElementById('msgstr_' + code);
-                            return el && !el.value.trim();
-                        });
+                        .filter(code => fieldNeedsAutoTranslate(msgid, document.getElementById('msgstr_' + code)));
 
                     if (!targetLanguages.length) {
                         if (window.showAlert) window.showAlert(cfg.t.nothingToTranslate, 'info');
@@ -1438,15 +1540,28 @@
                     });
 
                     if (data.translations) {
+                        const filled = [];
+                        const skipped = [];
                         Object.entries(data.translations).forEach(([code, value]) => {
                             const field = document.getElementById('msgstr_' + code);
-                            if (field && !field.value.trim()) {
-                                field.value = value || '';
-                                if (isRTL(code)) {
-                                    field.setAttribute('dir', 'rtl');
+                            if (field && fieldNeedsAutoTranslate(msgid, field)) {
+                                if (value && String(value).trim()) {
+                                    field.value = value;
+                                    if (isRTL(code)) {
+                                        field.setAttribute('dir', 'rtl');
+                                    }
+                                    filled.push(getLangDisplayName(code));
+                                } else {
+                                    skipped.push(getLangDisplayName(code));
                                 }
                             }
                         });
+                        if (skipped.length && window.showAlert) {
+                            window.showAlert(
+                                cfg.t.autoTranslatePartial + ' ' + skipped.join(', '),
+                                'warning'
+                            );
+                        }
                     }
                 } catch (e) {
                     console.error(e);
@@ -1466,44 +1581,22 @@
             });
         }
 
-        // Clear translations button
+        // Clear translations button (no confirmation or toast — changes apply only on Save)
         const clearBtn = document.getElementById('modal-clear-translations-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', function() {
-                const msg = cfg.t.clearConfirm;
-                function doClear() {
-                    const translationFields = document.querySelectorAll('#edit-translation-modal textarea[id^="msgstr_"], #edit-translation-modal input[id^="msgstr_"]');
-                    let clearedCount = 0;
+                const translationFields = document.querySelectorAll('#edit-translation-modal textarea[id^="msgstr_"], #edit-translation-modal input[id^="msgstr_"]');
+                translationFields.forEach(field => {
+                    const fieldId = field.id;
+                    if (fieldId === 'msgstr_en' || fieldId.startsWith('msgstr_en_')) return;
 
-                    translationFields.forEach(field => {
-                        const fieldId = field.id;
-                        if (fieldId === 'msgstr_en' || fieldId.startsWith('msgstr_en_')) return;
-
-                        if (field.value && field.value.trim() !== '') {
-                            field.value = '';
-                            clearedCount++;
-                            field.classList.remove('border-red-500', 'border-2', 'border-yellow-500');
-                            const errorDiv = field.parentElement.querySelector('.placeholder-error');
-                            if (errorDiv) errorDiv.remove();
-                        }
-                    });
-
-                    if (clearedCount > 0) {
-                        var m = clearedCount === 1
-                            ? cfg.t.cleared1
-                            : cfg.t.cleared + ' ' + clearedCount + ' ' + cfg.t.translationFields;
-                        if (window.showAlert) window.showAlert(m, 'success');
-                    } else {
-                        if (window.showAlert) window.showAlert(cfg.t.noFieldsToClear, 'info');
+                    if (field.value && field.value.trim() !== '') {
+                        field.value = '';
+                        field.classList.remove('border-red-500', 'border-2', 'border-yellow-500');
+                        const errorDiv = field.parentElement.querySelector('.placeholder-error');
+                        if (errorDiv) errorDiv.remove();
                     }
-                }
-                if (window.showDangerConfirmation) {
-                    window.showDangerConfirmation(msg, doClear, null, cfg.t.clearBtn, cfg.t.cancel, cfg.t.clearTitle);
-                } else if (window.showConfirmation) {
-                    window.showConfirmation(msg, doClear, null, cfg.t.clearBtn, cfg.t.cancel, cfg.t.clearTitle);
-                } else {
-                    doClear();
-                }
+                });
             });
         }
 

@@ -877,6 +877,24 @@ class AutoTranslator:
         )
 
     @staticmethod
+    def _finalize_protected_translation(
+        original_text: str,
+        translated: str,
+        token_map: Dict[str, str],
+    ) -> Optional[str]:
+        """Restore protected placeholders and require all source placeholders in the result."""
+        if not translated:
+            return None
+        restored = AutoTranslator._restore_variables(translated, token_map or {})
+        if not token_map:
+            return restored
+        from app.services.translation.placeholder_validator import validate_placeholders
+
+        if validate_placeholders(original_text, restored).get('valid'):
+            return restored
+        return None
+
+    @staticmethod
     def _restore_variables(text: str, variable_map: Dict[str, str]) -> str:
         """
         Restore protected placeholders into translated text.
@@ -1016,20 +1034,7 @@ class AutoTranslator:
                     )
                 continue
 
-            if token_map and not self._all_tokens_preserved(translated, token_map):
-                if debug:
-                    logger.info(
-                        f"[auto_translate_debug] svc={getattr(svc,'service_name','?')} "
-                        f"{source_code}->{target_code} rejected=mangled_placeholders text={original_text[:120]!r}"
-                    )
-                continue
-
-            # Some services legitimately return unchanged strings (e.g., acronyms/proper nouns).
-            # If we have other services available, treat "unchanged" as a soft-failure so we
-            # can attempt a better translation; otherwise accept it to avoid hard failures.
             if translated == protected_text and source_code != target_code:
-                # If the output is *likely* not a real translation (long English-ish sentence),
-                # treat it as a failure even if it's the last service.
                 if _is_likely_untranslated_output(
                     translated_text=translated,
                     protected_text=protected_text,
@@ -1052,14 +1057,34 @@ class AutoTranslator:
                         )
                     continue
 
+            restored = self._finalize_protected_translation(original_text, translated, token_map)
+            if token_map and restored is None:
+                if debug:
+                    logger.info(
+                        f"[auto_translate_debug] svc={getattr(svc,'service_name','?')} "
+                        f"{source_code}->{target_code} rejected=missing_placeholders_after_restore "
+                        f"text={original_text[:120]!r}"
+                    )
+                continue
+            if not restored:
+                continue
+
+            tokens_inline = not token_map or self._all_tokens_preserved(translated, token_map)
+            if not tokens_inline and svc_idx < (len(services_to_try) - 1):
+                if debug:
+                    logger.info(
+                        f"[auto_translate_debug] svc={getattr(svc,'service_name','?')} "
+                        f"{source_code}->{target_code} softfail=mangled_tokens_try_fallback "
+                        f"text={original_text[:120]!r}"
+                    )
+                continue
+
             if debug:
-                # Log a short preview (post-restore) for debugging.
-                restored_preview = self._restore_variables(translated, token_map)
                 logger.info(
                     f"[auto_translate_debug] svc={getattr(svc,'service_name','?')} "
-                    f"{source_code}->{target_code} ok text={original_text[:120]!r} out={restored_preview[:120]!r}"
+                    f"{source_code}->{target_code} ok text={original_text[:120]!r} out={restored[:120]!r}"
                 )
-            return self._restore_variables(translated, token_map)
+            return restored
 
         return None
 
@@ -1134,11 +1159,8 @@ class AutoTranslator:
                     continue
                 if not translated:
                     continue
-                if variable_maps[i] and not self._all_tokens_preserved(translated, variable_maps[i]):
-                    continue
-                # If unchanged and we have more services to try, leave it pending.
+
                 if translated == protected_texts[i] and source_code != target_code:
-                    # If it's likely not a real translation (long English-ish sentence), never accept it.
                     if _is_likely_untranslated_output(
                         translated_text=translated,
                         protected_text=protected_texts[i],
@@ -1150,7 +1172,25 @@ class AutoTranslator:
                     is_last_service = (svc_idx >= (len(services_to_try) - 1))
                     if not is_last_service:
                         continue
-                out[i] = self._restore_variables(translated, variable_maps[i])
+
+                restored = self._finalize_protected_translation(
+                    originals[i],
+                    translated,
+                    variable_maps[i],
+                )
+                if variable_maps[i] and restored is None:
+                    continue
+                if not restored:
+                    continue
+
+                tokens_inline = (
+                    not variable_maps[i]
+                    or self._all_tokens_preserved(translated, variable_maps[i])
+                )
+                if not tokens_inline and svc_idx < (len(services_to_try) - 1):
+                    continue
+
+                out[i] = restored
 
         return out
 

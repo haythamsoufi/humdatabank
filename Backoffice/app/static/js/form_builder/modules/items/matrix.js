@@ -4,9 +4,6 @@
 const truthyMatrixValues = new Set(['true', '1', 'yes', 'on']);
 const falsyMatrixValues = new Set(['false', '0', 'no', 'off', '']);
 
-const DEFAULT_FORMAT_HINT_TEXT =
-    'Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.';
-
 const isTruthyMatrixValue = (value) => {
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') return value !== 0;
@@ -149,9 +146,6 @@ export const MatrixItem = {
         const legendTextInput = modalElement.querySelector('#matrix-legend-text');
         const legendTextTranslationsInput = modalElement.querySelector('#matrix-legend-text-translations');
         const legendHideInput = modalElement.querySelector('#matrix-legend-hide');
-        const formatHintCheckbox = modalElement.querySelector('#matrix-show-format-hint');
-        const formatHintTextInput = modalElement.querySelector('#matrix-format-hint-text');
-        const formatHintTextTranslationsInput = modalElement.querySelector('#matrix-format-hint-text-translations');
 
         if (rowsContainer) rowsContainer.replaceChildren();
         if (columnsContainer) columnsContainer.replaceChildren();
@@ -200,9 +194,6 @@ export const MatrixItem = {
         }
         if (legendTextTranslationsInput) legendTextTranslationsInput.value = '{}';
         if (legendHideInput) legendHideInput.value = 'false';
-        if (formatHintCheckbox) formatHintCheckbox.checked = false;
-        if (formatHintTextInput) formatHintTextInput.value = DEFAULT_FORMAT_HINT_TEXT;
-        if (formatHintTextTranslationsInput) formatHintTextTranslationsInput.value = '{}';
         const lookupTooltipLabelInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label');
         const lookupTooltipLabelTranslationsInput = modalElement.querySelector('#matrix-variable-lookup-tooltip-label-translations');
         const submittedTooltipLabelInput = modalElement.querySelector('#matrix-variable-submitted-tooltip-label');
@@ -854,8 +845,6 @@ export const MatrixItem = {
         const legendTextWrapper = Utils.getElementById('matrix-legend-text-wrapper');
         const legendHideBtn = Utils.getElementById('matrix-legend-hide-btn');
         const legendHideInput = Utils.getElementById('matrix-legend-hide');
-        const formatHintCheckbox = Utils.getElementById('matrix-show-format-hint');
-        const formatHintTextInput = Utils.getElementById('matrix-format-hint-text');
 
         if (rowTotalsCheckbox) {
             if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
@@ -885,22 +874,6 @@ export const MatrixItem = {
             if (!columnTotalsCheckbox._matrixConfigListenerAdded) {
                 columnTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
                 columnTotalsCheckbox._matrixConfigListenerAdded = true;
-            }
-        }
-        if (formatHintCheckbox) {
-            if (!formatHintCheckbox._matrixConfigListenerAdded) {
-                formatHintCheckbox.addEventListener('change', () => {
-                    this.updateFormatHintTextVisibility(modalElement);
-                    this.updateConfig(modalElement);
-                });
-                formatHintCheckbox._matrixConfigListenerAdded = true;
-            }
-        }
-        if (formatHintTextInput) {
-            if (!formatHintTextInput._matrixFormatHintListenerAdded) {
-                formatHintTextInput.addEventListener('input', () => this.updateConfig(modalElement));
-                formatHintTextInput.addEventListener('change', () => this.updateConfig(modalElement));
-                formatHintTextInput._matrixFormatHintListenerAdded = true;
             }
         }
         if (autoLoadCheckbox) {
@@ -940,7 +913,6 @@ export const MatrixItem = {
 
         // Update legend text visibility on initial load
         this.updateLegendTextVisibility(modalElement);
-        this.updateFormatHintTextVisibility(modalElement);
 
         // Initialize legend hide button state
         this.initializeLegendHideButton(modalElement);
@@ -1010,19 +982,6 @@ export const MatrixItem = {
                 legendTextWrapper.classList.remove('hidden');
             } else {
                 legendTextWrapper.classList.add('hidden');
-            }
-        }
-    },
-
-    updateFormatHintTextVisibility(modalElement) {
-        const formatHintCheckbox = Utils.getElementById('matrix-show-format-hint');
-        const formatHintTextWrapper = Utils.getElementById('matrix-format-hint-text-wrapper');
-
-        if (formatHintCheckbox && formatHintTextWrapper) {
-            if (formatHintCheckbox.checked) {
-                formatHintTextWrapper.classList.remove('hidden');
-            } else {
-                formatHintTextWrapper.classList.add('hidden');
             }
         }
     },
@@ -1534,9 +1493,6 @@ export const MatrixItem = {
         });
         const showRowTotals = Utils.getElementById('matrix-show-row-totals')?.checked !== false;
         const showColumnTotals = Utils.getElementById('matrix-show-column-totals')?.checked !== false;
-        const showFormatHint = Utils.getElementById('matrix-show-format-hint')?.checked === true;
-        const formatHintTextInput = Utils.getElementById('matrix-format-hint-text');
-        const formatHintTextTranslationsInput = Utils.getElementById('matrix-format-hint-text-translations');
         const rowTotalManualEnabled = Utils.getElementById('matrix-row-total-manual-enabled')?.checked === true;
         const rowTotalValidation = Utils.getElementById('matrix-row-total-validation')?.value || 'none';
         const autoLoadEntities = Utils.getElementById('matrix-auto-load-entities')?.checked === true;
@@ -1551,7 +1507,6 @@ export const MatrixItem = {
             columns: columns,
             show_row_totals: showRowTotals,
             show_column_totals: showColumnTotals,
-            show_format_hint: showFormatHint,
             row_mode: selectedMode,
             highlight_manual_rows: highlightManualRows
         };
@@ -1560,21 +1515,6 @@ export const MatrixItem = {
             config.row_total_manual_enabled = rowTotalManualEnabled;
             if (rowTotalManualEnabled) {
                 config.row_total_validation = rowTotalValidation;
-            }
-        }
-
-        if (showFormatHint) {
-            config.format_hint_text = formatHintTextInput?.value?.trim() || DEFAULT_FORMAT_HINT_TEXT;
-            if (formatHintTextTranslationsInput?.value) {
-                try {
-                    const translations = JSON.parse(formatHintTextTranslationsInput.value);
-                    if (translations && typeof translations === 'object' &&
-                        Object.values(translations).some(v => String(v || '').trim())) {
-                        config.format_hint_text_translations = translations;
-                    }
-                } catch (e) {
-                    console.warn('Failed to parse format hint text translations:', e);
-                }
             }
         }
 
@@ -1921,9 +1861,6 @@ export const MatrixItem = {
                 }
                 const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
                 const columnTotalsCheckbox = Utils.getElementById('matrix-show-column-totals');
-                const formatHintCheckbox = Utils.getElementById('matrix-show-format-hint');
-                const formatHintTextInput = Utils.getElementById('matrix-format-hint-text');
-                const formatHintTextTranslationsInput = Utils.getElementById('matrix-format-hint-text-translations');
                 const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
                 const highlightManualRowsCheckbox = Utils.getElementById('matrix-highlight-manual-rows');
                 const legendTextInput = Utils.getElementById('matrix-legend-text');
@@ -1941,14 +1878,6 @@ export const MatrixItem = {
                 }
                 this.updateRowTotalOptionsVisibility(modalElement);
                 if (columnTotalsCheckbox) columnTotalsCheckbox.checked = matrixConfig.show_column_totals !== false;
-                if (formatHintCheckbox) formatHintCheckbox.checked = matrixConfig.show_format_hint === true;
-                if (formatHintTextInput) {
-                    formatHintTextInput.value = matrixConfig.format_hint_text || DEFAULT_FORMAT_HINT_TEXT;
-                }
-                if (formatHintTextTranslationsInput && matrixConfig.format_hint_text_translations) {
-                    formatHintTextTranslationsInput.value = JSON.stringify(matrixConfig.format_hint_text_translations);
-                }
-                this.updateFormatHintTextVisibility(modalElement);
                 if (autoLoadCheckbox) autoLoadCheckbox.checked = matrixConfig.auto_load_entities === true;
                 if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = matrixConfig.highlight_manual_rows === true;
                 if (legendTextInput) {

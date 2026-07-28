@@ -94,16 +94,149 @@
 
 <div class="container mx-auto px-4 py-6">
 
-    {# Loading overlay (shown until JS signals formBuilderInitialized) #}
-    <div id="form-builder-loading" class="w-full py-16 flex items-center justify-center" style="display:flex;">
-        <div class="text-center">
-            <div class="flex items-center justify-center">
-                <i class="fas fa-spinner fa-spin text-blue-600 text-2xl"></i>
+    {# Loading skeleton (shown until JS signals formBuilderInitialized) #}
+    {# IMPORTANT: loader is visible by default, UI is hidden by default (works even if <head> styles don't render) #}
+    <div id="form-builder-loading" class="form-builder-skeleton w-full min-w-0" style="display:block;" aria-busy="true" aria-live="polite">
+        <span class="sr-only">{{ _('Loading form builder…') }}</span>
+
+        {# Toolbar skeleton — mirrors Add Section / Template Variables row #}
+        <div class="mb-8 flex items-center justify-between gap-3" aria-hidden="true">
+            <div class="flex items-center flex-wrap gap-3">
+                <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-10 w-36 rounded-md"></div>
+                <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-10 w-44 rounded-md"></div>
             </div>
-            <p class="mt-3 text-gray-700 font-medium">{{ _('Loading form builder…') }}</p>
-            <p id="form-builder-loading-detail" class="text-sm text-gray-600 mt-1">{{ _('Preparing components. Please wait.') }}</p>
+            <div class="flex items-center gap-2 ml-auto">
+                <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-5 w-32 rounded"></div>
+                <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-5 w-36 rounded"></div>
+            </div>
+        </div>
+
+        {# Section cards skeleton — mirrors .section-item cards + items table #}
+        <div class="space-y-6" aria-hidden="true">
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-6 w-48 max-w-full"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-5 w-20 rounded-full shrink-0"></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 pb-3 mb-3 border-b border-gray-100">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-12"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[40%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-24 hidden sm:block"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden md:block"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16"></div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3 border-b border-gray-50">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[75%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3 border-b border-gray-50">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[60%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3 border-b border-gray-50">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[85%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[55%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md border border-gray-200 mb-6">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+                        <div class="flex items-center gap-2 flex-1 min-w-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-6 w-56 max-w-full"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-5 w-24 rounded-full shrink-0"></div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded shrink-0"></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-4 pb-3 mb-3 border-b border-gray-100">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-12"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[40%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-24 hidden sm:block"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden md:block"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16"></div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3 border-b border-gray-50">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[70%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3 border-b border-gray-50">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[90%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 py-3">
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-8 shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 flex-1 max-w-[65%]"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-20 hidden sm:block shrink-0"></div>
+                        <div class="form-builder-skeleton-bar form-builder-skeleton-pulse h-4 w-16 hidden md:block shrink-0"></div>
+                        <div class="flex gap-2 shrink-0">
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                            <div class="form-builder-skeleton-bar form-builder-skeleton-pulse w-8 h-8 rounded"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-builder-skeleton-status mt-6 text-center">
+            <p id="form-builder-loading-detail" class="text-sm text-gray-600">{{ _('Preparing components. Please wait.') }}</p>
             {# display:none inline: .btn sets display:inline-flex and can override Tailwind .hidden #}
-            <button type="button" id="form-builder-loading-reload" class="btn btn-primary mt-4" style="display: none;" aria-hidden="true">
+            <button type="button" id="form-builder-loading-reload" class="btn btn-primary mt-3" style="display: none;" aria-hidden="true">
                 <i class="fas fa-sync-alt mr-2"></i>{{ _('Reload') }}
             </button>
         </div>
@@ -730,13 +863,13 @@
     auto_translate_permission_code='admin.templates.edit'
 ) }}
 
-{# Matrix Number Format Hint Translation Modal #}
+{# Entry Form Hint Translation Modal #}
 {{ translation_modal(
-    modal_id='matrix-format-hint-text-translation-modal',
-    modal_title=_('Number Format Hint Translations'),
+    modal_id='item-entry-form-hint-text-translation-modal',
+    modal_title=_('Entry Form Hint Translations'),
     context='form_item',
     show_auto_translate=true,
-    css_prefix='matrix-format-hint-text',
+    css_prefix='item-entry-form-hint-text',
     auto_translate_permission_context='templates',
     auto_translate_permission_code='admin.templates.edit'
 ) }}
@@ -1028,7 +1161,7 @@
     <script type="module" nonce="{{ csp_nonce() }}" src="{{ static_url('js/form_builder/modules/translation/page-specific.js') }}"></script>
 
     <script nonce="{{ csp_nonce() }}">
-        // Loading spinner controller (debug logging lives in /static/js/form_builder/modules/debug.js).
+        // Loading skeleton controller (debug logging lives in /static/js/form_builder/modules/debug.js).
         (function () {
             'use strict';
             var RELOAD_BUTTON_MIN_MS = 8000;

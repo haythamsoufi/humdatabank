@@ -41,6 +41,17 @@ def validate_placeholders(source_text: str | None, translation_text: str | None)
     return {'valid': True, 'missing': [], 'extra': []}
 
 
+def validate_placeholders_if_present(source_text: str | None, translation_text: str | None) -> Dict[str, Any]:
+    """Validate placeholders only when *translation_text* is non-empty.
+
+    Blank translations are allowed — they represent an untranslated locale and should
+    not block saving other languages for format-string msgids.
+    """
+    if not (translation_text or '').strip():
+        return {'valid': True, 'missing': [], 'extra': []}
+    return validate_placeholders(source_text, translation_text)
+
+
 def localized_validation_message(validation: Dict[str, Any]) -> str:
     """Return a gettext-wrapped user message for a failed validation result."""
     try:

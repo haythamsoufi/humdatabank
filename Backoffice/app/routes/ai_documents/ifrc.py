@@ -19,7 +19,7 @@ from sqlalchemy import or_
 
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk, AIEmbedding, Country, AIJob, AIJobItem
-from app.services.ai_document_processor import AIDocumentProcessor
+from app.services.ai.documents.processor import AIDocumentProcessor
 from app.utils.datetime_helpers import utcnow
 from app.routes.admin.shared import admin_required, permission_required
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
@@ -824,7 +824,7 @@ def import_ifrc_api_document():
                         logger.debug("Alt source URL metadata update failed: %s", e)
                 existing.is_public = is_public
                 existing.searchable = True
-                from app.services.ai_country_detection import detect_countries as _det_countries
+                from app.services.ai.documents.country_detection import detect_countries as _det_countries
                 if country_id is not None:
                     existing.country_id = country_id
                     existing.country_name = country_name or None
@@ -857,7 +857,7 @@ def import_ifrc_api_document():
                     message='Import started; poll document status for progress.',
                 )
 
-            from app.services.ai_country_detection import detect_countries as _det_countries2
+            from app.services.ai.documents.country_detection import detect_countries as _det_countries2
             detected_country_id = country_id
             detected_country_name = country_name
             detected_countries = []

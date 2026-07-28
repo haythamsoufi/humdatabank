@@ -195,10 +195,8 @@ function isPresetAssignmentMode(modalElement) {
 function updatePresetModeUi(modalElement) {
     if (!modalElement) return;
     const customWrap = modalElement.querySelector('#document-fixed-period-custom-fields');
-    const hint = modalElement.querySelector('#item-doc-preset-assignment-hint');
     const useAssignment = isPresetAssignmentMode(modalElement);
     if (customWrap) customWrap.classList.toggle('hidden', useAssignment);
-    if (hint) hint.classList.toggle('hidden', !useAssignment);
 }
 
 export const DocumentItem = {

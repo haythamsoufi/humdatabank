@@ -5,6 +5,11 @@ import { QuestionItem } from '../items/question.js';
 import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
 import { populateCarryForwardFields } from './carry-forward.js';
+import { populateEntryFormHintFields } from './entry-form-hint.js';
+import {
+    mountEntryFormHintPanel,
+    populateDescriptionVisibility,
+} from './description-hint-ui.js';
 
 function parseBool(val) {
     return val === true || val === 'true' || val === 1 || val === '1';
@@ -368,6 +373,9 @@ export const FormPopulationMixin = {
         }
 
         populateCarryForwardFields(this.modalElement, itemData);
+        populateEntryFormHintFields(this.modalElement, itemData);
+        populateDescriptionVisibility(this.modalElement, itemData);
+        mountEntryFormHintPanel(this.modalElement, this.currentItemType);
 
         const sectionIdInput = this.modalElement.querySelector('#item-modal-section-id');
         const itemIdInput = this.modalElement.querySelector('#item-modal-id');

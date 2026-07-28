@@ -1,4 +1,5 @@
 {# Item Modal Partial - Handles adding/editing all item types (Indicator, Question, Document, Matrix, Plugin) #}
+{% from 'forms/form_builder/partials/_field_help_tooltip.html' import field_help %}
 <div id="item-modal" role="dialog" aria-modal="true" aria-labelledby="item-modal-title" class="fixed inset-0 bg-gray-800 bg-opacity-75 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center px-4">
     <div class="item-modal-panel relative p-6 border w-full max-w-xl shadow-xl rounded-lg bg-white">
         <div class="item-modal-header-actions">
@@ -86,23 +87,41 @@
                         <div class="mb-4">
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label for="item-indicator-label" class="text-gray-700 text-sm font-semibold">{{ _('Custom Label (Optional)') }}</label>
+                                {{ field_help(_('Leave empty to use the indicator bank name.')) }}
                                 <button type="button" id="indicator-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
                             <textarea data-field-type="label" id="item-indicator-label" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Override label (leave empty to use indicator bank name)')|forceescape }}" autocomplete="off"></textarea>
-                            <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty to use the indicator bank name.') }}</p>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="item-indicator-definition" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Custom Definition (Optional)') }}</label>
-                            <textarea id="item-indicator-definition" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Override definition (leave empty to use indicator bank definition)')|forceescape }}"></textarea>
-                            <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty to use the indicator bank definition.') }}</p>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="definition">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                        {{ field_help(_('Leave empty to use the indicator bank definition.')) }}
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea id="item-indicator-definition" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Override definition (leave empty to use indicator bank definition)')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
                         </div>
 
                         {# Default value (optional) for indicator numeric entry #}
                         <div class="mb-4">
-                            <label for="item-indicator-default-value" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Default Value (Optional)') }}</label>
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-indicator-default-value" class="text-gray-700 text-sm font-semibold">{{ _('Default Value (Optional)') }}</label>
+                                {{ field_help(_('You can enter a value or use a template variable like [variable_name]. For disaggregated indicators, this applies to Total mode only.')) }}
+                            </div>
                             <input type="text"
                                    name="default_value"
                                    id="item-indicator-default-value"
@@ -110,9 +129,6 @@
                                    class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md"
                                    placeholder="{{ _('e.g., 123 or [some_variable]')|forceescape }}"
                                    autocomplete="off">
-                            <p class="mt-1 text-xs text-gray-500">
-                                {{ _('You can enter a value or use a template variable like [variable_name]. For disaggregated indicators, this applies to Total mode only.') }}
-                            </p>
                         </div>
 
                         <div class="mb-4 hidden" id="add_item_indicator_disaggregation_options_wrapper">
@@ -123,9 +139,11 @@
                             </div>
                         </div>
                         <div class="mb-6 hidden" id="add_item_indicator_age_groups_config_wrapper">
-                            <label for="add_item_modal_indicator_age_groups_input" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Age Groups (comma-separated)') }}</label>
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="add_item_modal_indicator_age_groups_input" class="text-gray-700 text-sm font-semibold">{{ _('Age Groups (comma-separated)') }}</label>
+                                {{ field_help(_("Leave empty for defaults. Only if unit is 'People' & age disaggregation is allowed.")) }}
+                            </div>
                             <input type="text" name="age_groups_config" id="add_item_modal_indicator_age_groups_input" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('e.g., 0-4,5-9,10-14,15+')|forceescape }}">
-                            <p class="mt-1 text-xs text-gray-500">{{ _('Leave empty for defaults. Only if unit is \'People\' & age disaggregation is allowed.') }}</p>
                         </div>
                     </div>
 
@@ -170,12 +188,21 @@
                         </div>
 
                         <!-- Definition / body text (label varies for Blank/Note) -->
-                        <div class="mb-4">
-                            <label for="item-question-definition"
-                                   id="item-question-definition-caption"
-                                   class="block text-gray-700 text-sm font-semibold mb-2"
-                                   data-default-text="{{ _('Definition')|forceescape }}"
-                                   data-blank-text="{{ _('Body text')|forceescape }}">{{ _('Definition') }}</label>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="definition">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700"
+                                                  data-default-text="{{ _('Description')|forceescape }}"
+                                                  data-blank-text="{{ _('Body text')|forceescape }}">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
 
                             {# Rich-text toolbar – shown only when question_type == blank #}
                             <div id="blank-body-toolbar"
@@ -274,6 +301,10 @@
                                       data-default-placeholder="{{ _('Detailed definition/description of this question')|forceescape }}"
                                       data-blank-placeholder="{{ _('Text shown below the heading')|forceescape }}"
                                       placeholder="{{ _('Detailed definition/description of this question')|forceescape }}"></textarea>
+                            </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
                         </div>
 
                         <!-- Options Source - Hidden by default -->
@@ -334,7 +365,10 @@
                         <div id="item-question-calculated-list-container" class="mb-6 hidden">
                             <div class="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label for="item-calculated-list-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Select List') }}</label>
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="item-calculated-list-select" class="text-gray-700 text-sm font-semibold">{{ _('Select List') }}</label>
+                                        {{ field_help(_('Filters can be added after selecting a list.')) }}
+                                    </div>
                                     <select id="item-calculated-list-select" name="lookup_list_id" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                         <option value="">{{ _('Select List...') }}</option>
                                         {% for lst in lookup_lists_for_js %}
@@ -344,15 +378,16 @@
                                                     {% if lst.config_js_handler | default(none) %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
                                         {% endfor %}
                                     </select>
-                                    <p class="mt-2 text-xs text-gray-500">{{ _('Filters can be added after selecting a list.') }}</p>
                                 </div>
                                 <!-- Display Column Select -->
                                 <div id="item-calculated-display-column-wrapper" class="hidden">
-                                    <label for="item-calculated-list-display-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Display Column') }}</label>
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="item-calculated-list-display-column" class="text-gray-700 text-sm font-semibold">{{ _('Display Column') }}</label>
+                                        {{ field_help(_("Values from this column will appear as dropdown options. Fields marked as [Multilingual] will display in the user's selected language.")) }}
+                                    </div>
                                     <select id="item-calculated-list-display-column" name="list_display_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
                                         <option value="">{{ _('Select Column...') }}</option>
                                     </select>
-                                    <p class="mt-1 text-xs text-gray-500">{{ _('Values from this column will appear as dropdown options. Fields marked as [Multilingual] will display in the user\'s selected language.') }}</p>
                                 </div>
                             </div>
                             <button type="button" id="item-calculated-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2"><i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}</button>
@@ -370,7 +405,7 @@
                                        class="form-checkbox h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500 shrink-0">
                                 <span class="text-sm text-gray-700 font-medium">{{ _('Allow "Other" option') }}</span>
                                 <span class="custom-info-tooltip shrink-0 cursor-help" aria-label="{{ _('Help')|forceescape }}">
-                                    <i class="fas fa-info-circle text-gray-400" aria-hidden="true"></i>
+                                    <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
                                     <span class="tooltip-text">{{ _('Adds an "Other (please specify)" entry to the list. Users can type a custom value that is stored as their answer.') }}</span>
                                 </span>
                             </label>
@@ -382,8 +417,8 @@
                                            class="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-green-500 focus:border-green-500"
                                            min="1" max="99" value="1">
                                     <span>{{ _('extra "Other" entries (beyond the option count limit)') }}</span>
+                                    {{ field_help(_('Users can add this many additional "Other" entries on top of the number of list options.')) }}
                                 </label>
-                                <p class="mt-1 text-xs text-gray-500">{{ _('Users can add this many additional "Other" entries on top of the number of list options.') }}</p>
                             </div>
                         </div>
                     </div>
@@ -411,9 +446,24 @@
                             </select>
                         </div>
 
-                        <div class="mb-4">
-                            <label for="item-document-description" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Description (Optional)') }}</label>
-                            <textarea data-field-type="description" id="item-document-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}"></textarea>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" id="item-document-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
                         </div>
 
                         <div class="mb-4">
@@ -426,8 +476,10 @@
 
                         {# Document Field Display Options #}
                         <div class="mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                            <h4 class="text-sm font-semibold text-gray-700 mb-3">{{ _('Upload Modal Fields') }}</h4>
-                            <p class="text-xs text-gray-600 mb-3">{{ _('Select which fields to show in the document upload modal during data entry:') }}</p>
+                            <div class="flex items-center gap-2 flex-wrap mb-3">
+                                <h4 class="text-sm font-semibold text-gray-700">{{ _('Upload Modal Fields') }}</h4>
+                                {{ field_help(_('Select which fields to show in the document upload modal during data entry:')) }}
+                            </div>
 
                             <div class="space-y-3">
                                 <label class="flex items-center">
@@ -465,8 +517,10 @@
 
                                     {# Fixed period when the focal-point period selector is hidden (show_year off) #}
                                     <div id="document-fixed-period-block" class="ml-6 mt-3 space-y-2 p-3 border border-gray-200 rounded-md bg-white">
-                                        <p class="text-xs font-medium text-gray-700">{{ _('Fixed period for uploads') }}</p>
-                                        <p class="text-xs text-gray-500">{{ _('When the Year/Period selector is hidden, all uploads use this period. Focal points cannot change it.') }}</p>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <p class="text-xs font-medium text-gray-700">{{ _('Fixed period for uploads') }}</p>
+                                            {{ field_help(_('When the Year/Period selector is hidden, all uploads use this period. Focal points cannot change it.')) }}
+                                        </div>
                                         <div class="space-y-2">
                                             <label class="flex items-center gap-2 cursor-pointer">
                                                 <input type="radio" name="preset_period_mode" value="custom" id="item-doc-preset-mode-custom" class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500" checked>
@@ -475,9 +529,9 @@
                                             <label class="flex items-center gap-2 cursor-pointer">
                                                 <input type="radio" name="preset_period_mode" value="assignment" id="item-doc-preset-mode-assignment" class="form-radio h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500">
                                                 <span class="text-sm text-gray-700">{{ _('Same as assignment period') }}</span>
+                                                {{ field_help(_('Uses the period of the current assignment (shown in the form header).')) }}
                                             </label>
                                         </div>
-                                        <p id="item-doc-preset-assignment-hint" class="text-xs text-gray-500 hidden">{{ _('Uses the period of the current assignment (shown in the form header).') }}</p>
                                         <div id="document-fixed-period-custom-fields">
                                         <div>
                                             <label for="item-doc-preset-period-type" class="block text-xs text-gray-600 mb-1">{{ _('Period type') }}</label>
@@ -590,11 +644,11 @@
                                 </label>
 
                                 <div class="pt-2 border-t border-gray-200 mt-2">
-                                    <label class="flex items-start">
+                                    <label class="flex items-start gap-2">
                                         <input type="checkbox" id="item-document-entity-repo" name="cross_assignment_period_reuse" value="true" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5">
-                                        <span class="ml-2 text-sm text-gray-700">
+                                        <span class="inline-flex items-center gap-2 text-sm text-gray-700">
                                             {{ _("Satisfy from this entity's document repository") }}
-                                            <span class="block text-xs text-gray-500 font-normal mt-1">{{ _("Uploads by this entity's focal points for this form template are kept as a shared repository. When enabled, this field is satisfied if a matching document type already exists in that repository for the same entity, its period covers all years of the current assignment, and the document type matches the type set above.") }}</span>
+                                            {{ field_help(_("Uploads by this entity's focal points for this form template are kept as a shared repository. When enabled, this field is satisfied if a matching document type already exists in that repository for the same entity, its period covers all years of the current assignment, and the document type matches the type set above.")) }}
                                         </span>
                                     </label>
                                 </div>
@@ -617,20 +671,38 @@
                             <input type="text" data-field-type="label" id="item-matrix-label" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Matrix Title')|forceescape }}">
                         </div>
 
-                        <div class="mb-4">
-                            <label for="item-matrix-description" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Description (Optional)') }}</label>
-                            <textarea data-field-type="description" data-enable-variables="true" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional) — supports [assignment_period], etc.')|forceescape }}"></textarea>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" data-enable-variables="true" id="item-matrix-description" class="shadow-sm focus:ring-orange-500 focus:border-orange-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional) — supports [assignment_period], etc.')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
                         </div>
 
-                        {# Matrix Configuration — Row setup + Display Options. Stays in the
-                           left column when the modal is split into two columns; the Column
-                           Codes section below is what moves to the right column. #}
+                        {# Matrix table config (rows + columns) — moves to the right column in fill-content mode #}
+                        <div id="matrix-table-config-anchor" class="hidden" aria-hidden="true"></div>
+                        <div id="matrix-table-config-panel">
                         <div id="matrix-config-rows-section" class="mb-4 border-t border-gray-200 pt-4">
-                            <h4 class="text-sm font-semibold text-gray-700 mb-4">{{ _('Matrix Configuration') }}</h4>
+                            <h4 class="text-sm font-semibold text-gray-700 mb-4">{{ _('Table rows') }}</h4>
 
                             {# Row Mode Selection #}
                             <div class="mb-4">
-                                <label id="matrix-row-mode-label" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Row Configuration Mode') }}</label>
+                                <div class="flex items-center gap-2 flex-wrap mb-2">
+                                    <label id="matrix-row-mode-label" class="text-gray-700 text-sm font-semibold">{{ _('Row Configuration Mode') }}</label>
+                                    {{ field_help(_('Manual: Define fixed row headers. Advanced: Allow dynamic rows from list library during data entry.')) }}
+                                </div>
                                 <div class="flex items-center space-x-4" role="radiogroup" aria-labelledby="matrix-row-mode-label">
                                     <label class="inline-flex items-center">
                                         <input type="radio" name="matrix_row_mode" value="manual" class="form-radio h-4 w-4 text-orange-600" checked>
@@ -641,7 +713,6 @@
                                         <span class="ml-2 text-sm text-gray-700">{{ _('Advanced (List Library)') }}</span>
                                     </label>
                                 </div>
-                                <p class="mt-1 text-xs text-gray-500">{{ _('Manual: Define fixed row headers. Advanced: Allow dynamic rows from list library during data entry.') }}</p>
                             </div>
 
                             {# Manual Row Headers #}
@@ -665,7 +736,10 @@
                             <div id="matrix-list-library-section" class="mb-4 hidden">
                                 <div class="grid grid-cols-2 gap-6">
                                     <div>
-                                        <label for="matrix-list-select" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Select List for Rows') }}</label>
+                                        <div class="flex items-center gap-2 flex-wrap mb-2">
+                                            <label for="matrix-list-select" class="text-gray-700 text-sm font-semibold">{{ _('Select List for Rows') }}</label>
+                                            {{ field_help(_('Users will be able to select rows from this list during data entry.')) }}
+                                        </div>
                                         <select id="matrix-list-select" name="matrix_lookup_list_id" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
                                             <option value="">{{ _('Select List...') }}</option>
                                             {% for lst in lookup_lists_for_js %}
@@ -675,22 +749,25 @@
                                                         {% if lst.config_js_handler | default(none) %}data-config-js-handler="{{ lst.config_js_handler }}"{% endif %}>{{ lst.name }}</option>
                                             {% endfor %}
                                         </select>
-                                        <p class="mt-1 text-xs text-gray-500">{{ _('Users will be able to select rows from this list during data entry.') }}</p>
                                     </div>
                                     <div id="matrix-display-column-wrapper" class="hidden">
-                                        <label for="matrix-list-display-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Row Label Column') }}</label>
+                                        <div class="flex items-center gap-2 flex-wrap mb-2">
+                                            <label for="matrix-list-display-column" class="text-gray-700 text-sm font-semibold">{{ _('Row Label Column') }}</label>
+                                            {{ field_help(_("Values from this column will appear as row headers. Fields marked as [Multilingual] will display in the user's selected language.")) }}
+                                        </div>
                                         <select id="matrix-list-display-column" name="matrix_list_display_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
                                             <option value="">{{ _('Select Column...') }}</option>
                                         </select>
-                                        <p class="mt-1 text-xs text-gray-500">{{ _("Values from this column will appear as row headers. Fields marked as [Multilingual] will display in the user's selected language.") }}</p>
                                     </div>
                                 </div>
                                 <div id="matrix-group-by-wrapper" class="mt-4 hidden">
-                                    <label for="matrix-group-by-column" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Group Rows By Column') }} <span class="text-gray-400 font-normal">{{ _('(optional)') }}</span></label>
+                                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                                        <label for="matrix-group-by-column" class="text-gray-700 text-sm font-semibold">{{ _('Group Rows By Column') }} <span class="text-gray-400 font-normal">{{ _('(optional)') }}</span></label>
+                                        {{ field_help(_("Rows will be grouped under collapsible headers based on this column's values (e.g. group countries by region).")) }}
+                                    </div>
                                     <select id="matrix-group-by-column" name="matrix_group_by_column" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
                                         <option value="">{{ _('No grouping') }}</option>
                                     </select>
-                                    <p class="mt-1 text-xs text-gray-500">{{ _("Rows will be grouped under collapsible headers based on this column's values (e.g. group countries by region).") }}</p>
                                     <div id="matrix-group-controls-wrapper" class="mt-2 space-y-1 hidden">
                                         <label class="inline-flex items-center">
                                             <input type="checkbox" id="matrix-group-dropdown-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
@@ -705,6 +782,7 @@
                                 <div class="mt-4">
                                     <div class="flex items-center gap-2 flex-wrap mb-2">
                                         <label for="matrix-search-placeholder" class="text-gray-700 text-sm font-semibold">{{ _('Search Placeholder Text') }}</label>
+                                        {{ field_help(_('Customize the placeholder text shown in the search input when users add rows.')) }}
                                         <button type="button" id="matrix-search-placeholder-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
                                             <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                         </button>
@@ -716,7 +794,6 @@
                                            placeholder="{{ _('Search and select a row to add...')|forceescape }}"
                                            value="{{ _('Search and select a row to add...') }}">
                                     <input type="hidden" id="matrix-search-placeholder-translations" value="{}">
-                                    <p class="mt-1 text-xs text-gray-500">{{ _('Customize the placeholder text shown in the search input when users add rows.') }}</p>
                                 </div>
                                 <button type="button" id="matrix-list-add-filter-btn" class="text-xs font-medium text-blue-600 hover:text-blue-800 focus:outline-none focus:underline inline-flex items-center mt-2">
                                     <i class="fas fa-filter w-3 h-3 mr-1"></i>{{ _('Add Filter') }}
@@ -728,131 +805,16 @@
                                 <div id="matrix-plugin-config-container" class="mt-4"></div>
                             </div>
 
-                            {# Anchor marking where the Column Codes section lives when not
-                               moved into the right column (fill-content mode). Kept even when
-                               the section is relocated so it can be moved back reliably. #}
-                            <div id="matrix-columns-anchor" class="hidden" aria-hidden="true"></div>
-
-                            {# Matrix Display Options #}
-                            <div class="mb-4">
-                                <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Display Options') }}</label>
-                                <div class="space-y-2">
-                                    <div>
-                                        <label class="inline-flex items-center">
-                                            <input type="checkbox" id="matrix-show-row-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
-                                            <span class="ml-2 text-sm text-gray-700">{{ _('Show Row Totals') }}</span>
-                                        </label>
-                                        <div id="matrix-row-total-options-wrapper" class="ml-6 mt-2 space-y-2 border-l-2 border-orange-200 pl-3">
-                                            <label class="inline-flex items-center">
-                                                <input type="checkbox" id="matrix-row-total-manual-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
-                                                <span class="ml-2 text-sm text-gray-700">{{ _('Allow manual row total entry') }}</span>
-                                            </label>
-                                            <p class="text-xs text-gray-500">{{ _('When enabled, users can override the calculated row total. Breakdown vs total conflicts can be flagged or block submission.') }}</p>
-                                            <div id="matrix-row-total-validation-wrapper" class="hidden">
-                                                <label for="matrix-row-total-validation" class="block text-xs font-medium text-gray-600 mb-1">{{ _('Total vs breakdown validation') }}</label>
-                                                <select id="matrix-row-total-validation" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded-md text-sm">
-                                                    <option value="none">{{ _('Informational only (flag conflicts, allow save)') }}</option>
-                                                    <option value="partial">{{ _('Partial breakdown OK (manual total must be ≥ breakdown sum)') }}</option>
-                                                    <option value="strict">{{ _('Strict (manual total must equal breakdown sum; blocks submit)') }}</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <label class="inline-flex items-center">
-                                        <input type="checkbox" id="matrix-show-column-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
-                                        <span class="ml-2 text-sm text-gray-700">{{ _('Show Column Totals') }}</span>
-                                    </label>
-                                    <div>
-                                        <label class="inline-flex items-center">
-                                            <input type="checkbox" id="matrix-show-format-hint" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
-                                            <span class="ml-2 text-sm text-gray-700">{{ _('Show number format hint') }}</span>
-                                            <span class="custom-info-tooltip cursor-help inline-flex items-center justify-center ml-1" aria-label="{{ _('Help')|forceescape }}">
-                                                <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
-                                                <span class="tooltip-text">{{ _('Shows a highlighted note above the matrix table in the entry form. Only shown when the matrix has at least one number column.') }}</span>
-                                            </span>
-                                        </label>
-                                        <div id="matrix-format-hint-text-wrapper" class="mt-2 ml-6 hidden">
-                                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                                <label for="matrix-format-hint-text" class="text-sm font-medium text-gray-700">{{ _('Hint text') }}</label>
-                                                <button type="button" id="matrix-format-hint-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
-                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
-                                                </button>
-                                            </div>
-                                            <textarea id="matrix-format-hint-text"
-                                                      name="matrix_format_hint_text"
-                                                      rows="2"
-                                                      class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">{{ _('Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.') }}</textarea>
-                                            <input type="hidden" id="matrix-format-hint-text-translations" value="{}">
-                                            <p class="mt-1 text-xs text-gray-500">{{ _('Customize the message shown above the matrix table.') }}</p>
-                                        </div>
-                                    </div>
-                                    <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
-                                        <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
-                                        <span class="ml-2 text-sm text-gray-700">{{ _('Auto Load Entities') }}</span>
-                                    </label>
-                                    <label class="inline-flex items-center">
-                                        <input type="checkbox" id="matrix-highlight-manual-rows" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
-                                        <span class="ml-2 text-sm text-gray-700">{{ _('Highlight Manually Added Rows') }}</span>
-                                    </label>
-                                    <div id="matrix-legend-text-wrapper" class="mt-2 hidden">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <div class="flex items-center gap-2 flex-wrap min-w-0">
-                                                <label class="text-sm font-medium text-gray-700">{{ _('Legend Text') }}</label>
-                                                <button type="button" id="matrix-legend-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
-                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
-                                                </button>
-                                            </div>
-                                            <div class="flex items-center space-x-2 shrink-0">
-                                                <button type="button" id="matrix-legend-hide-btn" class="text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline inline-flex items-center" title="{{ _('Legend is shown — click to hide')|forceescape }}">
-                                                    <i class="fas fa-eye w-4 h-4 mr-1"></i>
-                                                    <span>{{ _('Legend shown') }}</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <input type="text" id="matrix-legend-text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Manually added row')|forceescape }}" value="{{ _('Manually added row') }}">
-                                        <input type="hidden" id="matrix-legend-text-translations" value="{}">
-                                        <input type="hidden" id="matrix-legend-hide" value="false">
-                                        <p class="text-xs text-gray-500 mt-1">{{ _('Text to display in the legend when manually added rows are highlighted') }}</p>
-                                    </div>
-                                    <div id="matrix-variable-tooltip-labels-wrapper" class="mt-3 space-y-3 border-t border-gray-200 pt-3">
-                                        <p class="text-xs font-medium text-gray-700">{{ _('Variable column tooltip labels') }}</p>
-                                        <div>
-                                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                                <label for="matrix-variable-lookup-tooltip-label" class="text-sm text-gray-700">{{ _('Lookup value label') }}</label>
-                                                <button type="button" id="matrix-variable-lookup-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
-                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
-                                                </button>
-                                            </div>
-                                            <input type="text" id="matrix-variable-lookup-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Lookup value')|forceescape }}" value="{{ _('Lookup value') }}">
-                                            <input type="hidden" id="matrix-variable-lookup-tooltip-label-translations" value="{}">
-                                        </div>
-                                        <div>
-                                            <div class="flex items-center gap-2 flex-wrap mb-1">
-                                                <label for="matrix-variable-submitted-tooltip-label" class="text-sm text-gray-700">{{ _('Submitted value label') }}</label>
-                                                <button type="button" id="matrix-variable-submitted-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
-                                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
-                                                </button>
-                                            </div>
-                                            <input type="text" id="matrix-variable-submitted-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Submitted value')|forceescape }}" value="{{ _('Submitted value') }}">
-                                            <input type="hidden" id="matrix-variable-submitted-tooltip-label-translations" value="{}">
-                                        </div>
-                                        <p class="text-xs text-gray-500">{{ _('Labels shown in the tooltip when a saved variable value differs from the current lookup.') }}</p>
-                                    </div>
-                                </div>
-                            </div>
-
                         </div>
 
-                        {# Column Codes — moved into the right column when the modal is
-                           split into two (fill-content mode + Matrix item). #}
-                        <div id="matrix-columns-section" class="mb-4">
-                            <div class="flex items-center gap-2 flex-wrap mb-2">
-                                <label class="text-gray-700 text-sm font-semibold">{{ _('Column Codes') }}</label>
+                        <div id="matrix-columns-section" class="mb-4 border-t border-gray-200 pt-4 mt-2">
+                            <div class="flex items-center gap-2 flex-wrap mb-3">
+                                <h4 class="text-sm font-semibold text-gray-700">{{ _('Table columns') }}</h4>
+                                {{ field_help(_('Enter a stable code for each column (e.g. total_beneficiaries). Use the translations button to set display labels in English and other languages.')) }}
                                 <button type="button" id="matrix-column-headers-translations-matrix-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Manage column header translations')|forceescape }}" aria-label="{{ _('Translations')|forceescape }}">
                                     <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
                                 </button>
                             </div>
-                            <p class="text-xs text-gray-500 mb-2">{{ _('Enter a stable code for each column') }} (e.g. <code class="bg-gray-100 px-1 rounded">total_beneficiaries</code>). {{ _('Use the translations button to set display labels in English and other languages.') }}</p>
                             <div id="matrix-columns-container" class="space-y-2">
                                 <!-- Column headers will be added here dynamically -->
                             </div>
@@ -866,6 +828,34 @@
                                     {{ _('Add Group') }}
                                 </button>
                             </div>
+
+                            <div id="matrix-variable-tooltip-labels-wrapper" class="mt-4 pt-4 space-y-3 border-t border-gray-200">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="text-xs font-medium text-gray-700">{{ _('Variable column tooltip labels') }}</p>
+                                    {{ field_help(_('Labels shown in the tooltip when a saved variable value differs from the current lookup.')) }}
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                                        <label for="matrix-variable-lookup-tooltip-label" class="text-sm text-gray-700">{{ _('Lookup value label') }}</label>
+                                        <button type="button" id="matrix-variable-lookup-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <input type="text" id="matrix-variable-lookup-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Lookup value')|forceescape }}" value="{{ _('Lookup value') }}">
+                                    <input type="hidden" id="matrix-variable-lookup-tooltip-label-translations" value="{}">
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                                        <label for="matrix-variable-submitted-tooltip-label" class="text-sm text-gray-700">{{ _('Submitted value label') }}</label>
+                                        <button type="button" id="matrix-variable-submitted-tooltip-label-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <input type="text" id="matrix-variable-submitted-tooltip-label" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Submitted value')|forceescape }}" value="{{ _('Submitted value') }}">
+                                    <input type="hidden" id="matrix-variable-submitted-tooltip-label-translations" value="{}">
+                                </div>
+                            </div>
+                        </div>
                         </div>
 
                         {# Hidden inputs for matrix configuration #}
@@ -979,9 +969,24 @@
                             </div>
                             <input type="text" data-field-type="label" id="item-image-caption" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Caption shown below the image')|forceescape }}">
                         </div>
-                        <div class="mb-4">
-                            <label for="item-image-alt" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Alt text (optional)') }}</label>
-                            <textarea data-field-type="description" id="item-image-alt" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Describe the image for screen readers')|forceescape }}"></textarea>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" id="item-image-alt" class="shadow-sm focus:ring-teal-500 focus:border-teal-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Describe the image for screen readers')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
                         </div>
                         <div class="mb-4 grid grid-cols-2 gap-4">
                             <div>
@@ -1044,10 +1049,19 @@
                         <!-- Plugin configuration will be dynamically loaded here from individual plugin templates -->
                     </div>
 
+                    {# Entry form hint panel storage — JS mounts panel after active description #}
+                    <div id="item-description-hint-panel-storage" class="hidden" aria-hidden="true">
+                        {% include 'forms/form_builder/partials/_item_modal_entry_form_hint_panel.html' %}
+                    </div>
+
                     {# Properties Section - Common for all item types #}
                     <div id="item-properties-section" class="mb-3 border-t border-gray-200 pt-4">
                         <label class="block text-gray-700 text-sm font-semibold mb-3">{{ _('Properties') }}</label>
-                        <div id="item-properties-content" class="grid grid-cols-2 gap-x-6 gap-y-4 items-start">
+
+                        {# Display — layout, visibility, matrix presentation #}
+                        <div id="item-properties-display-group" class="mb-5">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{{ _('Display') }}</p>
+                            <div id="item-properties-display-content" class="grid grid-cols-2 gap-x-6 gap-y-4 items-start">
 
                             {# Section — left column; label and dropdown on one line #}
                             <div class="flex items-center gap-2 min-w-0">
@@ -1080,6 +1094,9 @@
                                 </span>
                             </div>
 
+                            {# Privacy — right column; populated by JS #}
+                            <div id="item-privacy-field" class="flex items-center gap-2 min-w-0"></div>
+
                             <div id="item-modal-stable-key-row" class="hidden col-span-2 flex items-center gap-2 min-w-0 flex-wrap">
                                 <label for="item-modal-stable-key" class="shrink-0 w-20 text-sm font-semibold text-gray-700">{{ _('Field ID') }}</label>
                                 <input type="text" id="item-modal-stable-key" readonly class="flex-1 min-w-0 shadow-sm bg-gray-50 text-gray-600 py-1.5 sm:text-sm border-gray-300 rounded-md font-mono text-xs" aria-readonly="true">
@@ -1087,8 +1104,23 @@
                                 <button type="button" id="item-modal-stable-key-copy" class="btn btn-secondary btn-sm shrink-0" title="{{ _('Copy field identity')|forceescape }}">{{ _('Copy') }}</button>
                             </div>
 
-                            {# Privacy — right column; populated by JS #}
-                            <div id="item-privacy-field" class="flex items-center gap-2 min-w-0"></div>
+                            {# Force new row #}
+                            <div class="item-properties-cell min-h-[1.5rem] flex items-center">
+                                <label class="flex items-center text-gray-700 text-sm">
+                                    <input type="checkbox" name="layout_break_after" id="item-layout-break-after" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span class="ml-2">{{ _('Force new row after this item') }}</span>
+                                </label>
+                            </div>
+
+                            {% include 'forms/form_builder/partials/_item_modal_matrix_display_properties.html' %}
+
+                            </div>
+                        </div>
+
+                        {# Data — validation, entry behaviour, carry-forward #}
+                        <div id="item-properties-data-group">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{{ _('Data') }}</p>
+                            <div id="item-properties-content" class="grid grid-cols-2 gap-x-6 gap-y-4 items-start">
 
                             {# Required Field #}
                             <div class="item-properties-cell min-h-[1.5rem] flex items-center">
@@ -1111,14 +1143,6 @@
                                 <label class="flex items-center text-gray-700 text-sm">
                                     <input type="checkbox" name="allow_not_applicable" id="item-allow-not-applicable" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                     <span class="ml-2">{{ _('Allow "Not applicable" option') }}</span>
-                                </label>
-                            </div>
-
-                            {# Force new row #}
-                            <div class="item-properties-cell min-h-[1.5rem] flex items-center">
-                                <label class="flex items-center text-gray-700 text-sm">
-                                    <input type="checkbox" name="layout_break_after" id="item-layout-break-after" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                    <span class="ml-2">{{ _('Force new row after this item') }}</span>
                                 </label>
                             </div>
 
@@ -1147,21 +1171,21 @@
 
                                 {# Sub-option: connected with a left-border tree line — conditionally shown #}
                                 <div id="limit-entries-to-option-count-row" class="mt-2 ml-2 pl-4 border-l-2 border-gray-200" style="display: none;">
-                                    <label class="flex items-center text-gray-700 text-sm">
+                                    <label class="flex items-center gap-2 text-gray-700 text-sm">
                                         <input type="checkbox" name="limit_entries_to_option_count" id="item-limit-entries-to-option-count" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                        <span class="ml-2">{{ _('Limit repeat section entries to the number of options') }}</span>
+                                        <span>{{ _('Limit repeat section entries to the number of options') }}</span>
+                                        {{ field_help(_('The number of repeat entries cannot exceed the number of available options.')) }}
                                     </label>
-                                    <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('The number of repeat entries cannot exceed the number of available options.') }}</p>
                                 </div>
                             </div>
 
                             {# Repeat entry title dropdown (single choice in repeat sections) — conditionally shown #}
                             <div id="use-as-repeat-entry-title-row" class="col-span-2" style="display: none;">
-                                <label class="flex items-center text-gray-700 text-sm">
+                                <label class="flex items-center gap-2 text-gray-700 text-sm">
                                     <input type="checkbox" name="use_as_repeat_entry_title" id="item-use-as-repeat-entry-title" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                    <span class="ml-2">{{ _('Use as repeat entry title (dropdown in header)') }}</span>
+                                    <span>{{ _('Use as repeat entry title (dropdown in header)') }}</span>
+                                    {{ field_help(_('In repeat sections, shows the dropdown in the entry header instead of as a separate field.')) }}
                                 </label>
-                                <p class="mt-1 ml-6 text-xs text-gray-500">{{ _('In repeat sections, shows the dropdown in the entry header instead of as a separate field.') }}</p>
                             </div>
 
                             {# Carry-forward from previous reporting round — all data-entry item types #}
@@ -1169,8 +1193,8 @@
                                 <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
                                     <input type="checkbox" id="item-carry-forward" name="carry_forward" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
                                     <span>{{ _('Carry forward from previous round') }}</span>
+                                    {{ field_help(_('When empty in a new reporting round, prefill this field from a configured prior data source for the same entity.')) }}
                                 </label>
-                                <p class="mt-1 text-xs text-gray-500">{{ _('When empty in a new reporting round, prefill this field from a configured prior data source for the same entity.') }}</p>
                                 <div id="item-carry-forward-sources-wrapper" class="hidden mt-3 space-y-2">
                                     <div class="flex flex-col gap-1">
                                         <label for="item-carry-forward-priority" class="text-xs font-medium text-gray-700">{{ _('Resolution priority') }}</label>
@@ -1189,6 +1213,7 @@
                             </div>
 
                             {# Plugin options will be dynamically added here by the item modal #}
+                            </div>
                         </div>
 
                         {# Rules Section - Below Properties Grid #}
@@ -1227,9 +1252,11 @@
                         <input type="hidden" name="validation_condition" id="item-validation-condition">
 
                         <div class="mt-4">
-                            <label for="item-validation-message" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Validation Message') }}</label>
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-validation-message" class="text-gray-700 text-sm font-semibold">{{ _('Validation Message') }}</label>
+                                {{ field_help(_('Message to display to the user if the validation rule is not met.')) }}
+                            </div>
                             <textarea name="validation_message" id="item-validation-message" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Message to show if validation fails')|forceescape }}"></textarea>
-                            <p class="mt-1 text-xs text-gray-500">{{ _('Message to display to the user if the validation rule is not met.') }}</p>
                         </div>
                     </div>
                 </div>

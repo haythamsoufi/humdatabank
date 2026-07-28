@@ -128,7 +128,7 @@ def update_document(document_id: int):
             if doc.user_id != current_user.id:
                 return json_forbidden('Access denied')
 
-        from app.services.ai_metadata_extractor import DOCUMENT_CATEGORIES
+        from app.services.ai.documents.metadata import DOCUMENT_CATEGORIES
 
         data = get_json_safe()
         if "is_public" in data:

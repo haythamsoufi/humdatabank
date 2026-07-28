@@ -25,3 +25,18 @@ class TestPlaceholderValidator:
     def test_no_placeholders_is_valid(self):
         result = validate_placeholders('Dashboard', 'Tableau de bord')
         assert result['valid'] is True
+
+
+class TestValidatePlaceholdersIfPresent:
+    def test_blank_translation_skips_validation(self):
+        from app.services.translation.placeholder_validator import validate_placeholders_if_present
+
+        msgid = 'Showing the %(loaded)d most recent of %(total)d processed requests.'
+        result = validate_placeholders_if_present(msgid, '')
+        assert result['valid'] is True
+
+    def test_non_blank_still_validates(self):
+        from app.services.translation.placeholder_validator import validate_placeholders_if_present
+
+        result = validate_placeholders_if_present('%(count)d more', 'plus')
+        assert result['valid'] is False

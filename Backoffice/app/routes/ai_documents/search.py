@@ -8,7 +8,7 @@ from flask import request
 from flask_login import login_required, current_user
 
 from app.extensions import limiter
-from app.services.ai_vector_store import AIVectorStore
+from app.services.ai.documents.vector_store import AIVectorStore
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 

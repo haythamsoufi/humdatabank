@@ -1,0 +1,59 @@
+{# Matrix display options — shown in Properties > Display when editing a matrix item #}
+{% from 'forms/form_builder/partials/_field_help_tooltip.html' import field_help %}
+<div id="item-properties-matrix-display" class="col-span-2 hidden">
+    <div class="space-y-2 border-t border-gray-100 pt-3 mt-1">
+        <div>
+            <label class="inline-flex items-center">
+                <input type="checkbox" id="matrix-show-row-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                <span class="ml-2 text-sm text-gray-700">{{ _('Show Row Totals') }}</span>
+            </label>
+            <div id="matrix-row-total-options-wrapper" class="ml-6 mt-2 space-y-2 border-l-2 border-orange-200 pl-3">
+                <label class="inline-flex items-center gap-2">
+                    <input type="checkbox" id="matrix-row-total-manual-enabled" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+                    <span class="text-sm text-gray-700">{{ _('Allow manual row total entry') }}</span>
+                    {{ field_help(_('When enabled, users can override the calculated row total. Breakdown vs total conflicts can be flagged or block submission.')) }}
+                </label>
+                <div id="matrix-row-total-validation-wrapper" class="hidden">
+                    <label for="matrix-row-total-validation" class="block text-xs font-medium text-gray-600 mb-1">{{ _('Total vs breakdown validation') }}</label>
+                    <select id="matrix-row-total-validation" class="w-full max-w-md px-2 py-1.5 border border-gray-300 rounded-md text-sm">
+                        <option value="none">{{ _('Informational only (flag conflicts, allow save)') }}</option>
+                        <option value="partial">{{ _('Partial breakdown OK (manual total must be ≥ breakdown sum)') }}</option>
+                        <option value="strict">{{ _('Strict (manual total must equal breakdown sum; blocks submit)') }}</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <label class="inline-flex items-center">
+            <input type="checkbox" id="matrix-show-column-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+            <span class="ml-2 text-sm text-gray-700">{{ _('Show Column Totals') }}</span>
+        </label>
+        <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
+            <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+            <span class="ml-2 text-sm text-gray-700">{{ _('Auto Load Entities') }}</span>
+        </label>
+        <label class="inline-flex items-center">
+            <input type="checkbox" id="matrix-highlight-manual-rows" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
+            <span class="ml-2 text-sm text-gray-700">{{ _('Highlight Manually Added Rows') }}</span>
+        </label>
+        <div id="matrix-legend-text-wrapper" class="mt-2 hidden">
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
+                    <label class="text-sm font-medium text-gray-700">{{ _('Legend Text') }}</label>
+                    {{ field_help(_('Text to display in the legend when manually added rows are highlighted')) }}
+                    <button type="button" id="matrix-legend-text-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                        <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button type="button" id="matrix-legend-hide-btn" class="text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus:underline inline-flex items-center" title="{{ _('Legend is shown — click to hide')|forceescape }}">
+                        <i class="fas fa-eye w-4 h-4 mr-1"></i>
+                        <span>{{ _('Legend shown') }}</span>
+                    </button>
+                </div>
+            </div>
+            <input type="text" id="matrix-legend-text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" placeholder="{{ _('Manually added row')|forceescape }}" value="{{ _('Manually added row') }}">
+            <input type="hidden" id="matrix-legend-text-translations" value="{}">
+            <input type="hidden" id="matrix-legend-hide" value="false">
+        </div>
+    </div>
+</div>

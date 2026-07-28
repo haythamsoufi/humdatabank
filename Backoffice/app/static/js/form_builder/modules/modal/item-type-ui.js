@@ -6,6 +6,7 @@ import { IndicatorItem } from '../items/indicator.js';
 import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
 import { BlankBodyEditor, BlankTranslationEditor } from '../items/blank.js';
+import { mountEntryFormHintPanel } from './description-hint-ui.js';
 
 export const ItemTypeUIMixin = {
     switchItemType: function(itemType, optionalQuestionType) {
@@ -87,6 +88,7 @@ export const ItemTypeUIMixin = {
         try { (window.__clientLog || console.debug)('[ItemModal:Privacy] calling ensurePrivacyField()'); } catch (e) {}
         this.ensurePrivacyField();
         this.ensureDisplayOnlyPropertyFields(itemType);
+        this.ensureMatrixDisplayProperties(itemType);
         this.ensureAllowOver100Field(itemType);
         this.ensureUniqueOptionsInSectionField(itemType);
         this.ensureUseAsRepeatEntryTitleField(itemType);
@@ -96,6 +98,7 @@ export const ItemTypeUIMixin = {
         this._fillModeManual = null;
         try { this.syncFillContentMode(); } catch (_e) {}
         try { this.syncRightPanel(); } catch (_e) {}
+        try { mountEntryFormHintPanel(this.modalElement, itemType); } catch (_e) {}
 
         if (!this._scrollRafQueued) {
             this._scrollRafQueued = true;
@@ -352,7 +355,7 @@ export const ItemTypeUIMixin = {
         const mode = isBlank ? 'blank' : 'default';
 
         const labelCaption = this.modalElement.querySelector('#item-question-label-caption');
-        const definitionCaption = this.modalElement.querySelector('#item-question-definition-caption');
+        const descriptionLabel = this.modalElement.querySelector('#item-question-fields .item-show-description-label');
         const labelInput = this.modalElement.querySelector('#item-question-label');
         const definitionInput = this.modalElement.querySelector('#item-question-definition');
 
@@ -369,7 +372,7 @@ export const ItemTypeUIMixin = {
         };
 
         applyCaption(labelCaption);
-        applyCaption(definitionCaption);
+        applyCaption(descriptionLabel);
         applyPlaceholder(labelInput);
         applyPlaceholder(definitionInput);
 

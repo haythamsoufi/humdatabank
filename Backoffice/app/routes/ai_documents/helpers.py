@@ -18,9 +18,9 @@ from flask import current_app, g
 
 from app.extensions import db
 from app.models import Country
-from app.services.ai_document_processor import DocumentProcessingError
-from app.services.ai_embedding_service import EmbeddingError
-from app.services.ai_vector_store import AIVectorStore
+from app.services.ai.documents.processor import DocumentProcessingError
+from app.services.ai.documents.embedding import EmbeddingError
+from app.services.ai.documents.vector_store import AIVectorStore
 from app.utils.ai_utils import openai_model_supports_sampling_params
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.services import storage_service as _storage
@@ -535,7 +535,7 @@ def _resolve_country_from_text(country_text: str | None) -> tuple[int | None, st
     except Exception as e:
         logger.debug("Country resolution from ISO failed: %s", e)
     try:
-        from app.services.ai_country_detection import detect_country_id_and_name
+        from app.services.ai.documents.country_detection import detect_country_id_and_name
         cid, cname = detect_country_id_and_name(filename=None, title=t, text=t)
         return cid, cname
     except Exception as e:

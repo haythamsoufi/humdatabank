@@ -13,9 +13,24 @@
         <textarea name="label" id="item-plugin-label" data-field-type="label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Field Label" required autocomplete="off"></textarea>
     </div>
 
-    <div class="mb-4">
-        <label for="item-plugin-description" class="block text-gray-700 text-sm font-semibold mb-2">Description (Optional)</label>
-        <textarea name="description" id="item-plugin-description" data-field-type="description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Description (Optional)" autocomplete="off"></textarea>
+    <div class="item-description-hint-section mb-4">
+        <div class="item-description-hint-section-inner">
+            <div class="item-optional-description-block mb-0" data-description-source="description">
+                <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                    <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                        <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Description') }}</span>
+                    </label>
+                    <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                        <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                    </button>
+                </div>
+                <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                    <textarea name="description" id="item-plugin-description" data-field-type="description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="{{ _('Description (Optional)')|forceescape }}" autocomplete="off"></textarea>
+                </div>
+            </div>
+            <div class="item-description-hint-anchor w-full"></div>
+        </div>
     </div>
 
     {# Plugin-specific configuration will be dynamically loaded here #}

@@ -16,7 +16,7 @@ import pytest
 
 class TestCircuitBreakerState:
     def test_enum_has_three_states(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreakerState
         states = {s.value for s in CircuitBreakerState}
         assert states == {"closed", "open", "half_open"}
 
@@ -27,25 +27,25 @@ class TestCircuitBreakerState:
 
 class TestCircuitBreakerInitialState:
     def test_starts_closed(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker()
         assert cb.state == CircuitBreakerState.CLOSED
 
     def test_allows_call_when_closed(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker
         assert CircuitBreaker().allow_call() is True
 
     def test_default_threshold_is_3(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker
         assert CircuitBreaker().failure_threshold == 3
 
     def test_custom_threshold_respected(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker
         cb = CircuitBreaker(failure_threshold=5)
         assert cb.failure_threshold == 5
 
     def test_threshold_clamped_to_minimum_1(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker
         cb = CircuitBreaker(failure_threshold=0)
         assert cb.failure_threshold == 1
 
@@ -56,26 +56,26 @@ class TestCircuitBreakerInitialState:
 
 class TestCircuitBreakerOpening:
     def test_opens_after_threshold_failures(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=3, reset_timeout_seconds=60.0)
         for _ in range(3):
             cb.record_failure()
         assert cb.state == CircuitBreakerState.OPEN
 
     def test_blocks_calls_when_open(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=60.0)
         cb.record_failure()
         assert cb.allow_call() is False
 
     def test_single_failure_below_threshold_stays_closed(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=3)
         cb.record_failure()
         assert cb.state == CircuitBreakerState.CLOSED
 
     def test_two_failures_below_threshold_stays_closed(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=3)
         cb.record_failure()
         cb.record_failure()
@@ -88,7 +88,7 @@ class TestCircuitBreakerOpening:
 
 class TestCircuitBreakerRecovery:
     def test_success_resets_to_closed(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=2)
         cb.record_failure()
         cb.record_failure()
@@ -97,13 +97,13 @@ class TestCircuitBreakerRecovery:
         assert cb.state == CircuitBreakerState.CLOSED
 
     def test_success_after_closed_stays_closed(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker()
         cb.record_success()
         assert cb.state == CircuitBreakerState.CLOSED
 
     def test_success_allows_call_after_open(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=60.0)
         cb.record_failure()
         cb.record_success()
@@ -116,7 +116,7 @@ class TestCircuitBreakerRecovery:
 
 class TestCircuitBreakerHalfOpen:
     def test_transitions_to_half_open_after_timeout(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=0.01)
         cb.record_failure()
         assert cb.state == CircuitBreakerState.OPEN
@@ -126,7 +126,7 @@ class TestCircuitBreakerHalfOpen:
         assert cb.state == CircuitBreakerState.HALF_OPEN
 
     def test_failure_in_half_open_reopens(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=0.01)
         cb.record_failure()
         time.sleep(0.05)
@@ -135,7 +135,7 @@ class TestCircuitBreakerHalfOpen:
         assert cb.state == CircuitBreakerState.OPEN
 
     def test_success_in_half_open_closes(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=0.01)
         cb.record_failure()
         time.sleep(0.05)
@@ -144,7 +144,7 @@ class TestCircuitBreakerHalfOpen:
         assert cb.state == CircuitBreakerState.CLOSED
 
     def test_zero_reset_timeout_never_half_opens(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=0.0)
         cb.record_failure()
         time.sleep(0.05)
@@ -152,7 +152,7 @@ class TestCircuitBreakerHalfOpen:
         assert cb.state == CircuitBreakerState.OPEN
 
     def test_allow_call_on_half_open_returns_true(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=0.01)
         cb.record_failure()
         time.sleep(0.05)
@@ -166,7 +166,7 @@ class TestCircuitBreakerHalfOpen:
 
 class TestCircuitBreakerIsolation:
     def test_two_breakers_are_independent(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb1 = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=60.0)
         cb2 = CircuitBreaker(failure_threshold=1, reset_timeout_seconds=60.0)
         cb1.record_failure()
@@ -174,7 +174,7 @@ class TestCircuitBreakerIsolation:
         assert cb2.state == CircuitBreakerState.CLOSED
 
     def test_failure_count_does_not_leak_between_instances(self):
-        from app.services.ai_agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
+        from app.services.ai.agent._circuit_breaker import CircuitBreaker, CircuitBreakerState
         cb1 = CircuitBreaker(failure_threshold=3)
         cb2 = CircuitBreaker(failure_threshold=3)
         cb1.record_failure()

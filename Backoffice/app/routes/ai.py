@@ -32,7 +32,7 @@ from app.utils.ai_utils import sanitize_page_context, openai_model_supports_samp
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.request_validation import enforce_csrf_json
-from app.services.ai_chat_request import (
+from app.services.ai.chat.request import (
     parse_chat_request,
     resolve_conversation_and_history,
     get_idempotent_reply,
@@ -46,10 +46,10 @@ from app.utils.datetime_helpers import utcnow
 from app.extensions import db, limiter
 from app.models.ai_chat import AIConversation, AIMessage
 from app.models import AIReasoningTrace
-from app.services.ai_chat_retention import delete_archive_object, load_archived_conversation
-from app.services.ai_dlp import evaluate_ai_message, log_dlp_audit_event
+from app.services.ai.chat.retention import delete_archive_object, load_archived_conversation
+from app.services.ai.chat.dlp import evaluate_ai_message, log_dlp_audit_event
 
-from app.services.ai_fastpath import try_answer_value_question
+from app.services.ai.chat.fastpath import try_answer_value_question
 
 # Telemetry tracking
 from app.services.chatbot_telemetry import ChatbotTelemetryService, ChatbotMetrics
@@ -60,7 +60,7 @@ from app.services.user_analytics_service import get_client_ip
 def _get_ai_chat_integration():
     """Lazy-load AIChatIntegration singleton to avoid import errors at startup."""
     try:
-        from app.services.ai_chat_integration import get_ai_chat_integration
+        from app.services.ai.chat.integration import get_ai_chat_integration
 
         return get_ai_chat_integration()
     except Exception as e:
@@ -854,7 +854,7 @@ def ai_health():
     # Optional embedding probe
     if request.args.get("probe") == "embedding":
         try:
-            from app.services.ai_embedding_service import AIEmbeddingService
+            from app.services.ai.documents.embedding import AIEmbeddingService
             svc = AIEmbeddingService()
             _, _ = svc.generate_embedding("health")
             status["checks"]["embedding_probe"] = "ok"
@@ -1024,7 +1024,7 @@ def chat():
 
     try:
         # Centralized OpenAI-only chain (agent -> OpenAI)
-        from app.services.ai_chat_engine import AIChatEngine
+        from app.services.ai.chat.engine import AIChatEngine
 
         engine = AIChatEngine()
         result = engine.run(
@@ -1814,7 +1814,7 @@ def chat_stream():
         try:
             _worker_start_t = time.time()
             current_app_logger = None  # will be set once app context is available
-            from app.services.ai_chat_engine import AIChatEngine
+            from app.services.ai.chat.engine import AIChatEngine
 
             with app_obj.app_context():
                 current_app.logger.info(
@@ -1898,7 +1898,7 @@ def chat_stream():
                     # Persist user-visible progress steps on the trace (best-effort)
                     if trace_id_for_feedback and _collected_progress_steps:
                         try:
-                            from app.services.ai_reasoning_trace import AIReasoningTraceService
+                            from app.services.ai.quality.reasoning_trace import AIReasoningTraceService
                             AIReasoningTraceService().update_progress_steps(
                                 trace_id_for_feedback, list(_collected_progress_steps)
                             )

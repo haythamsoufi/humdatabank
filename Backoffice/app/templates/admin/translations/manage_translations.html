@@ -680,6 +680,7 @@ window.manageTranslationsConfig = {
         blockedByWaf: {{ _('Blocked by WAF for translation')|tojson }},
         networkError: {{ _('Network error for translation')|tojson }},
         missingPlaceholders: {{ _('Missing placeholders')|tojson }},
+        unexpectedPlaceholders: {{ _('Unexpected placeholders')|tojson }},
         allPlaceholdersMustBePreserved: {{ _('All placeholders from the original text must be preserved.')|tojson }},
         failedToLoadData: {{ _('Failed to load translation data')|tojson }},
         savingText: {{ _('Saving...')|tojson }},
@@ -702,13 +703,7 @@ window.manageTranslationsConfig = {
         noSourceText: {{ _('Please ensure English or Message ID has text to translate from.')|tojson }},
         nothingToTranslate: {{ _('Nothing to translate — all enabled language fields already have values.')|tojson }},
         autoTranslateFailed: {{ _('Auto-translate failed.')|tojson }},
-        clearConfirm: {{ _('Are you sure you want to clear all translation fields except English? This action cannot be undone.')|tojson }},
-        cleared1: {{ _('Cleared 1 translation field.')|tojson }},
-        cleared: {{ _('Cleared')|tojson }},
-        translationFields: {{ _('translation fields.')|tojson }},
-        noFieldsToClear: {{ _('No translation fields to clear.')|tojson }},
-        clearBtn: {{ _('Clear')|tojson }},
-        clearTitle: {{ _('Clear Translations?')|tojson }},
+        autoTranslatePartial: {{ _('No translation was returned for:')|tojson }},
         translationLabel: {{ _('Translation')|tojson }}
     }
 };

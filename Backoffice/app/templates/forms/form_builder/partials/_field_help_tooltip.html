@@ -1,0 +1,7 @@
+{# Reusable ? help tooltip for form builder modals #}
+{% macro field_help(text) %}
+<span class="custom-info-tooltip cursor-help inline-flex items-center justify-center shrink-0" aria-label="{{ _('Help')|forceescape }}">
+    <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
+    <span class="tooltip-text">{{ text }}</span>
+</span>
+{% endmacro %}

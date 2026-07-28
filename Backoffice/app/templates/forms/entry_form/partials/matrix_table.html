@@ -36,26 +36,6 @@
     {% set _matrix_label = field.display_label or field.label %}
 {% endif %}
 {% set _matrix_can_edit = can_edit if can_edit is defined else true %}
-{% set _matrix_has_numeric_col = namespace(value=false) %}
-{% for _col in matrix_columns %}
-    {% if not (_col is mapping and _col.get('type') == 'tick') %}{% set _matrix_has_numeric_col.value = true %}{% endif %}
-{% endfor %}
-{% set _matrix_format_hint_visible = _matrix_has_numeric_col.value and matrix_config.get('show_format_hint') is sameas true %}
-{% set _default_format_hint = _('Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.') %}
-{% set _format_hint_text = none %}
-{% set _format_hint_translations = matrix_config.get('format_hint_text_translations', {}) or {} %}
-{% if _format_hint_translations %}
-    {% set _format_hint_cand = _format_hint_translations.get(translation_key) or _format_hint_translations.get('en') %}
-    {% if _format_hint_cand and _format_hint_cand|trim %}{% set _format_hint_text = _format_hint_cand %}{% endif %}
-{% endif %}
-{% if not _format_hint_text or not _format_hint_text|trim %}
-    {% set _format_hint_custom = matrix_config.get('format_hint_text') %}
-    {% if _format_hint_custom and _format_hint_custom|trim %}
-        {% set _format_hint_text = _format_hint_custom %}
-    {% else %}
-        {% set _format_hint_text = _default_format_hint %}
-    {% endif %}
-{% endif %}
 
 <div class="matrix-container disaggregation-inputs{% if matrix_is_imputed %} bg-blue-50 border border-blue-300 rounded-md p-2{% endif %}"
      data-field-id="{{ field.id }}"
@@ -68,7 +48,7 @@
      {% if matrix_highlight_prefilled_cells %}data-prefilled-legend-text="{{ _('Prefilled value')|forceescape }}"{% endif %}
      role="group"
      aria-labelledby="field-{{ field.id }}"
-     aria-describedby="matrix-error-{{ field.id }}{% if _matrix_format_hint_visible %} matrix-format-hint-{{ field.id }}{% endif %}"
+     aria-describedby="matrix-error-{{ field.id }}"
      style="position: relative; overflow: visible;">
 
     {% if matrix_is_imputed %}
@@ -79,17 +59,6 @@
 
     {# Error Message Container #}
     <div id="matrix-error-{{ field.id }}" class="text-red-600 text-sm mt-1 mb-2" style="display: none;" role="alert" aria-live="polite"></div>
-
-    {% if _matrix_format_hint_visible %}
-        <div class="matrix-number-format-hint flex items-center gap-2.5 text-sm text-amber-950 bg-amber-50 border border-amber-300 border-l-4 border-l-amber-500 rounded-md px-3 py-2.5 mb-3 shadow-sm"
-             id="matrix-format-hint-{{ field.id }}"
-             role="note">
-            <span class="inline-flex shrink-0 items-center justify-center text-amber-600 leading-none" aria-hidden="true">
-                <i class="fas fa-info-circle text-base"></i>
-            </span>
-            <span class="font-medium leading-normal">{{ _format_hint_text }}</span>
-        </div>
-    {% endif %}
 
     {# Title for Advanced Mode - Removed to prevent duplicate labels #}
     {# The field label should be handled by the parent form template #}

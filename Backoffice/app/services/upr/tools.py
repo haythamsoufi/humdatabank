@@ -25,7 +25,7 @@ from app.services.data_retrieval_service import (
     get_upr_kpi_timeseries as get_upr_kpi_timeseries_service,
     get_upr_kpi_values_for_all_countries as get_upr_kpi_values_for_all_countries_service,
 )
-from app.services.ai_tools._utils import (
+from app.services.ai.tools._utils import (
     resolve_ai_user_context,
     resolve_source_config,
     tool_wrapper,
@@ -108,7 +108,7 @@ def analyze_unified_plans_focus_areas(
 
     from sqlalchemy import or_, not_
     from app.models.embeddings import AIDocument
-    from app.services.ai_tools._focus_area_analysis import (
+    from app.services.ai.tools._focus_area_analysis import (
         resolve_area_config,
         compile_area_regexes,
         match_focus_areas,

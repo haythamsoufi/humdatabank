@@ -18,8 +18,8 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import IndicatorBank, IndicatorBankEmbedding
-from app.services.ai_embedding_service import AIEmbeddingService
-from app.services.ai_embedding_service import EmbeddingError
+from app.services.ai.documents.embedding import AIEmbeddingService
+from app.services.ai.documents.embedding import EmbeddingError
 
 logger = logging.getLogger(__name__)
 

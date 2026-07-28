@@ -4,6 +4,7 @@ import { ImageItem } from '../items/image.js';
 import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
 import { serializeCarryForwardSources } from './carry-forward.js';
+import { clearDisabledDescriptions } from './description-hint-ui.js';
 
 export const FormSubmitMixin = {
     /**
@@ -48,6 +49,9 @@ export const FormSubmitMixin = {
         } catch (_e) {}
 
         this.handleFormValidation(form);
+        try {
+            if (this.modalElement) clearDisabledDescriptions(this.modalElement);
+        } catch (_e) {}
         this.syncUIToShared();
         this.ensureCanonicalSharedFieldNames(form);
 

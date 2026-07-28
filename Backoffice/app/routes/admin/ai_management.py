@@ -651,7 +651,7 @@ def redetect_country_document(document_id):
         from app.models import AIDocument, Country
         from app.routes.ai_documents.upload import _apply_country_detection_to_doc
         from app.routes.ai_documents.helpers import _download_ifrc_document
-        from app.services.ai_document_processor import AIDocumentProcessor
+        from app.services.ai.documents.processor import AIDocumentProcessor
 
         doc = AIDocument.query.get_or_404(document_id)
 
@@ -717,8 +717,8 @@ def reprocess_document_metadata(document_id):
         import requests as _requests
         from app.models import AIDocument
         from app.routes.ai_documents.helpers import _download_ifrc_document
-        from app.services.ai_document_processor import AIDocumentProcessor
-        from app.services.ai_metadata_extractor import enrich_document_metadata
+        from app.services.ai.documents.processor import AIDocumentProcessor
+        from app.services.ai.documents.metadata import enrich_document_metadata
 
         doc = AIDocument.query.get_or_404(document_id)
 
@@ -1001,8 +1001,8 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
     with app.app_context():
         from app.models import AIDocument, AIJobItem
         from app.routes.ai_documents.helpers import _download_ifrc_document
-        from app.services.ai_document_processor import AIDocumentProcessor
-        from app.services.ai_metadata_extractor import enrich_document_metadata
+        from app.services.ai.documents.processor import AIDocumentProcessor
+        from app.services.ai.documents.metadata import enrich_document_metadata
 
         cancel_ev = _get_reprocess_job_cancel_event(job_id)
         item = AIJobItem.query.get(int(item_id))
@@ -1639,7 +1639,7 @@ def document_processing_status(document_id):
 def process_submitted_document(submitted_doc_id):
     """Process a submitted document through the AI system."""
     try:
-        from app.services.ai_submitted_document_ingest import enqueue_submitted_document_ai_processing
+        from app.services.ai.documents.ingest import enqueue_submitted_document_ai_processing
 
         result = enqueue_submitted_document_ai_processing(
             submitted_doc_id,
@@ -2037,7 +2037,7 @@ def reasoning_traces():
         total_traces = db.session.query(AIReasoningTrace).count()
         # Count traces matching current filters (all-time by default when days_filter=0)
         recent_traces = base_filter.count()
-        from app.services.ai_reasoning_trace import TRACE_COMPLETED_STATUSES, TRACE_FAILURE_STATUSES
+        from app.services.ai.quality.reasoning_trace import TRACE_COMPLETED_STATUSES, TRACE_FAILURE_STATUSES
 
         filtered_completed = base_filter.filter(
             AIReasoningTrace.status.in_(TRACE_COMPLETED_STATUSES)
@@ -2433,7 +2433,7 @@ def ai_chat_analytics():
         # Failure rate trend (daily error count vs total, last N days)
         try:
             from sqlalchemy import func as _func, case as _case
-            from app.services.ai_reasoning_trace import TRACE_FAILURE_STATUSES
+            from app.services.ai.quality.reasoning_trace import TRACE_FAILURE_STATUSES
 
             daily_stats = (
                 db.session.query(
@@ -2504,7 +2504,7 @@ def ai_chat_analytics():
 
         # Top failing queries (by error count)
         try:
-            from app.services.ai_reasoning_trace import TRACE_FAILURE_STATUSES
+            from app.services.ai.quality.reasoning_trace import TRACE_FAILURE_STATUSES
 
             failing = (
                 db.session.query(AIReasoningTrace.query)
@@ -2556,7 +2556,7 @@ def ai_dashboard():
 
         # Trace stats (last 30 days)
         thirty_days_ago = utcnow() - timedelta(days=30)
-        from app.services.ai_reasoning_trace import TRACE_COMPLETED_STATUSES, TRACE_FAILURE_STATUSES
+        from app.services.ai.quality.reasoning_trace import TRACE_COMPLETED_STATUSES, TRACE_FAILURE_STATUSES
 
         trace_stats = {
             'total': db.session.query(AIReasoningTrace).count(),

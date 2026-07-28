@@ -22,8 +22,8 @@ from app.services.data_retrieval_service import (
     get_value_breakdown as svc_get_value_breakdown,
     check_country_access as svc_check_country_access,
 )
-from app.services.ai_fastpath import try_answer_value_question
-from app.services.ai_chat_integration import AIChatIntegration
+from app.services.ai.chat.fastpath import try_answer_value_question
+from app.services.ai.chat.integration import AIChatIntegration
 from app.services.chatbot_telemetry import track_chatbot_interaction, get_chatbot_analytics
 from app.services.app_settings_service import get_organization_name
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE

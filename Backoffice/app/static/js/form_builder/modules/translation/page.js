@@ -2,7 +2,6 @@
 
 import { TranslationModal } from '/static/js/components/translation-modal.js';
 import { TranslationMatrix } from '/static/js/components/translation-matrix.js';
-import { MatrixItem } from '../items/matrix.js';
 import '/static/js/components/translation-utils.js';
 
 function attachQuestionModal() {
@@ -444,19 +443,19 @@ function attachMatrixSearchPlaceholderModal() {
   });
 }
 
-function attachMatrixFormatHintTextModal() {
+function attachItemEntryFormHintModal() {
   const defaultHintText =
     'Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.';
-  if (!window.TranslationModal || !document.getElementById('matrix-format-hint-text-translations-btn')) return;
+  if (!window.TranslationModal || !document.getElementById('item-entry-form-hint-text-translations-btn')) return;
   window.TranslationModal.attach({
-    openButtonId: 'matrix-format-hint-text-translations-btn',
-    modalId: 'matrix-format-hint-text-translation-modal',
-    cssPrefix: 'matrix-format-hint-text',
-    resolveEnglishText: () => (document.getElementById('matrix-format-hint-text')?.value || defaultHintText),
+    openButtonId: 'item-entry-form-hint-text-translations-btn',
+    modalId: 'item-entry-form-hint-text-translation-modal',
+    cssPrefix: 'item-entry-form-hint-text',
+    resolveEnglishText: () => (document.getElementById('item-entry-form-hint-text')?.value || defaultHintText),
     onSaveHiddenFields: (collected) => {
-      const input = document.getElementById('matrix-format-hint-text-translations');
+      const input = document.getElementById('item-entry-form-hint-text-translations');
       if (input) input.value = JSON.stringify(collected || {});
-      const btn = document.getElementById('matrix-format-hint-text-translations-btn');
+      const btn = document.getElementById('item-entry-form-hint-text-translations-btn');
       if (btn) {
         const originalNodes = Array.from(btn.childNodes).map(n => n.cloneNode(true));
         const restore = () => {
@@ -471,20 +470,16 @@ function attachMatrixFormatHintTextModal() {
         btn.classList.add('text-green-600');
         setTimeout(() => { restore(); btn.classList.remove('text-green-600'); }, 2000);
       }
-      if (MatrixItem?.updateConfig) {
-        const modalElement = document.getElementById('item-modal');
-        if (modalElement) MatrixItem.updateConfig(modalElement);
-      }
     },
     autoTranslateType: 'form_item',
     onModalOpen: () => {
-      const input = document.getElementById('matrix-format-hint-text-translations');
+      const input = document.getElementById('item-entry-form-hint-text-translations');
       let translations = {};
       if (input && input.value) {
         try { translations = JSON.parse(input.value); } catch (e) {}
       }
       if (window.TranslationModalUtils) {
-        window.TranslationModalUtils.populateFields('matrix-format-hint-text', translations);
+        window.TranslationModalUtils.populateFields('item-entry-form-hint-text', translations);
       }
     }
   });
@@ -1112,7 +1107,7 @@ export function attachFormBuilderTranslation() {
     attachMatrixLabelModal();
     attachMatrixLegendTextModal();
     attachMatrixSearchPlaceholderModal();
-    attachMatrixFormatHintTextModal();
+    attachItemEntryFormHintModal();
     attachMatrixVariableTooltipLabelModals();
     attachMatrixColumnHeadersModal();
     attachMatrixRowHeadersModal();

@@ -135,7 +135,7 @@ class TestIndicatorResolutionServiceResolve:
 
     def test_embedding_error_returns_empty(self, app):
         with app.app_context():
-            from app.services.ai_embedding_service import EmbeddingError
+            from app.services.ai.documents.embedding import EmbeddingError
 
             svc = IndicatorResolutionService()
             mock_es = MagicMock()
@@ -367,7 +367,7 @@ class TestSyncAll:
 
     def test_embedding_error_raised(self, app):
         with app.app_context():
-            from app.services.ai_embedding_service import EmbeddingError
+            from app.services.ai.documents.embedding import EmbeddingError
 
             svc = IndicatorResolutionService()
             mock_es = MagicMock()

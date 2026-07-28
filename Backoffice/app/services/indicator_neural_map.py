@@ -218,7 +218,7 @@ def probe_query_embedding(
     The frontend positions the probe marker as a weighted centroid
     of the nearest neighbours that are already rendered on-screen.
     """
-    from app.services.ai_embedding_service import AIEmbeddingService
+    from app.services.ai.documents.embedding import AIEmbeddingService
 
     records = _load_records(max_nodes, exclude_archived)
     if not records:

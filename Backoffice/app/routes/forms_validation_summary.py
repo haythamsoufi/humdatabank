@@ -847,7 +847,7 @@ def register_validation_summary_routes(bp) -> None:
             # Ensure Flask app context inside the thread
             with app_obj.app_context():
                 try:
-                    from app.services.ai_formdata_validation_service import AIFormDataValidationService
+                    from app.services.ai.validation.formdata_validation import AIFormDataValidationService
                     from app.models.ai_validation import AIFormDataValidation
 
                     svc = AIFormDataValidationService()
@@ -1214,7 +1214,7 @@ def register_validation_summary_routes(bp) -> None:
 
             ran_count = 0
             if run and form_data_ids:
-                from app.services.ai_formdata_validation_service import AIFormDataValidationService
+                from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 
                 svc = AIFormDataValidationService()
                 for fid in list(dict.fromkeys(form_data_ids)):
@@ -1245,7 +1245,7 @@ def register_validation_summary_routes(bp) -> None:
             # If include_non_reported and run=1, also (best-effort) run missing-row suggestions without creating FormData.
             if include_non_reported and run:
                 try:
-                    from app.services.ai_formdata_validation_service import AIFormDataValidationService
+                    from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 
                     svc = AIFormDataValidationService()
                     for fi in form_items:
@@ -1671,7 +1671,7 @@ def register_validation_summary_routes(bp) -> None:
 
             from app.services.authorization_service import AuthorizationService
             from app.models.ai_validation import AIFormDataValidation
-            from app.services.ai_formdata_validation_service import AIFormDataValidationService
+            from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 
             if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
                 return json_forbidden("Access denied")
@@ -1892,7 +1892,7 @@ def register_validation_summary_routes(bp) -> None:
 
         from app.services.authorization_service import AuthorizationService
         from app.models.ai_validation import AIFormDataValidation
-        from app.services.ai_formdata_validation_service import AIFormDataValidationService
+        from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 
         if not AuthorizationService.can_access_assignment(assignment_entity_status, current_user):
             return Response(

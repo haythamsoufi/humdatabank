@@ -535,11 +535,11 @@ const __WHOLE_NUMBER_VIOLATION_INPUT_CLASSES = [
 ];
 const __WHOLE_NUMBER_VIOLATION_CELL_CLASS = 'bg-red-50';
 
-function __rawValueHasNonZeroFraction(rawValue) {
+function __rawValueHasNonZeroFraction(rawValue, maxDecimals) {
     if (rawValue === null || rawValue === undefined || rawValue === '') return false;
     const unformatFn = typeof window !== 'undefined' ? window.__numericUnformat : null;
     const rawString = (typeof unformatFn === 'function')
-        ? unformatFn(String(rawValue), undefined)
+        ? unformatFn(String(rawValue), maxDecimals)
         : String(rawValue).trim().replace(/,/g, '');
     if (!rawString) return false;
     const num = parseFloat(rawString);
@@ -588,7 +588,7 @@ function __syncWholeNumberViolationHighlight(input) {
     if (!input || input.type === 'checkbox') return false;
     if (input.getAttribute('data-is-row-total') === 'true') return false;
     const maxDecimals = __readMatrixMaxDecimals(input);
-    const violated = maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value);
+    const violated = maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value, maxDecimals);
     __applyWholeNumberViolationHighlight(input, violated);
     return violated;
 }
@@ -602,12 +602,12 @@ function __setMatrixNumericCellDisplay(input, rawValue) {
     }
 
     const maxDecimals = __readMatrixMaxDecimals(input);
-    const violated = maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value);
+    const violated = maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value, maxDecimals);
 
     if (violated) {
         const unformatFn = typeof window !== 'undefined' ? window.__numericUnformat : null;
         const normalized = typeof unformatFn === 'function'
-            ? unformatFn(String(input.value), undefined)
+            ? unformatFn(String(input.value), maxDecimals)
             : String(input.value).trim().replace(/,/g, '');
         if (normalized !== '') input.value = normalized;
         __applyWholeNumberViolationHighlight(input, true);
@@ -1594,10 +1594,10 @@ class MatrixHandler {
             const trimmed = String(input.value || '').trim();
             if (trimmed === '') {
                 value = 0;
-            } else if (maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value)) {
+            } else if (maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value, maxDecimals)) {
                 const unformatFn = typeof window.__numericUnformat === 'function' ? window.__numericUnformat : null;
                 const rawString = unformatFn
-                    ? unformatFn(trimmed, undefined)
+                    ? unformatFn(trimmed, maxDecimals)
                     : trimmed.replace(/,/g, '');
                 const parsed = parseFloat(rawString);
                 value = isFinite(parsed) ? parsed : trimmed;
@@ -2251,7 +2251,7 @@ class MatrixHandler {
         }
 
         const maxDecimals = __readMatrixMaxDecimals(input);
-        if (maxDecimals === 0 && input.value && __rawValueHasNonZeroFraction(input.value)) {
+        if (maxDecimals === 0 && input.value && __rawValueHasNonZeroFraction(input.value, maxDecimals)) {
             errors.push(_t('This column requires a whole number. Please correct the decimal value.'));
         }
 

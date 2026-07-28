@@ -158,7 +158,7 @@ def ai_extract_document():
     if not valid:
         return json_bad_request(error_message or "Unsupported file type.")
 
-    from app.services.ai_document_processor import AIDocumentProcessor, DocumentProcessingError
+    from app.services.ai.documents.processor import AIDocumentProcessor, DocumentProcessingError
 
     tmp_path = None
     try:

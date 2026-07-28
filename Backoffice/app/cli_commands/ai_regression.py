@@ -24,7 +24,7 @@ def ai_regression_cli():
 @with_appcontext
 def run_regression(limit: int, output):
     """Run regression tests against golden Q&A pairs and print a report."""
-    from app.services.ai_regression_test import AIRegressionTestRunner
+    from app.services.ai.quality.regression_test import AIRegressionTestRunner
 
     click.echo(f"Running regression tests (limit={limit})...")
     runner = AIRegressionTestRunner()
@@ -46,7 +46,7 @@ def run_regression(limit: int, output):
 @with_appcontext
 def list_golden_pairs():
     """List all available golden Q&A pairs."""
-    from app.services.ai_regression_test import AIRegressionTestRunner
+    from app.services.ai.quality.regression_test import AIRegressionTestRunner
 
     runner = AIRegressionTestRunner()
     pairs = runner.load_golden_pairs(limit=500)

@@ -42,7 +42,7 @@ from app.utils.advanced_validation import AdvancedValidator
 from app.utils.datetime_helpers import utcnow
 from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.transactions import request_transaction_rollback
-from app.services.ai_submitted_document_ingest import (
+from app.services.ai.documents.ingest import (
     maybe_enqueue_submitted_document_ai_processing_after_approval,
     sync_ai_document_is_public_from_submitted,
 )

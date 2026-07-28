@@ -8,6 +8,9 @@ from app.models import IndicatorBank, LookupList
 from config.config import Config
 import json
 
+ENTRY_FORM_HINT_STYLES = frozenset({'normal', 'info', 'warning', 'tip', 'important'})
+DEFAULT_ENTRY_FORM_HINT_STYLE = 'warning'
+
 
 def sanitize_blank_body_html(html: str) -> str:
     """
@@ -554,6 +557,11 @@ def _update_matrix_fields(matrix_item, form, request_form):
                 matrix_item.list_display_column = None
                 matrix_item.list_filters_json = None
 
+            # Drop legacy matrix-only format hint keys (now stored at item.config level)
+            if isinstance(matrix_config, dict):
+                for legacy_key in ('show_format_hint', 'format_hint_text', 'format_hint_text_translations'):
+                    matrix_config.pop(legacy_key, None)
+
             # Update only the matrix_config part while preserving other config fields
             matrix_item.config['matrix_config'] = matrix_config
 
@@ -796,6 +804,52 @@ def _update_item_config(form_item, form, request_form):
     else:
         form_item.config.pop('carry_forward_sources', None)
         form_item.config.pop('carry_forward_priority', None)
+
+    show_hint_enabled = 'show_hint' in request_form
+    form_item.config['show_hint'] = show_hint_enabled
+
+    if show_hint_enabled:
+        hint_text = (request_form.get('hint_text') or '').strip()
+        if hint_text:
+            form_item.config['hint_text'] = hint_text[:500]
+        else:
+            form_item.config.pop('hint_text', None)
+
+        hint_translations_raw = request_form.get('hint_text_translations', '{}')
+        try:
+            parsed_hint_translations = json.loads(hint_translations_raw) if hint_translations_raw else {}
+        except (json.JSONDecodeError, TypeError):
+            parsed_hint_translations = {}
+
+        supported_codes = current_app.config.get(
+            'SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en'])
+        )
+        filtered_hint_translations = {}
+        if isinstance(parsed_hint_translations, dict):
+            for k, v in parsed_hint_translations.items():
+                if not (isinstance(k, str) and isinstance(v, str) and str(v).strip()):
+                    continue
+                code = k.strip().lower().split('_', 1)[0]
+                if code in supported_codes:
+                    filtered_hint_translations[code] = str(v).strip()[:500]
+
+        if filtered_hint_translations:
+            form_item.config['hint_text_translations'] = filtered_hint_translations
+        else:
+            form_item.config.pop('hint_text_translations', None)
+
+        hint_style = (request_form.get('hint_style') or '').strip().lower()
+        if hint_style in ENTRY_FORM_HINT_STYLES:
+            if hint_style == DEFAULT_ENTRY_FORM_HINT_STYLE:
+                form_item.config.pop('hint_style', None)
+            else:
+                form_item.config['hint_style'] = hint_style
+        else:
+            form_item.config.pop('hint_style', None)
+    else:
+        form_item.config.pop('hint_text', None)
+        form_item.config.pop('hint_text_translations', None)
+        form_item.config.pop('hint_style', None)
 
 
 def _update_plugin_fields(plugin_item, form, request_form):

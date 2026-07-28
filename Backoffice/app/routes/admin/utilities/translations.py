@@ -19,7 +19,7 @@ from app.forms.content import TranslationForm
 from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.utils.request_utils import is_json_request, get_request_data
 from app.services.translation.auto_translator import translate_text as auto_translate_text
-from app.services.translation.placeholder_validator import validate_placeholders, localized_validation_message
+from app.services.translation.placeholder_validator import validate_placeholders_if_present, localized_validation_message
 from app.extensions import limiter
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
@@ -1172,7 +1172,7 @@ def edit_translation():
         for lang, msgstr in lang_to_msgstr.items():
             if lang == 'en':
                 continue
-            validation = validate_placeholders(msgid, msgstr)
+            validation = validate_placeholders_if_present(msgid, msgstr)
             if not validation.get('valid'):
                 return json_bad_request(localized_validation_message(validation))
 
@@ -1203,7 +1203,7 @@ def edit_translation():
         for lang, msgstr in lang_to_msgstr.items():
             if lang == 'en':
                 continue
-            validation = validate_placeholders(msgid, msgstr)
+            validation = validate_placeholders_if_present(msgid, msgstr)
             if not validation.get('valid'):
                 flash(localized_validation_message(validation), 'danger')
                 return redirect(url_for('utilities.manage_translations'))

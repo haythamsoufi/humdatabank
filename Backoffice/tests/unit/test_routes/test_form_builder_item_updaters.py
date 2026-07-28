@@ -924,6 +924,55 @@ class TestUpdateItemConfig:
         assert item.config['carry_forward_sources'] == sources
         assert item.config['carry_forward_priority'] == 'assignment'
 
+    def test_entry_form_hint_disabled_strips_text_and_translations(self, app):
+        from app.models import FormItem
+        item = FormItem(item_type='question', section_id=1, template_id=1, version_id=1,
+                        label='Q', type='number', order=1)
+        item.config = {
+            'show_hint': True,
+            'hint_text': 'Use whole numbers only.',
+            'hint_text_translations': {'en': 'Use whole numbers only.'},
+            'hint_style': 'info',
+        }
+        form = _make_form_with_config()
+        _update_item_config(item, form, {})
+        assert item.config['show_hint'] is False
+        assert 'hint_text' not in item.config
+        assert 'hint_text_translations' not in item.config
+        assert 'hint_style' not in item.config
+
+    def test_entry_form_hint_enabled_persists_text_and_translations(self, app):
+        from app.models import FormItem
+        item = FormItem(item_type='matrix', section_id=1, template_id=1, version_id=1,
+                        label='M', order=1)
+        item.config = {}
+        form = _make_form_with_config()
+        translations = {'en': 'Number format hint', 'fr': 'Format numérique'}
+        _update_item_config(item, form, {
+            'show_hint': 'on',
+            'hint_text': 'Number format hint',
+            'hint_text_translations': json.dumps(translations),
+            'hint_style': 'tip',
+        })
+        assert item.config['show_hint'] is True
+        assert item.config['hint_text'] == 'Number format hint'
+        assert item.config['hint_text_translations'] == translations
+        assert item.config['hint_style'] == 'tip'
+
+    def test_entry_form_hint_default_style_not_stored(self, app):
+        from app.models import FormItem
+        item = FormItem(item_type='question', section_id=1, template_id=1, version_id=1,
+                        label='Q', type='text', order=1)
+        item.config = {}
+        form = _make_form_with_config()
+        _update_item_config(item, form, {
+            'show_hint': 'on',
+            'hint_text': 'Plain note',
+            'hint_style': 'warning',
+        })
+        assert item.config['show_hint'] is True
+        assert 'hint_style' not in item.config
+
 
 # ---------------------------------------------------------------------------
 # _update_plugin_fields

@@ -179,6 +179,41 @@ function __readMaxDecimals(input) {
     return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
+function __isMatrixNumericInput(input) {
+    return !!(input && input.closest && input.closest('.matrix-container') &&
+        input.matches && (input.matches('input[type="number"]') || input.dataset.numeric === 'true'));
+}
+
+/** Matrix cells accept typed digits only; decimal columns also allow one "." (commas added on blur). */
+function __sanitizeMatrixNumericInputValue(value, maxDecimals) {
+    let str = String(value ?? '');
+    if (typeof maxDecimals === 'number' && maxDecimals === 0) {
+        return str.replace(/[^0-9]/g, '');
+    }
+    str = str.replace(/[^0-9.]/g, '');
+    const dotIndex = str.indexOf('.');
+    if (dotIndex !== -1) {
+        str = str.slice(0, dotIndex + 1) + str.slice(dotIndex + 1).replace(/\./g, '');
+    }
+    return str;
+}
+
+function __sanitizeNumericInputValue(input) {
+    if (__isMatrixNumericInput(input)) {
+        return __sanitizeMatrixNumericInputValue(input.value, __readMaxDecimals(input));
+    }
+    return String(input.value || '').replace(/[^0-9,.\u0027\-+ \u00A0\u202F]/g, '');
+}
+
+function __rawValueForEditing(input) {
+    const maxDecimals = __readMaxDecimals(input);
+    const raw = unformat(input.value, maxDecimals);
+    if (__isMatrixNumericInput(input)) {
+        return __sanitizeMatrixNumericInputValue(raw, maxDecimals);
+    }
+    return raw;
+}
+
 function formatInPlace(input) {
     const maxDecimals = __readMaxDecimals(input);
     const raw = unformat(input.value, maxDecimals);
@@ -245,7 +280,7 @@ function setupNumericFormatting() {
         if (!IS_COARSE) {
             input.addEventListener('focus', () => {
                 // Show raw digits for editing
-                input.value = unformat(input.value, __readMaxDecimals(input));
+                input.value = __rawValueForEditing(input);
             });
 
             // Apply formatting when the user leaves the field in various ways
@@ -263,8 +298,7 @@ function setupNumericFormatting() {
         }
 
         input.addEventListener('input', () => {
-            // Allow digits, separators (comma, apostrophe), minus, plus, dot/comma
-            input.value = input.value.replace(/[^0-9,.\u0027\-+ \u00A0\u202F]/g, '');
+            input.value = __sanitizeNumericInputValue(input);
         });
     });
 
@@ -334,6 +368,7 @@ if (typeof MutationObserver !== 'undefined') {
 
 // Expose helpers if needed elsewhere (e.g. matrix-handler for autoloaded variable values)
 window.__numericUnformat = unformat;
+window.__sanitizeMatrixNumericInputValue = __sanitizeMatrixNumericInputValue;
 window.__numericFormatInPlace = function formatInPlaceForInput(input) {
     if (!input || typeof input.value === 'undefined') return;
     // On mobile (coarse pointer) inputs stay as type="number". Assigning a comma-formatted string
@@ -363,7 +398,7 @@ function scheduleGlobalFormat(target) {
 document.addEventListener('focus', (e) => {
     const target = e.target;
     if (shouldFormatInput(target)) {
-        try { target.value = unformat(target.value, __readMaxDecimals(target)); } catch (_) { /* no-op */ }
+        try { target.value = __rawValueForEditing(target); } catch (_) { /* no-op */ }
     }
 }, true);
 
@@ -386,13 +421,15 @@ document.addEventListener('input', (e) => {
     const target = e.target;
     if (shouldFormatInput(target)) {
         try {
-            // Allow digits, separators (comma, apostrophe), minus, plus, spaces (incl. NBSPs)
-            target.value = String(target.value || '').replace(/[^0-9,.\u0027\-+ \u00A0\u202F]/g, '');
+            target.value = __sanitizeNumericInputValue(target);
         } catch (_) { /* no-op */ }
     } else if (IS_COARSE && target && target.matches && target.matches('input[type="number"]')) {
-        // On mobile, still sanitize obvious non-numeric characters
         try {
-            target.value = String(target.value || '').replace(/[^0-9,\.\-+]/g, '');
+            if (__isMatrixNumericInput(target)) {
+                target.value = __sanitizeMatrixNumericInputValue(target.value, __readMaxDecimals(target));
+            } else {
+                target.value = String(target.value || '').replace(/[^0-9,\.\-+]/g, '');
+            }
         } catch (_) { /* no-op */ }
     }
 }, true);

@@ -633,7 +633,7 @@ def run_ai_validation_for_rows():
                 return json_bad_request("rows (or form_data_ids) is required")
             rows = [{"row_id": v, "form_data_id": v} for v in ids]
 
-        from app.services.ai_formdata_validation_service import AIFormDataValidationService
+        from app.services.ai.validation.formdata_validation import AIFormDataValidationService
 
         svc = AIFormDataValidationService()
         results: Dict[str, Any] = {}

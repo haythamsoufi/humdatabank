@@ -1,4 +1,6 @@
 // Plugin item logic extracted from item-modal.js
+
+import { mountEntryFormHintPanel, populateDescriptionVisibility } from '../modal/description-hint-ui.js';
 import { fetchBaseTemplate, fetchFieldBuilderConfig } from '../plugin-api.js';
 
 const truthyStrings = new Set(['true', '1', 'yes', 'on']);
@@ -173,9 +175,24 @@ export const PluginItem = {
                             </div>
                             <textarea name="label" id="item-plugin-label" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Field Label" required autocomplete="off"></textarea>
                         </div>
-                        <div class="mb-4">
-                            <label for="item-plugin-description" class="block text-gray-700 text-sm font-semibold mb-2">Description (Optional)</label>
-                            <textarea name="description" id="item-plugin-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Description (Optional)" autocomplete="off"></textarea>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">Description</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="Add translations" aria-label="Add translations">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea name="description" id="item-plugin-description" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="3" placeholder="Description (Optional)" autocomplete="off"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
                         </div>
                         <div id="plugin-configuration-container" class="mb-4"></div>
                         <input type="hidden" name="label_translations" id="item-plugin-label-translations" value="{}">
@@ -348,6 +365,8 @@ export const PluginItem = {
         const descriptionTranslationsInput = document.getElementById('item-plugin-description-translations');
         if (labelTranslationsInput && itemData.label_translations) labelTranslationsInput.value = JSON.stringify(itemData.label_translations);
         if (descriptionTranslationsInput && itemData.description_translations) descriptionTranslationsInput.value = JSON.stringify(itemData.description_translations);
+        populateDescriptionVisibility(modalElement, itemData);
+        mountEntryFormHintPanel(modalElement, window.ItemModal?.currentItemType);
     },
 
     populateConfigFields(modalElement, config) {

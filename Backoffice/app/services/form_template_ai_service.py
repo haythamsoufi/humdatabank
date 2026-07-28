@@ -369,6 +369,16 @@ class FormTemplateAIService:
             data["max_documents"] = (item.config or {}).get("max_documents")
         elif item.is_matrix:
             data["matrix_config"] = (item.config or {}).get("matrix_config")
+
+        cfg = item.config or {}
+        if cfg.get("show_hint"):
+            data["show_hint"] = True
+            if cfg.get("hint_text"):
+                data["hint_text"] = cfg["hint_text"]
+            if cfg.get("hint_text_translations"):
+                data["hint_text_translations"] = cfg["hint_text_translations"]
+            if cfg.get("hint_style"):
+                data["hint_style"] = cfg["hint_style"]
         return data
 
     @staticmethod
@@ -1194,6 +1204,20 @@ class FormTemplateAIService:
             "privacy": _clean_str(schema.get("privacy"), 50) or "ifrc_network",
         }
 
+        if _as_bool(schema.get("show_hint")):
+            config["show_hint"] = True
+            hint_text = _clean_str(schema.get("hint_text"), 500)
+            if hint_text:
+                config["hint_text"] = hint_text
+            hint_translations = _normalize_name_translations(
+                schema.get("hint_text_translations"), max_len=500
+            )
+            if hint_translations:
+                config["hint_text_translations"] = hint_translations
+            hint_style = _clean_str(schema.get("hint_style"), 20)
+            if hint_style in {"normal", "info", "warning", "tip", "important"} and hint_style != "warning":
+                config["hint_style"] = hint_style
+
         if item_type == "question":
             item.type = question_type
             item.definition = _clean_str(schema.get("definition"), 4000) or ""
@@ -1424,17 +1448,7 @@ class FormTemplateAIService:
             "columns": columns,
             "show_row_totals": _as_bool(value.get("show_row_totals")),
             "show_column_totals": _as_bool(value.get("show_column_totals")),
-            "show_format_hint": _as_bool(value.get("show_format_hint")),
         }
-
-        format_hint_text = _clean_str(value.get("format_hint_text"), 500)
-        if format_hint_text:
-            config["format_hint_text"] = format_hint_text
-        format_hint_translations = _normalize_name_translations(
-            value.get("format_hint_text_translations"), max_len=500
-        )
-        if format_hint_translations:
-            config["format_hint_text_translations"] = format_hint_translations
 
         if row_mode == "manual":
             rows_in = value.get("rows")

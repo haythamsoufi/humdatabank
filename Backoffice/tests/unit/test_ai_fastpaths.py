@@ -7,19 +7,19 @@ class TestAiFastpathsImport:
     """Verify the package re-exports the expected entry point."""
 
     def test_module_importable(self):
-        import app.services.ai_fastpaths as pkg
+        import app.services.ai.chat.fastpaths as pkg
         assert pkg is not None
 
     def test_run_unified_plans_focus_fastpath_re_exported(self):
-        from app.services.ai_fastpaths import run_unified_plans_focus_fastpath
+        from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath
         assert callable(run_unified_plans_focus_fastpath)
 
     def test_all_list_contains_entrypoint(self):
-        import app.services.ai_fastpaths as pkg
+        import app.services.ai.chat.fastpaths as pkg
         assert "run_unified_plans_focus_fastpath" in pkg.__all__
 
     def test_entrypoint_is_same_object_as_source(self):
-        from app.services.ai_fastpaths import run_unified_plans_focus_fastpath as exported
+        from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath as exported
         from app.services.upr.focus_area_analysis import run_unified_plans_focus_fastpath as source
         assert exported is source
 
@@ -40,7 +40,7 @@ class TestRunUnifiedPlansFocusFastpath:
         }
 
     def test_returns_none_for_non_matching_query(self, app):
-        from app.services.ai_fastpaths import run_unified_plans_focus_fastpath
+        from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath
 
         with app.app_context():
             result = run_unified_plans_focus_fastpath(
@@ -50,7 +50,7 @@ class TestRunUnifiedPlansFocusFastpath:
         assert result is None
 
     def test_returns_none_when_required_tool_missing(self, app):
-        from app.services.ai_fastpaths import run_unified_plans_focus_fastpath
+        from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath
 
         registry = MagicMock()
         registry.get_tool_definitions_openai.return_value = [
@@ -65,7 +65,7 @@ class TestRunUnifiedPlansFocusFastpath:
         registry.execute_tool.assert_not_called()
 
     def test_executes_tool_and_returns_answer_on_success(self, app):
-        from app.services.ai_fastpaths import run_unified_plans_focus_fastpath
+        from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath
 
         registry = MagicMock()
         registry.get_tool_definitions_openai.return_value = [

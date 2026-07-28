@@ -26,7 +26,7 @@ class TestAIChunkingService:
     def chunker(self, app):
         """Create chunking service instance."""
         with app.app_context():
-            from app.services.ai_chunking_service import AIChunkingService
+            from app.services.ai.documents.chunking import AIChunkingService
             return AIChunkingService()
 
     def test_chunk_short_text(self, chunker):
@@ -96,7 +96,7 @@ class TestAIEmbeddingService:
         """Create embedding service with local provider."""
         with app.app_context():
             app.config['AI_EMBEDDING_PROVIDER'] = 'local'
-            from app.services.ai_embedding_service import AIEmbeddingService
+            from app.services.ai.documents.embedding import AIEmbeddingService
             return AIEmbeddingService()
 
     def test_generate_embedding_local(self, embedding_service_local):
@@ -139,7 +139,7 @@ class TestAIEmbeddingService:
                 usage=MagicMock(total_tokens=10)
             )
 
-            from app.services.ai_embedding_service import AIEmbeddingService
+            from app.services.ai.documents.embedding import AIEmbeddingService
             service = AIEmbeddingService()
 
             embedding, cost = service.generate_embedding("Test text")
@@ -160,8 +160,8 @@ class TestAIToolsRegistry:
         """Create tools registry instance."""
         with app.app_context():
             # Mock the vector store dependency (implementation lives in ai_tools.registry)
-            with patch('app.services.ai_tools.registry.AIVectorStore'):
-                from app.services.ai_tools import AIToolsRegistry
+            with patch('app.services.ai.tools.registry.AIVectorStore'):
+                from app.services.ai.tools import AIToolsRegistry
                 return AIToolsRegistry()
 
     def test_get_tool_definitions_openai(self, tools_registry):
@@ -218,7 +218,7 @@ class TestAIToolsRegistry:
 
     def test_execute_unknown_tool(self, tools_registry):
         """Test executing an unknown tool."""
-        from app.services.ai_tools import ToolExecutionError
+        from app.services.ai.tools import ToolExecutionError
 
         with pytest.raises(ToolExecutionError):
             tools_registry.execute_tool('unknown_tool')
@@ -233,21 +233,21 @@ class TestPlatformScopeHeuristic:
 
     def test_data_query_is_in_scope(self, app):
         with app.app_context():
-            from app.services.ai_query_rewriter import heuristic_likely_in_platform_scope
+            from app.services.ai.planning.query_rewriter import heuristic_likely_in_platform_scope
 
             assert heuristic_likely_in_platform_scope("volunteers in Syria 2024") is True
             assert heuristic_likely_in_platform_scope("which countries mention climate in UPL") is True
 
     def test_obvious_off_topic_not_heuristic_in_scope(self, app):
         with app.app_context():
-            from app.services.ai_query_rewriter import heuristic_likely_in_platform_scope
+            from app.services.ai.planning.query_rewriter import heuristic_likely_in_platform_scope
 
             assert heuristic_likely_in_platform_scope("generate a code of a calculator app in python") is False
             assert heuristic_likely_in_platform_scope("write me a recipe for lasagna") is False
 
     def test_meta_help_is_in_scope(self, app):
         with app.app_context():
-            from app.services.ai_query_rewriter import heuristic_likely_in_platform_scope
+            from app.services.ai.planning.query_rewriter import heuristic_likely_in_platform_scope
 
             assert heuristic_likely_in_platform_scope("what can you do") is True
 
@@ -267,7 +267,7 @@ class TestAIAgentExecutor:
             app.config['OPENAI_API_KEY'] = 'test-key'
 
             with patch('openai.OpenAI'):
-                from app.services.ai_agent import AIAgentExecutor
+                from app.services.ai.agent import AIAgentExecutor
                 agent = AIAgentExecutor()
                 return agent
 
@@ -284,7 +284,7 @@ class TestAIAgentExecutor:
             app.config['OPENAI_API_KEY'] = 'test-key'
 
             with patch('openai.OpenAI'):
-                from app.services.ai_agent import AIAgentExecutor
+                from app.services.ai.agent import AIAgentExecutor
                 agent = AIAgentExecutor()
 
                 with (
@@ -318,7 +318,7 @@ class TestAIAgentExecutor:
         agent.cost_limit_usd = 0.001  # Very low limit
 
         # Mock to simulate high cost (cost estimation lives in ai_agent.executor)
-        with patch('app.services.ai_agent.executor._estimate_openai_cost', return_value=1.0):
+        with patch('app.services.ai.agent.executor._estimate_openai_cost', return_value=1.0):
             # Should not exceed cost limit
             result = agent._execute_openai_native(
                 query="test",
@@ -332,7 +332,7 @@ class TestAIAgentExecutor:
 
     def test_redundant_document_search_guard_exact_duplicate(self):
         """Exact duplicate query should be flagged as redundant."""
-        from app.services.ai_tool_routing_policy import is_redundant_document_search
+        from app.services.ai.policies.tool_routing_policy import is_redundant_document_search
 
         recent = [
             {
@@ -356,7 +356,7 @@ class TestAIAgentExecutor:
 
     def test_redundant_document_search_guard_reordered_terms(self):
         """Reordered/near-identical query terms should be flagged as redundant."""
-        from app.services.ai_tool_routing_policy import is_redundant_document_search
+        from app.services.ai.policies.tool_routing_policy import is_redundant_document_search
 
         recent = [
             {
@@ -380,7 +380,7 @@ class TestAIAgentExecutor:
 
     def test_redundant_document_search_guard_different_query_not_flagged(self):
         """A genuinely different query should not be flagged as redundant."""
-        from app.services.ai_tool_routing_policy import is_redundant_document_search
+        from app.services.ai.policies.tool_routing_policy import is_redundant_document_search
 
         recent = [
             {
@@ -415,7 +415,7 @@ class TestAIToolRoutingPolicy:
         with app.app_context():
             with app.test_request_context("/"):
                 from flask import g
-                from app.services.ai_tool_routing_policy import docs_only_sources_enabled
+                from app.services.ai.policies.tool_routing_policy import docs_only_sources_enabled
 
                 g.ai_sources_cfg = {
                     "historical": False,
@@ -429,7 +429,7 @@ class TestAIToolRoutingPolicy:
         with app.app_context():
             with app.test_request_context("/"):
                 from flask import g
-                from app.services.ai_tool_routing_policy import docs_only_sources_enabled
+                from app.services.ai.policies.tool_routing_policy import docs_only_sources_enabled
 
                 g.ai_sources_cfg = {
                     "historical": True,
@@ -440,7 +440,7 @@ class TestAIToolRoutingPolicy:
 
     def test_should_skip_search_pagination_when_relevance_drops(self):
         """Guard should stop deep pagination after consecutive low-score batches."""
-        from app.services.ai_tool_routing_policy import should_skip_search_pagination
+        from app.services.ai.policies.tool_routing_policy import should_skip_search_pagination
 
         recent = [
             {
@@ -488,7 +488,7 @@ class TestAIToolRoutingPolicy:
 
     def test_should_not_skip_search_pagination_for_full_table_request(self):
         """Explicit full-table flow should keep exhaustive pagination."""
-        from app.services.ai_tool_routing_policy import should_skip_search_pagination
+        from app.services.ai.policies.tool_routing_policy import should_skip_search_pagination
 
         recent = [
             {
@@ -544,34 +544,12 @@ class TestAIToolRoutingPolicy:
 
 
 class TestAIQueryIntentHelpers:
-    """Tests for query-intent helper heuristics."""
+    """Tests for non-routing query helpers (metric labels, bulk signatures)."""
 
-    def test_platform_usage_help_detected(self):
-        from app.services.ai_query_intent_helpers import is_platform_usage_help_question
+    def test_infer_metric_label_volunteers(self):
+        from app.services.ai.planning.query_intent_helpers import infer_metric_label_from_query
 
-        assert is_platform_usage_help_question("Where can I find the planning template in the platform?") is True
-
-    def test_matrix_tooltip_terms_do_not_force_agent_side_usage_routing(self):
-        from app.services.ai_query_intent_helpers import is_platform_usage_help_question
-
-        assert is_platform_usage_help_question("what is original vs modified here in the matrix?") is False
-        assert is_platform_usage_help_question("What does Original vs Current mean when I hover over a matrix cell?") is False
-
-    def test_platform_usage_help_not_detected_for_document_lookup(self):
-        from app.services.ai_query_intent_helpers import is_platform_usage_help_question
-
-        assert is_platform_usage_help_question("Find the planning template PDF document for Syria.") is False
-        assert is_platform_usage_help_question("Search documents for original modified matrix.") is False
-
-    def test_template_assignment_ambiguous_true(self):
-        from app.services.ai_query_intent_helpers import is_template_assignment_ambiguous
-
-        assert is_template_assignment_ambiguous("I need the template for this year's assignment") is True
-
-    def test_template_assignment_ambiguous_false_for_document_request(self):
-        from app.services.ai_query_intent_helpers import is_template_assignment_ambiguous
-
-        assert is_template_assignment_ambiguous("Please download the planning template PDF file.") is False
+        assert infer_metric_label_from_query("How many volunteers in Syria?") == "Volunteers"
 
 
 class TestAIResponsePolicy:
@@ -579,20 +557,13 @@ class TestAIResponsePolicy:
 
     def test_user_expects_full_table_direct_request(self):
         """Explicit table requests should trigger table mode."""
-        from app.services.ai_response_policy import user_expects_full_table
+        from app.services.ai.policies.response_policy import user_expects_full_table
 
         assert user_expects_full_table("Please give me a full table of countries", []) is True
 
-    def test_wants_reasoning_evidence_keywords(self):
-        """Reasoning evidence helper should match explanatory intent words."""
-        from app.services.ai_response_policy import wants_reasoning_evidence
-
-        assert wants_reasoning_evidence("Why did this happen? Please provide evidence.") is True
-        assert wants_reasoning_evidence("hello there") is False
-
     def test_sanitize_agent_answer_strips_traces(self):
         """Sanitizer should remove ReAct step traces and keep user-facing answer."""
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         raw = (
             "--- Step 1 ---\n"
@@ -607,7 +578,7 @@ class TestAIResponsePolicy:
 
     def test_sanitize_agent_answer_strips_leaked_search_documents_json(self):
         """Echoed search_documents tool arguments must not appear in user-facing text."""
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         leak = '{"query":"migration crime","return_all_countries":true,"top_k":50,"offset":0}'
         raw = (
@@ -621,7 +592,7 @@ class TestAIResponsePolicy:
         assert "Summary of findings" in cleaned
 
     def test_sanitize_agent_answer_strips_inline_search_documents_json(self):
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         leak = '{"query":"x","return_all_countries":false,"top_k":8,"offset":0}'
         raw = f"Preamble {leak} after"
@@ -631,14 +602,14 @@ class TestAIResponsePolicy:
 
     def test_sanitize_agent_answer_keeps_unrelated_json(self):
         """Do not strip arbitrary JSON that is not search_documents args."""
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         keep = '{"query":"title","notes":"user metadata"}'
         cleaned = sanitize_agent_answer(keep)
         assert "notes" in cleaned
 
     def test_contains_leaked_search_documents_tool_json(self):
-        from app.services.ai_response_policy import contains_leaked_search_documents_tool_json
+        from app.services.ai.policies.response_policy import contains_leaked_search_documents_tool_json
 
         leak = '{"query":"migration crime","return_all_countries":true,"top_k":50,"offset":0}'
         assert contains_leaked_search_documents_tool_json(f"Intro\n{leak}\nMore")
@@ -651,7 +622,7 @@ class TestAIPayloadInference:
 
     def test_timeseries_shape_detection(self):
         """Timeseries data should be detected by shape, not tool name."""
-        from app.services.ai_payload_inference import _is_timeseries
+        from app.services.ai.planning.payload_inference import _is_timeseries
 
         assert _is_timeseries({
             "series": [{"year": 2020, "value": 10}, {"year": 2021, "value": 12}],
@@ -662,7 +633,7 @@ class TestAIPayloadInference:
 
     def test_country_rows_shape_detection(self):
         """Country rows with iso3 + value should be detected."""
-        from app.services.ai_payload_inference import _is_country_rows, _TABLE_MIN_ROWS
+        from app.services.ai.planning.payload_inference import _is_country_rows, _TABLE_MIN_ROWS
 
         rows = [{"iso3": f"C{i:02d}", "value": i} for i in range(_TABLE_MIN_ROWS)]
         assert _is_country_rows({"rows": rows})
@@ -671,7 +642,7 @@ class TestAIPayloadInference:
 
     def test_comparison_shape_detection(self):
         """Small countries list with indicator should be detected."""
-        from app.services.ai_payload_inference import _is_comparison
+        from app.services.ai.planning.payload_inference import _is_comparison
 
         assert _is_comparison({
             "indicator": "Volunteers",
@@ -685,7 +656,7 @@ class TestAIPayloadInference:
 
     def test_categorical_counts_detection(self):
         """Dict of category -> count should be detected."""
-        from app.services.ai_payload_inference import _is_categorical_counts
+        from app.services.ai.planning.payload_inference import _is_categorical_counts
 
         assert _is_categorical_counts({"counts_by_area": {"health": 5, "wash": 3}})
         assert not _is_categorical_counts({"counts_by_area": {"only_one": 1}})
@@ -693,7 +664,7 @@ class TestAIPayloadInference:
 
     def test_build_line_chart_from_tool_result(self):
         """Timeseries tool result should produce a line chart via shape detection."""
-        from app.services.ai_payload_inference import build_payload_from_tool_result
+        from app.services.ai.planning.payload_inference import build_payload_from_tool_result
 
         tool_result = {
             "success": True,
@@ -717,7 +688,7 @@ class TestAIPayloadInference:
 
     def test_build_bar_chart_from_comparison(self):
         """Comparison data should produce a bar chart."""
-        from app.services.ai_payload_inference import build_payload_from_tool_result
+        from app.services.ai.planning.payload_inference import build_payload_from_tool_result
 
         tool_result = {
             "success": True,
@@ -738,7 +709,7 @@ class TestAIPayloadInference:
 
     def test_build_pie_chart_from_counts(self):
         """Categorical counts should produce a pie chart."""
-        from app.services.ai_payload_inference import build_payload_from_tool_result
+        from app.services.ai.planning.payload_inference import build_payload_from_tool_result
 
         tool_result = {
             "success": True,
@@ -755,7 +726,7 @@ class TestAIPayloadInference:
 
     def test_infer_payloads_from_steps(self):
         """Steps with timeseries data should produce chart_payload via infer_payloads."""
-        from app.services.ai_payload_inference import infer_payloads
+        from app.services.ai.planning.payload_inference import infer_payloads
 
         steps = [
             {
@@ -782,7 +753,7 @@ class TestAIPayloadInference:
 
     def test_extract_answer_column_hints_ignores_coverage_kpi_lines(self):
         """Pipe-heavy coverage lines must not be mistaken for markdown table headers."""
-        from app.services.ai_payload_inference import _extract_answer_column_hints
+        from app.services.ai.planning.payload_inference import _extract_answer_column_hints
 
         bad = (
             "Coverage: **286/286 plans** matched.\n\n"
@@ -791,7 +762,7 @@ class TestAIPayloadInference:
         assert _extract_answer_column_hints(bad) == ""
 
     def test_unified_plans_focus_reference_enrichment_gating(self):
-        from app.services.ai_payload_inference import _unified_plans_focus_wants_reference_enrichment
+        from app.services.ai.planning.payload_inference import _unified_plans_focus_wants_reference_enrichment
 
         assert not _unified_plans_focus_wants_reference_enrichment(
             "what countries prioritize migration in unified plans"
@@ -801,7 +772,7 @@ class TestAIPayloadInference:
         )
 
     def test_focus_area_table_payload_includes_table_kind(self):
-        from app.services.ai_payload_inference import build_payload_from_tool_result, _TABLE_MIN_ROWS
+        from app.services.ai.planning.payload_inference import build_payload_from_tool_result, _TABLE_MIN_ROWS
 
         def _iso3(idx: int) -> str:
             return (
@@ -842,7 +813,7 @@ class TestAIPayloadInference:
 
     def test_infer_payloads_multi_slot(self):
         """Country rows should produce both table and map payloads."""
-        from app.services.ai_payload_inference import infer_payloads, _TABLE_MIN_ROWS
+        from app.services.ai.planning.payload_inference import infer_payloads, _TABLE_MIN_ROWS
 
         def _iso3(idx: int) -> str:
             return (
@@ -876,7 +847,7 @@ class TestAIPayloadInference:
 
     def test_skipped_and_failed_observations_ignored(self):
         """Skipped or failed observations should not produce payloads."""
-        from app.services.ai_payload_inference import infer_payloads
+        from app.services.ai.planning.payload_inference import infer_payloads
 
         steps = [
             {"step": 0, "action": "t", "observation": {"skipped": True, "series": [{"year": 2020, "value": 1}, {"year": 2021, "value": 2}]}},
@@ -886,7 +857,7 @@ class TestAIPayloadInference:
 
     def test_build_payload_handles_flat_observation(self):
         """Observations without result nesting should still be detected."""
-        from app.services.ai_payload_inference import build_payload_from_tool_result
+        from app.services.ai.planning.payload_inference import build_payload_from_tool_result
 
         tool_result = {
             "success": True,
@@ -902,7 +873,7 @@ class TestAIPayloadInference:
         assert payloads["chart_payload"]["metric"] == "Branches"
 
     def test_build_indicator_search_table_from_tool_result(self):
-        from app.services.ai_payload_inference import build_payload_from_tool_result
+        from app.services.ai.planning.payload_inference import build_payload_from_tool_result
 
         tool_result = {
             "success": True,
@@ -938,7 +909,7 @@ class TestAIPayloadInference:
         assert table["rows"][0]["match_type"] == "Exact name"
 
     def test_sanitize_strips_indicator_search_bullets(self):
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         raw = (
             "An exact match exists.\n\n"
@@ -955,7 +926,7 @@ class TestAIPayloadInference:
         assert "View indicator" in cleaned
 
     def test_sanitize_trims_long_indicator_search_interpretation(self):
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         raw = (
             'The Indicator Bank already contains this indicator: "Test indicator" (exact match). '
@@ -972,7 +943,7 @@ class TestAIPayloadInference:
         assert "View indicator" in cleaned
 
     def test_sanitize_dedupes_duplicate_exact_match_sentences(self):
-        from app.services.ai_response_policy import sanitize_agent_answer
+        from app.services.ai.policies.response_policy import sanitize_agent_answer
 
         raw = (
             'An indicator identical to your phrase already exists in the Indicator Bank. '
@@ -992,7 +963,7 @@ class TestAIRuntimeUtils:
 
     def test_estimate_openai_cost_positive(self):
         """Cost estimation should return positive value for non-zero token counts."""
-        from app.services.ai_runtime_utils import estimate_openai_cost
+        from app.services.ai.runtime.runtime_utils import estimate_openai_cost
 
         cost = estimate_openai_cost("gpt-5-mini", 1000, 1000)
         assert cost > 0
@@ -1008,7 +979,7 @@ class TestAIQueryPlanner:
     def test_validate_rejects_low_confidence(self, app):
         """Plans under confidence threshold should be rejected."""
         with app.app_context():
-            from app.services.ai_query_planner import AIQueryPlanner
+            from app.services.ai.planning.query_planner import AIQueryPlanner
             plan = AIQueryPlanner._validate_simple_plan_dict(
                 {
                     "is_simple": True,
@@ -1024,7 +995,7 @@ class TestAIQueryPlanner:
         """search_documents top_k should be bounded by config safety cap."""
         with app.app_context():
             app.config["AI_DOCUMENT_SEARCH_MAX_TOP_K_LIST"] = 120
-            from app.services.ai_query_planner import AIQueryPlanner
+            from app.services.ai.planning.query_planner import AIQueryPlanner
             plan = AIQueryPlanner._validate_simple_plan_dict(
                 {
                     "is_simple": True,
@@ -1046,7 +1017,7 @@ class TestAIQueryPlanner:
     def test_plan_simple_returns_none_on_missing_required_args(self, app):
         """Planner output missing required tool args should not pass validation."""
         with app.app_context():
-            from app.services.ai_query_planner import AIQueryPlanner
+            from app.services.ai.planning.query_planner import AIQueryPlanner
 
             mock_client = MagicMock()
             mock_response = MagicMock()
@@ -1078,14 +1049,14 @@ class TestAIVectorStore:
         with app.app_context():
             app.config['AI_EMBEDDING_PROVIDER'] = 'local'
 
-            with patch('app.services.ai_vector_store.AIEmbeddingService') as mock_emb:
+            with patch('app.services.ai.documents.vector_store.AIEmbeddingService') as mock_emb:
                 mock_service = MagicMock()
                 mock_service.generate_embedding.return_value = ([0.1] * 384, 0)
                 mock_service.model = 'test-model'
                 mock_service.dimensions = 384
                 mock_emb.return_value = mock_service
 
-                from app.services.ai_vector_store import AIVectorStore
+                from app.services.ai.documents.vector_store import AIVectorStore
                 return AIVectorStore()
 
     def test_store_initialization(self, vector_store):
@@ -1111,7 +1082,7 @@ class TestAIDocumentProcessor:
     def processor(self, app):
         """Create document processor instance."""
         with app.app_context():
-            from app.services.ai_document_processor import AIDocumentProcessor
+            from app.services.ai.documents.processor import AIDocumentProcessor
             return AIDocumentProcessor()
 
     def test_supported_file_types(self, processor):
@@ -1169,7 +1140,7 @@ class TestAIReasoningTraceService:
     def trace_service(self, app):
         """Create trace service instance."""
         with app.app_context():
-            from app.services.ai_reasoning_trace import AIReasoningTraceService
+            from app.services.ai.quality.reasoning_trace import AIReasoningTraceService
             return AIReasoningTraceService()
 
     def test_service_initialization(self, trace_service):
@@ -1203,7 +1174,7 @@ class TestAIServicesIntegration:
         from app.extensions import db
         from app.models import AIReasoningTrace
         from app.models.enums import AIReasoningTraceStatusValue
-        from app.services.ai_reasoning_trace import AIReasoningTraceService
+        from app.services.ai.quality.reasoning_trace import AIReasoningTraceService
 
         with app.app_context():
             service = AIReasoningTraceService()

@@ -6,10 +6,10 @@ This script scans the codebase for potential hardcoded secrets, API keys,
 passwords, and other sensitive information.
 
 Usage:
-    python Backoffice/scripts/scan_secrets.py                    # Full scan (repo root)
-    python Backoffice/scripts/scan_secrets.py --pre-commit      # Pre-commit mode (staged files only)
-    python Backoffice/scripts/scan_secrets.py --path Backoffice # Scan specific directory
-    python Backoffice/scripts/scan_secrets.py --fix             # Show fix suggestions
+    python Backoffice/scripts/ci/scan_secrets.py                    # Full scan (repo root)
+    python Backoffice/scripts/ci/scan_secrets.py --pre-commit      # Pre-commit mode (staged files only)
+    python Backoffice/scripts/ci/scan_secrets.py --path Backoffice # Scan specific directory
+    python Backoffice/scripts/ci/scan_secrets.py --fix             # Show fix suggestions
 
 Author: Security Team
 """

@@ -2,7 +2,7 @@
 
 > **Status:** Active / In progress  
 > **Last updated:** June 2026  
-> **Primary files:** `Backoffice/scripts/import_upr_excel_data.py` · `Backoffice/app/services/upr_excel_import_service.py` · `Backoffice/app/routes/admin/upr_excel_import.py` · `Backoffice/app/templates/admin/templates/upr_excel_import.html`
+> **Primary files:** `Backoffice/scripts/imports/import_upr_excel_data.py` · `Backoffice/app/services/upr/excel_import_service.py` · `Backoffice/app/routes/admin/upr_excel_import.py` · `Backoffice/app/templates/admin/templates/upr_excel_import.html`
 
 > **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 33 + 23 are implemented, including Emergency 1/2/3 on T33 (repeat group + dynamic indicators).
 
@@ -84,7 +84,7 @@ upsert_form_data_rows()        ← shared helper in import_fdrs_form_data.py; ba
 ```
 
 The script can be run:
-- **CLI:** `python scripts/import_upr_excel_data.py --input "UPR Master.xlsx" --rounds P26 --templates 24,22 --dry-run`
+- **CLI:** `python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --rounds P26 --templates 24,22 --dry-run`
 - **UI wizard:** `/admin/templates/upr-excel-import/` (4-step wizard, async background job)
 
 ---
@@ -632,19 +632,19 @@ Backoffice/
 
 ```bash
 # Analyze workbook only (shows all rounds, sections, row counts)
-python scripts/import_upr_excel_data.py --input "UPR Master.xlsx" --analyze-only
+python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --analyze-only
 
 # ── Planning ──────────────────────────────────────────────────────────────────
 
 # Dry run for P26 (templates 24 + 22)
-python scripts/import_upr_excel_data.py \
+python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds P26 \
   --templates 24,22 \
   --dry-run
 
 # Live import P26
-python scripts/import_upr_excel_data.py \
+python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds P26 \
   --templates 24,22
@@ -652,14 +652,14 @@ python scripts/import_upr_excel_data.py \
 # ── Reporting — Annual Report (AR) ────────────────────────────────────────────
 
 # Dry run for AR25 (country + PNS reporting)
-python scripts/import_upr_excel_data.py \
+python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds AR25 \
   --templates 33,23 \
   --dry-run
 
 # Live import AR25
-python scripts/import_upr_excel_data.py \
+python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds AR25 \
   --templates 33,23
@@ -668,14 +668,14 @@ python scripts/import_upr_excel_data.py \
 # T23 has no MYR assignments — use template 33 only.
 
 # Dry run for MYR26
-python scripts/import_upr_excel_data.py \
+python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds MYR26 \
   --templates 33 \
   --dry-run
 
 # Live import MYR26
-python scripts/import_upr_excel_data.py \
+python scripts/imports/import_upr_excel_data.py \
   --input "UPR Master.xlsx" \
   --rounds MYR26 \
   --templates 33

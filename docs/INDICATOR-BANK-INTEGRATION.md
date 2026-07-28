@@ -71,7 +71,7 @@ The `Key` must match a valid Backoffice API key (`api_keys` table or `MOBILE_APP
    ```powershell
    cd Backoffice
    $env:PYTHONPATH = (Get-Location).Path
-   python scripts/smoke_indicator_bank_compat.py YOUR_BACKOFFICE_API_KEY
+   python scripts/dev/smoke_indicator_bank_compat.py YOUR_BACKOFFICE_API_KEY
    ```
 3. Run the IFRC Blazor client with `appsettings.json` pointing at the same Backoffice host.
 4. Ensure indicator embeddings exist (admin sync or `IndicatorResolutionService.sync_all()`) so `/Indicator/search` uses vector search; ILIKE fallback applies if embeddings are missing.

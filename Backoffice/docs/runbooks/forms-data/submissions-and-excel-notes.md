@@ -93,7 +93,7 @@ Used to pre-populate or bulk-update submissions from external data sources (e.g.
 **CLI:**
 ```bash
 cd Backoffice
-python scripts/import_FDRS_data.py
+python scripts/imports/import_fdrs_form_data.py
 ```
 
 **Admin UI import:** Admin → Utilities → Import (if available for the data type)
@@ -123,12 +123,12 @@ All scripts run from `Backoffice/` with the virtualenv activated. Always snapsho
 
 | Script | Purpose | Typical use |
 |--------|---------|-------------|
-| `scripts/import_FDRS_data.py` | Bulk import from FDRS data files | Annual data ingestion |
+| `scripts/imports/import_fdrs_form_data.py` | Bulk import from FDRS data files | Annual data ingestion |
 | `scripts/check_db_migration.py` | Sanity-check migration heads | Pre-deploy check |
-| `scripts/trigger_automated_trace_review.py` | Export pending AI trace-review packets | Monthly AI quality review |
-| `scripts/seed_low_quality_review.py` | Create a test trace review item | QA / pipeline testing |
-| `scripts/check_no_console_saved_bypass.py` | CI check: no `__consoleSaved` bypasses in templates | Pre-merge CI |
-| `scripts/gate_template_console_calls.py` | Bulk-fix console call patterns in templates | Dev toolchain |
+| `scripts/ai/trigger_automated_trace_review.py` | Export pending AI trace-review packets | Monthly AI quality review |
+| `scripts/ai/seed_low_quality_review.py` | Create a test trace review item | QA / pipeline testing |
+| `scripts/ci/check_no_console_saved_bypass.py` | CI check: no `__consoleSaved` bypasses in templates | Pre-merge CI |
+| `scripts/ci/gate_template_console_calls.py` | Bulk-fix console call patterns in templates | Dev toolchain |
 
 **Before running any write script in production:**
 ```bash

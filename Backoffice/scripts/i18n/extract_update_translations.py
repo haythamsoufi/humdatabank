@@ -6,7 +6,7 @@ This is the canonical i18n workflow for Backoffice:
 1) Extract to a POT file (source of truth): translations/messages.pot
 2) Update all locales in translations/*/LC_MESSAGES/messages.po
    - Removed msgids are marked as obsolete (#~) by Babel during update.
-3) (Optional) Compile PO -> MO (already handled by scripts/compile_translations.py)
+3) (Optional) Compile PO -> MO (already handled by scripts/i18n/compile_translations.py)
 
 Usage (from Backoffice/):
   py scripts/extract_update_translations.py
@@ -350,7 +350,7 @@ def main() -> int:
 
     if args.compile:
         logger.info("[i18n] Compiling PO → MO")
-        compile_script = backoffice_dir / "scripts" / "compile_translations.py"
+        compile_script = Path(__file__).resolve().parent / "compile_translations.py"
         _run([sys.executable, str(compile_script)], cwd=backoffice_dir)
 
     logger.info("[i18n] Done.")

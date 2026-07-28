@@ -38,7 +38,7 @@ Flask-Babel/`{{ _(...) }}` output is Markup-safe and is **not** HTML-escaped ins
 CI guardrail (diff + full template scan):
 
 ```bash
-python Backoffice/scripts/check_unsafe_gettext_embedding.py --all-templates
+python Backoffice/scripts/ci/check_unsafe_gettext_embedding.py --all-templates
 ```
 
 Batch fix existing templates:
@@ -56,10 +56,10 @@ See also `docs/DEVELOPER-HANDBOOK.md` (Template Safety Checklist).
 Controlled logging via guarded helpers (`CLIENT_CONSOLE_LOGGING` pattern). CI guardrail:
 
 ```bash
-python Backoffice/scripts/check_no_console_saved_bypass.py
+python Backoffice/scripts/ci/check_no_console_saved_bypass.py
 ```
 
-Bulk autofix tooling: `python Backoffice/scripts/gate_template_console_calls.py`.
+Bulk autofix tooling: `python Backoffice/scripts/ci/gate_template_console_calls.py`.
 
 ---
 

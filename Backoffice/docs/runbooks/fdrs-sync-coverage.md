@@ -1,6 +1,6 @@
 # FDRS sync coverage and progress (template 21)
 
-Track what the FDRS import pipeline (`Backoffice/scripts/import_fdrs_form_data.py`) fills from [data-api.ifrc.org](https://data-api.ifrc.org), and what remains manual or blocked.
+Track what the FDRS import pipeline (`Backoffice/scripts/imports/import_fdrs_form_data.py`) fills from [data-api.ifrc.org](https://data-api.ifrc.org), and what remains manual or blocked.
 
 **Last updated:** 2026-06-05
 
@@ -35,7 +35,7 @@ Track what the FDRS import pipeline (`Backoffice/scripts/import_fdrs_form_data.p
 | 928 | Financial reporting start date | `KPI_StartDate` |
 | 937 | Financial reporting end date | `KPI_EndDate` |
 
-Constants: `Backoffice/scripts/fdrs_sync_constants.py` → `FDRS_QUESTION_KPI_TO_ITEM`.
+Constants: `Backoffice/scripts/imports/fdrs_sync_constants.py` → `FDRS_QUESTION_KPI_TO_ITEM`.
 
 ### Income Sources matrix (item 943)
 
@@ -57,7 +57,7 @@ Constants: `Backoffice/scripts/fdrs_sync_constants.py` → `FDRS_QUESTION_KPI_TO
 - FDRS exposes **per-section** workflow KPIs (Governance `KPI_NSGS_*`, Finance `KPI_NSFP_*`, Reach `KPI_NSR_*`):
   - `WasStarted`, `WasSubmitted`, `WasValidated`, `WasPublished`
   - `ValidationDate`, `PublishDate` (ISO datetimes on raw fdrsdata rows)
-- Module: `Backoffice/scripts/fdrs_assignment_status_sync.py` (runs after form_data upsert).
+- Module: `Backoffice/scripts/imports/fdrs_assignment_status_sync.py` (runs after form_data upsert).
 - Mapping to databank status:
   - all 3 sections validated/published → `approved`
   - all 3 submitted → `submitted`
@@ -71,7 +71,7 @@ Constants: `Backoffice/scripts/fdrs_sync_constants.py` → `FDRS_QUESTION_KPI_TO
 ### Documents (metadata only)
 
 - API: `GET /api/documents?apiKey=…&showunpublished=true&force=true[&year=YYYY]`
-- Module: `Backoffice/scripts/fdrs_documents_sync.py`
+- Module: `Backoffice/scripts/imports/fdrs_documents_sync.py`
 - Maps FDRS `document_type` → form items 923, 933, 1309, 1310.
 - Creates/updates `SubmittedDocument` with `source_url`, `file_pending=true`, `storage_path=NULL`.
 - Idempotency: `fdrs_import_key` (unique).
@@ -95,7 +95,7 @@ CLI:
 
 ```bash
 cd Backoffice
-python scripts/import_fdrs_form_data.py --fdrs-from-data-api --fdrs-years 2024
+python scripts/imports/import_fdrs_form_data.py --fdrs-from-data-api --fdrs-years 2024
 ```
 
 Optional env:

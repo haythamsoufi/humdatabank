@@ -21,7 +21,7 @@
 
 .EXAMPLE
     # Arbitrary remote shell command (no script upload)
-    .\azure_webapp_tools.bat prod run "cd /app && python scripts/backfill_stable_keys.py --dry-run"
+    .\azure_webapp_tools.bat prod run "cd /app && python scripts/ops/backfill_stable_keys.py --dry-run"
 #>
 param(
     [Parameter(Mandatory = $true)]

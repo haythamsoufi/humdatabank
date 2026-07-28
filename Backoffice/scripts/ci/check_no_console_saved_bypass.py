@@ -3,8 +3,8 @@ Fail if Jinja templates reference __consoleSaved.* — that handle is the pre-gu
 console and ignores CLIENT_CONSOLE_LOGGING. Inline scripts must use window.__clientLog etc.
 
 Run from repo root or Backoffice/:
-  python Backoffice/scripts/check_no_console_saved_bypass.py
-  python scripts/check_no_console_saved_bypass.py   # if cwd is Backoffice/
+  python Backoffice/scripts/ci/check_no_console_saved_bypass.py
+  python scripts/ci/check_no_console_saved_bypass.py   # if cwd is Backoffice/
 """
 from __future__ import annotations
 

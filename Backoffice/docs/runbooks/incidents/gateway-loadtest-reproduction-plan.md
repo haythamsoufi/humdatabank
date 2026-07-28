@@ -233,8 +233,8 @@ Collect at least:
 **App logs / diagnostics**
 
 - SSH snapshot (no Redis required; uses shared FS mirror):  
-  `cd /app && python scripts/check_gunicorn_pressure.py`  
-  During an incident: `python scripts/check_gunicorn_pressure.py --watch 60 --interval 2`
+  `cd /app && python scripts/ops/check_gunicorn_pressure.py`  
+  During an incident: `python scripts/ops/check_gunicorn_pressure.py --watch 60 --interval 2`
 - `[WS_POOL]`, `[NOTIF_PREFS_FETCH]`, `[WS_STATUS_FETCH]` (or successors)
 - `WORKER TIMEOUT` / recycle / `[SCHED_SHUTDOWN]` / `[WORKER_EXIT]`
 - Platform-error security events with worker-pressure snapshots

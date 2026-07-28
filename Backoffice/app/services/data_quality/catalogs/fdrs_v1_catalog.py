@@ -2,7 +2,7 @@
 FDRS v1 QoD indicator catalog (from IFRC Quality of Data methodology PDF).
 
 KPI codes match indicator_bank.fdrs_kpi_code values on template 21 (published).
-Run `python scripts/dump_data_quality_catalog.py` to verify mappings after template changes.
+Run `python scripts/dev/dump_data_quality_catalog.py` to verify mappings after template changes.
 """
 
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID

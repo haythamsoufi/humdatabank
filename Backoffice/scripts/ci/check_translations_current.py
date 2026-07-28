@@ -8,7 +8,7 @@ Two checks:
    touching the committed file) and compares msgids.  Fails if any msgid is
    present in the source but absent from the committed catalog, which means
    a developer added a new _() call without running
-   scripts/extract_update_translations.py.
+   scripts/i18n/extract_update_translations.py.
 
 2. Compile — loads every locale .po file via polib.  Fails if any file raises
    a parse error, which would cause gettext to silently fall back to msgids at
@@ -18,7 +18,7 @@ Exit code 0 → all checks pass.
 Exit code 1 → at least one check failed (details printed to stderr).
 
 Usage (from Backoffice/):
-    python scripts/check_translations_current.py
+    python scripts/ci/check_translations_current.py
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def check_staleness() -> None:
     if not COMMITTED_POT.exists():
         errors.append(
             "translations/messages.pot does not exist. "
-            "Run: py scripts/extract_update_translations.py"
+            "Run: py scripts/i18n/extract_update_translations.py"
         )
         return
 
@@ -103,7 +103,7 @@ def check_staleness() -> None:
             msg = (
                 f"{len(new_ids)} translatable string(s) are in the source code but "
                 f"missing from translations/messages.pot.\n"
-                f"  Run: py scripts/extract_update_translations.py\n"
+                f"  Run: py scripts/i18n/extract_update_translations.py\n"
                 f"  New strings (first {len(sample)}):\n"
             )
             for s in sample:
@@ -131,17 +131,22 @@ def check_compile() -> None:
         return
 
     for po_file in sorted(TRANSLATIONS_DIR.rglob("messages.po")):
+        tmp_mo = None
         try:
             po = polib.pofile(str(po_file))
-            # Exercise the .mo serialization path — this catches encoding and
-            # plural-forms errors that polib.pofile() alone may not surface.
-            import io
-
-            buf = io.BytesIO()
-            po.save_as_mofile(buf)  # type: ignore[arg-type]
+            # Exercise the .mo serialization path — polib expects a filesystem path here.
+            with tempfile.NamedTemporaryFile(suffix=".mo", delete=False) as tmp:
+                tmp_mo = tmp.name
+            po.save_as_mofile(tmp_mo)
         except Exception as exc:
             rel = po_file.relative_to(BACKOFFICE_DIR)
             errors.append(f"PO compile error in {rel}: {exc}")
+        finally:
+            if tmp_mo:
+                try:
+                    os.unlink(tmp_mo)
+                except OSError:
+                    pass
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

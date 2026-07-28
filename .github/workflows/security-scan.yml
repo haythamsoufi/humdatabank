@@ -92,7 +92,7 @@ jobs:
           python-version: '3.11'
 
       - name: Block __consoleSaved.* in Jinja templates
-        run: python Backoffice/scripts/check_no_console_saved_bypass.py
+        run: python Backoffice/scripts/ci/check_no_console_saved_bypass.py
 
       - name: Run Custom Scanner
         run: |

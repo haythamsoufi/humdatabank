@@ -178,7 +178,7 @@ def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    backoffice_root = Path(__file__).resolve().parent.parent
+    backoffice_root = Path(__file__).resolve().parents[2]
     docs_root = backoffice_root / "docs"
     sections = tuple(args.sections) if args.sections else DEFAULT_SECTIONS
     target_langs = tuple(args.langs) if args.langs else DOCS_LANGS

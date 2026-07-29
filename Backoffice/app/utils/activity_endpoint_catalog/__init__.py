@@ -4,7 +4,7 @@ Per-(method, endpoint) descriptions for routes that automatic activity logging r
 **GET is omitted:** navigations only bump session ``page_views`` (see activity middleware
 and session utilities), not ``UserActivityLog`` rows for ``page_view``.
 Generated rows live under generated/partials/ (merged in generated/__init__.py).
-Regenerate: python scripts/generate_activity_endpoint_catalog.py
+Regenerate: python scripts/dev/generate_activity_endpoint_catalog.py
 Manual overrides in manual_overrides.py win for the same endpoint (wildcard '*' applies to all methods).
 """
 

@@ -11,7 +11,7 @@ def backoffice_dir(from_file: str | Path | None = None) -> Path:
     """Return the Backoffice/ root directory."""
     start = Path(from_file or __file__).resolve()
     for parent in (start.parent, *start.parents):
-        if (parent / "app").is_dir() and (parent / "config.py").is_file():
+        if (parent / "app").is_dir() and (parent / "run.py").is_file():
             return parent
     raise RuntimeError(f"Cannot locate Backoffice root from {start}")
 

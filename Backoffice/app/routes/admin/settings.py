@@ -1817,7 +1817,7 @@ def api_settings_email_template_test_send():
 @admin_permission_required("admin.settings.manage")
 def api_settings_email_templates_seed():
     """Load bundled default email/notification templates (same as ``flask seed-email-templates``)."""
-    from scripts.seed_email_templates import seed_templates
+    from scripts.seeding.seed_email_templates import seed_templates
 
     data = get_json_safe() or {}
     force = bool(data.get("force"))

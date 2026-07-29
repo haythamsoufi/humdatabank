@@ -435,7 +435,7 @@ def register_commands(app):
     @with_appcontext
     def seed_email_templates_cmd(force):
         """Seed default email & notification templates (unified) into the database."""
-        from scripts.seed_email_templates import seed_templates
+        from scripts.seeding.seed_email_templates import seed_templates
 
         click.echo("\n=== Seeding Email & Notification Templates (unified) ===\n")
         stats = seed_templates(force=force)
@@ -451,7 +451,7 @@ def register_commands(app):
     @with_appcontext
     def seed_campaign_email_templates_cmd(force):
         """Seed default Communication Center campaign email templates."""
-        from scripts.seed_campaign_email_templates import seed_campaign_templates
+        from scripts.seeding.seed_campaign_email_templates import seed_campaign_templates
 
         click.echo("\n=== Seeding Campaign Email Templates ===\n")
         stats = seed_campaign_templates(force=force)

@@ -16,13 +16,15 @@ import sys
 
 logger = logging.getLogger(__name__)
 import re
+from pathlib import Path
 from sqlalchemy import text
 
-# Add the parent directory to the path so we can import app
-script_dir = os.path.dirname(os.path.abspath(__file__))
-backend_dir = os.path.dirname(script_dir)
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
+_scripts = Path(__file__).resolve().parents[1]
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+from _bootstrap import setup_cli_paths
+
+setup_cli_paths(__file__)
 
 # Set up environment
 if 'FLASK_CONFIG' not in os.environ:

@@ -19,7 +19,7 @@ except ImportError:
 
 def main():
     backoffice_dir = Path(__file__).resolve().parent.parent.parent
-    en_po_path = backoffice_dir / "app" / "translations" / "en" / "LC_MESSAGES" / "messages.po"
+    en_po_path = backoffice_dir / "translations" / "en" / "LC_MESSAGES" / "messages.po"
 
     if not en_po_path.exists():
         logger.error("English PO file not found: %s", en_po_path)

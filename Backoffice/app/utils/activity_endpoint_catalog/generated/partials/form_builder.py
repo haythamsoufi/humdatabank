@@ -1,6 +1,6 @@
 """
 AUTO-GENERATED — blueprint 'form_builder'. Do not edit by hand.
-Regenerate: python scripts/generate_activity_endpoint_catalog.py
+Regenerate: python scripts/dev/generate_activity_endpoint_catalog.py
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ SPECS: dict[tuple[str, str], ActivityEndpointSpec] = {
     ("POST", "form_builder.configure_dynamic_section"): ActivityEndpointSpec(description="Configured Dynamic Section", activity_type="admin_forms"),
     ("POST", "form_builder.configure_repeat_section"): ActivityEndpointSpec(description="Configured Repeat Section", activity_type="admin_forms"),
     ("POST", "form_builder.create_draft_version"): ActivityEndpointSpec(description="Created Draft Version", activity_type="admin_forms"),
+    ("POST", "form_builder.create_template_from_indicator_bank"): ActivityEndpointSpec(description="Created Template From Indicator Bank", activity_type="admin_forms"),
     ("POST", "form_builder.delete_template"): ActivityEndpointSpec(description="Deleted Template", activity_type="admin_forms"),
     ("POST", "form_builder.delete_template_section"): ActivityEndpointSpec(description="Deleted Template Section", activity_type="admin_forms"),
     ("POST", "form_builder.delete_template_version"): ActivityEndpointSpec(description="Deleted Template Version", activity_type="admin_forms"),

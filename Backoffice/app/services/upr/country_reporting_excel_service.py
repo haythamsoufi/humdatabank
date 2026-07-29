@@ -20,9 +20,11 @@ def _ensure_scripts_in_path() -> None:
     if _SCRIPTS_DIR is not None:
         return
     scripts_dir = os.path.normpath(os.path.join(current_app.root_path, "..", "scripts"))
-    if scripts_dir not in sys.path:
-        sys.path.insert(0, scripts_dir)
-    _SCRIPTS_DIR = scripts_dir
+    imports_dir = os.path.join(scripts_dir, "imports")
+    for path in (imports_dir, scripts_dir):
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    _SCRIPTS_DIR = imports_dir
 
 
 class UprCountryReportingExcelService:

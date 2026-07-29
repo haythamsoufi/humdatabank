@@ -12,11 +12,15 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-backoffice_dir = os.path.dirname(script_dir)
-if backoffice_dir not in sys.path:
-    sys.path.insert(0, backoffice_dir)
+_scripts = Path(__file__).resolve().parents[1]
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+from _bootstrap import setup_cli_paths
+
+setup_cli_paths(__file__)
+
 if "FLASK_CONFIG" not in os.environ:
     os.environ["FLASK_CONFIG"] = "development"
 

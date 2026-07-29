@@ -6,7 +6,7 @@ Run from the **`Backoffice/`** directory with venv and `.env` loaded unless a sc
 
 | Folder | Purpose |
 |--------|---------|
-| [`ci/`](ci/) | CI guardrails (template safety, translations staleness, secret scanning) |
+| [`ci/`](ci/) | CI guardrails (template safety, translations staleness, secret scanning, script path references) |
 | [`i18n/`](i18n/) | Extract, sync, and compile translations |
 | [`seeding/`](seeding/) | Dev/test data seeding and reporting-period catalog backfills |
 | [`imports/`](imports/) | **Importable modules** — FDRS/UPR Excel pipelines (`import_fdrs_form_data`, `import_upr_excel_data`, …). App code and tests add `scripts/imports` to `sys.path`. |
@@ -24,6 +24,8 @@ Shared path helpers: [`_bootstrap.py`](_bootstrap.py).
 ```bash
 # CI guardrails (also run in GitHub Actions)
 python scripts/ci/check_no_console_saved_bypass.py
+python scripts/ci/check_script_references.py
+python scripts/ci/check_script_bootstrap.py
 python scripts/ci/check_translations_current.py
 
 # i18n

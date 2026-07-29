@@ -216,9 +216,9 @@ The old test files have been converted:
 
 - `tests/test_transaction_middleware.py` → `tests/integration/test_transaction_middleware.py`
 - `tests/test_transaction_middleware_db.py` → `tests/integration/test_transaction_middleware.py` (merged)
-- `scripts/test_api_endpoints.py` → `tests/api/test_api_endpoints.py`
-- `scripts/test_static_cache.py` → `tests/integration/test_static_cache.py`
-- `scripts/test_email.py` → `tests/integration/test_email.py`
+- `scripts/dev/test_api_endpoints.py` → `tests/api/test_api_endpoints.py`
+- `scripts/dev/test_static_cache.py` → `tests/integration/test_static_cache.py`
+- `scripts/dev/test_email.py` → `tests/integration/test_email.py`
 
 Old test files can be removed after verifying new tests work correctly.
 

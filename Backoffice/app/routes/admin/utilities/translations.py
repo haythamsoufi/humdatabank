@@ -1410,10 +1410,15 @@ def compile_translations():
         # Run the compilation script
         import subprocess
         import os
+        import sys
         # Get the backoffice root directory (parent of app/)
         backoffice_root = os.path.abspath(os.path.join(current_app.root_path, '..'))
-        scripts_dir = os.path.join(backoffice_root, 'scripts')
-        result = subprocess.run(['python', 'compile_translations.py'],
+        scripts_dir = os.path.join(backoffice_root, 'scripts', 'i18n')
+        script_path = os.path.join(scripts_dir, 'compile_translations.py')
+        if not os.path.exists(script_path):
+            flash(_('Compilation script not found. Please ensure scripts/i18n/compile_translations.py exists.'), 'danger')
+            return redirect(url_for('utilities.manage_translations'))
+        result = subprocess.run([sys.executable, 'compile_translations.py'],
                               capture_output=True, text=True, cwd=scripts_dir)
 
         if result.returncode == 0:

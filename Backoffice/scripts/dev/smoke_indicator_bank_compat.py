@@ -1,5 +1,13 @@
 """Quick smoke test for IFRC Indicator Bank compat routes."""
 import sys
+from pathlib import Path
+
+_scripts = Path(__file__).resolve().parents[1]
+if str(_scripts) not in sys.path:
+    sys.path.insert(0, str(_scripts))
+from _bootstrap import setup_cli_paths
+
+setup_cli_paths(__file__)
 
 from app import create_app
 

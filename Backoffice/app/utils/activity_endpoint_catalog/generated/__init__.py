@@ -1,6 +1,6 @@
 """
 AUTO-GENERATED — merged activity catalog from per-blueprint partials.
-Regenerate: python scripts/generate_activity_endpoint_catalog.py
+Regenerate: python scripts/dev/generate_activity_endpoint_catalog.py
 """
 
 from __future__ import annotations

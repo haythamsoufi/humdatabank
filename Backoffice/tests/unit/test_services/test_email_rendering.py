@@ -239,7 +239,7 @@ class TestRenderAdminEmailTemplate:
 
     def test_security_alert_header_style_preserved(self):
         from app.services.email.preview_context import build_security_alert_email_context
-        from scripts.seed_email_templates import DEFAULT_EMAIL_TEMPLATES
+        from scripts.seeding.seed_email_templates import DEFAULT_EMAIL_TEMPLATES
 
         ctx = build_security_alert_email_context(
             event_type="failed_login",

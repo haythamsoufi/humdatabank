@@ -1060,7 +1060,7 @@ def api_campaign_email_compose_preview():
 @permission_required("admin.settings.manage")
 def api_campaign_email_templates_seed():
     from flask_login import current_user
-    from scripts.seed_campaign_email_templates import seed_campaign_templates
+    from scripts.seeding.seed_campaign_email_templates import seed_campaign_templates
 
     data = get_json_safe() or {}
     force = bool(data.get("force"))

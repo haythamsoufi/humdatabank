@@ -560,7 +560,7 @@ def _send_via_ifrc(
         return False
 
     body_b64 = _b64_utf8(raw_html)
-    # IFRC gateway examples (and scripts/test_email.py) always send Cc/Bcc keys; some
+    # IFRC gateway examples (and scripts/dev/test_email.py) always send Cc/Bcc keys; some
     # environments reject payloads when these properties are omitted entirely.
     cc_b64 = _b64_utf8(out_cc) if (out_cc and out_cc.strip()) else ""
     bcc_b64 = _b64_utf8(out_bcc) if (out_bcc and out_bcc.strip()) else ""

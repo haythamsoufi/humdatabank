@@ -23,7 +23,7 @@ from app.services.forms.reporting_period_service import (
     backfill_assigned_forms_missing_period,
     resync_all_reporting_periods,
 )
-from scripts.seed_reporting_period_catalog import seed_reporting_period_catalog
+from scripts.seeding.seed_reporting_period_catalog import seed_reporting_period_catalog
 
 
 def main() -> int:

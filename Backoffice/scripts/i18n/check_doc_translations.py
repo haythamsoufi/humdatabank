@@ -86,7 +86,7 @@ def check_translations(docs_dir):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    docs_dir = Path(__file__).resolve().parent.parent / 'docs'
+    docs_dir = Path(__file__).resolve().parents[2] / "docs"
 
     all_files, missing = check_translations(docs_dir)
 

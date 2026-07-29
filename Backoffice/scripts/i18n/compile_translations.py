@@ -5,7 +5,8 @@ Simple script to compile PO files to MO files for Flask-Babel
 
 import logging
 import os
-import sys
+
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 try:
@@ -14,12 +15,7 @@ except Exception as e:
     logger.debug("polib import failed: %s", e)
     raise SystemExit("polib is not installed. Run: py -m pip install -r Backoffice/requirements.txt")
 
-# Ensure Backoffice/ is on sys.path so we can import the config package when
-# running this file directly (e.g., py Backoffice/scripts/compile_translations.py)
-CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
-BACKOFFICE_DIR = os.path.abspath(os.path.join(CURRENT_DIR, '..', '..'))
-if BACKOFFICE_DIR not in sys.path:
-    sys.path.insert(0, BACKOFFICE_DIR)
+BACKOFFICE_DIR = Path(__file__).resolve().parents[2]
 
 def compile_po_to_mo(po_file_path, mo_file_path):
     """Compile a PO file to MO file"""
@@ -37,22 +33,22 @@ def compile_po_to_mo(po_file_path, mo_file_path):
 
 def main():
     """Compile all PO files in the translations directory"""
-    translations_dir = os.path.abspath(os.path.join(BACKOFFICE_DIR, 'translations'))
+    translations_dir = BACKOFFICE_DIR / "translations"
     try:
         locales = sorted(
             name for name in os.listdir(translations_dir)
-            if os.path.isdir(os.path.join(translations_dir, name))
+            if (translations_dir / name).is_dir()
         )
     except Exception as e:
         logger.error("Could not list translations dir %s: %s", translations_dir, e)
         raise SystemExit(1)
 
     for lang in locales:
-        po_file = os.path.join(translations_dir, lang, 'LC_MESSAGES', 'messages.po')
-        mo_file = os.path.join(translations_dir, lang, 'LC_MESSAGES', 'messages.mo')
+        po_file = translations_dir / lang / "LC_MESSAGES" / "messages.po"
+        mo_file = translations_dir / lang / "LC_MESSAGES" / "messages.mo"
 
-        if os.path.exists(po_file):
-            compile_po_to_mo(po_file, mo_file)
+        if po_file.is_file():
+            compile_po_to_mo(str(po_file), str(mo_file))
         else:
             logger.warning("PO file not found: %s", po_file)
 

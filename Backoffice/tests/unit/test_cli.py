@@ -748,7 +748,7 @@ class TestSeedEmailTemplatesCommand:
             "email": {"seeded": 5, "skipped": 2},
             "metadata": {"seeded": 3, "skipped": 1},
         }
-        with patch("scripts.seed_email_templates.seed_templates", return_value=stats):
+        with patch("scripts.seeding.seed_email_templates.seed_templates", return_value=stats):
             result = runner.invoke(args=["seed-email-templates"])
 
         assert result.exit_code == 0
@@ -760,8 +760,17 @@ class TestSeedEmailTemplatesCommand:
             "email": {"seeded": 7, "skipped": 0},
             "metadata": {"seeded": 4, "skipped": 0},
         }
-        with patch("scripts.seed_email_templates.seed_templates", return_value=stats) as mock_seed:
+        with patch("scripts.seeding.seed_email_templates.seed_templates", return_value=stats) as mock_seed:
             result = runner.invoke(args=["seed-email-templates", "--force"])
 
         assert result.exit_code == 0
         mock_seed.assert_called_once_with(force=True)
+
+
+class TestSeedCampaignEmailTemplatesCommand:
+    def test_seed_campaign_without_force(self, runner):
+        stats = {"email": {"seeded": 2, "skipped": 1}}
+        with patch("scripts.seeding.seed_campaign_email_templates.seed_campaign_templates", return_value=stats):
+            result = runner.invoke(args=["seed-campaign-email-templates"])
+        assert result.exit_code == 0
+        assert "2 seeded" in result.output

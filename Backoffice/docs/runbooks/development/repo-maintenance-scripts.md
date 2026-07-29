@@ -7,6 +7,8 @@ See **[`scripts/README.md`](../../../scripts/README.md)** for the full folder in
 | Script / topic | Typical use |
 |----------------|--------------|
 | `ci/check_db_migration.py` | Sanity-check migration heads before upgrades. *(if present)* |
+| `ci/check_script_references.py` | Fail when app/tests still reference flat `scripts/*.py` paths after reorganization. |
+| `ci/check_script_bootstrap.py` | Fail when scripts in subfolders resolve `Backoffice/` one level short (`scripts/` instead). |
 | `ci/check_no_console_saved_bypass.py` | Ensures templates do not bypass client console guards. |
 | `ci/gate_template_console_calls.py` | Bulk template console-call fixes (see `tailwind-and-template-safety.md`). |
 | `ci/check_translations_current.py` | CI: translations catalog is current and `.po` files compile. |

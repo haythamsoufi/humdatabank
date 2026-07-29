@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 BACKOFFICE_ROOT = Path(__file__).resolve().parents[2]
-CHECK_SCRIPT = BACKOFFICE_ROOT / "scripts" / "check_unsafe_gettext_embedding.py"
+CHECK_SCRIPT = BACKOFFICE_ROOT / "scripts" / "ci" / "check_unsafe_gettext_embedding.py"
 SCRIPT_TAG = re.compile(
     r"<script\b([^>]*)>(.*?)</script>",
     re.IGNORECASE | re.DOTALL,
@@ -105,7 +105,7 @@ class TestGettextEmbedRenderSmoke:
         _assert_scripts_parse(_extract_inline_scripts(html))
 
     def test_check_script_flags_unsafe_js_embedding(self):
-        from scripts.check_unsafe_gettext_embedding import find_unsafe_embeddings
+        from scripts.ci.check_unsafe_gettext_embedding import find_unsafe_embeddings
 
         unsafe_line = "showError('{{ _(\"Job title is required.\") }}');"
         assert find_unsafe_embeddings(unsafe_line)
@@ -114,7 +114,7 @@ class TestGettextEmbedRenderSmoke:
         assert not find_unsafe_embeddings(safe_line)
 
     def test_check_script_flags_unsafe_attribute_embedding(self):
-        from scripts.check_unsafe_gettext_embedding import scan_template_text
+        from scripts.ci.check_unsafe_gettext_embedding import scan_template_text
 
         snippet = '<div data-confirm="{{ _(\'Send now?\') }}"></div>'
         findings = scan_template_text("sample.html", snippet)

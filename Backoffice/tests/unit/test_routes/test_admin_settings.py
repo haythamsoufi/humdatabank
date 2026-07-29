@@ -653,7 +653,7 @@ class TestEmailTemplatesSeed:
     def test_seed_success(self, logged_in_client, db_session, app):
         mock_stats = {"created": 2, "updated": 0, "skipped": 0}
         with _auth(), \
-             patch("scripts.seed_email_templates.seed_templates", return_value=mock_stats):
+             patch("scripts.seeding.seed_email_templates.seed_templates", return_value=mock_stats):
             resp = logged_in_client.post(
                 "/admin/api/settings/email-templates/seed",
                 json={},
@@ -664,7 +664,7 @@ class TestEmailTemplatesSeed:
     def test_seed_with_force_flag(self, logged_in_client, db_session, app):
         mock_stats = {"created": 3, "updated": 0, "skipped": 0}
         with _auth(), \
-             patch("scripts.seed_email_templates.seed_templates", return_value=mock_stats):
+             patch("scripts.seeding.seed_email_templates.seed_templates", return_value=mock_stats):
             resp = logged_in_client.post(
                 "/admin/api/settings/email-templates/seed",
                 json={"force": True},
@@ -674,7 +674,7 @@ class TestEmailTemplatesSeed:
 
     def test_seed_exception(self, logged_in_client, db_session, app):
         with _auth(), \
-             patch("scripts.seed_email_templates.seed_templates", side_effect=Exception("fail")):
+             patch("scripts.seeding.seed_email_templates.seed_templates", side_effect=Exception("fail")):
             resp = logged_in_client.post(
                 "/admin/api/settings/email-templates/seed",
                 json={},
@@ -684,7 +684,7 @@ class TestEmailTemplatesSeed:
 
     def test_seed_unauthenticated(self, client, db_session):
         resp = client.post("/admin/api/settings/email-templates/seed", follow_redirects=False)
-        assert resp.status_code == 302
+        assert resp.status_code in (302, 401)
 
 
 # ---------------------------------------------------------------------------

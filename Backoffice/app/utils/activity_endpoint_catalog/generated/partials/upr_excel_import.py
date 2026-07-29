@@ -1,6 +1,6 @@
 """
 AUTO-GENERATED — blueprint 'upr_excel_import'. Do not edit by hand.
-Regenerate: python scripts/generate_activity_endpoint_catalog.py
+Regenerate: python scripts/dev/generate_activity_endpoint_catalog.py
 """
 
 from __future__ import annotations

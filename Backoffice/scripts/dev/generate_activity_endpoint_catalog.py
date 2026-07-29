@@ -17,9 +17,14 @@ import re
 import shutil
 import sys
 
-_BACKOFFICE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _BACKOFFICE_ROOT not in sys.path:
-    sys.path.insert(0, _BACKOFFICE_ROOT)
+from pathlib import Path
+
+_SCRIPTS_BOOTSTRAP = Path(__file__).resolve().parents[1]
+if str(_SCRIPTS_BOOTSTRAP) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_BOOTSTRAP))
+from _bootstrap import backoffice_dir, setup_cli_paths
+
+_BACKOFFICE_ROOT = str(setup_cli_paths(__file__)[0])
 
 os.chdir(_BACKOFFICE_ROOT)
 if not os.environ.get("FLASK_APP"):
@@ -136,7 +141,7 @@ def main() -> None:
     init_lines = [
         '"""',
         "AUTO-GENERATED — merged activity catalog from per-blueprint partials.",
-        "Regenerate: python scripts/generate_activity_endpoint_catalog.py",
+        "Regenerate: python scripts/dev/generate_activity_endpoint_catalog.py",
         '"""',
         "",
         "from __future__ import annotations",

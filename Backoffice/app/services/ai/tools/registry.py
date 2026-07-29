@@ -285,6 +285,12 @@ def tool_wrapper(func: Callable) -> Callable:
                 cached = tool_cache_get(cache_key)
                 if isinstance(cached, dict):
                     logger.info("Tool %s cache hit", tool_name)
+                    try:
+                        from app.services.ai.runtime.cache_trace import record_ai_cache_event
+
+                        record_ai_cache_event("tool_result_cache", name=tool_name, hit=True)
+                    except Exception:
+                        pass
                     log_tool_usage(
                         tool_name=tool_name,
                         tool_input=log_kwargs,
@@ -294,7 +300,10 @@ def tool_wrapper(func: Callable) -> Callable:
                         execution_time_ms=cached.get("execution_time_ms"),
                         user_id=user_id,
                     )
-                    return cached
+                    cached_out = dict(cached)
+                    cached_out["cache_hit"] = True
+                    cached_out["cache_source"] = "tool_result_cache"
+                    return cached_out
 
             result = func(*args, **call_kwargs)
             execution_time = (time.time() - start_time) * 1000
@@ -1369,6 +1378,17 @@ class AIToolsRegistry:
                     full_results = cached["results"]
                     total_count = len(full_results)
                     chunk_slice = full_results[offset : offset + limit]
+                    try:
+                        from app.services.ai.runtime.cache_trace import record_ai_cache_event
+
+                        record_ai_cache_event(
+                            "search_documents_pagination",
+                            name="search_documents",
+                            hit=True,
+                            detail={"offset": offset, "limit": limit},
+                        )
+                    except Exception:
+                        pass
                     return {
                         "success": True,
                         "result": chunk_slice,

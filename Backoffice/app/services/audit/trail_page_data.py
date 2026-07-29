@@ -110,9 +110,7 @@ def build_audit_trail_multiselect_data(
     for s in recent_session_logs:
         email = s.user.email if s.user and s.user.email else '—'
         label = f'#{s.id} — {email}'
-        sublabel = ''
-        if s.session_start:
-            sublabel = s.session_start.strftime('%Y-%m-%d %H:%M') + ' UTC'
+        sublabel = _iso_datetime(s.session_start)
         session_items.append({
             'value': str(s.id),
             'label': label,

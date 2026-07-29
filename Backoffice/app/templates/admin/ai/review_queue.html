@@ -106,7 +106,7 @@
                 {% endif %}
             </td>
             <td class="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                {{ review.created_at.strftime('%Y-%m-%d') if review.created_at else '—' }}
+                {{ review.created_at|datetime_local('date') if review.created_at else '—' }}
             </td>
             <td class="px-4 py-3 text-right">
                 <a href="{{ url_for('ai_management.ai_review_detail', review_id=review.id) }}"

@@ -68,6 +68,7 @@ def reopen_assignment(aes_id):
                 AssignmentEntityStatusValue.approved,
                 AssignmentEntityStatusValue.requires_revision,
                 AssignmentEntityStatusValue.sent_for_review,
+                AssignmentEntityStatusValue.cancelled,
             }
             if assignment_entity_status.status in _submitted_statuses:
                 assignment_entity_status.status = AssignmentEntityStatusValue.in_progress

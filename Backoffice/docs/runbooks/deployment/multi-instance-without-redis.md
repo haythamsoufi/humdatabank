@@ -15,7 +15,11 @@ Scaling App Service **out** (more instances) improves capacity and isolates work
 
 **Good news:** Core databank operations (login, form entry, API writes) use **signed cookie sessions** and **PostgreSQL** — they do **not** require Redis.
 
+> **Note on Redis sizing misconceptions:** Redis is not only for “millions of sessions.” It addresses coordination and performance at many scales (caching, rate limits, locks, queues, real-time state). The decision depends on latency, traffic patterns, data lifetime, and ops cost — not an arbitrary user count. For this app, the driver is **multi-worker / multi-instance coordination**, not session volume. See [Redis provisioning — §2.1](redis-provisioning.md#21-common-misconception--redis-is-only-for-millions-of-sessions).
+
 **Main gaps without Redis:**
+
+> **Growth context:** Load and traffic are only increasing. Planned next phases migrate the **Indicator Bank** and **FDRS** reporting systems into Network Databank — provision shared coordination (Redis) before that traffic lands on multi-instance deployments. See [Redis provisioning — Growth trajectory](redis-provisioning.md#growth-trajectory--load-is-increasing).
 
 | Area | Cross-instance? |
 |------|-----------------|
@@ -85,7 +89,7 @@ Actions grouped by effort. Prefer **Immediate** before the next reporting peak o
 
 | Action | Addresses | Detail |
 |--------|-----------|--------|
-| Set **`REDIS_URL`** | R3, R4, R5 | Shared rate limits, fleet-wide alert cooldown, cross-worker presence. Azure Cache for Redis Basic C0 is sufficient to start. |
+| Set **`REDIS_URL`** | R3, R4, R5 | Shared rate limits, fleet-wide alert cooldown, cross-worker presence. See [Redis provisioning](redis-provisioning.md): **Azure Managed Redis Balanced B0 (West Europe)**. |
 | Set **`RATELIMIT_STORAGE_URI`** | R3 | Can mirror `REDIS_URL` or use a separate DB index. |
 | **Turn ARR Affinity Off** | R9 | Better load distribution once sessions/rate limits/presence are Redis-backed. |
 | **Redis scheduler lock** | R1 | Optional enhancement; external scheduler (§3.3) may still be preferable for heavy jobs. |
@@ -147,6 +151,7 @@ Before turning ARR Affinity **Off**:
 
 ## 7. Related documentation
 
+- [Redis provisioning](redis-provisioning.md) — **Azure Managed Redis Balanced B0** (West Europe, CHF estimates)
 - [Azure App Service §3a — recommended settings](azure-app-service.md#3a-recommended-application-settings-avoid-502504)
 - [Gateway 504 / worker saturation](../incidents/gateway-504-worker-saturation.md)
 - [Platform 502 DB pool incident (2026-07-22)](../../../../docs/handovers/2026-07-22-platform-502-db-pool-alert-storm-incident.md)

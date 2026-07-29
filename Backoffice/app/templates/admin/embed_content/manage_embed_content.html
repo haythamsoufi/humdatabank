@@ -79,7 +79,7 @@
                     {% endif %}
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-500">
-                    {{ item.updated_at.strftime('%Y-%m-%d %H:%M') if item.updated_at else '-' }}
+                    {{ item.updated_at|datetime_local('datetimeShort') if item.updated_at else '—' }}
                 </td>
                 <td class="px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-2">

@@ -1100,6 +1100,15 @@ class CampaignsGridManager {
         if (!params.value) {
             return '<span class="text-gray-400">Not scheduled</span>';
         }
+        if (typeof AgGridRenderers !== 'undefined' && AgGridRenderers.dateTime) {
+            return AgGridRenderers.dateTime(params);
+        }
+        if (typeof DateTimeUtils !== 'undefined') {
+            const formatted = DateTimeUtils.format(params.value, 'datetime');
+            return formatted
+                ? '<span class="text-sm text-gray-900">' + formatted + '</span>'
+                : '<span class="text-gray-400">Not scheduled</span>';
+        }
         return params.value;
     }
 

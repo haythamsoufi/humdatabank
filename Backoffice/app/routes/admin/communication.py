@@ -11,6 +11,7 @@ from flask_login import current_user
 from app.extensions import csrf, db
 from app.models import User, NotificationType, Notification, NotificationCampaign
 from app.routes.admin.shared import permission_required
+from app.utils.datetime_helpers import ensure_utc
 from app.utils.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
 from app.utils.request_validation import enforce_api_or_csrf_protection
@@ -151,6 +152,7 @@ def communication_center():
         email_fields_by_id=email_fields_by_id,
         original_notification_ids=original_notification_ids,
         attention_notification_ids=attention_notification_ids,
+        iso_dates=True,
     )
     total_count = len(notifications_data)
 
@@ -186,8 +188,8 @@ def communication_center():
             'override_preferences': campaign.override_preferences,
             'redirect_type': campaign.redirect_type or '',
             'redirect_url': campaign.redirect_url or '',
-            'scheduled_for': campaign.scheduled_for.strftime('%Y-%m-%d %H:%M:%S') if campaign.scheduled_for else '',
-            'scheduled_for_display': campaign.scheduled_for.strftime('%Y-%m-%d %H:%M:%S') if campaign.scheduled_for else None,  # For display logic
+            'scheduled_for': ensure_utc(campaign.scheduled_for).isoformat() if campaign.scheduled_for else '',
+            'scheduled_for_display': ensure_utc(campaign.scheduled_for).isoformat() if campaign.scheduled_for else None,
             'status': campaign_status,
             'status_display': campaign_status_display,  # Formatted status
             'user_selection_type': campaign.user_selection_type,
@@ -199,9 +201,9 @@ def communication_center():
             'created_by_title': creator.title if creator else '',
             'created_by_active': bool(creator.active) if creator else True,
             'created_by_profile_color': (creator.profile_color if creator else '') or '',
-            'created_at': campaign.created_at.strftime('%Y-%m-%d %H:%M:%S') if campaign.created_at else '',
-            'updated_at': campaign.updated_at.strftime('%Y-%m-%d %H:%M:%S') if campaign.updated_at else '',
-            'sent_at': campaign.sent_at.strftime('%Y-%m-%d %H:%M:%S') if campaign.sent_at else '',
+            'created_at': ensure_utc(campaign.created_at).isoformat() if campaign.created_at else '',
+            'updated_at': ensure_utc(campaign.updated_at).isoformat() if campaign.updated_at else '',
+            'sent_at': ensure_utc(campaign.sent_at).isoformat() if campaign.sent_at else '',
             'sent_count': campaign.sent_count,
             'failed_count': campaign.failed_count,
             'recipients_count': len(campaign.user_ids) if campaign.user_ids else 0

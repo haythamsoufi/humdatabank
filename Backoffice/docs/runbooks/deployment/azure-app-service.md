@@ -72,7 +72,9 @@ Set these in Azure Portal → App Service → Configuration → Application sett
 | `SCHEDULER_LOCK_FAIL_OPEN` | unset | Scheduler-lock filesystem errors **fail closed** (worker skips starting the scheduler) because duplicate schedulers have sent duplicate digest emails before. Set `true` only as a temporary escape hatch if lock-file I/O is broken and the scheduler must run |
 | `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway DB queries (2 min) so pool connections aren't held indefinitely |
 | `DB_CONNECT_TIMEOUT` | `10` | Aborts stalled PostgreSQL TCP handshakes (e.g. private-endpoint cold start) |
-| `REDIS_URL` | `redis://<host>:6379/0` | Enables cross-worker rate limiting; removes ARR Affinity dependency |
+| `REDIS_URL` | `rediss://<host>:6380/0` | Cross-worker coordination (not sessions). **SKU:** [Azure Managed Redis Balanced B0 — West Europe](redis-provisioning.md). |
+
+> **Redis SKU:** [Redis provisioning](redis-provisioning.md) — **Azure Managed Redis Balanced B0** (~CHF 11/mo staging single-node, ~CHF 22/mo prod two-node HA in West Europe).
 | `SCHEDULER_DISABLE_ALL_WORKERS` | `true` (if using Azure Function/Container Jobs for background tasks) | Prevents N schedulers running the same DB jobs N times in parallel |
 
 > **Without `REDIS_URL`**: enable **ARR Affinity** (Azure Portal → App Service → Configuration → General settings → ARR Affinity = **On**) so Flask sessions are reliably routed to the same worker.
@@ -200,7 +202,7 @@ This swaps back to the previous code. **Note:** If migrations ran against the pr
 | AI WebSocket (`/api/ai/v2/ws`) | Requires affinity or single worker | Requires affinity or single worker |
 | Presence heartbeats | In-memory (per-worker, clears on restart) | Redis-backed (shared, survives restart) |
 
-**Recommendation:** Configure `REDIS_URL` in production for any deployment with 2+ workers.
+**Recommendation:** Configure `REDIS_URL` for any deployment with 2+ workers. Provision **[Azure Managed Redis Balanced B0 — West Europe](redis-provisioning.md)** (Private Link; ~CHF 22/mo two-node HA).
 
 **ARR Affinity:** Enable in Azure Portal → App Service → Configuration → General settings → ARR Affinity = On. Required when Redis is not configured.
 

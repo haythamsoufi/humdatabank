@@ -16,6 +16,7 @@ STATUS_DISPLAY_LABELS: dict[str, str] = {
     'approved': 'Approved',
     'requires_revision': 'Requires Revision',
     'sent_for_review': 'Sent for Review',
+    'cancelled': 'Cancelled',
     'rejected': 'Rejected',
     'reviewed': 'Under Review',
     'implemented': 'Implemented',
@@ -80,6 +81,7 @@ _ASSIGNMENT_ENTITY_STATUS_WORKFLOW_ORDER: tuple[str, ...] = (
     'sent_for_review',
     'submitted',
     'approved',
+    'cancelled',
 )
 
 
@@ -92,6 +94,7 @@ class AssignmentEntityStatusValue(str, enum.Enum):
     sent_for_review = 'sent_for_review'
     submitted = 'submitted'
     approved = 'approved'
+    cancelled = 'cancelled'
 
     @classmethod
     def choices(cls) -> list[tuple[str, str]]:

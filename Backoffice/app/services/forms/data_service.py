@@ -188,6 +188,17 @@ class FormDataService:
         # Determine if this is a public submission using the helper method
         is_public_submission = cls._is_public_submission(assignment_entity_status)
 
+        if not is_public_submission:
+            status = assignment_entity_status.status
+            if hasattr(status, 'value'):
+                status = status.value
+            if status == AssignmentEntityStatusValue.cancelled.value:
+                return {
+                    'success': False,
+                    'validation_errors': ['This assignment has been cancelled and can no longer be edited.'],
+                    'field_changes': [],
+                }
+
         action = request.form.get('action')
         # When action is 'save', do not block on required fields (including required matrix)
         skip_required_validation = (action == 'save')

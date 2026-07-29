@@ -89,6 +89,7 @@ def job_record_to_dict(job: AIJob) -> Dict[str, Any]:
         "updated_ts": meta.get("updated_ts"),
         "last_logged_pct": meta.get("last_logged_pct"),
         "download_url": meta.get("download_url"),
+        "worker_pid": meta.get("worker_pid"),
     }
 
 
@@ -185,6 +186,7 @@ def update_import_job(
                 "download_url",
                 "started_at",
                 "started_ts",
+                "worker_pid",
             )
             for key in meta_keys:
                 if key not in fields:

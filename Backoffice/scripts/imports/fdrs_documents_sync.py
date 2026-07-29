@@ -28,6 +28,7 @@ from fdrs_sync_constants import (
     FDRS_DOCUMENT_PUBLIC_OK,
     FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL,
     FDRS_DOCUMENT_TYPE_TO_ITEM,
+    FdrsSyncCancelled,
     fdrs_document_approval_rank,
     fdrs_document_status_from_approval,
 )
@@ -37,6 +38,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_DOCUMENTS_PATH = "/api/documents"
 _FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
 _DEFAULT_DOWNLOAD_TIMEOUT = 120
+_PROGRESS_REPORT_EVERY = 10
 _YEAR_IN_TEXT_RE = re.compile(r"\b(20\d{2})\b")
 
 
@@ -367,6 +369,24 @@ def _parse_fdrs_modified_at(raw: Any) -> Optional[datetime]:
         return None
 
 
+def _check_cancel(cancel_check: Optional[Callable[[], bool]]) -> None:
+    if cancel_check and cancel_check():
+        raise FdrsSyncCancelled()
+
+
+def _document_progress_percent(
+    index: int,
+    total: int,
+    *,
+    progress_start_pct: float,
+    progress_end_pct: float,
+) -> float:
+    if total <= 0:
+        return progress_end_pct
+    span = max(progress_end_pct - progress_start_pct, 0.0)
+    return progress_start_pct + (span * (index / total))
+
+
 def upsert_fdrs_document_metadata(
     plan_rows: List[Dict[str, Any]],
     *,
@@ -374,6 +394,10 @@ def upsert_fdrs_document_metadata(
     dry_run: bool = False,
     batch_size: int = 500,
     download_timeout: int = _DEFAULT_DOWNLOAD_TIMEOUT,
+    progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    progress_start_pct: float = 82.0,
+    progress_end_pct: float = 94.0,
 ) -> Dict[str, int]:
     """Insert or update SubmittedDocument rows; download file bytes when the FDRS URL responds 200/206."""
     from app.extensions import db
@@ -394,6 +418,38 @@ def upsert_fdrs_document_metadata(
     if not plan_rows:
         return stats
 
+    total_rows = len(plan_rows)
+
+    def _emit_progress(index: int, *, message: str) -> None:
+        if not progress_cb and not cancel_check:
+            return
+        _check_cancel(cancel_check)
+        if not progress_cb:
+            return
+        pct = _document_progress_percent(
+            index,
+            total_rows,
+            progress_start_pct=progress_start_pct,
+            progress_end_pct=progress_end_pct,
+        )
+        try:
+            progress_cb(
+                {
+                    "stage": "documents_upsert",
+                    "message": message,
+                    "current": index,
+                    "total": total_rows,
+                    "percent": pct,
+                    "stats": dict(stats),
+                }
+            )
+        except FdrsSyncCancelled:
+            raise
+        except Exception as e:
+            logger.debug("documents upsert progress_cb failed: %s", e)
+
+    _emit_progress(0, message=f"Starting FDRS documents upsert ({total_rows} planned)...")
+
     keys = [r["fdrs_import_key"] for r in plan_rows if r.get("fdrs_import_key")]
     existing_by_key: Dict[str, SubmittedDocument] = {}
     if keys:
@@ -412,6 +468,7 @@ def upsert_fdrs_document_metadata(
             aes_by_id[aes.id] = aes
 
     for i, row in enumerate(plan_rows, start=1):
+        _check_cancel(cancel_check)
         import_key = row.get("fdrs_import_key")
         if not import_key:
             stats["skipped"] += 1
@@ -435,6 +492,7 @@ def upsert_fdrs_document_metadata(
                 if existing and existing.storage_path and not existing.file_pending:
                     file_pending = False
             elif _should_attempt_download(row, existing):
+                _check_cancel(cancel_check)
                 data, download_status = fetch_fdrs_document_bytes(
                     source_url,
                     timeout=download_timeout,
@@ -522,6 +580,14 @@ def upsert_fdrs_document_metadata(
 
             if batch_size and i % batch_size == 0:
                 db.session.commit()
+
+            if i == 1 or i % _PROGRESS_REPORT_EVERY == 0 or i == total_rows:
+                _emit_progress(
+                    i,
+                    message=f"FDRS documents {i}/{total_rows} (downloaded={stats['downloaded']} pending={stats['pending']})",
+                )
+        except FdrsSyncCancelled:
+            raise
         except Exception as e:
             stats["errors"] += 1
             logger.error("FDRS document row error: %s", e)
@@ -541,21 +607,38 @@ def run_fdrs_documents_sync(
     dry_run: bool = False,
     batch_size: int = 500,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    progress_start_pct: float = 82.0,
+    progress_end_pct: float = 94.0,
 ) -> Dict[str, Any]:
     def _progress(**kwargs: Any) -> None:
-        if progress_cb:
-            try:
-                progress_cb(kwargs)
-            except Exception as e:
-                logger.debug("documents progress_cb failed: %s", e)
+        _check_cancel(cancel_check)
+        if not progress_cb:
+            return
+        try:
+            progress_cb(kwargs)
+        except FdrsSyncCancelled:
+            raise
+        except Exception as e:
+            logger.debug("documents progress_cb failed: %s", e)
 
-    _progress(stage="fetch_documents", message="Fetching FDRS documents API...", percent=90.0)
+    fetch_pct = progress_start_pct
+    _progress(
+        stage="fetch_documents",
+        message="Fetching FDRS documents API...",
+        percent=fetch_pct,
+        current=0,
+        total=0,
+    )
     documents = fetch_fdrs_documents_api(base_url, api_key, years=years)
     plan, summary = build_document_import_plan(documents, assignment_rows, sync_years=years)
+    planned = int(summary.get("planned") or 0)
     _progress(
         stage="documents_plan",
-        message=f"FDRS documents planned: {summary.get('planned', 0)}",
-        percent=92.0,
+        message=f"FDRS documents planned: {planned}",
+        percent=progress_start_pct,
+        current=0,
+        total=planned,
         extra={"documents_summary": summary},
     )
     doc_stats = upsert_fdrs_document_metadata(
@@ -563,6 +646,10 @@ def run_fdrs_documents_sync(
         uploaded_by_user_id=uploaded_by_user_id,
         dry_run=dry_run,
         batch_size=batch_size,
+        progress_cb=progress_cb,
+        cancel_check=cancel_check,
+        progress_start_pct=progress_start_pct,
+        progress_end_pct=progress_end_pct,
     )
     _progress(
         stage="documents_done",
@@ -571,7 +658,9 @@ def run_fdrs_documents_sync(
             f"pending={doc_stats.get('pending', 0)} "
             f"errors={doc_stats.get('download_errors', 0)}"
         ),
-        percent=95.0,
+        percent=progress_end_pct,
+        current=planned,
+        total=planned,
         extra={"documents_stats": doc_stats},
     )
     return {"documents_summary": summary, "documents_stats": doc_stats}

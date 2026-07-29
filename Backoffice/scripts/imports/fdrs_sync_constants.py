@@ -4,6 +4,11 @@ Shared FDRS sync mappings for import_fdrs_form_data.py (template 21).
 KPI / document type → form_item_id links that are not resolved via indicator bank.
 """
 
+
+class FdrsSyncCancelled(Exception):
+    """Raised when an in-flight FDRS sync is cancelled by the user."""
+
+
 from typing import Any, Optional
 
 from app.services.data_quality.catalogs.fdrs_v1_catalog import INCOME_SOURCE_KPI_CODES

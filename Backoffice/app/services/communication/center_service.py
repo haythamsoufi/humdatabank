@@ -19,6 +19,7 @@ from app.models import EmailDeliveryLog, Notification, User
 from app.services.email.delivery import get_email_delivery_logs_needing_attention
 from app.services.notification.core import get_default_icon_for_notification_type
 from app.services.notification.service import NotificationService
+from app.utils.datetime_helpers import ensure_utc
 
 RECORD_TYPE_NOTIFICATION = 'notification'
 RECORD_TYPE_EMAIL = 'email'
@@ -30,10 +31,11 @@ def count_attention_needed_email_deliveries() -> int:
     return len(get_email_delivery_logs_needing_attention())
 
 
-def _format_datetime(value: Optional[datetime], *, iso: bool) -> str:
+def _format_datetime(value: Optional[datetime]) -> str:
     if not value:
         return ''
-    return value.isoformat() if iso else value.strftime('%Y-%m-%d %H:%M:%S')
+    dt_utc = ensure_utc(value)
+    return dt_utc.isoformat() if dt_utc else ''
 
 
 def _record_type_display(record_type: str) -> str:
@@ -93,7 +95,7 @@ def build_email_grid_row(
     """First-class email-only grid row (no synthetic notification fields)."""
     email_fields = NotificationService._serialize_email_delivery_log(log)
     recipient_name = (user.name or user.email) if user else (log.email_address or _('Unknown'))
-    logged_at = _format_datetime(log.created_at, iso=iso_dates)
+    logged_at = _format_datetime(log.created_at)
 
     return {
         'row_kind': RECORD_TYPE_EMAIL,
@@ -175,8 +177,8 @@ def format_notification_grid_row(
     else:
         status_display = 'unread'
 
-    created = _format_datetime(notification.created_at, iso=iso_dates)
-    read_at = _format_datetime(notification.read_at, iso=iso_dates)
+    created = _format_datetime(notification.created_at)
+    read_at = _format_datetime(notification.read_at)
     has_email = bool(email_fields.get('has_email'))
     record_type = RECORD_TYPE_BOTH if has_email else RECORD_TYPE_NOTIFICATION
 

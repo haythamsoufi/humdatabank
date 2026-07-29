@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from fdrs_sync_constants import (
     FDRS_SECTION_WORKFLOW_SPECS,
+    FdrsSyncCancelled,
     fdrs_section_workflow_kpi_codes,
 )
 
@@ -277,6 +278,10 @@ def upsert_assignment_status_from_plan(
     plan_rows: List[Dict[str, Any]],
     *,
     dry_run: bool = False,
+    progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    progress_start_pct: float = 94.0,
+    progress_end_pct: float = 99.0,
 ) -> Dict[str, int]:
     """Apply assignment status updates. Does not set submitted_by / approved_by (unknown in FDRS)."""
     from app.extensions import db
@@ -287,13 +292,42 @@ def upsert_assignment_status_from_plan(
     if not plan_rows:
         return stats
 
+    total_rows = len(plan_rows)
+
+    def _check_cancel() -> None:
+        if cancel_check and cancel_check():
+            raise FdrsSyncCancelled()
+
+    def _emit_progress(index: int, *, message: str) -> None:
+        _check_cancel()
+        if not progress_cb:
+            return
+        span = max(progress_end_pct - progress_start_pct, 0.0)
+        pct = progress_start_pct + (span * (index / total_rows)) if total_rows else progress_end_pct
+        try:
+            progress_cb(
+                {
+                    "stage": "assignment_status_upsert",
+                    "message": message,
+                    "current": index,
+                    "total": total_rows,
+                    "percent": pct,
+                    "stats": dict(stats),
+                }
+            )
+        except FdrsSyncCancelled:
+            raise
+        except Exception as e:
+            logger.debug("assignment status progress_cb failed: %s", e)
+
     aes_ids = [int(r["assignment_entity_status_id"]) for r in plan_rows]
     aes_by_id = {
         int(row.id): row
         for row in AssignmentEntityStatus.query.filter(AssignmentEntityStatus.id.in_(aes_ids)).all()
     }
 
-    for row in plan_rows:
+    for i, row in enumerate(plan_rows, start=1):
+        _check_cancel()
         try:
             aes_id = int(row["assignment_entity_status_id"])
             aes = aes_by_id.get(aes_id)
@@ -301,8 +335,12 @@ def upsert_assignment_status_from_plan(
                 stats["skipped"] += 1
                 continue
 
-            new_status = AssignmentEntityStatusValue.normalize(row["status"])
             current_status = aes.status.value if hasattr(aes.status, "value") else str(aes.status)
+            if current_status == AssignmentEntityStatusValue.cancelled.value:
+                stats["skipped"] += 1
+                continue
+
+            new_status = AssignmentEntityStatusValue.normalize(row["status"])
             new_ts = row.get("status_timestamp")
             new_submitted_at = row.get("submitted_at")
 
@@ -332,6 +370,11 @@ def upsert_assignment_status_from_plan(
                 aes.submitted_at = None
             db.session.add(aes)
             stats["updated"] += 1
+
+            if i == 1 or i % 50 == 0 or i == total_rows:
+                _emit_progress(i, message=f"Assignment status {i}/{total_rows}")
+        except FdrsSyncCancelled:
+            raise
         except Exception as e:
             stats["errors"] += 1
             logger.error("Assignment status row error (aes_id=%s): %s", row.get("assignment_entity_status_id"), e)
@@ -349,13 +392,30 @@ def run_fdrs_assignment_status_sync(
     years: Optional[List[int]] = None,
     dry_run: bool = False,
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+    progress_start_pct: float = 94.0,
+    progress_end_pct: float = 99.0,
 ) -> Dict[str, Any]:
     """Fetch workflow KPIs, build plan, upsert assignment_entity_status."""
-    if progress_cb:
+    def _progress(**kwargs: Any) -> None:
+        if cancel_check and cancel_check():
+            raise FdrsSyncCancelled()
+        if not progress_cb:
+            return
         try:
-            progress_cb({"stage": "assignment_status", "message": "Fetching FDRS section workflow KPIs...", "percent": 96.0})
+            progress_cb(kwargs)
+        except FdrsSyncCancelled:
+            raise
         except Exception:
             pass
+
+    _progress(
+        stage="assignment_status",
+        message="Fetching FDRS section workflow KPIs...",
+        percent=progress_start_pct,
+        current=0,
+        total=0,
+    )
 
     workflow_rows = fetch_section_workflow_rows(base_url, api_key, years=years)
     plan, summary = build_assignment_status_plan(
@@ -364,7 +424,33 @@ def run_fdrs_assignment_status_sync(
         base_url=base_url,
         api_key=api_key,
     )
-    upsert_stats = upsert_assignment_status_from_plan(plan, dry_run=dry_run)
+    planned = int(summary.get("planned") or 0)
+    _progress(
+        stage="assignment_status_plan",
+        message=f"Assignment status planned: {planned}",
+        percent=progress_start_pct,
+        current=0,
+        total=planned,
+    )
+    upsert_stats = upsert_assignment_status_from_plan(
+        plan,
+        dry_run=dry_run,
+        progress_cb=progress_cb,
+        cancel_check=cancel_check,
+        progress_start_pct=progress_start_pct,
+        progress_end_pct=progress_end_pct,
+    )
+    _progress(
+        stage="assignment_status_done",
+        message=(
+            f"Assignment status: updated={upsert_stats.get('updated', 0)} "
+            f"skipped={upsert_stats.get('skipped', 0)} "
+            f"errors={upsert_stats.get('errors', 0)}"
+        ),
+        percent=progress_end_pct,
+        current=planned,
+        total=planned,
+    )
 
     logger.info(
         "FDRS assignment status: planned=%s updated=%s skipped=%s errors=%s by_status=%s",

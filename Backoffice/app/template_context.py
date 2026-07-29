@@ -444,26 +444,6 @@ def register_template_context(app, config_class):
     from flask_babel import format_date, format_datetime
     from app.utils.datetime_helpers import ensure_utc
 
-    @app.template_filter('format_date_localized')
-    def format_date_localized_filter(date, format='medium'):
-        if not date:
-            return ''
-        try:
-            return format_date(date, format=format)
-        except Exception as e:
-            current_app.logger.debug("format_date_localized failed: %s", e)
-            return date.strftime('%Y-%m-%d')
-
-    @app.template_filter('format_datetime_localized')
-    def format_datetime_localized_filter(dt, format='medium', time_format=None):
-        if not dt:
-            return ''
-        try:
-            return format_datetime(dt, format=format)
-        except Exception as e:
-            current_app.logger.debug("format_datetime_localized failed: %s", e)
-            return dt.strftime('%Y-%m-%d %H:%M')
-
     @app.template_filter('datetime_iso')
     def datetime_iso_filter(dt):
         if not dt:
@@ -509,6 +489,30 @@ def register_template_context(app, config_class):
         except Exception as e:
             current_app.logger.debug("datetime_local filter failed: %s", e)
             return ''
+
+    @app.template_filter('format_date_localized')
+    def format_date_localized_filter(date_val, format='medium'):
+        from datetime import date as date_type, datetime as datetime_type
+
+        if not date_val:
+            return ''
+        # Pure calendar dates (no time) — locale formatting without TZ shift.
+        if isinstance(date_val, date_type) and not isinstance(date_val, datetime_type):
+            try:
+                return format_date(date_val, format=format)
+            except Exception as e:
+                current_app.logger.debug("format_date_localized failed: %s", e)
+                return date_val.strftime('%Y-%m-%d')
+        # Datetimes — show date in viewer timezone.
+        fmt_map = {'short': 'dateShort', 'medium': 'date', 'long': 'date', 'full': 'date'}
+        return datetime_local_filter(date_val, fmt_map.get(format, 'date'))
+
+    @app.template_filter('format_datetime_localized')
+    def format_datetime_localized_filter(dt, format='medium', time_format=None):
+        if not dt:
+            return ''
+        fmt_map = {'short': 'datetimeShort', 'medium': 'datetime', 'long': 'datetimeFull', 'full': 'datetimeFull'}
+        return datetime_local_filter(dt, fmt_map.get(format, 'datetime'))
 
     @app.template_filter('session_effective_duration_minutes')
     def session_effective_duration_minutes_filter(session_log):

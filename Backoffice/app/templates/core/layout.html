@@ -622,6 +622,9 @@
     {# Centralized AG Grid i18n for all pages (used by ag-grid helper/libs when loaded) #}
     {% include "components/ag_grid_i18n_js.html" %}
 
+    {# UTC → viewer local timezone for datetime_local spans and DateTimeUtils.format() #}
+    <script src="{{ static_url('js/lib/datetime-utils.js') }}"></script>
+
     {% block extra_js %}{% endblock %}
 </body>
 </html>

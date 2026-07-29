@@ -712,3 +712,25 @@ def test_resolve_download_outcome_pending_when_no_file_and_404():
     data, pending = _resolve_download_outcome(None, 404, None)
     assert data is None
     assert pending is True
+
+
+def test_document_progress_percent_scales_within_range():
+    from fdrs_documents_sync import _document_progress_percent
+
+    assert _document_progress_percent(0, 100, progress_start_pct=82.0, progress_end_pct=94.0) == 82.0
+    assert _document_progress_percent(50, 100, progress_start_pct=82.0, progress_end_pct=94.0) == 88.0
+    assert _document_progress_percent(100, 100, progress_start_pct=82.0, progress_end_pct=94.0) == 94.0
+
+
+def test_check_cancel_raises_fdrs_sync_cancelled():
+    from fdrs_documents_sync import _check_cancel
+    from fdrs_sync_constants import FdrsSyncCancelled
+
+    raised = False
+    try:
+        _check_cancel(lambda: True)
+    except FdrsSyncCancelled:
+        raised = True
+    assert raised
+    _check_cancel(lambda: False)
+    _check_cancel(None)

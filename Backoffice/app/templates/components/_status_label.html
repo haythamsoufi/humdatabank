@@ -13,10 +13,13 @@
 {% macro assignment_status_variant(status) -%}
     {%- set raw = status.value if status is not none and status.value is defined else status -%}
     {%- set key = raw|string|lower|replace(' ', '_') -%}
-    {%- if key in ['submitted', 'approved'] -%}success
+    {%- if key == 'pending' -%}neutral
+    {%- elif key == 'in_progress' -%}pending
+    {%- elif key == 'submitted' -%}info
+    {%- elif key == 'approved' -%}success
     {%- elif key == 'requires_revision' -%}warning
     {%- elif key == 'sent_for_review' -%}review
-    {%- elif key == 'in_progress' -%}active
+    {%- elif key == 'cancelled' -%}danger
     {%- else -%}neutral
     {%- endif -%}
 {%- endmacro %}

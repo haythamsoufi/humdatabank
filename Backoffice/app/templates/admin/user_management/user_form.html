@@ -1258,26 +1258,26 @@ window.userFormConfig = {
                                     {% endif %}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900 device-created-date" data-datetime="{{ device.created_at|datetime_iso }}">
-                                        {{ device.created_at.strftime('%Y-%m-%d') if device.created_at else 'N/A' }}
+                                    <div class="text-sm text-gray-900">
+                                        {{ device.created_at|datetime_local('dateISO') if device.created_at else 'N/A' }}
                                     </div>
-                                    <div class="text-xs text-gray-500 device-created-time" data-datetime="{{ device.created_at|datetime_iso }}">
-                                        {{ device.created_at.strftime('%H:%M:%S') if device.created_at else '' }}
+                                    <div class="text-xs text-gray-500">
+                                        {{ device.created_at|datetime_local('timeFull') if device.created_at else '' }}
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900 device-last-active-date" data-datetime="{{ device.last_active_at|datetime_iso }}">
-                                        {{ device.last_active_at.strftime('%Y-%m-%d') if device.last_active_at else 'N/A' }}
+                                    <div class="text-sm text-gray-900">
+                                        {{ device.last_active_at|datetime_local('dateISO') if device.last_active_at else 'N/A' }}
                                     </div>
-                                    <div class="text-xs text-gray-500 device-last-active-time" data-datetime="{{ device.last_active_at|datetime_iso }}">
-                                        {{ device.last_active_at.strftime('%H:%M:%S') if device.last_active_at else '' }}
+                                    <div class="text-xs text-gray-500">
+                                        {{ device.last_active_at|datetime_local('timeFull') if device.last_active_at else '' }}
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {% if device.logged_out_at %}
                                         {{ status_label(_('Logged Out'), 'danger') }}
-                                        <div class="text-xs text-gray-500 mt-1 device-logged-out-date" data-datetime="{{ device.logged_out_at|datetime_iso }}">
-                                            {{ device.logged_out_at.strftime('%Y-%m-%d %H:%M') if device.logged_out_at else '' }}
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            {{ device.logged_out_at|datetime_local('datetimeShort') }}
                                         </div>
                                     {% else %}
                                         {{ status_label_for_active(true) }}
@@ -1455,9 +1455,7 @@ window.userFormConfig = {
 }
 </style>
 
-{# Include DateTimeUtils for timezone conversion #}
-{% from "components/datetime_utils_js.html" import datetime_utils_js %}
-{{ datetime_utils_js() }}
+{# DateTimeUtils is loaded globally from layout.html #}
 
 
 <script src="{{ static_url('js/components/hierarchical-entity-selector.js') }}"></script>

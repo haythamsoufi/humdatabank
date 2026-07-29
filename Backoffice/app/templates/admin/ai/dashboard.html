@@ -203,7 +203,7 @@
                             {{ trace.query[:100] }}{% if trace.query|length > 100 %}...{% endif %}
                         </p>
                         <div class="flex items-center gap-3 text-xs text-gray-500">
-                            <span>{{ trace.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                            <span>{{ trace.created_at|datetime_local('datetimeShort') if trace.created_at else '—' }}</span>
                             {{ status_label_for_generic_status(trace.status) }}
                             {% if trace.llm_quality_verdict %}
                             {{ status_label(trace.llm_quality_verdict|replace('_', ' ')|title, 'info') }}

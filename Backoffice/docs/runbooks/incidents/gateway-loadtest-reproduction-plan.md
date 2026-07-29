@@ -180,7 +180,7 @@ Staging AGW answers “does this look like prod?”
 
 1. Put **staging** behind Application Gateway (same class of backend timeout / WS path as prod, as far as practical).
 2. Point health probes at a cheap health endpoint (not a heavy HTML page), consistent with prod hardening advice.
-3. Provision **Azure Managed Redis (Balanced B0)** for staging when ready for the Redis workstream — optional for the *first* saturation baseline.
+3. Provision **Azure Managed Redis Balanced B0 (West Europe)** for staging when ready for the Redis workstream ([SKU / CHF estimates](../deployment/redis-provisioning.md)) — optional for the *first* saturation baseline.
 
 ### 5.2 Test matrix
 

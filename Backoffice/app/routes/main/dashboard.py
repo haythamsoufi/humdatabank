@@ -802,6 +802,8 @@ def dashboard():
                     # For assigned forms, check if they should be in past submissions
                     if item['status'] in ('requires_revision', 'sent_for_review', 'submitted'):
                         current_assignments.append(item)
+                    elif item['status'] == 'cancelled':
+                        past_assignments.append(item)
                     elif item['status'] in ('approved', 'pending', 'in_progress'):
                         # Ensure status_timestamp is timezone-aware for comparison
                         status_ts = item.get('status_timestamp')

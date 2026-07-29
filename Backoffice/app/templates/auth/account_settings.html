@@ -380,26 +380,26 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 device-created-date" data-datetime="{{ device.created_at|datetime_iso }}">
-                                    {{ device.created_at.strftime('%Y-%m-%d') if device.created_at else 'N/A' }}
+                                <div class="text-sm text-gray-900">
+                                    {{ device.created_at|datetime_local('dateISO') if device.created_at else 'N/A' }}
                                 </div>
-                                <div class="text-xs text-gray-500 device-created-time" data-datetime="{{ device.created_at|datetime_iso }}">
-                                    {{ device.created_at.strftime('%H:%M:%S') if device.created_at else '' }}
+                                <div class="text-xs text-gray-500">
+                                    {{ device.created_at|datetime_local('timeFull') if device.created_at else '' }}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900 device-last-active-date" data-datetime="{{ device.last_active_at|datetime_iso }}">
-                                    {{ device.last_active_at.strftime('%Y-%m-%d') if device.last_active_at else 'N/A' }}
+                                <div class="text-sm text-gray-900">
+                                    {{ device.last_active_at|datetime_local('dateISO') if device.last_active_at else 'N/A' }}
                                 </div>
-                                <div class="text-xs text-gray-500 device-last-active-time" data-datetime="{{ device.last_active_at|datetime_iso }}">
-                                    {{ device.last_active_at.strftime('%H:%M:%S') if device.last_active_at else '' }}
+                                <div class="text-xs text-gray-500">
+                                    {{ device.last_active_at|datetime_local('timeFull') if device.last_active_at else '' }}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if device.logged_out_at %}
                                     {{ status_label(_('Logged Out'), 'danger') }}
-                                    <div class="text-xs text-gray-500 mt-1 device-logged-out-date" data-datetime="{{ device.logged_out_at|datetime_iso }}">
-                                        {{ device.logged_out_at.strftime('%Y-%m-%d %H:%M') if device.logged_out_at else '' }}
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        {{ device.logged_out_at|datetime_local('datetimeShort') }}
                                     </div>
                                 {% else %}
                                     {{ status_label_for_active(true) }}
@@ -448,9 +448,7 @@
     😭 "Bye bye... I'll miss you!" *sad robot noises*
 </div>
 
-{# Include DateTimeUtils for timezone conversion #}
-{% from "components/datetime_utils_js.html" import datetime_utils_js %}
-{{ datetime_utils_js() }}
+{# DateTimeUtils is loaded globally from layout.html #}
 
 <script src="{{ static_url('js/components/status-labels.js') }}"></script>
 <script src="{{ static_url('libs/profile-initials.js') }}"></script>
@@ -768,28 +766,6 @@ document.addEventListener('DOMContentLoaded', function() {
             wasInitiallyChecked = this.checked;
         });
     }
-
-    // Convert all device timestamps to viewer's local timezone using DateTimeUtils
-    // DateTimeUtils is loaded from datetime-utils.js and handles timezone conversion automatically
-    document.querySelectorAll('.device-created-date').forEach(element => {
-        DateTimeUtils.convertElement(element, 'dateISO');
-    });
-
-    document.querySelectorAll('.device-created-time').forEach(element => {
-        DateTimeUtils.convertElement(element, 'timeFull');
-    });
-
-    document.querySelectorAll('.device-last-active-date').forEach(element => {
-        DateTimeUtils.convertElement(element, 'dateISO');
-    });
-
-    document.querySelectorAll('.device-last-active-time').forEach(element => {
-        DateTimeUtils.convertElement(element, 'timeFull');
-    });
-
-    document.querySelectorAll('.device-logged-out-date').forEach(element => {
-        DateTimeUtils.convertElement(element, 'datetime');
-    });
 
     // Helper function to attach remove device listener
     function attachRemoveDeviceListener(button) {

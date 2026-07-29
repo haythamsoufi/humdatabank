@@ -57,6 +57,40 @@ def _country_by_aes_id_for_assignments(assignments):
 # ----------------------------------
 _DATA_SYNC_LOCK = threading.Lock()
 _DATA_SYNC_CANCEL_EVENTS: Dict[str, threading.Event] = {}
+_DATA_SYNC_STALE_SECONDS = 15 * 60
+
+
+def _reconcile_stale_data_sync_job(job_id: str) -> None:
+    """Mark long-idle running jobs as failed/cancelled (worker recycle orphan recovery)."""
+    job = get_import_job(job_id)
+    if not job:
+        return
+    status = job.get("status")
+    if status not in ("running", "cancel_requested"):
+        return
+    updated_ts = job.get("updated_ts")
+    if updated_ts is None:
+        return
+    if time.time() - float(updated_ts) <= _DATA_SYNC_STALE_SECONDS:
+        return
+    if status == "cancel_requested":
+        update_import_job(
+            job_id,
+            force=True,
+            status="cancelled",
+            stage="cancelled",
+            message="Cancelled",
+            error="Sync cancelled by user.",
+        )
+        return
+    update_import_job(
+        job_id,
+        force=True,
+        status="failed",
+        stage="failed",
+        message="Stopped",
+        error="The sync worker stopped responding (likely after an app restart). Re-run the sync.",
+    )
 
 
 def _cleanup_data_sync_jobs_locked(now_ts: Optional[float] = None) -> None:
@@ -1315,13 +1349,19 @@ def run_data_sync(template_id: int):
                     pct = payload.get("percent")
                     msg = payload.get("message") or ""
                     existing = get_import_job(job_id) or {}
+                    if stage.startswith(("documents", "assignment_status")):
+                        current = payload.get("current")
+                        total = payload.get("total")
+                    else:
+                        current = payload.get("current") if payload.get("current") is not None else existing.get("current")
+                        total = payload.get("total") if payload.get("total") is not None else existing.get("total")
                     update_import_job(
                         job_id,
                         status="running",
                         stage=payload.get("stage") or existing.get("stage"),
                         message=payload.get("message") or existing.get("message"),
-                        current=payload.get("current") if payload.get("current") is not None else existing.get("current"),
-                        total=payload.get("total") if payload.get("total") is not None else existing.get("total"),
+                        current=current,
+                        total=total,
                         percent=float(payload.get("percent") or existing.get("percent") or 0.0),
                         stats=payload.get("stats") if payload.get("stats") is not None else existing.get("stats"),
                     )
@@ -1332,9 +1372,22 @@ def run_data_sync(template_id: int):
                         pct_f = None
                     log_state = get_import_job_logging_state(job_id)
                     last_logged = log_state.get("last_logged_pct")
-                    should_log = (stage and stage != "upsert") or (
-                        pct_f is not None
-                        and (last_logged is None or abs(pct_f - float(last_logged)) >= 5.0)
+                    should_log = (
+                        stage
+                        in (
+                            "documents_plan",
+                            "documents_done",
+                            "assignment_status_plan",
+                            "assignment_status_done",
+                            "complete",
+                            "failed",
+                            "cancelled",
+                        )
+                        or (stage and stage != "upsert" and not stage.endswith("_upsert"))
+                        or (
+                            pct_f is not None
+                            and (last_logged is None or abs(pct_f - float(last_logged)) >= 5.0)
+                        )
                     )
                     if should_log and pct_f is not None:
                         log_state["last_logged_pct"] = pct_f
@@ -1367,6 +1420,7 @@ def run_data_sync(template_id: int):
                         status="running",
                         stage="starting",
                         message="Starting...",
+                        worker_pid=os.getpid(),
                     )
                     app.logger.info(
                         "Data sync %s: starting (template_id=%s, dry_run=%s, test=%s)",
@@ -1534,6 +1588,9 @@ def data_sync_status(template_id: int, job_id: str):
         return json_not_found("Job not found")
     if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
         return json_forbidden("Access denied")
+
+    _reconcile_stale_data_sync_job(job_id)
+    job = get_import_job(job_id) or job
 
     resp = {
         "success": True,

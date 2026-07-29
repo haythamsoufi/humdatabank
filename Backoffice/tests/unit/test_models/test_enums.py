@@ -70,6 +70,10 @@ class TestStatusDisplayLabel:
         """'sent_for_review' returns 'Sent for Review'."""
         assert status_display_label('sent_for_review') == 'Sent for Review'
 
+    def test_known_status_cancelled(self):
+        """'cancelled' returns 'Cancelled'."""
+        assert status_display_label('cancelled') == 'Cancelled'
+
     def test_known_status_rejected(self):
         """'rejected' returns 'Rejected'."""
         assert status_display_label('rejected') == 'Rejected'
@@ -199,6 +203,7 @@ class TestAssignmentEntityStatusValue:
         assert 'approved' in vals
         assert 'requires_revision' in vals
         assert 'sent_for_review' in vals
+        assert 'cancelled' in vals
 
     def test_choices_order(self):
         """choices() preserves workflow order."""

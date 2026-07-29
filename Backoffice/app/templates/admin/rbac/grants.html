@@ -111,7 +111,7 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-500">
-                            {{ grant.created_at.strftime('%Y-%m-%d') if grant.created_at else '-' }}
+                            {{ grant.created_at|datetime_local('date') if grant.created_at else '—' }}
                         </td>
                         <td class="px-4 py-3 text-sm">
                             <div class="flex items-center justify-end">

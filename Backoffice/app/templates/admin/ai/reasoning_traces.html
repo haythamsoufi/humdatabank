@@ -219,7 +219,7 @@
             actual_iterations: {{ trace.actual_iterations or 0 }},
             total_cost_usd: {{ trace.total_cost_usd if trace.total_cost_usd is not none else 'null' }},
             execution_time_ms: {{ trace.execution_time_ms if trace.execution_time_ms is not none else 'null' }},
-            created_at: {{ trace.created_at.strftime('%Y-%m-%d %H:%M')|tojson|safe }},
+            created_at: {{ (trace.created_at|datetime_iso if trace.created_at else '')|tojson|safe }},
             view_url: {{ url_for('ai_management.trace_detail', trace_id=trace.id)|tojson|safe }},
             query_suspicious: {{ trace._admin_query_security.suspicious|tojson|safe }},
             query_security_summary: {{ trace._admin_query_security.summary|tojson|safe }}
@@ -236,7 +236,8 @@
             first_query_preview: {{ (conv.first_query_preview or '')|tojson|safe }},
             query_suspicious: {{ conv.first_query_security.suspicious|default(false)|tojson|safe }},
             query_security_summary: {{ (conv.first_query_security.summary or '')|tojson|safe }},
-            activity_range: {{ (conv.activity_range or '')|tojson|safe }},
+            first_at: {{ (conv.first_at|datetime_iso if conv.first_at else '')|tojson|safe }},
+            last_at: {{ (conv.last_at|datetime_iso if conv.last_at else '')|tojson|safe }},
             total_cost_usd: {{ conv.total_cost_usd if conv.total_cost_usd is not none else 'null' }},
             conversation_url: {{ url_for('ai_management.conversation_traces', conversation_id=conv.conversation_id)|tojson|safe }}
         }{% if not loop.last %},{% endif %}
@@ -405,9 +406,18 @@
                 var score = params.data && params.data.llm_quality_score;
                 var needsReview = params.data && params.data.llm_needs_review;
                 if ((!verdict || verdict === '') && score == null) return '<span class="text-gray-400">—</span>';
-                if (verdict) html += StatusLabels.renderGenericStatus(verdict, toTitleCaseLabel(verdict));
+                var html = '';
+                if (score != null) {
+                    var pct = Math.round(Number(score) * 100);
+                    var scoreVariant = pct >= 70 ? 'success' : (pct >= 50 ? 'warning' : 'danger');
+                    html += StatusLabels.render(String(pct) + '%', scoreVariant);
+                }
+                if (verdict) {
+                    if (html) html += ' ';
+                    html += StatusLabels.renderGenericStatus(verdict, toTitleCaseLabel(verdict));
+                }
                 if (needsReview) html += ' <i class="fas fa-flag text-amber-500 ml-1" title="' + {{ _("Flagged for review")|tojson|safe }} + '"></i>';
-                return '<div class="flex items-center gap-1">' + html + '</div>';
+                return '<div class="flex items-center gap-1 flex-wrap">' + html + '</div>';
             }
         },
         { field: 'actual_iterations', headerName: {{ _("Steps")|tojson|safe }}, width: 90, minWidth: 75, filter: 'agNumberColumnFilter', sortable: true, valueFormatter: function(p) { return p.value != null ? p.value : 0; } },
@@ -439,7 +449,8 @@
             minWidth: 125,
             filter: 'agDateColumnFilter',
             filterParams: AgGridRenderers.dateFilterParams,
-            sortable: true
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateTime
         }
     ];
 
@@ -583,7 +594,25 @@
             minWidth: 160,
             filter: 'agTextColumnFilter',
             sortable: true,
-            valueFormatter: AgGridRenderers.dashIfEmpty
+            valueGetter: function(params) {
+                var d = params.data;
+                if (!d || !d.first_at) return '';
+                var start = DateTimeUtils.format(d.first_at, 'datetimeShort');
+                if (!d.last_at || d.last_at === d.first_at) return start;
+                return start + ' – ' + DateTimeUtils.format(d.last_at, 'datetimeShort');
+            },
+            filterValueGetter: function(params) {
+                var d = params.data;
+                if (!d || !d.first_at) return '';
+                var start = DateTimeUtils.format(d.first_at, 'datetimeShort');
+                if (!d.last_at || d.last_at === d.first_at) return start;
+                return start + ' – ' + DateTimeUtils.format(d.last_at, 'datetimeShort');
+            },
+            cellRenderer: function(params) {
+                var text = params.value;
+                if (!text) return '<span class="text-gray-400">—</span>';
+                return '<span class="text-sm text-gray-900">' + escapeHtml(String(text)) + '</span>';
+            }
         },
         {
             field: 'total_cost_usd',

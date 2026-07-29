@@ -518,7 +518,7 @@ Key env vars to set in **Azure Portal → App Service → Configuration → Appl
 | `SCHEDULER_LOCK_FAIL_OPEN` | unset (default: fail closed) | On scheduler-lock filesystem errors the worker skips starting the scheduler; set `true` to start it anyway (risk: duplicate schedulers → duplicate digest emails) |
 | `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway queries so pool connections are released |
 | `DB_CONNECT_TIMEOUT` | `10` | Aborts stale TCP handshakes to PostgreSQL |
-| `REDIS_URL` | `redis://…` | Cross-worker rate limiting; eliminates ARR Affinity dependency |
+| `REDIS_URL` | `rediss://…` | Cross-worker coordination (rate limits, presence, alert cooldown). Azure SKU: [Managed Redis Balanced B0, West Europe](../Backoffice/docs/runbooks/deployment/redis-provisioning.md). |
 | `SCHEDULER_DISABLE_ALL_WORKERS` | `true` | Stop gunicorn workers from running APScheduler when background jobs run in an Azure Function / Container Job |
 
 **ARR Affinity** (Azure Portal → App Service → Configuration → General settings):

@@ -681,6 +681,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     var hMode = hc.history_mode || 'unknown';
                     lines.push('History context: ' + hUsed + ' used / ' + hAvail + ' available (window ' + hWin + ', mode ' + hMode + ')');
                 }
+                var cacheUsage = (meta.output_payloads && meta.output_payloads.cache_usage && typeof meta.output_payloads.cache_usage === 'object')
+                    ? meta.output_payloads.cache_usage : null;
+                if (cacheUsage && cacheUsage.summary) {
+                    var cacheLine = cacheUsage.summary.line
+                        || ((cacheUsage.summary.hits || 0) + ' hit(s), ' + (cacheUsage.summary.misses || 0) + ' miss(es)');
+                    lines.push('Cache usage: ' + cacheLine);
+                } else {
+                    lines.push('Cache usage: none recorded');
+                }
                 lines.push('Steps: ' + (meta.actual_iterations || 0) + ' / max ' + (meta.max_iterations || '?'));
                 var timePart = meta.execution_time_ms != null ? (meta.execution_time_ms / 1000).toFixed(1) + 's' : '?';
                 var costPart = meta.total_cost_usd != null ? '$' + meta.total_cost_usd.toFixed(6) : '?';
@@ -802,6 +811,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (op.plan_kind) { handledKeys.plan_kind = true; lines.push('plan_kind: ' + op.plan_kind); }
                     if (op.output_hint) { handledKeys.output_hint = true; lines.push('output_hint: ' + op.output_hint); }
                     if (op.retrieved_chunks_count != null) { handledKeys.retrieved_chunks_count = true; lines.push('retrieved_chunks_count: ' + op.retrieved_chunks_count); }
+                    if (op.cache_usage) {
+                        handledKeys.cache_usage = true;
+                        var cu = op.cache_usage;
+                        if (cu.summary && cu.summary.line) {
+                            lines.push('cache_usage: ' + cu.summary.line);
+                        } else if (cu.events && cu.events.length) {
+                            lines.push('cache_usage: ' + cu.events.length + ' event(s)');
+                        }
+                    }
                     Object.keys(op).forEach(function(k) {
                         if (handledKeys[k]) return;
                         var v = op[k];

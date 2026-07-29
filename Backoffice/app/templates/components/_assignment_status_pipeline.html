@@ -3,13 +3,19 @@
 {% macro assignment_status_pipeline_badge(status, is_closed=false, lang='en', assignment_entity_status=none) %}
     {% set status_key %}{{ assignment_status_key(status) }}{% endset %}
     {% set status_key = status_key|trim %}
+    {% set status_variant %}{{ assignment_status_variant(status) }}{% endset %}
+    {% set status_variant = status_variant|trim %}
+    {% set status_text = localize_status(status) ~ (' - ' ~ _('Closed') if is_closed else '') %}
+
+    {% if status_key == 'cancelled' %}
+        <span class="inline-block align-middle shrink-0" title="{{ assignment_status_step_description(status_key) }}">
+            {{ status_label(status_text, status_variant) }}
+        </span>
+    {% else %}
     {% set steps = assignment_status_workflow_steps(assignment_entity_status) %}
     {% set cur_idx = steps.index(status_key) if status_key in steps else -1 %}
     {% set default_step_idx = cur_idx if cur_idx >= 0 else 0 %}
     {% set default_step = steps[default_step_idx] if steps and default_step_idx < (steps|length) else none %}
-    {% set status_variant %}{{ assignment_status_variant(status) }}{% endset %}
-    {% set status_variant = status_variant|trim %}
-    {% set status_text = localize_status(status) ~ (' - ' ~ _('Closed') if is_closed else '') %}
 
     <span class="assignment-status-pipeline-container relative inline-block align-middle shrink-0">
         <span tabindex="0"
@@ -68,4 +74,5 @@
             {% endif %}
         </span>
     </span>
+    {% endif %}
 {% endmacro %}

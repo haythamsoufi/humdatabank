@@ -12,14 +12,15 @@ All agent orchestration decisions MUST go through `app/services/ai/policies/agen
 
 - Let the LLM choose tools from prompts + conversation history (`tool_choice="auto"`).
 - Route execution via `AgentRoutingPolicy.decide_fast_path_plan()` — fast path only when the LLM returns `execution_mode="fast_path"` with high confidence; default is full ReAct.
-- Use structural guards only: form-builder panel, UI source toggles, loop prevention (dedupe/pagination caps), explicit user source directives (`user_forbids_documents`).
+- Pre-flight multi-source routing via `AgentRoutingPolicy.decide_evidence_plan()` — LLM decides required source families (`indicator_bank`, `documents`, `databank_values`); defer `finish` structurally until satisfied (not keyword routing).
+- Use structural guards only: form-builder panel, UI source toggles, loop prevention (dedupe/pagination caps), explicit user source directives (`user_forbids_documents`), evidence-plan finish deferral.
 - Add per-turn prompt supplements via `AgentRoutingPolicy.turn_system_prompt_supplement()` (page context, table requests, source toggles).
 
 ## Do not
 
 - Auto-run fast path before the LLM routing decision (no keyword/heuristic hijacks).
 - Add regex/keyword lists that force `search_documents`, `get_indicator_value`, or other tools based on query phrasing.
-- Block `finish` or inject nudges to force tools on keyword match.
+- Block `finish` or inject nudges to force tools on keyword match (evidence-plan deferral is allowed — it follows an LLM pre-flight plan, not query regex).
 - Rewrite user queries with regex follow-up matchers in `query_rewriter.py`.
 
 Loop guards stay in `tool_routing_policy.py` (dedupe, pagination). LLM guidance stays in `prompt_policy.py`.

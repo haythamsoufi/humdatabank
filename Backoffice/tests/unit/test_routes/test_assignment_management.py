@@ -616,6 +616,24 @@ class TestUpdateEntityStatus:
         )
         assert resp.status_code in (200, 302)
 
+    def test_update_cancelled(self, logged_in_client, db_session, app):
+        from app.models.assignments import AssignmentEntityStatus
+        from app.models.enums import AssignmentEntityStatusValue
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.put(
+            f"/admin/assignments/{assignment_id}/entities/{aes_id}",
+            json={"status": "cancelled"},
+        )
+        assert resp.status_code in (200, 302)
+        with app.app_context():
+            refreshed = AssignmentEntityStatus.query.get(aes_id)
+            assert refreshed.status == AssignmentEntityStatusValue.cancelled
+
     def test_update_public_available(self, logged_in_client, db_session, app):
         with app.app_context():
             country = create_test_country(db_session)
@@ -743,6 +761,24 @@ class TestBulkUpdateEntityStatus:
             json={"status_ids": [aes_id], "status": "sent_for_review"},
         )
         assert resp.status_code in (200, 302)
+
+    def test_bulk_update_cancelled(self, logged_in_client, db_session, app):
+        from app.models.assignments import AssignmentEntityStatus
+        from app.models.enums import AssignmentEntityStatusValue
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.post(
+            f"/admin/assignments/{assignment_id}/entities/bulk-update-status",
+            json={"status_ids": [aes_id], "status": "cancelled"},
+        )
+        assert resp.status_code in (200, 302)
+        with app.app_context():
+            refreshed = AssignmentEntityStatus.query.get(aes_id)
+            assert refreshed.status == AssignmentEntityStatusValue.cancelled
 
     def test_bulk_update_with_due_date(self, logged_in_client, db_session, app):
         with app.app_context():

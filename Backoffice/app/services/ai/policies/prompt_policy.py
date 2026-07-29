@@ -311,11 +311,13 @@ def build_agent_system_prompt(user_context: Optional[Dict[str, Any]], language: 
     # The focal-point personalisation block is dynamic (per-user) and must NOT be cached,
     # so we store only the structural template and append it unconditionally below.
     base_prompt = None
+    prompt_cache_hit = False
     if ttl > 0:
         with _PROMPT_CACHE_LOCK:
             hit = _AGENT_SYSTEM_PROMPT_CACHE.get(cache_key)
             if hit and now < hit[0]:
                 base_prompt = hit[1]
+                prompt_cache_hit = True
 
     if base_prompt is None:
         prompt = f"""You are an intelligent AI assistant for the {org_name} platform.
@@ -436,12 +438,20 @@ Best-effort first, then suggest follow-ups:
 - Only if ALL tools return no relevant data may you suggest specifying a year or checking Indicator Bank / Country Management.
 - If one source doesn't have the information, still check the other source before concluding.
 
+Indicator definitions + document evidence — when to use both tool families:
+- Assess the user's PURPOSE, not their wording. Some question types require BOTH Indicator Bank tools AND document tools regardless of how clear the definition is:
+  * **Eligibility / qualification**: the user wants to know whether a specific activity or intervention counts under a reporting indicator or can be entered into a form (MYR, FDRS, Unified Plan). MANDATORY two-phase sequence — (1) search_indicator_bank then (optionally) get_indicator_metadata for the full definition; (2) search_documents for plan/report evidence. You MUST complete both phases even when the definition clearly answers yes or no. A clear definition and document examples are two DIFFERENT types of evidence: the definition states the rule; documents show how NS have actually described and entered comparable activities in practice. A focal point who reads "yes, health topics qualify" still benefits from seeing how Malaysia or Bangladesh documented a similar programme — that is not redundant, it is practical guidance.
+  * **Reporting guidance with definitional grounding**: a focal point asks what to include in a reporting form. The definition sets the rule; documents show how comparable NS have described and entered similar activities. Both are required.
+  * **Explicit multi-source request**: the user references both "documentation" (plans, reports, documents) AND "definitions" or "indicator bank" in the same question — honour each independently and use both tool families.
+- CRITICAL — "a clear definition" does NOT make document evidence redundant: An Indicator Bank definition that unambiguously covers a topic still does not show you how NS document that topic in submitted plans, what language they use, or how they frame the activity. Do NOT skip search_documents because the definition gives a confident yes/no. Skipping documents makes the answer less useful even when technically correct.
+- After both phases, synthesise: (1) what the indicator definition says about eligibility (one clear sentence), (2) what NS plans/documents show in practice with document citations, (3) a direct actionable recommendation for the focal point. End with ## Sources citing both.
+
 Avoid redundant tool calls:
 - Do NOT call the same tool more than once with the same parameters. Reuse previous observations.
 - Call search_documents at most ONCE or TWICE per country per question. Do NOT search year-by-year. A single call with good keywords returns results across multiple years.
 - search_documents "query" must be a short, focused phrase — at most 5-8 words. NEVER paste the full user message. NEVER append random terms.
 - Do NOT call the same tool with trivially different parameters (e.g. changing only top_k or rephrasing the query).
-- When a confident result is already available from tool calls, finish with your answer.
+- When a confident result is already available from ALL relevant tool calls (including document/plan tools for compound questions), finish with your answer.
 
 === SECTION 4: TOOL-SPECIFIC INSTRUCTIONS ===
 
@@ -476,12 +486,20 @@ Bulk all-countries tools (get_indicator_values_for_all_countries, get_form_field
 Single-value tools:
 - search_indicator_bank: **only** when the user asks which Indicator Bank row is closest / most semantically similar to a free-text description or outcome phrase (e.g. "closest indicator to [text]"). Returns ranked indicator names with similarity scores — not country values.
 - After search_indicator_bank returns: the platform AUTOMATICALLY renders an interactive table (indicator names as clickable links to /admin/indicator_bank/view/{id}). Your text response MUST NOT repeat the match list, output a markdown table, or use bullet lists of indicators with scores — the table already shows them.
-- **Intent:** similarity lookup questions ("closest indicator to …", "find an indicator for …", "which indicator matches …") are informational — the user may be browsing, comparing, checking coverage, or planning. Do NOT assume they want to create a new indicator unless they explicitly say add/create/propose/new indicator.
-- Text response for similarity lookup (default — keep SHORT, max ~3 sentences before links):
+- **CRITICAL — assess intent before finishing:**
+  * **Pure similarity lookup** — the user is ONLY asking which indicator best matches a phrase ("closest indicator to …", "find an indicator for …", "which indicator matches …"). The user is browsing or checking coverage. Finish after search_indicator_bank with the short format below.
+  * **Compound query: indicator definition + real-world evidence** — the user also wants to know whether/how an activity qualifies under the indicator, how NS apply it in their plans or reports, or has explicitly asked to check both definitions and documentation. Do NOT finish after search_indicator_bank alone — the definition gives the rule, documents give the precedent; both are required. Continue with document/plan tools (see section below).
+- **Pure similarity lookup — text response (keep SHORT, max ~3 sentences before links):**
   (1) ONE direct answer sentence: The closest match is "[name]" (exact match) OR The closest match is "[name]" (score 0.XX). Optionally ONE short follow-up clause on what it measures (e.g. "NS-level policy indicator" or "counts referrals") — no more.
   (2) Inline markdown links for the top match only: [View indicator](/admin/indicator_bank/view/{id}) and when relevant [Edit indicator](/admin/indicator_bank/edit/{id}). No "Action links:" heading. No [Open Indicator Bank](/admin/indicator_bank).
   (3) ## Sources with one bullet: Indicator Bank (semantic similarity; not country-reported values).
   FORBIDDEN unless the user asked to add/create: "duplicate", "re-using", "editing instead of creating", "before you create", evidence/SOP/MOU checklists, pairing with other indicators, or a labeled "Interpretation:" section longer than one sentence.
+- **Compound query — continue with document/plan tools after search_indicator_bank:**
+  Before finishing, ask: is the user's question only about *which* indicator matches, or also about *whether* an activity qualifies, *how* NS apply the concept in practice, or *what* appears in plans and reports? If the latter, do NOT finish after Indicator Bank tools:
+  — Eligibility / qualification purpose (user wants to know if something counts under an indicator or form field): after search_indicator_bank and optionally get_indicator_metadata, you MUST call search_documents with a focused 4–6 word query on the core topic. This is required even when the definition clearly covers the activity — document evidence shows how NS actually document similar work in submitted plans, which is different information that directly helps the focal point. A confident yes from the definition is not a reason to skip search_documents.
+  — Unified Plan / country plan inclusion (user wants to know how NS address this topic in their plans): after search_indicator_bank, call analyze_unified_plans_focus_areas with the relevant focus area(s).
+  — Both documentation and definitions explicitly requested: call Indicator Bank tools then a document tool — do not omit either.
+  Final answer for compound queries: lead with ONE sentence on the indicator match and what its definition covers, then synthesise the document/plan evidence (what the documents show, how NS describe similar activities, practical notes for the focal point). End with ## Sources citing both the Indicator Bank and the documents. Do NOT add an "Interpretation:" section.
 - Only when the user **explicitly** wants to add, create, or propose a new indicator: after search_indicator_bank, add ONE extra sentence if score > 0.80: An indicator very similar to this already exists: "[name]" (score 0.XX) — consider editing it instead of creating a new one.
 - get_indicator_value: for a specific indicator's **reported value** from the Indicator Bank (e.g. "Number of branches", "Volunteers"). With period=None returns most recent available data.
 - get_form_field_value: for form matrix/table data for ONE country (e.g. "people to be reached", single-country "income sources"). Pass field_label_or_name as section name or matrix item label. period = matrix row/key, assignment_period = which assignment.
@@ -503,7 +521,7 @@ Interactive table rule (15+ rows — stated once, applies everywhere):
 - When get_indicator_values_for_all_countries OR get_form_field_values_for_all_countries OR analyze_unified_plans_focus_areas returns 15+ rows: the platform AUTOMATICALLY renders a complete, sortable, interactive table. You MUST NOT output ANY markdown table — not even partial.
 - Matrix share results (matrix_share_rows set): the platform ALWAYS renders an interactive table regardless of row count. Provide at most 3 short sentences plus ## Sources — no country lists, no top/bottom rankings.
 - When search_indicator_bank returns matches: the platform AUTOMATICALLY renders an interactive table with all matches (always — even for small result sets). Do NOT output markdown tables or bullet lists of indicators for that tool.
-- Instead provide ONLY a textual summary and ## Sources. For indicator tools: highlight top 5 and bottom 5 countries with values, totals, regional patterns, caveats. For analyze_unified_plans_focus_areas: thematic summary synthesized from activity_examples. For search_indicator_bank: a brief closest-match answer only (see Section 4) — the interactive table shows all ranked matches.
+- Instead provide ONLY a textual summary and ## Sources. For indicator tools: highlight top 5 and bottom 5 countries with values, totals, regional patterns, caveats. For analyze_unified_plans_focus_areas: thematic summary synthesized from activity_examples. For search_indicator_bank (pure lookup): a brief closest-match answer only (see Section 4) — the interactive table shows all ranked matches. For compound queries where search_indicator_bank is followed by document/plan tools: the indicator table is still auto-rendered, but your text response must also include the document evidence (table from search_documents, or thematic summary from analyze_unified_plans_focus_areas) — do not omit the document part.
 - STRICTLY FORBIDDEN for these large result sets: any markdown table (even partial), "Download Excel/CSV", "Show N more rows", "I can provide the rest", tables with "—" placeholders.
 - For SMALL result sets (fewer than 15 rows), you MAY output a markdown table inline.
 - This rule does NOT apply to search_documents or list_documents — for those tools, ALWAYS output the full markdown table regardless of row count.
@@ -610,5 +628,22 @@ Navigation (when relevant):
     fb_ctx = page_ctx.get("formBuilder") if isinstance(page_ctx.get("formBuilder"), dict) else None
     if fb_ctx and fb_ctx.get("enabled"):
         final_prompt = final_prompt + "\n\n" + _build_form_builder_context_block(fb_ctx)
+
+    try:
+        from app.services.ai.runtime.cache_trace import record_ai_cache_event
+
+        record_ai_cache_event(
+            "agent_system_prompt",
+            hit=prompt_cache_hit,
+            detail={
+                "scope": "base_prompt",
+                "ttl_seconds": ttl,
+                "language": lang_for_prompt,
+                "role": str(ctx.get("role") or "user").strip().lower(),
+                "upr_active": upr_active,
+            },
+        )
+    except Exception:
+        pass
 
     return final_prompt

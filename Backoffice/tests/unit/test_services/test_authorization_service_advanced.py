@@ -351,6 +351,15 @@ class TestCanEditAssignment:
             result = AuthorizationService.can_edit_assignment(aes, user)
         assert result is False
 
+    def test_cancelled_status_is_locked(self, db_session, app):
+        with app.app_context():
+            user, country, aes = create_focal_point_with_country(db_session)
+            _grant_role_permission(db_session, "assignment_editor_submitter", "assignment.enter")
+            aes.status = AssignmentEntityStatusValue.cancelled.value
+            db_session.commit()
+            result = AuthorizationService.can_edit_assignment(aes, user)
+        assert result is False
+
     def test_sent_for_review_delegation_user_can_edit(self, db_session, app):
         with app.app_context():
             user, country, aes = create_focal_point_with_country(db_session)

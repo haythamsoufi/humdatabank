@@ -1105,6 +1105,11 @@ def assignment_status_workflow_steps(assignment_entity_status=None):
     - Shows ``requires_revision`` only when that is the current status (replaces ``in_progress``).
     """
     steps = [value for value, _label in AssignmentEntityStatusValue.choices()]
+    steps = [
+        step
+        for step in steps
+        if step != AssignmentEntityStatusValue.cancelled.value
+    ]
     if assignment_entity_status is None:
         return steps
 
@@ -1160,6 +1165,9 @@ def assignment_status_step_description(status):
         'approved': _(
             'The submission was validated and approved. Data entry is complete.'
         ),
+        'cancelled': _(
+            'This assignment was cancelled and is no longer required for submission.'
+        ),
         'rejected': _('This submission was rejected.'),
         'closed': _('This assignment is closed and no further changes are expected.'),
     }
@@ -1186,6 +1194,7 @@ def localize_status(status):
         'approved': _('Approved'),
         'requires_revision': _('Requires Revision'),
         'sent_for_review': _('Sent for Review'),
+        'cancelled': _('Cancelled'),
         'rejected': _('Rejected'),
         'closed': _('Closed'),
     }

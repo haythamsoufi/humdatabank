@@ -27,7 +27,7 @@ Backoffice compat routes (root paths: /Indicator, /Sector, /list-home, …)
 PostgreSQL (indicator_bank, sectors, embeddings, common_word, …)
 ```
 
-- **Admin UI in the Blazor app is disabled.** Admin routes show a message that management lives in Backoffice (`/admin/indicator_bank`).
+- **Admin UI in the Blazor app:** “Admin site” and “Login” buttons are hidden from the public header. No admin-route redirects — indicator management is in Backoffice (`/admin/indicator_bank`).
 - **Public UI reads from Backoffice** via a compatibility Flask blueprint that mirrors the legacy IFRC Web API contract.
 - **Semantic search** uses Backoffice `IndicatorResolutionService` (pgvector + OpenAI embeddings), not the legacy Python mpnet microservice.
 
@@ -59,10 +59,14 @@ Implementation: [`Backoffice/app/routes/api/indicator_bank_compat.py`](../Backof
 
 Update `OpenApiClient:IndicatorBankApi` in:
 
-- `IFRC.IndicatorBank.Client/appsettings.json` (local Backoffice, default `http://127.0.0.1:5000/`)
-- `appsettings.PreProd.json` / `appsettings.Release.json` (set `Url` to your deployed Backoffice host)
+| File | `Url` |
+|------|-------|
+| `appsettings.json` | `http://127.0.0.1:5000/` (local Backoffice) |
+| `appsettings.Debug.json` | `https://databank.ifrc.org/` |
+| `appsettings.PreProd.json` | `https://databank-stage.ifrc.org/` |
+| `appsettings.Release.json` | `https://databank.ifrc.org/` |
 
-The `Key` must match a valid Backoffice API key (`api_keys` table or `MOBILE_APP_API_KEY`).
+The `Key` must match a valid Backoffice API key on the target host (`api_keys` table or `MOBILE_APP_API_KEY`).
 
 ## Pre-cutover checklist
 
@@ -91,7 +95,7 @@ The `Key` must match a valid Backoffice API key (`api_keys` table or `MOBILE_APP
 | Suggestion submit | `POST /Indicator/Suggestion` | Implemented (+ reCAPTCHA) |
 | Tooltip glossary | `GET /CommonWord` | Implemented |
 | Excel export (header) | `GET /Excel` | Implemented (legacy IFRC column layout) |
-| Admin pages | Redirect to Backoffice `/admin/indicator_bank` | Implemented |
+| Admin pages | Not linked from public UI | Header buttons hidden; no router redirect |
 
 ### Known limitations
 
@@ -107,8 +111,11 @@ After the public Blazor app is verified against Backoffice in staging/production
 | `IFRC.IndicatorBank.WebAPI` | Decommission |
 | IFRC Indicator Bank SQL Server DB | Decommission |
 | `IFRC.IndicatorBank.SearchService` (Python mpnet) | Decommission |
-| Blazor admin pages | Already blocked; can remove from codebase later |
+| Blazor admin pages | Entry points hidden; routes left in place — can remove from codebase later |
 | `IFRC_INDICATORBANK_API_*` sync-from-remote | Retire once Backoffice is sole source of truth |
+
+Internal engineering notes: [`INDICATOR-BANK-INTEGRATION.md`](INDICATOR-BANK-INTEGRATION.md).  
+Handoff for the Indicator Bank app team: [`INDICATOR-BANK-APP-TEAM-HANDOFF.md`](INDICATOR-BANK-APP-TEAM-HANDOFF.md).
 
 ## Related Backoffice code
 

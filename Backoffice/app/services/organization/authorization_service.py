@@ -914,6 +914,7 @@ class AuthorizationService:
             AssignmentEntityStatusValue.approved.value,
             AssignmentEntityStatusValue.requires_revision.value,
             AssignmentEntityStatusValue.sent_for_review.value,
+            AssignmentEntityStatusValue.cancelled.value,
         }:
             return True
         if AuthorizationService._assignment_is_effectively_closed(assignment_entity_status):
@@ -973,6 +974,7 @@ class AuthorizationService:
         locked = {
             AssignmentEntityStatusValue.submitted.value,
             AssignmentEntityStatusValue.approved.value,
+            AssignmentEntityStatusValue.cancelled.value,
         }
         if status in locked:
             return False
@@ -1034,6 +1036,9 @@ class AuthorizationService:
         if status == AssignmentEntityStatusValue.approved.value:
             return False
 
+        if status == AssignmentEntityStatusValue.cancelled.value:
+            return False
+
         if status == AssignmentEntityStatusValue.sent_for_review.value:
             return review_enabled(assignment_entity_status) and is_delegation_user(user)
 
@@ -1055,6 +1060,11 @@ class AuthorizationService:
             return False
 
         from app.models.enums import AssignmentEntityStatusValue
+        status = assignment_entity_status.status
+        if hasattr(status, 'value'):
+            status = status.value
+        if status == AssignmentEntityStatusValue.cancelled.value:
+            return False
         # Delegation users submit, they don't send for review.
         # Note: system-manager check is intentionally after this — a system manager
         # with an org-domain email acts as delegation and cannot send for review.

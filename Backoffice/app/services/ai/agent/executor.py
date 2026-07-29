@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover
 from app.services.ai.tools import AIToolsRegistry, ToolExecutionError
 from app.services.ai.quality.reasoning_trace import AIReasoningTraceService
 from app.services.ai.planning.query_planner import AIQueryPlanner, SimplePlan
+from app.services.ai.planning.evidence_plan import AIEvidencePlanner, EvidencePlan
 from app.services.ai.policies.prompt_policy import build_agent_system_prompt
 from app.utils.organization_helpers import get_org_name
 from app.services.ai.policies.tool_routing_policy import (
@@ -98,6 +99,17 @@ CONVERSATION_HISTORY_MESSAGES = 6  # native / _build_messages
 CONVERSATION_HISTORY_MESSAGES_REACT = 4  # custom ReAct scratchpad
 # When to stop forcing another iteration (e.g. doc search) before timeout
 TIMEOUT_SAFETY_FRACTION = 0.75
+
+
+def _tools_used_from_steps(steps: Optional[List[Dict[str, Any]]]) -> List[str]:
+    """Collect tool names from agent steps (excludes finish / structural deferrals)."""
+    skip = frozenset({"finish", "evidence_plan_defer"})
+    used: List[str] = []
+    for step in steps or []:
+        action = str((step or {}).get("action") or "").strip()
+        if action and action not in skip:
+            used.append(action)
+    return used
 
 
 def _build_history_context_debug(
@@ -180,6 +192,10 @@ def _observation_summary_from_tool_result(
     if not tool_result or not isinstance(tool_result, dict):
         return None
     summary = {}
+    if tool_result.get("cache_hit"):
+        summary["cache_hit"] = True
+        if tool_result.get("cache_source"):
+            summary["cache_source"] = str(tool_result.get("cache_source"))
     if tool_result.get("execution_time_ms") is not None:
         try:
             summary["execution_time_ms"] = round(float(tool_result["execution_time_ms"]), 2)
@@ -198,6 +214,35 @@ def _observation_summary_from_tool_result(
         if result.get("returned_count") is not None:
             summary["returned_count"] = int(result["returned_count"])
     return summary if summary else None
+
+
+def _tool_step_thought(
+    tool_name: str,
+    *,
+    agent_dedupe_hit: bool = False,
+    circuit_skipped: bool = False,
+    tool_result: Optional[Dict[str, Any]] = None,
+    fallback_thought: str = "",
+) -> str:
+    """User-visible step thought reflecting cache reuse when applicable."""
+    if circuit_skipped:
+        return f"Skipped {tool_name} (circuit breaker open)"
+    if agent_dedupe_hit:
+        return f"Reused agent dedupe cache for {tool_name}"
+    if isinstance(tool_result, dict) and tool_result.get("cache_hit"):
+        return f"Served from tool result cache: {tool_name}"
+    if fallback_thought:
+        return fallback_thought
+    return f"Need to call {tool_name}"
+
+
+def _record_agent_dedupe_cache_hit(tool_name: str) -> None:
+    try:
+        from app.services.ai.runtime.cache_trace import record_ai_cache_event
+
+        record_ai_cache_event("agent_dedupe_cache", name=tool_name, hit=True)
+    except Exception:
+        pass
 
 
 class AgentExecutionError(Exception):
@@ -315,6 +360,7 @@ class AIAgentExecutor:
 
         self._init_llm_client()
         self.query_planner = AIQueryPlanner(client=self.client, model=self.model)
+        self.evidence_planner = AIEvidencePlanner(client=self.client, model=self.model)
 
     def _execute_simple_plan(
         self,
@@ -971,6 +1017,12 @@ class AIAgentExecutor:
                 original_query=original_message,
                 platform_context=user_context if isinstance(user_context, dict) else None,
             )
+            try:
+                from app.services.ai.runtime.cache_trace import reset_ai_cache_trace
+
+                reset_ai_cache_trace()
+            except Exception:
+                pass
             if has_request_context():
                 g.ai_trace_id = trace_id
                 # Propagate authenticated user context for tool execution.
@@ -1025,6 +1077,7 @@ class AIAgentExecutor:
                             language,
                             on_step_callback,
                             original_message=original_message,
+                            evidence_plan=None,
                         )
                         result["execution_path"] = "form_builder_react"
                     else:
@@ -1050,12 +1103,46 @@ class AIAgentExecutor:
                         logger.debug("Get tool definitions failed: %s", e)
                         tool_names = set()
 
-                    plan = AgentRoutingPolicy.decide_fast_path_plan(
-                        query_planner=self.query_planner,
+                    from app.services.ai.planning.evidence_plan import DOCUMENT_TOOLS, INDICATOR_BANK_TOOLS
+                    logger.info(
+                        "[EvidencePlan] executor: tool_count=%s search_documents_in_tools=%s "
+                        "search_indicator_bank_in_tools=%s",
+                        len(tool_names),
+                        "search_documents" in tool_names,
+                        "search_indicator_bank" in tool_names,
+                    )
+
+                    evidence_plan = AgentRoutingPolicy.decide_evidence_plan(
+                        evidence_planner=self.evidence_planner,
                         query=query,
                         tool_names=tool_names,
                         conversation_history=conversation_history,
                     )
+                    documents_allowed, databank_allowed = AgentRoutingPolicy.resolve_source_flags(query)
+                    logger.info(
+                        "[EvidencePlan] executor: preflight_plan=%s documents_allowed=%s databank_allowed=%s",
+                        evidence_plan.source_families if evidence_plan else None,
+                        documents_allowed,
+                        databank_allowed,
+                    )
+                    multi_source_evidence = (
+                        evidence_plan is not None
+                        and len([f for f in evidence_plan.source_families if f != "help_only"]) > 1
+                    )
+                    if multi_source_evidence:
+                        logger.info(
+                            "Evidence plan requires multiple families (%s); skipping fast path",
+                            evidence_plan.source_families if evidence_plan else [],
+                        )
+
+                    plan = None
+                    if not multi_source_evidence:
+                        plan = AgentRoutingPolicy.decide_fast_path_plan(
+                            query_planner=self.query_planner,
+                            query=query,
+                            tool_names=tool_names,
+                            conversation_history=conversation_history,
+                        )
                     if plan is None:
                         logger.info("LLM routing: full ReAct agent (no fast-path plan).")
                     if callable(on_step_callback):
@@ -1100,6 +1187,10 @@ class AIAgentExecutor:
                                 language,
                                 on_step_callback,
                                 original_message=original_message,
+                                evidence_plan=evidence_plan,
+                                tool_names=tool_names,
+                                documents_allowed=documents_allowed,
+                                databank_allowed=databank_allowed,
                             )
                             result["execution_path"] = "openai_native"
                         else:
@@ -1110,6 +1201,10 @@ class AIAgentExecutor:
                                 language,
                                 on_step_callback,
                                 original_message=original_message,
+                                evidence_plan=evidence_plan,
+                                tool_names=tool_names,
+                                documents_allowed=documents_allowed,
+                                databank_allowed=databank_allowed,
                             )
                             result["execution_path"] = "react"
 
@@ -1178,16 +1273,42 @@ class AIAgentExecutor:
 
             # Build output_payloads for trace (map, chart, table, answer_content, output_hint, plan_kind)
             output_payloads = {}
-            for key in ("map_payload", "chart_payload", "table_payload", "answer_content", "output_hint", "plan_kind"):
+            for key in ("map_payload", "chart_payload", "table_payload", "answer_content", "output_hint", "plan_kind", "evidence_plan", "evidence_plan_meta"):
                 val = result.get(key)
                 if val is not None:
                     output_payloads[key] = val
+            # Always record evidence routing diagnostics for every run so the trace is self-explaining.
+            try:
+                from app.services.ai.planning.evidence_plan import DOCUMENT_TOOLS, INDICATOR_BANK_TOOLS
+                _ep_tool_names = locals().get("tool_names") or set()
+                output_payloads["evidence_routing_diag"] = {
+                    "search_documents_in_tools": "search_documents" in _ep_tool_names,
+                    "search_indicator_bank_in_tools": "search_indicator_bank" in _ep_tool_names,
+                    "tool_count": len(_ep_tool_names),
+                    "documents_allowed": locals().get("documents_allowed"),
+                    "databank_allowed": locals().get("databank_allowed"),
+                    "preflight_plan": (
+                        locals()["evidence_plan"].to_dict()
+                        if locals().get("evidence_plan") is not None
+                        else None
+                    ),
+                }
+            except Exception as _ep_diag_err:
+                logger.debug("evidence_routing_diag collection failed: %s", _ep_diag_err)
             output_payloads["history_context"] = _build_history_context_debug(
                 execution_path=str(result.get("execution_path") or ""),
                 conversation_history=conversation_history,
                 history_window_native=self.conversation_history_messages,
                 history_window_react=self.conversation_history_messages_react,
             )
+            try:
+                from app.services.ai.runtime.cache_trace import build_ai_cache_trace_payload
+
+                cache_payload = build_ai_cache_trace_payload()
+                if cache_payload:
+                    output_payloads["cache_usage"] = cache_payload
+            except Exception:
+                pass
 
             # Resolve final answer: prefer result['answer'], else from last finish step
             final_answer_for_trace = result.get("answer")
@@ -1407,14 +1528,32 @@ class AIAgentExecutor:
         language: str,
         on_step_callback: Optional[Callable[[str], None]] = None,
         original_message: Optional[str] = None,
+        evidence_plan: Optional[EvidencePlan] = None,
+        tool_names: Optional[Set[str]] = None,
+        documents_allowed: bool = True,
+        databank_allowed: bool = True,
     ) -> Dict[str, Any]:
         """Execute using OpenAI's native function calling."""
+        effective_evidence_plan = evidence_plan
+        finish_assessments: List[Dict[str, Any]] = []
+        if not tool_names:
+            try:
+                tool_defs = self.tools_registry.get_tool_definitions_openai() or []
+                tool_names = {
+                    str((t.get("function") or {}).get("name") or "").strip()
+                    for t in tool_defs
+                    if isinstance(t, dict)
+                }
+            except Exception as e:
+                logger.debug("Get tool definitions failed in native execute: %s", e)
+                tool_names = set()
         messages = self._build_messages(
             query,
             conversation_history,
             user_context,
             language,
             original_message=original_message,
+            evidence_plan=evidence_plan,
         )
         tools = self.tools_registry.get_tool_definitions_openai()
 
@@ -1436,6 +1575,7 @@ class AIAgentExecutor:
         _progress_reminder_added = False
         _full_table_requested = _user_expects_full_table(query, conversation_history)
         _tool_json_echo_nudge_count = 0
+        _evidence_deferrals = 0
         _fb_assistant = False
         try:
             from app.services.ai.tools._utils import resolve_form_builder_context
@@ -1570,6 +1710,46 @@ class AIAgentExecutor:
                         continue
 
                     final_answer = _sanitize_agent_answer(raw_content)
+                    tools_used = _tools_used_from_steps(steps)
+                    should_defer, pending, defer_msg, assessed_plan = (
+                        AgentRoutingPolicy.should_defer_finish_for_evidence(
+                            evidence_planner=self.evidence_planner,
+                            evidence_plan=effective_evidence_plan,
+                            query=query,
+                            tools_used=tools_used,
+                            tool_names=tool_names or set(),
+                            conversation_history=conversation_history,
+                            deferrals_used=_evidence_deferrals,
+                            documents_allowed=documents_allowed,
+                            databank_allowed=databank_allowed,
+                            finish_assessments=finish_assessments,
+                        )
+                    )
+                    if assessed_plan is not None:
+                        effective_evidence_plan = assessed_plan
+                    if should_defer:
+                        _evidence_deferrals += 1
+                        steps.append({
+                            'step': _next_step_index(steps),
+                            'thought': f'Evidence plan incomplete — still need: {", ".join(pending)}',
+                            'action': 'evidence_plan_defer',
+                            'observation': defer_msg,
+                            'timestamp': utcnow().isoformat(),
+                        })
+                        messages.append(message)
+                        messages.append({"role": "user", "content": defer_msg})
+                        logger.info(
+                            "Evidence plan deferral %s: pending=%s",
+                            _evidence_deferrals,
+                            pending,
+                        )
+                        if on_step_callback:
+                            try:
+                                on_step_callback(_("Gathering additional sources…"))
+                            except Exception as e:
+                                logger.debug("Evidence defer step callback failed: %s", e)
+                        continue
+
                     steps.append({
                         'step': _next_step_index(steps),
                         'thought': 'Final answer ready',
@@ -1614,6 +1794,13 @@ class AIAgentExecutor:
                         }
                     if _inferred.get("output_hint"):
                         result['output_hint'] = _inferred["output_hint"]
+                    if effective_evidence_plan is not None:
+                        result['evidence_plan'] = effective_evidence_plan.to_dict()
+                    if evidence_plan is not None or finish_assessments:
+                        result['evidence_plan_meta'] = {
+                            "preflight": evidence_plan.to_dict() if evidence_plan is not None else None,
+                            "finish_assessments": finish_assessments,
+                        }
                     return result
 
                 # Execute tool calls
@@ -1832,6 +2019,7 @@ class AIAgentExecutor:
                         _bulk_tool_signatures_seen.add(bulk_sig)
 
                     cache_hit = False
+                    agent_dedupe_hit = False
                     primary_id: Optional[int] = None
                     cache_key: Optional[Tuple[int, Optional[str], Optional[float]]] = None
                     _tb = tool_breaker_factory(tool_name)
@@ -1853,6 +2041,8 @@ class AIAgentExecutor:
                                             tool_name=tool_name, tool_result=tool_result
                                         )
                                         cache_hit = True
+                                        agent_dedupe_hit = True
+                                        _record_agent_dedupe_cache_hit(tool_name)
                                         logger.info(
                                             "Agent dedupe: reusing cached get_indicator_values_for_all_countries for indicator id %s",
                                             primary_id,
@@ -1975,7 +2165,12 @@ class AIAgentExecutor:
                         step_extra["observation_summary"] = obs_sum
                     steps.append({
                         'step': _next_step_index(steps),
-                        'thought': f'Need to call {tool_name}' if not cache_hit else f'Reused cached result for {tool_name}',
+                        'thought': _tool_step_thought(
+                            tool_name,
+                            agent_dedupe_hit=agent_dedupe_hit,
+                            circuit_skipped=circuit_skipped,
+                            tool_result=tool_result if isinstance(tool_result, dict) else None,
+                        ),
                         'action': tool_name,
                         'action_input': tool_args,
                         'observation': tool_result,
@@ -2044,6 +2239,10 @@ class AIAgentExecutor:
         language: str,
         on_step_callback: Optional[Callable[[str], None]] = None,
         original_message: Optional[str] = None,
+        evidence_plan: Optional[EvidencePlan] = None,
+        tool_names: Optional[Set[str]] = None,
+        documents_allowed: bool = True,
+        databank_allowed: bool = True,
     ) -> Dict[str, Any]:
         """
         Execute using custom ReAct implementation (no function calling).
@@ -2051,6 +2250,19 @@ class AIAgentExecutor:
         Uses a structured prompt to have the LLM output thoughts and actions
         in a specific format that we then parse and execute.
         """
+        effective_evidence_plan = evidence_plan
+        finish_assessments: List[Dict[str, Any]] = []
+        if not tool_names:
+            try:
+                tool_defs = self.tools_registry.get_tool_definitions_openai() or []
+                tool_names = {
+                    str((t.get("function") or {}).get("name") or "").strip()
+                    for t in tool_defs
+                    if isinstance(t, dict)
+                }
+            except Exception as e:
+                logger.debug("Get tool definitions failed in react execute: %s", e)
+                tool_names = set()
         steps = []
         tool_call_count = 0
         total_cost = 0.0
@@ -2065,6 +2277,7 @@ class AIAgentExecutor:
         _bulk_tool_signatures_seen_react: Set[Tuple[str, str]] = set()
         _full_table_requested = _user_expects_full_table(query, conversation_history)
         tool_breaker_factory_react = make_tool_breaker_factory()
+        _evidence_deferrals = 0
 
         # Build available tools description
         tools_description = self._get_tools_text_description()
@@ -2076,6 +2289,9 @@ class AIAgentExecutor:
             user_context=user_context,
             language=language
         )
+        plan_block = AgentRoutingPolicy.evidence_plan_supplement(effective_evidence_plan)
+        if plan_block:
+            react_prompt = react_prompt + "\n\n" + plan_block
 
         messages = [
             {"role": "system", "content": react_prompt}
@@ -2181,6 +2397,40 @@ class AIAgentExecutor:
                 if parsed['type'] == 'finish':
                     # Final answer reached - sanitize to strip any leaked reasoning traces
                     final_answer = _sanitize_agent_answer(parsed.get('answer', llm_output))
+                    tools_used = _tools_used_from_steps(steps)
+                    should_defer, pending, defer_msg, assessed_plan = (
+                        AgentRoutingPolicy.should_defer_finish_for_evidence(
+                            evidence_planner=self.evidence_planner,
+                            evidence_plan=effective_evidence_plan,
+                            query=query,
+                            tools_used=tools_used,
+                            tool_names=tool_names or set(),
+                            conversation_history=conversation_history,
+                            deferrals_used=_evidence_deferrals,
+                            documents_allowed=documents_allowed,
+                            databank_allowed=databank_allowed,
+                            finish_assessments=finish_assessments,
+                        )
+                    )
+                    if assessed_plan is not None:
+                        effective_evidence_plan = assessed_plan
+                    if should_defer:
+                        _evidence_deferrals += 1
+                        steps.append({
+                            'step': _next_step_index(steps),
+                            'thought': f'Evidence plan incomplete — still need: {", ".join(pending)}',
+                            'action': 'evidence_plan_defer',
+                            'observation': defer_msg,
+                            'timestamp': utcnow().isoformat(),
+                        })
+                        scratchpad += f"\n\nThought: Evidence plan requires additional sources.\nAction: [use tools for {', '.join(pending)}]\nObservation: {defer_msg}\n"
+                        logger.info(
+                            "ReAct evidence plan deferral %s: pending=%s",
+                            _evidence_deferrals,
+                            pending,
+                        )
+                        continue
+
                     steps.append({
                         'step': _next_step_index(steps),
                         'thought': parsed.get('thought', ''),
@@ -2217,6 +2467,13 @@ class AIAgentExecutor:
                         }
                     if _inferred.get("output_hint"):
                         result['output_hint'] = _inferred["output_hint"]
+                    if effective_evidence_plan is not None:
+                        result['evidence_plan'] = effective_evidence_plan.to_dict()
+                    if evidence_plan is not None or finish_assessments:
+                        result['evidence_plan_meta'] = {
+                            "preflight": evidence_plan.to_dict() if evidence_plan is not None else None,
+                            "finish_assessments": finish_assessments,
+                        }
                     return result
 
                 elif parsed['type'] == 'action':
@@ -2389,6 +2646,7 @@ class AIAgentExecutor:
                         _bulk_tool_signatures_seen_react.add(bulk_sig)
 
                     cache_hit = False
+                    agent_dedupe_hit = False
                     primary_id = None
                     cache_key = None
                     _tb = tool_breaker_factory_react(tool_name)
@@ -2410,6 +2668,8 @@ class AIAgentExecutor:
                                             tool_name=tool_name, tool_result=tool_result
                                         )
                                         cache_hit = True
+                                        agent_dedupe_hit = True
+                                        _record_agent_dedupe_cache_hit(tool_name)
                                         logger.info(
                                             "Agent dedupe: reusing cached get_indicator_values_for_all_countries for indicator id %s",
                                             primary_id,
@@ -2514,7 +2774,13 @@ class AIAgentExecutor:
                         step_extra["observation_summary"] = obs_sum
                     steps.append({
                         'step': _next_step_index(steps),
-                        'thought': parsed.get('thought', ''),
+                        'thought': _tool_step_thought(
+                            tool_name,
+                            agent_dedupe_hit=agent_dedupe_hit,
+                            circuit_skipped=circuit_skipped,
+                            tool_result=tool_result if isinstance(tool_result, dict) else None,
+                            fallback_thought=str(parsed.get('thought', '') or ''),
+                        ),
                         'action': tool_name,
                         'action_input': tool_args,
                         'observation': tool_result,
@@ -2760,6 +3026,7 @@ User context:
         user_context: Optional[Dict[str, Any]],
         language: str,
         original_message: Optional[str] = None,
+        evidence_plan: Optional[EvidencePlan] = None,
     ) -> List[Dict[str, str]]:
         """Build message list for LLM."""
         system_content = self._get_system_prompt(user_context, language)
@@ -2767,6 +3034,7 @@ User context:
             query=query,
             conversation_history=conversation_history,
             user_context=user_context,
+            evidence_plan=evidence_plan,
         )
         if supplement:
             system_content = system_content + "\n\n" + supplement

@@ -1195,7 +1195,7 @@
                 {% for item in current_assignments %}
                             {# Determine if overdue (only for assigned forms still awaiting submission) #}
                             {% set is_overdue = item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
-                                and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review'] %}
+                                and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
 
                             {# Apply conditional styling based on type #}
                             <div class="dashboard-assignment-card p-4 rounded-lg shadow-md flex flex-col justify-between relative transition-all duration-200 ease-out hover:shadow-xl {% if not is_overdue %}hover:-translate-y-0.5{% endif %} motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-md {% if is_overdue %}dashboard-assignment-card--overdue{% endif %} {# Added relative for delete button positioning #}
@@ -1323,9 +1323,9 @@
                                             {% if item.latest_public_submission %}
                                                 <span class="text-xs text-gray-500 ml-2">
                                                     {% if item.public_submission_count == 1 %}
-                                                        ({{ _('at: %(datetime)s', datetime=item.latest_public_submission.submitted_at|format_datetime_localized('short', 'short')) }})
+                                                        ({{ _('at:') }} {{ item.latest_public_submission.submitted_at|format_datetime_localized('short', 'short') }})
                                                     {% else %}
-                                                        ({{ _('Latest: %(datetime)s', datetime=item.latest_public_submission.submitted_at|format_datetime_localized('short', 'short')) }})
+                                                        ({{ _('Latest:') }} {{ item.latest_public_submission.submitted_at|format_datetime_localized('short', 'short') }})
                                                     {% endif %}
                                                 </span>
                                             {% endif %}
@@ -1400,7 +1400,7 @@
                                         {% set aes = item.item_object %}
                                         {# Conditional display of "Enter Data" button for Focal Points #}
                                         {% set aes_can_enter = (
-                                            aes.status not in ['submitted', 'approved']
+                                            aes.status not in ['submitted', 'approved', 'cancelled']
                                             and (
                                                 aes.status != 'sent_for_review'
                                                 or is_delegation_user
@@ -1676,6 +1676,8 @@
                                                 bg-green-50
                                             {% elif item.status == 'requires_revision' %}
                                                 bg-orange-50
+                                            {% elif item.status == 'cancelled' %}
+                                                bg-gray-100
                                             {% endif %}"
                                             {% if item.type == 'assigned' %}
                                             data-period="{{ item.item_object.assigned_form.period_name }}"
@@ -1689,7 +1691,7 @@
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="flex items-center">
                                                     <div class="flex-shrink-0 h-4 w-4">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 {% if item.status == 'approved' %}text-green-700{% elif item.status == 'requires_revision' %}text-orange-700{% else %}text-gray-600{% endif %}" viewBox="0 0 20 20" fill="currentColor">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 {% if item.status == 'approved' %}text-green-700{% elif item.status == 'requires_revision' %}text-orange-700{% elif item.status == 'cancelled' %}text-gray-500{% else %}text-gray-600{% endif %}" viewBox="0 0 20 20" fill="currentColor">
                                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                                                         </svg>
                                                     </div>

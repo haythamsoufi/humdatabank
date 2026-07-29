@@ -836,6 +836,16 @@ class TestDashboardAssignmentCategorization:
         resp, _ = self._run_with_aes(logged_in_client, db_session, admin_user, [aes])
         assert resp.status_code == 200
 
+    def test_cancelled_goes_to_past(self, logged_in_client, db_session, app, admin_user):
+        aes = self._build_aes_mock("cancelled", status_ts=datetime.now(timezone.utc))
+        resp, mock_rt = self._run_with_aes(logged_in_client, db_session, admin_user, [aes])
+        assert resp.status_code == 200
+        kwargs = mock_rt.call_args[1] if mock_rt.call_args else {}
+        past = kwargs.get("past_assignments") or []
+        current = kwargs.get("current_assignments") or []
+        assert any(item.get("status") == "cancelled" for item in past)
+        assert not any(item.get("status") == "cancelled" for item in current)
+
     def test_unknown_status_goes_to_current(self, logged_in_client, db_session, app, admin_user):
         aes = self._build_aes_mock("some_other_status")
         resp, _ = self._run_with_aes(logged_in_client, db_session, admin_user, [aes])

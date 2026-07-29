@@ -7,13 +7,14 @@
     'use strict';
 
     const ASSIGNMENT_VARIANTS = {
-        submitted: 'success',
+        pending: 'neutral',
+        in_progress: 'pending',
+        submitted: 'info',
         approved: 'success',
         requires_revision: 'warning',
         sent_for_review: 'review',
-        in_progress: 'active',
+        cancelled: 'danger',
         completed: 'success',
-        pending: 'pending',
     };
 
     const GENERIC_VARIANTS = {

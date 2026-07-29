@@ -131,7 +131,7 @@ def import_assignment_excel(aes_id):
 
     from app.services.organization.authorization_service import AuthorizationService
 
-    if aes.status in ["submitted", "approved"] and not AuthorizationService.is_admin(current_user):
+    if aes.status in ["submitted", "approved", "cancelled"] and not AuthorizationService.is_admin(current_user):
         error_msg = "This assignment is no longer in an editable state."
         flash(error_msg, "warning")
         if is_ajax:
@@ -251,7 +251,7 @@ def _validate_upr_country_reporting_assignment(aes_id, *, is_ajax: bool):
 
 
 def _validate_upr_country_reporting_import_state(aes, *, is_ajax: bool):
-    if aes.status in ["submitted", "approved"] and not AuthorizationService.is_admin(current_user):
+    if aes.status in ["submitted", "approved", "cancelled"] and not AuthorizationService.is_admin(current_user):
         error_msg = "This assignment is no longer in an editable state."
         flash(error_msg, "warning")
         if is_ajax:

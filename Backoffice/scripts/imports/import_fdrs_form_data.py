@@ -83,9 +83,19 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+# Progress budget (percent) for the full FDRS API sync pipeline.
+_PROGRESS_FORM_UPSERT_START = 20.0
+_PROGRESS_FORM_UPSERT_END = 82.0
+_PROGRESS_DOCUMENTS_START = 82.0
+_PROGRESS_DOCUMENTS_END = 94.0
+_PROGRESS_ASSIGNMENT_START = 94.0
+_PROGRESS_ASSIGNMENT_END = 99.0
 
-class FdrsSyncCancelled(Exception):
-    """Raised when an in-flight FDRS sync is cancelled by the user."""
+
+from fdrs_sync_constants import FdrsSyncCancelled
+
+# Re-export for callers that import from this module.
+__all__ = ("FdrsSyncCancelled",)
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -2502,6 +2512,8 @@ def run_import(
             return
         try:
             progress_cb(payload)
+        except FdrsSyncCancelled:
+            raise
         except Exception as e:
             logger.debug("progress_cb failed: %s", e)
 
@@ -2778,8 +2790,8 @@ def run_import(
             valid_form_item_ids=valid_form_item_ids,
             progress_cb=_emit_progress if progress_cb else None,
             cancel_check=cancel_check,
-            progress_start_pct=20.0,
-            progress_end_pct=100.0,
+            progress_start_pct=_PROGRESS_FORM_UPSERT_START,
+            progress_end_pct=_PROGRESS_FORM_UPSERT_END,
             stats=stats,
         )
 
@@ -2798,6 +2810,9 @@ def run_import(
                     dry_run=dry_run,
                     batch_size=batch_size,
                     progress_cb=_emit_progress,
+                    cancel_check=cancel_check,
+                    progress_start_pct=_PROGRESS_DOCUMENTS_START,
+                    progress_end_pct=_PROGRESS_DOCUMENTS_END,
                 )
                 ds = doc_result.get("documents_stats") or {}
                 stats["documents_inserted"] = ds.get("inserted", 0)
@@ -2815,6 +2830,8 @@ def run_import(
                     stats["documents_errors"],
                     (doc_result.get("documents_summary") or {}).get("planned"),
                 )
+            except FdrsSyncCancelled:
+                raise
             except Exception as e:
                 stats["documents_errors"] = stats.get("documents_errors", 0) + 1
                 logger.error("FDRS documents sync failed: %s", e, exc_info=True)
@@ -2831,6 +2848,9 @@ def run_import(
                     years=fdrs_sync_years,
                     dry_run=dry_run,
                     progress_cb=_emit_progress,
+                    cancel_check=cancel_check,
+                    progress_start_pct=_PROGRESS_ASSIGNMENT_START,
+                    progress_end_pct=_PROGRESS_ASSIGNMENT_END,
                 )
                 aes_stats = aes_result.get("assignment_status_stats") or {}
                 stats["assignment_status_updated"] = aes_stats.get("updated", 0)
@@ -2844,6 +2864,8 @@ def run_import(
                     stats["assignment_status_errors"],
                     (aes_result.get("assignment_status_summary") or {}).get("planned"),
                 )
+            except FdrsSyncCancelled:
+                raise
             except Exception as e:
                 stats["assignment_status_errors"] = stats.get("assignment_status_errors", 0) + 1
                 logger.error("FDRS assignment status sync failed: %s", e, exc_info=True)

@@ -890,6 +890,17 @@ class Config:
     # Prior user messages injected into native vs ReAct agent prompts (defaults preserve prior behavior).
     AI_AGENT_HISTORY_MESSAGES = int(os.environ.get("AI_AGENT_HISTORY_MESSAGES", "6") or "6")
     AI_AGENT_HISTORY_MESSAGES_REACT = int(os.environ.get("AI_AGENT_HISTORY_MESSAGES_REACT", "4") or "4")
+    # LLM evidence planner: pre-flight source-family routing (not keyword-based).
+    AI_AGENT_EVIDENCE_PLAN_ENABLED = _parse_bool(os.environ.get("AI_AGENT_EVIDENCE_PLAN_ENABLED"), default=True)
+    try:
+        AI_AGENT_EVIDENCE_PLAN_MIN_CONFIDENCE = float(os.environ.get("AI_AGENT_EVIDENCE_PLAN_MIN_CONFIDENCE", "0.7"))
+    except (TypeError, ValueError):
+        AI_AGENT_EVIDENCE_PLAN_MIN_CONFIDENCE = 0.7
+    AI_AGENT_EVIDENCE_PLAN_TIMEOUT_SECONDS = int(os.environ.get("AI_AGENT_EVIDENCE_PLAN_TIMEOUT_SECONDS", "30") or "30")
+    AI_AGENT_EVIDENCE_PLAN_MAX_DEFERRALS = int(os.environ.get("AI_AGENT_EVIDENCE_PLAN_MAX_DEFERRALS", "2") or "2")
+    AI_AGENT_EVIDENCE_FINISH_ASSESS_ENABLED = _parse_bool(
+        os.environ.get("AI_AGENT_EVIDENCE_FINISH_ASSESS_ENABLED"), default=True
+    )
 
     # Agent tool observations: max chars passed to the LLM per tool result (avoids context overflow).
     # Lower AI_TOOL_OBSERVATION_MAX_CHARS_DOCUMENT_SEARCH (e.g. 80000) if "could not generate narrative" after large searches.
@@ -1153,6 +1164,10 @@ class DevelopmentConfig(Config):
 
     # Allow HTTP cookies in development (for localhost testing). Env: true/false only.
     SESSION_COOKIE_SECURE = _parse_bool(os.environ.get('SESSION_COOKIE_SECURE'), default=False)
+
+    # Disable AI caches locally so prompt/tool changes apply on every request.
+    AI_AGENT_SYSTEM_PROMPT_CACHE_TTL_SECONDS = 0
+    AI_TOOL_CACHE_ENABLED = False
 
 class ProductionConfig(Config):
     # DEBUG is inherited from Config base class (automatically False for production)

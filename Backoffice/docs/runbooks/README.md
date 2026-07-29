@@ -51,6 +51,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 | Runbook | When to use |
 |---------|-------------|
 | [Azure App Service](deployment/azure-app-service.md) | Deploy order, migrations, slots, rollback, Redis/workers |
+| [Redis provisioning](deployment/redis-provisioning.md) | Azure Managed Redis Balanced B0 (West Europe, CHF) |
 | [Multi-instance without Redis](deployment/multi-instance-without-redis.md) | Scaling out (≥2 instances) when `REDIS_URL` is unavailable — risks, severity, mitigations |
 | [Release process](development/release-process.md) | Branch strategy, pre-release checklist, migration safety, CSS rebuild, go/no-go |
 

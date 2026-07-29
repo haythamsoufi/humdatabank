@@ -2001,12 +2001,6 @@ def reasoning_traces():
             for row in group_rows:
                 cid, trace_count, first_at, last_at, total_cost = row
                 fq_preview = first_queries.get(cid, "")
-                if first_at:
-                    activity_range = first_at.strftime("%Y-%m-%d %H:%M")
-                    if last_at and last_at != first_at:
-                        activity_range += " – " + last_at.strftime("%Y-%m-%d %H:%M")
-                else:
-                    activity_range = ""
                 conversations.append({
                     "conversation_id": cid,
                     "conversation_title": titles_by_cid.get(cid, ""),
@@ -2016,7 +2010,6 @@ def reasoning_traces():
                     "total_cost_usd": total_cost,
                     "first_query_preview": fq_preview,
                     "first_query_security": _admin_trace_query_security_text(fq_preview),
-                    "activity_range": activity_range,
                 })
             traces = []
             pagination = None
@@ -2177,7 +2170,7 @@ def conversation_traces(conversation_id):
         conversation_summary_data = [
             {
                 'id': t.id,
-                'created_at': t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else '',
+                'created_at': ensure_utc(t.created_at).isoformat() if t.created_at else '',
                 'original_query': t.original_query or '',
                 'query': t.query or '',
                 'final_answer': (_display_answer(t) or '')[:2000],
@@ -2198,7 +2191,7 @@ def conversation_traces(conversation_id):
         conversation_full_data = [
             {
                 'id': t.id,
-                'created_at': t.created_at.strftime('%Y-%m-%d %H:%M:%S') if t.created_at else '',
+                'created_at': ensure_utc(t.created_at).isoformat() if t.created_at else '',
                 'original_query': t.original_query or '',
                 'query': t.query or '',
                 'final_answer': _display_answer(t) or t.final_answer or '',

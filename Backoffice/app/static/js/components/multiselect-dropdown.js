@@ -19,6 +19,15 @@
  * });
  */
 
+function formatMultiselectSublabel(text) {
+    if (!text) return text;
+    if (typeof DateTimeUtils !== 'undefined') {
+        const formatted = DateTimeUtils.format(text, 'datetimeShort');
+        if (formatted) return formatted;
+    }
+    return text;
+}
+
 class MultiselectDropdown {
     constructor(options = {}) {
         this.options = {
@@ -165,7 +174,7 @@ class MultiselectDropdown {
                 const br = document.createElement('br');
                 const sublabelSpan = document.createElement('span');
                 sublabelSpan.className = 'text-xs text-gray-500';
-                sublabelSpan.textContent = item.sublabel;
+                sublabelSpan.textContent = formatMultiselectSublabel(item.sublabel);
                 labelSpan.appendChild(br);
                 labelSpan.appendChild(sublabelSpan);
             }
@@ -208,7 +217,7 @@ class MultiselectDropdown {
                 const br = document.createElement('br');
                 const sublabelSpan = document.createElement('span');
                 sublabelSpan.className = 'text-xs text-gray-500';
-                sublabelSpan.textContent = item.sublabel;
+                sublabelSpan.textContent = formatMultiselectSublabel(item.sublabel);
                 labelSpan.appendChild(br);
                 labelSpan.appendChild(sublabelSpan);
             }

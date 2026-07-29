@@ -99,7 +99,7 @@
             </div>
             <div>
                 <dt class="text-sm text-gray-500">{{ _('Created') }}</dt>
-                <dd class="text-sm font-medium text-gray-900">{{ trace.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</dd>
+                <dd class="text-sm font-medium text-gray-900">{{ trace.created_at|datetime_local('datetimeFull') if trace.created_at else '—' }}</dd>
             </div>
             {% if user %}
             <div>
@@ -133,6 +133,15 @@
             <div>
                 <dt class="text-sm text-gray-500">{{ _('Execution path') }}</dt>
                 <dd class="text-sm font-medium text-gray-900 font-mono">{{ trace.execution_path }}</dd>
+            </div>
+            {% endif %}
+            {% set _cache_usage = (trace.output_payloads or {}).get('cache_usage') if trace.output_payloads is mapping else none %}
+            {% if _cache_usage is mapping and _cache_usage.get('summary') %}
+            <div>
+                <dt class="text-sm text-gray-500">{{ _('Cache usage') }}</dt>
+                <dd class="text-sm font-medium text-gray-900 font-mono">
+                    {{ _cache_usage.summary.get('line') or (_cache_usage.summary.hits ~ ' hit(s), ' ~ _cache_usage.summary.misses ~ ' miss(es)') }}
+                </dd>
             </div>
             {% endif %}
             {% if trace.original_query %}

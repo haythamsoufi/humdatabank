@@ -55,8 +55,7 @@
     {% from "components/ag_grid_includes.html" import ag_grid_container %}
     <!-- Main Table Card -->
     <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative">
-        {{ ag_grid_container('templatesGrid', loading_text=_('Loading templates data...'), include_card=false) }}
-        <p id="templates-empty-hint" class="text-gray-700{% if templates %} hidden{% endif %}">{{ _('No form templates found.') }}</p>
+        {{ ag_grid_container('templatesGrid', loading_text=_('Loading templates data...'), include_card=false, empty_message=_('No form templates found.')) }}
     </div>
 {% endblock %}
 
@@ -294,13 +293,6 @@
         gridApi = result.api;
         window.gridApi = gridApi;
         window.gridHelper = gridHelper;
-        updateTemplatesEmptyHint(rows.length);
-    }
-
-    function updateTemplatesEmptyHint(count) {
-        var hint = document.getElementById('templates-empty-hint');
-        if (!hint) return;
-        hint.classList.toggle('hidden', count > 0);
     }
 
     if (document.readyState === 'loading') {

@@ -150,6 +150,10 @@ export const DlpPolicyMixin = {
     _showAiPolicyModal() {
         const overlay = document.getElementById('chatAiPolicyModalOverlay');
         if (!overlay) return;
+        const active = document.activeElement;
+        if (active && !overlay.contains(active)) {
+            this._aiPolicyModalPreviousFocus = active;
+        }
         overlay.removeAttribute('hidden');
         overlay.setAttribute('aria-hidden', 'false');
         const ackBtn = document.getElementById('chatAiPolicyModalAckBtn');
@@ -161,6 +165,23 @@ export const DlpPolicyMixin = {
     _hideAiPolicyModal() {
         const overlay = document.getElementById('chatAiPolicyModalOverlay');
         if (!overlay) return;
+
+        const active = document.activeElement;
+        if (active && overlay.contains(active)) {
+            const prev = this._aiPolicyModalPreviousFocus;
+            const fallback = document.getElementById('chatAiPolicyLinkBtn')
+                || this.elements?.input
+                || document.body;
+            const target = (prev && document.contains(prev) && !overlay.contains(prev)) ? prev : fallback;
+            try {
+                if (target && typeof target.focus === 'function') target.focus();
+                else active.blur();
+            } catch (_) {
+                try { active.blur(); } catch (_) {}
+            }
+        }
+        this._aiPolicyModalPreviousFocus = null;
+
         overlay.setAttribute('aria-hidden', 'true');
         overlay.setAttribute('hidden', '');
     },

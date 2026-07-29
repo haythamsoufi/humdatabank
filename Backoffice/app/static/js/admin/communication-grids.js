@@ -231,7 +231,7 @@ class CommunicationsGridManager {
         this.columnDefs = options.columnDefs || this.buildColumnDefs();
         this.containerId = options.containerId || 'notificationsGrid';
         this.templateId = options.templateId || 'notifications';
-        this.loadingId = options.loadingId || 'notifications-loading';
+        this.loadingId = options.loadingId || 'notificationsGrid-loading';
         this.containerSelector = options.containerSelector || 'panel-view-all';
 
         var self = this;
@@ -862,7 +862,7 @@ class CampaignsGridManager {
         this.columnDefs = options.columnDefs || this.buildColumnDefs();
         this.containerId = options.containerId || 'campaignsGrid';
         this.templateId = options.templateId || 'campaigns';
-        this.loadingId = options.loadingId || 'campaigns-loading';
+        this.loadingId = options.loadingId || 'campaignsGrid-loading';
         this.containerSelector = options.containerSelector || 'panel-campaigns';
 
         var self = this;

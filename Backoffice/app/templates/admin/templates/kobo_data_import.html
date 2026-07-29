@@ -1,6 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/breadcrumbs.html" import breadcrumb %}
-{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_css %}
+{% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_css, ag_grid_body_wrap, ag_grid_skeleton_inner %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
@@ -388,13 +388,12 @@
             </details>
         </div>
 
-        <div id="preview-loading" class="flex items-center justify-center py-12 text-gray-400">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-            Loading preview...
+        <div id="preview-loading" class="flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden py-2" aria-live="polite" aria-busy="true" aria-label="{{ _('Loading preview...') }}">
+            {{ ag_grid_skeleton_inner(row_count=6) }}
         </div>
 
         <div id="preview-grid-wrapper" class="hidden">
-            <div id="previewGrid" class="ag-theme-alpine" style="width: 100%; height: 480px;"></div>
+            {{ ag_grid_body_wrap('previewGrid', grid_height='480px', show_loading_overlay=false, use_container=false) }}
         </div>
 
         <div id="preview-error" class="hidden text-sm text-red-600 py-4"></div>

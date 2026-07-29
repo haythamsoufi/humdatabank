@@ -1,4 +1,5 @@
 {# National Societies component: table + init. Uses AG Grid for data display. #}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
 <div id="nssComponentRoot">
     <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
@@ -32,7 +33,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div id="nssGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="nss-column-visibility-button-placeholder"></div>
+                {{ ag_grid_body_wrap('nssGrid', loading_text=_('Loading national societies...'), placeholder_id='nss-column-visibility-button-placeholder', grid_height='600px') }}
             </div>
         {% else %}
             <p class="text-gray-700 text-sm">{{ _('No National Societies found.') }}</p>

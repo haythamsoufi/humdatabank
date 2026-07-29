@@ -1,6 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/filter_card.html" import filter_card %}
-{% from "components/ag_grid_includes.html" import ag_grid_loading %}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Login Logs') }} - {{ _('Admin Panel') }}{% endblock %}
@@ -91,9 +91,7 @@
             </div>
 
             <div class="relative">
-                {{ ag_grid_loading('loginLogs', loading_text=_('Loading login logs…')) }}
-                <div id="loginLogsGrid" class="ag-theme-alpine" style="width: 100%; height: 600px;"
-                     data-placeholder-id="login-logs-column-visibility-placeholder"></div>
+                {{ ag_grid_body_wrap('loginLogsGrid', loading_text=_('Loading login logs…'), placeholder_id='login-logs-column-visibility-placeholder', grid_height='600px', use_container=false) }}
             </div>
 
             <div id="login-logs-pagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 pt-4">

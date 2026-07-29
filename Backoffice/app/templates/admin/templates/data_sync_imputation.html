@@ -58,6 +58,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 <div class="sharp-ui">
 {% set header_actions = namespace(items=[]) %}
 {% set __ = header_actions.items.append({
@@ -371,7 +372,7 @@
           <div id="preview-results-count" class="text-sm text-gray-600"></div>
         </div>
         <div class="overflow-x-auto">
-          <div id="previewDataGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+          {{ ag_grid_body_wrap('previewDataGrid', loading_text=_('Loading preview...'), grid_height='600px', show_loading_overlay=false, use_container=false) }}
         </div>
       </div>
 

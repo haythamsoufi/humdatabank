@@ -157,6 +157,7 @@
                 }, config.heightOptions || {}),
                 checkboxColumnWidth: typeof config.checkboxColumnWidth === 'number' ? config.checkboxColumnWidth : 56,
                 showResultCount: config.showResultCount !== false,
+                emptyMessage: config.emptyMessage || null,
             };
     
             this.gridApi = null;
@@ -226,8 +227,93 @@
             return {
                 enableCellTextSelection: true,
                 ensureDomOrder: true,
-                suppressCellFocus: false
+                suppressCellFocus: false,
+                overlayNoRowsTemplate: AgGridHelper.buildNoRowsOverlayTemplate()
             };
+        };
+
+        /**
+         * Default empty-state copy (optionally overridden per grid).
+         * @returns {{default: string, filtered: string}}
+         */
+        AgGridHelper.getEmptyStateMessages = function() {
+            var t = window.agGridTranslations || {};
+            return {
+                default: t.noRecordsFound || 'No records found',
+                filtered: t.noMatchingRecords || 'No records match your current filters'
+            };
+        };
+
+        /**
+         * Escape text for AG Grid overlay HTML templates.
+         * @param {string} text
+         * @returns {string}
+         */
+        AgGridHelper.escapeOverlayHtml = function(text) {
+            if (text == null) {
+                return '';
+            }
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        };
+
+        /**
+         * Professional empty-state overlay markup for AG Grid.
+         * @param {string} [message]
+         * @returns {string}
+         */
+        AgGridHelper.buildNoRowsOverlayTemplate = function(message) {
+            var copy = message || AgGridHelper.getEmptyStateMessages().default;
+            var safe = AgGridHelper.escapeOverlayHtml(copy);
+            return '' +
+                '<div class="ag-grid-empty-state" role="status">' +
+                    '<div class="ag-grid-empty-state__icon" aria-hidden="true">' +
+                        '<i class="fas fa-inbox"></i>' +
+                    '</div>' +
+                    '<p class="ag-grid-empty-state__message">' + safe + '</p>' +
+                '</div>';
+        };
+
+        /**
+         * Resolve a grid-specific empty message from config, DOM, or defaults.
+         * @param {string} gridId
+         * @param {string} [configMessage]
+         * @returns {string}
+         */
+        AgGridHelper.resolveEmptyMessage = function(gridId, configMessage) {
+            if (configMessage) {
+                return configMessage;
+            }
+            var gridEl = document.getElementById(gridId);
+            if (gridEl) {
+                var dataMessage = gridEl.getAttribute('data-empty-message');
+                if (dataMessage) {
+                    return dataMessage;
+                }
+            }
+            var emptyEl = document.getElementById(gridId + '-empty');
+            if (emptyEl) {
+                var messageEl = emptyEl.querySelector('.ag-grid-empty-state__message, p');
+                if (messageEl && messageEl.textContent.trim()) {
+                    return messageEl.textContent.trim();
+                }
+            }
+            return AgGridHelper.getEmptyStateMessages().default;
+        };
+
+        /**
+         * @param {Object} gridApi
+         * @returns {boolean}
+         */
+        AgGridHelper.hasActiveGridFilters = function(gridApi) {
+            if (!gridApi || typeof gridApi.getFilterModel !== 'function') {
+                return false;
+            }
+            var filterModel = gridApi.getFilterModel() || {};
+            return Object.keys(filterModel).length > 0;
         };
     
         /**
@@ -242,6 +328,12 @@
             const dataLang = (document.documentElement.getAttribute('data-language') || document.body.getAttribute('data-language') || '').toLowerCase();
             const isRtl = docDir === 'rtl' || dataLang === 'ar';
             const textSelection = AgGridHelper.getTextSelectionGridOptions();
+            const emptyStateMessages = AgGridHelper.getEmptyStateMessages();
+            this._emptyMessageDefault = AgGridHelper.resolveEmptyMessage(
+                this.config.containerId,
+                this.config.emptyMessage
+            );
+            this._emptyMessageFiltered = emptyStateMessages.filtered;
             const options = {
                 columnDefs: this.config.columnDefs,
                 rowData: this.config.rowData,
@@ -285,6 +377,7 @@
                     selectAll: 'filtered'
                 },
                 cellSelection: false,
+                overlayNoRowsTemplate: AgGridHelper.buildNoRowsOverlayTemplate(this._emptyMessageDefault),
                 // Ensure the auto-generated selection column checkbox is vertically centered.
                 // The defaultColDef.cellStyle does NOT apply to the selection column, so we
                 // must configure it separately via selectionColumnDef (ag-grid v32+).
@@ -649,7 +742,12 @@
     
                 // Header labels can overlap filter buttons after sizeColumnsToFit; bridge missed clicks.
                 this.setupHeaderFilterClickBridge();
-    
+
+                // Passthrough header clicks (when labels don't receive pointer events) need explicit sort.
+                this.setupHeaderSortClickBridge();
+
+                this.setupEmptyStateOverlay();
+
                 // Emit selection-changed events so templates can show bulk-action UI
                 this.setupSelectionChangedDispatcher();
     
@@ -676,7 +774,17 @@
                 window.gridApi = this.gridApi;
                 window.columnVisibilityManager = this.columnVisibilityManager;
                 window.gridHelper = this; // Expose helper instance
-    
+
+                // Auto-reveal when page uses ag_grid_body_wrap / ag_grid_container markup.
+                // AgGridHelper.create() sets autoRevealAfterInit: false and reveals itself.
+                if (this.config.autoRevealAfterInit !== false &&
+                    document.getElementById(this.config.containerId + '-loading')) {
+                    var revealSelf = this;
+                    setTimeout(function() {
+                        revealSelf.revealGridAfterInit();
+                    }, 50);
+                }
+
                 return this.gridApi;
             } catch (error) {
                 console.error('AgGridHelper: Error initializing grid:', error);
@@ -1306,7 +1414,104 @@
             loadingEl.style.display = 'none';
             loadingEl.style.pointerEvents = 'none';
             loadingEl.setAttribute('aria-hidden', 'true');
+            loadingEl.setAttribute('aria-busy', 'false');
             loadingEl.classList.add('is-hidden');
+        };
+
+        /**
+         * Show the standard loading overlay (skeleton or spinner) before grid init.
+         * @param {string|HTMLElement} loadingIdOrEl
+         */
+        AgGridHelper.showGridLoadingOverlay = function(loadingIdOrEl) {
+            var loadingEl = typeof loadingIdOrEl === 'string'
+                ? document.getElementById(loadingIdOrEl)
+                : loadingIdOrEl;
+            if (!loadingEl) {
+                return;
+            }
+            loadingEl.style.display = 'flex';
+            loadingEl.style.pointerEvents = 'auto';
+            loadingEl.removeAttribute('aria-hidden');
+            loadingEl.setAttribute('aria-busy', 'true');
+            loadingEl.classList.remove('is-hidden');
+        };
+
+        /**
+         * Reveal grid container and hide loading overlay (shared by create() and initialize()).
+         * @param {string} gridId
+         * @param {Object} [options]
+         * @param {AgGridHelper} [options.helper]
+         * @param {Function} [options.onReady]
+         */
+        AgGridHelper.revealGridContainer = function(gridId, options) {
+            options = options || {};
+            var helper = options.helper;
+            var loadingEl = document.getElementById(gridId + '-loading');
+            var containerEl = document.getElementById(gridId + '-container');
+            AgGridHelper.hideGridLoadingOverlay(loadingEl);
+            if (containerEl) {
+                containerEl.style.display = 'block';
+            }
+            if (helper) {
+                if (helper.isGridVisible && helper.isGridVisible()) {
+                    helper.refresh();
+                }
+                if (helper.columnVisibilityManager &&
+                    typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
+                    helper.columnVisibilityManager.finishInitialColumnState();
+                }
+                if (helper.gridApi) {
+                    AgGridHelper.syncColumnPinningForViewport(helper.gridApi, helper.columnVisibilityManager);
+                    AgGridHelper.enforceColumnMinWidths(helper.gridApi);
+                }
+            }
+            if (typeof options.onReady === 'function' && helper && helper.gridApi) {
+                options.onReady(helper.gridApi, helper);
+            }
+        };
+
+        /**
+         * Hide loading overlay and show grid container after initialization.
+         * @param {Function} [onReady]
+         */
+        AgGridHelper.prototype.revealGridAfterInit = function(onReady) {
+            AgGridHelper.revealGridContainer(this.config.containerId, {
+                helper: this,
+                onReady: onReady
+            });
+        };
+
+        /**
+         * Keep the no-rows overlay copy in sync with active filters.
+         */
+        AgGridHelper.prototype.setupEmptyStateOverlay = function() {
+            if (!this.gridApi) {
+                return;
+            }
+
+            var self = this;
+            var refreshOverlayMessage = function() {
+                if (!self.gridApi) {
+                    return;
+                }
+                var message = AgGridHelper.hasActiveGridFilters(self.gridApi)
+                    ? self._emptyMessageFiltered
+                    : self._emptyMessageDefault;
+                var template = AgGridHelper.buildNoRowsOverlayTemplate(message);
+
+                if (typeof self.gridApi.setGridOption === 'function') {
+                    self.gridApi.setGridOption('overlayNoRowsTemplate', template);
+                } else if (self._gridOptions) {
+                    self._gridOptions.overlayNoRowsTemplate = template;
+                }
+
+                if (self.gridApi.getDisplayedRowCount() === 0 &&
+                    typeof self.gridApi.showNoRowsOverlay === 'function') {
+                    self.gridApi.showNoRowsOverlay();
+                }
+            };
+
+            this.gridApi.addEventListener('filterChanged', refreshOverlayMessage);
         };
     
         /**
@@ -1373,7 +1578,9 @@
                 showResultCount: options.showResultCount !== false,
                 filterPersistence: options.filterPersistence !== false && options.persistFilters !== false,
                 autoDetectFilters: options.autoDetectFilters,
-                autoDetectFilterOptions: options.autoDetectFilterOptions
+                autoDetectFilterOptions: options.autoDetectFilterOptions,
+                autoRevealAfterInit: false,
+                emptyMessage: options.emptyMessage || null
             });
     
             // Initialize the grid
@@ -1383,24 +1590,10 @@
             var loadingEl = document.getElementById(loadingId);
             var containerEl = document.getElementById(containerId);
             var revealGrid = function() {
-                AgGridHelper.hideGridLoadingOverlay(loadingEl);
-                if (containerEl) {
-                    containerEl.style.display = 'block';
-                }
-                if (helper.isGridVisible && helper.isGridVisible()) {
-                    helper.refresh();
-                }
-                if (typeof options.onReady === 'function' && api) {
-                    options.onReady(api, helper);
-                }
-                if (helper.columnVisibilityManager &&
-                    typeof helper.columnVisibilityManager.finishInitialColumnState === 'function') {
-                    helper.columnVisibilityManager.finishInitialColumnState();
-                }
-                if (api) {
-                    AgGridHelper.syncColumnPinningForViewport(api, helper.columnVisibilityManager);
-                    AgGridHelper.enforceColumnMinWidths(api);
-                }
+                AgGridHelper.revealGridContainer(gridId, {
+                    helper: helper,
+                    onReady: options.onReady
+                });
             };
     
             if (autoShow) {

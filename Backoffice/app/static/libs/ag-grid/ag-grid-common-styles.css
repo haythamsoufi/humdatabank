@@ -179,6 +179,63 @@
     min-height: 12rem;
 }
 
+/* Table-shaped loading skeleton (ag_grid_loading_overlay loading_variant='skeleton') */
+@keyframes ag-grid-skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.ag-grid-skeleton {
+    padding: 0;
+}
+
+.ag-grid-skeleton-header,
+.ag-grid-skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.ag-grid-skeleton-header {
+    min-height: 48px;
+    background: #f9fafb;
+}
+
+.ag-grid-skeleton-row {
+    min-height: 50px;
+}
+
+.ag-grid-skeleton-bar {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 40%, #e5e7eb 80%);
+    background-size: 200% 100%;
+    animation: ag-grid-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.ag-grid-skeleton-bar--header {
+    height: 10px;
+    opacity: 0.85;
+}
+
+.ag-grid-skeleton-bar--narrow {
+    flex: 0 0 48px;
+    max-width: 48px;
+}
+
+.ag-grid-skeleton-bar--medium {
+    flex: 0 0 88px;
+    max-width: 88px;
+}
+
+.ag-grid-skeleton-bar--wide {
+    flex: 2 1 0;
+}
+
 /* Loading Spinner Animation */
 @keyframes ag-grid-spin {
     0% { transform: rotate(0deg); }
@@ -388,38 +445,53 @@ html[dir="rtl"] .ag-paging-number,
 /* Example: .my-template .ag-cell { align-items: flex-start !important; } */
 
 /* ===================================================================
-   EMPTY STATE STYLING
-   Ensures "No Rows To Show" message displays nicely centered
+   EMPTY STATE
+   Custom overlay shown when a grid has zero visible rows.
    =================================================================== */
 
-/* Center the overlay container */
-.ag-overlay {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-.ag-overlay-panel {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    min-height: 150px !important;
-}
-
-/* Style the "No Rows To Show" message */
 .ag-overlay-no-rows-wrapper {
     display: flex !important;
-    flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    padding: 32px 16px !important;
-    text-align: center !important;
+    padding: 2rem 1rem !important;
+    pointer-events: none;
 }
 
-.ag-overlay-no-rows-center {
-    color: #6b7280 !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
+.ag-grid-empty-state,
+.ag-grid-empty-state-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    max-width: 24rem;
+    margin: 0 auto;
+}
+
+.ag-grid-empty-state-panel {
+    min-height: 12rem;
+}
+
+.ag-grid-empty-state__icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 9999px;
+    background: #f3f4f6;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    margin-bottom: 0.75rem;
+}
+
+.ag-grid-empty-state__message {
+    color: #6b7280;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.5;
+    margin: 0;
 }
 
 /* Loading overlay styling */
@@ -472,9 +544,10 @@ html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field
     padding-right: 26px !important;
 }
 
-/* After sizeColumnsToFit, header labels can overlap the filter trigger.
-   Keep the label from stealing pointer events so filter icon clicks are reliable.
-   Sorting still works via clicks on the header cell area not covered by the filter button. */
+/* Keep header labels from overlapping the filter trigger after sizeColumnsToFit.
+   Filter clicks are handled by setupHeaderFilterClickBridge when overlap still occurs.
+   Sorting uses AG Grid's native label click handler; setupHeaderSortClickBridge covers
+   passthrough clicks when a label has pointer-events disabled elsewhere. */
 .ag-theme-alpine .ag-header-cell-label,
 .ag-theme-balham .ag-header-cell-label,
 .ag-theme-quartz .ag-header-cell-label,
@@ -485,7 +558,6 @@ html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field
     max-width: calc(100% - 36px);
     overflow: hidden;
     text-overflow: ellipsis;
-    pointer-events: none;
 }
 
 .ag-theme-alpine .ag-header-cell-filter-button,

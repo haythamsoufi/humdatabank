@@ -271,7 +271,9 @@ export class HumDatabankChatbot {
                 if (this.conversationHistory.length === 0) {
                     this.showWelcomeMessage();
                 }
-                this.elements.input.focus();
+                if (this._hasAcknowledgedAiPolicy()) {
+                    this.elements.input.focus();
+                }
                 window.addEventListener('popstate', this._handleImmersivePopstate.bind(this));
                 this._setupVisibilityChangeHandler();
             } else {
@@ -337,6 +339,9 @@ export class HumDatabankChatbot {
                 this._setAcknowledgedAiPolicy();
                 this._hideAiPolicyModal();
                 this._updateAiNoticeVisibility();
+                if (this._isImmersive() && this.elements?.input) {
+                    try { this.elements.input.focus(); } catch (_) {}
+                }
             });
         }
         const policyLinkBtn = document.getElementById('chatAiPolicyLinkBtn');

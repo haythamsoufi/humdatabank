@@ -16,6 +16,7 @@
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes, admin_underline_tab_badge_classes, admin_underline_subtab_btn_classes, admin_underline_subtab_count_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
 <div class="pr-6">
 {{ page_header(
@@ -190,7 +191,7 @@
             </div>
             {% if divisions %}
                 <div id="divisions-table-container" class="overflow-x-auto">
-                    <div id="divisionsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="divisions-column-visibility-button-placeholder"></div>
+                    {{ ag_grid_body_wrap('divisionsGrid', loading_text=_('Loading divisions...'), placeholder_id='divisions-column-visibility-button-placeholder', grid_height='600px') }}
                 </div>
             {% else %}
                 <p class="text-gray-700 text-sm">{{ _('No divisions found.') }}</p>
@@ -221,7 +222,7 @@
             </div>
             {% if departments %}
                 <div id="departments-table-container" class="overflow-x-auto">
-                    <div id="departmentsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="departments-column-visibility-button-placeholder"></div>
+                    {{ ag_grid_body_wrap('departmentsGrid', loading_text=_('Loading departments...'), placeholder_id='departments-column-visibility-button-placeholder', grid_height='600px') }}
                 </div>
             {% else %}
                 <p class="text-gray-700 text-sm">{{ _('No departments found.') }}</p>
@@ -252,7 +253,7 @@
             </div>
             {% if regions %}
                 <div id="regions-table-container" class="overflow-x-auto">
-                    <div id="regionsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="regions-column-visibility-button-placeholder"></div>
+                    {{ ag_grid_body_wrap('regionsGrid', loading_text=_('Loading regional offices...'), placeholder_id='regions-column-visibility-button-placeholder', grid_height='600px') }}
                 </div>
             {% else %}
                 <p class="text-gray-700 text-sm">{{ _('No regional offices found.') }}</p>
@@ -283,7 +284,7 @@
             </div>
             {% if clusters %}
                 <div id="clusters-table-container" class="overflow-x-auto">
-                    <div id="clustersGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="clusters-column-visibility-button-placeholder"></div>
+                    {{ ag_grid_body_wrap('clustersGrid', loading_text=_('Loading cluster offices...'), placeholder_id='clusters-column-visibility-button-placeholder', grid_height='600px') }}
                 </div>
             {% else %}
                 <p class="text-gray-700 text-sm">{{ _('No cluster offices found.') }}</p>

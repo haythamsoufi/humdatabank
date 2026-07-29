@@ -699,6 +699,26 @@
             }] : []
         );
 
+        function scheduleEntityGridInit() {
+            if (entityGridInitialized) {
+                return;
+            }
+            if (typeof AgGridHelper !== 'undefined' && AgGridHelper.showGridLoadingOverlay) {
+                AgGridHelper.showGridLoadingOverlay('entityManagementGrid-loading');
+            }
+            var containerEl = document.getElementById('entityManagementGrid-container');
+            if (containerEl) {
+                containerEl.style.display = 'none';
+            }
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    if (typeof initializeEntityGrid === 'function') {
+                        initializeEntityGrid();
+                    }
+                });
+            });
+        }
+
         function initializeEntityGrid() {
             window.__clientLog && window.__clientLog('[INIT-FUNC] initializeEntityGrid function called');
             if (entityGridInitialized) {
@@ -1195,12 +1215,7 @@
                     // Initialize AG Grid when "Manage Existing Entities" tab is shown
                     if (panel.id === 'manage-entities-panel') {
                         loadCategoriesOnce();
-                        if (typeof initializeEntityGrid === 'function') {
-                            setTimeout(function() {
-                                window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Initializing grid for manage-entities-panel');
-                                initializeEntityGrid();
-                            }, 150);
-                        }
+                        scheduleEntityGridInit();
                     }
                     // Initialize sub-tabs when "Add Entities" tab is shown
                     if (panel.id === 'add-entities-panel') {
@@ -1459,13 +1474,13 @@
             initializeEntityTabs(true); // Use stored tab if section is already visible
 
             // Initialize grid if "Manage Existing Entities" tab is active by default
-            setTimeout(function() {
+            requestAnimationFrame(function() {
                 const managePanel = document.getElementById('manage-entities-panel');
-                if (managePanel && !managePanel.classList.contains('hidden') && typeof initializeEntityGrid === 'function') {
+                if (managePanel && !managePanel.classList.contains('hidden') && typeof scheduleEntityGridInit === 'function') {
                     window.__clientLog && window.__clientLog('[DEBUG] Page load: Manage entities panel is visible, initializing grid');
-                    initializeEntityGrid();
+                    scheduleEntityGridInit();
                 }
-            }, 200);
+            });
         } else {
             window.__clientLog && window.__clientLog('[DEBUG] Page load: Section is hidden, will initialize with first tab when expanded');
             // Don't initialize yet - will be initialized when section is expanded

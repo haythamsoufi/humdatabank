@@ -8,6 +8,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ag_grid_includes.html" import ag_grid_loading_overlay %}
 {{ page_header(
     title=_('AI Reasoning Traces'),
     icon='fas fa-project-diagram',
@@ -152,12 +153,7 @@
         </div>
         <div id="reasoning-traces-column-visibility-placeholder"></div>
     </div>
-    <div id="reasoningTracesGrid-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;">
-        <div class="flex items-center space-x-3">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-            <span class="text-gray-700 font-medium text-base">{{ _('Loading...') }}</span>
-        </div>
-    </div>
+    {{ ag_grid_loading_overlay('reasoningTracesGrid', loading_text=_('Loading...')) }}
     <div id="reasoningTracesGrid-container" class="overflow-x-auto" style="display: none;">
         <div id="reasoningTracesGrid" class="ag-theme-alpine" style="width: 100%;" data-placeholder-id="reasoning-traces-column-visibility-placeholder"></div>
     </div>
@@ -175,12 +171,7 @@
     <div class="flex justify-end items-center flex-wrap gap-3 mb-4">
         <div id="reasoning-traces-conv-column-visibility-placeholder"></div>
     </div>
-    <div id="reasoningTracesConversationsGrid-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;">
-        <div class="flex items-center space-x-3">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-            <span class="text-gray-700 font-medium text-base">{{ _('Loading...') }}</span>
-        </div>
-    </div>
+    {{ ag_grid_loading_overlay('reasoningTracesConversationsGrid', loading_text=_('Loading...')) }}
     <div id="reasoningTracesConversationsGrid-container" class="overflow-x-auto" style="display: none;">
         <div id="reasoningTracesConversationsGrid" class="ag-theme-alpine" style="width: 100%;" data-placeholder-id="reasoning-traces-conv-column-visibility-placeholder"></div>
     </div>

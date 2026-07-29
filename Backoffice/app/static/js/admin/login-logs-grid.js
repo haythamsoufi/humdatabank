@@ -333,7 +333,7 @@
         }
 
         var t = window.LOGIN_LOGS_TRANSLATIONS || {};
-        var loadingEl = document.getElementById('loginLogs-loading');
+        var loadingEl = document.getElementById('loginLogsGrid-loading');
         var gridHost = document.getElementById('loginLogsGrid');
         if (!gridHost) return;
 

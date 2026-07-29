@@ -184,6 +184,8 @@
         })();
     </script>
 
+    {# AG Grid skeleton/loading styles — must load in head so ag_grid_body_wrap paints at full height before extra_js #}
+    <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
     {% block head %}{% endblock %}
     {% block extra_css %}{% endblock %}
 </head>

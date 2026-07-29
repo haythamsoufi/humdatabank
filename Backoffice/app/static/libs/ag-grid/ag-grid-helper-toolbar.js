@@ -716,6 +716,7 @@
                 }
 
                 ev.stopPropagation();
+                self._suppressHeaderSortClick = true;
                 var gestureColId = filterGestureColId;
                 clearFilterGesture();
                 openFilterIfClosed(gestureColId);
@@ -744,6 +745,87 @@
                     openFilterIfClosed(pendingColId);
                 }, 120);
             }, true);
+        };
+
+        /**
+         * Header sort bridge: when header labels use pointer-events:none (or clicks land on
+         * the comp-wrapper instead of the label), AG Grid's native sort handler never runs.
+         * This toggles sort for those passthrough clicks; label clicks are left to AG Grid.
+         */
+        AgGridHelper.prototype.setupHeaderSortClickBridge = function() {
+            if (!this.gridDiv || !this.gridApi || this._headerSortClickBridgeAttached) {
+                return;
+            }
+            this._headerSortClickBridgeAttached = true;
+
+            var self = this;
+
+            function isSortSuppressedTarget(target) {
+                if (!target || !target.closest) {
+                    return true;
+                }
+                return !!(
+                    target.closest('.ag-header-cell-filter-button') ||
+                    target.closest('.ag-header-cell-menu-button') ||
+                    target.closest('.ag-header-cell-resize') ||
+                    target.closest('.ag-header-select-all') ||
+                    target.closest('.ag-header-cell-label') ||
+                    target.closest('[col-id="ag-Grid-SelectionColumn"]')
+                );
+            }
+
+            function progressColumnSort(colId, multiSort) {
+                if (!colId || !self.gridApi || typeof self.gridApi.applyColumnState !== 'function') {
+                    return;
+                }
+                var column = typeof self.gridApi.getColumn === 'function'
+                    ? self.gridApi.getColumn(colId)
+                    : null;
+                if (!column) {
+                    return;
+                }
+                var colDef = typeof column.getColDef === 'function' ? column.getColDef() : null;
+                if (colDef && colDef.sortable === false) {
+                    return;
+                }
+                if (typeof column.isSortable === 'function' && !column.isSortable()) {
+                    return;
+                }
+
+                var currentSort = typeof column.getSort === 'function' ? column.getSort() : null;
+                var nextSort = currentSort === 'asc' ? 'desc' : (currentSort === 'desc' ? null : 'asc');
+                var applyOptions = {
+                    state: [{ colId: colId, sort: nextSort }]
+                };
+                if (!multiSort) {
+                    applyOptions.defaultState = { sort: null };
+                }
+                try {
+                    self.gridApi.applyColumnState(applyOptions);
+                } catch (e) {
+                    // Non-fatal
+                }
+            }
+
+            this.gridDiv.addEventListener('click', function(ev) {
+                if (self._suppressHeaderSortClick) {
+                    self._suppressHeaderSortClick = false;
+                    return;
+                }
+                if (isSortSuppressedTarget(ev.target)) {
+                    return;
+                }
+
+                var headerCell = ev.target.closest && ev.target.closest('.ag-header-cell-sortable');
+                if (!headerCell) {
+                    return;
+                }
+                var colId = headerCell.getAttribute('col-id');
+                if (!colId || colId === 'ag-Grid-SelectionColumn') {
+                    return;
+                }
+                progressColumnSort(colId, !!ev.shiftKey);
+            }, false);
         };
 
         /**

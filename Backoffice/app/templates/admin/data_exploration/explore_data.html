@@ -97,6 +97,7 @@
 {% endblock %}
 
 {% block content %}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap, ag_grid_skeleton_inner %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
     {% set explore_first_tab = explore_first_tab|default('data-table' if can_access_data_table else ('disaggregation' if can_access_analysis else ('compliance' if can_access_compliance else (explorer_extension_tabs_render[0].tab_id if explorer_extension_tabs_render else 'data-table')))) %}
@@ -282,15 +283,10 @@
                 <div id="column-visibility-button-placeholder"></div>
             </div>
         </div>
-        <div id="table-loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: none;">
-            <div class="flex items-center space-x-3">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span class="text-gray-700 font-medium text-base">{{ _('Loading data...') }}</span>
-            </div>
+        <div id="table-loading" class="ag-grid-loading-overlay absolute inset-0 flex flex-col bg-white bg-opacity-95 z-10" style="display: none;" aria-live="polite" aria-busy="true" aria-label="{{ _('Loading data...') }}">
+            {{ ag_grid_skeleton_inner() }}
         </div>
-        <div id="dataExplorationGrid-container" class="overflow-x-auto">
-            <div id="dataExplorationGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
-        </div>
+        {{ ag_grid_body_wrap('dataExplorationGrid', grid_height='600px', show_loading_overlay=false, use_container=false) }}
         <div id="no-data-message" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: none;">
             <div class="text-center py-12 text-gray-500">
                 <i class="fas fa-inbox text-4xl mb-4"></i>
@@ -565,9 +561,8 @@
             </div>
 
             <!-- Loading indicator -->
-            <div id="compliance-loading" class="text-center py-12" style="display: none;">
-                <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
-                <p class="text-gray-600">{{ _('Loading compliance data...') }}</p>
+            <div id="compliance-loading" class="bg-white border border-gray-200 rounded-lg overflow-hidden" style="display: none;" aria-live="polite" aria-busy="true" aria-label="{{ _('Loading compliance data...') }}">
+                {{ ag_grid_skeleton_inner(row_count=6) }}
             </div>
 
             <!-- Initial message (shown briefly before auto-load) -->
@@ -623,7 +618,7 @@
                 <div id="compliance-column-visibility-placeholder"></div>
             </div>
             <div id="complianceGrid-container" class="overflow-x-auto" style="display: none;">
-                <div id="complianceGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="compliance-column-visibility-placeholder"></div>
+                {{ ag_grid_body_wrap('complianceGrid', placeholder_id='compliance-column-visibility-placeholder', grid_height='600px', show_loading_overlay=false, use_container=false, wrapper_class='ag-grid-body-wrap relative') }}
             </div>
 
             <!-- Error message -->

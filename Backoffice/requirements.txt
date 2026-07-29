@@ -14,7 +14,7 @@ Flask-Limiter==3.5.0
 flask-sock==0.7.0
 Werkzeug==3.1.7
 polib==1.2.0
-filelock==3.19.1                # cross-process PO file write locking (prevents Gunicorn race conditions)
+filelock==3.20.3                # cross-process PO file write locking (prevents Gunicorn race conditions)
 APScheduler==3.10.4
 python-dotenv==1.2.2                # was 1.0.0 - CVE-2026-12112 (symlink following in set_key)
 psutil==5.9.8
@@ -22,15 +22,15 @@ email_validator==2.2.0
 alembic==1.15.2
 psycopg2-binary==2.9.10
 PyMuPDF==1.25.5
-Pillow==12.2.0                  # was 12.1.1 — CVE-2026-40192, CVE-2026-42308–42311
+Pillow==12.3.0                  # was 12.2.0 — GHSA-9hw9-ch79-4vh6 and related Pillow CVEs
 openpyxl==3.1.2
 pandas==2.2.3
 XlsxWriter==3.2.3
 reportlab==4.4.1
 user-agents==2.2.0
-weasyprint==68.0                # was 65.1 — CVE-2025-68616
+weasyprint==69.0                # was 68.0 — CVE-2026-49452 (CSS injection via presentational hints)
 requests==2.33.0                # was 2.32.3 — CVE-2024-47081, CVE-2026-25645
-PyJWT==2.12.1
+PyJWT==2.13.0                   # was 2.12.1 — GHSA-xgmm-8j9v-c9wx and related PyJWT CVEs
 google-auth==2.40.3
 google-auth-oauthlib==1.2.3
 google-auth-httplib2==0.2.0
@@ -38,7 +38,7 @@ google-auth-httplib2==0.2.0
 openai==1.109.1
 google-generativeai==0.8.5
 # Security Dependencies
-bleach==6.2.0
+bleach==6.4.0                   # was 6.2.0 — GHSA-gj48-438w-jh9v (formaction URI sanitization)
 jsonschema==4.25.1
 # WSGI Servers
 waitress==3.0.2
@@ -61,7 +61,7 @@ pgvector==0.2.5
 # the transformers 5.x upgrade possible. Both must be upgraded together.
 # CVE-2026-1839 has no fix in any 4.x release; 5.0.0 is the minimum stable fix.
 sentence-transformers==5.4.0    # was 2.7.0 — required to allow transformers 5.x
-transformers==5.0.0             # was 4.57.6 — CVE-2026-1839 (min fix: 5.0.0)
+transformers==5.5.0             # was 5.0.0 — GHSA-fgcw-684q-jj6r (min fix: 5.5.0)
 tiktoken==0.11.0
 
 # Document processing

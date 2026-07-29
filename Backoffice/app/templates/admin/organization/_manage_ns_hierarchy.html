@@ -1,5 +1,6 @@
 {# NS Hierarchy fragment for inclusion. Uses AG Grid for data display. #}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_subtab_btn_classes, admin_underline_subtab_count_classes %}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
 <div id="nsHierarchyComponentRoot"
      data-error-loading="{{ _('Error loading NS hierarchy data. Please try again.') | e }}"
@@ -62,7 +63,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div id="branchesGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="branches-column-visibility-button-placeholder"></div>
+                {{ ag_grid_body_wrap('branchesGrid', loading_text=_('Loading branches...'), placeholder_id='branches-column-visibility-button-placeholder', grid_height='600px') }}
             </div>
         {% else %}
             <p class="text-gray-700 text-sm">{{ _('No branches found.') }}</p>
@@ -93,7 +94,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div id="subbranchesGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="subbranches-column-visibility-button-placeholder"></div>
+                {{ ag_grid_body_wrap('subbranchesGrid', loading_text=_('Loading sub-branches...'), placeholder_id='subbranches-column-visibility-button-placeholder', grid_height='600px') }}
             </div>
         {% else %}
             <p class="text-gray-700 text-sm">{{ _('No sub-branches found.') }}</p>
@@ -125,7 +126,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div id="localunitsGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="localunits-column-visibility-button-placeholder"></div>
+                {{ ag_grid_body_wrap('localunitsGrid', loading_text=_('Loading local units...'), placeholder_id='localunits-column-visibility-button-placeholder', grid_height='600px') }}
             </div>
         {% else %}
             <p class="text-gray-700 text-sm">{{ _('No local units found.') }}</p>

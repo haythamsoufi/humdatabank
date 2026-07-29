@@ -1,4 +1,5 @@
 {# Reusable Countries component: table + modal + JS. Uses AG Grid for data display. #}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
 <div id="countriesComponentRoot"
      data-error-loading="{{ _('Error loading country data. Please try again.') | e }}"
@@ -33,7 +34,7 @@
                         {% endif %}
                     </div>
                 </div>
-                <div id="countriesGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;" data-placeholder-id="countries-column-visibility-button-placeholder"></div>
+                {{ ag_grid_body_wrap('countriesGrid', loading_text=_('Loading countries...'), placeholder_id='countries-column-visibility-button-placeholder', grid_height='600px') }}
             </div>
         {% else %}
             <p class="text-gray-700">{{ _('No countries found.') }}</p>

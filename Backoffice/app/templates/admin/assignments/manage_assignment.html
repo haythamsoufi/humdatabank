@@ -14,7 +14,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
 {% from "macros/year_picker.html" import year_picker %}
-{% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_element %}
+{% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
 
 {% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}
 {% set header_actions = namespace(items=[]) %}
@@ -511,9 +511,12 @@
                     </button>
                     {% endif %}
                 </div>
-                <div class="overflow-x-auto">
-                    {{ ag_grid_element('entityManagementGrid', placeholder_id='column-visibility-button-placeholder', height='600px') }}
-                </div>
+                {{ ag_grid_body_wrap(
+                    'entityManagementGrid',
+                    loading_text=_('Loading entities...'),
+                    placeholder_id='column-visibility-button-placeholder',
+                    grid_height='600px'
+                ) }}
             </div>
             {% endif %}
 

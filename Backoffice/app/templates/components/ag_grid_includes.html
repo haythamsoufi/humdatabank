@@ -19,19 +19,19 @@ Layout patterns (pick one):
 Toolbar markup MUST use ag_grid_header_toolbar (or data-ag-grid-toolbar="true") so
 AgGridHelper.normalizeGridHeaderLayout never treats a whole tab panel as the toolbar.
 
-IDs with ag_grid_container / ag_grid_body_wrap (matches AgGridHelper.create auto-show):
-  - {grid_id}-loading   overlay (hidden after init)
-  - {grid_id}-container wrapper (shown after init)
+IDs with ag_grid_container / ag_grid_body_wrap (matches AgGridHelper auto-reveal on init):
+  - {grid_id}-loading   skeleton/spinner overlay (hidden after init)
+  - {grid_id}-container wrapper (shown after init; grid hidden until ready)
 #}
 
 {# AG Grid custom CSS — optional preload in head block.
+   ag-grid-common-styles.css (skeleton/loading) is linked from layout.html <head>.
    Core AG Grid CSS (ag-grid.css, ag-theme-alpine.css) is bundled in the JS (v31+ CSS-in-JS).
-   These 3 custom stylesheets are also injected by ag_grid_js(), so calling this macro
-   is only needed if you want the CSS to load before the JS scripts. #}
+   Filter/colvis styles below are also injected by ag_grid_js(); call this macro in {% block head %}
+   only if you need those styles before extra_js scripts run. #}
 {% macro ag_grid_css() %}
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-set-filter-community.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
-<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
 {% endmacro %}
 
 {# AG Grid JS includes (and custom CSS) - call in extra_js block #}
@@ -39,7 +39,6 @@ IDs with ag_grid_container / ag_grid_body_wrap (matches AgGridHelper.create auto
 {# Custom CSS that is NOT bundled in the JS — must be loaded explicitly #}
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-set-filter-community.css') }}">
 <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-column-visibility-manager.css') }}">
-<link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
 <script src="{{ static_url('libs/ag-grid/ag-grid-community.min.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-grid-utils.js') }}"></script>
 <script src="{{ static_url('libs/ag-grid/ag-set-filter-community.js') }}"></script>
@@ -69,26 +68,68 @@ IDs with ag_grid_container / ag_grid_body_wrap (matches AgGridHelper.create auto
 </div>
 {% endmacro %}
 
-{# Grid body: loading overlay + optional {grid_id}-container wrapper. #}
-{% macro ag_grid_body_wrap(grid_id, loading_text=none, placeholder_id=none, grid_height=none, show_loading_overlay=true, wrapper_class='ag-grid-body-wrap relative', spinner_color='blue-600', use_container=true) %}
+{# Skeleton rows only — embed inside custom loading containers (e.g. explore_data fetch overlays). #}
+{% macro ag_grid_skeleton_inner(row_count=8) %}
+<div class="ag-grid-skeleton flex flex-1 flex-col w-full min-h-[12rem] overflow-hidden" aria-hidden="true">
+    <div class="ag-grid-skeleton-header">
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--header"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--header ag-grid-skeleton-bar--narrow"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--header ag-grid-skeleton-bar--medium"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--header ag-grid-skeleton-bar--wide"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--header ag-grid-skeleton-bar--narrow"></div>
+    </div>
+    {% for _ in range(row_count) %}
+    <div class="ag-grid-skeleton-row">
+        <div class="ag-grid-skeleton-bar"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--wide"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--medium"></div>
+        <div class="ag-grid-skeleton-bar ag-grid-skeleton-bar--narrow"></div>
+    </div>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{# Shared empty-state markup (grid overlay + optional external {grid_id}-empty panel). #}
+{% macro ag_grid_empty_state(message) %}
+<div class="ag-grid-empty-state" role="status">
+    <div class="ag-grid-empty-state__icon" aria-hidden="true"><i class="fas fa-inbox"></i></div>
+    <p class="ag-grid-empty-state__message">{{ message }}</p>
+</div>
+{% endmacro %}
+
+{# Grid loading overlay — skeleton (default) or spinner. #}
+{% macro ag_grid_loading_overlay(grid_id, loading_text=none, spinner_color='blue-600', loading_variant='skeleton') %}
 {% set loading_msg = loading_text if loading_text else _('Loading...') %}
-{% set placeholder = placeholder_id if placeholder_id else 'column-visibility-button-placeholder' %}
-{% set grid_style = 'width: 100%;' ~ (' height: ' ~ grid_height ~ ';' if grid_height else '') %}
-<div class="{{ wrapper_class }}">
-    {% if show_loading_overlay %}
-    <div id="{{ grid_id }}-loading" class="ag-grid-loading-overlay absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;" aria-live="polite">
+<div id="{{ grid_id }}-loading" class="ag-grid-loading-overlay absolute inset-0 flex flex-col bg-white bg-opacity-95 z-10" style="display: flex;" aria-live="polite" aria-busy="true" aria-label="{{ loading_msg }}">
+    {% if loading_variant == 'spinner' %}
+    <div class="flex flex-1 items-center justify-center">
         <div class="flex items-center space-x-3">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-{{ spinner_color }}"></div>
             <span class="text-gray-700 font-medium text-base">{{ loading_msg }}</span>
         </div>
     </div>
+    {% else %}
+    {{ ag_grid_skeleton_inner() }}
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# Grid body: loading overlay + optional {grid_id}-container wrapper. #}
+{% macro ag_grid_body_wrap(grid_id, loading_text=none, placeholder_id=none, grid_height=none, show_loading_overlay=true, wrapper_class='ag-grid-body-wrap relative', spinner_color='blue-600', use_container=true, loading_variant='skeleton', empty_message=none) %}
+{% set loading_msg = loading_text if loading_text else _('Loading...') %}
+{% set placeholder = placeholder_id if placeholder_id else 'column-visibility-button-placeholder' %}
+{% set resolved_min_height = grid_height if grid_height else '28rem' %}
+{% set grid_style = 'width: 100%;' ~ (' height: ' ~ grid_height ~ ';' if grid_height else '') %}
+<div class="{{ wrapper_class }}" style="min-height: {{ resolved_min_height }};">
+    {% if show_loading_overlay %}
+    {{ ag_grid_loading_overlay(grid_id, loading_text=loading_msg, spinner_color=spinner_color, loading_variant=loading_variant) }}
     {% endif %}
     {% if use_container %}
     <div id="{{ grid_id }}-container" class="ag-grid-container" style="display: none;">
-        <div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ grid_style }}" data-placeholder-id="{{ placeholder }}"></div>
+        <div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ grid_style }}" data-placeholder-id="{{ placeholder }}"{% if empty_message %} data-empty-message="{{ empty_message }}"{% endif %}></div>
     </div>
     {% else %}
-    <div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ grid_style }}" data-placeholder-id="{{ placeholder }}"></div>
+    <div id="{{ grid_id }}" class="ag-theme-alpine" style="{{ grid_style }}" data-placeholder-id="{{ placeholder }}"{% if empty_message %} data-empty-message="{{ empty_message }}"{% endif %}></div>
     {% endif %}
 </div>
 {% endmacro %}
@@ -107,7 +148,7 @@ Parameters:
   - include_card: Whether to wrap in the standard card div (optional, default true)
   - show_loading_overlay: When false, omit the grid loading overlay (use when parent supplies its own spinner, e.g. modal tabs)
 #}
-{% macro ag_grid_container(grid_id, loading_text=none, placeholder_id=none, show_placeholder=true, spinner_color='blue-600', empty_message=none, card_classes='', grid_height=none, include_card=true, show_loading_overlay=true) %}
+{% macro ag_grid_container(grid_id, loading_text=none, placeholder_id=none, show_placeholder=true, spinner_color='blue-600', empty_message=none, card_classes='', grid_height=none, include_card=true, show_loading_overlay=true, loading_variant='skeleton') %}
 {% set placeholder = placeholder_id if placeholder_id else 'column-visibility-button-placeholder' %}
 {% if include_card %}<div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200 relative {{ card_classes }}">{% endif %}
     {% if show_placeholder %}
@@ -119,12 +160,13 @@ Parameters:
         placeholder_id=placeholder,
         grid_height=grid_height,
         show_loading_overlay=show_loading_overlay,
-        spinner_color=spinner_color
+        spinner_color=spinner_color,
+        loading_variant=loading_variant,
+        empty_message=empty_message
     ) }}
     {% if empty_message %}
-    <div id="{{ grid_id }}-empty" class="text-center py-12 text-gray-500" style="display: none;">
-        <i class="fas fa-inbox text-4xl mb-4"></i>
-        <p class="text-lg">{{ empty_message }}</p>
+    <div id="{{ grid_id }}-empty" class="ag-grid-empty-state-panel" style="display: none;">
+        {{ ag_grid_empty_state(empty_message) }}
     </div>
     {% endif %}
 {% if include_card %}</div>{% endif %}
@@ -134,14 +176,8 @@ Parameters:
 Simple loading indicator only (for use with custom card structure)
 Uses overlay style matching the standard loading_indicator component.
 #}
-{% macro ag_grid_loading(grid_id, loading_text=none, spinner_color='blue-600') %}
-{% set loading_msg = loading_text if loading_text else _('Loading...') %}
-<div id="{{ grid_id }}-loading" class="ag-grid-loading-overlay absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-10" style="display: flex;" aria-live="polite">
-    <div class="flex items-center space-x-3">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-{{ spinner_color }}"></div>
-        <span class="text-gray-700 font-medium text-base">{{ loading_msg }}</span>
-    </div>
-</div>
+{% macro ag_grid_loading(grid_id, loading_text=none, spinner_color='blue-600', loading_variant='skeleton') %}
+{{ ag_grid_loading_overlay(grid_id, loading_text=loading_text, spinner_color=spinner_color, loading_variant=loading_variant) }}
 {% endmacro %}
 
 {#

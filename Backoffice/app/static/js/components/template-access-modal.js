@@ -1,8 +1,6 @@
 // Template Access Management Modal
 // Modal for managing template ownership and shared access, styled like confirm-dialogs.js
 
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 /**
  * Show template access management modal
  * @param {Object} options - Configuration options for the modal

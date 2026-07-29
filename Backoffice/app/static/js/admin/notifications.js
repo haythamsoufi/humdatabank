@@ -2,8 +2,6 @@
  * Admin Communication Center - Send communications and view all notifications
  */
 
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 async function _anFetch(url, options = {}) {
     const fn = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
     if (options.body && !options.headers) options.headers = { 'Content-Type': 'application/json' };

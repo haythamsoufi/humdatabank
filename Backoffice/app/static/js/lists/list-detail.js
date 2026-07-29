@@ -2,8 +2,6 @@
 // Assumes lookupListId is defined globally
 // Uses apiFetch/fetchJson and confirm-dialogs from core layout (load api-fetch.js)
 
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 const fetchJson = (url, options) => (window.fetchJson || window.apiFetch)(url, options);
 
 // Drag and drop functionality

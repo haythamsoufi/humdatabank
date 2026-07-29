@@ -1,7 +1,5 @@
 // Notification Center - Comprehensive notification management interface
 
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 async function _ncFetch(url, options = {}) {
     const fn = (window.getApiFetch && window.getApiFetch()) || window.apiFetch || fetch;
     if (options.body && !options.headers) options.headers = { 'Content-Type': 'application/json' };

@@ -4,8 +4,6 @@
  * Can be used for user permissions and assignment management
  */
 
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 class EntitySelector {
     constructor(config) {
         this.containerId = config.containerId;

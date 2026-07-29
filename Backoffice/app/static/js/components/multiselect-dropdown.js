@@ -1,5 +1,3 @@
-const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
-
 /**
  * Multiselect Dropdown Component
  * A reusable searchable multiselect dropdown component for any data type

@@ -21,7 +21,7 @@ class FormSectionForm(BaseForm):
         choices=[
             ('standard', 'Standard'),
             ('repeat', 'Repeat Section'),
-            ('dynamic_indicators', 'Dynamic Indicators')
+            ('dynamic_indicators', 'Dynamic Indicators'),
         ],
         validators=[Optional()],
         default='standard'

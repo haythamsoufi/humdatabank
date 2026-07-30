@@ -17,6 +17,13 @@ module.exports = {
     'focus:ring-amber-500'
   ],
   theme: {
+    screens: {
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1100px',
+      '2xl': '1536px',
+    },
     extend: {
       /* Use theme.css variables so button colors can be changed globally (primary = teal) */
       colors: {

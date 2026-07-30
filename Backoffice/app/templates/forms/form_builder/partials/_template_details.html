@@ -78,13 +78,22 @@
             <p class="text-gray-900 text-lg">
                 {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
                 {% set enable_discussion = selected_version.get_effective_enable_discussion() if selected_version else (fallback_version.enable_discussion if fallback_version else False) %}
+                {% set _discussion_section_row = sections_with_items | selectattr('section.section_type', 'equalto', 'discussion') | list | first %}
                 {% if enable_discussion %}
                     <i class="fas fa-check-circle text-green-500 mr-1"></i> {{ _('Enabled') }}
                     {% set _disc_cfg = selected_version.discussion_config if selected_version and selected_version.discussion_config is mapping else (fallback_version.discussion_config if fallback_version and fallback_version.discussion_config is mapping else {}) %}
                     {% if _disc_cfg.get('show_in_sidebar', true) %}
                         <span class="block text-sm text-gray-600 mt-1">{{ _('Side panel') }}: {{ _('Yes') }}</span>
                     {% else %}
-                        <span class="block text-sm text-gray-600 mt-1">{{ _('Side panel') }}: {{ _('No') }} ({{ _('form items only') }})</span>
+                        <span class="block text-sm text-gray-600 mt-1">{{ _('Side panel') }}: {{ _('No') }}</span>
+                    {% endif %}
+                    {% if _discussion_section_row %}
+                        <span class="block text-sm text-gray-600 mt-1">
+                            <i class="fas fa-comments text-sky-600 mr-1" aria-hidden="true"></i>
+                            {{ _('Form section') }}: {{ _discussion_section_row.section.display_name or _discussion_section_row.section.name }}
+                        </span>
+                    {% else %}
+                        <span class="block text-sm text-amber-700 mt-1">{{ _('No discussion section in the form yet.') }}</span>
                     {% endif %}
                 {% else %}
                     <i class="fas fa-times-circle text-red-500 mr-1"></i> {{ _('Disabled') }}
@@ -310,6 +319,7 @@
                     </div>
 
                     <div class="mb-4{% if not form.enable_discussion.data %} hidden{% endif %}" id="discussion-config-fields">
+                        {% set _td_discussion_section_row = sections_with_items | selectattr('section.section_type', 'equalto', 'discussion') | list | first %}
                         <div class="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <div>
                                 <label for="{{ form.discussion_title.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.discussion_title.label.text }}</label>
@@ -324,15 +334,38 @@
                                 {{ form.discussion_sort_order(class="form-select w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500") }}
                             </div>
                             <div class="flex items-center">
-                                {{ form.discussion_default_collapsed(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
-                                {{ form.discussion_default_collapsed.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                                <input type="hidden" name="discussion_default_expanded" value="n">
+                                {{ form.discussion_default_expanded(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                {{ form.discussion_default_expanded.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
                             </div>
+                            <p class="text-xs text-gray-500 mb-3">{{ _('When unchecked, the side panel discussion stays collapsed when the form loads.') }}</p>
                             <div class="flex items-center">
                                 <input type="hidden" name="discussion_show_in_sidebar" value="n">
                                 {{ form.discussion_show_in_sidebar(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
                                 {{ form.discussion_show_in_sidebar.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
                             </div>
-                            <p class="text-xs text-gray-500">{{ _('When unchecked, comments appear only where you add Discussion form items.') }}</p>
+                            <p class="text-xs text-gray-500">{{ _('When unchecked, comments appear only in the discussion section in the form body (not the side panel).') }}</p>
+
+                            <div id="discussion-section-form-actions" class="pt-2 border-t border-gray-200{% if _td_discussion_section_row %} hidden{% endif %}">
+                                <p class="text-sm text-gray-700 mb-2">{{ _('Add a discussion section to the form body so assignees can read and post comments inline.') }}</p>
+                                <button type="button"
+                                        id="add-discussion-section-btn"
+                                        class="btn btn-primary btn-sm"
+                                        data-template-id="{{ template.id }}"
+                                        data-version-id="{{ active_version_id }}"
+                                        data-create-url="{{ url_for('form_builder.create_discussion_section', template_id=template.id) }}">
+                                    <i class="fas fa-comments w-4 h-4 mr-2" aria-hidden="true"></i>
+                                    {{ _('Add discussion section to form') }}
+                                </button>
+                            </div>
+                            <div id="discussion-section-exists-notice" class="pt-2 border-t border-gray-200{% if not _td_discussion_section_row %} hidden{% endif %}">
+                                <p class="text-sm text-green-800">
+                                    <i class="fas fa-check-circle mr-1" aria-hidden="true"></i>
+                                    {{ _('Discussion section added') }}:
+                                    <strong id="discussion-section-name-label">{{ (_td_discussion_section_row.section.display_name or _td_discussion_section_row.section.name) if _td_discussion_section_row else '' }}</strong>.
+                                    {{ _('Edit its order, page, or translations in the form structure below.') }}
+                                </p>
+                            </div>
                         </div>
                     </div>
 

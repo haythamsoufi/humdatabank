@@ -326,7 +326,8 @@
      * - For Sector/Sub-sector: Split by " / " to get individual items
      */
     CustomSetFilter.prototype.parseComplexValue = function(value, field) {
-        if (!value || value === null || value === undefined) {
+        // Keep boolean false and numeric 0 — `!value` would drop them from set/text filters.
+        if (value === null || value === undefined) {
             return [];
         }
 

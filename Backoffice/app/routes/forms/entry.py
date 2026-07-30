@@ -1112,15 +1112,10 @@ def handle_assignment_form(aes_id):
             open_validation_questions = []
 
     discussion_comments = []
-    has_discussion_items = False
-    for sec in (all_sections or []):
-        for fi in getattr(sec, 'fields_ordered', []) or []:
-            if getattr(fi, 'item_type', None) == 'discussion':
-                has_discussion_items = True
-                break
-        if has_discussion_items:
-            break
-    if form_template and (getattr(form_template, 'enable_discussion', False) or has_discussion_items):
+    has_discussion_section = any(
+        getattr(sec, 'section_type', None) == 'discussion' for sec in (all_sections or [])
+    )
+    if form_template and (getattr(form_template, 'enable_discussion', False) or has_discussion_section):
         discussion_cfg = getattr(form_template, 'discussion_config', None) or {}
         sort_newest_first = (
             isinstance(discussion_cfg, dict)
@@ -1145,8 +1140,11 @@ def handle_assignment_form(aes_id):
     response = stream_template(
         "forms/entry_form/entry_form.html",
         open_validation_questions=open_validation_questions,
-        # completion_rate is no longer computed server-side; the entry form JS fetches
-        # it via GET /api/forms/assignment/<id>/completion-rate after page load.
+        completion_rate=(
+            round(float(assignment_entity_status.completion_rate), 1)
+            if assignment_entity_status.completion_rate is not None
+            else None
+        ),
         assignment_entity_status_id_for_rate=assignment_entity_status.id,
         template_structure=template_structure,
         sections=db_sections,

@@ -45,6 +45,7 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "mobile_api.device_heartbeat",
         "mobile_api.screen_view",
         "admin_analytics_api.session_logs_list_api",
+        "admin_analytics_api.session_log_page_view_paths_api",
         "admin_analytics_api.login_logs_list_api",
         "user_management.api_users_profile_summary",
         "main.api_users_profile_summary",

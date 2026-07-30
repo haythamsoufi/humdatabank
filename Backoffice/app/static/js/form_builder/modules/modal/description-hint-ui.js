@@ -6,7 +6,6 @@ const TYPE_FIELD_CONTAINER_IDS = {
     document_field: 'item-document-fields',
     matrix: 'item-matrix-fields',
     image: 'item-image-fields',
-    discussion: 'item-discussion-fields',
 };
 
 const DESCRIPTION_TRANSLATION_TRIGGER_IDS = {
@@ -15,7 +14,6 @@ const DESCRIPTION_TRANSLATION_TRIGGER_IDS = {
     document_field: 'document-translations-btn',
     matrix: 'matrix-translations-btn',
     image: 'image-translations-btn',
-    discussion: 'discussion-translations-btn',
     plugin: 'plugin-translations-btn',
 };
 

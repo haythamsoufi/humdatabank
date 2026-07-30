@@ -556,7 +556,18 @@
     }
 
     function configImportSuccessMessage(payload) {
-        return (cfg.i18n && cfg.i18n.excelUploadedSuccessfully) || 'Excel uploaded successfully.';
+        const base = (cfg.i18n && cfg.i18n.excelUploadedSuccessfully) || 'Excel uploaded successfully.';
+        const validation = payload.validation || {};
+        const warnings = validation.warnings || [];
+        if (!warnings.length) return base;
+        const warningText = warnings.join(' ');
+        const template = (cfg.i18n && cfg.i18n.excelUploadedWithWarnings) || 'Excel uploaded with warnings: %(warnings)s';
+        return template.replace('%(warnings)s', warningText);
+    }
+
+    function uploadResultFlashLevel(payload) {
+        const warnings = (payload.validation && payload.validation.warnings) || [];
+        return warnings.length ? 'warning' : 'success';
     }
 
     async function importConfigFromExcel() {
@@ -850,7 +861,7 @@
             versionUi[activeVersion].statusCache = cachedStatus;
             updateAdminUi(payload.excel || null, cachedStatus);
             await applyImportedConfigPayload(payload);
-            showFlash(configImportSuccessMessage(payload), 'success');
+            showFlash(configImportSuccessMessage(payload), uploadResultFlashLevel(payload));
             if (els.fileInput) els.fileInput.value = '';
         } catch (error) {
             showFlash(error.message, 'danger');

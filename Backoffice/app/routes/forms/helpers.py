@@ -377,7 +377,7 @@ def build_entry_form_features(all_sections, form_template=None):
 
     enable_export_excel = bool(getattr(form_template, 'enable_export_excel', False)) if form_template else False
     enable_import_excel = bool(getattr(form_template, 'enable_import_excel', False)) if form_template else False
-    has_discussion_items = any(getattr(f, 'item_type', None) == 'discussion' for f in fields)
+    has_discussion_section = 'discussion' in section_types
     enable_discussion = bool(getattr(form_template, 'enable_discussion', False)) if form_template else False
     template_id = int(getattr(form_template, 'id', 0) or 0)
     upr_country_reporting_excel = template_id == 33
@@ -390,7 +390,7 @@ def build_entry_form_features(all_sections, form_template=None):
         'calculatedLists': has_calculated_list_fields,
         'pdfExport': True,
         'excelExport': enable_export_excel or enable_import_excel or upr_country_reporting_excel,
-        'discussion': enable_discussion or has_discussion_items,
+        'discussion': enable_discussion or has_discussion_section,
     }
 
 
@@ -398,11 +398,14 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
     """Calculate completion status for sections - returns dict format expected by template."""
     section_statuses = {}
     for section in all_sections:
+        if getattr(section, 'section_type', None) == 'discussion':
+            section_statuses[section.name] = 'N/A'
+            continue
         total_items_in_section = 0
         filled_items_count = 0
         if hasattr(section, 'fields_ordered'):
             for field in section.fields_ordered:
-                if hasattr(field, 'field_type_for_js') and field.field_type_for_js.lower() in ('blank', 'image', 'discussion'):
+                if hasattr(field, 'field_type_for_js') and field.field_type_for_js.lower() in ('blank', 'image'):
                     continue
                 if getattr(field, 'is_image', False):
                     continue

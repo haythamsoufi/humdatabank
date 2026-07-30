@@ -1,25 +1,36 @@
 {% from "components/_profile_icon.html" import profile_icon %}
-{% macro discussion_comment_row(comment, compact=false) %}
-<div class="discussion-comment flex gap-2.5{% if comment.source == 'upr_excel_import' %} discussion-comment--imported{% endif %}{% if compact %} discussion-comment--compact{% endif %}"
+{% macro discussion_comment_row(comment, compact=false, current_user_id=none, can_edit=false) %}
+{% set is_imported = comment.source == 'upr_excel_import' %}
+{% set is_own = (
+    current_user_id
+    and comment.created_by_user_id
+    and comment.created_by_user_id == current_user_id
+    and not is_imported
+) %}
+{% set show_manage = is_own and can_edit and not compact and not is_imported %}
+<div class="discussion-comment{% if is_own %} discussion-comment--self{% else %} discussion-comment--other{% endif %}{% if is_imported %} discussion-comment--imported{% endif %}{% if compact %} discussion-comment--compact{% endif %}"
      data-comment-id="{{ comment.id }}"
+     {% if comment.created_by_user_id %}data-created-by-user-id="{{ comment.created_by_user_id }}"{% endif %}
      {% if comment.source %}data-comment-source="{{ comment.source }}"{% endif %}>
-    <div class="flex-shrink-0">
-        {% if comment.source == 'upr_excel_import' %}
-            <span class="inline-flex items-center justify-center {% if compact %}w-7 h-7{% else %}w-9 h-9{% endif %} rounded-full bg-amber-100 text-amber-700" title="{{ _('Imported from UPR Excel')|forceescape }}" aria-hidden="true">
-                <i class="fas fa-file-import {% if compact %}text-xs{% else %}text-sm{% endif %}"></i>
+    <div class="discussion-comment__avatar flex-shrink-0">
+        {% if is_imported %}
+            <span class="discussion-comment__avatar-icon discussion-comment__avatar-icon--imported"
+                  title="{{ _('Imported from UPR Excel')|forceescape }}"
+                  aria-hidden="true">
+                <i class="fas fa-file-import"></i>
             </span>
         {% elif comment.created_by_user %}
             {{ profile_icon(comment.created_by_user, 'sm' if compact else 'md', false, false, false, 'avatar-circle') }}
         {% else %}
-            <span class="inline-flex items-center justify-center {% if compact %}w-7 h-7{% else %}w-9 h-9{% endif %} rounded-full bg-gray-200 text-gray-600" aria-hidden="true">
-                <i class="fas fa-user {% if compact %}text-xs{% else %}text-sm{% endif %}"></i>
+            <span class="discussion-comment__avatar-icon discussion-comment__avatar-icon--unknown" aria-hidden="true">
+                <i class="fas fa-user"></i>
             </span>
         {% endif %}
     </div>
-    <div class="min-w-0 flex-1">
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-0.5">
-            <span class="{% if compact %}text-xs{% else %}text-sm{% endif %} font-semibold text-gray-900 truncate max-w-full">
-                {% if comment.source == 'upr_excel_import' %}
+    <div class="discussion-comment__main">
+        <div class="discussion-comment__header">
+            <span class="discussion-comment__author">
+                {% if is_imported %}
                     {{ _('Imported from UPR Excel') }}
                 {% elif comment.created_by_user %}
                     {{ comment.created_by_user.name or comment.created_by_user.email }}
@@ -27,17 +38,32 @@
                     {{ _('Unknown user') }}
                 {% endif %}
             </span>
-            {% if comment.source == 'upr_excel_import' and not compact %}
-            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-                {{ _('Historical import') }}
-            </span>
+            {% if is_imported and not compact %}
+            <span class="discussion-comment__badge">{{ _('Historical import') }}</span>
             {% endif %}
-            <span class="text-xs text-gray-500 whitespace-nowrap">
+            <span class="discussion-comment__time">
                 {{ comment.created_at|format_datetime_localized('short', 'short') if comment.created_at else '' }}
             </span>
+            {% if show_manage %}
+            <div class="discussion-comment__actions">
+                <button type="button"
+                        class="discussion-comment__action-btn discussion-comment-edit-btn"
+                        title="{{ _('Edit comment')|forceescape }}"
+                        aria-label="{{ _('Edit comment')|forceescape }}">
+                    <i class="fas fa-pen" aria-hidden="true"></i>
+                </button>
+                <button type="button"
+                        class="discussion-comment__action-btn discussion-comment-delete-btn"
+                        title="{{ _('Delete comment')|forceescape }}"
+                        aria-label="{{ _('Delete comment')|forceescape }}">
+                    <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                </button>
+            </div>
+            {% endif %}
         </div>
-        <p class="{% if compact %}text-xs line-clamp-3{% else %}text-sm{% endif %} text-gray-800 whitespace-pre-wrap break-words">{{ comment.body }}</p>
+        <div class="discussion-comment__bubble">
+            <p class="discussion-comment__body" dir="auto">{{ comment.body }}</p>
+        </div>
     </div>
 </div>
 {% endmacro %}
-

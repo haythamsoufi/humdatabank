@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -708,6 +709,26 @@ class PBProgressService:
         if size_bytes > max_bytes:
             raise ValueError("Uploaded file exceeds the maximum allowed size.")
 
+        temp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+                file_storage.stream.seek(0)
+                tmp.write(file_storage.read())
+                temp_path = tmp.name
+
+            from plugins.pb_progress.db_source import WorkbookValidationError, validate_uploaded_workbook
+
+            validation = validate_uploaded_workbook(temp_path)
+        except WorkbookValidationError as exc:
+            raise ValueError(str(exc)) from exc
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+
+        file_storage.stream.seek(0)
         storage_service.upload(STORAGE_CATEGORY, cls._excel_rel(version), file_storage)
 
         uploaded_at = cls._now_iso()
@@ -725,7 +746,9 @@ class PBProgressService:
             state["status"] = "idle"
             state["error"] = None
         cls._persist_status(version)
-        return cls._import_system_config_after_excel_upload(version, excel_info)
+        result = cls._import_system_config_after_excel_upload(version, excel_info)
+        result["validation"] = validation
+        return result
 
     @classmethod
     def _import_system_config_after_excel_upload(

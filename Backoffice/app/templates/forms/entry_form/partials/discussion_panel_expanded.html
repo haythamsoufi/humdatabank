@@ -5,19 +5,19 @@
 {% set max_length = 2000 %}
 
 <div id="discussion-sidebar-expanded"
-     class="discussion-sidebar-expanded"
+     class="discussion-sidebar-expanded w-full px-6 pb-6"
      aria-hidden="true">
-    <div id="discussion-panel-body" class="flex flex-col min-h-0 h-full">
+    <div id="discussion-panel-body">
         {% if panel_description %}
         <p class="flex-shrink-0 text-xs text-gray-600 px-1 pb-3 border-b border-gray-100 mb-3">{{ panel_description }}</p>
         {% endif %}
 
         <div id="discussion-comments-list"
-             class="discussion-sidebar-comments flex-1 min-h-0 overflow-y-auto space-y-3 pr-1"
+             class="discussion-sidebar-comments overflow-y-auto"
              aria-live="polite">
             {% if discussion_comments %}
                 {% for comment in discussion_comments %}
-                    {{ discussion_comment_row(comment, compact=false) }}
+                    {{ discussion_comment_row(comment, compact=false, current_user_id=current_user.id if current_user.is_authenticated else none, can_edit=can_edit) }}
                 {% endfor %}
             {% else %}
                 <p id="discussion-expanded-empty-state" class="text-sm text-gray-500 italic">{{ _('No comments yet.') }}</p>
@@ -25,7 +25,7 @@
         </div>
 
         {% if can_edit %}
-        <div id="discussion-compose" class="flex-shrink-0 border-t border-gray-200 pt-3 mt-3">
+        <div id="discussion-compose" class="discussion-sidebar-compose flex-shrink-0 border-t border-gray-200 pt-3 mt-3">
             <label for="discussion-comment-input" class="sr-only">{{ _('Add a comment') }}</label>
             <textarea id="discussion-comment-input"
                       rows="3"
@@ -36,8 +36,8 @@
                 <p id="discussion-comment-error" class="text-xs text-red-600 hidden" role="alert"></p>
                 <button type="button"
                         id="discussion-post-btn"
-                        class="btn btn-primary btn-sm ml-auto">
-                    <i class="fas fa-paper-plane mr-1" aria-hidden="true"></i>
+                        class="btn btn-primary btn-sm ms-auto">
+                    <i class="fas fa-paper-plane me-1" aria-hidden="true"></i>
                     {{ _('Post comment') }}
                 </button>
             </div>
@@ -45,4 +45,4 @@
         {% endif %}
     </div>
 </div>
-
+

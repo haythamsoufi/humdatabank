@@ -53,9 +53,6 @@ export const FormPopulationMixin = {
                 case 'image':
                     this.populateImageForm(itemData);
                     break;
-                case 'discussion':
-                    this.populateDiscussionForm(itemData);
-                    break;
             }
         }
     },
@@ -226,31 +223,6 @@ export const FormPopulationMixin = {
         ImageItem.populateForm(this.modalElement, itemData);
         this.populateCommonFields(itemData);
         this.ensureDisplayOnlyPropertyFields('image');
-    },
-
-    populateDiscussionForm: function(itemData) {
-        const sharedLabelTranslations = document.querySelector(this.sharedFields.label_translations);
-        const sharedDescriptionTranslations = document.querySelector(this.sharedFields.description_translations);
-
-        const titleInput = this.modalElement.querySelector('#item-discussion-title');
-        const descInput = this.modalElement.querySelector('#item-discussion-description');
-        if (titleInput) titleInput.value = itemData.label || '';
-        if (descInput) descInput.value = itemData.description || '';
-        if (sharedLabelTranslations && itemData.label_translations) {
-            sharedLabelTranslations.value = JSON.stringify(itemData.label_translations);
-        }
-        if (sharedDescriptionTranslations && itemData.description_translations) {
-            sharedDescriptionTranslations.value = JSON.stringify(itemData.description_translations);
-        }
-
-        this.syncSharedToUI();
-        this.populateCommonFields(itemData);
-        populateDescriptionVisibility(this.modalElement, itemData);
-        const relevanceBuilderEl = this.modalElement.querySelector('#item-relevance-rule-builder');
-        if (relevanceBuilderEl) {
-            attachRuleData(relevanceBuilderEl, itemData.relevance_condition, 'relevance');
-        }
-        this.ensureDisplayOnlyPropertyFields('discussion');
     },
 
     populatePluginBasicFields: function(itemData) {

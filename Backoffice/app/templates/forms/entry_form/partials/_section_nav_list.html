@@ -1,0 +1,149 @@
+{# Side navigation section list (included inside #sidebar-nav-scroll) #}
+<ul class="sidebar-nav-list space-y-2 px-6">
+    {% if is_public_submission %}
+        <li>
+            <a href="#submitter-information-section"
+               class="section-link group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
+               data-section-id="submitter-information-section" data-page-number="{{ 1 }}">
+                <i class="far fa-circle section-status-icon flex-shrink-0 w-4 h-4 text-gray-400" aria-hidden="true"></i>
+                <span class="truncate min-w-0 flex-1">{{ _('Submitter Information') }}</span>
+            </a>
+        </li>
+    {% endif %}
+    {% if all_sections %}
+        {% set main_sections = [] %}
+        {% set sub_sections_by_parent = {} %}
+
+        {% for section_nav in all_sections %}
+            {% if section_nav.parent_section_id is none %}
+                {% set __ignore = main_sections.append(section_nav) %}
+            {% else %}
+                {% set parent_id = section_nav.parent_section_id %}
+                {% if parent_id not in sub_sections_by_parent %}
+                    {% set __ignore = sub_sections_by_parent.update({parent_id: []}) %}
+                {% endif %}
+                {% set __ignore = sub_sections_by_parent[parent_id].append(section_nav) %}
+            {% endif %}
+        {% endfor %}
+
+        {% if template_structure.is_paginated %}
+            {% set sections_by_page_nav = {} %}
+            {% set page_display_order = {} %}
+            {% set page_names = {} %}
+            {% set sorted_page_info = [] %}
+            {% for section in main_sections %}
+                {% if section.page_id %}
+                    {% set page_id = section.page_id %}
+                {% else %}
+                    {% set page_id = 'default' %}
+                {% endif %}
+                {% if page_id not in sections_by_page_nav %}
+                    {% set __ignore = sections_by_page_nav.update({page_id: []}) %}
+                {% endif %}
+                {% set __ignore = sections_by_page_nav[page_id].append(section) %}
+            {% endfor %}
+
+            {% set sorted_main_sections_nav = [] %}
+            {% for page in published_pages | sort(attribute='order') %}
+                {% set page_id = page.id %}
+                {% set display_order = loop.index %}
+                {% set page_label = page.display_name if page.display_name else (page.name if page.name else _('Page ') ~ display_order) %}
+                {% set __ignore = page_display_order.update({page_id: display_order}) %}
+                {% set __ignore = page_names.update({page_id: page_label}) %}
+                {% if page_id in sections_by_page_nav %}
+                    {% set page_sections = sections_by_page_nav[page_id] | sort(attribute='order') %}
+                    {% for section in page_sections %}
+                        {% set __ignore = sorted_main_sections_nav.append(section) %}
+                    {% endfor %}
+                    {% set __ignore = sorted_page_info.append({'id': page_id, 'number': display_order, 'name': page_label}) %}
+                {% endif %}
+            {% endfor %}
+
+            {% if 'default' in sections_by_page_nav %}
+                {% set default_sections = sections_by_page_nav['default'] | sort(attribute='order') %}
+                {% set default_display_order = (page_display_order|length) + 1 %}
+                {% set __ignore = page_display_order.update({'default': default_display_order}) %}
+                {% set __ignore = page_names.update({'default': _('Unassigned Sections')}) %}
+                {% set __ignore = sorted_page_info.append({'id': 'default', 'number': default_display_order, 'name': _('Unassigned Sections')}) %}
+                {% for section in default_sections %}
+                    {% set __ignore = sorted_main_sections_nav.append(section) %}
+                {% endfor %}
+            {% endif %}
+        {% else %}
+            {% set page_display_order = {'default': 1} %}
+            {% set page_names = {'default': _('Sections')} %}
+            {% set sorted_page_info = [{'id': 'default', 'number': 1, 'name': _('Sections')}] %}
+            {% set sorted_main_sections_nav = main_sections | sort(attribute='order') %}
+        {% endif %}
+
+        {% set nav_last_page_number = namespace(value=none) %}
+        {% for section_nav_item in sorted_main_sections_nav %}
+            {% set section_page_key = section_nav_item.page_id if section_nav_item.page_id is not none else 'default' %}
+            {% set section_page_number = page_display_order.get(section_page_key, 1) %}
+            {% set section_page_name = page_names.get(section_page_key, section_nav_item.page.display_name if section_nav_item.page and section_nav_item.page.display_name else (section_nav_item.page.name if section_nav_item.page else 'Page ' ~ section_page_number)) %}
+            {% if template_structure.is_paginated and sorted_page_info|length > 1 and nav_last_page_number.value != section_page_number %}
+                <li class="sidebar-page-label" role="presentation">{{ section_page_name }}</li>
+                {% set nav_last_page_number.value = section_page_number %}
+            {% endif %}
+            <li>
+                <a href="#section-container-{{ section_nav_item.id }}"
+                   class="section-link group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
+                   data-section-id="section-container-{{ section_nav_item.id }}"
+                   data-page-number="{{ section_page_number }}"
+                   data-page-name="{{ section_page_name }}">
+                    {% set status = section_statuses.get(section_nav_item.name) %}
+                    <i class="section-status-icon
+                        {% if status == 'Completed' %}fas fa-check-circle text-green-500
+                        {% elif status == 'in_progress' %}fas fa-pen text-blue-500
+                        {% elif status == 'Not Started' %}far fa-circle text-gray-400
+                        {% elif status == 'N/A' %}fas fa-minus-circle text-gray-500
+                        {% endif %}
+                        flex-shrink-0 w-4 h-4" aria-hidden="true"></i>
+                    {% set section_nav_display_name = section_nav_item._display_name_resolved if hasattr(section_nav_item, '_display_name_resolved') and section_nav_item._display_name_resolved else (section_nav_item.display_name if section_nav_item.display_name else section_nav_item.name) %}
+                    <span class="truncate min-w-0 flex-1">{{ section_nav_display_name }}</span>
+                </a>
+                {% if section_nav_item.section_type == 'repeat' and section_nav_item.show_entries_in_navigation %}
+                    <ul class="repeat-entry-nav-list ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3" data-repeat-section-id="{{ section_nav_item.id }}"></ul>
+                {% endif %}
+                {% if section_nav_item.id in sub_sections_by_parent %}
+                    {% set nav_sub_sections = sub_sections_by_parent[section_nav_item.id] %}
+                    {% if section_nav_item.section_type == 'repeat' %}
+                        {% set nav_sub_sections = nav_sub_sections | rejectattr('section_type', 'equalto', 'dynamic_indicators') | list %}
+                    {% endif %}
+                    {% if nav_sub_sections %}
+                    <ul class="ml-4 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
+                        {% for sub_section_nav in nav_sub_sections %}
+                            <li>
+                                {% set sub_section_page_key = sub_section_nav.page_id if sub_section_nav.page_id is not none else (section_nav_item.page_id if section_nav_item.page_id is not none else 'default') %}
+                                {% set sub_section_page_number = page_display_order.get(sub_section_page_key, section_page_number) %}
+                                {% set sub_section_page_name = page_names.get(sub_section_page_key, sub_section_nav.page.display_name if sub_section_nav.page and sub_section_nav.page.display_name else (sub_section_nav.page.name if sub_section_nav.page else section_page_name)) %}
+                                <a href="#section-container-{{ sub_section_nav.id }}"
+                                   class="section-link group flex items-center gap-2 px-2 py-1 rounded-md text-xs font-medium text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
+                                   data-section-id="section-container-{{ sub_section_nav.id }}"
+                                   data-page-number="{{ sub_section_page_number }}"
+                                   data-page-name="{{ sub_section_page_name }}">
+                                    {% set sub_status = section_statuses.get(sub_section_nav.name) %}
+                                    <i class="section-status-icon
+                                        {% if sub_status == 'Completed' %}fas fa-check-circle text-green-500
+                                        {% elif sub_status == 'in_progress' %}fas fa-pen text-blue-500
+                                        {% elif sub_status == 'Not Started' %}far fa-circle text-gray-400
+                                        {% elif sub_status == 'N/A' %}fas fa-minus-circle text-gray-500
+                                        {% endif %}
+                                        flex-shrink-0 w-3 h-3" aria-hidden="true"></i>
+                                    {% set sub_section_nav_display_name = sub_section_nav._display_name_resolved if hasattr(sub_section_nav, '_display_name_resolved') and sub_section_nav._display_name_resolved else (sub_section_nav.display_name if sub_section_nav.display_name else sub_section_nav.name) %}
+                                    <span class="truncate min-w-0 flex-1">{% if template_structure.display_order_visible %}{{ sub_section_nav.display_order }}. {% endif %}{{ sub_section_nav_display_name }}</span>
+                                </a>
+                                {% if sub_section_nav.section_type == 'repeat' and sub_section_nav.show_entries_in_navigation %}
+                                    <ul class="repeat-entry-nav-list ml-3 mt-1 space-y-1 border-l-2 border-gray-200 pl-2" data-repeat-section-id="{{ sub_section_nav.id }}"></ul>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                {% endif %}
+            </li>
+        {% endfor %}
+    {% else %}
+         <li><p class="text-sm text-gray-500 italic px-3">{{ _('No sections defined.') }}</p></li>
+    {% endif %}
+</ul>

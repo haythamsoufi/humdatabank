@@ -515,6 +515,8 @@ class FormSection(db.Model):
             return SectionType.dynamic_indicators
         elif st == 'repeat':
             return SectionType.repeat
+        elif st == 'discussion':
+            return SectionType.discussion
         return SectionType.standard
 
     @property

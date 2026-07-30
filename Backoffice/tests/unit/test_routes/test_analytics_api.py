@@ -116,6 +116,12 @@ class TestSessionLogsListApi:
         resp = logged_in_client.get("/admin/api/analytics/session-logs?page=1&per_page=5")
         _assert_status(resp, 200, 302)
 
+    def test_page_view_paths_not_found(self, logged_in_client, db_session):
+        resp = logged_in_client.get(
+            "/admin/api/analytics/session-logs/nonexistent-session/page-view-paths"
+        )
+        _assert_status(resp, 200, 302, 404)
+
 
 # ---------------------------------------------------------------------------
 # end_session_api  POST /admin/api/analytics/end-session/<session_id>

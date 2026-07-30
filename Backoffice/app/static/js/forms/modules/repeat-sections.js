@@ -499,7 +499,7 @@ function hideDynamicSubSectionsInNavigation() {
         navLink?.closest('li')?.remove();
     });
 
-    document.querySelectorAll('#section-navigation-sidebar ul.ml-6').forEach((ul) => {
+    document.querySelectorAll('#section-navigation-sidebar ul ul').forEach((ul) => {
         if (!ul.querySelector('li')) {
             ul.remove();
         }

@@ -6,6 +6,7 @@
 {% from "components/_form_helpers.html" import format_number_value %}
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
 {% from "components/_status_label.html" import status_label, status_label_for_data_flag %}
+{% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
 {% block head %}
@@ -108,13 +109,18 @@
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
                                 {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status) }}
-                                {# Completion rate is loaded asynchronously after page init to keep it off the critical render path. #}
+                                {# Completion rate is stored on assignment_entity_status and rendered immediately. #}
                                 {% if assignment_entity_status_id_for_rate is defined and assignment_entity_status_id_for_rate %}
                                 <span class="mx-2">•</span>
                                 <span class="completion-progress-inline inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
                                     <span class="font-medium">{{ _('Completion:') }}</span>&nbsp;<span class="completion-info-tooltip inline-flex items-center" tabindex="0" aria-label="{{ _('About completion rate')|forceescape }}">
                                         <span class="completion-info-tooltip-trigger inline-flex items-center gap-1 cursor-help rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
+                                            {% if completion_rate is defined and completion_rate is not none %}
+                                            {% set cr = completion_rate|default(0)|float %}
+                                            <span id="completion-rate-display" class="font-medium tabular-nums underline decoration-dotted underline-offset-2 {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}" aria-live="polite">{{ "{:.1f}%".format(cr) }}</span>
+                                            {% else %}
                                             <span id="completion-rate-display" class="font-medium text-gray-400 tabular-nums underline decoration-dotted underline-offset-2" aria-live="polite">…</span>
+                                            {% endif %}
                                             <i class="fas fa-circle-info text-gray-400 text-xs" aria-hidden="true"></i>
                                         </span>
                                         <span class="tooltip-text completion-info-tooltip-text" role="tooltip">
@@ -124,8 +130,9 @@
                                                     id="completion-gap-btn"
                                                     class="completion-gap-btn w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-amber-900 bg-amber-100 border border-amber-300 hover:bg-amber-200 hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-100"
                                                     data-aes-id="{{ assignment_entity_status_id_for_rate }}"
+                                                    {% if completion_rate is defined and completion_rate is not none %}data-completion-rate="{{ completion_rate|float }}"{% endif %}
                                                     aria-pressed="false"
-                                                    disabled>
+                                                    {% if completion_rate is not defined or completion_rate is none or (completion_rate|default(0)|float) >= 100 %}disabled{% endif %}>
                                                 <i class="fas fa-highlighter text-[0.65rem]" aria-hidden="true"></i>
                                                 <span class="completion-gap-btn-label">{{ _('Show me what I missed') }}</span>
                                             </button>
@@ -371,43 +378,37 @@
             <div id="entry-form-skeleton-layout" class="flex flex-col lg:flex-row gap-4 lg:gap-6 min-w-0">
                 {# Sections pane skeleton — same shell classes as #section-navigation-sidebar #}
                 <div id="entry-form-skeleton-sidebar"
-                     class="fixed inset-y-0 left-0 z-40 w-4/5 max-w-xs bg-white pt-6 px-6 pb-0 flex flex-col transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl border-r border-gray-200
-                            xl:relative xl:translate-x-0 xl:transform-none xl:w-1/5 xl:max-w-xs xl:inset-auto xl:z-auto xl:bg-white xl:pt-6 xl:px-6 xl:pb-0 xl:rounded-lg xl:shadow xl:border xl:border-gray-200 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:border-r-0 xl:transition-none min-h-0"
+                     class="entry-form-sections-pane"
                      aria-hidden="true">
-                    <div class="flex-shrink-0 flex items-center justify-between mb-4">
+                    <div class="entry-form-sections-pane__header flex-shrink-0 flex items-center justify-between mb-4 px-6">
                         <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-7 w-28"></div>
                         <div class="entry-form-skeleton-bar entry-form-skeleton-pulse hidden xl:block w-8 h-8 rounded-md shrink-0"></div>
                     </div>
-                    <div class="flex-1 min-h-0 overflow-y-auto">
-                        <ul class="space-y-2">
-                            <li class="flex items-center gap-3 px-3 py-2">
-                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                    <div class="entry-form-sections-pane__scroll flex-1 min-h-0 overflow-y-auto">
+                        <ul class="sidebar-nav-list space-y-2 px-6">
+                            <li class="flex items-center gap-2 px-3 py-2">
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[85%]"></div>
                             </li>
-                            <li class="flex items-center gap-3 px-3 py-2">
-                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                            <li class="flex items-center gap-2 px-3 py-2">
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[70%]"></div>
                             </li>
-                            <li class="flex items-center gap-3 px-3 py-2">
-                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                            <li class="flex items-center gap-2 px-3 py-2">
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[90%]"></div>
                             </li>
-                            <li class="flex items-center gap-3 px-3 py-2">
-                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                            <li class="flex items-center gap-2 px-3 py-2">
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[65%]"></div>
                             </li>
-                            <li class="flex items-center gap-3 px-3 py-2">
-                                <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded shrink-0"></div>
+                            <li class="flex items-center gap-2 px-3 py-2">
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse w-4 h-4 rounded-full shrink-0"></div>
                                 <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-4 flex-1 max-w-[80%]"></div>
                             </li>
                         </ul>
                     </div>
-                    <div class="sticky bottom-0 z-10 mt-6 pt-6 border-t border-gray-200 bg-white pb-6 -mb-6">
+                    <div class="entry-form-sections-pane__footer flex-shrink-0 mt-auto px-6 pt-6 pb-6 border-t border-gray-200 bg-white">
                         <div class="flex flex-wrap gap-2">
                             <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 flex-1 min-w-[6rem] rounded-md"></div>
                             <div class="entry-form-skeleton-bar entry-form-skeleton-pulse h-10 flex-1 min-w-[6rem] rounded-md"></div>
@@ -488,12 +489,11 @@
             {% set _discussion_cfg = tmpl.discussion_config if tmpl and tmpl.discussion_config is mapping else {} %}
             {% set _discussion_show_in_sidebar = _discussion_cfg.get('show_in_sidebar', true) %}
             <div id="section-navigation-sidebar"
-                 class="fixed inset-y-0 left-0 z-40 w-4/5 max-w-xs bg-white pt-6 px-6 pb-0 flex flex-col transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl border-r border-gray-200
-                        xl:relative xl:translate-x-0 xl:transform-none xl:w-1/5 xl:max-w-xs xl:inset-auto xl:z-auto xl:bg-white xl:pt-6 xl:px-6 xl:pb-0 xl:rounded-lg xl:shadow xl:border xl:border-gray-200 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:border-r-0 xl:transition-none min-h-0"
+                 class="entry-form-sections-pane"
                  data-collapsed="false">
 
                 {# Header pinned to top — switches between navigation and discussion #}
-                <div class="flex-shrink-0 flex items-center justify-between mb-4 min-h-[2rem]">
+                <div class="entry-form-sections-pane__header flex-shrink-0 flex items-center justify-between mb-4 min-h-[2rem] px-6">
                     <div id="sidebar-header-nav" class="flex items-center justify-between w-full gap-2">
                         <h2 id="sidebar-title" class="text-xl font-semibold text-gray-700">{{ _('Navigation') }}</h2>
                         <div class="flex items-center gap-1">
@@ -509,176 +509,22 @@
                             </button>
                         </div>
                     </div>
-                    <div id="sidebar-header-discussion" class="hidden items-center justify-between w-full gap-2" aria-hidden="true">
+                    <div id="sidebar-header-discussion" class="hidden items-center w-full gap-2 min-w-0" aria-hidden="true">
                         <button type="button"
                                 id="discussion-collapse-btn"
-                                class="btn btn-ghost btn-sm text-gray-600 hover:text-gray-900 -ml-2"
+                                class="btn btn-secondary btn-sm flex-shrink-0"
                                 aria-label="{{ _('Back to navigation')|forceescape }}">
-                            <i class="fas fa-chevron-left mr-1" aria-hidden="true"></i>
-                            <span class="text-sm font-medium">{{ _('Back') }}</span>
+                            <i class="fas fa-chevron-left discussion-back-chevron" aria-hidden="true"></i>
+                            {{ _('Back') }}
                         </button>
-                        <h2 id="sidebar-discussion-title" class="text-base font-semibold text-gray-800 truncate flex-1 text-right xl:text-left">{{ _('Comments & Discussion') }}</h2>
+                        <h2 id="sidebar-discussion-title" class="text-base font-semibold text-gray-800 truncate min-w-0 flex-1">{{ _('Comments & Discussion') }}</h2>
                     </div>
                 </div>
                 {# Shared pane: section navigation + discussion preview / expanded overlay #}
                 <div id="sidebar-shared-pane" class="flex-1 min-h-0 flex flex-col relative">
-                <div id="sidebar-nav-pane" class="sidebar-pane sidebar-pane--nav flex-1 min-h-0 flex flex-col transition-all duration-300 ease-in-out">
-                {# Scrollable section list #}
-                <div id="sidebar-nav-scroll" class="flex-1 min-h-0 overflow-y-auto">
-                <ul class="space-y-2">
-                    {% if is_public_submission %}
-                        <li>
-                            <a href="#submitter-information-section"
-                               class="section-link group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
-                               data-section-id="submitter-information-section" data-page-number="{{ 1 }}">
-                                <i class="fas fa-user flex-shrink-0 w-4 h-4 text-gray-500"></i>
-                                <i class="far fa-circle flex-shrink-0 w-4 h-4 text-gray-400"></i>
-                                <span class="truncate">{{ _('Submitter Information') }}</span>
-                            </a>
-                        </li>
-                    {% endif %}
-                    {% if all_sections %}
-                        {% set main_sections = [] %}
-                        {% set sub_sections_by_parent = {} %}
-
-                        {% for section_nav in all_sections %}
-                            {% if section_nav.parent_section_id is none %}
-                                {% set __ignore = main_sections.append(section_nav) %}
-                            {% else %}
-                                {% set parent_id = section_nav.parent_section_id %}
-                                {% if parent_id not in sub_sections_by_parent %}
-                                    {% set __ignore = sub_sections_by_parent.update({parent_id: []}) %}
-                                {% endif %}
-                                {% set __ignore = sub_sections_by_parent[parent_id].append(section_nav) %}
-                            {% endif %}
-                        {% endfor %}
-
-                        {# Sort sections for navigation based on whether template is paginated #}
-                        {% if template_structure.is_paginated %}
-                            {# For paginated templates: Group sections by page and sort by page order, then section order #}
-                            {% set sections_by_page_nav = {} %}
-                            {% set page_display_order = {} %}
-                            {% set page_names = {} %}
-                            {% set sorted_page_info = [] %}
-                            {% for section in main_sections %}
-                                {% if section.page_id %}
-                                    {% set page_id = section.page_id %}
-                                {% else %}
-                                    {% set page_id = 'default' %}
-                                {% endif %}
-                                {% if page_id not in sections_by_page_nav %}
-                                    {% set __ignore = sections_by_page_nav.update({page_id: []}) %}
-                                {% endif %}
-                                {% set __ignore = sections_by_page_nav[page_id].append(section) %}
-                            {% endfor %}
-
-                            {# Sort pages by order and sections within each page by order #}
-                            {% set sorted_main_sections_nav = [] %}
-                            {% for page in published_pages | sort(attribute='order') %}
-                                {% set page_id = page.id %}
-                                {% set display_order = loop.index %}
-                                {% set page_label = page.display_name if page.display_name else (page.name if page.name else _('Page ') ~ display_order) %}
-                                {% set __ignore = page_display_order.update({page_id: display_order}) %}
-                                {% set __ignore = page_names.update({page_id: page_label}) %}
-                                {% if page_id in sections_by_page_nav %}
-                                    {% set page_sections = sections_by_page_nav[page_id] | sort(attribute='order') %}
-                                    {% for section in page_sections %}
-                                        {% set __ignore = sorted_main_sections_nav.append(section) %}
-                                    {% endfor %}
-                                    {% set __ignore = sorted_page_info.append({'id': page_id, 'number': display_order, 'name': page_label}) %}
-                                {% endif %}
-                            {% endfor %}
-
-                            {# Add sections without page assignment at the end #}
-                            {% if 'default' in sections_by_page_nav %}
-                                {% set default_sections = sections_by_page_nav['default'] | sort(attribute='order') %}
-                                {% set default_display_order = (page_display_order|length) + 1 %}
-                                {% set __ignore = page_display_order.update({'default': default_display_order}) %}
-                                {% set __ignore = page_names.update({'default': _('Unassigned Sections')}) %}
-                                {% set __ignore = sorted_page_info.append({'id': 'default', 'number': default_display_order, 'name': _('Unassigned Sections')}) %}
-                                {% for section in default_sections %}
-                                    {% set __ignore = sorted_main_sections_nav.append(section) %}
-                                {% endfor %}
-                            {% endif %}
-                        {% else %}
-                            {# For non-paginated templates: Just sort sections by their order #}
-                            {% set page_display_order = {'default': 1} %}
-                            {% set page_names = {'default': _('Sections')} %}
-                            {% set sorted_page_info = [{'id': 'default', 'number': 1, 'name': _('Sections')}] %}
-                            {% set sorted_main_sections_nav = main_sections | sort(attribute='order') %}
-                        {% endif %}
-
-                        {% for section_nav_item in sorted_main_sections_nav %}
-                            <li>
-                                {% set section_page_key = section_nav_item.page_id if section_nav_item.page_id is not none else 'default' %}
-                                {% set section_page_number = page_display_order.get(section_page_key, 1) %}
-                                {% set section_page_name = page_names.get(section_page_key, section_nav_item.page.display_name if section_nav_item.page and section_nav_item.page.display_name else (section_nav_item.page.name if section_nav_item.page else 'Page ' ~ section_page_number)) %}
-                                <a href="#section-container-{{ section_nav_item.id }}"
-                                   class="section-link group flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150 ease-in-out"
-                                   data-section-id="section-container-{{ section_nav_item.id }}"
-                                   data-page-number="{{ section_page_number }}"
-                                   data-page-name="{{ section_page_name }}">
-                                    <i class="fas fa-layer-group flex-shrink-0 w-4 h-4 text-gray-500"></i>
-                                    {% set status = section_statuses.get(section_nav_item.name) %}
-                                    <i class="section-status-icon
-                                        {% if status == 'Completed' %}fas fa-check-circle text-green-500
-                                        {% elif status == 'in_progress' %}fas fa-pen text-blue-500
-                                        {% elif status == 'Not Started' %}far fa-circle text-gray-400
-                                        {% elif status == 'N/A' %}fas fa-minus-circle text-gray-500
-                                        {% endif %}
-                                        flex-shrink-0 w-4 h-4"></i>
-                                    {% set section_nav_display_name = section_nav_item._display_name_resolved if hasattr(section_nav_item, '_display_name_resolved') and section_nav_item._display_name_resolved else (section_nav_item.display_name if section_nav_item.display_name else section_nav_item.name) %}
-                                    <span class="truncate min-w-0 flex-1">{{ section_nav_display_name }}</span>
-                                </a>
-                                {% if section_nav_item.section_type == 'repeat' and section_nav_item.show_entries_in_navigation %}
-                                    <ul class="repeat-entry-nav-list ml-6 mt-2 space-y-1 border-l-2 border-blue-200 pl-3" data-repeat-section-id="{{ section_nav_item.id }}"></ul>
-                                {% endif %}
-                                {% if section_nav_item.id in sub_sections_by_parent %}
-                                    {% set nav_sub_sections = sub_sections_by_parent[section_nav_item.id] %}
-                                    {# Dynamic indicator sub-sections live inside each repeat entry; skip them in side nav. #}
-                                    {% if section_nav_item.section_type == 'repeat' %}
-                                        {% set nav_sub_sections = nav_sub_sections | rejectattr('section_type', 'equalto', 'dynamic_indicators') | list %}
-                                    {% endif %}
-                                    {% if nav_sub_sections %}
-                                    <ul class="ml-6 mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
-                                        {% for sub_section_nav in nav_sub_sections %}
-                                            <li>
-                                                {% set sub_section_page_key = sub_section_nav.page_id if sub_section_nav.page_id is not none else (section_nav_item.page_id if section_nav_item.page_id is not none else 'default') %}
-                                                {% set sub_section_page_number = page_display_order.get(sub_section_page_key, section_page_number) %}
-                                                {% set sub_section_page_name = page_names.get(sub_section_page_key, sub_section_nav.page.display_name if sub_section_nav.page and sub_section_nav.page.display_name else (sub_section_nav.page.name if sub_section_nav.page else section_page_name)) %}
-                                                <a href="#section-container-{{ sub_section_nav.id }}"
-                                   class="section-link group flex items-center gap-2 px-2 py-1 rounded-md text-xs font-medium text-gray-600 hover:bg-teal-50 hover:text-teal-600 transition duration-150 ease-in-out"
-                                   data-section-id="section-container-{{ sub_section_nav.id }}"
-                                   data-page-number="{{ sub_section_page_number }}"
-                                   data-page-name="{{ sub_section_page_name }}">
-                                    <i class="fas fa-indent flex-shrink-0 w-3 h-3 text-teal-500"></i>
-                                    {% set sub_status = section_statuses.get(sub_section_nav.name) %}
-                                    <i class="section-status-icon
-                                        {% if sub_status == 'Completed' %}fas fa-check-circle text-green-500
-                                        {% elif sub_status == 'in_progress' %}fas fa-pen text-blue-500
-                                        {% elif sub_status == 'Not Started' %}far fa-circle text-gray-400
-                                        {% elif sub_status == 'N/A' %}fas fa-minus-circle text-gray-500
-                                        {% endif %}
-                                        flex-shrink-0 w-3 h-3"></i>
-                                    {% set sub_section_nav_display_name = sub_section_nav._display_name_resolved if hasattr(sub_section_nav, '_display_name_resolved') and sub_section_nav._display_name_resolved else (sub_section_nav.display_name if sub_section_nav.display_name else sub_section_nav.name) %}
-                                    <span class="truncate text-teal-700 min-w-0 flex-1">{% if template_structure.display_order_visible %}{{ sub_section_nav.display_order }}. {% endif %}{{ sub_section_nav_display_name }}</span>
-                                                </a>
-                                                {% if sub_section_nav.section_type == 'repeat' and sub_section_nav.show_entries_in_navigation %}
-                                                    <ul class="repeat-entry-nav-list ml-4 mt-1 space-y-1 border-l-2 border-blue-200 pl-2" data-repeat-section-id="{{ sub_section_nav.id }}"></ul>
-                                                {% endif %}
-                                            </li>
-                                        {% endfor %}
-                                    </ul>
-                                    {% endif %}
-                                {% endif %}
-                            </li>
-                        {% endfor %}
-                    {% else %}
-                         <li><p class="text-sm text-gray-500 italic">{{ _('No sections defined.') }}</p></li>
-                    {% endif %}
-                </ul>
+                <div id="sidebar-nav-scroll" class="sidebar-pane sidebar-pane--nav flex-1 min-h-0 overflow-y-auto transition-all duration-300 ease-in-out">
+                    {% include 'forms/entry_form/partials/_section_nav_list.html' %}
                 </div>
-                </div>{# /sidebar-nav-pane #}
 
                 {% if tmpl and tmpl.enable_discussion and _discussion_show_in_sidebar and not is_preview_mode %}
                     {% include 'forms/entry_form/partials/discussion_panel_expanded.html' %}
@@ -687,7 +533,7 @@
 
                 {% set _has_sidebar_discussion = tmpl and tmpl.enable_discussion and _discussion_show_in_sidebar and not is_preview_mode %}
                 {% if can_edit or (not is_preview_mode and not is_public_submission) or _has_sidebar_discussion %}
-                <div id="sidebar-bottom-dock" class="flex-shrink-0 mt-auto w-full bg-white z-10 pb-6 -mb-6">
+                <div id="sidebar-bottom-dock" class="entry-form-sections-pane__footer flex-shrink-0 mt-auto w-full bg-white z-10 px-6 pb-6">
                 {% if can_edit %}
                 <div id="sidebar-action-buttons" class="pt-6 border-t border-gray-200 bg-white">
                     {% if is_preview_mode %}
@@ -769,7 +615,7 @@
                 {% endif %}
 
                 {% if _has_sidebar_discussion %}
-                <div id="sidebar-discussion-footer" class="{% if can_edit or (not is_preview_mode and not is_public_submission) %}border-t border-gray-200{% endif %} bg-white">
+                <div id="sidebar-discussion-footer" class="bg-white">
                     {% include 'forms/entry_form/partials/discussion_panel.html' %}
                 </div>
                 {% endif %}
@@ -915,7 +761,9 @@
 
                                     <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-4 sm:space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}
                                         {# Render direct fields of the parent section #}
-                                        {% if section.fields_ordered %}
+                                        {% if section.section_type == 'discussion' %}
+                                            {% include 'forms/entry_form/partials/discussion_panel_section.html' %}
+                                        {% elif section.fields_ordered %}
                                             {% for field in section.fields_ordered %}
                                                 {# Unified FormItem approach - check for document fields #}
                                                 {% if hasattr(field, 'item_type') %}
@@ -928,7 +776,6 @@
 
                                                 {% set is_blank_block = field.field_type_for_js|lower == 'blank' %}
                                                 {% set is_image_block = field.field_type_for_js|lower == 'image' %}
-                                                {% set is_discussion_block = field.field_type_for_js|lower == 'discussion' %}
 
                                                 {% if is_blank_block %}
                                                     {# Blank/Note: Question Text (label) in bold, Definition as normal text below #}
@@ -971,8 +818,6 @@
                                                             <p class="text-gray-700 text-sm text-center mt-2">{{ field_display_label }}</p>
                                                         {% endif %}
                                                     </div>
-                                                {% elif is_discussion_block %}
-                                                    {% include 'forms/entry_form/partials/discussion_panel_inline.html' %}
                                                 {% elif field.item_type and field.item_type.startswith('plugin_') %}
                                                     {# Plugin Field - render using plugin template #}
                                                     {% set is_sub_item_plugin = field.is_sub_item %}
@@ -1001,7 +846,7 @@
                                                         <div class="flex items-start justify-between">
                                                             <div class="flex-1 pr-2">
                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                                <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                <label {{ entry_form_field_label_binding(field, is_plugin=true) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                     {% if is_sub_item_plugin %}
                                                                         <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}</span>
                                                                     {% else %}
@@ -1144,7 +989,7 @@
                                                             <div class="flex-1 pr-2">
                                                                 {# Use resolved display label if available (for variable replacement), otherwise use original #}
                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                                <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                <label {{ entry_form_field_label_binding(field, is_dynamic_indicator=is_dynamic_indicator, unified_item_type=unified_item_type) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                     {% if is_sub_item %}
                                                                         <span class="text-gray-600">
                                                                             {% if template_structure.display_order_visible %}{{ section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}
@@ -1966,7 +1811,7 @@
                                                                         <div class="flex items-start justify-between">
                                                                             <div class="flex-1 pr-2">
                                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                                                <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                                <label {{ entry_form_field_label_binding(field, is_plugin=true) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                                     {% if is_sub_item_plugin %}
                                                                                         <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ sub_section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}</span>
                                                                                     {% else %}
@@ -2094,7 +1939,7 @@
                                                                          {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}"{% endif %}>
                                                                 <div class="flex items-start justify-between">
                                                                     <div class="flex-1 pr-2">
-                                                                        <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                        <label {{ entry_form_field_label_binding(field, is_dynamic_indicator=is_dynamic_indicator, unified_item_type=unified_item_type) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                             {% if is_sub_item %}
                                                                                 <span class="text-gray-600">
                                                                                     {% if template_structure.display_order_visible %}{{ sub_section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field.display_label }}
@@ -2869,7 +2714,7 @@
         {% call modal_shell('document-upload-modal', doc_modal_title, aria_label=_('Upload Document'), max_width='max-w-lg', title_safe=true, close_class='close-modal-btn', data_attrs=doc_modal_data, title_class='flex items-center mb-5') %}
                 <div class="flex flex-col space-y-4">
                     <div>
-                        <label for="document-field-name" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Field:') }}</label>
+                        <span class="block text-sm font-medium text-gray-700 mb-1">{{ _('Field:') }}</span>
                         <p id="document-field-name" class="text-gray-900 font-medium"></p>
                         <p id="modal-locked-period-line" class="text-xs text-gray-600 mt-1 hidden" role="note" aria-live="polite"></p>
                         <input type="hidden" id="modal-document-id" name="document_id" value="">

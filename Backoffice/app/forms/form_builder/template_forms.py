@@ -35,7 +35,7 @@ class FormTemplateForm(BaseForm):
         choices=[('oldest_first', _('Oldest first')), ('newest_first', _('Newest first'))],
         default='oldest_first',
     )
-    discussion_default_collapsed = BooleanField(_("Collapsed by default"), default=False)
+    discussion_default_expanded = BooleanField(_("Expand by default"), default=True)
     discussion_show_in_sidebar = BooleanField(_("Show in side navigation panel"), default=True)
     data_quality_methodology = SelectField(
         _("Data quality methodology"),

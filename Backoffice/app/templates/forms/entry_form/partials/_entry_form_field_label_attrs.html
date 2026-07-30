@@ -1,0 +1,42 @@
+{# Emit id or for on the main field title label (never both).
+   - for="field-<id>" when a labelable control uses id="field-<id>"
+   - id="field-<id>" for group labels (matrix, plugin, document, disaggregated number, yes/no, etc.)
+   - neither when multiple_choice (wrapper div already uses id="field-<id>")
+   Params:
+     field — form item
+     is_plugin — plugin field block (optional, default false)
+     is_document — document field block (optional, default false)
+     is_dynamic_indicator — dynamic indicator block (optional, default false)
+     unified_item_type — 'matrix' | 'indicator' | 'question' | ... (optional)
+#}
+{% macro entry_form_field_label_binding(field, is_plugin=false, is_document=false, is_dynamic_indicator=false, unified_item_type=none) -%}
+{%- set binding = 'id' -%}
+{%- if is_plugin or is_document or unified_item_type == 'matrix' -%}
+  {%- set binding = 'id' -%}
+{%- elif is_dynamic_indicator -%}
+  {%- set ft = (field.field_type_for_js or '')|lower -%}
+  {%- if ft in ['number', 'currency', 'yesno'] -%}
+    {%- set binding = 'id' -%}
+  {%- else -%}
+    {%- set binding = 'for' -%}
+  {%- endif -%}
+{%- elif field.is_indicator -%}
+  {%- set ft = (field.field_type_for_js or '')|lower -%}
+  {%- if ft in ['number', 'currency', 'yesno'] -%}
+    {%- set binding = 'id' -%}
+  {%- else -%}
+    {%- set binding = 'for' -%}
+  {%- endif -%}
+{%- elif field.is_question -%}
+  {%- if field.field_type_for_js == 'multiple_choice' -%}
+    {%- set binding = 'none' -%}
+  {%- elif field.field_type_for_js == 'yesno' -%}
+    {%- set binding = 'id' -%}
+  {%- else -%}
+    {%- set binding = 'for' -%}
+  {%- endif -%}
+{%- else -%}
+  {%- set binding = 'for' -%}
+{%- endif -%}
+{%- if binding == 'for' -%}for="field-{{ field.id }}"{%- elif binding == 'id' -%}id="field-{{ field.id }}"{%- endif -%}
+{%- endmacro %}

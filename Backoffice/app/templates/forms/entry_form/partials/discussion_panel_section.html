@@ -1,143 +1,85 @@
 {% from "forms/entry_form/partials/discussion_comment_macros.html" import discussion_comment_row %}
 
-{% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-
-{% set field_display_description = field._display_description if hasattr(field, '_display_description') and field._display_description else field.description %}
+{% set section_display_name = section._display_name_resolved if hasattr(section, '_display_name_resolved') and section._display_name_resolved else section.display_name %}
 
 {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
 
 {% set discussion_cfg = tmpl.discussion_config if tmpl and tmpl.discussion_config is mapping else {} %}
 
-{% set panel_title = field_display_label|trim if field_display_label|trim else (discussion_cfg.get('title') or _('Comments & Discussion')) %}
+{% set panel_title = section_display_name|trim if section_display_name|trim else (discussion_cfg.get('title') or _('Comments & Discussion')) %}
 
-{% set panel_description = field_display_description|trim if field_display_description|trim else (discussion_cfg.get('description') or '') %}
+{% set panel_description = discussion_cfg.get('description') or '' %}
 
 {% set max_length = 2000 %}
 
 {% set aes_id = assignment_entity_status_id if assignment_entity_status_id is defined else (assignment_status.id if assignment_status else none) %}
 
-{% set instance_id = field.id %}
+{% set instance_id = section.id %}
 
 {% set comment_count = discussion_comments | length if discussion_comments else 0 %}
 
-
-
 <div class="form-item-block discussion-form-item bg-white rounded-lg border border-gray-200 shadow-sm min-w-0"
-
-     data-item-id="{{ field.id }}"
-
+     data-section-id="{{ section.id }}"
      data-item-type="discussion"
-
-     data-layout-width="{{ field.layout_column_width or 12 }}"
-
-     data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
-
      data-aes-id="{{ aes_id }}"
-
-     data-discussion-instance="item-{{ instance_id }}"
-
+     data-discussion-instance="section-{{ instance_id }}"
      data-max-length="{{ max_length }}"
-
      data-can-edit="{{ 'true' if can_edit else 'false' }}"
-
+     data-current-user-id="{{ current_user.id if current_user and current_user.is_authenticated else 0 }}"
      data-comment-count="{{ comment_count }}"
-
      data-panel-title="{{ panel_title|forceescape }}"
-
-     data-i18n-show-more="{{ _('Show %(count)s more', count='%(count)s')|forceescape }}">
-
+     data-i18n-show-more="{{ _('Show %(count)s more', count='%(count)s')|forceescape }}"
+     data-i18n-historical-import="{{ _('Historical import')|forceescape }}"
+     data-i18n-edit="{{ _('Edit comment')|forceescape }}"
+     data-i18n-delete="{{ _('Delete comment')|forceescape }}"
+     data-i18n-save="{{ _('Save')|forceescape }}"
+     data-i18n-cancel="{{ _('Cancel')|forceescape }}"
+     data-i18n-delete-title="{{ _('Delete comment?')|forceescape }}"
+     data-i18n-delete-confirm="{{ _('Delete this comment? This cannot be undone.')|forceescape }}">
     <div class="px-4 sm:px-6 py-4">
-
         <div class="flex items-center gap-2 mb-3 min-w-0">
-
             <i class="fas fa-comments text-blue-600" aria-hidden="true"></i>
-
             <h3 class="text-base font-semibold text-gray-800 truncate">{{ panel_title }}</h3>
-
         </div>
 
-
-
         {% if tmpl and tmpl.enable_discussion and not is_preview_mode %}
-
             {% if panel_description %}
-
             <p class="text-sm text-gray-600 mb-4">{{ panel_description }}</p>
-
             {% endif %}
 
-
-
-            <div id="discussion-comments-list-item-{{ instance_id }}"
-
-                 class="discussion-inline-comments space-y-4 max-h-[28rem] overflow-y-auto pr-1"
-
+            <div id="discussion-comments-list-section-{{ instance_id }}"
+                 class="discussion-inline-comments max-h-[28rem] overflow-y-auto"
                  aria-live="polite">
-
                 {% if discussion_comments %}
-
                     {% for comment in discussion_comments %}
-
-                        {{ discussion_comment_row(comment, compact=false) }}
-
+                        {{ discussion_comment_row(comment, compact=false, current_user_id=current_user.id if current_user.is_authenticated else none, can_edit=can_edit) }}
                     {% endfor %}
-
                 {% else %}
-
-                    <p id="discussion-empty-state-item-{{ instance_id }}" class="text-sm text-gray-500 italic">{{ _('No comments yet.') }}</p>
-
+                    <p id="discussion-empty-state-section-{{ instance_id }}" class="text-sm text-gray-500 italic">{{ _('No comments yet.') }}</p>
                 {% endif %}
-
             </div>
-
-
 
             {% if can_edit %}
-
-            <div id="discussion-compose-item-{{ instance_id }}" class="border-t border-gray-200 pt-4 mt-4">
-
-                <label for="discussion-comment-input-item-{{ instance_id }}" class="sr-only">{{ _('Add a comment') }}</label>
-
-                <textarea id="discussion-comment-input-item-{{ instance_id }}"
-
+            <div id="discussion-compose-section-{{ instance_id }}" class="border-t border-gray-200 pt-4 mt-4">
+                <label for="discussion-comment-input-section-{{ instance_id }}" class="sr-only">{{ _('Add a comment') }}</label>
+                <textarea id="discussion-comment-input-section-{{ instance_id }}"
                           rows="3"
-
                           maxlength="{{ max_length }}"
-
                           class="discussion-comment-input block w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-
                           placeholder="{{ _('Add a comment…')|forceescape }}"></textarea>
-
                 <div class="mt-2 flex items-center justify-between gap-3">
-
-                    <p id="discussion-comment-error-item-{{ instance_id }}" class="text-sm text-red-600 hidden discussion-comment-error" role="alert"></p>
-
+                    <p id="discussion-comment-error-section-{{ instance_id }}" class="text-sm text-red-600 hidden discussion-comment-error" role="alert"></p>
                     <button type="button"
-
-                            id="discussion-post-btn-item-{{ instance_id }}"
-
-                            class="discussion-post-btn btn btn-primary btn-sm ml-auto">
-
-                        <i class="fas fa-paper-plane mr-1" aria-hidden="true"></i>
-
+                            id="discussion-post-btn-section-{{ instance_id }}"
+                            class="discussion-post-btn btn btn-primary btn-sm ms-auto">
+                        <i class="fas fa-paper-plane me-1" aria-hidden="true"></i>
                         {{ _('Post comment') }}
-
                     </button>
-
                 </div>
-
             </div>
-
             {% endif %}
-
         {% else %}
-
             <p class="text-sm text-gray-500 italic">{{ _('Discussion is disabled for this template. Enable it in template settings to show comments here.') }}</p>
-
         {% endif %}
-
     </div>
-
 </div>
-
-

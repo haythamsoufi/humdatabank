@@ -115,7 +115,6 @@ export const ItemTypeUIMixin = {
         const documentFields = Utils.getElementById('item-document-fields');
         const matrixFields = Utils.getElementById('item-matrix-fields');
         const imageFields = Utils.getElementById('item-image-fields');
-        const discussionFields = Utils.getElementById('item-discussion-fields');
         const pluginFieldsContainer = Utils.getElementById('item-plugin-fields-container');
 
         const setContainerDisabled = (container, disabled) => {
@@ -131,14 +130,12 @@ export const ItemTypeUIMixin = {
         Utils.hideElement(documentFields);
         Utils.hideElement(matrixFields);
         Utils.hideElement(imageFields);
-        Utils.hideElement(discussionFields);
         Utils.hideElement(pluginFieldsContainer);
         setContainerDisabled(indicatorFields, true);
         setContainerDisabled(questionFields, true);
         setContainerDisabled(documentFields, true);
         setContainerDisabled(matrixFields, true);
         setContainerDisabled(imageFields, true);
-        setContainerDisabled(discussionFields, true);
         setContainerDisabled(pluginFieldsContainer, true);
 
         if (itemType !== 'question') {
@@ -178,11 +175,6 @@ export const ItemTypeUIMixin = {
         }
         if (imageFields) {
             imageFields.querySelectorAll('[required]').forEach(field => {
-                field.removeAttribute('required');
-            });
-        }
-        if (discussionFields) {
-            discussionFields.querySelectorAll('[required]').forEach(field => {
                 field.removeAttribute('required');
             });
         }
@@ -252,15 +244,6 @@ export const ItemTypeUIMixin = {
             Utils.showElement(imageFields);
             setContainerDisabled(imageFields, false);
             this.setupImageFields();
-        } else if (itemType === 'discussion') {
-            try { MatrixItem.teardown(this.modalElement); } catch (e) {}
-            try { QuestionItem.teardown(this.modalElement); } catch (e) {}
-            try { IndicatorItem.teardown(this.modalElement); } catch (e) {}
-            try { PluginItem.teardown(this.modalElement); } catch (e) {}
-            try { ImageItem.teardown(this.modalElement); } catch (e) {}
-            Utils.showElement(discussionFields);
-            setContainerDisabled(discussionFields, false);
-            this.ensureDisplayOnlyPropertyFields('discussion');
         } else if (itemType.startsWith('plugin_')) {
             try { MatrixItem.teardown(this.modalElement); } catch (e) {}
             try { QuestionItem.teardown(this.modalElement); } catch (e) {}
@@ -275,7 +258,6 @@ export const ItemTypeUIMixin = {
 
         const validationRuleToggle = Utils.getElementById('validation-rule-toggle-section');
         const hideValidation = itemType === 'document_field'
-            || itemType === 'discussion'
             || this.isDisplayOnlyItemType(itemType, this.currentQuestionType);
         if (hideValidation) {
             Utils.hideElement(validationRuleToggle);
@@ -481,8 +463,6 @@ export const ItemTypeUIMixin = {
                 return 'fas fa-table w-6 h-6 mr-2 text-orange-600';
             case 'image':
                 return 'fas fa-image w-6 h-6 mr-2 text-teal-600';
-            case 'discussion':
-                return 'fas fa-comments w-6 h-6 mr-2 text-sky-600';
             default:
                 return 'fas fa-plus-circle w-6 h-6 mr-2 text-gray-600';
         }
@@ -576,8 +556,6 @@ export const ItemTypeUIMixin = {
                 return 'Matrix Table';
             case 'image':
                 return 'Image';
-            case 'discussion':
-                return 'Discussion';
             default:
                 return 'Item';
         }

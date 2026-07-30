@@ -622,6 +622,39 @@
             updateDiscussionVisibility();
             discussionCheckbox.addEventListener('change', updateDiscussionVisibility);
         }
+
+        const addDiscussionSectionBtn = document.getElementById('add-discussion-section-btn');
+        if (addDiscussionSectionBtn) {
+            addDiscussionSectionBtn.addEventListener('click', function () {
+                const btn = this;
+                const url = btn.dataset.createUrl;
+                const versionId = btn.dataset.versionId;
+                let csrfToken = '';
+                try {
+                    csrfToken = JSON.parse(document.getElementById('csrf-token-data')?.textContent || '""');
+                } catch (_e) {
+                    csrfToken = '';
+                }
+                if (!url || !csrfToken) {
+                    return;
+                }
+                btn.disabled = true;
+                const formData = new FormData();
+                formData.append('csrf_token', csrfToken);
+                formData.append('version_id', versionId);
+                fetch(url, { method: 'POST', body: formData, credentials: 'same-origin', redirect: 'follow' })
+                    .then((resp) => {
+                        if (resp.redirected) {
+                            window.location.href = resp.url;
+                        } else {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(() => {
+                        btn.disabled = false;
+                    });
+            });
+        }
     });
 </script>
 

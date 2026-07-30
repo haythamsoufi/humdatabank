@@ -643,12 +643,15 @@ class TemplatePreparationService:
         section_statuses = {}
 
         for section in all_sections:
+            if getattr(section, 'section_type', None) == 'discussion':
+                section_statuses[section.name] = 'N/A'
+                continue
             total_items_in_section = 0
             filled_items_count = 0
 
             if hasattr(section, 'fields_ordered'):
                 for field in section.fields_ordered:
-                    if hasattr(field, 'field_type_for_js') and str(field.field_type_for_js).lower() in ('blank', 'image', 'discussion'):
+                    if hasattr(field, 'field_type_for_js') and str(field.field_type_for_js).lower() in ('blank', 'image'):
                         continue
                     if getattr(field, 'is_image', False):
                         continue

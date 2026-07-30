@@ -5,7 +5,6 @@ export const PropertiesMixin = {
 
     isDisplayOnlyItemType: function(itemType, questionType) {
         if (itemType === 'image') return true;
-        if (itemType === 'discussion') return true;
         if (itemType !== 'question') return false;
         const qt = questionType !== undefined && questionType !== null
             ? questionType

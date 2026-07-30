@@ -172,11 +172,12 @@ _SECTION_SCHEMA: Dict[str, Any] = {
         "order": {"type": "number"},
         "section_type": {
             "type": "string",
-            "enum": ["standard", "repeat", "dynamic_indicators"],
+            "enum": ["standard", "repeat", "dynamic_indicators", "discussion"],
             "default": "standard",
             "description": (
                 "'repeat' = repeating group (set max_entries); 'dynamic_indicators' = data-entry users pick "
-                "indicators themselves (set indicator_filters / max_dynamic_indicators)."
+                "indicators themselves (set indicator_filters / max_dynamic_indicators); "
+                "'discussion' = comment thread section (at most one per template version; requires enable_discussion; add from template details, not the section modal)."
             ),
         },
         "page_ref": {"type": "string", "description": "Page ref this section belongs to (paginated templates)."},
@@ -247,7 +248,7 @@ _OPERATION_SCHEMA: Dict[str, Any] = {
         "order": {"type": "number"},
         "section_type": {
             "type": "string",
-            "enum": ["standard", "repeat", "dynamic_indicators"],
+            "enum": ["standard", "repeat", "dynamic_indicators", "discussion"],
         },
         "label": {"type": "string"},
         "definition": {"type": "string"},

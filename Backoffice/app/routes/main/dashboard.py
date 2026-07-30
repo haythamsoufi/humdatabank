@@ -43,10 +43,10 @@ from app.routes.main.helpers import (
     SELECTED_ENTITY_TYPE_SESSION_KEY,
     SELECTED_ENTITY_ID_SESSION_KEY,
     _parse_int,
-    _extract_changed_matrix_values,
     get_localized_template_name,
     localized_field_name,
     format_activity_value,
+    postprocess_activity_summary_params,
     render_activity_summary,
     render_matrix_change,
 )
@@ -957,27 +957,7 @@ def dashboard():
                         current_app.logger.debug(f"Could not get period for activity {assignment_id}: {e}")
 
                 key = getattr(activity, 'summary_key', None)
-
-                # Single field change
-                if key == 'activity.form_data_updated.single':
-                    old_val = params.get('old')
-                    new_val = params.get('new')
-                    trimmed_old, trimmed_new = _extract_changed_matrix_values(old_val, new_val)
-                    if trimmed_old is not None and trimmed_new is not None:
-                        params['old'] = trimmed_old
-                        params['new'] = trimmed_new
-
-                # Multiple field changes – each change entry may be matrix-style
-                elif key == 'activity.form_data_updated.multiple' and isinstance(params.get('changes'), list):
-                    for change in params['changes']:
-                        if not isinstance(change, dict):
-                            continue
-                        old_val = change.get('old')
-                        new_val = change.get('new')
-                        trimmed_old, trimmed_new = _extract_changed_matrix_values(old_val, new_val)
-                        if trimmed_old is not None and trimmed_new is not None:
-                            change['old'] = trimmed_old
-                            change['new'] = trimmed_new
+                postprocess_activity_summary_params(params, key)
         except Exception as e:
             current_app.logger.error(
                 f"Error post-processing recent activities for matrix diffs: {e}",
@@ -1109,28 +1089,10 @@ def load_more_activities():
                 except Exception as e:
                     current_app.logger.debug(f"Could not get period for activity {assignment_id}: {e}")
 
-            # Trim matrix-style diffs so we only render changed cells
+            # Trim matrix-style diffs and drop no-op matrix entries
             try:
                 key = getattr(activity, 'summary_key', None)
-
-                if key == 'activity.form_data_updated.single':
-                    old_val = params.get('old')
-                    new_val = params.get('new')
-                    trimmed_old, trimmed_new = _extract_changed_matrix_values(old_val, new_val)
-                    if trimmed_old is not None and trimmed_new is not None:
-                        params['old'] = trimmed_old
-                        params['new'] = trimmed_new
-
-                elif key == 'activity.form_data_updated.multiple' and isinstance(params.get('changes'), list):
-                    for change in params['changes']:
-                        if not isinstance(change, dict):
-                            continue
-                        old_val = change.get('old')
-                        new_val = change.get('new')
-                        trimmed_old, trimmed_new = _extract_changed_matrix_values(old_val, new_val)
-                        if trimmed_old is not None and trimmed_new is not None:
-                            change['old'] = trimmed_old
-                            change['new'] = trimmed_new
+                postprocess_activity_summary_params(params, key)
             except Exception as e:
                 current_app.logger.debug(f"Matrix diff trimming failed for load_more activities: {e}")
 

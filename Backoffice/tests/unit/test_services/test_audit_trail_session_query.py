@@ -16,6 +16,7 @@ from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,
+    count_audit_visible_entries_for_sessions,
 )
 
 
@@ -309,3 +310,47 @@ class TestCountAuditVisibleEntriesForSession:
 
         result = count_audit_visible_entries_for_session(sl)
         assert result == 0
+
+
+class TestCountAuditVisibleEntriesForSessionsBatch:
+    def test_batch_matches_single_session(self, app, db_session):
+        """Batch helper returns the same count as the single-session helper."""
+        from app.models import UserActivityLog, UserSessionLog
+        from app.utils.datetime_helpers import utcnow
+        from tests.factories import create_test_user
+
+        now = utcnow()
+        session_start = now - timedelta(hours=1)
+        user = create_test_user(db_session)
+
+        sl = UserSessionLog(
+            session_id="test-batch-count-001",
+            user_id=user.id,
+            session_start=session_start,
+            session_end=now,
+            actions_performed=0,
+            ip_address="127.0.0.1",
+        )
+        db_session.add(sl)
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                user_session_id="test-batch-count-001",
+                activity_type="data_modified",
+                endpoint="analytics.audit_trail",
+                url_path="/admin/analytics/audit-trail",
+                ip_address="127.0.0.1",
+                timestamp=session_start + timedelta(minutes=5),
+            )
+        )
+        db_session.commit()
+
+        single = count_audit_visible_entries_for_session(sl)
+        batch = count_audit_visible_entries_for_sessions([sl])
+        assert batch[sl.id] == single
+
+    def test_batch_handles_fallback_sessions(self, app):
+        with app.app_context():
+            sl = _make_session_log(session_id="", actions_performed=7)
+            batch = count_audit_visible_entries_for_sessions([sl])
+            assert batch[sl.id] == 7

@@ -109,7 +109,7 @@ class TestTemplateDetailsSave:
                     "discussion_title": "Team Discussion",
                     "discussion_description": "Notes for reviewers",
                     "discussion_sort_order": "newest_first",
-                    "discussion_default_collapsed": "y",
+                    "discussion_default_expanded": "n",
                     "discussion_show_in_sidebar": "n",
                 },
                 follow_redirects=False,

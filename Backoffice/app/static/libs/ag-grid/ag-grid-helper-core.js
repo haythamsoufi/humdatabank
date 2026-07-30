@@ -1494,24 +1494,43 @@
                 if (!self.gridApi) {
                     return;
                 }
-                var message = AgGridHelper.hasActiveGridFilters(self.gridApi)
-                    ? self._emptyMessageFiltered
-                    : self._emptyMessageDefault;
-                var template = AgGridHelper.buildNoRowsOverlayTemplate(message);
 
-                if (typeof self.gridApi.setGridOption === 'function') {
-                    self.gridApi.setGridOption('overlayNoRowsTemplate', template);
-                } else if (self._gridOptions) {
-                    self._gridOptions.overlayNoRowsTemplate = template;
-                }
+                // Defer until AG Grid has applied filter/model changes to displayed rows.
+                var syncOverlay = function() {
+                    if (!self.gridApi) {
+                        return;
+                    }
 
-                if (self.gridApi.getDisplayedRowCount() === 0 &&
-                    typeof self.gridApi.showNoRowsOverlay === 'function') {
-                    self.gridApi.showNoRowsOverlay();
+                    var displayedCount = self.gridApi.getDisplayedRowCount();
+                    var message = AgGridHelper.hasActiveGridFilters(self.gridApi)
+                        ? self._emptyMessageFiltered
+                        : self._emptyMessageDefault;
+                    var template = AgGridHelper.buildNoRowsOverlayTemplate(message);
+
+                    if (typeof self.gridApi.setGridOption === 'function') {
+                        self.gridApi.setGridOption('overlayNoRowsTemplate', template);
+                    } else if (self._gridOptions) {
+                        self._gridOptions.overlayNoRowsTemplate = template;
+                    }
+
+                    if (displayedCount === 0) {
+                        if (typeof self.gridApi.showNoRowsOverlay === 'function') {
+                            self.gridApi.showNoRowsOverlay();
+                        }
+                    } else if (typeof self.gridApi.hideOverlay === 'function') {
+                        self.gridApi.hideOverlay();
+                    }
+                };
+
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(syncOverlay);
+                } else {
+                    setTimeout(syncOverlay, 0);
                 }
             };
 
             this.gridApi.addEventListener('filterChanged', refreshOverlayMessage);
+            this.gridApi.addEventListener('modelUpdated', refreshOverlayMessage);
         };
     
         /**

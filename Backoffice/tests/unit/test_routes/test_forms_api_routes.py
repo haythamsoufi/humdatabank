@@ -26,8 +26,8 @@ def _json_put(client, url, data):
     return client.put(url, json=data, content_type="application/json")
 
 
-def _json_patch(client, url):
-    return client.patch(url, json={}, content_type="application/json")
+def _json_patch(client, url, data):
+    return client.patch(url, json=data, content_type="application/json")
 
 
 # =====================================================================
@@ -1435,3 +1435,84 @@ class TestDiscussionCommentsApi:
             assert len(saved) == 1
             assert saved[0].body == "New comment"
             assert saved[0].created_by_user_id == admin_user.id
+
+    def test_patch_other_users_comment_returns_403(self, app, admin_user, db_session, client):
+        from app.models import SubmissionDiscussionComment
+        from tests.factories import create_test_assignment_entity_status, create_test_user
+
+        client = _make_logged_in_client(client, admin_user.id)
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session)
+            other = create_test_user(db_session)
+            comment = SubmissionDiscussionComment(
+                assignment_entity_status_id=aes.id,
+                body="Original",
+                created_by_user_id=other.id,
+            )
+            db_session.add(comment)
+            db_session.commit()
+            comment_id = comment.id
+
+            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+                 patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True):
+                resp = _json_patch(
+                    client,
+                    f"/api/forms/discussion/comments/{comment_id}",
+                    {"body": "Hacked"},
+                )
+            assert resp.status_code == 403
+
+    def test_patch_updates_own_comment(self, app, admin_user, db_session, client):
+        from app.models import SubmissionDiscussionComment
+        from tests.factories import create_test_assignment_entity_status
+
+        client = _make_logged_in_client(client, admin_user.id)
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session)
+            comment = SubmissionDiscussionComment(
+                assignment_entity_status_id=aes.id,
+                body="Original",
+                created_by_user_id=admin_user.id,
+            )
+            db_session.add(comment)
+            db_session.commit()
+            comment_id = comment.id
+
+            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+                 patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True), \
+                 patch("app.routes.forms_api.log_entity_activity"):
+                resp = _json_patch(
+                    client,
+                    f"/api/forms/discussion/comments/{comment_id}",
+                    {"body": "Updated text"},
+                )
+
+            assert resp.status_code == 200
+            payload = resp.get_json()
+            assert payload["comment"]["body"] == "Updated text"
+            refreshed = SubmissionDiscussionComment.query.get(comment_id)
+            assert refreshed.body == "Updated text"
+
+    def test_delete_own_comment(self, app, admin_user, db_session, client):
+        from app.models import SubmissionDiscussionComment
+        from tests.factories import create_test_assignment_entity_status
+
+        client = _make_logged_in_client(client, admin_user.id)
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session)
+            comment = SubmissionDiscussionComment(
+                assignment_entity_status_id=aes.id,
+                body="Delete me",
+                created_by_user_id=admin_user.id,
+            )
+            db_session.add(comment)
+            db_session.commit()
+            comment_id = comment.id
+
+            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+                 patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True), \
+                 patch("app.routes.forms_api.log_entity_activity"):
+                resp = client.delete(f"/api/forms/discussion/comments/{comment_id}")
+
+            assert resp.status_code == 200
+            assert SubmissionDiscussionComment.query.get(comment_id) is None

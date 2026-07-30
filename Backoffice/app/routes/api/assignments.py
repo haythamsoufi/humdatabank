@@ -430,6 +430,7 @@ def _resolve_auto_load_entities_inner(
     source_form_item_id,
     require_tick_value_1=False,
     tick_column_names=None,
+    assignment_entity_status_id=None,
 ):
     """Core logic shared between the single and batch auto-load-entities endpoints.
 
@@ -494,7 +495,7 @@ def _resolve_auto_load_entities_inner(
                 f'"{source_assignment_period}" for this entity. Save the source matrix first.'
             ),
             'debug_info': {
-                'current_assignment_entity_status_id': assignment_entity_status.id,
+                'current_assignment_entity_status_id': assignment_entity_status_id,
                 'source_assignment_entity_status_ids_queried': source_assignment_entity_status_ids,
                 'source_template_id': source_template_id,
                 'source_assignment_period': source_assignment_period,
@@ -672,6 +673,7 @@ def get_matrix_auto_load_entities_batch():
                     source_form_item_id=source_form_item_id,
                     require_tick_value_1=bool(req.get('require_tick_value_1', False)),
                     tick_column_names=req.get('tick_column_names') or [],
+                    assignment_entity_status_id=first_aes_id,
                 )
                 results.append(result)
             except Exception as sub_exc:

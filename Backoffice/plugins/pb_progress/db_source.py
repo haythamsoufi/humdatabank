@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,74 @@ _AGG_LABEL_LANG_MAP = {"English": "en", "French": "fr", "Spanish": "es", "Arabic
 
 class DbSourceError(RuntimeError):
     """Raised when system dataset generation fails."""
+
+
+class WorkbookValidationError(ValueError):
+    """Raised when an uploaded SG Report workbook fails validation."""
+
+
+REQUIRED_UPLOAD_SHEETS: tuple[str, ...] = ("Mapping", "Final", "TotalReported")
+OPTIONAL_UPLOAD_SHEETS: tuple[str, ...] = ("Translations", "SectionOrder")
+
+
+def _visuals_scripts_path() -> Path:
+    return Path(__file__).resolve().parent / "visuals" / "scripts"
+
+
+def validate_uploaded_workbook(path: Path | str) -> dict[str, Any]:
+    """Validate an SG Report workbook before accepting it for report generation."""
+    workbook_path = Path(path)
+    if not workbook_path.is_file():
+        raise WorkbookValidationError(f"Workbook not found: {workbook_path}")
+
+    try:
+        excel_file = pd.ExcelFile(workbook_path)
+    except Exception as exc:
+        raise WorkbookValidationError(f"Cannot read Excel file: {exc}") from exc
+
+    missing_required = [sheet for sheet in REQUIRED_UPLOAD_SHEETS if sheet not in excel_file.sheet_names]
+    if missing_required:
+        raise WorkbookValidationError(
+            "Workbook is missing required sheet(s): "
+            f"{', '.join(missing_required)}."
+        )
+
+    warnings: list[str] = []
+    for sheet in OPTIONAL_UPLOAD_SHEETS:
+        if sheet not in excel_file.sheet_names:
+            warnings.append(
+                f"Sheet '{sheet}' is missing; built-in defaults will be used during report generation."
+            )
+
+    mapping_df = pd.read_excel(workbook_path, sheet_name="Mapping", header=MAPPING_HEADER_ROW)
+    if mapping_df.empty or "ID" not in mapping_df.columns:
+        raise WorkbookValidationError(
+            "Mapping sheet is empty or missing an ID column (expected header row 4)."
+        )
+    indicator_ids = mapping_df["ID"].map(_normalize_id)
+    if not indicator_ids.replace("", pd.NA).dropna().any():
+        raise WorkbookValidationError("Mapping sheet has no indicator IDs.")
+
+    scripts_path = _visuals_scripts_path()
+    scripts_path_str = str(scripts_path)
+    if scripts_path_str not in sys.path:
+        sys.path.insert(0, scripts_path_str)
+
+    from pb_figures.data import DataModelError, build_model
+
+    try:
+        model = build_model(workbook_path)
+    except DataModelError as exc:
+        raise WorkbookValidationError(str(exc)) from exc
+
+    sections = sorted(model["section"].dropna().astype(str).unique())
+    return {
+        "valid": True,
+        "warnings": warnings,
+        "indicator_count": int(model["ID"].nunique()),
+        "row_count": len(model),
+        "sections": sections,
+    }
 
 
 def _section_from_area(area: str | None) -> str:
@@ -366,6 +435,14 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
     PBProgressDataStore.save_mapping_config(version, mapping_rows)
     mapping_rows = validate_mapping_config(mapping_rows)
     PBProgressDataStore.save_mapping_config(version, mapping_rows)
+    if not translations_rows:
+        from plugins.pb_progress.report_defaults import default_translations_config_rows
+
+        translations_rows = default_translations_config_rows()
+    if not section_order_rows:
+        from plugins.pb_progress.report_defaults import default_section_order_config_rows
+
+        section_order_rows = default_section_order_config_rows()
     PBProgressDataStore.save_translations_config(version, translations_rows)
     PBProgressDataStore.save_section_order_config(version, section_order_rows)
     return {
@@ -645,9 +722,22 @@ def build_dataset(version: str) -> dict[str, pd.DataFrame]:
 
 
 def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
+    from plugins.pb_progress.report_defaults import (
+        default_section_order_config_rows,
+        default_translations_config_rows,
+    )
+
     sheets = build_dataset(version)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    translations_df = sheets["translations"]
+    if translations_df.empty:
+        translations_df = pd.DataFrame(default_translations_config_rows())
+
+    section_order_df = sheets["sectionorder"]
+    if section_order_df.empty:
+        section_order_df = pd.DataFrame(default_section_order_config_rows())
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         empty = pd.DataFrame()
@@ -655,10 +745,8 @@ def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
         sheets["mapping"].to_excel(writer, sheet_name="Mapping", index=False, startrow=MAPPING_HEADER_ROW)
         sheets["final"].to_excel(writer, sheet_name="Final", index=False)
         sheets["total_reported"].to_excel(writer, sheet_name="TotalReported", index=False)
-        if not sheets["translations"].empty:
-            sheets["translations"].to_excel(writer, sheet_name="Translations", index=False)
-        if not sheets["sectionorder"].empty:
-            sheets["sectionorder"].to_excel(writer, sheet_name="SectionOrder", index=False)
+        translations_df.to_excel(writer, sheet_name="Translations", index=False)
+        section_order_df.to_excel(writer, sheet_name="SectionOrder", index=False)
     return output_path
 
 

@@ -849,6 +849,91 @@ class TestRenderMatrixChange:
             )
         assert result == ""
 
+    def test_checkbox_matrix_renders_only_changed_cell(self, app):
+        from app.routes.main.helpers import render_matrix_change
+        new = {
+            "_matrix_change": True,
+            "45_EFs Planned": {"original": "0", "modified": "0", "isModified": False},
+            "45_SP2 Supported": {"original": "0", "modified": "1", "isModified": True},
+            "45_SP3 Planned": {"original": "0", "modified": "0", "isModified": False},
+        }
+        with app.app_context():
+            result = render_matrix_change("Received Support", {}, new)
+        assert "SP2 Supported" in result
+        assert "SP3 Planned" not in result
+        assert "EFs Planned" not in result
+        assert "0 &rarr; 0" not in result
+
+
+# ---------------------------------------------------------------------------
+# postprocess_activity_summary_params
+# ---------------------------------------------------------------------------
+
+class TestPostprocessActivitySummaryParams:
+    def test_filters_no_op_matrix_changes_from_multiple(self, app):
+        from app.routes.main.helpers import postprocess_activity_summary_params
+
+        params = {
+            "count": 3,
+            "template": "Unified Country Report",
+            "change_type": "updated",
+            "changes": [
+                {
+                    "field": "Simple field",
+                    "field_id": 1,
+                    "old": "no",
+                    "new": "",
+                    "change_type": "removed",
+                },
+                {
+                    "field": "Optional breakdown by SP/EF (CHF)",
+                    "field_id": 1405,
+                    "old": "",
+                    "new": {"_matrix_change": True, "Row_Funding (CHF)": 0},
+                    "change_type": "added",
+                },
+                {
+                    "field": "Funding",
+                    "field_id": 1403,
+                    "old": {"_matrix_change": True, "IFRC Secretariat_NS 2025 Total Funding": 100},
+                    "new": {
+                        "_matrix_change": True,
+                        "IFRC Secretariat_NS 2025 Total Funding": 100,
+                        "IFRC Secretariat_ns_fun": 0,
+                    },
+                    "change_type": "updated",
+                },
+            ],
+        }
+        with app.app_context():
+            postprocess_activity_summary_params(params, "activity.form_data_updated.multiple")
+
+        assert params["count"] == 1
+        assert len(params["changes"]) == 1
+        assert params["changes"][0]["field_id"] == 1
+
+    def test_keeps_matrix_change_with_real_diff(self, app):
+        from app.routes.main.helpers import postprocess_activity_summary_params
+
+        params = {
+            "count": 1,
+            "changes": [
+                {
+                    "field": "Funding",
+                    "field_id": 13,
+                    "old": {"_matrix_change": True, "13_SP2": 0},
+                    "new": {"_matrix_change": True, "13_SP2": 108020},
+                    "change_type": "updated",
+                },
+            ],
+        }
+        with app.app_context():
+            postprocess_activity_summary_params(params, "activity.form_data_updated.multiple")
+
+        assert params["count"] == 1
+        assert params["changes"][0]["old"]["13_SP2"] == 0
+        assert params["changes"][0]["new"]["13_SP2"] == 108020
+
 
 # ---------------------------------------------------------------------------
 # localize_status (Jinja global)

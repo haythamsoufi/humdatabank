@@ -656,3 +656,88 @@ class TestB64DecodeField:
         encoded = base64.b64encode(payload.encode('utf-8')).decode('utf-8')
         result = _b64_decode_field(encoded)
         assert result == payload
+
+
+# ---------------------------------------------------------------------------
+# discussion section type
+# ---------------------------------------------------------------------------
+
+class TestDiscussionSectionType:
+
+    def _enable_discussion(self, db_session, template):
+        from app.models import FormTemplateVersion
+        version = db_session.get(FormTemplateVersion, template.published_version_id)
+        version.enable_discussion = True
+        db_session.commit()
+        return version.id
+
+    def test_creates_discussion_section_when_enabled(self, logged_in_client, db_session, admin_user, app):
+        from app.models import FormSection, FormTemplateVersion
+        template = _make_owned_template(db_session, admin_user, name='Discussion Template')
+        version_id = self._enable_discussion(db_session, template)
+        version = db_session.get(FormTemplateVersion, version_id)
+        version.discussion_config = {'title': 'Team Discussion'}
+        db_session.commit()
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/discussion',
+                data={'version_id': str(version_id)},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        section = db_session.query(FormSection).filter_by(
+            template_id=template.id, version_id=version_id, section_type='discussion'
+        ).one()
+        assert section.name == 'Team Discussion'
+
+    def test_rejects_second_discussion_section(self, logged_in_client, db_session, admin_user, app):
+        template = _make_owned_template(db_session, admin_user)
+        version_id = self._enable_discussion(db_session, template)
+        _make_section(db_session, template, version_id=version_id, name='Comments', section_type='discussion')
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/discussion',
+                data={'version_id': str(version_id)},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        from app.models import FormSection
+        count = db_session.query(FormSection).filter_by(
+            version_id=version_id, section_type='discussion', archived=False
+        ).count()
+        assert count == 1
+
+    def test_rejects_discussion_when_template_disabled(self, logged_in_client, db_session, admin_user, app):
+        from app.models import FormSection
+        template = _make_owned_template(db_session, admin_user)
+        version_id = template.published_version_id
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/discussion',
+                data={'version_id': str(version_id)},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        assert db_session.query(FormSection).filter_by(
+            version_id=version_id, section_type='discussion'
+        ).count() == 0
+
+    def test_rejects_discussion_section_via_add_section_modal(self, logged_in_client, db_session, admin_user, app):
+        from app.models import FormSection
+        template = _make_owned_template(db_session, admin_user, name='Discussion Template')
+        version_id = self._enable_discussion(db_session, template)
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/templates/{template.id}/sections/new',
+                data={
+                    'section-name': 'Comments',
+                    'section-section_type': 'discussion',
+                    'section-order': '1',
+                    'version_id': str(version_id),
+                },
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        assert db_session.query(FormSection).filter_by(
+            version_id=version_id, section_type='discussion'
+        ).count() == 0

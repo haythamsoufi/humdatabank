@@ -3,6 +3,7 @@
      entry_form_document_field — FormItem / field object
      entry_form_document_section_order — int for section.display_order or sub_section.display_order
 #}
+{% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
 {% set field = entry_form_document_field %}
 {% set section_order = entry_form_document_section_order %}
 {% set doc_item_id = field.id %}
@@ -32,7 +33,7 @@
      {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
     <div class="flex items-start justify-between">
         <div class="flex-1 pr-2">
-            <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+            <label {{ entry_form_field_label_binding(field, is_document=true) }} class="block text-md font-semibold text-gray-800 mb-1">
                 {% if is_sub_item_doc %}
                     <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}{% if locked_period_for_label %} <span class="text-gray-600 font-normal">({{ locked_period_for_label }})</span>{% endif %}</span>
                 {% else %}

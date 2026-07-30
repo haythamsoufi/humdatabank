@@ -123,6 +123,13 @@
             <div class="mt-2 space-y-1">
                 {% for ch in sp.get('changes') %}
                     {% set ict = (ch.get('change_type') or 'updated')|lower %}
+                    {% set ch_field_id = ch.get('field_id') %}
+                    {% set ch_label = localized_field_name(ch.get('field_id'), ch.get('field'), ch.get('field_id_kind'), assignment_id) %}
+                    {% set ch_old = ch.get('old') %}
+                    {% set ch_new = ch.get('new') %}
+                    {% set ch_is_matrix = (ch_old is mapping and ch_old.get('_matrix_change')) or (ch_new is mapping and ch_new.get('_matrix_change')) %}
+                    {% if ch_is_matrix and not matrix_activity_has_visible_changes(ch_old if ch_old is mapping else {}, ch_new if ch_new is mapping else {}) %}
+                    {% else %}
                     <div class="flex items-start text-xs">
                         <span class="mr-2">
                             {% if ict == 'added' %}
@@ -134,11 +141,7 @@
                             {% endif %}
                         </span>
                         <span class="text-gray-800">
-                            {% set ch_field_id = ch.get('field_id') %}
-                            {% set ch_label = localized_field_name(ch.get('field_id'), ch.get('field'), ch.get('field_id_kind'), assignment_id) %}
-                            {% set ch_old = ch.get('old') %}
-                            {% set ch_new = ch.get('new') %}
-                            {% if (ch_old is mapping and ch_old.get('_matrix_change')) or (ch_new is mapping and ch_new.get('_matrix_change')) %}
+                            {% if ch_is_matrix %}
                                 {{ render_matrix_change(ch_label, ch_old if ch_old is mapping else {}, ch_new if ch_new is mapping else {}, ch_field_id)|safe }}
                             {% else %}
                                 {{ ch_label }}
@@ -148,6 +151,7 @@
                             {% endif %}
                         </span>
                     </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         {% endif %}

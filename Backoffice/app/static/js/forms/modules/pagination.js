@@ -211,9 +211,6 @@ function initPagination() {
     prevBtn.addEventListener('click', () => changePage(currentPageIdx - 1));
     nextBtn.addEventListener('click', () => changePage(currentPageIdx + 1));
 
-    // Group sidebar navigation
-    organiseSidebar();
-
     // Ensure section links switch pages if necessary
     hookSectionLinks();
 
@@ -586,33 +583,6 @@ function initPagination() {
         wrapper.appendChild(pageIndicator);
         wrapper.appendChild(nextBtn);
         return wrapper;
-    }
-
-    /** Add page headers to sidebar navigation */
-    function organiseSidebar() {
-        const sidebar = document.getElementById('section-navigation-sidebar');
-        if (!sidebar) return;
-        const list = sidebar.querySelector('ul.space-y-2');
-        if (!list) return;
-
-        // Only add page headers if we have multiple pages
-        if (pages.length <= 1) return;
-
-        const processedPages = new Set();
-        const listItems = Array.from(list.children);
-        listItems.forEach(li => {
-            const link = li.querySelector('.section-link');
-            if (!link) return;
-            const pNum = parseInt(link.dataset.pageNumber || '1');
-            const pName = link.dataset.pageName || `Page ${pNum}`;
-            if (!processedPages.has(pNum)) {
-                const headerLi = document.createElement('li');
-                headerLi.textContent = pName;
-                headerLi.className = 'text-xs font-semibold text-gray-500 mt-4 mb-1 uppercase tracking-wide';
-                list.insertBefore(headerLi, li);
-                processedPages.add(pNum);
-            }
-        });
     }
 
     /** Hook clicks on section links so they switch pages automatically */

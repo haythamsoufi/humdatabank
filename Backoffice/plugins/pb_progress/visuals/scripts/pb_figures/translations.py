@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import resolve_excel
+from .defaults import default_translations_bundle
 
 EXCEL_TO_LANG = {
     "EN": "English",
@@ -31,26 +32,9 @@ class TranslationsError(RuntimeError):
     """Raised when required translation sheets are missing from the Excel workbook."""
 
 
-@lru_cache(maxsize=8)
-def _load_bundle(
-    excel_path_str: str,
-) -> tuple[dict[str, dict[str, str]], dict[str, list[str]], tuple[str, ...]]:
-    path = Path(excel_path_str)
-    if not path.exists():
-        raise TranslationsError(f"Excel workbook not found: {path}")
-
-    try:
-        trans_df = pd.read_excel(path, sheet_name="Translations", keep_default_na=False)
-        order_df = pd.read_excel(path, sheet_name="SectionOrder", keep_default_na=False)
-    except ValueError as exc:
-        raise TranslationsError(
-            f"{path.name} must contain {', '.join(REQUIRED_SHEETS)} sheets"
-        ) from exc
-    except (PermissionError, OSError) as exc:
-        raise TranslationsError(f"Cannot read {path.name}: {exc}") from exc
-
+def _parse_translations_sheet(trans_df: pd.DataFrame) -> dict[str, dict[str, str]]:
     if trans_df.empty or "id" not in trans_df.columns:
-        raise TranslationsError(f"{path.name} → Translations sheet is empty or missing an 'id' column")
+        return {}
 
     translations: dict[str, dict[str, str]] = {}
     for _, row in trans_df.iterrows():
@@ -65,14 +49,12 @@ def _load_bundle(
                     entry[lang] = text
         if entry:
             translations[code] = entry
+    return translations
 
-    if not translations:
-        raise TranslationsError(f"{path.name} → Translations sheet has no usable rows")
 
+def _parse_section_order_sheet(order_df: pd.DataFrame) -> tuple[dict[str, list[str]], tuple[str, ...]]:
     if order_df.empty or not {"part", "section", "order"}.issubset(order_df.columns):
-        raise TranslationsError(
-            f"{path.name} → SectionOrder sheet is empty or missing part/section/order columns"
-        )
+        return {}, ()
 
     parsed: dict[str, list[tuple[int, str]]] = {}
     part_min_order: dict[str, int] = {}
@@ -88,11 +70,56 @@ def _load_bundle(
 
     section_order = {part: [section for _, section in sorted(items)] for part, items in parsed.items()}
     if not section_order:
-        raise TranslationsError(f"{path.name} → SectionOrder sheet has no usable rows")
+        return {}, ()
 
     parts_order = tuple(
         sorted(part_min_order.keys(), key=lambda part_id: (part_min_order[part_id], part_id))
     )
+    return section_order, parts_order
+
+
+@lru_cache(maxsize=8)
+def _load_bundle(
+    excel_path_str: str,
+) -> tuple[dict[str, dict[str, str]], dict[str, list[str]], tuple[str, ...]]:
+    path = Path(excel_path_str)
+    if not path.exists():
+        raise TranslationsError(f"Excel workbook not found: {path}")
+
+    default_translations, default_section_order, default_parts_order = default_translations_bundle()
+    translations = dict(default_translations)
+    section_order = dict(default_section_order)
+    parts_order = default_parts_order
+
+    try:
+        trans_df = pd.read_excel(path, sheet_name="Translations", keep_default_na=False)
+    except ValueError:
+        trans_df = pd.DataFrame()
+    except (PermissionError, OSError) as exc:
+        raise TranslationsError(f"Cannot read {path.name}: {exc}") from exc
+    else:
+        parsed_translations = _parse_translations_sheet(trans_df)
+        if parsed_translations:
+            translations.update(parsed_translations)
+
+    try:
+        order_df = pd.read_excel(path, sheet_name="SectionOrder", keep_default_na=False)
+    except ValueError:
+        order_df = pd.DataFrame()
+    except (PermissionError, OSError) as exc:
+        raise TranslationsError(f"Cannot read {path.name}: {exc}") from exc
+    else:
+        parsed_section_order, parsed_parts_order = _parse_section_order_sheet(order_df)
+        if parsed_section_order:
+            section_order = parsed_section_order
+        if parsed_parts_order:
+            parts_order = parsed_parts_order
+
+    if not translations:
+        raise TranslationsError(f"{path.name} → Translations sheet has no usable rows")
+
+    if not section_order:
+        raise TranslationsError(f"{path.name} → SectionOrder sheet has no usable rows")
 
     return translations, section_order, parts_order
 

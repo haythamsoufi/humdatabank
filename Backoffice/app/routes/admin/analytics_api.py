@@ -33,7 +33,10 @@ from app.services.platform.user_analytics_service import (
     session_log_device_icon_classes,
     user_session_log_active_duration_minutes_sql,
 )
-from app.services.audit.trail_session_query import count_audit_visible_entries_for_session
+from app.services.audit.trail_session_query import (
+    count_audit_visible_entries_for_session,
+    count_audit_visible_entries_for_sessions,
+)
 from app.utils.page_view_paths import distinct_page_view_path_count
 
 
@@ -77,6 +80,87 @@ def _has_table(table_name):
     except Exception as e:
         current_app.logger.debug("has_table(%s) failed: %s", table_name, e)
         return False
+
+
+def _session_logs_filtered_query():
+    """Shared filters for session log list APIs (HTML grid + mobile)."""
+    user_filter = request.args.get('user')
+    active_only = request.args.get('active_only', type=bool)
+    min_duration = request.args.get('min_duration', type=int)
+    session_id_exact = (request.args.get('session_id') or '').strip()
+
+    query = UserSessionLog.query.options(joinedload(UserSessionLog.user)).join(User)
+
+    if session_id_exact:
+        query = query.filter(UserSessionLog.session_id == session_id_exact)
+
+    if user_filter:
+        query = query.filter(User.email.ilike(safe_ilike_pattern(user_filter)))
+
+    if active_only:
+        query = query.filter(UserSessionLog.is_active == True)
+
+    if min_duration is not None and min_duration > 0:
+        cutoff = utcnow() - timedelta(minutes=min_duration)
+        active_min_sql = user_session_log_active_duration_minutes_sql()
+        min_parts = [
+            UserSessionLog.duration_minutes >= min_duration,
+            and_(
+                UserSessionLog.is_active == True,
+                UserSessionLog.session_start.isnot(None),
+                UserSessionLog.session_start <= cutoff,
+            ),
+        ]
+        if active_min_sql is not None:
+            min_parts.append(active_min_sql >= min_duration)
+        query = query.filter(or_(*min_parts))
+
+    return query.order_by(desc(UserSessionLog.is_active), desc(UserSessionLog.session_start))
+
+
+def _serialize_session_log_list_item(session_log, activity_count):
+    """JSON payload for one session row (list view — omits page_view_path_counts)."""
+    user = session_log.user
+    user_payload = None
+    if user is not None:
+        user_payload = {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+        }
+    user_agent = session_log.user_agent
+    if user_agent and len(user_agent) > 400:
+        user_agent = user_agent[:400] + '…'
+
+    page_views = session_log.page_views or 0
+    distinct_paths = distinct_page_view_path_count(session_log)
+
+    return {
+        'session_log_id': session_log.id,
+        'session_id': session_log.session_id,
+        'session_start': session_log.session_start.isoformat() if session_log.session_start else None,
+        'session_end': session_log.session_end.isoformat() if session_log.session_end else None,
+        'last_activity': session_log.last_activity.isoformat() if session_log.last_activity else None,
+        'duration_minutes': effective_session_duration_minutes(session_log),
+        'active_duration_minutes': effective_session_active_duration_minutes(session_log),
+        'page_views': page_views,
+        'distinct_page_view_paths': distinct_paths,
+        'has_path_breakdown': page_views > 0 or distinct_paths > 0,
+        'activity_count': activity_count,
+        'is_active': bool(session_log.is_active),
+        'device_type': session_log.device_type,
+        'browser': session_log.browser,
+        'operating_system': session_log.operating_system,
+        'ip_address': session_log.ip_address,
+        'user_agent': user_agent,
+        'user': user_payload,
+        'device_icon_classes': session_log_device_icon_classes(
+            session_log.user_agent,
+            session_log.device_type,
+            session_log.operating_system,
+        ),
+    }
+
 
 @bp.route("/analytics/login-logs", methods=["GET"])
 @permission_required('admin.analytics.view')
@@ -204,78 +288,22 @@ def session_logs_list_api():
     page, per_page = validate_pagination_params(
         request.args, default_per_page=50, max_per_page=100
     )
-    user_filter = request.args.get('user')
-    active_only = request.args.get('active_only', type=bool)
-    min_duration = request.args.get('min_duration', type=int)
-    session_id_exact = (request.args.get('session_id') or '').strip()
 
-    query = UserSessionLog.query.options(joinedload(UserSessionLog.user)).join(User)
+    paginated = _session_logs_filtered_query().paginate(
+        page=page, per_page=per_page, error_out=False
+    )
 
-    if session_id_exact:
-        query = query.filter(UserSessionLog.session_id == session_id_exact)
-
-    if user_filter:
-        query = query.filter(User.email.ilike(safe_ilike_pattern(user_filter)))
-
-    if active_only:
-        query = query.filter(UserSessionLog.is_active == True)
-
-    if min_duration is not None and min_duration > 0:
-        cutoff = utcnow() - timedelta(minutes=min_duration)
-        active_min_sql = user_session_log_active_duration_minutes_sql()
-        min_parts = [
-            UserSessionLog.duration_minutes >= min_duration,
-            and_(
-                UserSessionLog.is_active == True,
-                UserSessionLog.session_start.isnot(None),
-                UserSessionLog.session_start <= cutoff,
+    activity_counts = count_audit_visible_entries_for_sessions(paginated.items)
+    items = [
+        _serialize_session_log_list_item(
+            s,
+            activity_counts.get(
+                s.id,
+                count_audit_visible_entries_for_session(s),
             ),
-        ]
-        if active_min_sql is not None:
-            min_parts.append(active_min_sql >= min_duration)
-        query = query.filter(or_(*min_parts))
-
-    query = query.order_by(desc(UserSessionLog.is_active), desc(UserSessionLog.session_start))
-    paginated = query.paginate(page=page, per_page=per_page, error_out=False)
-
-    items = []
-    for s in paginated.items:
-        u = s.user
-        user_payload = None
-        if u is not None:
-            user_payload = {
-                'id': u.id,
-                'name': u.name,
-                'email': u.email,
-            }
-        ua = s.user_agent
-        if ua and len(ua) > 400:
-            ua = ua[:400] + '…'
-
-        pvc = s.page_view_path_counts if isinstance(s.page_view_path_counts, dict) else {}
-        items.append({
-            'session_log_id': s.id,
-            'session_id': s.session_id,
-            'session_start': s.session_start.isoformat() if s.session_start else None,
-            'session_end': s.session_end.isoformat() if s.session_end else None,
-            'last_activity': s.last_activity.isoformat() if s.last_activity else None,
-            'duration_minutes': effective_session_duration_minutes(s),
-            'active_duration_minutes': effective_session_active_duration_minutes(s),
-            'page_views': s.page_views or 0,
-            'distinct_page_view_paths': distinct_page_view_path_count(s),
-            'page_view_path_counts': pvc,
-            'activity_count': count_audit_visible_entries_for_session(s),
-            'is_active': bool(s.is_active),
-            'device_type': s.device_type,
-            'browser': s.browser,
-            'operating_system': s.operating_system,
-            'ip_address': s.ip_address,
-            'user_agent': ua,
-            'user': user_payload,
-            'device_icon_classes': session_log_device_icon_classes(
-                s.user_agent, s.device_type, s.operating_system
-            ),
-        })
+        )
+        for s in paginated.items
+    ]
 
     return json_ok(
         data={
@@ -284,6 +312,31 @@ def session_logs_list_api():
             'page': paginated.page,
             'per_page': paginated.per_page,
             'pages': paginated.pages or 0,
+        }
+    )
+
+
+@bp.route("/analytics/session-logs/<session_id>/page-view-paths", methods=["GET"])
+@permission_required('admin.analytics.view')
+def session_log_page_view_paths_api(session_id):
+    """Lazy-load page view path histogram for one session (session logs grid modal)."""
+    if not _has_table(UserSessionLog.__tablename__):
+        return json_not_found('Session not found.')
+
+    session_log = UserSessionLog.query.filter_by(session_id=session_id).first()
+    if not session_log:
+        return json_not_found('Session not found.')
+
+    pvc = (
+        session_log.page_view_path_counts
+        if isinstance(session_log.page_view_path_counts, dict)
+        else {}
+    )
+    return json_ok(
+        data={
+            'session_id': session_log.session_id,
+            'page_views': session_log.page_views or 0,
+            'page_view_path_counts': pvc,
         }
     )
 

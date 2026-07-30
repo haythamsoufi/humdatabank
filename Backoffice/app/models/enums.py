@@ -416,6 +416,7 @@ class SectionType(enum.Enum):
     standard = 'Standard'
     dynamic_indicators = 'Dynamic Indicators'
     repeat = 'Repeat'
+    discussion = 'Discussion'
 
 
 class FormItemType(enum.Enum):

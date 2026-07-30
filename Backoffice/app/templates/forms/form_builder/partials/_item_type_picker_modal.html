@@ -83,13 +83,6 @@
                     <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-teal-100 text-teal-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-image text-xl"></i></span>
                     <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Image') }}</span>
                 </button>
-                {% if selected_version and selected_version.get_effective_enable_discussion() %}
-                <button type="button" class="{{ tile_base }} bg-gradient-to-br from-sky-50 to-white hover:border-sky-400 hover:shadow-sky-100 focus:ring-sky-500" data-item-type="discussion">
-                    <span class="item-type-tooltip-copy" aria-hidden="true">{{ _('Embed the assignment discussion thread in the form at this position.') }}</span>
-                    <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-sky-100 text-sky-600 mb-2 group-hover:scale-110 transition-transform"><i class="fas fa-comments text-xl"></i></span>
-                    <span class="text-sm font-semibold text-gray-800 text-center leading-snug">{{ _('Discussion') }}</span>
-                </button>
-                {% endif %}
                 {% for field_type in custom_field_types %}
                 <button type="button" class="{{ tile_base }} bg-gradient-to-br from-orange-50 to-white hover:border-orange-400 hover:shadow-orange-100 focus:ring-orange-500" data-item-type="plugin_{{ field_type.type_id }}">
                     <span class="item-type-tooltip-copy" aria-hidden="true">{{ field_type.description or _('Custom field type from a plugin.') }}</span>

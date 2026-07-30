@@ -584,6 +584,10 @@ def _parse_field_value_for_display(value, data_not_available=None, not_applicabl
         return str(value)
 
 from app.utils.matrix_activity import (  # noqa: E402
+    collect_matrix_activity_cell_changes,
+    is_matrix_activity_payload,
+    matrix_activity_has_visible_changes as _matrix_activity_has_visible_changes,
+    matrix_cell_activity_render_displays,
     matrix_cell_activity_values_differ,
     matrix_cell_display_value,
     normalize_matrix_activity_display,
@@ -803,6 +807,64 @@ def _extract_changed_matrix_values(old_value, new_value):
 
     return trim_matrix_activity_maps(old_map, new_map)
 
+
+def postprocess_activity_summary_params(params, summary_key):
+    """
+    Trim matrix cell diffs and drop matrix entries that normalize to no visible change.
+    Mutates params in place (updates changes list and count for multi-field activities).
+    """
+    if not isinstance(params, dict):
+        return
+
+    def _apply_matrix_processing(old_val, new_val):
+        if not is_matrix_activity_payload(old_val, new_val):
+            return old_val, new_val, True
+
+        trimmed_old, trimmed_new = _extract_changed_matrix_values(old_val, new_val)
+        if trimmed_old is not None and trimmed_new is not None:
+            old_val, new_val = trimmed_old, trimmed_new
+        else:
+            old_val = old_val if isinstance(old_val, dict) else {}
+            new_val = new_val if isinstance(new_val, dict) else {}
+
+        if _matrix_activity_has_visible_changes(old_val, new_val):
+            return old_val, new_val, True
+        return None, None, False
+
+    if summary_key == 'activity.form_data_updated.single':
+        old_val, new_val, keep = _apply_matrix_processing(params.get('old'), params.get('new'))
+        if keep:
+            params['old'] = old_val
+            params['new'] = new_val
+        else:
+            params['_suppress_matrix_display'] = True
+        return
+
+    if summary_key != 'activity.form_data_updated.multiple' or not isinstance(params.get('changes'), list):
+        return
+
+    filtered = []
+    for change in params['changes']:
+        if not isinstance(change, dict):
+            continue
+        old_val, new_val, keep = _apply_matrix_processing(change.get('old'), change.get('new'))
+        if not keep:
+            continue
+        updated = dict(change)
+        updated['old'] = old_val
+        updated['new'] = new_val
+        filtered.append(updated)
+
+    params['changes'] = filtered
+    params['count'] = len(filtered)
+
+
+@bp.app_template_global()
+def matrix_activity_has_visible_changes(old_value, new_value):
+    """Jinja helper: True when matrix old/new contains displayable cell diffs."""
+    return _matrix_activity_has_visible_changes(old_value, new_value)
+
+
 from app.utils.route_helpers import normalize_value_for_display as _normalize_value_for_summary_display
 
 @bp.app_template_global()
@@ -822,53 +884,13 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
             # Fallback to simple representation if values are not the expected dicts
             return f"{escape(field_label)}: {escape(str(new_value))}"
 
-        # Work on shallow copies so we don't mutate the original params
-        old_map = dict(old_value)
-        new_map = dict(new_value)
-
-        # Remove sentinel flag if present
-        old_map.pop('_matrix_change', None)
-        new_map.pop('_matrix_change', None)
-
-        if not old_map and not new_map:
-            return ""
-
-        # Collect all keys that participate in the change
-        all_keys = set(old_map.keys()) | set(new_map.keys())
-        if not all_keys:
-            return ""
-
-        # Helper to unwrap plugin-style metadata dicts using user-visible display values
-        def _effective_cell_value(v):
-            return matrix_cell_display_value(v)
-
-        # Group changes by entity (row) code
-        rows = {}
-        for key in sorted(all_keys):
-            if key is None:
-                continue
-            key_str = str(key)
-            if '_' in key_str:
-                row_code, col_label = key_str.split('_', 1)
-            else:
-                row_code, col_label = key_str, ''
-
-            old_v = _effective_cell_value(old_map.get(key))
-            new_v = _effective_cell_value(new_map.get(key))
-
-            # Skip if nothing actually changed (defensive; normally trimmed already)
-            if normalize_matrix_activity_display(old_map.get(key)) == normalize_matrix_activity_display(
-                new_map.get(key)
-            ):
-                continue
-
-            rows.setdefault(row_code, []).append((col_label, old_v, new_v))
-
+        rows = collect_matrix_activity_cell_changes(old_value, new_value)
         if not rows:
             return ""
 
         # Resolve entity names where possible (e.g. national society id -> NS name)
         html_parts = [f"{escape(field_label)}:<br>"]
+        has_content = False
 
         for row_code in sorted(rows.keys(), key=lambda rc: (not str(rc).isdigit(), int(rc) if str(rc).isdigit() else str(rc))):
             entity_label = str(row_code)
@@ -882,40 +904,33 @@ def render_matrix_change(field_label, old_value, new_value, form_item_id=None):
                 current_app.logger.debug("entity label lookup failed: %s", e)
                 entity_label = str(row_code)
 
-            html_parts.append(f"<span class='font-semibold'>{escape(entity_label)}</span>:<br>")
-
-            # Sort columns for consistent ordering
+            row_lines = []
             for col_label, old_v, new_v in sorted(rows[row_code], key=lambda item: str(item[0])):
                 col_label_str = str(col_label).strip()
-
-                # Treat missing/None values as 0 for typical binary/numeric matrices,
-                # so we show "0 → 1" instead of "→ 1" when a checkbox is newly ticked.
-                def _is_binary_like(v):
-                    return v in (0, 1, "0", "1", True, False)
-
-                if (old_v is None or old_v == "") and _is_binary_like(new_v):
-                    old_disp = "0"
-                else:
-                    old_disp = "" if old_v is None else str(old_v)
-
-                if (new_v is None or new_v == "") and _is_binary_like(old_v):
-                    new_disp = "0"
-                else:
-                    new_disp = "" if new_v is None else str(new_v)
+                old_disp, new_disp = matrix_cell_activity_render_displays(old_v, new_v)
+                if old_disp == new_disp:
+                    continue
 
                 if not old_disp and new_disp:
-                    html_parts.append(
+                    row_lines.append(
                         f"{escape(col_label_str)}: {escape(new_disp)}<br>"
                     )
                 elif old_disp and not new_disp:
-                    html_parts.append(
+                    row_lines.append(
                         f"{escape(col_label_str)}: {escape(old_disp)} &rarr; <em>removed</em><br>"
                     )
                 else:
-                    html_parts.append(
+                    row_lines.append(
                         f"{escape(col_label_str)}: {escape(old_disp)} &rarr; {escape(new_disp)}<br>"
                     )
 
+            if row_lines:
+                has_content = True
+                html_parts.append(f"<span class='font-semibold'>{escape(entity_label)}</span>:<br>")
+                html_parts.extend(row_lines)
+
+        if not has_content:
+            return ""
         return "".join(html_parts)
     except Exception as e:
         current_app.logger.error(f"Error rendering matrix change summary: {e}", exc_info=True)
@@ -1322,6 +1337,8 @@ def render_activity_summary(activity):
         'activity.assignment_reopened': babel_("Assignment reopened: %(template)s"),
         'activity.document_uploaded': babel_("Document uploaded: %(document)s"),
         'activity.discussion_comment_added': babel_("Comment added by %(user)s"),
+        'activity.discussion_comment_edited': babel_("Comment edited by %(user)s"),
+        'activity.discussion_comment_deleted': babel_("Comment deleted by %(user)s"),
         'activity.self_report_created': babel_("Self-report created: %(template)s"),
         'activity.audit_user_activity': babel_("User %(action)s"),
         'activity.audit_admin_action': babel_("Admin %(action)s %(target)s"),

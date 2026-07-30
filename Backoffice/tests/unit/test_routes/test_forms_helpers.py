@@ -1063,9 +1063,8 @@ class TestBuildEntryFormFeatures:
         features = build_entry_form_features([], template)
         assert features['discussion'] is True
 
-    def test_discussion_enabled_for_discussion_items(self):
-        field = SimpleNamespace(item_type='discussion')
-        section = SimpleNamespace(fields_ordered=[field])
+    def test_discussion_enabled_for_discussion_section(self):
+        section = SimpleNamespace(section_type='discussion', fields_ordered=[])
         features = build_entry_form_features([section], SimpleNamespace(enable_discussion=False))
         assert features['discussion'] is True
 

@@ -1428,3 +1428,13 @@ html[dir="rtl"] #edit-translation-modal .bg-blue-50 .flex.items-start i {
     margin-right: 0 !important;
     margin-left: 0.5rem !important;
 }
+
+/* Entry form discussion panel — chevrons and sidebar collapse in RTL */
+html[dir="rtl"] .discussion-back-chevron,
+html[dir="rtl"] #sidebar-collapse-toggle .fa-chevron-left {
+    transform: scaleX(-1);
+}
+
+html[dir="rtl"] #section-navigation-sidebar[data-collapsed="true"] #sidebar-collapse-toggle i {
+    transform: scaleX(-1) rotate(180deg);
+}

@@ -288,7 +288,7 @@ def session_logs():
         session_log_device_icon_classes,
         user_session_log_active_duration_minutes_sql,
     )
-    from app.services.audit.trail_session_query import count_audit_visible_entries_for_session
+    from app.services.audit.trail_session_query import count_audit_visible_entries_for_sessions
 
     try:
         if not _has_table(UserSessionLog.__tablename__):
@@ -323,6 +323,7 @@ def session_logs():
         query = query.order_by(desc(UserSessionLog.is_active), desc(UserSessionLog.session_start))
         paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
+        activity_counts = count_audit_visible_entries_for_sessions(paginated.items)
         items = []
         for s in paginated.items:
             u = s.user
@@ -340,7 +341,7 @@ def session_logs():
                 'page_views': s.page_views or 0,
                 'distinct_page_view_paths': distinct_page_view_path_count(s),
                 'page_view_path_counts': pvc,
-                'activity_count': count_audit_visible_entries_for_session(s),
+                'activity_count': activity_counts.get(s.id, 0),
                 'is_active': bool(s.is_active),
                 'device_type': s.device_type,
                 'browser': s.browser,

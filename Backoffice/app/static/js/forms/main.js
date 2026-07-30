@@ -22,7 +22,7 @@ import { initFormEvents } from './modules/form-events.js';
 import { cleanupInputValues, setupNumericInputJsonSupport } from './modules/form-item-utils.js';
 import { initAiOpinions } from './modules/ai-opinions.js';
 import { debugLog, debugWarn, debugError } from './modules/debug.js';
-import { initCompletionGapHighlight, initCompletionRateRefresh, refreshVisibleCompletionRate } from './modules/entry-form-progress.js';
+import { initCompletionGapHighlight, initCompletionRateRefresh, refreshVisibleCompletionRate, applyCompletionRate } from './modules/entry-form-progress.js';
 // Heavy feature modules — dynamically imported based on window.__formFeatures flags.
 // Stubs ensure safe destructuring even when the flag is false and the module is skipped.
 
@@ -44,6 +44,9 @@ async function initializeEntryForm() {
     // Provides completion_rate + initial auto_load + resolved_variables in one round-trip.
     const gapBtnEarly = document.getElementById('completion-gap-btn');
     const bootstrapAesId = gapBtnEarly && gapBtnEarly.dataset.aesId;
+    if (gapBtnEarly?.dataset.completionRate) {
+        applyCompletionRate(parseFloat(gapBtnEarly.dataset.completionRate));
+    }
     if (bootstrapAesId && !window.__entryBootstrapPromise) {
         const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
         window.__entryBootstrapPromise = fetchFn(
@@ -56,6 +59,9 @@ async function initializeEntryForm() {
             .then((r) => (r.ok ? r.json() : null))
             .then((data) => {
                 window.__entryBootstrap = data || null;
+                if (typeof data?.completion_rate === 'number') {
+                    applyCompletionRate(data.completion_rate);
+                }
                 return data;
             })
             .catch(() => {
@@ -249,14 +255,17 @@ async function initializeEntryForm() {
         debugLog('main', initErrors.length ? '⚠️ Form initialization completed with errors' : '✅ Form initialization completed successfully');
     }
 
-    // Apply completion rate after relevance conditions have settled (visible fields only).
+    // Refresh completion rate after save; skip fetch when server already rendered it.
     const completionDisplay = document.getElementById('completion-rate-display');
     const gapBtn = document.getElementById('completion-gap-btn');
     if (completionDisplay && gapBtn && gapBtn.dataset.aesId) {
         const aesId = gapBtn.dataset.aesId;
         initCompletionRateRefresh(aesId);
-        refreshVisibleCompletionRate(aesId)
-            .catch(() => { completionDisplay.textContent = '—'; });
+        const pending = (completionDisplay.textContent || '').trim();
+        if (pending === '…' || pending === '' || pending === '—') {
+            refreshVisibleCompletionRate(aesId)
+                .catch(() => { completionDisplay.textContent = '—'; });
+        }
     }
 
     initCompletionGapHighlight();

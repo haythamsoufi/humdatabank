@@ -1013,26 +1013,6 @@ function initializeItemManagement() {
                 };
                 ItemModal.showEditModal(dataset.imageItemId, 'image', itemData);
             }
-
-            const discussionBtn = e.target.closest('.edit-discussion-item-btn');
-            if (discussionBtn) {
-                e.preventDefault();
-                const dataset = discussionBtn.dataset;
-                const itemData = {
-                    id: dataset.discussionItemId,
-                    label: dataset.discussionItemLabel,
-                    description: dataset.discussionItemDescription,
-                    section_id: dataset.currentSectionId || null,
-                    order: dataset.discussionItemOrder,
-                    is_required: false,
-                    relevance_condition: dataset.relevanceCondition,
-                    layout_column_width: dataset.layoutColumnWidth,
-                    layout_break_after: dataset.layoutBreakAfter === 'true',
-                    label_translations: JSON.parse(dataset.labelTranslations || '{}'),
-                    description_translations: JSON.parse(dataset.descriptionTranslations || '{}'),
-                };
-                ItemModal.showEditModal(dataset.discussionItemId, 'discussion', itemData);
-            }
         });
     }
 
@@ -1678,8 +1658,14 @@ function showSectionModal(mode, sectionData = null) {
 
         // Reset section type to standard
         typeRadios.forEach(radio => {
+            radio.disabled = false;
             radio.checked = radio.value === 'standard';
         });
+        const typeFieldWrapper = document.getElementById('section-type-field-wrapper');
+        if (typeFieldWrapper) {
+            typeFieldWrapper.classList.remove('hidden');
+        }
+        form.querySelector('#section-type-discussion-hidden')?.remove();
 
         // Hide max_entries field for new sections
         const maxEntriesContainer = Utils.getElementById('repeat-group-config');
@@ -1765,8 +1751,35 @@ function showSectionModal(mode, sectionData = null) {
             radioValue = 'standard';
         } else if (sectionData.section_type === 'Repeat') {
             radioValue = 'repeat';
+        } else if (sectionData.section_type === 'Discussion' || sectionData.section_type === 'discussion') {
+            radioValue = 'discussion';
         } else {
             radioValue = 'standard';
+        }
+
+        const isDiscussionSection = radioValue === 'discussion';
+        const typeFieldWrapper = document.getElementById('section-type-field-wrapper');
+        form.querySelector('#section-type-discussion-hidden')?.remove();
+        if (isDiscussionSection) {
+            if (typeFieldWrapper) {
+                typeFieldWrapper.classList.add('hidden');
+            }
+            typeRadios.forEach(radio => {
+                radio.disabled = true;
+            });
+            const hiddenType = document.createElement('input');
+            hiddenType.type = 'hidden';
+            hiddenType.name = 'section-section_type';
+            hiddenType.value = 'discussion';
+            hiddenType.id = 'section-type-discussion-hidden';
+            form.appendChild(hiddenType);
+        } else {
+            if (typeFieldWrapper) {
+                typeFieldWrapper.classList.remove('hidden');
+            }
+            typeRadios.forEach(radio => {
+                radio.disabled = false;
+            });
         }
 
         // Set the correct radio button

@@ -13,7 +13,7 @@ from app.utils.request_utils import is_json_request, get_request_data
 from app.services.platform.user_analytics_service import log_admin_action
 from app.utils.transactions import request_transaction_rollback
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-from app.utils.api_responses import json_ok, json_server_error
+from app.utils.api_responses import json_ok, json_server_error, json_bad_request
 from app.services.forms.section_duplication_service import SectionDuplicationService
 from config.config import Config
 from .helpers import (_update_version_timestamp, _ensure_template_access_or_redirect,
@@ -110,6 +110,145 @@ def _apply_section_entry_display_config(section, data):
     section.config = config
 
 
+def _discussion_section_exists(version_id, *, exclude_section_id=None) -> bool:
+    q = FormSection.query.filter_by(
+        version_id=version_id,
+        section_type='discussion',
+        archived=False,
+    )
+    if exclude_section_id:
+        q = q.filter(FormSection.id != exclude_section_id)
+    return q.first() is not None
+
+
+def _validate_discussion_section(*, version, section_type, parent_section_id, exclude_section_id=None):
+    """Return an error message if a discussion section cannot be created/updated, else None."""
+    if (section_type or '').lower() != 'discussion':
+        return None
+    if not version or not getattr(version, 'enable_discussion', False):
+        return _('Discussion sections require "Enable discussion" in template settings.')
+    if parent_section_id:
+        return _('Discussion sections must be top-level sections (not sub-sections).')
+    if _discussion_section_exists(version.id, exclude_section_id=exclude_section_id):
+        return _('Only one discussion section is allowed per template version.')
+    return None
+
+
+def _default_discussion_section_name(version):
+    cfg = version.discussion_config if isinstance(getattr(version, 'discussion_config', None), dict) else {}
+    title = (cfg.get('title') or '').strip()
+    if title:
+        return title
+    return str(_('Comments & Discussion'))
+
+
+def _create_discussion_section(*, template, version, user_id):
+    """Create a top-level discussion section using template discussion defaults."""
+    discussion_err = _validate_discussion_section(
+        version=version,
+        section_type='discussion',
+        parent_section_id=None,
+    )
+    if discussion_err:
+        raise ValueError(str(discussion_err))
+
+    last_top = FormSection.query.filter_by(
+        template_id=template.id,
+        version_id=version.id,
+        parent_section_id=None,
+        archived=False,
+    ).order_by(FormSection.order.desc()).first()
+    order_val = (int(last_top.order) + 1) if last_top and last_top.order is not None else 1
+
+    new_section = FormSection(
+        name=_default_discussion_section_name(version),
+        order=order_val,
+        template_id=template.id,
+        version_id=version.id,
+        parent_section_id=None,
+        section_type='discussion',
+        config={},
+    )
+    db.session.add(new_section)
+    _update_version_timestamp(version.id, user_id)
+    db.session.flush()
+
+    try:
+        log_admin_action(
+            action_type='form_section_create',
+            description=(
+                f"Created discussion section '{new_section.name}' in template '{template.name}'"
+            ),
+            target_type='form_section',
+            target_id=new_section.id,
+            target_description=(
+                f"Template ID: {template.id}, Section ID: {new_section.id}, "
+                f"Version ID: {version.id}"
+            ),
+            risk_level='low',
+        )
+    except Exception as log_error:
+        current_app.logger.error(f"Error logging discussion section creation: {log_error}")
+
+    return new_section
+
+
+@bp.route("/templates/<int:template_id>/sections/discussion", methods=["POST"])
+@permission_required('admin.templates.edit')
+def create_discussion_section(template_id):
+    """Add a discussion section to the form from template details."""
+    data = get_request_data()
+    template = FormTemplate.query.get_or_404(template_id)
+    version_ref = data.get('version_id') or request.args.get('version_id')
+    access_redirect = _ensure_template_access_or_redirect(template_id, version_ref)
+    if access_redirect:
+        return access_redirect
+
+    version = None
+    if version_ref:
+        try:
+            version = FormTemplateVersion.query.filter_by(
+                id=int(version_ref), template_id=template.id
+            ).first()
+        except Exception as e:
+            current_app.logger.debug("version_id parse failed: %s", e)
+            version = None
+    if not version and template.published_version_id:
+        version = FormTemplateVersion.query.get(template.published_version_id)
+    if not version:
+        version = (
+            FormTemplateVersion.query.filter_by(template_id=template.id)
+            .order_by(FormTemplateVersion.created_at.desc())
+            .first()
+        )
+
+    if not version:
+        flash(_('No template version found.'), 'danger')
+        return redirect(url_for('form_builder.edit_template', template_id=template_id))
+
+    try:
+        new_section = _create_discussion_section(
+            template=template, version=version, user_id=current_user.id
+        )
+        db.session.commit()
+        flash(
+            _('Discussion section "%(name)s" added. You can change its order or page below.', name=new_section.name),
+            'success',
+        )
+    except ValueError as e:
+        request_transaction_rollback()
+        flash(str(e), 'danger')
+    except Exception as e:
+        request_transaction_rollback()
+        flash(_('An error occurred. Please try again.'), 'danger')
+        current_app.logger.error(
+            f"Error creating discussion section for template {template_id}: {e}",
+            exc_info=True,
+        )
+
+    return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=version.id))
+
+
 @bp.route("/templates/<int:template_id>/sections/new", methods=["POST"])
 @permission_required('admin.templates.edit')
 def new_template_section(template_id):
@@ -190,6 +329,22 @@ def new_template_section(template_id):
             section_type = (form.section_type.data.lower() if form.section_type.data else 'standard')
             max_dynamic_indicators = form.max_dynamic_indicators.data
             add_indicator_note = form.add_indicator_note.data
+
+            if section_type == 'discussion':
+                flash(
+                    _('Add a discussion section from Template Details → Discussion settings.'),
+                    'danger',
+                )
+                return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=version.id))
+
+            discussion_err = _validate_discussion_section(
+                version=version,
+                section_type=section_type,
+                parent_section_id=parent_section_id,
+            )
+            if discussion_err:
+                flash(str(discussion_err), 'danger')
+                return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=version.id))
 
             # Get max_entries for repeat groups
             max_entries_raw = data.get('max_entries')
@@ -378,9 +533,37 @@ def edit_template_section(section_id):
                 current_app.logger.error(f"Error parsing section name translations: {e}")
 
         section_type = data.get("section-section_type", "standard")
-        section.section_type = section_type.lower() if section_type else 'standard'
+        section_type = section_type.lower() if section_type else 'standard'
+        current_type = (section.section_type or 'standard').lower()
 
-        if section_type.lower() == 'repeat':
+        if section_type == 'discussion' and current_type != 'discussion':
+            msg = _('Add a discussion section from Template Details → Discussion settings.')
+            if is_ajax:
+                return json_bad_request(str(msg), success=False)
+            flash(str(msg), 'danger')
+            return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=section.version_id))
+
+        if current_type == 'discussion':
+            section_type = 'discussion'
+
+        version_for_discussion = section.version if section.version else (
+            section.template.published_version if section.template and section.template.published_version else None
+        )
+        discussion_err = _validate_discussion_section(
+            version=version_for_discussion,
+            section_type=section_type,
+            parent_section_id=section.parent_section_id,
+            exclude_section_id=section.id,
+        )
+        if discussion_err:
+            if is_ajax:
+                return json_bad_request(str(discussion_err), success=False)
+            flash(str(discussion_err), 'danger')
+            return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=section.version_id))
+
+        section.section_type = section_type
+
+        if section_type == 'repeat':
             _apply_repeat_section_config(section, data)
         else:
             if section.config:
@@ -588,6 +771,10 @@ def duplicate_template_section(section_id):
     access_redirect = _ensure_template_access_or_redirect(template_id, version_id)
     if access_redirect:
         return access_redirect
+
+    if (section.section_type or '').lower() == 'discussion':
+        flash(_('Discussion sections cannot be duplicated.'), 'danger')
+        return redirect(url_for('form_builder.edit_template', template_id=template_id, version_id=version_id))
 
     try:
         # Use the section duplication service

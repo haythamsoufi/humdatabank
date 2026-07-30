@@ -1,4 +1,5 @@
 {# Lazy-loaded page sections fragment - variables match entry_form.html #}
+{% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
 <div class="lazy-page-sections-fragment" data-page-fragment="true">
                         {% if all_sections %}
                             {% if render_section_ids is not defined %}
@@ -91,7 +92,9 @@
 
                                     <div id="collapsible-content-{{ section.id }}" data-collapsible-content class="space-y-4 sm:space-y-6"> {# Container for parent section's direct fields AND its sub-sections #}
                                         {# Render direct fields of the parent section #}
-                                        {% if section.fields_ordered %}
+                                        {% if section.section_type == 'discussion' %}
+                                            {% include 'forms/entry_form/partials/discussion_panel_section.html' %}
+                                        {% elif section.fields_ordered %}
                                             {% for field in section.fields_ordered %}
                                                 {# Unified FormItem approach - check for document fields #}
                                                 {% if hasattr(field, 'item_type') %}
@@ -104,7 +107,6 @@
 
                                                 {% set is_blank_block = field.field_type_for_js|lower == 'blank' %}
                                                 {% set is_image_block = field.field_type_for_js|lower == 'image' %}
-                                                {% set is_discussion_block = field.field_type_for_js|lower == 'discussion' %}
 
                                                 {% if is_blank_block %}
                                                     {# Blank/Note: Question Text (label) in bold, Definition as normal text below #}
@@ -147,8 +149,6 @@
                                                             <p class="text-gray-700 text-sm text-center mt-2">{{ field_display_label }}</p>
                                                         {% endif %}
                                                     </div>
-                                                {% elif is_discussion_block %}
-                                                    {% include 'forms/entry_form/partials/discussion_panel_inline.html' %}
                                                 {% elif field.item_type and field.item_type.startswith('plugin_') %}
                                                     {# Plugin Field - render using plugin template #}
                                                     {% set is_sub_item_plugin = field.is_sub_item %}
@@ -177,7 +177,7 @@
                                                         <div class="flex items-start justify-between">
                                                             <div class="flex-1 pr-2">
                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                                <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                <label {{ entry_form_field_label_binding(field, is_plugin=true) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                     {% if is_sub_item_plugin %}
                                                                         <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}</span>
                                                                     {% else %}
@@ -320,7 +320,7 @@
                                                             <div class="flex-1 pr-2">
                                                                 {# Use resolved display label if available (for variable replacement), otherwise use original #}
                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                                <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                <label {{ entry_form_field_label_binding(field, is_dynamic_indicator=is_dynamic_indicator, unified_item_type=unified_item_type) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                     {% if is_sub_item %}
                                                                         <span class="text-gray-600">
                                                                             {% if template_structure.display_order_visible %}{{ section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}
@@ -1273,7 +1273,7 @@
                                                                         <div class="flex items-start justify-between">
                                                                             <div class="flex-1 pr-2">
                                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
-                                                                                <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                                <label {{ entry_form_field_label_binding(field, is_plugin=true) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                                     {% if is_sub_item_plugin %}
                                                                                         <span class="text-gray-600">{% if template_structure.display_order_visible %}{{ sub_section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field_display_label }}</span>
                                                                                     {% else %}
@@ -1401,7 +1401,7 @@
                                                                          {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}"{% endif %}>
                                                                 <div class="flex items-start justify-between">
                                                                     <div class="flex-1 pr-2">
-                                                                        <label for="field-{{ field.id }}" class="block text-md font-semibold text-gray-800 mb-1">
+                                                                        <label {{ entry_form_field_label_binding(field, is_dynamic_indicator=is_dynamic_indicator, unified_item_type=unified_item_type) }} class="block text-md font-semibold text-gray-800 mb-1">
                                                                             {% if is_sub_item %}
                                                                                 <span class="text-gray-600">
                                                                                     {% if template_structure.display_order_visible %}{{ sub_section.display_order }}.{{ field.display_order }}. {% endif %}↳ {{ field.display_label }}

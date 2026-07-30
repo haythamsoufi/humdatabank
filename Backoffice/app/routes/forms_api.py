@@ -54,11 +54,13 @@ from app.utils.error_handling import handle_json_view_exception
 from app.services.forms.processing_service import _create_dynamic_indicator_object
 from app.routes.forms.helpers import existing_data_for_dynamic_assignment, render_dynamic_indicator_item_html
 from app.services.organization.authorization_service import AuthorizationService
+from app.utils.profile_utils import display_initials_for_user, get_user_profile_color
 from app.services.notification.core import log_entity_activity
 from markupsafe import escape
 from app.utils.discussion_comments import (
     DISCUSSION_SOURCE_UPR_EXCEL,
     discussion_comment_author_label,
+    discussion_comment_can_be_managed_by,
     discussion_comment_is_imported,
 )
 
@@ -1216,6 +1218,7 @@ def _entry_bootstrap_matrix_candidates(aes, matrix_item, variable_configs, assig
             int(source_form_item_id),
             require_tick_value_1=bool(tick_column_names),
             tick_column_names=tick_column_names,
+            assignment_entity_status_id=aes.id,
         )
         if result.get('entity_type') and not entity_type:
             entity_type = result['entity_type']
@@ -1484,10 +1487,44 @@ def api_presence_active_users(aes_id):
 
 # ===================== Discussion Comments APIs =====================
 
+def _discussion_comment_mutation_context(comment_id):
+    """Load a comment and verify the current user may edit/delete it."""
+    comment = SubmissionDiscussionComment.query.get(comment_id)
+    if not comment:
+        return None, json_not_found('Comment not found')
+
+    aes_id = comment.assignment_entity_status_id
+    if not aes_id:
+        return None, json_forbidden('Cannot modify this comment')
+
+    access_result = ensure_aes_access(aes_id)
+    if 'error' in access_result:
+        return None, json_forbidden(access_result['error'])
+
+    aes = access_result['aes']
+    if not AuthorizationService.can_edit_assignment(aes, current_user):
+        return None, json_forbidden('Cannot modify comments on this assignment')
+
+    if not discussion_comment_can_be_managed_by(comment, current_user):
+        return None, json_forbidden('Can only modify your own comments')
+
+    return {'comment': comment, 'aes': aes}, None
+
+
 def _serialize_discussion_comment(comment):
     from flask_babel import gettext as _
     user = comment.created_by_user
     author_label = discussion_comment_author_label(comment, gettext_fn=_)
+    author_payload = None
+    if user:
+        author_payload = {
+            'id': user.id,
+            'name': user.name or user.email,
+            'email': user.email or '',
+            'title': user.title or '',
+            'profile_color': get_user_profile_color(user),
+            'initials': display_initials_for_user(user),
+        }
     return {
         'id': comment.id,
         'body': comment.body,
@@ -1495,10 +1532,8 @@ def _serialize_discussion_comment(comment):
         'source': comment.source,
         'is_imported': discussion_comment_is_imported(comment),
         'author_label': author_label,
-        'author': {
-            'id': user.id,
-            'name': user.name or user.email,
-        } if user else None,
+        'author': author_payload,
+        'created_by_user_id': comment.created_by_user_id,
     }
 
 
@@ -1578,3 +1613,81 @@ def api_add_discussion_comment():
     except Exception as e:
         db.session.rollback()
         return handle_json_view_exception(e, 'Failed to add discussion comment', status_code=500)
+
+
+@bp.route('/discussion/comments/<int:comment_id>', methods=['PATCH'])
+@login_required
+def api_update_discussion_comment(comment_id):
+    """Update the current user's own discussion comment."""
+    try:
+        ctx, error_response = _discussion_comment_mutation_context(comment_id)
+        if error_response is not None:
+            return error_response
+
+        comment = ctx['comment']
+        aes = ctx['aes']
+        data = get_json_or_form()
+        body = (data.get('body') or '').strip()
+        if not body:
+            return json_bad_request('Comment body is required')
+        if len(body) > DISCUSSION_COMMENT_MAX_LENGTH:
+            return json_bad_request(
+                f'Comment exceeds maximum length of {DISCUSSION_COMMENT_MAX_LENGTH} characters'
+            )
+
+        comment.body = escape(body)
+        db.session.flush()
+
+        author_name = current_user.name or current_user.email
+        log_entity_activity(
+            aes.entity_type,
+            aes.entity_id,
+            'discussion_comment_edited',
+            f'Comment edited by {author_name}',
+            summary_key='activity.discussion_comment_edited',
+            summary_params={'user': author_name},
+            related_object_type='submission_discussion_comment',
+            related_object_id=comment.id,
+            assignment_id=aes.id,
+            user_id=current_user.id,
+        )
+        db.session.commit()
+        return json_ok(comment=_serialize_discussion_comment(comment))
+    except Exception as e:
+        db.session.rollback()
+        return handle_json_view_exception(e, 'Failed to update discussion comment', status_code=500)
+
+
+@bp.route('/discussion/comments/<int:comment_id>', methods=['DELETE'])
+@login_required
+def api_delete_discussion_comment(comment_id):
+    """Delete the current user's own discussion comment."""
+    try:
+        ctx, error_response = _discussion_comment_mutation_context(comment_id)
+        if error_response is not None:
+            return error_response
+
+        comment = ctx['comment']
+        aes = ctx['aes']
+        deleted_id = comment.id
+        db.session.delete(comment)
+        db.session.flush()
+
+        author_name = current_user.name or current_user.email
+        log_entity_activity(
+            aes.entity_type,
+            aes.entity_id,
+            'discussion_comment_deleted',
+            f'Comment deleted by {author_name}',
+            summary_key='activity.discussion_comment_deleted',
+            summary_params={'user': author_name},
+            related_object_type='submission_discussion_comment',
+            related_object_id=deleted_id,
+            assignment_id=aes.id,
+            user_id=current_user.id,
+        )
+        db.session.commit()
+        return json_ok(deleted_id=deleted_id)
+    except Exception as e:
+        db.session.rollback()
+        return handle_json_view_exception(e, 'Failed to delete discussion comment', status_code=500)

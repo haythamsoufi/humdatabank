@@ -318,12 +318,12 @@ class TestFormTemplate:
             assert version.get_effective_discussion_show_in_sidebar() is False
             assert template.discussion_show_in_sidebar is False
 
-    def test_is_discussion_item_type(self, db_session, app):
+    def test_discussion_section_type_enum(self, db_session, app):
         with app.app_context():
-            from app.models import FormItem
-            item = FormItem(item_type='discussion', label='Team thread', order=1)
-            assert item.is_discussion is True
-            assert item.field_type_for_js == 'discussion'
+            from app.models import FormSection
+            from app.models.enums import SectionType
+            section = FormSection(section_type='discussion', name='Comments', order=1)
+            assert section.section_type_enum == SectionType.discussion
 
     def test_data_quality_methodology(self, db_session, app):
         with app.app_context():

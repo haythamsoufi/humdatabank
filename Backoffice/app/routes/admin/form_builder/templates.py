@@ -72,17 +72,18 @@ def _build_discussion_config(data, *, enabled, form=None):
         description = (form.discussion_description.data or '').strip() or None
         sort_order = form.discussion_sort_order.data or 'oldest_first'
         if data:
-            default_collapsed = _form_bool(data, 'discussion_default_collapsed')
+            default_expanded = _form_bool(data, 'discussion_default_expanded', default=True)
             show_in_sidebar = _form_bool(data, 'discussion_show_in_sidebar', default=True)
         else:
-            default_collapsed = bool(form.discussion_default_collapsed.data)
+            default_expanded = bool(form.discussion_default_expanded.data)
             show_in_sidebar = bool(form.discussion_show_in_sidebar.data)
     else:
         title = (data.get('discussion_title') or '').strip() or None
         description = (data.get('discussion_description') or '').strip() or None
         sort_order = data.get('discussion_sort_order') or 'oldest_first'
-        default_collapsed = _form_bool(data, 'discussion_default_collapsed')
+        default_expanded = _form_bool(data, 'discussion_default_expanded', default=True)
         show_in_sidebar = _form_bool(data, 'discussion_show_in_sidebar', default=True)
+    default_collapsed = not default_expanded
     return {
         'title': title,
         'description': description,
@@ -99,7 +100,7 @@ def _populate_discussion_form_from_version(form, version):
     form.discussion_title.data = cfg.get('title') or ''
     form.discussion_description.data = cfg.get('description') or ''
     form.discussion_sort_order.data = cfg.get('sort_order') or 'oldest_first'
-    form.discussion_default_collapsed.data = bool(cfg.get('default_collapsed'))
+    form.discussion_default_expanded.data = not bool(cfg.get('default_collapsed', False))
     form.discussion_show_in_sidebar.data = cfg.get('show_in_sidebar', True)
 
 

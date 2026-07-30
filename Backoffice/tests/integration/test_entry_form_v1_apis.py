@@ -526,6 +526,58 @@ class TestEntryFormMatrixAutoLoadEntitiesApi:
                 assert data.get("reason") == "no_form_data"
                 assert isinstance(data.get("debug_info"), dict)
 
+    def test_auto_load_entities_batch_no_form_data_returns_reason(self, client, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session, role="admin")
+            _login(client, user.id)
+            headers = _get_csrf_headers(client)
+
+            country = create_test_country(db_session)
+            current_template = create_test_template(db_session)
+            source_template = create_test_template(db_session)
+
+            current_aes = self._create_assignment_entity_status(db_session, current_template, "2024", country.id)
+
+            source_assigned_form = AssignedForm(template_id=source_template.id, period_name="1999")
+            db_session.add(source_assigned_form)
+            db_session.flush()
+            source_aes = AssignmentEntityStatus(
+                assigned_form_id=source_assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(source_aes)
+            db_session.flush()
+
+            source_form_item_id = self._create_form_item(db_session, source_template)
+
+            with patch(
+                "app.routes.api.assignments.AuthorizationService.can_access_assignment",
+                return_value=True,
+            ):
+                resp = client.post(
+                    "/api/v1/matrix/auto-load-entities/batch",
+                    json={
+                        "requests": [
+                            {
+                                "source_template_id": source_template.id,
+                                "source_assignment_period": "1999",
+                                "source_form_item_id": source_form_item_id,
+                                "assignment_entity_status_id": current_aes.id,
+                            },
+                        ],
+                    },
+                    headers=headers,
+                )
+                assert resp.status_code == 200
+                data = resp.get_json()
+                assert len(data["results"]) == 1
+                result = data["results"][0]
+                assert result["entities"] == []
+                assert result.get("reason") == "no_form_data"
+                assert result.get("debug_info", {}).get("current_assignment_entity_status_id") == current_aes.id
+
     def test_auto_load_entities_no_entity_keys_in_data_returns_reason(self, client, db_session, app):
         with app.app_context():
             user = create_test_user(db_session, role="admin")

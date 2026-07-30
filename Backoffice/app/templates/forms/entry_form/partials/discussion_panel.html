@@ -6,6 +6,8 @@
 
 {% set panel_title = discussion_cfg.get('title') or _('Comments & Discussion') %}
 
+{% set default_collapsed = discussion_cfg.get('default_collapsed', false) %}
+
 {% set max_length = 2000 %}
 
 {% set aes_id = assignment_entity_status_id if assignment_entity_status_id is defined else (assignment_status.id if assignment_status else none) %}
@@ -19,8 +21,7 @@
 
 
 <div id="discussion-panel"
-
-     class="discussion-sidebar-preview flex-shrink-0 bg-gray-50/80"
+     class="discussion-sidebar-preview flex-shrink-0"
 
      data-aes-id="{{ aes_id }}"
 
@@ -31,15 +32,23 @@
      data-comment-count="{{ comment_count }}"
 
      data-panel-title="{{ panel_title|forceescape }}"
+     data-default-collapsed="{{ 'true' if default_collapsed else 'false' }}"
      data-i18n-show-more="{{ _('Show %(count)s more', count='%(count)s')|forceescape }}"
      data-i18n-view-discussion="{{ _('View discussion')|forceescape }}"
      data-i18n-add-comment="{{ _('Add a comment')|forceescape }}"
+     data-i18n-historical-import="{{ _('Historical import')|forceescape }}"
+     data-i18n-edit="{{ _('Edit comment')|forceescape }}"
+     data-i18n-delete="{{ _('Delete comment')|forceescape }}"
+     data-i18n-save="{{ _('Save')|forceescape }}"
+     data-i18n-cancel="{{ _('Cancel')|forceescape }}"
+     data-i18n-delete-title="{{ _('Delete comment?')|forceescape }}"
+     data-i18n-delete-confirm="{{ _('Delete this comment? This cannot be undone.')|forceescape }}"
 
      data-current-user-id="{{ current_user.id if current_user and current_user.is_authenticated else 0 }}"
 
      data-current-user-name="{{ (current_user.name or current_user.email)|forceescape if current_user and current_user.is_authenticated else '' }}">
 
-    <div class="px-1 pt-3 pb-2">
+    <div class="px-3 py-3">
 
         <div class="flex items-center gap-2 mb-2 min-w-0">
 
@@ -55,7 +64,7 @@
 
             {% if preview_comment %}
 
-                {{ discussion_comment_row(preview_comment, compact=true) }}
+                {{ discussion_comment_row(preview_comment, compact=true, current_user_id=current_user.id if current_user.is_authenticated else none, can_edit=can_edit) }}
 
             {% else %}
 
@@ -71,7 +80,7 @@
 
                 id="discussion-expand-btn"
 
-                class="discussion-sidebar-expand-btn mt-2 w-full text-left text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md px-2 py-1.5 transition-colors duration-200{% if comment_count == 0 and not can_edit %} hidden{% endif %}"
+                class="discussion-sidebar-expand-btn mt-2 w-full text-start text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md px-2 py-1.5 transition-colors duration-200{% if comment_count == 0 and not can_edit %} hidden{% endif %}"
 
                 aria-expanded="false"
 

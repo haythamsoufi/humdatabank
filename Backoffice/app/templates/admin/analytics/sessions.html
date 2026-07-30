@@ -1,6 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/filter_card.html" import filter_card %}
-{% from "components/ag_grid_includes.html" import ag_grid_container %}
+{% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Session Logs') }} - {{ _('Admin Panel') }}{% endblock %}
@@ -14,7 +14,7 @@
     .admin-sessions-logs-wrap {
         min-height: 600px;
     }
-    /* Compact pinned actions column on phones */
+    /* Icon-only pinned actions column */
     .session-log-action-logout {
         display: inline-flex;
         align-items: center;
@@ -97,8 +97,34 @@
         </div>
     {% endcall %}
 
-    <div class="admin-sessions-logs-wrap relative">
-        {{ ag_grid_container('sessionLogsGrid', loading_text=_('Loading sessions…')) }}
+    <div class="admin-sessions-logs-container bg-white shadow-md border border-gray-200 admin-sessions-logs-wrap">
+        <div class="p-6">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-4">
+                <div class="min-w-0 flex-1" data-ag-grid-title-group>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ _('Sessions') }}</label>
+                    <p class="text-xs text-gray-500">
+                        {{ _('Browse user sessions. Pagination follows the filters in the address bar.') }}
+                    </p>
+                </div>
+                <div class="flex flex-shrink-0 justify-end sm:pt-0.5">
+                    <div id="session-logs-column-visibility-placeholder"></div>
+                </div>
+            </div>
+
+            <div class="relative">
+                {{ ag_grid_body_wrap('sessionLogsGrid', loading_text=_('Loading sessions…'), placeholder_id='session-logs-column-visibility-placeholder', grid_height='600px', use_container=false) }}
+            </div>
+
+            <div id="session-logs-pagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 pt-4">
+                <button type="button" id="session-logs-page-prev" class="btn btn-secondary btn-sm order-2 sm:order-1">
+                    <i class="fas fa-chevron-left mr-1"></i>{{ _('Previous') }}
+                </button>
+                <span id="session-logs-page-label" class="text-sm text-gray-600 order-1 sm:order-2 text-center"></span>
+                <button type="button" id="session-logs-page-next" class="btn btn-secondary btn-sm order-3">
+                    {{ _('Next') }}<i class="fas fa-chevron-right ml-1"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -109,7 +135,8 @@
 <script src="{{ static_url('js/admin/session-logs-grid.js') }}"></script>
 {% set session_logs_grid_bootstrap = {
     'apiUrl': url_for('admin_analytics_api.session_logs_list_api'),
-    'fetchPerPage': 100,
+    'pathBreakdownUrlTemplate': url_for('admin_analytics_api.session_log_page_view_paths_api', session_id='SESSION_ID_PLACEHOLDER'),
+    'perPage': 50,
     'endSessionUrlTemplate': url_for('analytics.end_session', session_id='SESSION_ID_PLACEHOLDER'),
     'confirmForceLogout': _('Are you sure you want to force logout this user? They will be logged out on their next request.'),
     'auditTrailUrl': url_for('analytics.audit_trail'),
@@ -145,6 +172,11 @@
         'pathBucketOther': _('Other paths (aggregated)'),
         'pathColumn': _('Path'),
         'viewCount': _('Count'),
+        'pathBreakdownLoadError': _('Could not load path breakdown for this session.'),
+        'pathBreakdownLoading': _('Loading path breakdown…'),
+        'pageOfTotal': _('Page {page} of {pages} ({total} total)'),
+        'previous': _('Previous'),
+        'next': _('Next'),
         'close': _('Close')
     }
 } %}

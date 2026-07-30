@@ -982,6 +982,27 @@ class PBProgressService:
         return job_id
 
     @classmethod
+    def _build_workspace_dir(cls, version: str) -> Path:
+        upload_root = Path(current_app.config.get("UPLOAD_FOLDER") or "instance/uploads")
+        path = upload_root / STORAGE_CATEGORY / version_storage_prefix(version) / "build_workspace"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @classmethod
+    def _read_build_log_excerpt(cls, log_path: Path, *, max_lines: int = 40) -> str:
+        if not log_path.is_file():
+            return ""
+        try:
+            text = log_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return ""
+        lines = [cls._sanitize_build_line(line) for line in text.splitlines()]
+        lines = [line for line in lines if line]
+        if not lines:
+            return ""
+        return "\n".join(lines[-max_lines:])
+
+    @classmethod
     def _build_log_path(cls, version: str) -> Path:
         upload_root = Path(current_app.config.get("UPLOAD_FOLDER") or "instance/uploads")
         return upload_root / STORAGE_CATEGORY / version_storage_prefix(version) / BUILD_LOG_NAME
@@ -1022,6 +1043,7 @@ class PBProgressService:
         env["PB_REPORT_LABEL"] = REPORT_VERSIONS[version]["label"]
         env["PB_FIGURES_RENDERER"] = "html"
         env["PB_BUILD_WORKERS"] = cls._build_worker_cap()
+        env["PB_VISUALS_BUILD_ROOT"] = str(cls._build_workspace_dir(version))
         env["PYTHONUNBUFFERED"] = "1"
         env["PYTHONDONTWRITEBYTECODE"] = "1"
 
@@ -1223,6 +1245,13 @@ class PBProgressService:
             except BaseException as exc:
                 if isinstance(exc, KeyboardInterrupt):
                     raise
+                log_excerpt = cls._read_build_log_excerpt(cls._build_log_path(version))
+                if log_excerpt:
+                    logger.error(
+                        "P&B progress build log excerpt (job %s):\n%s",
+                        job_id[:8],
+                        log_excerpt,
+                    )
                 cls._log_build_step(
                     job_id,
                     "failed",

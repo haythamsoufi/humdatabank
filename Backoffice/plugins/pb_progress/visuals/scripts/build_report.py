@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pb_figures.config import resolve_excel, cleanup_build_copy  # noqa: E402
+from pb_figures.config import cleanup_build_copy, resolve_excel, resolve_figures_output, resolve_report_output  # noqa: E402
 from pb_figures.styles import ENV_VAR, STYLE_NAMES  # noqa: E402
 REPORT_DIR = ROOT / "report"
 QUARTO_ENV_VAR = "PB_QUARTO_EXE"
@@ -169,7 +169,7 @@ def main() -> None:
             if "html" in formats:
                 from package_figures import package_figures  # noqa: E402
 
-                package_figures()
+                package_figures(resolve_figures_output(), resolve_report_output())
                 _run_docx_and_pdf(env)
                 from package_documents import package_documents  # noqa: E402
 

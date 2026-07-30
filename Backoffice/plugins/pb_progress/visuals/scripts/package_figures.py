@@ -6,9 +6,9 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
+from pb_figures.config import resolve_figures_output, resolve_report_output
+
 ROOT = Path(__file__).resolve().parents[1]
-FIGURES_DIR = ROOT / "Figures"
-OUTPUT_DIR = ROOT / "report" / "output"
 
 
 def _language_slug(language: str) -> str:
@@ -64,7 +64,7 @@ def package_figures(
 
 
 def main() -> None:
-    package_figures()
+    package_figures(resolve_figures_output(), resolve_report_output())
 
 
 if __name__ == "__main__":

@@ -55,9 +55,31 @@ DASHBOARD_SIZES = {
 
 DEFAULT_EXCEL = Path(__file__).resolve().parents[2] / "SG Report.xlsx"
 
-DEFAULT_OUTPUT = Path(__file__).resolve().parents[2] / "Figures"
+_DEFAULT_VISUALS_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUTPUT = _DEFAULT_VISUALS_ROOT / "Figures"
 
 BUILD_COPY_SUFFIX = "._build"
+
+
+def visuals_build_root() -> Path | None:
+    """Writable build workspace (Azure uploads dir); None uses plugin tree."""
+    raw = (os.environ.get("PB_VISUALS_BUILD_ROOT") or "").strip()
+    return Path(raw) if raw else None
+
+
+def resolve_figures_output() -> Path:
+    """Dashboard PNG download folder; uses writable workspace on Azure when set."""
+    root = visuals_build_root()
+    path = (root / "Figures") if root is not None else _DEFAULT_VISUALS_ROOT / "Figures"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def resolve_report_output() -> Path:
+    """Quarto/DOCX/PDF output directory (always under the plugin report tree)."""
+    path = _DEFAULT_VISUALS_ROOT / "report" / "output"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _is_readable(path: Path) -> bool:

@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pb_figures.config import DEFAULT_OUTPUT, build_workers, resolve_excel  # noqa: E402
+from pb_figures.config import build_workers, resolve_excel, resolve_figures_output  # noqa: E402
 from pb_figures.charts import render_dashboard  # noqa: E402
 from pb_figures.data import build_model, load_mapping, load_sg_report  # noqa: E402
 from pb_figures.languages import discover_languages, is_rtl  # noqa: E402
@@ -66,7 +66,7 @@ def _render_language_assets(
             log_lines.append(f"    {section}/ {label}")
             chart_total += len(refs)
 
-            dash_path = DEFAULT_OUTPUT / language / f"{section}.png"
+            dash_path = resolve_figures_output() / language / f"{section}.png"
             render_dashboard(
                 model,
                 section,
@@ -215,7 +215,7 @@ def main() -> None:
     chart_total, dashboard_total = _generate_assets(excel, languages, mapping)
     print(
         f"[pre_render] assets done: {chart_total} chart assets, "
-        f"{dashboard_total} dashboard PNGs -> {DEFAULT_OUTPUT.name}/",
+        f"{dashboard_total} dashboard PNGs -> {resolve_figures_output().name}/",
         flush=True,
     )
 

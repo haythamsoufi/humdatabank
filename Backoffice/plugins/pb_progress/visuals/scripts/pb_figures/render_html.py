@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .font_faces import inject_chart_fonts
 from .payload import build_payload
@@ -15,6 +16,23 @@ if TYPE_CHECKING:
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "dashboard.html"
 _PLACEHOLDER = "__DASHBOARD_JSON__"
+
+
+def chromium_launch_options() -> dict[str, Any]:
+    """Headless Chromium options for Linux containers (Azure App Service, Docker).
+
+    Without ``--no-sandbox``, ``chromium.launch()`` typically fails immediately on
+    Azure Linux because the process cannot create a new sandbox namespace.
+    """
+    options: dict[str, Any] = {"headless": True}
+    if sys.platform == "win32":
+        return options
+    options["args"] = [
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+    ]
+    return options
 
 
 class PlaywrightScreenshotSession:
@@ -29,7 +47,7 @@ class PlaywrightScreenshotSession:
         from playwright.sync_api import sync_playwright
 
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch()
+        self._browser = self._playwright.chromium.launch(**chromium_launch_options())
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

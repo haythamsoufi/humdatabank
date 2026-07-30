@@ -315,6 +315,41 @@ function attachImageModal() {
   });
 }
 
+function attachDiscussionModal() {
+  if (!window.TranslationModal || !document.getElementById('discussion-translation-modal')) return;
+  window.TranslationModal.attach({
+    openButtonId: 'discussion-translations-btn',
+    modalId: 'discussion-translation-modal',
+    cssPrefix: 'discussion',
+    resolveEnglishText: () => (document.getElementById('item-discussion-title')?.value || ''),
+    onSaveHiddenFields: (collectedByTab) => {
+      const labelTranslationsInput = document.getElementById('item-modal-shared-label-translations');
+      const descriptionTranslationsInput = document.getElementById('item-modal-shared-description-translations');
+      if (labelTranslationsInput) labelTranslationsInput.value = JSON.stringify(collectedByTab.labels || {});
+      if (descriptionTranslationsInput) descriptionTranslationsInput.value = JSON.stringify(collectedByTab.descriptions || {});
+    },
+    autoTranslateType: 'form_item',
+    tabSuffixes: ['labels', 'descriptions'],
+    defaultTabSuffix: 'labels',
+    onModalOpen: () => {
+      const labelTranslationsInput = document.getElementById('item-modal-shared-label-translations');
+      const descriptionTranslationsInput = document.getElementById('item-modal-shared-description-translations');
+      let labelTranslations = {};
+      let descriptionTranslations = {};
+      if (labelTranslationsInput && labelTranslationsInput.value) {
+        try { labelTranslations = JSON.parse(labelTranslationsInput.value); } catch (_e) {}
+      }
+      if (descriptionTranslationsInput && descriptionTranslationsInput.value) {
+        try { descriptionTranslations = JSON.parse(descriptionTranslationsInput.value); } catch (_e) {}
+      }
+      if (window.TranslationModalUtils) {
+        window.TranslationModalUtils.populateFields('discussion', labelTranslations, '', 'labels');
+        window.TranslationModalUtils.populateFields('discussion', descriptionTranslations, '', 'descriptions');
+      }
+    }
+  });
+}
+
 function attachMatrixLabelModal() {
   // Use dedicated matrix translation modal
   if (!window.TranslationModal || !document.getElementById('matrix-translations-btn')) return;
@@ -1103,6 +1138,7 @@ export function attachFormBuilderTranslation() {
     attachTemplateNameModal();
     attachDocumentModal();
     attachImageModal();
+    attachDiscussionModal();
     attachPluginModal();
     attachMatrixLabelModal();
     attachMatrixLegendTextModal();

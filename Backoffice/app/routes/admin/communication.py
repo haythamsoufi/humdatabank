@@ -326,13 +326,48 @@ def communication_registry():
             },
         )
 
+    from app.services.notification.preview import preview_variants_by_type_key
+
     return render_template(
         "admin/communication/registry.html",
         rows=rows_out,
         total_catalog=total_specs,
         filtered_count=len(rows_out),
         q=request.args.get("q") or "",
+        preview_variants_by_type=preview_variants_by_type_key(),
     )
+
+
+@bp.route("/api/communication/notification-type-preview", methods=["POST"])
+@permission_required("admin.communication.manage")
+def api_notification_type_preview():
+    """Render sample in-app copy and instant notification email HTML for a registry type."""
+    from app.services.email.rendering import sanitize_admin_email_html_for_api
+    from app.services.notification.preview import render_notification_preview
+
+    data = request.get_json(silent=True) or {}
+    type_key = (data.get("type_key") or "").strip()
+    variant_id = (data.get("variant_id") or "default").strip() or "default"
+    locale = (data.get("locale") or "en").strip() or "en"
+
+    if not type_key:
+        return json_bad_request("type_key is required.")
+
+    try:
+        preview = render_notification_preview(
+            type_key,
+            variant_id=variant_id,
+            locale=locale,
+            user_name=getattr(current_user, "name", None) or "Preview User",
+        )
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+
+    email_html = preview.pop("email_html", None)
+    if email_html:
+        preview["email_html"] = sanitize_admin_email_html_for_api(email_html)
+
+    return json_ok(preview=preview)
 
 
 @bp.route("/api/notifications/send", methods=["POST"])

@@ -6,9 +6,11 @@ AI chatbot retrieval lives in app.services.ai.data.form_retrieval.
 """
 
 import logging
+import re
+from datetime import datetime as _dt
 from typing import Dict, List, Optional, Any
 
-from sqlalchemy import and_, literal
+from sqlalchemy import and_, literal, or_
 from sqlalchemy.orm import joinedload
 
 from app.models import FormData, FormItem, FormSection, IndicatorBank, PublicSubmission

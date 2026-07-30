@@ -105,6 +105,12 @@ class TestTemplateDetailsSave:
                     "enable_import_excel": "n",
                     "enable_ai_validation": "n",
                     "enable_data_quality": "n",
+                    "enable_discussion": "y",
+                    "discussion_title": "Team Discussion",
+                    "discussion_description": "Notes for reviewers",
+                    "discussion_sort_order": "newest_first",
+                    "discussion_default_collapsed": "y",
+                    "discussion_show_in_sidebar": "n",
                 },
                 follow_redirects=False,
             )
@@ -113,6 +119,11 @@ class TestTemplateDetailsSave:
             version = db.session.get(FormTemplateVersion, version_id)
             assert version.name == "Updated Details Template"
             assert version.description == "Updated from test"
+            assert version.enable_discussion is True
+            assert version.discussion_config["title"] == "Team Discussion"
+            assert version.discussion_config["sort_order"] == "newest_first"
+            assert version.discussion_config["default_collapsed"] is True
+            assert version.discussion_config["show_in_sidebar"] is False
 
 
 @pytest.mark.integration

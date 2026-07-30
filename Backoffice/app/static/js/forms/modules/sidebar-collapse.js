@@ -165,6 +165,7 @@ class SidebarCollapseController {
    * Mobile sidebar operations
    */
   closeMobileSidebar() {
+    document.dispatchEvent(new CustomEvent('discussion:collapse'));
     const { sidebar, overlay, mobiletoggle } = this.elements;
     if (sidebar) {
       sidebar.classList.add('-translate-x-full');

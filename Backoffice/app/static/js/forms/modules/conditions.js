@@ -1063,6 +1063,9 @@ export function checkAllRelevanceConditions(meta = {}) {
     } else {
         // Reset pass counter when stable
         __checkAllPasses = 0;
+        try {
+            document.dispatchEvent(new CustomEvent('ifrc:relevance-settled'));
+        } catch (_) { /* no-op */ }
     }
 }
 

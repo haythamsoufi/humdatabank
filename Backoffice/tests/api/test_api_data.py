@@ -1,7 +1,9 @@
 import pytest
+from datetime import date
 from unittest.mock import MagicMock, patch
 
 from tests.factories import create_test_template, create_test_country
+from tests.unit.test_services.test_data_retrieval_form import _make_full_setup
 
 
 @pytest.mark.api
@@ -88,6 +90,30 @@ class TestApiData:
         assert "fact_matrix_cells" not in tables
         assert "dynamic_data" not in star
         assert "matrix_cells" not in star
+
+    def test_get_data_period_name_filter_returns_matching_rows(
+        self, client, auth_headers, db_session, app
+    ):
+        with app.app_context():
+            _, template, _, _, _, _, _, fd = _make_full_setup(
+                db_session,
+                status="submitted",
+                value="42",
+                period_name="Annual Report 2024",
+                period_start=date(2024, 1, 1),
+                period_end=date(2024, 12, 31),
+            )
+            template_id = template.id
+            form_data_id = fd.id
+
+        resp = client.get(
+            f"/api/v1/data?period_name=2024&template_id={template_id}",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        data_rows = payload.get("data") or []
+        assert any(row.get("id") == form_data_id for row in data_rows)
 
     def test_api_key_with_no_data_permission_returns_403(self, client, db_session, app):
         from app import db

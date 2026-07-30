@@ -1,5 +1,4 @@
-from contextlib import suppress
-# ========== Forms API Blueprint ==========
+from app.routes.forms.helpers import parse_csv_id_set
 from app.utils.datetime_helpers import utcnow
 from app.utils.sql_utils import safe_ilike_pattern
 """
@@ -21,7 +20,7 @@ from app.extensions import csrf, limiter
 from app.models import (
     db, IndicatorBank, DynamicIndicatorData,
     FormSection, RepeatGroupInstance, LookupList, LookupListRow,
-    User, Country, NationalSociety, Config
+    User, Country, NationalSociety, Config, SubmissionDiscussionComment,
 )
 from app.utils.form_localization import (
     get_localized_indicator_name, get_localized_sector_name, get_localized_subsector_name,
@@ -54,6 +53,16 @@ from app.utils.api_responses import json_bad_request, json_error, json_forbidden
 from app.utils.error_handling import handle_json_view_exception
 from app.services.forms.processing_service import _create_dynamic_indicator_object
 from app.routes.forms.helpers import existing_data_for_dynamic_assignment, render_dynamic_indicator_item_html
+from app.services.organization.authorization_service import AuthorizationService
+from app.services.notification.core import log_entity_activity
+from markupsafe import escape
+from app.utils.discussion_comments import (
+    DISCUSSION_SOURCE_UPR_EXCEL,
+    discussion_comment_author_label,
+    discussion_comment_is_imported,
+)
+
+DISCUSSION_COMMENT_MAX_LENGTH = 2000
 
 # Create the API blueprint
 # Changed from /forms to /api/forms to avoid prefix conflict with forms.py
@@ -476,6 +485,9 @@ def api_toggle_repeat_instance_hide(instance_id):
     try:
         instance.is_hidden = not instance.is_hidden
         db.session.flush()
+        if instance.assignment_entity_status_id:
+            from app.services.assignments.completion_service import AssignmentCompletionService
+            AssignmentCompletionService.refresh_and_persist(instance.assignment_entity_status_id)
         return json_ok(is_hidden=instance.is_hidden)
     except Exception as e:
         return handle_json_view_exception(e, 'Database error', status_code=500)
@@ -1015,11 +1027,29 @@ def evaluate_filter_condition(field_value, operator, filter_value):
 @bp.route('/assignment/<int:aes_id>/completion-rate', methods=['GET'])
 @login_required
 def api_assignment_completion_rate(aes_id):
-    """Return the completion rate for a given AssignmentEntityStatus.
+    """Return the persisted completion rate for a given AssignmentEntityStatus."""
+    try:
+        if not check_aes_access_light(aes_id):
+            return json_forbidden('Assignment not found or access denied')
 
-    Called by the entry form JS after the page loads so the heavy aggregation
-    queries are off the critical render path.
-    """
+        aes = db.session.get(AssignmentEntityStatus, aes_id)
+        if not aes:
+            return json_not_found('Assignment form not found')
+
+        from app.services.assignments.completion_service import AssignmentCompletionService
+
+        completion_rate = AssignmentCompletionService.stored_rate_for(aes)
+        response = json_ok(completion_rate=completion_rate)
+        response.headers['Cache-Control'] = 'private, max-age=30'
+        return response
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to compute completion rate', status_code=500)
+
+
+@bp.route('/assignment/<int:aes_id>/completion-gaps', methods=['GET'])
+@login_required
+def api_assignment_completion_gaps(aes_id):
+    """Return form items that count toward completion rate but are not yet filled."""
     try:
         if not check_aes_access_light(aes_id):
             return json_forbidden('Assignment not found or access denied')
@@ -1038,17 +1068,65 @@ def api_assignment_completion_rate(aes_id):
 
         template_id, published_version_id = row
         if not published_version_id:
-            return json_ok(completion_rate=0.0)
+            return json_ok(
+                completion_rate=0.0,
+                total_items=0,
+                missing_count=0,
+                missing_items=[],
+                section_ids=[],
+            )
+
+        from flask import current_app
 
         from app.services.assignments.completion_service import AssignmentCompletionService
-        metrics = AssignmentCompletionService.compute_for_assignment(
-            aes_id, template_id, published_version_id
+
+        hidden_field_ids = parse_csv_id_set(request.args.get('hidden_fields'))
+        hidden_section_ids = parse_csv_id_set(request.args.get('hidden_sections'))
+        include_debug = (
+            request.args.get('debug') == '1'
+            or current_app.config.get('DEBUG', False)
         )
-        response = json_ok(completion_rate=round(metrics.completion_rate, 1))
-        response.headers['Cache-Control'] = 'private, max-age=30'
+        aes = db.session.get(AssignmentEntityStatus, aes_id)
+        completion_rate = (
+            AssignmentCompletionService.stored_rate_for(aes) if aes else 0.0
+        )
+        metrics = AssignmentCompletionService.compute_for_assignment(
+            aes_id,
+            template_id,
+            published_version_id,
+        )
+        missing = AssignmentCompletionService.list_missing_items(
+            aes_id,
+            template_id,
+            published_version_id,
+            hidden_field_ids=hidden_field_ids,
+            hidden_section_ids=hidden_section_ids,
+            include_debug=include_debug,
+        )
+        missing_payload = [item.as_dict(include_debug=include_debug) for item in missing]
+        section_ids = sorted({item.section_id for item in missing})
+        if include_debug:
+            for item in missing:
+                if item.item_type == 'matrix':
+                    current_app.logger.info(
+                        'completion-gap matrix form_item_id=%s label=%r fill_hint=%s debug=%s',
+                        item.form_item_id,
+                        item.label,
+                        item.fill_hint,
+                        item.fill_debug,
+                    )
+        response = json_ok(
+            completion_rate=completion_rate,
+            total_items=metrics.total_items,
+            missing_count=len(missing_payload),
+            missing_items=missing_payload,
+            section_ids=section_ids,
+            matrix_rule='one_cell_enough',
+        )
+        response.headers['Cache-Control'] = 'private, max-age=15'
         return response
     except Exception as e:
-        return handle_json_view_exception(e, 'Failed to compute completion rate', status_code=500)
+        return handle_json_view_exception(e, 'Failed to compute completion gaps', status_code=500)
 
 
 def _matrix_uses_auto_load(matrix_item):
@@ -1221,10 +1299,7 @@ def api_assignment_entry_bootstrap(aes_id):
         from app.services.assignments.completion_service import AssignmentCompletionService
         from app.services.forms.variable_resolution_service import VariableResolutionService
 
-        metrics = AssignmentCompletionService.compute_for_assignment(
-            aes_id, template_id, published_version_id
-        )
-        completion_rate = round(metrics.completion_rate, 1)
+        completion_rate = AssignmentCompletionService.stored_rate_for(aes)
 
         template_version = FormTemplateVersion.query.get(published_version_id)
         variable_configs = (template_version.variables if template_version else None) or {}
@@ -1405,3 +1480,101 @@ def api_presence_active_users(aes_id):
         return json_ok(users=users)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+# ===================== Discussion Comments APIs =====================
+
+def _serialize_discussion_comment(comment):
+    from flask_babel import gettext as _
+    user = comment.created_by_user
+    author_label = discussion_comment_author_label(comment, gettext_fn=_)
+    return {
+        'id': comment.id,
+        'body': comment.body,
+        'created_at': comment.created_at.isoformat() if comment.created_at else None,
+        'source': comment.source,
+        'is_imported': discussion_comment_is_imported(comment),
+        'author_label': author_label,
+        'author': {
+            'id': user.id,
+            'name': user.name or user.email,
+        } if user else None,
+    }
+
+
+@bp.route('/discussion/comments', methods=['GET'])
+@login_required
+def api_get_discussion_comments():
+    """List discussion comments for an assignment entity status."""
+    try:
+        aes_id = request.args.get('assignment_entity_status_id', type=int)
+        if not aes_id:
+            return json_bad_request('Missing assignment_entity_status_id')
+
+        access_result = ensure_aes_access(aes_id)
+        if 'error' in access_result:
+            return json_forbidden(access_result['error'])
+
+        comments = (
+            SubmissionDiscussionComment.query
+            .filter_by(assignment_entity_status_id=aes_id)
+            .order_by(SubmissionDiscussionComment.created_at.asc())
+            .all()
+        )
+        return json_ok(comments=[_serialize_discussion_comment(c) for c in comments])
+    except Exception as e:
+        return handle_json_view_exception(e, 'Failed to load discussion comments', status_code=500)
+
+
+@bp.route('/discussion/comments', methods=['POST'])
+@login_required
+def api_add_discussion_comment():
+    """Append a discussion comment to an assignment entity status."""
+    try:
+        data = get_json_or_form()
+        aes_id_raw = data.get('assignment_entity_status_id')
+        if not aes_id_raw:
+            return json_bad_request('Missing assignment_entity_status_id')
+
+        aes_id = int(aes_id_raw)
+        access_result = ensure_aes_access(aes_id)
+        if 'error' in access_result:
+            return json_forbidden(access_result['error'])
+
+        aes = access_result['aes']
+        if not AuthorizationService.can_edit_assignment(aes, current_user):
+            return json_forbidden('Cannot add comment to this assignment')
+
+        body = (data.get('body') or '').strip()
+        if not body:
+            return json_bad_request('Comment body is required')
+        if len(body) > DISCUSSION_COMMENT_MAX_LENGTH:
+            return json_bad_request(f'Comment exceeds maximum length of {DISCUSSION_COMMENT_MAX_LENGTH} characters')
+
+        comment = SubmissionDiscussionComment(
+            assignment_entity_status_id=aes_id,
+            body=escape(body),
+            created_by_user_id=current_user.id,
+            created_at=utcnow(),
+        )
+        db.session.add(comment)
+        db.session.flush()
+
+        author_name = current_user.name or current_user.email
+        log_entity_activity(
+            aes.entity_type,
+            aes.entity_id,
+            'discussion_comment_added',
+            f'Comment added by {author_name}',
+            summary_key='activity.discussion_comment_added',
+            summary_params={'user': author_name},
+            related_object_type='submission_discussion_comment',
+            related_object_id=comment.id,
+            assignment_id=aes.id,
+            user_id=current_user.id,
+        )
+        db.session.commit()
+        return json_ok(comment=_serialize_discussion_comment(comment))
+    except Exception as e:
+        db.session.rollback()
+        return handle_json_view_exception(e, 'Failed to add discussion comment', status_code=500)

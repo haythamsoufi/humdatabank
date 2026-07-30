@@ -12,6 +12,8 @@ from flask import current_app, render_template
 from sqlalchemy.orm import joinedload
 
 from app.models import (
+    AssignmentEntityStatus,
+    db,
     FormData, FormItem, DynamicIndicatorData, FormSection,
     SubmittedDocument,
 )
@@ -338,10 +340,12 @@ def map_unified_item_to_original(item_id, item_type):
 
 
 def calculate_assignment_completion_rate(assignment_entity_status_id, template_id, version_id):
-    """Calculate assignment completion rate for the published template version."""
-    return AssignmentCompletionService.compute_for_assignment(
-        assignment_entity_status_id, template_id, version_id
-    ).completion_rate
+    """Return persisted assignment completion rate (refreshes when not yet stored)."""
+    del template_id, version_id  # kept for call-site compatibility
+    aes = db.session.get(AssignmentEntityStatus, assignment_entity_status_id)
+    if not aes:
+        return 0.0
+    return AssignmentCompletionService.stored_rate_for(aes)
 
 
 def build_entry_form_features(all_sections, form_template=None):
@@ -373,6 +377,8 @@ def build_entry_form_features(all_sections, form_template=None):
 
     enable_export_excel = bool(getattr(form_template, 'enable_export_excel', False)) if form_template else False
     enable_import_excel = bool(getattr(form_template, 'enable_import_excel', False)) if form_template else False
+    has_discussion_items = any(getattr(f, 'item_type', None) == 'discussion' for f in fields)
+    enable_discussion = bool(getattr(form_template, 'enable_discussion', False)) if form_template else False
     template_id = int(getattr(form_template, 'id', 0) or 0)
     upr_country_reporting_excel = template_id == 33
 
@@ -384,6 +390,7 @@ def build_entry_form_features(all_sections, form_template=None):
         'calculatedLists': has_calculated_list_fields,
         'pdfExport': True,
         'excelExport': enable_export_excel or enable_import_excel or upr_country_reporting_excel,
+        'discussion': enable_discussion or has_discussion_items,
     }
 
 
@@ -395,9 +402,12 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
         filled_items_count = 0
         if hasattr(section, 'fields_ordered'):
             for field in section.fields_ordered:
-                if hasattr(field, 'field_type_for_js') and field.field_type_for_js.lower() in ('blank', 'image'):
+                if hasattr(field, 'field_type_for_js') and field.field_type_for_js.lower() in ('blank', 'image', 'discussion'):
                     continue
                 if getattr(field, 'is_image', False):
+                    continue
+                field_config = getattr(field, 'config', None) or {}
+                if field_config.get('exclude_from_completion_rate'):
                     continue
 
                 total_items_in_section +=1
@@ -451,3 +461,74 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
             section_statuses[section.name] = 'Completed'
 
     return section_statuses
+
+
+def build_submitted_documents_dict(assignment_entity_status_id):
+    """Build the field_value-keyed submitted-documents map used by section status logic."""
+    submitted_docs = (
+        SubmittedDocument.query.filter_by(assignment_entity_status_id=assignment_entity_status_id)
+        .order_by(SubmittedDocument.uploaded_at.desc())
+        .all()
+    )
+    existing_submitted_documents_dict = {}
+    for doc in submitted_docs:
+        if not doc.form_item_id:
+            continue
+        key = f'field_value[{doc.form_item_id}]'
+        if key not in existing_submitted_documents_dict:
+            existing_submitted_documents_dict[key] = doc
+        elif isinstance(existing_submitted_documents_dict[key], list):
+            existing_submitted_documents_dict[key].append(doc)
+        else:
+            existing_submitted_documents_dict[key] = [
+                existing_submitted_documents_dict[key], doc
+            ]
+    return existing_submitted_documents_dict
+
+
+def parse_csv_id_set(raw: str | None) -> set[int]:
+    """Parse comma-separated numeric ids (FormItem / FormSection ids from the client)."""
+    if not raw or not str(raw).strip():
+        return set()
+    out: set[int] = set()
+    for part in str(raw).split(','):
+        part = part.strip()
+        if part.isdigit():
+            with suppress(Exception):
+                out.add(int(part))
+    return out
+
+
+def compute_entry_form_progress_metrics(
+    assignment_entity_status,
+    form_template,
+    all_sections,
+    *,
+    hidden_field_ids: set[int] | None = None,
+    hidden_section_ids: set[int] | None = None,
+):
+    """Reload saved assignment data and return completion rate + section statuses for the UI."""
+    existing_data_processed = _load_existing_data_for_assignment(
+        assignment_entity_status, form_template
+    )
+    existing_submitted_documents_dict = build_submitted_documents_dict(
+        assignment_entity_status.id
+    )
+    section_statuses_by_name = calculate_section_completion_status(
+        all_sections, existing_data_processed, existing_submitted_documents_dict
+    )
+    section_statuses = {
+        str(section.id): section_statuses_by_name.get(section.name, 'Not Started')
+        for section in (all_sections or [])
+    }
+
+    completion_rate = 0.0
+    if getattr(assignment_entity_status, 'id', None):
+        completion_rate = AssignmentCompletionService.refresh_and_persist(
+            assignment_entity_status.id
+        )
+
+    return {
+        'completion_rate': completion_rate,
+        'section_statuses': section_statuses,
+    }

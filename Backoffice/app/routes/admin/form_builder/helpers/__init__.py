@@ -18,6 +18,7 @@ from .item_updaters import (
     _update_document_field_fields,
     _update_matrix_fields,
     _update_image_fields,
+    _update_discussion_fields,
     _update_item_config,
     _update_plugin_fields,
 )
@@ -73,6 +74,7 @@ __all__ = [
     '_update_document_field_fields',
     '_update_matrix_fields',
     '_update_image_fields',
+    '_update_discussion_fields',
     '_update_item_config',
     '_update_plugin_fields',
     # item_factories

@@ -27,6 +27,16 @@ class FormTemplateForm(BaseForm):
     enable_import_excel = BooleanField(_("Enable Import Excel button"), default=False)
     enable_ai_validation = BooleanField(_("Enable Run AI validation button"), default=False)
     enable_data_quality = BooleanField(_("Enable Data Quality (QoD) dashboard and validation checks"), default=False)
+    enable_discussion = BooleanField(_("Enable Discussion & Comments panel"), default=False)
+    discussion_title = StringField(_("Discussion panel title"), validators=[Optional(), Length(max=100)])
+    discussion_description = TextAreaField(_("Discussion panel description"), validators=[Optional(), Length(max=500)])
+    discussion_sort_order = SelectField(
+        _("Comment sort order"),
+        choices=[('oldest_first', _('Oldest first')), ('newest_first', _('Newest first'))],
+        default='oldest_first',
+    )
+    discussion_default_collapsed = BooleanField(_("Collapsed by default"), default=False)
+    discussion_show_in_sidebar = BooleanField(_("Show in side navigation panel"), default=True)
     data_quality_methodology = SelectField(
         _("Data quality methodology"),
         choices=[("", _("— None —"))],

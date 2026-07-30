@@ -67,6 +67,7 @@ from import_upr_excel_data import (  # noqa: E402
     reporting_funding_matrix_column,
     reporting_special_item,
     round_to_period,
+    upsert_upr_discussion_comments,
     upsert_dynamic_indicator_entries,
     _queue_other_dynamic_indicator,
 )
@@ -2949,19 +2950,15 @@ def transform_upr_country_reporting_to_import_rows(
             cell_key = f"{ns_id}_{area} Supported"
             matrix_cells.setdefault((aes_id, support_item), {})[cell_key] = 1
 
-    # Comments (T33 item — single textarea ↔ Commetns_overall)
-    comments_item_id = _resolve_comments_item_id(ctx)
+    # Comments (T33) → discussion panel (historical import, no author)
     comments = parse_comments(wb)
-    if comments and comments_item_id:
-        import_rows.append(
-            _scalar_row(
-                aes_id=aes_id,
-                item_id=comments_item_id,
-                value=comments,
-                iso3=iso3,
-                period=period,
-                debug_kpi="comments",
-            )
+    if comments:
+        ctx.discussion_comment_entries.append(
+            {
+                "aes_id": aes_id,
+                "body": comments,
+                "source": "upr_excel_import",
+            }
         )
 
     for (aid, item_id), cells in matrix_cells.items():
@@ -3089,6 +3086,11 @@ def run_upr_country_reporting_import(
             valid_form_item_ids=valid_item_ids,
             stats=stats,
         )
+        discussion_stats = upsert_upr_discussion_comments(
+            ctx.discussion_comment_entries,
+            dry_run=dry_run,
+        )
+        upsert_stats.update(discussion_stats)
         if not dry_run:
             dyn_stats = _import_dynamic_indicators_from_workbook(
                 aes_id,

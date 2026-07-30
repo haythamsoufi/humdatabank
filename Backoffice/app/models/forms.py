@@ -186,6 +186,36 @@ class FormTemplate(db.Model):
         return False
 
     @property
+    def enable_discussion(self):
+        """Get enable_discussion from the published version, or fallback to first version."""
+        if self.published_version:
+            return self.published_version.enable_discussion
+        first_version = self.versions.order_by('created_at').first()
+        if first_version:
+            return first_version.enable_discussion
+        return False
+
+    @property
+    def discussion_config(self):
+        """Get discussion_config from the published version, or fallback to first version."""
+        if self.published_version:
+            return self.published_version.discussion_config
+        first_version = self.versions.order_by('created_at').first()
+        if first_version:
+            return first_version.discussion_config
+        return None
+
+    @property
+    def discussion_show_in_sidebar(self):
+        """Whether discussion appears in the entry form side navigation panel."""
+        if self.published_version:
+            return self.published_version.get_effective_discussion_show_in_sidebar()
+        first_version = self.versions.order_by('created_at').first()
+        if first_version:
+            return first_version.get_effective_discussion_show_in_sidebar()
+        return False
+
+    @property
     def data_quality_methodology(self):
         if self.published_version:
             return self.published_version.data_quality_methodology
@@ -236,6 +266,8 @@ class FormTemplateVersion(db.Model):
     enable_data_quality = Column(Boolean, default=False, nullable=False)
     data_quality_methodology = Column(String(64), nullable=True)
     validation_rule_pack = Column(String(64), nullable=True)
+    enable_discussion = Column(Boolean, default=False, nullable=False)
+    discussion_config = Column(JSON, nullable=True)
 
     # Template variables for referencing values from other form submissions
     # Structure: {"variable_name": {"source_template_id": int, "source_assignment_period": str,
@@ -294,6 +326,15 @@ class FormTemplateVersion(db.Model):
 
     def get_effective_enable_data_quality(self):
         return self.enable_data_quality
+
+    def get_effective_enable_discussion(self):
+        return self.enable_discussion
+
+    def get_effective_discussion_show_in_sidebar(self):
+        if not self.enable_discussion:
+            return False
+        cfg = self.discussion_config if isinstance(self.discussion_config, dict) else {}
+        return cfg.get('show_in_sidebar', True)
 
     def get_name_translation(self, language):
         """Get the translated name for a specific language."""
@@ -953,6 +994,52 @@ class FormData(DataEntryMixin, db.Model):
             display_value = f"Disaggregated ({self.disaggregation_mode})"
 
         return f'<FormData Assignment:{assignment_id} Country:{country_name} {item_label} Value:{display_value}>'
+
+
+class SubmissionDiscussionComment(db.Model):
+    """Append-only discussion comment on an assignment submission or public submission."""
+
+    __tablename__ = 'submission_discussion_comment'
+
+    id = db.Column(db.Integer, primary_key=True)
+    assignment_entity_status_id = db.Column(
+        db.Integer,
+        db.ForeignKey('assignment_entity_status.id', ondelete='CASCADE'),
+        nullable=True,
+    )
+    public_submission_id = db.Column(
+        db.Integer,
+        db.ForeignKey('public_submission.id', ondelete='CASCADE'),
+        nullable=True,
+    )
+    body = db.Column(db.Text, nullable=False)
+    source = db.Column(db.String(64), nullable=True)
+    created_by_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    created_by_user = relationship('User', backref='discussion_comments')
+    assignment_entity_status = relationship(
+        'AssignmentEntityStatus',
+        foreign_keys=[assignment_entity_status_id],
+        backref=db.backref('discussion_comments', lazy='dynamic'),
+    )
+    public_submission = relationship(
+        'PublicSubmission',
+        foreign_keys=[public_submission_id],
+        backref=db.backref('discussion_comments', lazy='dynamic'),
+    )
+
+    __table_args__ = (
+        db.Index('ix_sdc_aes', 'assignment_entity_status_id'),
+        db.Index('ix_sdc_public', 'public_submission_id'),
+    )
+
+    def __repr__(self):
+        return f'<SubmissionDiscussionComment {self.id} aes={self.assignment_entity_status_id}>'
 
 
 class DynamicIndicatorData(DataEntryMixin, db.Model):

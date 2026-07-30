@@ -294,7 +294,76 @@ class NotificationService:
     _MESSAGE_KEYS_WITH_COUNTRY_PARAM = frozenset({
         'notification.user_added_to_country.message',
         'notification.public_submission_received.message',
+        'notification.assignment_sent_for_review.message',
+        'notification.assignment_sent_for_review.admin.message',
     })
+
+    _NOTIFICATION_KEYS_WITH_COUNTRY_PARAM = _MESSAGE_KEYS_WITH_COUNTRY_PARAM | frozenset({
+        'notification.assignment_sent_for_review.title',
+        'notification.assignment_sent_for_review.admin.title',
+    })
+
+    _ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS = frozenset({
+        'notification.assignment_sent_for_review.message',
+        'notification.assignment_sent_for_review.admin.message',
+    })
+
+    @classmethod
+    def _ensure_country_param(
+        cls,
+        notification: Notification,
+        params: Optional[Dict[str, Any]],
+        translation_key: Optional[str],
+    ) -> Dict[str, Any]:
+        """Add country/entity name when a template requires %(country)s."""
+        if not translation_key or translation_key not in cls._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
+            return params or {}
+        params = (params or {}).copy()
+        if 'country' in params:
+            return params
+
+        entity_type = params.get('_entity_type') or getattr(notification, 'entity_type', None)
+        entity_id = params.get('_entity_id') or getattr(notification, 'entity_id', None)
+        if entity_type and entity_id:
+            try:
+                from app.services.organization.entity_service import EntityService
+                entity_name = EntityService.get_localized_entity_name(
+                    entity_type,
+                    entity_id,
+                    include_hierarchy=True,
+                )
+                if entity_name and not entity_name.startswith('Unknown'):
+                    params['country'] = entity_name
+            except Exception as e:
+                logger.warning(
+                    "[NOTIFICATION_SERVICE] Error getting entity name for country parameter: %s",
+                    e,
+                    exc_info=True,
+                )
+        elif translation_key in cls._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
+            logger.warning(
+                "[NOTIFICATION_SERVICE] Notification %s: missing entity info for required country param "
+                "(translation_key='%s', entity_type='%s', entity_id=%s)",
+                getattr(notification, 'id', '?'),
+                translation_key,
+                entity_type,
+                entity_id,
+            )
+        return params
+
+    @classmethod
+    def _ensure_assignment_sent_for_review_params(cls, params: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Backfill params for older sent-for-review notifications."""
+        params = (params or {}).copy()
+        if 'submitter_name' not in params:
+            params['submitter_name'] = 'A National Society focal point'
+        if 'period' not in params:
+            params['period'] = '—'
+        if 'template' not in params:
+            params['template'] = 'this assignment'
+        if 'country' not in params:
+            params['country'] = 'Unknown entity'
+        return params
 
     @classmethod
     def _apply_localized_country_param(
@@ -390,6 +459,13 @@ class NotificationService:
                             tp['submitter_name'] = 'A focal point'
                         if 'period' not in tp:
                             tp['period'] = '—'
+                    if title_key in cls._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
+                        tp = cls._ensure_country_param(notification, tp, title_key)
+                    if title_key in (
+                        'notification.assignment_sent_for_review.title',
+                        'notification.assignment_sent_for_review.admin.title',
+                    ):
+                        tp = cls._ensure_assignment_sent_for_review_params(tp)
                     translated_title = translate_notification_message(title_key, tp, locale=locale_to_use)
                 except Exception as e:
                     logger.warning(f"Error translating title_key '{title_key}' for notification {notification.id}: {e}", exc_info=True)
@@ -417,30 +493,9 @@ class NotificationService:
                     keys_requiring_country = {
                         'notification.public_submission_received.message',
                         'notification.user_added_to_country.message',
-                    }
-                    if message_key in keys_requiring_country and 'country' not in message_params:
-                        # Check if we have entity info to get country name
-                        # First try from message_params, then from notification object as fallback
-                        entity_type = message_params.get('_entity_type') or getattr(notification, 'entity_type', None)
-                        entity_id = message_params.get('_entity_id') or getattr(notification, 'entity_id', None)
-                        if entity_type and entity_id:
-                            try:
-                                from app.services.organization.entity_service import EntityService
-                                entity_name = EntityService.get_localized_entity_name(
-                                    entity_type,
-                                    entity_id,
-                                    include_hierarchy=True
-                                )
-                                if entity_name and not entity_name.startswith('Unknown'):
-                                    message_params['country'] = entity_name
-                            except Exception as e:
-                                logger.warning(f"[NOTIFICATION_SERVICE] Error getting entity name for country parameter: {e}", exc_info=True)
-                        else:
-                            # Important only when the message requires %(country)s, otherwise it's noise.
-                            logger.warning(
-                                f"[NOTIFICATION_SERVICE] Notification {notification.id}: missing entity info for required country param "
-                                f"(message_key='{message_key}', entity_type='{entity_type}', entity_id={entity_id})"
-                            )
+                    } | cls._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM
+                    if message_key in keys_requiring_country:
+                        message_params = cls._ensure_country_param(notification, message_params, message_key)
 
                     # Add missing submitter_name/period for assignment_submitted.admin (older notifications may lack them)
                     if message_key == 'notification.assignment_submitted.admin.message':
@@ -448,6 +503,9 @@ class NotificationService:
                             message_params['submitter_name'] = 'A focal point'
                         if 'period' not in message_params:
                             message_params['period'] = '—'
+
+                    if message_key in cls._ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS:
+                        message_params = cls._ensure_assignment_sent_for_review_params(message_params)
 
                     # Localize template names in params if they exist
                     # This needs to happen at display time to respect user's current language

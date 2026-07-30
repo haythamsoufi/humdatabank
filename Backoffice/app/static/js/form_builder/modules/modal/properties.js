@@ -5,6 +5,7 @@ export const PropertiesMixin = {
 
     isDisplayOnlyItemType: function(itemType, questionType) {
         if (itemType === 'image') return true;
+        if (itemType === 'discussion') return true;
         if (itemType !== 'question') return false;
         const qt = questionType !== undefined && questionType !== null
             ? questionType
@@ -21,9 +22,10 @@ export const PropertiesMixin = {
         const requiredRow = this.modalElement.querySelector('#item-required')?.closest('.item-properties-cell');
         const dnaRow = this.modalElement.querySelector('#item-allow-data-not-available')?.closest('.item-properties-cell');
         const naRow = this.modalElement.querySelector('#item-allow-not-applicable')?.closest('.item-properties-cell');
+        const excludeCompletionRow = this.modalElement.querySelector('#item-exclude-from-completion-rate-row');
         const carryForwardRow = this.modalElement.querySelector('#item-carry-forward-row');
 
-        [privacyField, requiredRow, dnaRow, naRow, carryForwardRow].forEach((el) => {
+        [privacyField, requiredRow, dnaRow, naRow, excludeCompletionRow, carryForwardRow].forEach((el) => {
             if (!el) return;
             el.style.display = hide ? 'none' : '';
         });
@@ -31,10 +33,11 @@ export const PropertiesMixin = {
         const requiredCheckbox = this.modalElement.querySelector('#item-required');
         const dnaCheckbox = this.modalElement.querySelector('#item-allow-data-not-available');
         const naCheckbox = this.modalElement.querySelector('#item-allow-not-applicable');
+        const excludeCompletionCheckbox = this.modalElement.querySelector('#item-exclude-from-completion-rate');
         const privacySelect = this.modalElement.querySelector('#item-privacy-select');
         const carryForwardCheckbox = this.modalElement.querySelector('#item-carry-forward');
 
-        [requiredCheckbox, dnaCheckbox, naCheckbox, carryForwardCheckbox].forEach((el) => {
+        [requiredCheckbox, dnaCheckbox, naCheckbox, excludeCompletionCheckbox, carryForwardCheckbox].forEach((el) => {
             if (!el) return;
             if (hide) {
                 el.checked = false;

@@ -1965,8 +1965,8 @@
             }
             periodSelect.disabled = false;
             countrySelect.disabled = false;
-            if (periodHelp) periodHelp.textContent = periodNames.length ? `${periodNames.length} ' + {{ _("periods")|tojson|safe }} + '` : {{ _("No periods for this template")|tojson|safe }};
-            if (countryHelp) countryHelp.textContent = countries.length ? `${countries.length} ' + {{ _("countries")|tojson|safe }} + '` : {{ _("No countries for this template")|tojson|safe }};
+            if (periodHelp) periodHelp.textContent = periodNames.length ? (periodNames.length + ' ' + {{ _("periods")|tojson|safe }}) : {{ _("No periods for this template")|tojson|safe }};
+            if (countryHelp) countryHelp.textContent = countries.length ? (countries.length + ' ' + {{ _("countries")|tojson|safe }}) : {{ _("No countries for this template")|tojson|safe }};
         } catch (error) {
             console.error('Error loading assignment filters:', error);
             resetAssignmentFilters();
@@ -2133,7 +2133,7 @@
 
             formItemSelect.disabled = false;
             formItemHelpText.textContent = seenIds.size > 0
-                ? `${seenIds.size} ' + {{ _("form items loaded")|tojson|safe }} + '`
+                ? (seenIds.size + ' ' + {{ _("form items loaded")|tojson|safe }})
                 : {{ _("No form items found for this template")|tojson|safe }};
 
             window.__clientDebug && window.__clientDebug('[ExploreData] loadFormItems done', {
@@ -3238,7 +3238,7 @@
 
                 const originalHtml = runAiBtn.innerHTML;
                 runAiBtn.disabled = true;
-                runAiBtn.innerHTML = `<i class=\"fas fa-spinner fa-spin mr-2\"></i>" + {{ _('Running…')|tojson|safe }} + "`;
+                runAiBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + {{ _('Running…')|tojson|safe }};
 
                 try {
                     const batchSize = 200;
@@ -3331,7 +3331,7 @@
 
             btn.disabled = true;
             const originalHtml = btn.innerHTML;
-            btn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i>' + {{ _("Saving…")|tojson|safe }} + '`;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>' + {{ _("Saving…")|tojson|safe }};
             try {
                 const body = {};
                 if (!isVirtual) {
@@ -3378,7 +3378,7 @@
                 gridHelper.setRowData(rowData);
                 gridHelper.refresh();
 
-                btn.innerHTML = `<i class="fas fa-check mr-1"></i>' + {{ _("Imputed")|tojson|safe }} + '`;
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i>' + {{ _("Imputed")|tojson|safe }};
             } catch (e) {
                 console.error('Failed to apply imputed value:', e);
                 btn.innerHTML = originalHtml;
@@ -3462,7 +3462,7 @@
                     domCache.disaggInitialPrompt.innerHTML = `
                         <div class="text-center py-12 text-gray-500">
                             <i class="fas fa-chart-pie text-4xl mb-4"></i>
-                            <p class="text-lg font-medium mb-2">" + {{ _('No data loaded yet')|tojson|safe }} + "</p>
+                            <p class="text-lg font-medium mb-2">` + {{ _('No data loaded yet')|tojson|safe }} + `</p>
                             <p class="text-sm">{{ _('Select a template above to analyze eligible disaggregation indicators.') }}</p>
                         </div>
                     `;

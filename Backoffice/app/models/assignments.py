@@ -336,6 +336,9 @@ class AssignmentEntityStatus(db.Model):
     # When the parent assignment round is closed, admins can reopen data entry for this entity only
     reopened_after_close = db.Column(db.Boolean, default=False, nullable=False)
 
+    # Denormalized cache of AssignmentCompletionService.compute_for_assignment() (refreshed on save).
+    completion_rate = db.Column(db.Numeric(5, 1), nullable=True)
+
     # Relationships
     assigned_form = relationship('AssignedForm', backref=db.backref('entity_statuses', lazy='dynamic', cascade="all, delete-orphan"))
     submitted_by_user = db.relationship('User', foreign_keys=[submitted_by_user_id])

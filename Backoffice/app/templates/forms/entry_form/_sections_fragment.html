@@ -104,6 +104,7 @@
 
                                                 {% set is_blank_block = field.field_type_for_js|lower == 'blank' %}
                                                 {% set is_image_block = field.field_type_for_js|lower == 'image' %}
+                                                {% set is_discussion_block = field.field_type_for_js|lower == 'discussion' %}
 
                                                 {% if is_blank_block %}
                                                     {# Blank/Note: Question Text (label) in bold, Definition as normal text below #}
@@ -146,6 +147,8 @@
                                                             <p class="text-gray-700 text-sm text-center mt-2">{{ field_display_label }}</p>
                                                         {% endif %}
                                                     </div>
+                                                {% elif is_discussion_block %}
+                                                    {% include 'forms/entry_form/partials/discussion_panel_inline.html' %}
                                                 {% elif field.item_type and field.item_type.startswith('plugin_') %}
                                                     {# Plugin Field - render using plugin template #}
                                                     {% set is_sub_item_plugin = field.is_sub_item %}
@@ -710,7 +713,7 @@
                                                             {% endif %}
 
                                                             {# Data Availability Options for Dynamic Indicators #}
-                                                            {% if can_edit and (field.allow_data_not_available or field.allow_not_applicable) %}
+                                                            {% if field.allow_data_not_available or field.allow_not_applicable %}
                                                                 <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                     {% if field.allow_data_not_available %}
                                                                         <label class="inline-flex items-center">
@@ -887,7 +890,7 @@
                                                             {% endif %}
 
                                                             {# Data Availability Options for Indicators #}
-                                                            {% if can_edit and (field.allow_data_not_available or field.allow_not_applicable) %}
+                                                            {% if field.allow_data_not_available or field.allow_not_applicable %}
                                                                 <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                     {% if field.allow_data_not_available %}
                                                                         <label class="inline-flex items-center">
@@ -1159,7 +1162,7 @@
                                                             {% endif %}
 
                                                             {# Data Availability Options for Questions #}
-                                                            {% if can_edit and (field.allow_data_not_available or field.allow_not_applicable) %}
+                                                            {% if field.allow_data_not_available or field.allow_not_applicable %}
                                                                 <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                     {% if field.allow_data_not_available %}
                                                                         <label class="inline-flex items-center">
@@ -1899,7 +1902,6 @@
                                                                         {% endif %} {# End of indicator/question/matrix specific rendering for Sub-Section #}
 
                                                                         {# Data availability checkboxes for sub-section indicators and questions #}
-                                                                        {% if can_edit %}
                                                                                                             {% if field.is_indicator and (field.allow_data_not_available or field.allow_not_applicable) %}
                                     <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                                                                         {% if field.allow_data_not_available %}
@@ -1931,7 +1933,6 @@
                                     {% endif %}
                                                                                 </div>
                                                                             {% endif %}
-                                                                        {% endif %}
 
                                                                         {% if field.is_indicator and field.allow_disability_questions %}
                                                                             {% with name_prefix='indicator_' ~ field.id|string %}

@@ -1013,6 +1013,26 @@ function initializeItemManagement() {
                 };
                 ItemModal.showEditModal(dataset.imageItemId, 'image', itemData);
             }
+
+            const discussionBtn = e.target.closest('.edit-discussion-item-btn');
+            if (discussionBtn) {
+                e.preventDefault();
+                const dataset = discussionBtn.dataset;
+                const itemData = {
+                    id: dataset.discussionItemId,
+                    label: dataset.discussionItemLabel,
+                    description: dataset.discussionItemDescription,
+                    section_id: dataset.currentSectionId || null,
+                    order: dataset.discussionItemOrder,
+                    is_required: false,
+                    relevance_condition: dataset.relevanceCondition,
+                    layout_column_width: dataset.layoutColumnWidth,
+                    layout_break_after: dataset.layoutBreakAfter === 'true',
+                    label_translations: JSON.parse(dataset.labelTranslations || '{}'),
+                    description_translations: JSON.parse(dataset.descriptionTranslations || '{}'),
+                };
+                ItemModal.showEditModal(dataset.discussionItemId, 'discussion', itemData);
+            }
         });
     }
 

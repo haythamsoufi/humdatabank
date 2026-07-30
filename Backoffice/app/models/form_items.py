@@ -46,6 +46,7 @@ class FormItem(db.Model):
         'allow_not_applicable': False,
         'allow_disability_questions': False,
         'indirect_reach': False,
+        'exclude_from_completion_rate': False,
         'privacy': 'ifrc_network'
     })
 
@@ -152,6 +153,10 @@ class FormItem(db.Model):
         return self.item_type == 'image'
 
     @property
+    def is_discussion(self):
+        return self.item_type == 'discussion'
+
+    @property
     def is_plugin(self):
         """Returns True if this is a plugin field type."""
         return self.item_type.startswith('plugin_')
@@ -249,6 +254,16 @@ class FormItem(db.Model):
     def allow_not_applicable(self, value):
         """Set allow_not_applicable in config."""
         self.set_allow_not_applicable(value)
+
+    @property
+    def exclude_from_completion_rate(self):
+        """Get exclude_from_completion_rate from config."""
+        return self.config.get('exclude_from_completion_rate', False) if self.config else False
+
+    @exclude_from_completion_rate.setter
+    def exclude_from_completion_rate(self, value):
+        """Set exclude_from_completion_rate in config."""
+        self.set_exclude_from_completion_rate(value)
 
     @property
     def allow_disability_questions(self):
@@ -354,6 +369,12 @@ class FormItem(db.Model):
         if self.config is None:
             self.config = {}
         self.config['allow_not_applicable'] = bool(value)
+
+    def set_exclude_from_completion_rate(self, value):
+        """Set exclude_from_completion_rate in config."""
+        if self.config is None:
+            self.config = {}
+        self.config['exclude_from_completion_rate'] = bool(value)
 
     def set_allow_disability_questions(self, value):
         """Set allow_disability_questions in config."""
@@ -900,6 +921,8 @@ class FormItem(db.Model):
             return 'matrix'
         elif self.is_image:
             return 'image'
+        elif self.is_discussion:
+            return 'discussion'
         elif self.item_type and self.item_type.startswith('plugin_'):
             # For plugin items, return PLUGIN_{PLUGIN_TYPE}
             plugin_type = self.item_type.replace('plugin_', '')

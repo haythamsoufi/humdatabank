@@ -341,6 +341,26 @@ class ImageForm(BaseForm, LayoutFieldsMixin, SkipLogicMixin):
         self.section_id.choices = []
 
 
+class DiscussionBlockForm(BaseForm, LayoutFieldsMixin, SkipLogicMixin):
+    """Form for adding or editing a Discussion display item within a Form Template."""
+
+    section_id = SelectField("Section", coerce=int_or_none, validators=[DataRequired(message="Please select a section.")])
+    label = StringField("Title", validators=[Optional(), Length(max=255)])
+    order = FloatField("Order in Section (e.g., 1, 1.1, 1.2 for sub-items)", validators=[Optional()], default=0)
+    description = TextAreaField("Introduction", validators=[Optional(), Length(max=1000)])
+
+    label_translations = HiddenField("Label Translations")
+    description_translations = HiddenField("Description Translations")
+
+    submit = SubmitField("Save Discussion Block")
+
+    def __init__(self, *args, **kwargs):
+        super(DiscussionBlockForm, self).__init__(*args, **kwargs)
+        self.add_layout_fields()
+        self.add_skip_logic_fields()
+        self.section_id.choices = []
+
+
 class PluginItemForm(BaseForm, LayoutFieldsMixin, DataAvailabilityMixin, SkipLogicMixin):
     """Form for adding or editing Plugin Items within a Form Template."""
 

@@ -1328,3 +1328,110 @@ class TestEntryBootstrapMatrixCandidates:
         assert result is not None
         assert result['entity_map'] == {}
         assert result['tick_var_names'] == []
+
+
+class TestDiscussionCommentsApi:
+    def test_get_missing_aes_id_returns_400(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        resp = client.get("/api/forms/discussion/comments")
+        assert resp.status_code == 400
+
+    def test_get_access_denied_returns_403(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        with patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "Access denied"}):
+            resp = client.get("/api/forms/discussion/comments?assignment_entity_status_id=1")
+        assert resp.status_code == 403
+
+    def test_get_returns_comments(self, app, admin_user, db_session, client):
+        from app.models import SubmissionDiscussionComment
+        from tests.factories import create_test_assignment_entity_status, create_test_user
+
+        client = _make_logged_in_client(client, admin_user.id)
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session)
+            author = create_test_user(db_session)
+            comment = SubmissionDiscussionComment(
+                assignment_entity_status_id=aes.id,
+                body="Hello team",
+                created_by_user_id=author.id,
+            )
+            db_session.add(comment)
+            db_session.commit()
+
+            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}):
+                resp = client.get(f"/api/forms/discussion/comments?assignment_entity_status_id={aes.id}")
+
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert len(payload["comments"]) == 1
+        assert payload["comments"][0]["body"] == "Hello team"
+
+    def test_post_missing_body_returns_400(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        mock_aes = MagicMock()
+        mock_aes.id = 1
+        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+             patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True):
+            resp = _json_post(
+                client,
+                "/api/forms/discussion/comments",
+                {"assignment_entity_status_id": 1, "body": "   "},
+            )
+        assert resp.status_code == 400
+
+    def test_post_not_editable_returns_403(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        mock_aes = MagicMock()
+        mock_aes.id = 1
+        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+             patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=False):
+            resp = _json_post(
+                client,
+                "/api/forms/discussion/comments",
+                {"assignment_entity_status_id": 1, "body": "A comment"},
+            )
+        assert resp.status_code == 403
+
+    def test_post_too_long_returns_400(self, app, admin_user, db_session, client):
+        client = _make_logged_in_client(client, admin_user.id)
+        mock_aes = MagicMock()
+        mock_aes.id = 1
+        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+             patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True):
+            resp = _json_post(
+                client,
+                "/api/forms/discussion/comments",
+                {"assignment_entity_status_id": 1, "body": "x" * 2001},
+            )
+        assert resp.status_code == 400
+
+    def test_post_creates_comment(self, app, admin_user, db_session, client):
+        from app.models import SubmissionDiscussionComment
+        from tests.factories import create_test_assignment_entity_status
+
+        client = _make_logged_in_client(client, admin_user.id)
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session)
+            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
+                 patch("app.routes.forms_api.AuthorizationService.can_edit_assignment", return_value=True), \
+                 patch("app.routes.forms_api.log_entity_activity"):
+                resp = _json_post(
+                    client,
+                    "/api/forms/discussion/comments",
+                    {"assignment_entity_status_id": aes.id, "body": "New comment"},
+                )
+
+            assert resp.status_code == 200
+            payload = resp.get_json()
+            assert payload["success"] is True
+            assert payload["comment"]["body"] == "New comment"
+            assert payload["comment"].get("is_imported") is False
+            assert payload["comment"].get("author_label")
+
+            saved = SubmissionDiscussionComment.query.filter_by(
+                assignment_entity_status_id=aes.id
+            ).all()
+            assert len(saved) == 1
+            assert saved[0].body == "New comment"
+            assert saved[0].created_by_user_id == admin_user.id

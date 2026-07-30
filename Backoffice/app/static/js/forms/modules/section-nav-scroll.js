@@ -225,7 +225,7 @@ function createSectionNavScrollSpy(links) {
   }
 
   function ensureNavLinkVisible(link) {
-    const navScroller = document.querySelector('#section-navigation-sidebar .overflow-y-auto');
+    const navScroller = document.querySelector('#sidebar-nav-scroll') || document.querySelector('#section-navigation-sidebar .overflow-y-auto');
     if (!navScroller || !link) return;
     const linkRect = link.getBoundingClientRect();
     const scrollerRect = navScroller.getBoundingClientRect();

@@ -785,6 +785,33 @@ class TestAddTranslationSupport:
                 FormItemProcessor._add_translation_support(fi)
         assert fi.display_label == "Étiquette"
 
+    def test_discussion_label_translation_applied(self, app):
+        from app.services.forms.processing_service import FormItemProcessor
+        fi = _make_form_item(item_type="discussion", label="Team Discussion")
+        fi.label_translations = {"fr": "Discussion d'équipe"}
+        fi.description_translations = None
+        fi.display_label = "Team Discussion"
+        fi._display_description = "Intro"
+        with app.app_context():
+            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+                 patch("app.get_locale", return_value="fr"):
+                FormItemProcessor._add_translation_support(fi)
+        assert fi.display_label == "Discussion d'équipe"
+
+    def test_discussion_description_translation_applied(self, app):
+        from app.services.forms.processing_service import FormItemProcessor
+        fi = _make_form_item(item_type="discussion", label="Team Discussion")
+        fi.label_translations = None
+        fi.description_translations = {"fr": "Notes pour les réviseurs"}
+        fi.display_label = "Team Discussion"
+        fi.description = "Notes for reviewers"
+        fi._display_description = "Notes for reviewers"
+        with app.app_context():
+            with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
+                 patch("app.get_locale", return_value="fr"):
+                FormItemProcessor._add_translation_support(fi)
+        assert fi._display_description == "Notes pour les réviseurs"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FormItemProcessor._process_question_data

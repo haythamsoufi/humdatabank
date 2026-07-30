@@ -15333,15 +15333,15 @@ msgstr ""
 #: app/services/notification/core.py:320
 #, python-format
 msgid ""
-"Period %(period)s: a National Society focal point escalated this "
-"assignment for delegation review."
+"%(submitter_name)s escalated the %(template)s assignment for %(country)s "
+"(period %(period)s) for delegation review."
 msgstr ""
 
 #: app/services/notification/core.py:314
 #, python-format
 msgid ""
-"Period %(period)s: a National Society focal point sent this assignment "
-"for your review before submission."
+"%(submitter_name)s sent the %(template)s assignment for %(country)s (period "
+"%(period)s) for your review before submission."
 msgstr ""
 
 #: app/services/notification/core.py:290
@@ -17485,7 +17485,7 @@ msgstr ""
 
 #: app/services/notification/core.py:311
 #, python-format
-msgid "Review requested: %(template)s"
+msgid "Review requested: %(template)s — %(country)s"
 msgstr ""
 
 #: app/templates/admin/analytics/login_logs.html:30
@@ -19069,7 +19069,7 @@ msgstr ""
 
 #: app/services/notification/core.py:317
 #, python-format
-msgid "Sent for review: %(template)s"
+msgid "Sent for review: %(template)s — %(country)s"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:121

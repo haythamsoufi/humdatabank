@@ -654,6 +654,173 @@ class TestFormDataService:
             assert saved.disagg_data is not None
             assert saved.disagg_data.get('mode') == 'sex_age'
 
+    def test_save_clears_question_textarea_when_user_empties_field(self, db_session, app, admin_user):
+        """Regression: clearing a textarea question and saving must remove the stored value."""
+        with app.app_context():
+            from flask_login import login_user
+
+            login_user(admin_user)
+
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+
+            section = FormSection(
+                template_id=template.id,
+                name="Notes Section",
+                order=1,
+                version_id=template.published_version_id,
+            )
+            db_session.add(section)
+            db_session.flush()
+
+            question = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                item_type='question',
+                label="Notes",
+                type='textarea',
+                order=1,
+                version_id=template.published_version_id,
+            )
+            db_session.add(question)
+            db_session.flush()
+
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+
+            assignment_status = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(assignment_status)
+            db_session.flush()
+
+            form_data = FormData(
+                assignment_entity_status_id=assignment_status.id,
+                form_item_id=question.id,
+            )
+            form_data.set_simple_value("Old notes")
+            db_session.add(form_data)
+            db_session.commit()
+
+            question_id = question.id
+            aes_id = assignment_status.id
+            with app.test_request_context(
+                method='POST',
+                data={
+                    'action': 'save',
+                    f'field_value[{question_id}]': '',
+                },
+            ):
+                from flask_wtf import FlaskForm
+                csrf_form = FlaskForm()
+                csrf_form.validate_on_submit = Mock(return_value=True)
+
+                section.fields_ordered = [question]
+                result = FormDataService.process_form_submission(
+                    assignment_status, [section], csrf_form
+                )
+
+            assert result['success'] is True
+            saved = FormData.query.filter_by(
+                assignment_entity_status_id=aes_id,
+                form_item_id=question_id,
+            ).first()
+            assert saved is not None
+            assert saved.get_effective_value() in (None, '')
+
+    def test_save_clears_text_indicator_when_user_empties_field_value_input(self, db_session, app, admin_user):
+        """Regression: text-like indicators rendered with field_value[] must clear on empty save."""
+        with app.app_context():
+            from flask_login import login_user
+
+            login_user(admin_user)
+
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+
+            section = FormSection(
+                template_id=template.id,
+                name="Text Indicator Section",
+                order=1,
+                version_id=template.published_version_id,
+            )
+            db_session.add(section)
+            db_session.flush()
+
+            import uuid as _uuid
+            indicator_bank = IndicatorBank(
+                name=f"Narrative {_uuid.uuid4().hex[:8]}",
+                definition="Test",
+                type="Text",
+                unit="N/A",
+            )
+            db_session.add(indicator_bank)
+            db_session.flush()
+
+            indicator = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                item_type='indicator',
+                label=indicator_bank.name,
+                order=1,
+                version_id=template.published_version_id,
+                indicator_bank_id=indicator_bank.id,
+                allowed_disaggregation_options=['total'],
+            )
+            db_session.add(indicator)
+            db_session.flush()
+
+            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
+            db_session.add(assigned_form)
+            db_session.flush()
+
+            assignment_status = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="in_progress",
+            )
+            db_session.add(assignment_status)
+            db_session.flush()
+
+            form_data = FormData(
+                assignment_entity_status_id=assignment_status.id,
+                form_item_id=indicator.id,
+            )
+            form_data.set_simple_value("Old narrative")
+            db_session.add(form_data)
+            db_session.commit()
+
+            indicator_id = indicator.id
+            aes_id = assignment_status.id
+            with app.test_request_context(
+                method='POST',
+                data={
+                    'action': 'save',
+                    f'field_value[{indicator_id}]': '',
+                },
+            ):
+                from flask_wtf import FlaskForm
+                csrf_form = FlaskForm()
+                csrf_form.validate_on_submit = Mock(return_value=True)
+
+                section.fields_ordered = [indicator]
+                result = FormDataService.process_form_submission(
+                    assignment_status, [section], csrf_form
+                )
+
+            assert result['success'] is True
+            saved = FormData.query.filter_by(
+                assignment_entity_status_id=aes_id,
+                form_item_id=indicator_id,
+            ).first()
+            assert saved is not None
+            assert saved.get_effective_value() in (None, '')
+
     def test_save_total_mode_value_when_stale_sex_age_mode_in_post(self, db_session, app, admin_user):
         """Regression: total entry must save even if POST still carries sex_age reporting_mode."""
         with app.app_context():

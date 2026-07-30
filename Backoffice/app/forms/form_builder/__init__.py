@@ -5,7 +5,7 @@ Form builder forms for templates, sections, and form field management.
 
 from .template_forms import FormTemplateForm
 from .section_forms import FormSectionForm
-from .field_forms import IndicatorForm, QuestionForm, DocumentFieldForm, MatrixForm, ImageForm, PluginItemForm
+from .field_forms import IndicatorForm, QuestionForm, DocumentFieldForm, MatrixForm, ImageForm, DiscussionBlockForm, PluginItemForm
 
 __all__ = [
     'FormTemplateForm',
@@ -15,5 +15,6 @@ __all__ = [
     'DocumentFieldForm',
     'MatrixForm',
     'ImageForm',
+    'DiscussionBlockForm',
     'PluginItemForm'
 ]

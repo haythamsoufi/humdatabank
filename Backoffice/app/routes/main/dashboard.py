@@ -7,7 +7,7 @@ from app.models.rbac import RbacUserRole, RbacRole
 from app.models.enums import EntityType
 from app.models.system import CountryAccessRequestStatus
 from app.services.organization.entity_service import EntityService
-from app.services.assignments.completion_service import AssignmentCompletionService, CompletionMetrics
+from app.services.assignments.completion_service import AssignmentCompletionService
 from sqlalchemy import and_, or_, func, case
 from sqlalchemy.orm import aliased, joinedload
 from app.services import get_user_countries
@@ -744,22 +744,16 @@ def dashboard():
                      ).first()
                      version_id = template.published_version_id
                      if aes and version_id:
-                         completion_metrics = AssignmentCompletionService.compute_for_assignment(
-                             aes.id, template.id, version_id
-                         )
+                         completion_rate = AssignmentCompletionService.stored_rate_for(aes)
+                         filled_items = 0
+                         total_possible_items = 0
                      else:
                          total_possible_items = (
                              AssignmentCompletionService.template_total_items(template.id, version_id)
                              if version_id else 0
                          )
-                         completion_metrics = CompletionMetrics(
-                             filled_items=0,
-                             total_items=total_possible_items,
-                             completion_rate=0.0,
-                         )
-                     completion_rate = completion_metrics.completion_rate
-                     filled_items = completion_metrics.filled_items
-                     total_possible_items = completion_metrics.total_items
+                         completion_rate = 0.0
+                         filled_items = 0
 
                      all_forms_for_display.append({
                          'type': 'public',

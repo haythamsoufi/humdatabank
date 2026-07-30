@@ -5,8 +5,10 @@ Tests for form data retrieval: API query builders and AI chatbot tools.
 - ai_data.form_retrieval: indicator/bulk tools used by the chatbot
 """
 import json
+import logging
 import pytest
-from datetime import datetime, timezone, timedelta
+from contextlib import contextmanager, ExitStack
+from datetime import date, datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 
 from app.models import (
@@ -52,10 +54,19 @@ def _make_form_data(db_session, *, aes, form_item, value=None, disagg_data=None)
     return fd
 
 
-def _make_full_setup(db_session, *, status="submitted", value="100", period_name="2024"):
+def _make_full_setup(
+    db_session,
+    *,
+    status="submitted",
+    value="100",
+    period_name="2024",
+    template=None,
+    period_start=None,
+    period_end=None,
+):
     """Create country + template + section + indicator + item + aes + formdata."""
     country = create_test_country(db_session)
-    template = create_test_template(db_session)
+    template = template or create_test_template(db_session)
     section = create_test_section(db_session, template)
     ind = _make_indicator(db_session, f"Test Indicator {id(db_session)}")
     item = create_test_item(
@@ -71,6 +82,8 @@ def _make_full_setup(db_session, *, status="submitted", value="100", period_name
     assigned_form = AssignedForm(
         template_id=template.id,
         period_name=period_name,
+        period_start=period_start,
+        period_end=period_end,
     )
     db_session.add(assigned_form)
     db_session.flush()
@@ -94,6 +107,26 @@ def _make_full_setup(db_session, *, status="submitted", value="100", period_name
     db_session.refresh(aes)
 
     return country, template, section, ind, item, assigned_form, aes, fd
+
+
+@contextmanager
+def _public_query_patches():
+    """Patches so unauthenticated callers can read public form items."""
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None)
+        )
+        stack.enter_context(
+            patch(
+                "app.services.data_retrieval.form.can_view_non_public_form_items",
+                return_value=True,
+            )
+        )
+        yield
+
+
+def _assigned_form_data_ids(result):
+    return {row.id for row in result["assigned"].all()}
 
 
 # ---------------------------------------------------------------------------
@@ -214,14 +247,31 @@ class TestQueryFormData:
                 result = query_form_data(country_id=country.id)
                 assert result["assigned"] is not None
 
-    def test_with_period_name_filter(self, app, db_session):
+    def test_with_period_name_filter(self, app, db_session, caplog):
         with app.app_context():
             from app.services.data_retrieval.form import query_form_data
-            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
-                       return_value=True):
-                result = query_form_data(period_name="2024")
-                assert result["assigned"] is not None
+            _, template, _, _, _, _, _, fd = _make_full_setup(
+                db_session, status="submitted", value="100", period_name="Annual Report 2024"
+            )
+            with _public_query_patches(), caplog.at_level(
+                logging.ERROR, logger="app.services.data_retrieval.form"
+            ):
+                result = query_form_data(period_name="2024", template_id=template.id)
+            assert fd.id in _assigned_form_data_ids(result)
+            assert "Error building form data query" not in caplog.text
+
+    def test_period_name_excludes_non_matching_period(self, app, db_session, caplog):
+        with app.app_context():
+            from app.services.data_retrieval.form import query_form_data
+            _, template, _, _, _, _, _, fd = _make_full_setup(
+                db_session, status="submitted", value="100", period_name="Annual Report 2023"
+            )
+            with _public_query_patches(), caplog.at_level(
+                logging.ERROR, logger="app.services.data_retrieval.form"
+            ):
+                result = query_form_data(period_name="2024", template_id=template.id)
+            assert fd.id not in _assigned_form_data_ids(result)
+            assert "Error building form data query" not in caplog.text
 
     def test_with_submission_id_filter(self, app, db_session):
         with app.app_context():
@@ -298,14 +348,99 @@ class TestQueryFormData:
                 result = query_form_data(preload=True)
                 assert result["assigned"] is not None
 
-    def test_period_name_with_year_range(self, app, db_session):
+    def test_period_name_with_year_range(self, app, db_session, caplog):
         with app.app_context():
             from app.services.data_retrieval.form import query_form_data
-            with patch("app.services.data_retrieval.form.get_effective_request_user", return_value=None), \
-                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
-                       return_value=True):
-                result = query_form_data(period_name="2023-2024")
-                assert result["assigned"] is not None
+            country, template, section, ind, item, af_2023, aes_2023, fd_2023 = _make_full_setup(
+                db_session,
+                status="submitted",
+                value="100",
+                period_name="Annual Report 2023",
+                period_start=date(2023, 1, 1),
+                period_end=date(2023, 12, 31),
+            )
+            af_2024 = AssignedForm(
+                template_id=template.id,
+                period_name="Annual Report 2024",
+                period_start=date(2024, 1, 1),
+                period_end=date(2024, 12, 31),
+            )
+            db_session.add(af_2024)
+            db_session.flush()
+
+            aes_2024 = AssignmentEntityStatus(
+                assigned_form_id=af_2024.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="submitted",
+            )
+            db_session.add(aes_2024)
+            db_session.flush()
+
+            fd_2024 = FormData(
+                assignment_entity_status_id=aes_2024.id,
+                form_item_id=item.id,
+                value="200",
+            )
+            db_session.add(fd_2024)
+            db_session.commit()
+
+            with _public_query_patches(), caplog.at_level(
+                logging.ERROR, logger="app.services.data_retrieval.form"
+            ):
+                result = query_form_data(period_name="2023-2024", template_id=template.id)
+            matched = _assigned_form_data_ids(result)
+            assert fd_2023.id in matched
+            assert fd_2024.id in matched
+            assert "Error building form data query" not in caplog.text
+
+    def test_period_name_matches_via_period_dates_without_label_match(self, app, db_session, caplog):
+        with app.app_context():
+            from app.services.data_retrieval.form import query_form_data
+            country = create_test_country(db_session)
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            ind = _make_indicator(db_session, f"Test Indicator dates {id(db_session)}")
+            item = create_test_item(
+                db_session, section, template,
+                item_type="indicator",
+                indicator_bank_id=ind.id,
+            )
+            item.config = {"privacy": "public"}
+            db_session.commit()
+
+            assigned_form = AssignedForm(
+                template_id=template.id,
+                period_name="Mid-year Report",
+                period_start=date(2024, 1, 1),
+                period_end=date(2024, 6, 30),
+            )
+            db_session.add(assigned_form)
+            db_session.flush()
+
+            aes = AssignmentEntityStatus(
+                assigned_form_id=assigned_form.id,
+                entity_type=EntityType.country.value,
+                entity_id=country.id,
+                status="submitted",
+            )
+            db_session.add(aes)
+            db_session.flush()
+
+            fd = FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=item.id,
+                value="300",
+            )
+            db_session.add(fd)
+            db_session.commit()
+
+            with _public_query_patches(), caplog.at_level(
+                logging.ERROR, logger="app.services.data_retrieval.form"
+            ):
+                result = query_form_data(period_name="2024", template_id=template.id)
+            assert fd.id in _assigned_form_data_ids(result)
+            assert "Error building form data query" not in caplog.text
 
     def test_exception_returns_empty_queries(self, app):
         with app.app_context():
@@ -470,10 +605,7 @@ class TestQueryFormDataIntegration:
             country, template, section, ind, item, af, aes, fd = _make_full_setup(
                 db_session, status="submitted", value="100"
             )
-            with patch("app.services.data_retrieval.form.get_effective_request_user",
-                       return_value=None), \
-                 patch("app.services.data_retrieval.form.can_view_non_public_form_items",
-                       return_value=True):
+            with _public_query_patches():
                 result = query_form_data(
                     template_id=template.id,
                     country_id=country.id,
@@ -482,6 +614,23 @@ class TestQueryFormDataIntegration:
                 assert result["assigned"] is not None
                 all_rows = result["assigned"].all()
                 assert any(r.id == fd.id for r in all_rows)
+
+    def test_returns_formdata_with_period_name_filter(self, app, db_session, caplog):
+        with app.app_context():
+            from app.services.data_retrieval.form import query_form_data
+            country, template, section, ind, item, af, aes, fd = _make_full_setup(
+                db_session, status="submitted", value="100", period_name="Annual Report 2024"
+            )
+            with _public_query_patches(), caplog.at_level(
+                logging.ERROR, logger="app.services.data_retrieval.form"
+            ):
+                result = query_form_data(
+                    template_id=template.id,
+                    country_id=country.id,
+                    period_name="2024",
+                )
+            assert fd.id in _assigned_form_data_ids(result)
+            assert "Error building form data query" not in caplog.text
 
 
 # ---------------------------------------------------------------------------

@@ -648,7 +648,7 @@ class TemplatePreparationService:
 
             if hasattr(section, 'fields_ordered'):
                 for field in section.fields_ordered:
-                    if hasattr(field, 'field_type_for_js') and str(field.field_type_for_js).lower() in ('blank', 'image'):
+                    if hasattr(field, 'field_type_for_js') and str(field.field_type_for_js).lower() in ('blank', 'image', 'discussion'):
                         continue
                     if getattr(field, 'is_image', False):
                         continue

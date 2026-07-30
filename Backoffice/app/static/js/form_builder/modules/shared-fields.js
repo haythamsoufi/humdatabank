@@ -27,7 +27,8 @@ export const SharedFields = {
 			if (t === 'question') return root.querySelector('#item-question-label');
 			if (t === 'document_field') return root.querySelector('#item-document-label');
 			if (t === 'matrix') return root.querySelector('#item-matrix-label');
-			if (t === 'image') return root.querySelector('#item-image-caption');
+            if (t === 'image') return root.querySelector('#item-image-caption');
+            if (t === 'discussion') return root.querySelector('#item-discussion-title');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-label');
 			return root.querySelector(`[data-field-type="label"]:not(.hidden)`);
 		};
@@ -35,7 +36,8 @@ export const SharedFields = {
 			const t = (window.ItemModal && window.ItemModal.currentItemType) ? window.ItemModal.currentItemType : null;
 			if (t === 'document_field') return root.querySelector('#item-document-description');
 			if (t === 'matrix') return root.querySelector('#item-matrix-description');
-			if (t === 'image') return root.querySelector('#item-image-alt');
+            if (t === 'image') return root.querySelector('#item-image-alt');
+            if (t === 'discussion') return root.querySelector('#item-discussion-description');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-description');
 			// Indicator/question "description" is represented by other specific fields (definition etc),
 			// so only sync generic description fields when present.
@@ -76,6 +78,7 @@ export const SharedFields = {
 			if (t === 'document_field') return root.querySelector('#item-document-label:not([disabled])');
 			if (t === 'matrix') return root.querySelector('#item-matrix-label:not([disabled])');
 			if (t === 'image') return root.querySelector('#item-image-caption:not([disabled])');
+			if (t === 'discussion') return root.querySelector('#item-discussion-title:not([disabled])');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-label:not([disabled])');
 			return root.querySelector(`[data-field-type="label"]:not(.hidden):not([disabled])`);
 		};
@@ -84,6 +87,7 @@ export const SharedFields = {
 			if (t === 'document_field') return root.querySelector('#item-document-description:not([disabled])');
 			if (t === 'matrix') return root.querySelector('#item-matrix-description:not([disabled])');
 			if (t === 'image') return root.querySelector('#item-image-alt:not([disabled])');
+			if (t === 'discussion') return root.querySelector('#item-discussion-description:not([disabled])');
 			if (t && String(t).startsWith('plugin_')) return root.querySelector('#item-plugin-description:not([disabled])');
 			return root.querySelector(`[data-field-type="description"]:not(.hidden):not([disabled])`);
 		};

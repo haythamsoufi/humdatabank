@@ -406,6 +406,7 @@
                                 'document': 'fas fa-file-alt text-blue-600',
                                 'matrix': 'fas fa-table text-orange-600',
                                 'image': 'fas fa-image text-teal-600',
+                                'discussion': 'fas fa-comments text-sky-600',
                                 'plugin': 'fas fa-puzzle-piece text-teal-600'
                             }.get(item_type, 'fas fa-circle text-gray-400') %}
                                 <div class="fb-table-label-cell{% if is_sub_item or is_subsection_item %} fb-table-label-cell--nested{% endif %}">
@@ -538,6 +539,16 @@
                                         {% if img_sources %}
                                             <p class="mb-1"><strong>{{ _('Localized images') }}:</strong> {{ img_sources.keys() | list | join(', ') }}</p>
                                         {% endif %}
+                                    {% endif %}
+                                {% elif item_type == 'discussion' %}
+                                    <p class="mb-1"><strong>{{ _('Type') }}:</strong> {{ _('Discussion') }}</p>
+                                    {% if item_instance.label %}
+                                        <p class="mb-1"><strong>{{ _('Title') }}:</strong> {{ item_instance.label[:50] }}{{ '...' if item_instance.label | length > 50 else '' }}</p>
+                                    {% else %}
+                                        <p class="mb-1 text-gray-500">{{ _('Uses template discussion title') }}</p>
+                                    {% endif %}
+                                    {% if item_instance.description %}
+                                        <p class="mb-1"><strong>{{ _('Introduction') }}:</strong> {{ item_instance.description[:50] }}{{ '...' if item_instance.description | length > 50 else '' }}</p>
                                     {% endif %}
                                 {% elif item_type == 'plugin' %}
                                     {% set plugin_type = item_instance.item_type.replace('plugin_', '') %}
@@ -777,6 +788,36 @@
                                         <input id="section-csrf_token-image-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
                                         <input type="hidden" name="delete_data" value="true">
                                         <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Image')|forceescape }}" data-loading-text="">
+                                            <i class="fas fa-times w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                {% elif item_type == 'discussion' %}
+                                    <button type="button" class="edit-discussion-item-btn fb-icon-btn fb-icon-btn--primary" title="{{ _('Edit Discussion')|forceescape }}"
+                                            data-discussion-item-id="{{ item_instance.id }}"
+                                            data-discussion-item-label="{{ item_instance.label | e }}"
+                                            data-discussion-item-description="{{ item_instance.description | default('', true) | e }}"
+                                            data-discussion-item-order="{{ item_instance.order }}"
+                                            data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
+                                            data-layout-column-width="{{ item_instance.layout_column_width | default(12) }}"
+                                            data-layout-break-after="{{ 'true' if item_instance.layout_break_after else 'false' }}"
+                                            data-current-section-id="{{ item_instance.section_id if item_instance.section_id else (item_data.parent_subsection_id if is_subsection_item else item_s_f.section.id) }}"
+                                            data-label-translations='{{ (item_instance.label_translations | tojson | e) if item_instance.label_translations else "{}" }}'
+                                            data-description-translations='{{ (item_instance.description_translations | tojson | e) if item_instance.description_translations else "{}" }}'>
+                                        <i class="fas fa-pen w-4 h-4"></i>
+                                    </button>
+                                    <form action="{{ url_for('form_builder.duplicate_item', item_id=item_instance.id) }}" method="POST" class="inline-block duplicate-item-form" data-confirm-message="{{ _('Duplicate this discussion item?')|forceescape }}">
+                                        <input name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="version_id" value="{{ active_version_id }}">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--purple" title="{{ _('Duplicate Discussion')|forceescape }}" data-loading-text="">
+                                            <i class="fas fa-copy w-4 h-4"></i>
+                                        </button>
+                                    </form>
+                                   {% set _del_item_id = item_instance.id %}
+                                   {% set _item_count = item_data_counts.get(_del_item_id, 0) if item_data_counts is defined else 0 %}
+                                   <form action="{{ url_for('form_builder.delete_item', item_id=item_instance.id) }}" method="POST" class="inline-block delete-item-form delete-discussion-item-form" data-data-count="{{ _item_count }}" data-item-type="discussion" data-confirm-message="{{ _('Are you sure you want to delete this discussion item?')|forceescape }}">
+                                        <input id="section-csrf_token-discussion-{{ item_instance.id }}" name="csrf_token" type="hidden" value="{{ section_form.csrf_token.current_token }}">
+                                        <input type="hidden" name="delete_data" value="true">
+                                        <button type="submit" class="fb-icon-btn fb-icon-btn--danger" title="{{ _('Remove Discussion')|forceescape }}" data-loading-text="">
                                             <i class="fas fa-times w-4 h-4"></i>
                                         </button>
                                     </form>

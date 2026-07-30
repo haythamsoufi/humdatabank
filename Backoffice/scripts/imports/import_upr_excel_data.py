@@ -69,7 +69,7 @@ from upr_import_warnings import summarize_warnings  # noqa: E402
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 3
+TRANSFORM_CACHE_VERSION = 4
 
 UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     # ── Planning ──────────────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ FUNDING_MATRIX_BY_YEAR_OFFSET = {
 ITEM_LONGER_TERM_PROGRAMMES = 954
 ITEM_EMERGENCY_APPEALS = 960
 ITEM_BILATERAL_SUPPORT = 955
-ITEM_COMMENTS = 956
+ITEM_COMMENTS = 956  # Legacy textarea item; comments now import into discussion panel
 ITEM_FUNDING_REQUIREMENTS_T22 = 1303  # Template 22 – Funding Requirements (rows=country_map)
 T22_ROW_TOTAL_COLUMN = "Total"  # matrix row-total cell suffix (row_total_manual_enabled)
 # Item 1303 variable columns (Excel Area names) — overridden when PNS reports totals only.
@@ -210,7 +210,7 @@ T23_PNS_FUNDING_COLUMNS: Dict[int, str] = {
     # 2 = Funding Requirement ('00002') — variable/readonly, populated from planning, skip
 }
 
-# Excel Comments_* indicator codes → labels shown in the form textarea.
+# Excel Comments_* indicator codes → labels used in discussion panel import rows.
 COMMENT_INDICATOR_LABELS: Dict[str, str] = {
     "comments_fundingrequirements": "Funding requirements",
     "comments_keyfigures": "Key figures",
@@ -247,6 +247,7 @@ class UprImportContext:
     emergency_choice_item_id: Optional[int] = None
     emergency_slot_meta: Dict[Tuple[int, int], Dict[str, str]] = field(default_factory=dict)
     dynamic_indicator_entries: List[Dict[str, Any]] = field(default_factory=list)
+    discussion_comment_entries: List[Dict[str, Any]] = field(default_factory=list)
     staff_matrix_item_id: int = 1314  # fallback when label lookup fails (prod T22)
     pns_funding_item_id: int = ITEM_REPORTING_PNS_FUNDING
     ns_name_to_id: Dict[str, int] = field(default_factory=dict)
@@ -2146,7 +2147,6 @@ def transform_to_import_rows(
     iso3_by_host_cid = {cid: iso for iso, cid in ctx.country_id_by_iso3.items()}
 
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = defaultdict(dict)
-    comment_parts: Dict[int, List[str]] = defaultdict(list)
     import_rows: List[Dict[str, str]] = []
     dynamic_order: Dict[int, float] = {}
     emergency_dynamic_order: Dict[Tuple[int, int], float] = {}
@@ -2218,7 +2218,13 @@ def transform_to_import_rows(
             text_val = parse_comment_value(row)
             if not text_val:
                 continue
-            comment_parts[aes_id].append(f"{humanize_comment_label(indicator)}: {text_val}")
+            ctx.discussion_comment_entries.append(
+                {
+                    "aes_id": aes_id,
+                    "body": f"{humanize_comment_label(indicator)}: {text_val}",
+                    "source": "upr_excel_import",
+                }
+            )
             continue
 
         # --- Template 24: Support (bilateral ticks) ---
@@ -2706,21 +2712,6 @@ def transform_to_import_rows(
         for (pn, iso), aid in tpl_map.items():
             aes_meta.setdefault(aid, (iso, pn))
 
-    for aes_id, parts in comment_parts.items():
-        if not parts:
-            continue
-        iso3, period = aes_meta.get(aes_id, ("", ""))
-        import_rows.append(
-            _scalar_row(
-                aes_id=aes_id,
-                item_id=ITEM_COMMENTS,
-                value="\n".join(p for p in parts if p and str(p).strip()),
-                iso3=iso3,
-                period=period,
-                debug_kpi="comments",
-            )
-        )
-
     for (aes_id, item_id), cells in matrix_cells.items():
         if not cells:
             continue
@@ -2749,6 +2740,62 @@ def transform_to_import_rows(
     ctx.pns_t23_reported_aes = {int(aes) for aes, _ in pns_t23_reported_yes}
 
     return import_rows
+
+
+def upsert_upr_discussion_comments(
+    entries: List[Dict[str, Any]],
+    *,
+    dry_run: bool = False,
+) -> Dict[str, int]:
+    """Replace UPR-import discussion comments for affected assignments."""
+    from app.extensions import db
+    from app.models import SubmissionDiscussionComment
+    from app.utils.datetime_helpers import utcnow
+    from app.utils.discussion_comments import DISCUSSION_SOURCE_UPR_EXCEL
+
+    stats = {
+        "discussion_inserted": 0,
+        "discussion_deleted": 0,
+        "discussion_skipped": 0,
+    }
+    if not entries:
+        return stats
+
+    aes_ids = sorted({int(entry["aes_id"]) for entry in entries if entry.get("aes_id")})
+    if dry_run:
+        stats["discussion_inserted"] = sum(
+            1 for entry in entries if (entry.get("body") or "").strip()
+        )
+        return stats
+
+    if aes_ids:
+        deleted = (
+            SubmissionDiscussionComment.query.filter(
+                SubmissionDiscussionComment.assignment_entity_status_id.in_(aes_ids),
+                SubmissionDiscussionComment.source == DISCUSSION_SOURCE_UPR_EXCEL,
+            ).delete(synchronize_session=False)
+        )
+        stats["discussion_deleted"] = int(deleted or 0)
+
+    now = utcnow()
+    for entry in entries:
+        body = (entry.get("body") or "").strip()
+        if not body:
+            stats["discussion_skipped"] += 1
+            continue
+        db.session.add(
+            SubmissionDiscussionComment(
+                assignment_entity_status_id=int(entry["aes_id"]),
+                body=body,
+                created_by_user_id=None,
+                created_at=now,
+                source=entry.get("source") or DISCUSSION_SOURCE_UPR_EXCEL,
+            )
+        )
+        stats["discussion_inserted"] += 1
+
+    db.session.commit()
+    return stats
 
 
 def run_upr_import(
@@ -2844,6 +2891,11 @@ def run_upr_import(
             progress_end_pct=85.0,
             stats=stats,
         )
+        discussion_stats = upsert_upr_discussion_comments(
+            ctx.discussion_comment_entries,
+            dry_run=dry_run,
+        )
+        upsert_stats.update(discussion_stats)
         if not dry_run and import_rows:
             from app.services.forms.variable_resolution_service import VariableResolutionService
 

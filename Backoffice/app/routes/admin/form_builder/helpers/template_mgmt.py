@@ -60,7 +60,9 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
                 enable_export_pdf=False,  # Default for new template
                 enable_export_excel=False,  # Default for new template
                 enable_import_excel=False,  # Default for new template
-                enable_ai_validation=False  # Default for new template
+                enable_ai_validation=False,  # Default for new template
+                enable_discussion=False,
+                discussion_config=None,
             )
             db.session.add(draft)
             db.session.flush()
@@ -107,6 +109,8 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
             enable_import_excel=first_version.enable_import_excel if first_version else False,
             enable_ai_validation=first_version.enable_ai_validation if first_version else False,
             enable_data_quality=first_version.enable_data_quality if first_version else False,
+            enable_discussion=first_version.enable_discussion if first_version else False,
+            discussion_config=_deep_copy_json_value(first_version.discussion_config) if first_version and first_version.discussion_config else None,
             data_quality_methodology=first_version.data_quality_methodology if first_version else None,
             validation_rule_pack=first_version.validation_rule_pack if first_version else None,
             variables=_deep_copy_json_value(first_version.variables) if first_version and first_version.variables else None,
@@ -156,6 +160,8 @@ def _get_or_create_draft_version(template: FormTemplate, user_id: int) -> FormTe
         enable_import_excel=published.enable_import_excel,
         enable_ai_validation=published.enable_ai_validation,
         enable_data_quality=published.enable_data_quality,
+        enable_discussion=published.enable_discussion,
+        discussion_config=_deep_copy_json_value(published.discussion_config) if published.discussion_config else None,
         data_quality_methodology=published.data_quality_methodology,
         validation_rule_pack=published.validation_rule_pack,
         variables=_deep_copy_json_value(published.variables) if published.variables else None,

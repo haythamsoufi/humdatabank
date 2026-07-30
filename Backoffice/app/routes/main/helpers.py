@@ -1321,6 +1321,7 @@ def render_activity_summary(activity):
         'activity.assignment_approved': babel_("Assignment approved: %(template)s"),
         'activity.assignment_reopened': babel_("Assignment reopened: %(template)s"),
         'activity.document_uploaded': babel_("Document uploaded: %(document)s"),
+        'activity.discussion_comment_added': babel_("Comment added by %(user)s"),
         'activity.self_report_created': babel_("Self-report created: %(template)s"),
         'activity.audit_user_activity': babel_("User %(action)s"),
         'activity.audit_admin_action': babel_("Admin %(action)s %(target)s"),

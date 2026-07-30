@@ -957,6 +957,39 @@
                         </template>
                     </div>
 
+                    {# Discussion Fields (Initially Hidden) #}
+                    <div id="item-discussion-fields" class="hidden">
+                        <p class="text-sm text-gray-600 mb-4">{{ _('Shows assignment comments in the form. Requires Discussion to be enabled in template settings.') }}</p>
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 flex-wrap mb-2">
+                                <label for="item-discussion-title" class="text-gray-700 text-sm font-semibold">{{ _('Title (optional)') }}</label>
+                                <button type="button" id="discussion-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                            <input type="text" data-field-type="label" id="item-discussion-title" class="shadow-sm focus:ring-sky-500 focus:border-sky-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Comments & Discussion')|forceescape }}">
+                        </div>
+                        <div class="item-description-hint-section mb-4">
+                            <div class="item-description-hint-section-inner">
+                                <div class="item-optional-description-block mb-0" data-description-source="description">
+                                    <div class="item-description-toggle-row flex items-center gap-2 flex-wrap">
+                                        <label class="inline-flex items-center gap-2 text-gray-700 text-sm">
+                                            <input type="checkbox" class="item-show-description-toggle form-checkbox h-4 w-4 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                                            <span class="item-show-description-label text-sm font-medium text-gray-700">{{ _('Introduction') }}</span>
+                                        </label>
+                                        <button type="button" class="item-description-translations-btn hidden inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                            <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                    <div class="item-description-content-wrapper hidden mt-4 basis-full w-full">
+                                        <textarea data-field-type="description" id="item-discussion-description" rows="2" class="shadow-sm focus:ring-sky-500 focus:border-sky-500 block w-full sm:text-sm border-gray-300 rounded-md" placeholder="{{ _('Notes visible above the comment thread')|forceescape }}"></textarea>
+                                    </div>
+                                </div>
+                                <div class="item-description-hint-anchor w-full"></div>
+                            </div>
+                        </div>
+                    </div>
+
                     {# Image Fields (Initially Hidden) #}
                     <div id="item-image-fields" class="hidden">
                         <input type="hidden" id="item-image-config" name="image_config" value="{}">
@@ -1143,6 +1176,15 @@
                                 <label class="flex items-center text-gray-700 text-sm">
                                     <input type="checkbox" name="allow_not_applicable" id="item-allow-not-applicable" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                     <span class="ml-2">{{ _('Allow "Not applicable" option') }}</span>
+                                </label>
+                            </div>
+
+                            {# Exclude from completion rate — optional fields such as comments #}
+                            <div id="item-exclude-from-completion-rate-row" class="item-properties-cell col-span-2 min-h-[1.5rem] flex items-center">
+                                <label class="flex items-center gap-2 text-gray-700 text-sm">
+                                    <input type="checkbox" name="exclude_from_completion_rate" id="item-exclude-from-completion-rate" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <span>{{ _('Exclude from completion rate') }}</span>
+                                    {{ field_help(_('When enabled, this field is ignored when calculating assignment completion and will not appear in missing-field highlights.')) }}
                                 </label>
                             </div>
 

@@ -72,6 +72,26 @@
             </p>
         </div>
 
+        {# Discussion Panel #}
+        <div>
+            <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Discussion & Comments') }}:</p>
+            <p class="text-gray-900 text-lg">
+                {% set fallback_version = template.published_version if template.published_version else template.versions.order_by('created_at').first() %}
+                {% set enable_discussion = selected_version.get_effective_enable_discussion() if selected_version else (fallback_version.enable_discussion if fallback_version else False) %}
+                {% if enable_discussion %}
+                    <i class="fas fa-check-circle text-green-500 mr-1"></i> {{ _('Enabled') }}
+                    {% set _disc_cfg = selected_version.discussion_config if selected_version and selected_version.discussion_config is mapping else (fallback_version.discussion_config if fallback_version and fallback_version.discussion_config is mapping else {}) %}
+                    {% if _disc_cfg.get('show_in_sidebar', true) %}
+                        <span class="block text-sm text-gray-600 mt-1">{{ _('Side panel') }}: {{ _('Yes') }}</span>
+                    {% else %}
+                        <span class="block text-sm text-gray-600 mt-1">{{ _('Side panel') }}: {{ _('No') }} ({{ _('form items only') }})</span>
+                    {% endif %}
+                {% else %}
+                    <i class="fas fa-times-circle text-red-500 mr-1"></i> {{ _('Disabled') }}
+                {% endif %}
+            </p>
+        </div>
+
         {# Template Owner #}
         <div>
             <p class="block text-gray-700 text-sm font-semibold mb-1 mt-3 lg:mt-0">{{ _('Template Owner') }}:</p>
@@ -274,6 +294,45 @@
                                 <label for="{{ form.validation_rule_pack.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.validation_rule_pack.label.text }}</label>
                                 {{ form.validation_rule_pack(class="form-select w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500") }}
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="flex items-center">
+                            {{ form.enable_discussion(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                            {{ form.enable_discussion.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                        </div>
+                        {% if form.enable_discussion.errors %}
+                            {% for error in form.enable_discussion.errors %}
+                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4{% if not form.enable_discussion.data %} hidden{% endif %}" id="discussion-config-fields">
+                        <div class="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div>
+                                <label for="{{ form.discussion_title.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.discussion_title.label.text }}</label>
+                                {{ form.discussion_title(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md", placeholder=_('Comments & Discussion')|forceescape) }}
+                            </div>
+                            <div>
+                                <label for="{{ form.discussion_description.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.discussion_description.label.text }}</label>
+                                {{ form.discussion_description(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md", rows="2", placeholder=_('Notes visible to all users with access to this assignment.')|forceescape) }}
+                            </div>
+                            <div>
+                                <label for="{{ form.discussion_sort_order.id }}" class="block text-gray-700 text-sm font-semibold mb-1">{{ form.discussion_sort_order.label.text }}</label>
+                                {{ form.discussion_sort_order(class="form-select w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500") }}
+                            </div>
+                            <div class="flex items-center">
+                                {{ form.discussion_default_collapsed(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                {{ form.discussion_default_collapsed.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                            </div>
+                            <div class="flex items-center">
+                                <input type="hidden" name="discussion_show_in_sidebar" value="n">
+                                {{ form.discussion_show_in_sidebar(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
+                                {{ form.discussion_show_in_sidebar.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
+                            </div>
+                            <p class="text-xs text-gray-500">{{ _('When unchecked, comments appear only where you add Discussion form items.') }}</p>
                         </div>
                     </div>
 

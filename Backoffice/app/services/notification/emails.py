@@ -923,7 +923,8 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
 
     user_locale = _user_locale(user)
     if notification.priority in ('high', 'urgent'):
-        subject = notification.title
+        translated_title, _ = _translate_notification_for_email(notification, user_locale)
+        subject = translated_title or notification.title
     else:
         subject = _instant_notification_subject(notification, user_locale)
     body = render_instant_email(user, notification, locale=user_locale)
@@ -988,11 +989,19 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
                 tp = {}
         else:
             tp = tp.copy()
+        from app.services.notification.service import NotificationService
         if title_key == 'notification.assignment_submitted.admin.title':
             if 'submitter_name' not in tp:
                 tp['submitter_name'] = 'A focal point'
             if 'period' not in tp:
                 tp['period'] = '—'
+        if title_key in NotificationService._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
+            tp = NotificationService._ensure_country_param(notif, tp, title_key)
+        if title_key in (
+            'notification.assignment_sent_for_review.title',
+            'notification.assignment_sent_for_review.admin.title',
+        ):
+            tp = NotificationService._ensure_assignment_sent_for_review_params(tp)
         if message_params is None:
             message_params = {}
         elif not isinstance(message_params, dict):
@@ -1003,10 +1012,13 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
                 message_params = {}
         else:
             message_params = message_params.copy()
-        from app.services.notification.service import NotificationService
         message_params = NotificationService._apply_localized_country_param(
             notif, message_key, message_params, locale=locale
         )
+        if message_key in NotificationService._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
+            message_params = NotificationService._ensure_country_param(notif, message_params, message_key)
+        if message_key in NotificationService._ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS:
+            message_params = NotificationService._ensure_assignment_sent_for_review_params(message_params)
         with force_locale(locale):
             title = translate_notification_message(title_key, tp, locale=locale) if title_key else notif.title
             message = translate_notification_message(message_key, message_params, locale=locale) if message_key else notif.message
@@ -1070,12 +1082,14 @@ _DIGEST_TEMPLATE_SRC = """
                             {% endif %}
                         </div>
                         {% if notification.related_url %}
-                        <a href="{{ (base_url ~ notification.related_url) | e }}" class="action-button">{{ view_details }}</a>
+                        <a href="{{ (base_url ~ notification.related_url) | e }}"
+                           style="display:inline-block;background-color:#0d9488;color:#ffffff !important;padding:10px 20px;text-decoration:none;font-weight:600;font-size:14px;margin-top:10px;border:1px solid #0f766e;">{{ view_details }}</a>
                         {% endif %}
                     </div>
                     {% endfor %}
                     <div style="text-align: center; margin-top: 28px;">
-                        <a href="{{ (base_url ~ '/notifications') | e }}" class="action-button">{{ view_all }}</a>
+                        <a href="{{ (base_url ~ '/notifications') | e }}"
+                           style="display:inline-block;background-color:#0d9488;color:#ffffff !important;padding:10px 20px;text-decoration:none;font-weight:600;font-size:14px;border:1px solid #0f766e;">{{ view_all }}</a>
                     </div>
                 </div>
                 <div class="email-footer">
@@ -1177,7 +1191,7 @@ _INSTANT_TEMPLATE_SRC = """
                         </p>
                         {% if notification.related_url %}
                         <a href="{{ (base_url ~ notification.related_url) | e }}"
-                           class="action-button {% if is_action_required %}action-required{% else %}informational{% endif %}">{{ button_label }}</a>
+                           style="display:inline-block;padding:12px 24px;text-decoration:none;font-weight:600;font-size:15px;margin:12px 0 0;color:#ffffff !important;background-color:{% if is_action_required %}#dc2626{% else %}#0d9488{% endif %};border:1px solid {% if is_action_required %}#b91c1c{% else %}#0f766e{% endif %};">{{ button_label }}</a>
                         {% endif %}
                     </div>
                 </div>
@@ -1209,10 +1223,11 @@ def render_instant_email(user, notification, locale: Optional[str] = None):
     # Get organization branding
     org_name = get_org_name()
 
-    # Sanitize notification content for safe rendering
+    # Sanitize notification content for safe rendering (translate at send time for user locale)
+    translated_title, translated_message = _translate_notification_for_email(notification, user_locale)
     sanitized_notification = {
-        'title': sanitize_for_email(notification.title),
-        'message': sanitize_for_email(notification.message),
+        'title': sanitize_for_email(translated_title or notification.title),
+        'message': sanitize_for_email(translated_message or notification.message),
         'notification_type': notification.notification_type,
         'priority': sanitize_for_email(notification.priority),
         'related_url': notification.related_url  # URL is validated separately

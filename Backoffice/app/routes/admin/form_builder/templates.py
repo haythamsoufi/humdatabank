@@ -40,6 +40,69 @@ from . import (_handle_version_translations, _handle_version_description_transla
 import json
 
 
+def _parse_bool_value(raw_value, default=False):
+    if raw_value is None:
+        return default
+    if isinstance(raw_value, bool):
+        return raw_value
+    return str(raw_value).lower() in ('y', 'yes', 'true', 't', 'on', '1', '1.0')
+
+
+def _form_bool(data, field, *, default=False):
+    """Read a boolean from request form data (handles duplicate keys from hidden+checkbox)."""
+    if not data:
+        return default
+    if hasattr(data, 'getlist'):
+        vals = data.getlist(field)
+        if not vals:
+            return default
+        return _parse_bool_value(vals[-1], default=default)
+    raw = data.get(field)
+    if raw is None:
+        return default
+    return _parse_bool_value(raw, default=default)
+
+
+def _build_discussion_config(data, *, enabled, form=None):
+    """Build discussion_config JSON from request data or WTForms."""
+    if not enabled:
+        return None
+    if form is not None:
+        title = (form.discussion_title.data or '').strip() or None
+        description = (form.discussion_description.data or '').strip() or None
+        sort_order = form.discussion_sort_order.data or 'oldest_first'
+        if data:
+            default_collapsed = _form_bool(data, 'discussion_default_collapsed')
+            show_in_sidebar = _form_bool(data, 'discussion_show_in_sidebar', default=True)
+        else:
+            default_collapsed = bool(form.discussion_default_collapsed.data)
+            show_in_sidebar = bool(form.discussion_show_in_sidebar.data)
+    else:
+        title = (data.get('discussion_title') or '').strip() or None
+        description = (data.get('discussion_description') or '').strip() or None
+        sort_order = data.get('discussion_sort_order') or 'oldest_first'
+        default_collapsed = _form_bool(data, 'discussion_default_collapsed')
+        show_in_sidebar = _form_bool(data, 'discussion_show_in_sidebar', default=True)
+    return {
+        'title': title,
+        'description': description,
+        'sort_order': sort_order,
+        'default_collapsed': default_collapsed,
+        'show_in_sidebar': show_in_sidebar,
+    }
+
+
+def _populate_discussion_form_from_version(form, version):
+    """Populate discussion WTForm fields from a FormTemplateVersion."""
+    form.enable_discussion.data = bool(version.enable_discussion)
+    cfg = version.discussion_config if isinstance(version.discussion_config, dict) else {}
+    form.discussion_title.data = cfg.get('title') or ''
+    form.discussion_description.data = cfg.get('description') or ''
+    form.discussion_sort_order.data = cfg.get('sort_order') or 'oldest_first'
+    form.discussion_default_collapsed.data = bool(cfg.get('default_collapsed'))
+    form.discussion_show_in_sidebar.data = cfg.get('show_in_sidebar', True)
+
+
 def _shared_users_for_template_list(template):
     """Users with explicit template shares, excluding the template owner (deduped)."""
     owner_id = template.owned_by
@@ -461,6 +524,7 @@ def new_template():
                         form.enable_import_excel.data = source_version.enable_import_excel
                         form.enable_ai_validation.data = source_version.enable_ai_validation
                         form.enable_data_quality.data = source_version.enable_data_quality
+                        _populate_discussion_form_from_version(form, source_version)
                         form.data_quality_methodology.data = source_version.data_quality_methodology or ""
                         form.validation_rule_pack.data = source_version.validation_rule_pack or ""
                     else:
@@ -474,6 +538,7 @@ def new_template():
                         form.enable_export_excel.data = False
                         form.enable_import_excel.data = False
                         form.enable_ai_validation.data = False
+                        form.enable_discussion.data = False
                     form.owned_by.data = current_user.id  # New template owned by current user
 
                     # Handle name translations from version
@@ -517,6 +582,8 @@ def new_template():
         enable_import_excel = request.form.get('enable_import_excel') == 'y'
         enable_ai_validation = request.form.get('enable_ai_validation') == 'y'
         enable_data_quality = request.form.get('enable_data_quality') == 'y'
+        enable_discussion = request.form.get('enable_discussion') == 'y'
+        discussion_config = _build_discussion_config(request.form, enabled=enable_discussion)
         data_quality_methodology = (request.form.get('data_quality_methodology') or '').strip() or None
         validation_rule_pack = (request.form.get('validation_rule_pack') or '').strip() or None
         description = request.form.get('description', '')
@@ -549,6 +616,8 @@ def new_template():
             enable_import_excel=enable_import_excel,
             enable_ai_validation=enable_ai_validation,
             enable_data_quality=enable_data_quality,
+            enable_discussion=enable_discussion,
+            discussion_config=discussion_config,
             data_quality_methodology=data_quality_methodology if enable_data_quality else None,
             validation_rule_pack=validation_rule_pack if enable_data_quality else None,
             created_by=current_user.id,
@@ -754,6 +823,8 @@ def new_template():
             enable_import_excel=form.enable_import_excel.data,
             enable_ai_validation=form.enable_ai_validation.data,
             enable_data_quality=form.enable_data_quality.data,
+            enable_discussion=form.enable_discussion.data,
+            discussion_config=_build_discussion_config(None, enabled=form.enable_discussion.data, form=form),
             data_quality_methodology=form.data_quality_methodology.data or None if form.enable_data_quality.data else None,
             validation_rule_pack=form.validation_rule_pack.data or None if form.enable_data_quality.data else None,
             created_by=current_user.id,
@@ -932,6 +1003,8 @@ def create_template_from_indicator_bank():
         enable_import_excel=False,
         enable_ai_validation=False,
         enable_data_quality=False,
+        enable_discussion=False,
+        discussion_config=None,
         created_by=current_user.id,
         updated_by=current_user.id,
         created_at=now,
@@ -1112,6 +1185,8 @@ def get_template_clone_data(template_id):
         enable_import_excel=version.enable_import_excel if version else False,
         enable_ai_validation=version.enable_ai_validation if version else False,
         enable_data_quality=version.enable_data_quality if version else False,
+        enable_discussion=version.enable_discussion if version else False,
+        discussion_config=version.discussion_config if version else None,
         data_quality_methodology=version.data_quality_methodology if version else None,
         validation_rule_pack=version.validation_rule_pack if version else None,
         name_translations=version_translations,
@@ -1180,6 +1255,7 @@ def edit_template(template_id):
         form.enable_import_excel.data = selected_version.enable_import_excel
         form.enable_ai_validation.data = selected_version.enable_ai_validation
         form.enable_data_quality.data = selected_version.enable_data_quality
+        _populate_discussion_form_from_version(form, selected_version)
         form.data_quality_methodology.data = selected_version.data_quality_methodology or ""
         form.validation_rule_pack.data = selected_version.validation_rule_pack or ""
 
@@ -1296,6 +1372,12 @@ def edit_template(template_id):
         selected_version.enable_import_excel = get_boolean_from_form('enable_import_excel', default_when_missing=False)
         selected_version.enable_ai_validation = get_boolean_from_form('enable_ai_validation', default_when_missing=False)
         selected_version.enable_data_quality = get_boolean_from_form('enable_data_quality', default_when_missing=False)
+        selected_version.enable_discussion = get_boolean_from_form('enable_discussion', default_when_missing=False)
+        selected_version.discussion_config = _build_discussion_config(
+            data,
+            enabled=selected_version.enable_discussion,
+            form=form,
+        )
         methodology = (data.get('data_quality_methodology') or form.data_quality_methodology.data or "").strip() or None
         rule_pack = (data.get('validation_rule_pack') or form.validation_rule_pack.data or "").strip() or None
         selected_version.data_quality_methodology = methodology if selected_version.enable_data_quality else None
@@ -1907,6 +1989,8 @@ def duplicate_template(template_id):
             enable_import_excel=source_version.enable_import_excel if source_version else None,
             enable_ai_validation=source_version.enable_ai_validation if source_version else False,
             enable_data_quality=source_version.enable_data_quality if source_version else False,
+            enable_discussion=source_version.enable_discussion if source_version else False,
+            discussion_config=_deep_copy_json_value(source_version.discussion_config) if source_version and source_version.discussion_config else None,
             data_quality_methodology=source_version.data_quality_methodology if source_version else None,
             validation_rule_pack=source_version.validation_rule_pack if source_version else None,
             variables=_deep_copy_json_value(source_version.variables) if source_version and source_version.variables else None,

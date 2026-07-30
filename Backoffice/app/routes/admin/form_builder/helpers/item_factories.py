@@ -26,6 +26,8 @@ def _create_form_item(template, section, form_data, item_type):
         return _create_matrix_form_item(template, section, form_data, order)
     elif item_type == 'image':
         return _create_image_form_item(template, section, form_data, order)
+    elif item_type == 'discussion':
+        return _create_discussion_form_item(template, section, form_data, order)
     elif item_type.startswith('plugin_'):
         return _create_plugin_form_item(template, section, form_data, item_type, order)
     else:
@@ -98,6 +100,7 @@ def _create_indicator_form_item(template, section, form_data, default_order):
         'allow_not_applicable': bool(get_field_value('allow_not_applicable', '')),
         'allow_disability_questions': bool(get_field_value('allow_disability_questions', '')),
         'indirect_reach': bool(get_field_value('indirect_reach', '')),
+        'exclude_from_completion_rate': bool(get_field_value('exclude_from_completion_rate', '')),
         'default_value': None,
         'privacy': (get_field_value('privacy', '') or 'ifrc_network'),
         'allow_over_100': False  # Default to False
@@ -269,6 +272,7 @@ def _create_question_form_item(template, section, form_data, default_order):
         'unique_options_in_section': bool(get_field_value('unique_options_in_section', '')),
         'limit_entries_to_option_count': bool(get_field_value('limit_entries_to_option_count', '')),
         'use_as_repeat_entry_title': bool(get_field_value('use_as_repeat_entry_title', '')),
+        'exclude_from_completion_rate': bool(get_field_value('exclude_from_completion_rate', '')),
         'allow_other': get_field_value('allow_other', '') in ['true', 'on', '1'],
         'max_other_entries': (lambda v: max(0, int(v)) if str(v).lstrip('-').isdigit() else 0)(get_field_value('max_other_entries', '0') or '0'),
     }
@@ -671,6 +675,92 @@ def _create_image_form_item(template, section, form_data, default_order):
         'layout_column_width': int(get_field_value('layout_column_width') or '12'),
         'layout_break_after': bool(get_field_value('layout_break_after')),
         **image_config,
+        'allowed_disaggregation_options': ['total'],
+        'age_groups_config': None,
+        'allow_data_not_available': False,
+        'allow_not_applicable': False,
+        'indirect_reach': False,
+        'privacy': (get_field_value('privacy') or 'ifrc_network'),
+    }
+    form_item.config = config
+
+    _rel = get_field_value('relevance_condition') or ''
+    form_item.relevance_condition = _rel if is_conditions_meaningful(_rel) else None
+
+    supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+
+    label_translations_raw = get_field_value('label_translations', '')
+    if label_translations_raw:
+        try:
+            lt = json.loads(label_translations_raw)
+            if isinstance(lt, dict):
+                filtered = {}
+                for k, v in lt.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and v.strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered[code] = v.strip()
+                form_item.label_translations = filtered or None
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    description_translations_raw = get_field_value('description_translations', '')
+    if description_translations_raw:
+        try:
+            dt = json.loads(description_translations_raw)
+            if isinstance(dt, dict):
+                filtered = {}
+                for k, v in dt.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and v.strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered[code] = v.strip()
+                form_item.description_translations = filtered or None
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    db.session.add(form_item)
+    db.session.flush()
+    return form_item
+
+
+def _create_discussion_form_item(template, section, form_data, default_order):
+    """Create a discussion display block (embeds assignment comments in the form)."""
+    order = default_order
+
+    def get_field_value(field_name, prefix=''):
+        if prefix:
+            prefixed_name = f"{prefix}{field_name}"
+            value = form_data.get(prefixed_name)
+            if value:
+                return value
+        return form_data.get(field_name)
+
+    form_section_id = get_field_value('section_id')
+    target_section_id = int(form_section_id) if form_section_id else section.id
+    target_section = FormSection.query.get(target_section_id)
+
+    order_value = get_field_value('order')
+    if order_value and str(order_value).strip():
+        with suppress(ValueError, TypeError):
+            order = float(order_value)
+
+    form_item = FormItem(
+        item_type='discussion',
+        section_id=target_section_id,
+        template_id=template.id,
+        version_id=target_section.version_id if target_section else section.version_id,
+        label=get_field_value('label') or '',
+        order=order,
+        description=get_field_value('description') or '',
+    )
+
+    config = {
+        'is_required': False,
+        'layout_column_width': int(get_field_value('layout_column_width') or '12'),
+        'layout_break_after': bool(get_field_value('layout_break_after')),
         'allowed_disaggregation_options': ['total'],
         'age_groups_config': None,
         'allow_data_not_available': False,

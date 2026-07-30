@@ -1508,7 +1508,7 @@ class FormTemplateAIService:
         if op.get("description") is not None:
             draft.description = _clean_str(op.get("description"), 4000)
             changed.append("description")
-        for flag in ("is_paginated", "add_to_self_report", "display_order_visible"):
+        for flag in ("is_paginated", "add_to_self_report", "display_order_visible", "enable_discussion"):
             if op.get(flag) is not None:
                 setattr(draft, flag, _as_bool(op.get(flag)))
                 changed.append(f"{flag}={_as_bool(op.get(flag))}")

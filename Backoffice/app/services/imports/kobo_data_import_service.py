@@ -1630,6 +1630,8 @@ class KoboDataImportService:
                 enable_export_excel=True,
                 enable_import_excel=True,
                 enable_ai_validation=False,
+                enable_discussion=False,
+                discussion_config=None,
                 created_by=owned_by,
                 updated_by=owned_by,
                 created_at=now,

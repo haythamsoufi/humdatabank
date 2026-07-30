@@ -111,6 +111,16 @@ def deploy_template_version(template_id):
 
         db.session.flush()
 
+        try:
+            from app.services.assignments.completion_service import AssignmentCompletionService
+            AssignmentCompletionService.refresh_for_template(template.id)
+        except Exception as refresh_err:
+            current_app.logger.warning(
+                "Completion rate refresh after template deploy failed for template %s: %s",
+                template.id,
+                refresh_err,
+            )
+
         # Evict cached section/item data for this template so the next form load
         # picks up the freshly published structure instead of stale rows.
         try:
@@ -777,6 +787,8 @@ def create_draft_version(template_id):
             enable_import_excel=source_version.enable_import_excel,
             enable_ai_validation=source_version.enable_ai_validation,
             enable_data_quality=source_version.enable_data_quality,
+            enable_discussion=source_version.enable_discussion,
+            discussion_config=source_version.discussion_config.copy() if source_version.discussion_config else None,
             data_quality_methodology=source_version.data_quality_methodology,
             validation_rule_pack=source_version.validation_rule_pack,
             variables=source_version.variables.copy() if source_version.variables else None,

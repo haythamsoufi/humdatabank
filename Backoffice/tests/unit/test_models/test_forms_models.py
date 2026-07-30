@@ -269,6 +269,62 @@ class TestFormTemplate:
             db_session.refresh(template)
             assert isinstance(template.enable_data_quality, bool)
 
+    def test_enable_discussion(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            assert isinstance(template.enable_discussion, bool)
+
+    def test_enable_discussion_no_version(self, db_session, app):
+        with app.app_context():
+            template = FormTemplate()
+            db_session.add(template)
+            db_session.flush()
+            assert template.enable_discussion is False
+
+    def test_enable_discussion_from_version(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+            version.enable_discussion = True
+            version.discussion_config = {'title': 'Team Notes'}
+            db_session.commit()
+            db_session.refresh(template)
+            assert template.enable_discussion is True
+            assert template.discussion_config == {'title': 'Team Notes'}
+
+    def test_discussion_show_in_sidebar_defaults_true(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+            version.enable_discussion = True
+            version.discussion_config = {'title': 'Team Notes'}
+            db_session.commit()
+            assert version.get_effective_discussion_show_in_sidebar() is True
+            assert template.discussion_show_in_sidebar is True
+
+    def test_discussion_show_in_sidebar_false(self, db_session, app):
+        with app.app_context():
+            template = create_test_template(db_session)
+            version = db_session.query(FormTemplateVersion).filter_by(
+                id=template.published_version_id
+            ).first()
+            version.enable_discussion = True
+            version.discussion_config = {'show_in_sidebar': False}
+            db_session.commit()
+            assert version.get_effective_discussion_show_in_sidebar() is False
+            assert template.discussion_show_in_sidebar is False
+
+    def test_is_discussion_item_type(self, db_session, app):
+        with app.app_context():
+            from app.models import FormItem
+            item = FormItem(item_type='discussion', label='Team thread', order=1)
+            assert item.is_discussion is True
+            assert item.field_type_for_js == 'discussion'
+
     def test_data_quality_methodology(self, db_session, app):
         with app.app_context():
             template = create_test_template(db_session)

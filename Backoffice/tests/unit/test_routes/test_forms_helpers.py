@@ -437,21 +437,112 @@ class TestMapUnifiedItemToOriginal:
 # ---------------------------------------------------------------------------
 
 class TestCalculateAssignmentCompletionRate:
-    def test_delegates_to_service(self, app):
+    def test_reads_stored_rate(self, app):
         from app.routes.forms.helpers import calculate_assignment_completion_rate
 
-        mock_result = MagicMock()
-        mock_result.completion_rate = 0.75
+        mock_aes = MagicMock()
 
         with app.app_context():
             with patch(
-                "app.routes.forms.helpers.AssignmentCompletionService.compute_for_assignment",
-                return_value=mock_result,
-            ) as mock_compute:
+                "app.routes.forms.helpers.db.session.get",
+                return_value=mock_aes,
+            ), patch(
+                "app.routes.forms.helpers.AssignmentCompletionService.stored_rate_for",
+                return_value=75.0,
+            ) as mock_stored:
                 rate = calculate_assignment_completion_rate(10, 20, 30)
 
-        mock_compute.assert_called_once_with(10, 20, 30)
-        assert rate == 0.75
+        mock_stored.assert_called_once_with(mock_aes)
+        assert rate == 75.0
+
+    def test_missing_aes_returns_zero(self, app):
+        from app.routes.forms.helpers import calculate_assignment_completion_rate
+
+        with app.app_context():
+            with patch("app.routes.forms.helpers.db.session.get", return_value=None):
+                rate = calculate_assignment_completion_rate(10, 20, 30)
+
+        assert rate == 0.0
+
+
+class TestComputeEntryFormProgressMetrics:
+    def test_returns_completion_rate_and_section_statuses_by_id(self, app):
+        from app.routes.forms.helpers import compute_entry_form_progress_metrics
+
+        aes = MagicMock()
+        aes.id = 5
+        template = MagicMock()
+        template.id = 10
+        template.published_version_id = 99
+        section = MagicMock()
+        section.id = 7
+        section.name = "Governance"
+
+        with app.app_context():
+            with patch(
+                "app.routes.forms.helpers._load_existing_data_for_assignment",
+                return_value={"field_value[1]": "x"},
+            ), patch(
+                "app.routes.forms.helpers.build_submitted_documents_dict",
+                return_value={},
+            ), patch(
+                "app.routes.forms.helpers.calculate_section_completion_status",
+                return_value={"Governance": "in_progress"},
+            ), patch(
+                "app.routes.forms.helpers.AssignmentCompletionService.refresh_and_persist",
+                return_value=66.7,
+            ) as mock_refresh:
+                result = compute_entry_form_progress_metrics(aes, template, [section])
+
+        mock_refresh.assert_called_once_with(5)
+        assert result == {
+            "completion_rate": 66.7,
+            "section_statuses": {"7": "in_progress"},
+        }
+
+    def test_refresh_and_persist_ignores_hidden_field_params(self, app):
+        from app.routes.forms.helpers import compute_entry_form_progress_metrics
+
+        aes = MagicMock()
+        aes.id = 5
+        template = MagicMock()
+        template.id = 10
+        template.published_version_id = 99
+
+        with app.app_context():
+            with patch(
+                "app.routes.forms.helpers._load_existing_data_for_assignment",
+                return_value={},
+            ), patch(
+                "app.routes.forms.helpers.build_submitted_documents_dict",
+                return_value={},
+            ), patch(
+                "app.routes.forms.helpers.calculate_section_completion_status",
+                return_value={},
+            ), patch(
+                "app.routes.forms.helpers.AssignmentCompletionService.refresh_and_persist",
+                return_value=100.0,
+            ) as mock_refresh:
+                result = compute_entry_form_progress_metrics(
+                    aes,
+                    template,
+                    [],
+                    hidden_field_ids={1, 2},
+                    hidden_section_ids={9},
+                )
+
+        mock_refresh.assert_called_once_with(5)
+        assert result["completion_rate"] == 100.0
+
+
+class TestParseCsvIdSet:
+    def test_parses_comma_separated_ids(self):
+        from app.routes.forms.helpers import parse_csv_id_set
+
+        assert parse_csv_id_set("1, 2,3") == {1, 2, 3}
+        assert parse_csv_id_set("") == set()
+        assert parse_csv_id_set(None) == set()
+        assert parse_csv_id_set("abc,4") == {4}
 
 
 # ---------------------------------------------------------------------------
@@ -966,3 +1057,18 @@ class TestBuildEntryFormFeatures:
         features = build_entry_form_features([])
         assert features['pdfExport'] is True
         assert features['excelExport'] is False
+
+    def test_discussion_follows_template_flag(self):
+        template = SimpleNamespace(enable_discussion=True)
+        features = build_entry_form_features([], template)
+        assert features['discussion'] is True
+
+    def test_discussion_enabled_for_discussion_items(self):
+        field = SimpleNamespace(item_type='discussion')
+        section = SimpleNamespace(fields_ordered=[field])
+        features = build_entry_form_features([section], SimpleNamespace(enable_discussion=False))
+        assert features['discussion'] is True
+
+    def test_discussion_disabled_without_template(self):
+        features = build_entry_form_features([])
+        assert features['discussion'] is False

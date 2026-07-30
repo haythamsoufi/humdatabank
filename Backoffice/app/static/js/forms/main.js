@@ -22,6 +22,7 @@ import { initFormEvents } from './modules/form-events.js';
 import { cleanupInputValues, setupNumericInputJsonSupport } from './modules/form-item-utils.js';
 import { initAiOpinions } from './modules/ai-opinions.js';
 import { debugLog, debugWarn, debugError } from './modules/debug.js';
+import { initCompletionGapHighlight, initCompletionRateRefresh, refreshVisibleCompletionRate } from './modules/entry-form-progress.js';
 // Heavy feature modules — dynamically imported based on window.__formFeatures flags.
 // Stubs ensure safe destructuring even when the flag is false and the module is skipped.
 
@@ -41,8 +42,8 @@ async function initializeEntryForm() {
 
     // Kick off entry-bootstrap as early as possible (parallel with module imports).
     // Provides completion_rate + initial auto_load + resolved_variables in one round-trip.
-    const completionDisplayEarly = document.getElementById('completion-rate-display');
-    const bootstrapAesId = completionDisplayEarly && completionDisplayEarly.dataset.aesId;
+    const gapBtnEarly = document.getElementById('completion-gap-btn');
+    const bootstrapAesId = gapBtnEarly && gapBtnEarly.dataset.aesId;
     if (bootstrapAesId && !window.__entryBootstrapPromise) {
         const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
         window.__entryBootstrapPromise = fetchFn(
@@ -68,6 +69,7 @@ async function initializeEntryForm() {
     const feat = window.__formFeatures || {
         matrix: true, repeat: true, dynamicIndicators: true,
         documents: true, calculatedLists: true, pdfExport: true, excelExport: true,
+        discussion: false,
     };
 
     // Kick off dynamic imports for heavy feature modules concurrently — they run in
@@ -81,6 +83,7 @@ async function initializeEntryForm() {
         { initCalculatedLists = null } = {},
         { initPDFExport = null, initValidationSummaryExport = null } = {},
         { ExcelExportManager = null } = {},
+        { initDiscussion = null } = {},
     ] = await Promise.all([
         feat.matrix           ? import('./modules/matrix-handler.js')          : Promise.resolve({}),
         feat.dynamicIndicators? import('./modules/dynamic-indicators.js')      : Promise.resolve({}),
@@ -89,6 +92,7 @@ async function initializeEntryForm() {
         feat.calculatedLists  ? import('./modules/calculated-lists-runtime.js'): Promise.resolve({}),
         feat.pdfExport        ? import('./modules/pdf-export.js')              : Promise.resolve({}),
         feat.excelExport      ? import('./modules/excel-export.js')            : Promise.resolve({}),
+        feat.discussion       ? import('./modules/discussion.js')              : Promise.resolve({}),
     ]);
 
     try {
@@ -142,6 +146,7 @@ async function initializeEntryForm() {
         safeInit('initUniqueSectionOptions', () => initUniqueSectionOptions());
         safeInit('initDisaggregationCalculator', () => initDisaggregationCalculator());
         safeInit('initTooltips', () => initTooltips());
+        if (initDiscussion) safeInit('initDiscussion', () => initDiscussion());
 
         // Initialize matrix handling (await restore + auto-load + variable lookups so loading gate waits)
         if (matrixHandler) {
@@ -244,35 +249,17 @@ async function initializeEntryForm() {
         debugLog('main', initErrors.length ? '⚠️ Form initialization completed with errors' : '✅ Form initialization completed successfully');
     }
 
-    // Apply completion rate from entry-bootstrap (preferred) or legacy completion-rate endpoint.
+    // Apply completion rate after relevance conditions have settled (visible fields only).
     const completionDisplay = document.getElementById('completion-rate-display');
-    if (completionDisplay && completionDisplay.dataset.aesId) {
-        const applyCompletion = (data) => {
-            if (!data || typeof data.completion_rate !== 'number') return false;
-            const cr = data.completion_rate;
-            let colorClass = 'text-red-600 font-semibold';
-            if (cr >= 80) colorClass = 'text-green-700 font-semibold';
-            else if (cr >= 25) colorClass = 'text-amber-600 font-semibold';
-            completionDisplay.textContent = `${cr.toFixed(1)}%`;
-            completionDisplay.className = `font-medium ${colorClass}`;
-            return true;
-        };
-        const bootstrapPromise = window.__entryBootstrapPromise || Promise.resolve(window.__entryBootstrap);
-        bootstrapPromise
-            .then((data) => {
-                if (applyCompletion(data)) return;
-                // Fallback for older servers / bootstrap failure
-                const aesId = completionDisplay.dataset.aesId;
-                const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
-                return fetchFn(`/api/forms/assignment/${aesId}/completion-rate`, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                    credentials: 'same-origin',
-                })
-                    .then((r) => (r.ok ? r.json() : null))
-                    .then((legacy) => { applyCompletion(legacy); });
-            })
+    const gapBtn = document.getElementById('completion-gap-btn');
+    if (completionDisplay && gapBtn && gapBtn.dataset.aesId) {
+        const aesId = gapBtn.dataset.aesId;
+        initCompletionRateRefresh(aesId);
+        refreshVisibleCompletionRate(aesId)
             .catch(() => { completionDisplay.textContent = '—'; });
     }
+
+    initCompletionGapHighlight();
 
     // Debug: Scan all calculated total fields after everything loads
     // To enable debug scanning, use: window.debug.enableScan() then window.debug.scanCalculatedTotals()

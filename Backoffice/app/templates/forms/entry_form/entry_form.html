@@ -111,7 +111,28 @@
                                 {# Completion rate is loaded asynchronously after page init to keep it off the critical render path. #}
                                 {% if assignment_entity_status_id_for_rate is defined and assignment_entity_status_id_for_rate %}
                                 <span class="mx-2">•</span>
-                                <span class="font-medium">{{ _('Completion:') }}</span>&nbsp;<span id="completion-rate-display" class="font-medium text-gray-400" data-aes-id="{{ assignment_entity_status_id_for_rate }}" aria-live="polite">…</span>
+                                <span class="completion-progress-inline inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                                    <span class="font-medium">{{ _('Completion:') }}</span>&nbsp;<span class="completion-info-tooltip inline-flex items-center" tabindex="0" aria-label="{{ _('About completion rate')|forceescape }}">
+                                        <span class="completion-info-tooltip-trigger inline-flex items-center gap-1 cursor-help rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
+                                            <span id="completion-rate-display" class="font-medium text-gray-400 tabular-nums underline decoration-dotted underline-offset-2" aria-live="polite">…</span>
+                                            <i class="fas fa-circle-info text-gray-400 text-xs" aria-hidden="true"></i>
+                                        </span>
+                                        <span class="tooltip-text completion-info-tooltip-text" role="tooltip">
+                                            <strong>{{ _('What is completion?') }}</strong><br>
+                                            {{ _('The percentage of form fields that have a value, an uploaded document, or are marked Not applicable.') }}<br><br>
+                                            <button type="button"
+                                                    id="completion-gap-btn"
+                                                    class="completion-gap-btn w-full inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-amber-900 bg-amber-100 border border-amber-300 hover:bg-amber-200 hover:border-amber-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-amber-100"
+                                                    data-aes-id="{{ assignment_entity_status_id_for_rate }}"
+                                                    aria-pressed="false"
+                                                    disabled>
+                                                <i class="fas fa-highlighter text-[0.65rem]" aria-hidden="true"></i>
+                                                <span class="completion-gap-btn-label">{{ _('Show me what I missed') }}</span>
+                                            </button>
+                                            <span class="completion-gap-tooltip-hint block mt-2 text-[0.7rem] leading-snug text-gray-300">{{ _('Highlights empty fields in red. Click again to clear.') }}</span>
+                                        </span>
+                                    </span>
+                                </span>
                                 {% elif completion_rate is defined %}
                                 {# Legacy server-rendered path kept for non-assignment form types. #}
                                 {# Completion tiers match dashboard.html / MobileApp AssignmentCard._getCompletionColor #}
@@ -463,29 +484,47 @@
         <div id="entry-form-excel-import-notice" class="hidden mb-6" role="alert" aria-live="polite"></div>
         <div id="entry-form-layout" class="flex flex-col lg:flex-row gap-4 lg:gap-6 min-w-0">
             {# Sections Pane - Static pane on large screens (≥1100px), overlay sidebar on smaller screens #}
+            {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
+            {% set _discussion_cfg = tmpl.discussion_config if tmpl and tmpl.discussion_config is mapping else {} %}
+            {% set _discussion_show_in_sidebar = _discussion_cfg.get('show_in_sidebar', true) %}
             <div id="section-navigation-sidebar"
                  class="fixed inset-y-0 left-0 z-40 w-4/5 max-w-xs bg-white pt-6 px-6 pb-0 flex flex-col transform -translate-x-full transition-transform duration-300 ease-in-out shadow-xl border-r border-gray-200
                         xl:relative xl:translate-x-0 xl:transform-none xl:w-1/5 xl:max-w-xs xl:inset-auto xl:z-auto xl:bg-white xl:pt-6 xl:px-6 xl:pb-0 xl:rounded-lg xl:shadow xl:border xl:border-gray-200 xl:sticky xl:top-4 xl:max-h-[calc(100vh-8rem)] xl:border-r-0 xl:transition-none min-h-0"
                  data-collapsed="false">
 
-                {# Header pinned to top #}
-                <div class="flex-shrink-0 flex items-center justify-between mb-4">
-                    <h2 id="sidebar-title" class="text-xl font-semibold text-gray-700">{{ _('Navigation') }}</h2>
-
-                    {# Close button for mobile/collapsed navigation #}
-                    <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Close navigation')|forceescape }}">
-                        <i class="fas fa-times text-base"></i>
-                    </button>
-
-                    {# Collapse button for large screens (≥1100px) #}
-                    <button type="button" id="sidebar-collapse-toggle"
-                            class="btn btn-icon btn-sm btn-secondary hidden xl:block z-50"
-                            title="{{ _('Collapse navigation panel')|forceescape }}">
-                        <i class="fas fa-chevron-left text-lg"></i>
-                    </button>
+                {# Header pinned to top — switches between navigation and discussion #}
+                <div class="flex-shrink-0 flex items-center justify-between mb-4 min-h-[2rem]">
+                    <div id="sidebar-header-nav" class="flex items-center justify-between w-full gap-2">
+                        <h2 id="sidebar-title" class="text-xl font-semibold text-gray-700">{{ _('Navigation') }}</h2>
+                        <div class="flex items-center gap-1">
+                            {# Close button for mobile/collapsed navigation #}
+                            <button type="button" id="mobile-nav-close-button" class="btn btn-close-icon xl:hidden z-50" aria-label="{{ _('Close navigation')|forceescape }}">
+                                <i class="fas fa-times text-base"></i>
+                            </button>
+                            {# Collapse button for large screens (≥1100px) #}
+                            <button type="button" id="sidebar-collapse-toggle"
+                                    class="btn btn-icon btn-sm btn-secondary hidden xl:block z-50"
+                                    title="{{ _('Collapse navigation panel')|forceescape }}">
+                                <i class="fas fa-chevron-left text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="sidebar-header-discussion" class="hidden items-center justify-between w-full gap-2" aria-hidden="true">
+                        <button type="button"
+                                id="discussion-collapse-btn"
+                                class="btn btn-ghost btn-sm text-gray-600 hover:text-gray-900 -ml-2"
+                                aria-label="{{ _('Back to navigation')|forceescape }}">
+                            <i class="fas fa-chevron-left mr-1" aria-hidden="true"></i>
+                            <span class="text-sm font-medium">{{ _('Back') }}</span>
+                        </button>
+                        <h2 id="sidebar-discussion-title" class="text-base font-semibold text-gray-800 truncate flex-1 text-right xl:text-left">{{ _('Comments & Discussion') }}</h2>
+                    </div>
                 </div>
+                {# Shared pane: section navigation + discussion preview / expanded overlay #}
+                <div id="sidebar-shared-pane" class="flex-1 min-h-0 flex flex-col relative">
+                <div id="sidebar-nav-pane" class="sidebar-pane sidebar-pane--nav flex-1 min-h-0 flex flex-col transition-all duration-300 ease-in-out">
                 {# Scrollable section list #}
-                <div class="flex-1 min-h-0 overflow-y-auto">
+                <div id="sidebar-nav-scroll" class="flex-1 min-h-0 overflow-y-auto">
                 <ul class="space-y-2">
                     {% if is_public_submission %}
                         <li>
@@ -581,7 +620,7 @@
                                    data-page-name="{{ section_page_name }}">
                                     <i class="fas fa-layer-group flex-shrink-0 w-4 h-4 text-gray-500"></i>
                                     {% set status = section_statuses.get(section_nav_item.name) %}
-                                    <i class="
+                                    <i class="section-status-icon
                                         {% if status == 'Completed' %}fas fa-check-circle text-green-500
                                         {% elif status == 'in_progress' %}fas fa-pen text-blue-500
                                         {% elif status == 'Not Started' %}far fa-circle text-gray-400
@@ -614,7 +653,7 @@
                                    data-page-name="{{ sub_section_page_name }}">
                                     <i class="fas fa-indent flex-shrink-0 w-3 h-3 text-teal-500"></i>
                                     {% set sub_status = section_statuses.get(sub_section_nav.name) %}
-                                    <i class="
+                                    <i class="section-status-icon
                                         {% if sub_status == 'Completed' %}fas fa-check-circle text-green-500
                                         {% elif sub_status == 'in_progress' %}fas fa-pen text-blue-500
                                         {% elif sub_status == 'Not Started' %}far fa-circle text-gray-400
@@ -639,9 +678,18 @@
                     {% endif %}
                 </ul>
                 </div>
+                </div>{# /sidebar-nav-pane #}
 
+                {% if tmpl and tmpl.enable_discussion and _discussion_show_in_sidebar and not is_preview_mode %}
+                    {% include 'forms/entry_form/partials/discussion_panel_expanded.html' %}
+                {% endif %}
+                </div>{# /sidebar-shared-pane #}
+
+                {% set _has_sidebar_discussion = tmpl and tmpl.enable_discussion and _discussion_show_in_sidebar and not is_preview_mode %}
+                {% if can_edit or (not is_preview_mode and not is_public_submission) or _has_sidebar_discussion %}
+                <div id="sidebar-bottom-dock" class="flex-shrink-0 mt-auto w-full bg-white z-10 pb-6 -mb-6">
                 {% if can_edit %}
-                <div class="sticky bottom-0 z-10 mt-6 pt-6 border-t border-gray-200 bg-white pb-6 -mb-6">
+                <div id="sidebar-action-buttons" class="pt-6 border-t border-gray-200 bg-white">
                     {% if is_preview_mode %}
                         <div class="flex gap-2">
                             <button type="button" disabled
@@ -715,9 +763,17 @@
                     {% endif %}
                 </div>
                 {% elif not is_preview_mode and not is_public_submission %}
-                <div class="sticky bottom-0 z-10 mt-6 pt-6 border-t border-gray-200 bg-white pb-6 -mb-6">
+                <div id="sidebar-action-buttons" class="pt-6 border-t border-gray-200 bg-white">
                     <p class="text-gray-700 font-semibold text-center">{{ _('This form has been %(status)s. Data entry is disabled.', status=localize_status(assignment_status.status)) }}</p>
                 </div>
+                {% endif %}
+
+                {% if _has_sidebar_discussion %}
+                <div id="sidebar-discussion-footer" class="{% if can_edit or (not is_preview_mode and not is_public_submission) %}border-t border-gray-200{% endif %} bg-white">
+                    {% include 'forms/entry_form/partials/discussion_panel.html' %}
+                </div>
+                {% endif %}
+                </div>{# /sidebar-bottom-dock #}
                 {% endif %}
             </div>
 
@@ -872,6 +928,7 @@
 
                                                 {% set is_blank_block = field.field_type_for_js|lower == 'blank' %}
                                                 {% set is_image_block = field.field_type_for_js|lower == 'image' %}
+                                                {% set is_discussion_block = field.field_type_for_js|lower == 'discussion' %}
 
                                                 {% if is_blank_block %}
                                                     {# Blank/Note: Question Text (label) in bold, Definition as normal text below #}
@@ -914,6 +971,8 @@
                                                             <p class="text-gray-700 text-sm text-center mt-2">{{ field_display_label }}</p>
                                                         {% endif %}
                                                     </div>
+                                                {% elif is_discussion_block %}
+                                                    {% include 'forms/entry_form/partials/discussion_panel_inline.html' %}
                                                 {% elif field.item_type and field.item_type.startswith('plugin_') %}
                                                     {# Plugin Field - render using plugin template #}
                                                     {% set is_sub_item_plugin = field.is_sub_item %}
@@ -1478,7 +1537,7 @@
                                                             {% endif %}
 
                                                             {# Data Availability Options for Dynamic Indicators #}
-                                                            {% if can_edit and (field.allow_data_not_available or field.allow_not_applicable) %}
+                                                            {% if field.allow_data_not_available or field.allow_not_applicable %}
                                                                 <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                     {% if field.allow_data_not_available %}
                                                                         <label class="inline-flex items-center">
@@ -1655,7 +1714,7 @@
                                                             {% endif %}
 
                                                             {# Data Availability Options for Indicators #}
-                                                            {% if can_edit and (field.allow_data_not_available or field.allow_not_applicable) %}
+                                                            {% if field.allow_data_not_available or field.allow_not_applicable %}
                                                                 <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                     {% if field.allow_data_not_available %}
                                                                         <label class="inline-flex items-center">
@@ -1796,7 +1855,7 @@
                                                             {% endif %}
 
                                                             {# Data Availability Options for Questions #}
-                                                            {% if can_edit and (field.allow_data_not_available or field.allow_not_applicable) %}
+                                                            {% if field.allow_data_not_available or field.allow_not_applicable %}
                                                                 <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                     {% if field.allow_data_not_available %}
                                                                         <label class="inline-flex items-center">
@@ -2512,7 +2571,6 @@
                                                                         {% endif %} {# End of indicator/question/matrix specific rendering for Sub-Section #}
 
                                                                         {# Data availability checkboxes for sub-section indicators and questions #}
-                                                                        {% if can_edit %}
                                                                                                             {% if field.is_indicator and (field.allow_data_not_available or field.allow_not_applicable) %}
                                     <div class="mt-3 flex flex-wrap items-center justify-end gap-4 text-sm">
                                                                                                                         {% if field.allow_data_not_available %}
@@ -2544,7 +2602,6 @@
                                     {% endif %}
                                                                                 </div>
                                                                             {% endif %}
-                                                                        {% endif %}
 
                                                                         {% if field.is_indicator and field.allow_disability_questions %}
                                                                             {% with name_prefix='indicator_' ~ field.id|string %}

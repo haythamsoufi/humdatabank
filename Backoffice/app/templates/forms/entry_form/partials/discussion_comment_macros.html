@@ -1,0 +1,43 @@
+{% from "components/_profile_icon.html" import profile_icon %}
+{% macro discussion_comment_row(comment, compact=false) %}
+<div class="discussion-comment flex gap-2.5{% if comment.source == 'upr_excel_import' %} discussion-comment--imported{% endif %}{% if compact %} discussion-comment--compact{% endif %}"
+     data-comment-id="{{ comment.id }}"
+     {% if comment.source %}data-comment-source="{{ comment.source }}"{% endif %}>
+    <div class="flex-shrink-0">
+        {% if comment.source == 'upr_excel_import' %}
+            <span class="inline-flex items-center justify-center {% if compact %}w-7 h-7{% else %}w-9 h-9{% endif %} rounded-full bg-amber-100 text-amber-700" title="{{ _('Imported from UPR Excel')|forceescape }}" aria-hidden="true">
+                <i class="fas fa-file-import {% if compact %}text-xs{% else %}text-sm{% endif %}"></i>
+            </span>
+        {% elif comment.created_by_user %}
+            {{ profile_icon(comment.created_by_user, 'sm' if compact else 'md', false, false, false, 'avatar-circle') }}
+        {% else %}
+            <span class="inline-flex items-center justify-center {% if compact %}w-7 h-7{% else %}w-9 h-9{% endif %} rounded-full bg-gray-200 text-gray-600" aria-hidden="true">
+                <i class="fas fa-user {% if compact %}text-xs{% else %}text-sm{% endif %}"></i>
+            </span>
+        {% endif %}
+    </div>
+    <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-0.5">
+            <span class="{% if compact %}text-xs{% else %}text-sm{% endif %} font-semibold text-gray-900 truncate max-w-full">
+                {% if comment.source == 'upr_excel_import' %}
+                    {{ _('Imported from UPR Excel') }}
+                {% elif comment.created_by_user %}
+                    {{ comment.created_by_user.name or comment.created_by_user.email }}
+                {% else %}
+                    {{ _('Unknown user') }}
+                {% endif %}
+            </span>
+            {% if comment.source == 'upr_excel_import' and not compact %}
+            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+                {{ _('Historical import') }}
+            </span>
+            {% endif %}
+            <span class="text-xs text-gray-500 whitespace-nowrap">
+                {{ comment.created_at|format_datetime_localized('short', 'short') if comment.created_at else '' }}
+            </span>
+        </div>
+        <p class="{% if compact %}text-xs line-clamp-3{% else %}text-sm{% endif %} text-gray-800 whitespace-pre-wrap break-words">{{ comment.body }}</p>
+    </div>
+</div>
+{% endmacro %}
+

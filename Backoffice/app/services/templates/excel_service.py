@@ -2213,6 +2213,8 @@ class TemplateExcelService:
             enable_import_excel=source_version.enable_import_excel,
             enable_ai_validation=getattr(source_version, 'enable_ai_validation', False),
             enable_data_quality=getattr(source_version, 'enable_data_quality', False),
+            enable_discussion=getattr(source_version, 'enable_discussion', False),
+            discussion_config=source_version.discussion_config.copy() if getattr(source_version, 'discussion_config', None) else None,
             data_quality_methodology=getattr(source_version, 'data_quality_methodology', None),
             validation_rule_pack=getattr(source_version, 'validation_rule_pack', None),
             variables=source_version.variables.copy() if source_version.variables else None

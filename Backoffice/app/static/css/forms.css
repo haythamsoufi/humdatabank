@@ -638,6 +638,105 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     box-sizing: border-box !important;
 }
 
+/* Completion progress widget (header) */
+.completion-info-tooltip {
+  position: relative;
+}
+
+.completion-info-tooltip .tooltip-text {
+  visibility: hidden;
+  opacity: 0;
+  display: block;
+  position: absolute;
+  z-index: 1000;
+  width: max-content;
+  max-width: 300px;
+  min-width: 240px;
+  background-color: #1f2937;
+  color: #fff;
+  text-align: left;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.45;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+  transition: opacity 0.2s, visibility 0.2s;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.completion-info-tooltip .tooltip-text::after {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent transparent #1f2937 transparent;
+}
+
+/* Invisible hover bridge so the pointer can reach the tooltip button */
+.completion-info-tooltip .tooltip-text::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+
+.completion-info-tooltip:hover .tooltip-text,
+.completion-info-tooltip:focus-within .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.completion-info-tooltip .completion-gap-btn {
+  margin-top: 2px;
+}
+
+.completion-gap-btn.completion-gap-active {
+  background-color: #fde68a;
+  border-color: #f59e0b;
+  color: #78350f;
+}
+
+/* Completion-gap highlight (click "Show me what I missed") */
+.form-item-block.completion-gap-highlight {
+  outline: 2px solid #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
+  border-radius: 0.375rem;
+}
+
+.repeat-entry__title-select-wrap.completion-gap-highlight,
+.repeat-entry__header.completion-gap-highlight {
+  outline: 2px solid #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18);
+  border-radius: 0.375rem;
+  padding: 0.25rem;
+}
+
+a.section-link.completion-gap-section,
+a.repeat-entry-nav-link.completion-gap-section {
+  background-color: #fef2f2 !important;
+  box-shadow: inset 3px 0 0 #ef4444;
+}
+
+.completion-rate-trigger.completion-gap-active {
+  outline: 2px solid #f59e0b;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.completion-gap-btn[aria-busy="true"] .completion-gap-btn-label {
+  opacity: 0.7;
+}
+
 /* Matrix manual/duplicate row highlights
    Note: rowheader background is set with !important above, so these also must be !important. */
 .matrix-container table td[role="rowheader"].matrix-manual-row-header {
@@ -858,14 +957,15 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     display: flex !important;
   }
 
-  /* Ensure normal pane has sticky positioning */
+  /* Ensure normal pane keeps flex column layout; only nav list scrolls */
   #section-navigation-sidebar:not(.force-mobile-mode) {
     position: sticky !important;
     top: 1rem !important;
     max-height: calc(100vh - 8rem) !important;
-    overflow-y: auto !important;
+    overflow: hidden !important;
     transform: none !important;
-    display: block !important;
+    display: flex !important;
+    flex-direction: column !important;
     opacity: 1 !important;
   }
 }
@@ -914,7 +1014,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
   background: white !important;
   padding: 1.5rem !important;
-  overflow-y: auto !important;
+  overflow: hidden !important;
   inset: 0 auto 0 0 !important;
 }
 
@@ -1424,6 +1524,143 @@ a.btn.entry-form-doc-library-btn {
 @media (prefers-reduced-motion: reduce) {
   .entry-form-skeleton-pulse {
     animation: none;
+  }
+}
+
+/* ========================================
+   DISCUSSION SIDEBAR (entry form nav pane)
+   ======================================== */
+
+#sidebar-shared-pane {
+  isolation: isolate;
+}
+
+.sidebar-pane--nav {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] .sidebar-pane--nav {
+  opacity: 0;
+  transform: translateY(0.5rem);
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+
+.discussion-sidebar-expanded {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(0.75rem);
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, visibility 0s linear 0.3s;
+  z-index: 2;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] .discussion-sidebar-expanded {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, visibility 0s linear 0s;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] #sidebar-collapse-toggle {
+  display: none !important;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] #sidebar-header-nav {
+  display: none !important;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] #sidebar-header-discussion {
+  display: flex !important;
+}
+
+#sidebar-header-discussion {
+  display: none;
+}
+
+#sidebar-discussion-footer {
+  z-index: 5;
+}
+
+#sidebar-bottom-dock {
+  flex-shrink: 0;
+  margin-top: auto;
+  background: #fff;
+  z-index: 10;
+}
+
+#sidebar-shared-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.discussion-sidebar-preview {
+  transition: opacity 0.25s ease-in-out;
+  border-top: none;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] .discussion-sidebar-preview {
+  opacity: 0;
+}
+
+#section-navigation-sidebar[data-discussion-expanded="true"] #sidebar-discussion-footer {
+  display: none;
+}
+
+#sidebar-bottom-dock > #sidebar-discussion-footer:first-child {
+  border-top: 1px solid #e5e7eb;
+}
+
+.discussion-sidebar-comments {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.discussion-sidebar-comments::-webkit-scrollbar {
+  width: 6px;
+}
+
+.discussion-sidebar-comments::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 4px;
+}
+
+.discussion-inline-comments {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.discussion-inline-comments::-webkit-scrollbar {
+  width: 6px;
+}
+
+.discussion-inline-comments::-webkit-scrollbar-thumb {
+  background-color: #94a3b8;
+  border-radius: 4px;
+}
+
+.discussion-comment--compact .line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-pane--nav,
+  .discussion-sidebar-expanded,
+  .discussion-sidebar-preview {
+    transition: none !important;
   }
 }
 

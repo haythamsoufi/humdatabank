@@ -467,12 +467,22 @@ function setupAllRepeatEntryTitleDropdowns(scope) {
 }
 
 export function initRepeatSections() {
-    setupRepeatSections();
-    loadExistingRepeatData();
-    setupAllRepeatEntryTitleDropdowns();
-    hideDynamicSubSectionsInNavigation();
-    initRepeatEntryNavigation();
-    window.revealRepeatEntryTitleSelect = revealRepeatEntryTitleSelect;
+    if (window.__repeatSectionsInitialized) {
+        debugLog('repeat-sections', 'Already initialized, skipping duplicate init');
+        return;
+    }
+    window.__repeatSectionsInitialized = true;
+    window.__repeatSectionsInitializing = true;
+    try {
+        setupRepeatSections();
+        loadExistingRepeatData();
+        setupAllRepeatEntryTitleDropdowns();
+        hideDynamicSubSectionsInNavigation();
+        initRepeatEntryNavigation();
+        window.revealRepeatEntryTitleSelect = revealRepeatEntryTitleSelect;
+    } finally {
+        window.__repeatSectionsInitializing = false;
+    }
 }
 
 /**
@@ -610,7 +620,7 @@ function createInitialRepeatEntries() {
         const sectionId = sectionContainer.id.replace('section-container-', '');
         const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
 
-        if (repeatContainer && repeatContainer.children.length === 0) {
+        if (repeatContainer && repeatContainer.querySelectorAll('.repeat-entry').length === 0) {
             debugLog('repeat-sections', `Auto-creating Entry #1 for repeat section ${sectionId}`);
             createRepeatEntry(sectionId, true); // true = is initial entry
         }
@@ -731,7 +741,7 @@ function addRepeatEntry(sectionId, options = {}) {
 
     if (effectiveMax !== null && currentEntries >= effectiveMax) {
         debugWarn('repeat-sections', `Cannot add more entries: reached maximum of ${effectiveMax}`);
-        if (!silent) {
+        if (!silent && !window.__repeatSectionsInitializing) {
             // Check whether any limit-field has extra "Other" slots configured so we can
             // give a more informative message.
             const sectionContainer = document.getElementById(`section-container-${sectionId}`);
@@ -1769,6 +1779,42 @@ function setupDeleteButtons() {
     debugLog('repeat-sections', 'Delete buttons are handled inline for each repeat entry');
 }
 
+/**
+ * Ensure a repeat entry exists for the given saved instance number.
+ * Uses createRepeatEntry directly so restoring server data never triggers
+ * user-facing "max entries" warnings from addRepeatEntry.
+ *
+ * @param {string} sectionId
+ * @param {number} instanceNumber
+ * @param {HTMLElement} repeatContainer
+ * @returns {HTMLElement|null}
+ */
+function ensureRepeatEntryForInstance(sectionId, instanceNumber, repeatContainer) {
+    let currentEntry = repeatContainer.querySelector(
+        `.repeat-entry[data-repeat-instance="${instanceNumber}"]`
+    );
+
+    if (currentEntry) {
+        return currentEntry;
+    }
+
+    if (instanceNumber === 1) {
+        const existingEntries = repeatContainer.querySelectorAll('.repeat-entry');
+        if (existingEntries.length > 0) {
+            return existingEntries[0];
+        }
+    }
+
+    while (repeatContainer.querySelectorAll('.repeat-entry').length < instanceNumber) {
+        const currentCount = repeatContainer.querySelectorAll('.repeat-entry').length;
+        createRepeatEntry(sectionId, currentCount === 0);
+    }
+
+    return repeatContainer.querySelector(`.repeat-entry[data-repeat-instance="${instanceNumber}"]`)
+        || repeatContainer.querySelectorAll('.repeat-entry')[instanceNumber - 1]
+        || null;
+}
+
 function loadExistingRepeatData() {
     debugLog('repeat-sections', '📥 Loading existing repeat data...');
 
@@ -1793,41 +1839,34 @@ function loadExistingRepeatData() {
             return;
         }
 
-        // Sort instance numbers to ensure proper loading order
-        const instanceNumbers = Object.keys(sectionData).map(num => parseInt(num)).sort((a, b) => a - b);
+        // Sort instance numbers to ensure proper loading order (ignore non-numeric keys)
+        const instanceNumbers = Object.keys(sectionData)
+            .map(num => parseInt(num, 10))
+            .filter(num => Number.isFinite(num) && num > 0)
+            .sort((a, b) => a - b);
         debugLog('repeat-sections', `📋 Found ${instanceNumbers.length} instances: [${instanceNumbers.join(', ')}]`);
 
         instanceNumbers.forEach((instanceNumber, index) => {
             debugLog('repeat-sections', `\n📝 Processing instance ${instanceNumber} (${index + 1}/${instanceNumbers.length})`);
 
-            const instanceData = sectionData[instanceNumber];
+            const instanceData = sectionData[instanceNumber] ?? sectionData[String(instanceNumber)];
+            if (!instanceData || typeof instanceData !== 'object') {
+                debugWarn('repeat-sections', `Skipping invalid repeat instance data for instance ${instanceNumber}`);
+                return;
+            }
             debugLog('repeat-sections', `📊 Instance data:`, instanceData);
 
-            // Check if this is the first instance and if Entry #1 already exists
             const existingEntries = repeatContainer.querySelectorAll('.repeat-entry');
             debugLog('repeat-sections', `📊 Current repeat entries: ${existingEntries.length}`);
 
-            let currentEntry;
+            debugLog('repeat-sections', `🆕 Ensuring repeat entry exists for instance ${instanceNumber}`);
+            const currentEntry = ensureRepeatEntryForInstance(sectionId, instanceNumber, repeatContainer);
 
-            if (instanceNumber === 1 && existingEntries.length > 0) {
-                // For instance 1, use the existing Entry #1 (first entry)
-                currentEntry = existingEntries[0];
-                debugLog('repeat-sections', `✅ Using existing Entry #1 for instance ${instanceNumber}`);
-            } else {
-                // For other instances, create new repeat entry
-                debugLog('repeat-sections', `🆕 Creating new repeat entry for instance ${instanceNumber}`);
-                addRepeatEntry(sectionId);
-
-                // Find the newly created repeat entry
-                const newRepeatEntries = repeatContainer.querySelectorAll('.repeat-entry');
-                currentEntry = newRepeatEntries[newRepeatEntries.length - 1];
-
-                if (!currentEntry) {
-                    debugWarn('repeat-sections', `❌ Could not find newly created repeat entry for instance ${instanceNumber}`);
-                    return;
-                }
-                debugLog('repeat-sections', `✅ Created new repeat entry #${newRepeatEntries.length} for instance ${instanceNumber}`);
+            if (!currentEntry) {
+                debugWarn('repeat-sections', `❌ Could not find or create repeat entry for instance ${instanceNumber}`);
+                return;
             }
+            debugLog('repeat-sections', `✅ Using repeat entry for instance ${instanceNumber}`);
 
             debugLog('repeat-sections', `🎯 Using repeat entry: ${currentEntry.id || 'no-id'} (data-repeat-instance: ${currentEntry.getAttribute('data-repeat-instance') || 'none'})`);
 

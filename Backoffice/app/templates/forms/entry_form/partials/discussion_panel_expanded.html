@@ -1,0 +1,48 @@
+{% from "forms/entry_form/partials/discussion_comment_macros.html" import discussion_comment_row %}
+{% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
+{% set discussion_cfg = tmpl.discussion_config if tmpl and tmpl.discussion_config is mapping else {} %}
+{% set panel_description = discussion_cfg.get('description') or '' %}
+{% set max_length = 2000 %}
+
+<div id="discussion-sidebar-expanded"
+     class="discussion-sidebar-expanded"
+     aria-hidden="true">
+    <div id="discussion-panel-body" class="flex flex-col min-h-0 h-full">
+        {% if panel_description %}
+        <p class="flex-shrink-0 text-xs text-gray-600 px-1 pb-3 border-b border-gray-100 mb-3">{{ panel_description }}</p>
+        {% endif %}
+
+        <div id="discussion-comments-list"
+             class="discussion-sidebar-comments flex-1 min-h-0 overflow-y-auto space-y-3 pr-1"
+             aria-live="polite">
+            {% if discussion_comments %}
+                {% for comment in discussion_comments %}
+                    {{ discussion_comment_row(comment, compact=false) }}
+                {% endfor %}
+            {% else %}
+                <p id="discussion-expanded-empty-state" class="text-sm text-gray-500 italic">{{ _('No comments yet.') }}</p>
+            {% endif %}
+        </div>
+
+        {% if can_edit %}
+        <div id="discussion-compose" class="flex-shrink-0 border-t border-gray-200 pt-3 mt-3">
+            <label for="discussion-comment-input" class="sr-only">{{ _('Add a comment') }}</label>
+            <textarea id="discussion-comment-input"
+                      rows="3"
+                      maxlength="{{ max_length }}"
+                      class="block w-full px-3 py-2 border border-gray-200 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      placeholder="{{ _('Add a comment…')|forceescape }}"></textarea>
+            <div class="mt-2 flex items-center justify-between gap-3">
+                <p id="discussion-comment-error" class="text-xs text-red-600 hidden" role="alert"></p>
+                <button type="button"
+                        id="discussion-post-btn"
+                        class="btn btn-primary btn-sm ml-auto">
+                    <i class="fas fa-paper-plane mr-1" aria-hidden="true"></i>
+                    {{ _('Post comment') }}
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+

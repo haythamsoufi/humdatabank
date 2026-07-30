@@ -166,6 +166,9 @@ class DocumentService:
 
         db.session.delete(submitted_document)
         db.session.flush()
+        if aes.id:
+            from app.services.assignments.completion_service import AssignmentCompletionService
+            AssignmentCompletionService.refresh_and_persist(aes.id)
         return doc_filename
 
     @classmethod

@@ -119,10 +119,9 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
     mocks["RepeatGroupInstance"] = stack.enter_context(
         patch("app.routes.forms.entry.RepeatGroupInstance", rgi))
 
-    sd = MagicMock()
-    sd.query.filter_by.return_value.order_by.return_value.all.return_value = []
-    mocks["SubmittedDocument"] = stack.enter_context(
-        patch("app.routes.forms.entry.SubmittedDocument", sd))
+    mocks["build_submitted_docs"] = stack.enter_context(
+        patch("app.routes.forms.entry.build_submitted_documents_dict",
+              return_value={}))
 
     mocks["merge_carryover"] = stack.enter_context(
         patch("app.routes.forms.entry.merge_carryover_into_submitted_documents_dict",
@@ -130,9 +129,9 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
     mocks["calc_section"] = stack.enter_context(
         patch("app.routes.forms.entry.calculate_section_completion_status",
               return_value={}))
-    mocks["calc_completion"] = stack.enter_context(
-        patch("app.routes.forms.entry.calculate_assignment_completion_rate",
-              return_value=0))
+    mocks["compute_progress"] = stack.enter_context(
+        patch("app.routes.forms.entry.compute_entry_form_progress_metrics",
+              return_value={"completion_rate": 0.0, "section_statuses": {}}))
 
     fp = MagicMock()
     fp.query.filter_by.return_value.order_by.return_value.all.return_value = []
@@ -483,6 +482,7 @@ class TestHandleAssignmentFormGet:
         doc1.form_item_id = 5
         doc2 = MagicMock()
         doc2.form_item_id = 5
+        docs_dict = {f"field_value[{doc1.form_item_id}]": [doc1, doc2]}
 
         with app.test_request_context("/forms/assignment/1", method="GET"):
             from flask_login import login_user
@@ -490,9 +490,7 @@ class TestHandleAssignmentFormGet:
 
             with ExitStack() as stack:
                 mocks = _standard_aes_patches(aes, stack)
-                mocks["SubmittedDocument"].query.filter_by.return_value.order_by.return_value.all.return_value = [
-                    doc1, doc2
-                ]
+                mocks["build_submitted_docs"].return_value = docs_dict
                 from app.routes.forms.entry import handle_assignment_form
                 handle_assignment_form(1)
 
@@ -617,7 +615,7 @@ class TestHandleAssignmentFormPost:
         mocks["redirect"].assert_called()
 
     def test_post_submission_result_success_saved_ajax(self, app, mock_user):
-        """Successful save (AJAX) returns json_ok with uploaded_documents."""
+        """Successful save (AJAX) returns json_ok with uploaded_documents and progress metrics."""
         aes = _make_aes()
         submission_result = {
             "success": True,
@@ -633,6 +631,7 @@ class TestHandleAssignmentFormPost:
             "sent_for_review": False,
             "submitted": False,
         }
+        progress = {"completion_rate": 42.5, "section_statuses": {"7": "in_progress"}}
         mock_ok = _make_mock_response(200)
         with app.test_request_context("/forms/assignment/1", method="POST",
                                       data="{}", content_type="application/json"):
@@ -644,10 +643,23 @@ class TestHandleAssignmentFormPost:
                                               submission_result=submission_result)
                 mock_jok = stack.enter_context(
                     patch("app.routes.forms.entry.json_ok", return_value=mock_ok))
+                mock_progress = stack.enter_context(
+                    patch("app.routes.forms.entry.compute_entry_form_progress_metrics",
+                          return_value=progress))
                 from app.routes.forms.entry import handle_assignment_form
                 handle_assignment_form(1)
 
-        mock_jok.assert_called()
+        mock_progress.assert_called_once()
+        mock_jok.assert_called_once_with(
+            message="Progress saved successfully.",
+            uploaded_documents=[{
+                "form_item_id": 10,
+                "submitted_document_id": 1,
+                "filename": "file.pdf",
+            }],
+            completion_rate=42.5,
+            section_statuses={"7": "in_progress"},
+        )
 
     def test_post_sent_for_review_ajax(self, app, mock_user):
         """sent_for_review=True (AJAX) notifies and returns json_ok with redirect."""

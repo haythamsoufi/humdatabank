@@ -453,7 +453,7 @@
 
 
 {# Data Availability Options for Matrix #}
-{% if can_edit and (field.config.allow_data_not_available or field.config.allow_not_applicable) %}
+{% if field.config.allow_data_not_available or field.config.allow_not_applicable %}
     <div class="mt-3 flex items-center justify-end gap-4 text-sm" role="group" aria-label="{{ _('Data availability options')|forceescape }}">
         {% if field.config.allow_data_not_available %}
             <label class="inline-flex items-center">

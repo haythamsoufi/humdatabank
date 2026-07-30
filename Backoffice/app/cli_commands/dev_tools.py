@@ -494,3 +494,31 @@ def register_dev_tools_commands(app):
         except Exception as e:
             click.echo(f"Error during force cleanup: {str(e)}")
             return 0
+
+    @app.cli.command("backfill-completion-rates")
+    @click.option(
+        "--batch-size",
+        type=int,
+        default=500,
+        show_default=True,
+        help="Rows per DB commit (bulk UPDATE batch).",
+    )
+    @with_appcontext
+    def backfill_completion_rates(batch_size):
+        """Persist completion_rate for all assignment_entity_status rows."""
+        from app.services.assignments.completion_service import AssignmentCompletionService
+
+        def _progress(done):
+            click.echo(f"  … {done} rows updated", err=True)
+
+        click.echo("Backfilling completion_rate (this may take a while on large databases)…")
+        try:
+            count = AssignmentCompletionService.backfill_persisted_rates(
+                batch_size=batch_size,
+                progress_callback=_progress,
+            )
+        except Exception as exc:
+            click.echo(f"Backfill failed: {exc}", err=True)
+            raise SystemExit(1) from exc
+        click.echo(f"Done. Updated {count} assignment_entity_status row(s).")
+

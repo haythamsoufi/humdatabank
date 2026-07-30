@@ -1,5 +1,6 @@
 {% extends "core/layout.html" %}
 {% from "macros/filter_card.html" import filter_card %}
+{% from "macros/modal_shell.html" import modal_shell %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Notification type registry') }} - {{ _('Admin Panel') }}{% endblock %}
@@ -50,6 +51,7 @@
             {% endif %}
         </p>
         <p class="text-xs text-gray-600 mb-4 max-w-3xl">{{ _('Emitter status Active means this notification type is emitted today; Hypothetical means it is reserved for preferences or future use only. Active rows appear first.') }}</p>
+        <p class="text-xs text-gray-600 mb-4 max-w-3xl">{{ _('Preview shows translated sample copy and the hardcoded instant notification email layout (not the Communication Center email wrapper).') }}</p>
 
         <div class="overflow-x-auto border border-gray-200 rounded-md">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
@@ -63,6 +65,7 @@
                         <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 w-32">{{ _('Default priority') }}</th>
                         <th scope="col" class="px-3 py-2 text-right font-semibold text-gray-700 w-28">{{ _('TTL (days)') }}</th>
                         <th scope="col" class="px-3 py-2 text-left font-semibold text-gray-700 min-w-[14rem]">{{ _('Description') }}</th>
+                        <th scope="col" class="px-3 py-2 text-center font-semibold text-gray-700 w-24">{{ _('Preview') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white">
@@ -86,10 +89,22 @@
                         <td class="px-3 py-2 font-mono text-xs text-gray-800">{{ row.default_priority }}</td>
                         <td class="px-3 py-2 text-right font-mono text-xs text-gray-800">{{ row.ttl_days }}</td>
                         <td class="px-3 py-2 text-gray-800">{{ row.description_display }}</td>
+                        <td class="px-3 py-2 text-center">
+                            {% if preview_variants_by_type.get(row.type_key) %}
+                            <button type="button"
+                                    class="btn btn-secondary btn-sm notification-registry-preview-btn"
+                                    data-type-key="{{ row.type_key|e }}"
+                                    data-type-label="{{ row.label|forceescape }}">
+                                <i class="fas fa-eye mr-1" aria-hidden="true"></i>{{ _('Preview') }}
+                            </button>
+                            {% else %}
+                            <span class="text-xs text-gray-400">—</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">{{ _('No rows match this search.') }}</td>
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">{{ _('No rows match this search.') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -97,4 +112,53 @@
         </div>
     </div>
 </div>
+
+{% call modal_shell('notification-registry-preview-modal', _('Notification preview'), max_width='max-w-5xl', content_class='flex flex-col min-h-0 max-h-[85vh]') %}
+    <p id="notification-registry-preview-type" class="text-sm text-gray-600 mb-3"></p>
+    <div class="flex flex-wrap items-end gap-3 mb-4">
+        <div>
+            <label for="notification-registry-preview-variant" class="block text-xs font-medium text-gray-700 mb-1">{{ _('Channel') }}</label>
+            <select id="notification-registry-preview-variant" class="form-select border-gray-300 rounded-md text-sm"></select>
+        </div>
+        <div>
+            <label for="notification-registry-preview-locale" class="block text-xs font-medium text-gray-700 mb-1">{{ _('Language') }}</label>
+            <select id="notification-registry-preview-locale" class="form-select border-gray-300 rounded-md text-sm">
+                {% for code in config.SUPPORTED_LANGUAGES %}
+                <option value="{{ code }}"{% if code == 'en' %} selected{% endif %}>{{ code|upper }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="button" id="notification-registry-preview-refresh" class="btn btn-primary btn-sm">
+            <i class="fas fa-sync-alt mr-1" aria-hidden="true"></i>{{ _('Refresh preview') }}
+        </button>
+    </div>
+    <div id="notification-registry-preview-loading" class="hidden text-sm text-gray-500 mb-3">{{ _('Loading preview…') }}</div>
+    <div id="notification-registry-preview-error" class="hidden text-sm text-red-600 mb-3"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0 flex-1 overflow-hidden">
+        <div class="border border-gray-200 rounded-md p-4 bg-gray-50 min-h-[12rem] overflow-auto">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{{ _('In-app copy') }}</h4>
+            <p id="notification-registry-preview-title" class="text-base font-semibold text-gray-900 mb-2"></p>
+            <p id="notification-registry-preview-message" class="text-sm text-gray-700 whitespace-pre-wrap"></p>
+            <p id="notification-registry-preview-note" class="text-xs text-gray-500 mt-3"></p>
+        </div>
+        <div class="border border-gray-200 rounded-md bg-white min-h-[12rem] overflow-hidden flex flex-col">
+            <h4 class="text-xs font-semibold uppercase tracking-wide text-gray-500 px-4 pt-4 pb-2">{{ _('Instant email') }}</h4>
+            <iframe id="notification-registry-preview-email-frame"
+                    title="{{ _('Notification email preview')|forceescape }}"
+                    class="w-full flex-1 min-h-[20rem] border-0 bg-white"
+                    sandbox=""></iframe>
+            <p id="notification-registry-preview-email-unavailable" class="hidden text-sm text-gray-500 px-4 pb-4"></p>
+        </div>
+    </div>
+{% endcall %}
+
+<script type="application/json" id="notification-registry-preview-config">{{ {
+    'previewUrl': url_for('admin_communication.api_notification_type_preview'),
+    'variantsByType': preview_variants_by_type,
+    'labels': {
+        'emailUnavailable': _('In-app only — no email preview for this type.'),
+        'previewFailed': _('Could not load preview.'),
+    }
+}|tojson }}</script>
+<script src="{{ static_url('js/admin/notification-registry-preview.js') }}"></script>
 {% endblock %}

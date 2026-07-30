@@ -786,6 +786,66 @@ class TestCheckForFieldClearingSignals:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# FormDataService._should_preserve_existing_on_empty_save
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestShouldPreserveExistingOnEmptySave:
+    def test_question_empty_save_does_not_preserve(self, app):
+        from app.services.forms.data_service import FormDataService
+        entry = _make_form_data_entry(value="previous notes")
+        with app.test_request_context('/test', method='POST', data={'action': 'save'}):
+            assert FormDataService._should_preserve_existing_on_empty_save(
+                10, entry, is_presave=False, field_cleared=False
+            ) is False
+
+    def test_simple_indicator_empty_save_does_not_preserve(self, app):
+        from app.services.forms.data_service import FormDataService
+        indicator = MagicMock()
+        indicator.id = 10
+        indicator.allowed_disaggregation_options = ['total']
+        indicator.indirect_reach = False
+        entry = _make_form_data_entry(value="previous text")
+        with app.test_request_context('/test', method='POST', data={'action': 'save'}):
+            assert FormDataService._should_preserve_existing_on_empty_save(
+                10,
+                entry,
+                is_presave=False,
+                field_cleared=False,
+                indicator=indicator,
+                field_prefix='indicator_10',
+            ) is False
+
+    def test_disagg_indicator_preserves_when_only_empty_total_posted(self, app):
+        from app.services.forms.data_service import FormDataService
+        indicator = MagicMock()
+        indicator.id = 10
+        indicator.allowed_disaggregation_options = ['total', 'sex_age']
+        indicator.indirect_reach = False
+        indicator.effective_sex_categories = ['Female', 'Male']
+        indicator.effective_age_groups = ['5-17', '18-49']
+        entry = _make_form_data_entry(
+            disagg_data={'mode': 'sex_age', 'values': {'direct': {'female_5_17': 3}}}
+        )
+        with app.test_request_context(
+            '/test',
+            method='POST',
+            data={
+                'action': 'save',
+                'indicator_10_reporting_mode': 'sex_age',
+                'indicator_10_total_value': '',
+            },
+        ):
+            assert FormDataService._should_preserve_existing_on_empty_save(
+                10,
+                entry,
+                is_presave=False,
+                field_cleared=False,
+                indicator=indicator,
+                field_prefix='indicator_10',
+            ) is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # FormDataService._clear_ai_validation_for_form_data
 # ─────────────────────────────────────────────────────────────────────────────
 

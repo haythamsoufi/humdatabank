@@ -21,6 +21,7 @@ from app.models import (
     db, AssignedForm, AssignmentEntityStatus, Country, DynamicIndicatorData,
     FormData, FormItem, FormPage, FormSection, PublicSubmission,
     QuestionType, RepeatGroupData, RepeatGroupInstance, SubmittedDocument,
+    SubmissionDiscussionComment,
 )
 from app.models.enums import EntityType
 from app.services.organization.entity_service import EntityService
@@ -55,7 +56,9 @@ from config import Config
 from .helpers import (
     _load_existing_data_for_assignment,
     build_entry_form_features,
+    build_submitted_documents_dict,
     calculate_section_completion_status,
+    compute_entry_form_progress_metrics,
     process_existing_data_for_template,
     render_dynamic_indicator_item_html,
 )
@@ -752,25 +755,9 @@ def handle_assignment_form(aes_id):
     existing_data_processed['repeat_dynamic_indicator_data'] = repeat_dynamic_indicator_data
     _entry_lap("repeat_and_dynamic_data")
 
-    submitted_docs = (
-        SubmittedDocument.query.filter_by(assignment_entity_status_id=assignment_entity_status.id)
-        .order_by(SubmittedDocument.uploaded_at.desc())
-        .all()
+    existing_submitted_documents_dict = build_submitted_documents_dict(
+        assignment_entity_status.id
     )
-
-    existing_submitted_documents_dict = {}
-    for doc in submitted_docs:
-        if not doc.form_item_id:
-            continue
-        key = f'field_value[{doc.form_item_id}]'
-        if key not in existing_submitted_documents_dict:
-            existing_submitted_documents_dict[key] = doc
-        else:
-            current = existing_submitted_documents_dict[key]
-            if isinstance(current, list):
-                current.append(doc)
-            else:
-                existing_submitted_documents_dict[key] = [current, doc]
 
     entity_repo_document_ids = merge_carryover_into_submitted_documents_dict(
         existing_submitted_documents_dict, assignment_entity_status, all_sections
@@ -1017,9 +1004,16 @@ def handle_assignment_form(aes_id):
                             for ch in (submission_result.get('field_changes') or [])
                             if ch.get('submitted_document_id')
                         ]
+                        progress = compute_entry_form_progress_metrics(
+                            assignment_entity_status,
+                            form_template,
+                            all_sections,
+                        )
                         return json_ok(
                             message="Progress saved successfully.",
                             uploaded_documents=uploaded_documents,
+                            completion_rate=progress['completion_rate'],
+                            section_statuses=progress['section_statuses'],
                         )
                     else:
                         flash("Progress saved successfully.", "success")
@@ -1117,6 +1111,31 @@ def handle_assignment_form(aes_id):
         except Exception:
             open_validation_questions = []
 
+    discussion_comments = []
+    has_discussion_items = False
+    for sec in (all_sections or []):
+        for fi in getattr(sec, 'fields_ordered', []) or []:
+            if getattr(fi, 'item_type', None) == 'discussion':
+                has_discussion_items = True
+                break
+        if has_discussion_items:
+            break
+    if form_template and (getattr(form_template, 'enable_discussion', False) or has_discussion_items):
+        discussion_cfg = getattr(form_template, 'discussion_config', None) or {}
+        sort_newest_first = (
+            isinstance(discussion_cfg, dict)
+            and discussion_cfg.get('sort_order') == 'newest_first'
+        )
+        comment_query = SubmissionDiscussionComment.query.filter_by(
+            assignment_entity_status_id=assignment_entity_status.id,
+        )
+        order_clause = (
+            SubmissionDiscussionComment.created_at.desc()
+            if sort_newest_first
+            else SubmissionDiscussionComment.created_at.asc()
+        )
+        discussion_comments = comment_query.order_by(order_clause).all()
+
     _entry_lap("pre_render")
     # stream_template returns a Response with a Jinja2 generator body.
     # Flask sends the <head> and first blocks to the browser immediately, so CSS/JS
@@ -1171,6 +1190,7 @@ def handle_assignment_form(aes_id):
         assignment_entity_status_id=assignment_entity_status.id,
         template_variables=variable_configs if 'variable_configs' in locals() else {},
         form_features=form_features,
+        discussion_comments=discussion_comments,
         # Defer heavy chatbot modules (12 ES modules, ~567 KB) on entry form pages.
         # The chatbot is initialised lazily by entry_form.html after formInitialized instead.
         skip_layout_chatbot=True,

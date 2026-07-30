@@ -1272,7 +1272,7 @@
         window.autoTranslateModal.updateProgress();
 
         // Log the start of the translation process
-        window.autoTranslateModal.logProgress(`' + {{ _("Starting")|tojson|safe }} + ' ${indicatorsToTranslate.length} ' + {{ _("translations...")|tojson|safe }} + '`, 'info');
+        window.autoTranslateModal.logProgress({{ _("Starting")|tojson|safe }} + ' ' + indicatorsToTranslate.length + ' ' + {{ _("translations...")|tojson|safe }}, 'info');
 
         // Process indicators one by one
         processNextIndicator(indicatorsToTranslate, 0, languagesNeedingTranslation, selectedService);
@@ -1414,7 +1414,7 @@
                         if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                         const translationTypeText = translationTypes.join(' + ');
-                        window.autoTranslateModal.logProgress(`' + {{ _("✓")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText})`, 'success');
+                        window.autoTranslateModal.logProgress({{ _("✓")|tojson|safe }} + ' ' + indicator.id + ' → ' + indicator.language + ' (' + translationTypeText + ')', 'success');
                     } else {
                         window.autoTranslateModal.translationState.errorCount++;
 
@@ -1424,7 +1424,7 @@
                         if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                         const translationTypeText = translationTypes.join(' + ');
-                        const errorMsg = `' + {{ _("Failed to save")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveData.message || 'Unknown error'}`;
+                        const errorMsg = {{ _("Failed to save")|tojson|safe }} + ' ' + indicator.id + ' → ' + indicator.language + ' (' + translationTypeText + '): ' + (saveData.message || 'Unknown error');
                         window.autoTranslateModal.translationState.errors.push(errorMsg);
                         window.autoTranslateModal.logProgress(errorMsg, 'error');
                     }
@@ -1460,7 +1460,7 @@
                     if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                     const translationTypeText = translationTypes.join(' + ');
-                    const errorMsg = `' + {{ _("Network error saving")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${saveError.message}`;
+                    const errorMsg = {{ _("Network error saving")|tojson|safe }} + ' ' + indicator.id + ' → ' + indicator.language + ' (' + translationTypeText + '): ' + saveError.message;
                     window.autoTranslateModal.translationState.errors.push(errorMsg);
                     window.autoTranslateModal.logProgress(errorMsg, 'error');
                     window.autoTranslateModal.updateProgress();
@@ -1476,7 +1476,7 @@
                 if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
                 const translationTypeText = translationTypes.join(' + ');
-                const errorMsg = `' + {{ _("Failed to translate")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${data.message || 'Unknown error'}`;
+                const errorMsg = {{ _("Failed to translate")|tojson|safe }} + ' ' + indicator.id + ' → ' + indicator.language + ' (' + translationTypeText + '): ' + (data.message || 'Unknown error');
                 window.autoTranslateModal.translationState.errors.push(errorMsg);
                 window.autoTranslateModal.logProgress(errorMsg, 'error');
                 window.autoTranslateModal.updateProgress();
@@ -1494,7 +1494,7 @@
             if (indicator.needsDefinitionTranslation) translationTypes.push(' + {{ _("definition")|js|tojson|safe }} + ');
 
             const translationTypeText = translationTypes.join(' + ');
-            const errorMsg = `' + {{ _("Network error")|tojson|safe }} + ' ${indicator.id} → ${indicator.language} (${translationTypeText}): ${error.message}`;
+            const errorMsg = {{ _("Network error")|tojson|safe }} + ' ' + indicator.id + ' → ' + indicator.language + ' (' + translationTypeText + '): ' + error.message;
             window.autoTranslateModal.translationState.errors.push(errorMsg);
             window.autoTranslateModal.logProgress(errorMsg, 'error');
             window.autoTranslateModal.updateProgress();

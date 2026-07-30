@@ -308,16 +308,16 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         ),
 
         'notification.assignment_sent_for_review.title': _notification_msgid(
-            'Review requested: %(template)s'
+            'Review requested: %(template)s — %(country)s'
         ),
         'notification.assignment_sent_for_review.message': _notification_msgid(
-            'Period %(period)s: a National Society focal point sent this assignment for your review before submission.'
+            '%(submitter_name)s sent the %(template)s assignment for %(country)s (period %(period)s) for your review before submission.'
         ),
         'notification.assignment_sent_for_review.admin.title': _notification_msgid(
-            'Sent for review: %(template)s'
+            'Sent for review: %(template)s — %(country)s'
         ),
         'notification.assignment_sent_for_review.admin.message': _notification_msgid(
-            'Period %(period)s: a National Society focal point escalated this assignment for delegation review.'
+            '%(submitter_name)s escalated the %(template)s assignment for %(country)s (period %(period)s) for delegation review.'
         ),
 
         'notification.assignment_returned_for_revision.title': _notification_msgid(
@@ -2693,6 +2693,7 @@ def notify_assignment_sent_for_review(assignment_entity_status):
     entity_id = aes.entity_id
     assigned_form = aes.assigned_form
     from app.models.forms import FormTemplate
+    from app.services.organization.entity_service import EntityService
 
     template = FormTemplate.query.get(assigned_form.template_id) if assigned_form and assigned_form.template_id else None
     template_name = template.name if template else "Unknown Template"
@@ -2700,15 +2701,25 @@ def notify_assignment_sent_for_review(assignment_entity_status):
     if assigned_form and (assigned_form.period_name or "").startswith("[LOADTEST]"):
         return []
 
+    entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True)
+    if not entity_name or entity_name.startswith('Unknown'):
+        entity_name = entity_type.replace('_', ' ').title()
+
+    submitter_name = (
+        current_user.name
+        if (current_user and current_user.is_authenticated and current_user.name)
+        else "A National Society focal point"
+    )
+
     log_entity_activity(
         entity_type=entity_type,
         entity_id=entity_id,
         activity_type='assignment_sent_for_review',
         activity_description=(
-            f"Assignment '{template_name}' for period '{assigned_form.period_name}' was sent for review"
+            f"Assignment '{template_name}' for {entity_name} (period '{assigned_form.period_name}') was sent for review"
         ),
         summary_key='activity.assignment_sent_for_review',
-        summary_params={'template': template_name},
+        summary_params={'template': template_name, 'country': entity_name},
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
@@ -2729,11 +2740,17 @@ def notify_assignment_sent_for_review(assignment_entity_status):
             user_ids=org_focal_ids,
             notification_type=NotificationType.assignment_sent_for_review,
             title_key='notification.assignment_sent_for_review.title',
-            title_params={'template': template_name, 'period': assigned_form.period_name},
+            title_params={
+                'template': template_name,
+                'period': assigned_form.period_name,
+                'country': entity_name,
+            },
             message_key='notification.assignment_sent_for_review.message',
             message_params={
                 'template': template_name,
                 'period': assigned_form.period_name,
+                'country': entity_name,
+                'submitter_name': submitter_name,
                 '_entity_type': entity_type,
                 '_entity_id': entity_id,
             },
@@ -2760,11 +2777,17 @@ def notify_assignment_sent_for_review(assignment_entity_status):
             user_ids=admin_only,
             notification_type=NotificationType.assignment_sent_for_review,
             title_key='notification.assignment_sent_for_review.admin.title',
-            title_params={'template': template_name, 'period': assigned_form.period_name},
+            title_params={
+                'template': template_name,
+                'period': assigned_form.period_name,
+                'country': entity_name,
+            },
             message_key='notification.assignment_sent_for_review.admin.message',
             message_params={
                 'template': template_name,
                 'period': assigned_form.period_name,
+                'country': entity_name,
+                'submitter_name': submitter_name,
                 '_entity_type': entity_type,
                 '_entity_id': entity_id,
             },

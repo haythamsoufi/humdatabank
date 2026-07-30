@@ -1,5 +1,6 @@
 // AJAX Save Module - Handle form saving without page reload
 import { debugLog } from './debug.js';
+import { applyEntryFormProgress } from './entry-form-progress.js';
 
 const MODULE_NAME = 'ajax-save';
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
@@ -234,6 +235,7 @@ async function saveFormOnce(options = {}) {
             if (result.data) {
                 updateFormData(result.data);
             }
+            applyEntryFormProgress(result);
 
             const isPresave = options && options.presave === true;
             if (!isPresave) {

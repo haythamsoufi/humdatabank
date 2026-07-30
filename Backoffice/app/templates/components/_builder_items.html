@@ -23,6 +23,8 @@
 {% macro item_label_content(item_type, item_instance) %}
   {% if item_type == 'image' and not item_instance.label %}
     {{ _('Image') }}
+  {% elif item_type == 'discussion' and not item_instance.label %}
+    {{ _('Discussion') }}
   {% else %}
     {{ item_instance.label }}
   {% endif %}

@@ -298,6 +298,12 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
             if form_item_obj.config:
                 edit_form_instance.image_config.data = json.dumps(form_item_obj.config)
 
+        elif form_item_obj.is_discussion:
+            from app.forms.form_builder import DiscussionBlockForm
+            edit_form_instance = DiscussionBlockForm(obj=form_item_obj, prefix=f"edit_item_{form_item_obj.id}")
+            edit_form_instance.section_id.choices = [(s.id, s.name) for s in all_sections]
+            edit_form_instance.section_id.data = section_obj.id
+
         elif form_item_obj.is_plugin:
             # Plugin items don't need edit forms in the same way
             # They use the unified modal system
@@ -330,6 +336,10 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
             item_id = f'image_{form_item_obj.id}'
             item_label = f'Image: {form_item_obj.label or "Image"}'
             item_model = 'image'
+        elif form_item_obj.is_discussion:
+            item_id = f'discussion_{form_item_obj.id}'
+            item_label = f'Discussion: {form_item_obj.label or "Comments"}'
+            item_model = 'discussion'
         elif form_item_obj.is_plugin:
             plugin_type = form_item_obj.item_type.replace('plugin_', '')
             item_id = f'plugin_{form_item_obj.id}'
@@ -401,6 +411,8 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
             combined.append({'type': 'matrix', 'item': x['form_item'], 'form': x['form']})
         elif x['form_item'].item_type == 'image':
             combined.append({'type': 'image', 'item': x['form_item'], 'form': x['form']})
+        elif x['form_item'].item_type == 'discussion':
+            combined.append({'type': 'discussion', 'item': x['form_item'], 'form': x['form']})
 
     combined_sorted = sorted(combined, key=lambda y: getattr(y['item'], 'order', 0))
 

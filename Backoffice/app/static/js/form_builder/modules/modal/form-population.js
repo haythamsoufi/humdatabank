@@ -53,6 +53,9 @@ export const FormPopulationMixin = {
                 case 'image':
                     this.populateImageForm(itemData);
                     break;
+                case 'discussion':
+                    this.populateDiscussionForm(itemData);
+                    break;
             }
         }
     },
@@ -225,6 +228,31 @@ export const FormPopulationMixin = {
         this.ensureDisplayOnlyPropertyFields('image');
     },
 
+    populateDiscussionForm: function(itemData) {
+        const sharedLabelTranslations = document.querySelector(this.sharedFields.label_translations);
+        const sharedDescriptionTranslations = document.querySelector(this.sharedFields.description_translations);
+
+        const titleInput = this.modalElement.querySelector('#item-discussion-title');
+        const descInput = this.modalElement.querySelector('#item-discussion-description');
+        if (titleInput) titleInput.value = itemData.label || '';
+        if (descInput) descInput.value = itemData.description || '';
+        if (sharedLabelTranslations && itemData.label_translations) {
+            sharedLabelTranslations.value = JSON.stringify(itemData.label_translations);
+        }
+        if (sharedDescriptionTranslations && itemData.description_translations) {
+            sharedDescriptionTranslations.value = JSON.stringify(itemData.description_translations);
+        }
+
+        this.syncSharedToUI();
+        this.populateCommonFields(itemData);
+        populateDescriptionVisibility(this.modalElement, itemData);
+        const relevanceBuilderEl = this.modalElement.querySelector('#item-relevance-rule-builder');
+        if (relevanceBuilderEl) {
+            attachRuleData(relevanceBuilderEl, itemData.relevance_condition, 'relevance');
+        }
+        this.ensureDisplayOnlyPropertyFields('discussion');
+    },
+
     populatePluginBasicFields: function(itemData) {
         const labelInput = document.getElementById('item-plugin-label');
         const descriptionInput = document.getElementById('item-plugin-description');
@@ -307,6 +335,14 @@ export const FormPopulationMixin = {
                 : false;
             this._pendingLimitEntriesToOptionCount = limitVal;
             limitEntriesCheckbox.checked = limitVal;
+        }
+
+        const excludeCompletionCheckbox = this.modalElement.querySelector('#item-exclude-from-completion-rate');
+        if (excludeCompletionCheckbox && !isDisplayOnly) {
+            const excludeVal = (itemData && itemData.config && itemData.config.exclude_from_completion_rate !== undefined)
+                ? parseBool(itemData.config.exclude_from_completion_rate)
+                : false;
+            excludeCompletionCheckbox.checked = excludeVal;
         }
 
         // Restore max_other_entries (pending, resolved by ensureMaxOtherEntriesField after visibility settles)

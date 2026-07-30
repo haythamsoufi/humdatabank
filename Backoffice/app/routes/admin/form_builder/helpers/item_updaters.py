@@ -672,6 +672,48 @@ def _update_image_fields(image_item, form, request_form):
             image_item.description_translations = None
 
 
+def _update_discussion_fields(discussion_item, form, request_form):
+    """Update discussion block-specific fields."""
+    discussion_item.label = form.label.data or ''
+    discussion_item.description = form.description.data or ''
+
+    if discussion_item.config is None:
+        discussion_item.config = {}
+    discussion_item.config['is_required'] = False
+
+    if 'label_translations' in request_form and request_form['label_translations']:
+        try:
+            parsed_translations = json.loads(request_form['label_translations'])
+            supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+            filtered_translations = {}
+            if isinstance(parsed_translations, dict):
+                for k, v in parsed_translations.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and str(v).strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered_translations[code] = str(v).strip()
+            discussion_item.label_translations = filtered_translations if filtered_translations else None
+        except (json.JSONDecodeError, TypeError):
+            discussion_item.label_translations = None
+
+    if 'description_translations' in request_form and request_form['description_translations']:
+        try:
+            parsed_translations = json.loads(request_form['description_translations'])
+            supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+            filtered_translations = {}
+            if isinstance(parsed_translations, dict):
+                for k, v in parsed_translations.items():
+                    if not (isinstance(k, str) and isinstance(v, str) and str(v).strip()):
+                        continue
+                    code = k.strip().lower().split('_', 1)[0]
+                    if code in supported_codes:
+                        filtered_translations[code] = str(v).strip()
+            discussion_item.description_translations = filtered_translations if filtered_translations else None
+        except (json.JSONDecodeError, TypeError):
+            discussion_item.description_translations = None
+
+
 def _update_item_config(form_item, form, request_form):
     """Update common configuration fields for all item types"""
     if form_item.config is None:
@@ -734,6 +776,17 @@ def _update_item_config(form_item, form, request_form):
         except (json.JSONDecodeError, TypeError):
             use_as_repeat_entry_title = False
     form_item.config['use_as_repeat_entry_title'] = use_as_repeat_entry_title
+
+    exclude_from_completion_rate = False
+    if 'exclude_from_completion_rate' in request_form:
+        exclude_from_completion_rate = request_form.get('exclude_from_completion_rate') in ['true', 'on', '1']
+    elif request_form.get('config'):
+        try:
+            config_json = json.loads(request_form.get('config'))
+            exclude_from_completion_rate = bool(config_json.get('exclude_from_completion_rate', False))
+        except (json.JSONDecodeError, TypeError):
+            exclude_from_completion_rate = False
+    form_item.config['exclude_from_completion_rate'] = exclude_from_completion_rate
 
     # Allow "Other" free-text entry for choice questions
     allow_other = False

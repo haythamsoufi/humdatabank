@@ -277,12 +277,14 @@ Row key format: `{operation name} ({code})_Total People to be reached` — must 
 
 ---
 
-### 6.5 Comments → Template 24
+### 6.5 Comments → Template 24 (discussion panel)
 
 - Value from **`Value`** column (not `ValueNum`); falls back to `UPR Value`
 - `Area = Total` and `Attribute = Total` — exempted from aggregate filter alongside NS Data
-- All comment rows for a country/period are **concatenated** into a single textarea (item **956**), one per line
-- Excel indicator codes are humanised:
+- Each `Comments_*` row becomes a **discussion panel comment** on the assignment (requires `enable_discussion` on the template version to display in the entry form)
+- Comments are stored with `source = upr_excel_import` and **no author** — the UI shows **Imported from UPR Excel** with a **Historical import** badge (not “Unknown user”)
+- Re-import replaces prior UPR-import comments for the same assignment; user-posted comments are preserved
+- Excel indicator codes are humanised in the comment body (`Funding requirements: …`, etc.):
 
 | Excel indicator | Displayed label |
 |-----------------|----------------|

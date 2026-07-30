@@ -851,14 +851,19 @@ class FormDataService:
             return False
         if cls._check_for_field_clearing_signals(form_item_id):
             return False
-        if indicator is not None and field_prefix and FormItemProcessor._field_supports_disaggregation(indicator):
-            mode = FormItemProcessor._resolve_indicator_reporting_mode(
-                indicator, request.form, field_prefix
-            )
-            if FormItemProcessor._indicator_mode_has_submitted_values(
-                indicator, request.form, field_prefix, mode
-            ):
-                return False
+        # Questions and simple (non-disaggregated) indicators submit their primary input
+        # directly; an empty value means the user cleared the field.
+        if indicator is None:
+            return False
+        if not field_prefix or not FormItemProcessor._field_supports_disaggregation(indicator):
+            return False
+        mode = FormItemProcessor._resolve_indicator_reporting_mode(
+            indicator, request.form, field_prefix
+        )
+        if FormItemProcessor._indicator_mode_has_submitted_values(
+            indicator, request.form, field_prefix, mode
+        ):
+            return False
         return True
 
     @classmethod
@@ -867,7 +872,12 @@ class FormDataService:
         if not FormItemProcessor._field_supports_disaggregation(indicator):
             total_value_field = f'{field_prefix}_total_value'
             standard_value_field = f'{field_prefix}_standard_value'
-            return (total_value_field in request.form) or (standard_value_field in request.form)
+            field_value_field = f'field_value[{indicator.id}]'
+            return (
+                (total_value_field in request.form)
+                or (standard_value_field in request.form)
+                or (field_value_field in request.form)
+            )
 
         return FormItemProcessor._indicator_active_inputs_in_post(
             indicator, request.form, field_prefix
@@ -3660,6 +3670,12 @@ class FormDataService:
 
             # Persist all changes; middleware will commit when appropriate
             cls._commit_or_flush()
+
+            if hasattr(assignment_entity_status, 'id') and getattr(
+                assignment_entity_status, 'assigned_form_id', None
+            ):
+                from app.services.assignments.completion_service import AssignmentCompletionService
+                AssignmentCompletionService.refresh_and_persist(assignment_entity_status.id)
 
             return {
                 'success': True,

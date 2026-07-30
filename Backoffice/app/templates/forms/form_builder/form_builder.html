@@ -608,6 +608,20 @@
             updateDataQualityVisibility();
             dataQualityCheckbox.addEventListener('change', updateDataQualityVisibility);
         }
+
+        const discussionCheckbox = document.querySelector('input[name="enable_discussion"]');
+        const discussionFields = document.getElementById('discussion-config-fields');
+        if (discussionCheckbox && discussionFields) {
+            const updateDiscussionVisibility = () => {
+                if (discussionCheckbox.checked) {
+                    discussionFields.classList.remove('hidden');
+                } else {
+                    discussionFields.classList.add('hidden');
+                }
+            };
+            updateDiscussionVisibility();
+            discussionCheckbox.addEventListener('change', updateDiscussionVisibility);
+        }
     });
 </script>
 
@@ -826,6 +840,21 @@
     ],
     show_auto_translate=true,
     css_prefix='image',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
+{# Discussion Item Translation Modal #}
+{{ translation_modal(
+    modal_id='discussion-translation-modal',
+    modal_title=_('Discussion Item Translations'),
+    context='form_item',
+    tabs=[
+        {'id': 'labels', 'name': _('Titles')},
+        {'id': 'descriptions', 'name': _('Introductions')}
+    ],
+    show_auto_translate=true,
+    css_prefix='discussion',
     auto_translate_permission_context='templates',
     auto_translate_permission_code='admin.templates.edit'
 ) }}

@@ -1,8 +1,12 @@
-"""Unit tests for P&B progress orphan build recovery."""
+"""Unit tests for P&B progress orphan build recovery and workbook upload."""
 
 from __future__ import annotations
 
-from unittest.mock import patch
+import io
+from unittest.mock import MagicMock, patch
+
+import pytest
+from werkzeug.datastructures import FileStorage
 
 from plugins.pb_progress.service import PBProgressService
 from plugins.pb_progress.versions import DEFAULT_VERSION
@@ -24,6 +28,18 @@ def _reset_service_state() -> None:
             "output_names": [],
         }
     }
+
+
+def _dummy_workbook_bytes() -> bytes:
+    return b"PK dummy xlsx"
+
+
+def _file_storage(name: str = "SG Report.xlsx") -> FileStorage:
+    return FileStorage(
+        stream=io.BytesIO(_dummy_workbook_bytes()),
+        filename=name,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 class TestPBProgressOrphanRecovery:
@@ -60,3 +76,48 @@ class TestPBProgressOrphanRecovery:
         with patch.object(PBProgressService, "_persist_status"):
             PBProgressService._clear_orphaned_run(DEFAULT_VERSION)
         assert state["status"] == "running"
+
+
+class TestPBProgressWorkbookUpload:
+    def setup_method(self) -> None:
+        _reset_service_state()
+
+    def test_store_excel_archives_previous_workbook(self, app) -> None:
+        archived = {"id": "archive-1", "filename": "SG Report.xlsx"}
+        with app.app_context():
+            with patch.object(PBProgressService, "workbook_exists", return_value=True), patch.object(
+                PBProgressService, "_archive_current_workbook", return_value=archived
+            ) as archive_mock, patch(
+                "plugins.pb_progress.db_source.validate_uploaded_workbook",
+                return_value={"valid": True, "warnings": []},
+            ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch.object(
+                PBProgressService, "list_workbook_history", return_value=[archived]
+            ), patch(
+                "plugins.pb_progress.service.storage_service.upload"
+            ) as upload_mock, patch.object(PBProgressService, "_persist_status"):
+                result = PBProgressService.store_excel(
+                    DEFAULT_VERSION,
+                    _file_storage("Updated.xlsx"),
+                )
+        archive_mock.assert_called_once_with(DEFAULT_VERSION)
+        upload_mock.assert_called_once()
+        assert result["archived_workbook"] == archived
+
+    def test_store_excel_first_upload_skips_archive(self, app) -> None:
+        with app.app_context():
+            with patch.object(PBProgressService, "workbook_exists", return_value=False), patch.object(
+                PBProgressService, "_archive_current_workbook"
+            ) as archive_mock, patch(
+                "plugins.pb_progress.db_source.validate_uploaded_workbook",
+                return_value={"valid": True, "warnings": []},
+            ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch.object(
+                PBProgressService, "list_workbook_history", return_value=[]
+            ), patch(
+                "plugins.pb_progress.service.storage_service.upload"
+            ), patch.object(PBProgressService, "_persist_status"):
+                result = PBProgressService.store_excel(
+                    DEFAULT_VERSION,
+                    _file_storage(),
+                )
+        archive_mock.assert_not_called()
+        assert "archived_workbook" not in result

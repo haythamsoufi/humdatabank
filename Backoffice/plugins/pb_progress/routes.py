@@ -69,7 +69,10 @@ def upload_excel(version: str):
     if not file or not file.filename:
         return json_bad_request("No Excel file provided.")
     try:
-        upload_result = PBProgressService.store_excel(version_key, file)
+        upload_result = PBProgressService.store_excel(
+            version_key,
+            file,
+        )
         return json_ok(version=version_key, **upload_result)
     except ValueError as exc:
         return json_bad_request(str(exc))
@@ -86,7 +89,47 @@ def excel_info(version: str):
         version_key = validate_version(version)
     except ValueError as exc:
         return json_bad_request(str(exc))
-    return json_ok(excel=PBProgressService.get_excel_info(version_key), version=version_key)
+    return json_ok(
+        excel=PBProgressService.get_excel_info(version_key),
+        workbook_history=PBProgressService.list_workbook_history(version_key),
+        version=version_key,
+    )
+
+
+@bp.route("/pb-progress/<version>/workbook/download", methods=["GET"])
+@permission_required("admin.data_explore.pb_progress")
+@system_manager_required
+def download_workbook(version: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    try:
+        return PBProgressService.serve_workbook(version_key)
+    except NotFound:
+        raise
+    except Exception as exc:
+        logger.exception("P&B progress workbook download failed")
+        return json_server_error(str(exc))
+
+
+@bp.route("/pb-progress/<version>/workbook-history/<archive_id>/download", methods=["GET"])
+@permission_required("admin.data_explore.pb_progress")
+@system_manager_required
+def download_workbook_archive(version: str, archive_id: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    try:
+        return PBProgressService.serve_workbook_archive(version_key, archive_id)
+    except NotFound:
+        raise
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        logger.exception("P&B progress workbook archive download failed")
+        return json_server_error(str(exc))
 
 
 @bp.route("/pb-progress/<version>/generate", methods=["POST"])

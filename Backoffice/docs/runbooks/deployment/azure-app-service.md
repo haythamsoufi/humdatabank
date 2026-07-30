@@ -72,6 +72,9 @@ Set these in Azure Portal → App Service → Configuration → Application sett
 | `SCHEDULER_LOCK_FAIL_OPEN` | unset | Scheduler-lock filesystem errors **fail closed** (worker skips starting the scheduler) because duplicate schedulers have sent duplicate digest emails before. Set `true` only as a temporary escape hatch if lock-file I/O is broken and the scheduler must run |
 | `DB_STATEMENT_TIMEOUT_MS` | `120000` | Kills runaway DB queries (2 min) so pool connections aren't held indefinitely |
 | `DB_CONNECT_TIMEOUT` | `10` | Aborts stalled PostgreSQL TCP handshakes (e.g. private-endpoint cold start) |
+| `WEBSITES_CONTAINER_START_TIME_LIMIT` | `230` | Azure waits up to this many seconds for the container to pass the startup/warmup probe. Entrypoint (translations + migrations + tour JSON + Gunicorn) needs **~45s** before `/health` returns 200; without this setting prod saw `ContainerStartupFailure` ~7s after a health-check config change (2026-07-30). Use `230` (platform default ceiling) or higher if startup still races |
+| `WEBSITE_HEALTHCHECK_PATH` | `/health` | App Service health probe path (Monitoring → Health check). Lightweight route in `app/routes/public.py` — no DB check by default (`HEALTH_CHECK_DB=false`). Do **not** enable until `WEBSITES_CONTAINER_START_TIME_LIMIT` comfortably exceeds cold-start duration |
+| `WEBSITE_HEALTHCHECK_MAXPINGFAILURES` | `10` | Consecutive probe failures before Azure replaces the instance |
 | `REDIS_URL` | `rediss://<host>:6380/0` | Cross-worker coordination (not sessions). **SKU:** [Azure Managed Redis Balanced B0 — West Europe](redis-provisioning.md). |
 
 > **Redis SKU:** [Redis provisioning](redis-provisioning.md) — **Azure Managed Redis Balanced B0** (~CHF 11/mo staging single-node, ~CHF 22/mo prod two-node HA in West Europe).
@@ -91,7 +94,7 @@ If traffic passes through Application Gateway or Front Door before reaching App 
 
 The P&B Progress tab generates multilingual HTML, PDF, Word, and figure packages via a background build (Quarto + Playwright). **No extra App Service settings are required** — defaults are baked into [`entrypoint.sh`](../../../entrypoint.sh) and [`plugins/pb_progress/service.py`](../../../plugins/pb_progress/service.py):
 
-- On Linux container start, `entrypoint.sh` installs Quarto 1.6.42 and Playwright Chromium under `/home/site/playwright-browsers` when missing.
+- On Linux container start, `entrypoint.sh` ensures Playwright Chromium under `/home/site/playwright-browsers` and Quarto 1.6.42 under `/home/site/quarto` when missing (both persist on the worker volume across container recycles).
 - On Azure (`azure_blob` storage), the build uses `PB_BUILD_WORKERS=1` (sequential per-language Chromium) and runs Word before PDF to stay within App Service memory limits. Local dev uses `PB_BUILD_WORKERS=2` with parallel Word/PDF when appropriate.
 - Build subprocess uses report year `2026` and blob-persisted outputs under `pb_progress/`.
 

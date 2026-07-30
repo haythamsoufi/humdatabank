@@ -27,6 +27,8 @@ STORAGE_CATEGORY = "pb_progress"
 STATUS_NAME = "status.json"
 EXCEL_NAME = "source/SG_Report.xlsx"
 SYSTEM_GENERATED_NAME = "source/system_generated.xlsx"
+WORKBOOK_ARCHIVE_DIR = "source/archive"
+MAX_WORKBOOK_HISTORY = 20
 
 
 def _default_version_bucket() -> dict[str, Any]:
@@ -47,6 +49,7 @@ def _default_version_bucket() -> dict[str, Any]:
         "translations_config": [],
         "section_order_config": [],
         "selected_years": [],
+        "workbook_history": [],
     }
 
 
@@ -96,6 +99,7 @@ class PBProgressDataStore:
         bucket.setdefault("translations_config", [])
         bucket.setdefault("section_order_config", [])
         bucket.setdefault("selected_years", [])
+        bucket.setdefault("workbook_history", [])
         return bucket
 
     @classmethod
@@ -172,6 +176,17 @@ class PBProgressDataStore:
     def save_selected_years(cls, version: str, years: list[str]) -> bool:
         bucket = cls.get_version_bucket(version)
         bucket["selected_years"] = [str(year).strip() for year in years if str(year).strip()]
+        return cls.save_version_bucket(version, bucket)
+
+    @classmethod
+    def get_workbook_history(cls, version: str) -> list[dict[str, Any]]:
+        rows = cls.get_version_bucket(version).get("workbook_history") or []
+        return copy.deepcopy(rows) if isinstance(rows, list) else []
+
+    @classmethod
+    def save_workbook_history(cls, version: str, rows: list[dict[str, Any]]) -> bool:
+        bucket = cls.get_version_bucket(version)
+        bucket["workbook_history"] = copy.deepcopy(rows)
         return cls.save_version_bucket(version, bucket)
 
     @classmethod

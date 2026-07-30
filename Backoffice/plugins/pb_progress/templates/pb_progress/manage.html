@@ -105,10 +105,14 @@
                         <button type="button" id="pb-progress-upload-btn" class="btn btn-secondary btn-sm">
                             <i class="fas fa-upload mr-1.5"></i>{{ _('Upload workbook') }}
                         </button>
-                        <label id="pb-progress-replace-existing-wrap" class="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                            <input id="pb-progress-replace-existing" type="checkbox" class="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500" checked>
-                            <span>{{ _('Replace existing') }}</span>
-                        </label>
+                        <a id="pb-progress-download-workbook-link" class="btn btn-secondary btn-sm hidden" href="#" target="_blank" rel="noopener noreferrer">
+                            <i class="fas fa-download mr-1.5"></i>{{ _('Download current') }}
+                        </a>
+                    </div>
+                    <div id="pb-progress-workbook-history-wrap" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs space-y-2">
+                        <div class="font-medium text-gray-700">{{ _('Previous workbooks') }}</div>
+                        <p class="text-gray-500">{{ _('Each new upload moves the current workbook here before activating the new file.') }}</p>
+                        <ul id="pb-progress-workbook-history-list" class="space-y-1"></ul>
                     </div>
                 </div>
 
@@ -244,10 +248,13 @@ window.PBProgressConfig = {
         reportGeneratedSuccessfully: {{ _('Report generated successfully.')|tojson }},
         requestFailed: {{ _('Request failed.')|tojson }},
         lostConnection: {{ _('Lost connection to the server while generating. Wait for the server to come back, then refresh this page.')|tojson }},
-        enableReplaceWorkbook: {{ _('Enable replace existing workbook or upload the first source file.')|tojson }},
+        workbookArchived: {{ _('Previous workbook archived.')|tojson }},
+        previousWorkbooks: {{ _('Previous workbooks')|tojson }},
+        downloadCurrentWorkbook: {{ _('Download current')|tojson }},
+        noWorkbookHistory: {{ _('No archived workbooks yet.')|tojson }},
         uploading: {{ _('Uploading...')|tojson }},
         excelUploadedSuccessfully: {{ _('Excel uploaded successfully.')|tojson }},
-        excelUploadedWithWarnings: {{ _('Excel uploaded with warnings: %(warnings)s')|tojson }},
+        excelUploadedWithWarnings: {{ _('Excel uploaded with warnings:')|tojson }},
         dataSourceUpdated: {{ _('Data source updated.')|tojson }},
         mappingSaved: {{ _('Mapping saved.')|tojson }},
         translationsSaved: {{ _('Translations saved.')|tojson }},

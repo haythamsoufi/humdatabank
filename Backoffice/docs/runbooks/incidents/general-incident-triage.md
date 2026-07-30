@@ -133,6 +133,8 @@ See also the dedicated report [Gateway 504 / worker saturation](gateway-504-work
 
 In Azure Portal → App Service → Monitoring → **Health check**: set path to `/health`. Azure will automatically restart unhealthy instances and stop routing to them — dramatically reducing how long a 502 window lasts.
 
+Also set **`WEBSITES_CONTAINER_START_TIME_LIMIT=230`** (Configuration → Application settings). Cold start runs translations, migrations, tour JSON, and Gunicorn before `/health` responds (~45s observed in prod); enabling the health probe without this limit caused `ContainerStartupFailure` during a config change restart (2026-07-30).
+
 ---
 
 ### Scenario A: All users cannot log in

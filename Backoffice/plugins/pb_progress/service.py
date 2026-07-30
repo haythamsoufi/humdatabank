@@ -22,8 +22,10 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import NotFound
 
 from plugins.pb_progress.plugin_data_store import (
+    MAX_WORKBOOK_HISTORY,
     PBProgressDataStore,
     SYSTEM_GENERATED_NAME,
+    WORKBOOK_ARCHIVE_DIR,
 )
 from plugins.pb_progress.versions import (
     DEFAULT_VERSION,
@@ -676,25 +678,115 @@ class PBProgressService:
         return outputs
 
     @classmethod
+    def _workbook_archive_rel(cls, version: str, archive_id: str) -> str:
+        safe_id = cls._sanitize_archive_id(archive_id)
+        return cls._version_rel(version, f"{WORKBOOK_ARCHIVE_DIR}/{safe_id}.xlsx")
+
+    @classmethod
+    def _sanitize_archive_id(cls, archive_id: str) -> str:
+        safe = re.sub(r"[^a-zA-Z0-9_-]+", "", (archive_id or "").strip())
+        if not safe:
+            raise ValueError("Invalid archive id.")
+        return safe
+
+    @classmethod
+    def workbook_exists(cls, version: str) -> bool:
+        version = validate_version(version)
+        return storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version))
+
+    @classmethod
+    def _make_archive_id(cls) -> str:
+        stamp = cls._now_iso().replace(":", "").replace("-", "")
+        return f"{stamp}_{uuid.uuid4().hex[:8]}"
+
+    @classmethod
+    def _append_workbook_history(cls, version: str, entry: dict[str, Any]) -> None:
+        history = PBProgressDataStore.get_workbook_history(version)
+        history.insert(0, entry)
+        while len(history) > MAX_WORKBOOK_HISTORY:
+            removed = history.pop()
+            archive_id = removed.get("id")
+            if archive_id:
+                rel = cls._workbook_archive_rel(version, str(archive_id))
+                if storage_service.exists(STORAGE_CATEGORY, rel):
+                    try:
+                        storage_service.delete(STORAGE_CATEGORY, rel)
+                    except Exception:
+                        logger.warning("Failed to delete old P&B workbook archive %s", rel)
+        PBProgressDataStore.save_workbook_history(version, history)
+
+    @classmethod
+    def _archive_current_workbook(cls, version: str) -> dict[str, Any] | None:
+        if not cls.workbook_exists(version):
+            return None
+
+        archive_id = cls._make_archive_id()
+        current_rel = cls._excel_rel(version)
+        archive_rel = cls._workbook_archive_rel(version, archive_id)
+        blob = storage_service.download(STORAGE_CATEGORY, current_rel)
+        storage_service.upload(STORAGE_CATEGORY, archive_rel, blob)
+
+        excel_meta = cls.get_excel_info(version) or {}
+        archived_at = cls._now_iso()
+        entry = {
+            "id": archive_id,
+            "filename": excel_meta.get("filename") or "SG Report.xlsx",
+            "size_bytes": excel_meta.get("size_bytes") or len(blob),
+            "size_label": excel_meta.get("size_label") or cls._format_size(len(blob)),
+            "archived_at": archived_at,
+        }
+        cls._append_workbook_history(version, entry)
+        return entry
+
+    @classmethod
+    def list_workbook_history(cls, version: str) -> list[dict[str, Any]]:
+        version = validate_version(version)
+        entries: list[dict[str, Any]] = []
+        for row in PBProgressDataStore.get_workbook_history(version):
+            archive_id = row.get("id")
+            if not archive_id:
+                continue
+            rel = cls._workbook_archive_rel(version, str(archive_id))
+            if not storage_service.exists(STORAGE_CATEGORY, rel):
+                continue
+            item = dict(row)
+            item["download_url"] = url_for(
+                "pb_progress.download_workbook_archive",
+                version=version,
+                archive_id=str(archive_id),
+            )
+            entries.append(item)
+        if len(entries) != len(PBProgressDataStore.get_workbook_history(version)):
+            PBProgressDataStore.save_workbook_history(version, entries)
+        return entries
+
+    @classmethod
     def get_excel_info(cls, version: str) -> dict[str, Any] | None:
         version = validate_version(version)
         cls._ensure_status_loaded(version)
         state = cls._state_for(version)
         excel_meta = state.get("excel")
         if excel_meta:
-            return excel_meta
-        if not storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version)):
+            info = dict(excel_meta)
+        elif not storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version)):
             return None
-        size = storage_service.get_size(STORAGE_CATEGORY, cls._excel_rel(version))
-        return {
-            "filename": "SG Report.xlsx",
-            "size_bytes": size,
-            "size_label": cls._format_size(size) if size >= 0 else "",
-            "uploaded_at": None,
-        }
+        else:
+            size = storage_service.get_size(STORAGE_CATEGORY, cls._excel_rel(version))
+            info = {
+                "filename": "SG Report.xlsx",
+                "size_bytes": size,
+                "size_label": cls._format_size(size) if size >= 0 else "",
+                "uploaded_at": None,
+            }
+        info["download_url"] = url_for("pb_progress.download_workbook", version=version)
+        return info
 
     @classmethod
-    def store_excel(cls, version: str, file_storage: FileStorage) -> dict[str, Any]:
+    def store_excel(
+        cls,
+        version: str,
+        file_storage: FileStorage,
+    ) -> dict[str, Any]:
         version = validate_version(version)
         filename = (file_storage.filename or "").strip()
         if not filename.lower().endswith(".xlsx"):
@@ -710,10 +802,12 @@ class PBProgressService:
             raise ValueError("Uploaded file exceeds the maximum allowed size.")
 
         temp_path: str | None = None
+        file_bytes: bytes | None = None
         try:
             with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
                 file_storage.stream.seek(0)
-                tmp.write(file_storage.read())
+                file_bytes = file_storage.read()
+                tmp.write(file_bytes)
                 temp_path = tmp.name
 
             from plugins.pb_progress.db_source import WorkbookValidationError, validate_uploaded_workbook
@@ -728,8 +822,11 @@ class PBProgressService:
                 except OSError:
                     pass
 
-        file_storage.stream.seek(0)
-        storage_service.upload(STORAGE_CATEGORY, cls._excel_rel(version), file_storage)
+        archived_workbook = None
+        if cls.workbook_exists(version):
+            archived_workbook = cls._archive_current_workbook(version)
+
+        storage_service.upload(STORAGE_CATEGORY, cls._excel_rel(version), file_bytes or b"")
 
         uploaded_at = cls._now_iso()
         excel_info = {
@@ -748,6 +845,9 @@ class PBProgressService:
         cls._persist_status(version)
         result = cls._import_system_config_after_excel_upload(version, excel_info)
         result["validation"] = validation
+        if archived_workbook:
+            result["archived_workbook"] = archived_workbook
+        result["workbook_history"] = cls.list_workbook_history(version)
         return result
 
     @classmethod
@@ -791,6 +891,8 @@ class PBProgressService:
             cls._version_rel(version, SYSTEM_GENERATED_NAME),
         )
         status["excel"] = cls.get_excel_info(version)
+        if status.get("data_source") == "excel":
+            status["workbook_history"] = cls.list_workbook_history(version)
         if status.get("data_source") == "system":
             status["mapping_ready"] = bool(PBProgressDataStore.get_mapping_config(version))
         if status.get("status") == "done":
@@ -1182,6 +1284,34 @@ class PBProgressService:
             raise NotFound()
         path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
         return send_file(path, as_attachment=True, download_name="system_generated.xlsx")
+
+    @classmethod
+    def serve_workbook(cls, version: str):
+        from flask import send_file
+
+        version = validate_version(version)
+        rel = cls._excel_rel(version)
+        if not storage_service.exists(STORAGE_CATEGORY, rel):
+            raise NotFound()
+        info = cls.get_excel_info(version) or {}
+        download_name = info.get("filename") or "SG_Report.xlsx"
+        path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
+        return send_file(path, as_attachment=True, download_name=download_name)
+
+    @classmethod
+    def serve_workbook_archive(cls, version: str, archive_id: str):
+        from flask import send_file
+
+        version = validate_version(version)
+        safe_id = cls._sanitize_archive_id(archive_id)
+        rel = cls._workbook_archive_rel(version, safe_id)
+        if not storage_service.exists(STORAGE_CATEGORY, rel):
+            raise NotFound()
+        history = PBProgressDataStore.get_workbook_history(version)
+        entry = next((row for row in history if row.get("id") == safe_id), None)
+        download_name = (entry or {}).get("filename") or f"SG_Report_{safe_id}.xlsx"
+        path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
+        return send_file(path, as_attachment=True, download_name=download_name)
 
     @classmethod
     def serve_output(cls, version: str, filename: str):

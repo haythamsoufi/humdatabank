@@ -46,7 +46,9 @@
         badgeText: document.getElementById('pb-progress-excel-badge-text'),
         noExcelNotice: document.getElementById('pb-progress-no-excel-notice'),
         fileInput: document.getElementById('pb-progress-file-input'),
-        replaceExisting: document.getElementById('pb-progress-replace-existing'),
+        downloadWorkbookLink: document.getElementById('pb-progress-download-workbook-link'),
+        workbookHistoryWrap: document.getElementById('pb-progress-workbook-history-wrap'),
+        workbookHistoryList: document.getElementById('pb-progress-workbook-history-list'),
         uploadBtn: document.getElementById('pb-progress-upload-btn'),
         generateBtn: document.getElementById('pb-progress-generate-btn'),
         languageSelect: document.getElementById('pb-progress-language'),
@@ -269,9 +271,11 @@
 
     function renderExcelFileState(excel) {
         if (!isExcelMode()) return;
+        const hasWorkbook = !!excel;
         if (!excel) {
             if (els.badge) els.badge.classList.add('hidden');
             if (els.noExcelNotice) els.noExcelNotice.classList.remove('hidden');
+            if (els.downloadWorkbookLink) els.downloadWorkbookLink.classList.add('hidden');
             return;
         }
         const parts = [excel.filename || 'SG Report.xlsx'];
@@ -280,6 +284,44 @@
         if (els.badgeText) els.badgeText.textContent = parts.join(' · ');
         if (els.badge) els.badge.classList.remove('hidden');
         if (els.noExcelNotice) els.noExcelNotice.classList.add('hidden');
+        if (els.downloadWorkbookLink) {
+            if (excel.download_url) {
+                els.downloadWorkbookLink.href = excel.download_url;
+                els.downloadWorkbookLink.classList.remove('hidden');
+            } else {
+                els.downloadWorkbookLink.classList.add('hidden');
+            }
+        }
+    }
+
+    function renderWorkbookHistory(entries) {
+        if (!els.workbookHistoryWrap || !els.workbookHistoryList) return;
+        const rows = Array.isArray(entries) ? entries : [];
+        els.workbookHistoryList.innerHTML = '';
+        if (!rows.length) {
+            els.workbookHistoryWrap.classList.add('hidden');
+            return;
+        }
+        els.workbookHistoryWrap.classList.remove('hidden');
+        rows.forEach(function(entry) {
+            const li = document.createElement('li');
+            li.className = 'flex flex-wrap items-center gap-x-2 gap-y-1';
+            const link = document.createElement('a');
+            link.href = entry.download_url || '#';
+            link.className = 'text-blue-700 hover:underline';
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.textContent = entry.filename || 'SG Report.xlsx';
+            li.appendChild(link);
+            const meta = document.createElement('span');
+            meta.className = 'text-gray-500';
+            const metaParts = [];
+            if (entry.size_label) metaParts.push(entry.size_label);
+            if (entry.archived_at) metaParts.push(formatUploadedAt(entry.archived_at));
+            meta.textContent = metaParts.join(' · ');
+            li.appendChild(meta);
+            els.workbookHistoryList.appendChild(li);
+        });
     }
 
     function applyDataSourceMode(status, syncFromStatus) {
@@ -560,9 +602,8 @@
         const validation = payload.validation || {};
         const warnings = validation.warnings || [];
         if (!warnings.length) return base;
-        const warningText = warnings.join(' ');
-        const template = (cfg.i18n && cfg.i18n.excelUploadedWithWarnings) || 'Excel uploaded with warnings: %(warnings)s';
-        return template.replace('%(warnings)s', warningText);
+        const prefix = (cfg.i18n && cfg.i18n.excelUploadedWithWarnings) || 'Excel uploaded with warnings:';
+        return prefix + ' ' + warnings.join(' ');
     }
 
     function uploadResultFlashLevel(payload) {
@@ -659,6 +700,7 @@
         updateReferenceWorkbookActions(cachedStatus);
         if (isExcelMode()) {
             renderExcelFileState(excel || cachedStatus.excel || null);
+            renderWorkbookHistory(cachedStatus.workbook_history || []);
         }
     }
 
@@ -760,7 +802,13 @@
 
     async function loadExcelInfo() {
         const payload = await fetchJson(apiUrl('/excel-info'));
-        updateAdminUi(payload.excel || null, currentUi().statusCache || {});
+        const cachedStatus = Object.assign({}, currentUi().statusCache || {}, {
+            excel: payload.excel || null,
+            workbook_history: payload.workbook_history || [],
+        });
+        versionUi[activeVersion].statusCache = cachedStatus;
+        updateAdminUi(payload.excel || null, cachedStatus);
+        renderWorkbookHistory(payload.workbook_history || []);
         return payload.excel || null;
     }
 
@@ -842,11 +890,6 @@
 
     async function uploadExcelFile(file) {
         if (!file || uploadInProgress || !isExcelMode()) return;
-        const ui = currentUi();
-        if (!ui.hasExcel && els.replaceExisting && !els.replaceExisting.checked) {
-            showFlash((cfg.i18n && cfg.i18n.enableReplaceWorkbook) || 'Enable replace existing workbook or upload the first source file.', 'danger');
-            return;
-        }
         const formData = new FormData();
         formData.append('excel', file);
         setUploadBusy(true);
@@ -857,11 +900,18 @@
             });
             const cachedStatus = Object.assign({}, currentUi().statusCache || {}, {
                 excel: payload.excel || null,
+                workbook_history: payload.workbook_history || [],
             });
             versionUi[activeVersion].statusCache = cachedStatus;
             updateAdminUi(payload.excel || null, cachedStatus);
+            renderWorkbookHistory(payload.workbook_history || []);
             await applyImportedConfigPayload(payload);
-            showFlash(configImportSuccessMessage(payload), uploadResultFlashLevel(payload));
+            let message = configImportSuccessMessage(payload);
+            if (payload.archived_workbook) {
+                const archivedNote = (cfg.i18n && cfg.i18n.workbookArchived) || 'Previous workbook archived.';
+                message = message + ' ' + archivedNote;
+            }
+            showFlash(message, uploadResultFlashLevel(payload));
             if (els.fileInput) els.fileInput.value = '';
         } catch (error) {
             showFlash(error.message, 'danger');

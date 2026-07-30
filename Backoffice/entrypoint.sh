@@ -338,16 +338,38 @@ if [ "$(uname -s)" = "Linux" ]; then
     echo "✓ Playwright Chromium already available"
   fi
 
-  if ! command -v quarto >/dev/null 2>&1; then
-    _qver="1.6.42"
-    echo "P&B: installing Quarto ${_qver}..."
-    curl -fsSL "https://github.com/quarto-dev/quarto-cli/releases/download/v${_qver}/quarto-${_qver}-linux-amd64.deb" \
-        -o /tmp/quarto.deb \
-      && dpkg -i /tmp/quarto.deb && rm -f /tmp/quarto.deb \
-      && echo "✓ Quarto $(quarto --version)" \
-      || echo "WARN: Quarto install failed"
+  # Persist Quarto under /home/site (survives container recycle on the same worker,
+  # like Playwright browsers). dpkg -i into the image layer re-runs on every cold start
+  # and adds ~30s before Gunicorn can answer /health.
+  _qver="1.6.42"
+  _quarto_home="/home/site/quarto"
+  _quarto_bin="${_quarto_home}/bin/quarto"
+  _qmarker="${_quarto_home}/.installed-version"
+  mkdir -p "$_quarto_home"
+  if [ ! -x "$_quarto_bin" ] || [ "$(cat "$_qmarker" 2>/dev/null)" != "$_qver" ]; then
+    echo "P&B: installing Quarto ${_qver} to ${_quarto_home}..."
+    _qtmp="$(mktemp -d)"
+    if curl -fsSL "https://github.com/quarto-dev/quarto-cli/releases/download/v${_qver}/quarto-${_qver}-linux-amd64.deb" \
+        -o "${_qtmp}/quarto.deb" \
+      && dpkg-deb -x "${_qtmp}/quarto.deb" "${_qtmp}/extract"; then
+      rm -rf "${_quarto_home:?}/"*
+      if [ -d "${_qtmp}/extract/opt/quarto" ]; then
+        cp -a "${_qtmp}/extract/opt/quarto/." "${_quarto_home}/"
+      else
+        cp -a "${_qtmp}/extract/." "${_quarto_home}/"
+      fi
+      echo "$_qver" > "$_qmarker"
+      echo "✓ Quarto $("${_quarto_bin}" --version)"
+    else
+      echo "WARN: Quarto install failed"
+    fi
+    rm -rf "$_qtmp"
   else
-    echo "✓ Quarto already available"
+    echo "✓ Quarto already available ($("${_quarto_bin}" --version))"
+  fi
+  if [ -x "$_quarto_bin" ]; then
+    export PATH="${_quarto_home}/bin:${PATH}"
+    export PB_QUARTO_EXE="$_quarto_bin"
   fi
 fi
 

@@ -626,16 +626,17 @@ class PBProgressService:
         """Fail fast on Azure when WeasyPrint or CairoSVG cannot run."""
         visuals_tool_dir, _, _ = _visuals_paths()
         scripts_dir = visuals_tool_dir / "scripts"
+        # Must be a single-line -c script: ``with`` blocks are invalid after ``;``.
         code = (
+            "import io, tempfile; "
+            "from pathlib import Path; "
             "from weasyprint import HTML; "
             "from pb_figures.donut_chart import render_donut_svg; "
             "from pb_figures.svg_raster import write_svg_png; "
-            "from pathlib import Path; "
-            "import tempfile; "
             "svg = render_donut_svg({'value': 1, 'target': 2, 'value_label': '1'}); "
-            "with tempfile.TemporaryDirectory() as tmp: "
-            "  write_svg_png(svg, Path(tmp) / 't.png', width=64, height=64); "
-            "  HTML(string='<html><body>ok</body></html>').write_pdf(Path(tmp) / 't.pdf')"
+            "tmp = Path(tempfile.mkdtemp()); "
+            "write_svg_png(svg, tmp / 't.png', width=64, height=64); "
+            "HTML(string='<html><body>ok</body></html>').write_pdf(tmp / 't.pdf')"
         )
         env = os.environ.copy()
         env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -668,12 +669,21 @@ class PBProgressService:
             return "WeasyPrint is not installed."
         if "no module named 'cairosvg'" in lowered:
             return "cairosvg is not installed."
+        for prefix in ("SyntaxError:", "ImportError:", "ModuleNotFoundError:", "OSError:"):
+            for line in text.splitlines():
+                cleaned = line.strip()
+                if cleaned.startswith(prefix):
+                    return cls._sanitize_build_line(cleaned) or cleaned
         for line in text.splitlines():
             cleaned = line.strip()
             if not cleaned:
                 continue
+            if cleaned.startswith('File "<string>"'):
+                continue
+            if cleaned.startswith("^"):
+                continue
             sanitized = cls._sanitize_build_line(cleaned)
-            if sanitized:
+            if sanitized and sanitized not in {"line 1", "line 1."}:
                 return sanitized
         return cls._sanitize_build_line(text.splitlines()[-1]) or "unknown error"
 

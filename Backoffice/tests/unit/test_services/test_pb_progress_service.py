@@ -133,3 +133,13 @@ class TestPBProgressRenderStack:
         stderr = "ModuleNotFoundError: No module named 'weasyprint'"
         detail = PBProgressService._render_stack_error_detail("", stderr)
         assert "weasyprint" in detail.lower()
+
+    def test_render_stack_error_detail_prefers_syntax_error_over_file_line(self) -> None:
+        stderr = (
+            'File "<string>", line 1\n'
+            "    with tempfile.TemporaryDirectory() as tmp: pass\n"
+            "    ^^^^\n"
+            "SyntaxError: invalid syntax\n"
+        )
+        detail = PBProgressService._render_stack_error_detail("", stderr)
+        assert "invalid syntax" in detail.lower()

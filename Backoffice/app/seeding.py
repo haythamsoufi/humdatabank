@@ -7,8 +7,48 @@ from sqlalchemy import inspect
 
 from app.extensions import db
 
-# Full admin preset for the dev test admin (includes assignment management).
+# Granular admin roles that match the "Full (All admin roles)" UI preset.
+# Assigning these (not just the admin_full bundle role) keeps the user edit form
+# in sync with what the account can actually do.
+_DEV_TEST_ADMIN_ROLE_CODES = (
+    "admin_core",
+    "admin_docs_viewer",
+    "admin_users_manager",
+    "admin_templates_manager",
+    "admin_assignments_manager",
+    "admin_countries_manager",
+    "admin_indicator_bank_manager",
+    "admin_content_manager",
+    "admin_documents_manager",
+    "admin_communication_manager",
+    "admin_translations_manager",
+    "admin_analytics_viewer",
+    "admin_audit_viewer",
+    "admin_security_responder",
+    "admin_ai_manager",
+    "admin_governance_viewer",
+    "admin_data_explorer_data_table",
+    "admin_data_explorer_analysis",
+    "admin_data_explorer_compliance",
+    "admin_validation_dashboard",
+    "admin_validation_questions",
+    "admin_validation_rules",
+    "admin_api_manager",
+)
+
+# Backward-compatible alias used by create_admin CLI.
 _DEV_TEST_ADMIN_ROLE_CODE = "admin_full"
+
+
+def _baseline_role_defs_by_code():
+    from app.services.organization.rbac_seed_service import _baseline_roles, _permission_catalog
+
+    catalog = _permission_catalog()
+    return {
+        str(role_def["code"]): role_def
+        for role_def in _baseline_roles(catalog)
+        if role_def.get("code")
+    }
 
 
 def _ensure_rbac_seeded(app_instance) -> None:
@@ -22,13 +62,18 @@ def _ensure_rbac_seeded(app_instance) -> None:
         app_instance.logger.debug("RBAC seed skipped during default data: %s", e)
 
 
-def _assign_role_to_user(user_id: int, role_code: str, *, name: str, description: str) -> bool:
+def _assign_role_to_user(user_id: int, role_code: str, *, name: str | None = None, description: str | None = None) -> bool:
     """Assign an RBAC role if missing. Returns True when a new link was added."""
     from app.models.rbac import RbacRole, RbacUserRole
 
     role = RbacRole.query.filter_by(code=role_code).first()
     if not role:
-        role = RbacRole(code=role_code, name=name, description=description)
+        role_def = _baseline_role_defs_by_code().get(role_code, {})
+        role = RbacRole(
+            code=role_code,
+            name=name or role_def.get("name") or role_code,
+            description=description if description is not None else role_def.get("description"),
+        )
         db.session.add(role)
         db.session.flush()
 
@@ -40,20 +85,53 @@ def _assign_role_to_user(user_id: int, role_code: str, *, name: str, description
     return True
 
 
-def _ensure_dev_test_admin_roles(user, app_instance) -> None:
-    """Ensure the dev test admin has full admin permissions (not view-only core)."""
+def _assign_roles_to_user(user_id: int, role_codes) -> int:
+    """Assign multiple RBAC roles. Returns count of newly added links."""
+    added = 0
+    for role_code in role_codes:
+        if _assign_role_to_user(int(user_id), str(role_code)):
+            added += 1
+    return added
+
+
+def _ensure_user_country_entity_permission(user, country_id: int | None, app_instance) -> None:
+    """Grant Testland via UserEntityPermission (User.countries is view-only)."""
+    from app.models.core import UserEntityPermission
+
+    if not user or not country_id:
+        return
+
+    user_id = int(user.id)
+    country_id = int(country_id)
+    existing = UserEntityPermission.query.filter_by(
+        user_id=user_id,
+        entity_type="country",
+        entity_id=country_id,
+    ).first()
+    if existing:
+        return
+
     try:
-        added = _assign_role_to_user(
-            int(user.id),
-            _DEV_TEST_ADMIN_ROLE_CODE,
-            name="Admin: Full (All admin roles)",
-            description="Full access to all admin modules (non-system-manager).",
+        user.add_entity_permission(entity_type="country", entity_id=country_id)
+        db.session.commit()
+        app_instance.logger.info(
+            "Granted Testland entity permission to '%s'",
+            user.email,
         )
+    except Exception as e:
+        db.session.rollback()
+        app_instance.logger.debug("Entity permission assignment failed for '%s': %s", user.email, e)
+
+
+def _ensure_dev_test_admin_roles(user, app_instance) -> None:
+    """Ensure the dev test admin has full admin permissions and matching UI roles."""
+    try:
+        added = _assign_roles_to_user(int(user.id), _DEV_TEST_ADMIN_ROLE_CODES)
         if added:
             db.session.commit()
             app_instance.logger.info(
-                "Granted %s role to test admin '%s'",
-                _DEV_TEST_ADMIN_ROLE_CODE,
+                "Granted %d dev admin role(s) to test admin '%s'",
+                added,
                 user.email,
             )
     except Exception as e:
@@ -162,6 +240,8 @@ def create_default_data(app_instance):
                     db.session.commit()
                     app_instance.logger.info("Created default National Society for Testland")
 
+            test_country_id = int(test_country.id) if test_country else None
+
             _ensure_rbac_seeded(app_instance)
 
             from app.utils.organization_helpers import get_org_email_domain
@@ -176,17 +256,13 @@ def create_default_data(app_instance):
                     admin_password = os.environ.get('TEST_ADMIN_PASSWORD') or secrets.token_urlsafe(16)
                     admin = User(email=test_admin_email, name="Test Admin User")
                     admin.set_password(admin_password)
-                    admin.countries.append(test_country)
                     db.session.add(admin)
                     db.session.flush()
 
                     try:
-                        _assign_role_to_user(
-                            int(admin.id),
-                            _DEV_TEST_ADMIN_ROLE_CODE,
-                            name="Admin: Full (All admin roles)",
-                            description="Full access to all admin modules (non-system-manager).",
-                        )
+                        _assign_roles_to_user(int(admin.id), _DEV_TEST_ADMIN_ROLE_CODES)
+                        if test_country_id:
+                            admin.add_entity_permission(entity_type="country", entity_id=test_country_id)
                     except Exception as e:
                         app_instance.logger.debug("RBAC admin role assignment failed: %s", e)
 
@@ -209,6 +285,7 @@ def create_default_data(app_instance):
             else:
                 app_instance.logger.info("Default admin user '%s' already exists.", test_admin_email)
                 _ensure_dev_test_admin_roles(admin_exists, app_instance)
+                _ensure_user_country_entity_permission(admin_exists, test_country_id, app_instance)
 
             focal_point_user = User.query.filter_by(email=test_focal_email).first()
             if not focal_point_user:
@@ -216,7 +293,6 @@ def create_default_data(app_instance):
                     focal_password = os.environ.get('TEST_FOCAL_PASSWORD') or secrets.token_urlsafe(16)
                     focal_point = User(email=test_focal_email, name="Test Focal Point")
                     focal_point.set_password(focal_password)
-                    focal_point.countries.append(test_country)
                     db.session.add(focal_point)
                     db.session.flush()
 
@@ -227,6 +303,8 @@ def create_default_data(app_instance):
                             name="Assignment Editor/Submitter",
                             description="Enter/edit/submit assignments for assigned entities",
                         )
+                        if test_country_id:
+                            focal_point.add_entity_permission(entity_type="country", entity_id=test_country_id)
                     except Exception as e:
                         app_instance.logger.debug("RBAC focal point role assignment failed: %s", e)
 
@@ -246,13 +324,8 @@ def create_default_data(app_instance):
                     app_instance.logger.warning(
                         "Default country 'Testland' not found, cannot create default focal point."
                     )
-            elif focal_point_user and test_country and not focal_point_user.countries.first():
-                focal_point_user.countries.append(test_country)
-                db.session.commit()
-                app_instance.logger.info(
-                    "Assigned Testland to default focal point user '%s'",
-                    focal_point_user.email,
-                )
+            elif focal_point_user and test_country_id:
+                _ensure_user_country_entity_permission(focal_point_user, test_country_id, app_instance)
             elif focal_point_user:
                 app_instance.logger.info(
                     "Default focal point user '%s' already has countries assigned or Testland doesn't exist.",
@@ -266,7 +339,6 @@ def create_default_data(app_instance):
                     sys_password = os.environ.get('TEST_SYS_MANAGER_PASSWORD') or secrets.token_urlsafe(16)
                     sys_manager = User(email=test_sys_email, name="Test System Manager")
                     sys_manager.set_password(sys_password)
-                    sys_manager.countries.append(test_country)
                     db.session.add(sys_manager)
                     db.session.flush()
 
@@ -277,6 +349,8 @@ def create_default_data(app_instance):
                             name="System Manager",
                             description="Full access (superuser).",
                         )
+                        if test_country_id:
+                            sys_manager.add_entity_permission(entity_type="country", entity_id=test_country_id)
                     except Exception as e:
                         app_instance.logger.debug("RBAC system manager role assignment failed: %s", e)
 
@@ -300,6 +374,7 @@ def create_default_data(app_instance):
                 app_instance.logger.info(
                     "Default system manager user '%s' already exists.", test_sys_email
                 )
+                _ensure_user_country_entity_permission(sys_manager_user, test_country_id, app_instance)
 
         except Exception as e:
             db.session.rollback()

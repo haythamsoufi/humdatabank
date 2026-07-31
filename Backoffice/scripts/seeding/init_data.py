@@ -155,7 +155,9 @@ def main():
                         db.session.flush()
                         return int(role.id)
 
-                    admin_role_id = _ensure_role("admin_full", "Admin: Full (All admin roles)")
+                    from app.seeding import _DEV_TEST_ADMIN_ROLE_CODES, _assign_roles_to_user
+
+                    admin_role_codes = list(_DEV_TEST_ADMIN_ROLE_CODES)
                     focal_role_id = _ensure_role("assignment_editor_submitter", "Assignment Editor/Submitter")
                     sys_role_id = _ensure_role("system_manager", "System Manager")
 
@@ -166,14 +168,13 @@ def main():
                         admin.set_password('test123')
                         try:
                             with atomic(remove_session=True):
-                                # Attach country (best-effort)
+                                db.session.add(admin)
+                                db.session.flush()
+                                _assign_roles_to_user(admin.id, admin_role_codes)
                                 if test_country:
                                     country = Country.query.get(test_country_id)
                                     if country:
-                                        admin.countries.append(country)
-                                db.session.add(admin)
-                                db.session.flush()
-                                db.session.add(RbacUserRole(user_id=admin.id, role_id=admin_role_id))
+                                        admin.add_entity_permission(entity_type='country', entity_id=country.id)
                             logger.info('Created default admin user')
                         except IntegrityError:
                             logger.info('Default admin user already exists (skipped)')
@@ -185,13 +186,13 @@ def main():
                         admin2.set_password('test123')
                         try:
                             with atomic(remove_session=True):
+                                db.session.add(admin2)
+                                db.session.flush()
+                                _assign_roles_to_user(admin2.id, admin_role_codes)
                                 if test_country:
                                     country = Country.query.get(test_country_id)
                                     if country:
-                                        admin2.countries.append(country)
-                                db.session.add(admin2)
-                                db.session.flush()
-                                db.session.add(RbacUserRole(user_id=admin2.id, role_id=admin_role_id))
+                                        admin2.add_entity_permission(entity_type='country', entity_id=country.id)
                             logger.info('Created second default admin user')
                         except IntegrityError:
                             logger.info('Second default admin user already exists (skipped)')
@@ -203,13 +204,13 @@ def main():
                         focal_point.set_password('test123')
                         try:
                             with atomic(remove_session=True):
-                                if test_country:
-                                    country = Country.query.get(test_country_id)
-                                    if country:
-                                        focal_point.countries.append(country)
                                 db.session.add(focal_point)
                                 db.session.flush()
                                 db.session.add(RbacUserRole(user_id=focal_point.id, role_id=focal_role_id))
+                                if test_country:
+                                    country = Country.query.get(test_country_id)
+                                    if country:
+                                        focal_point.add_entity_permission(entity_type='country', entity_id=country.id)
                             logger.info('Created default focal point user')
                         except IntegrityError:
                             logger.info('Default focal point user already exists (skipped)')
@@ -221,13 +222,13 @@ def main():
                         focal_point2.set_password('test123')
                         try:
                             with atomic(remove_session=True):
-                                if test_country:
-                                    country = Country.query.get(test_country_id)
-                                    if country:
-                                        focal_point2.countries.append(country)
                                 db.session.add(focal_point2)
                                 db.session.flush()
                                 db.session.add(RbacUserRole(user_id=focal_point2.id, role_id=focal_role_id))
+                                if test_country:
+                                    country = Country.query.get(test_country_id)
+                                    if country:
+                                        focal_point2.add_entity_permission(entity_type='country', entity_id=country.id)
                             logger.info('Created second default focal point user')
                         except IntegrityError:
                             logger.info('Second default focal point user already exists (skipped)')
@@ -239,13 +240,13 @@ def main():
                         sys_manager.set_password('test123')
                         try:
                             with atomic(remove_session=True):
-                                if test_country:
-                                    country = Country.query.get(test_country_id)
-                                    if country:
-                                        sys_manager.countries.append(country)
                                 db.session.add(sys_manager)
                                 db.session.flush()
                                 db.session.add(RbacUserRole(user_id=sys_manager.id, role_id=sys_role_id))
+                                if test_country:
+                                    country = Country.query.get(test_country_id)
+                                    if country:
+                                        sys_manager.add_entity_permission(entity_type='country', entity_id=country.id)
                             logger.info('Created default system manager user')
                         except IntegrityError:
                             logger.info('Default system manager user already exists (skipped)')

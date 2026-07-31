@@ -19,6 +19,11 @@ describe('numeric-formatting unformat with maxDecimals', () => {
     it('uses locale heuristic when maxDecimals is omitted', () => {
         expect(window.__numericUnformat('123,12')).toBe('123.12');
     });
+
+    it('treats grouped thousands with trailing zeros when maxDecimals is 0', () => {
+        expect(window.__numericUnformat('300,000', 0)).toBe('300000');
+        expect(window.__numericUnformat('232,000', 0)).toBe('232000');
+    });
 });
 
 describe('matrix numeric input sanitization', () => {
@@ -36,5 +41,20 @@ describe('matrix numeric input sanitization', () => {
 
     it('decimal matrix cells strip minus signs', () => {
         expect(window.__sanitizeMatrixNumericInputValue('-12.3', 2)).toBe('12.3');
+    });
+});
+
+describe('numeric-formatting in-place display', () => {
+    beforeAll(async () => {
+        await import('../../../app/static/js/forms/modules/numeric-formatting.js');
+    });
+
+    it('converts number inputs to text before applying grouped formatting', () => {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = '232000';
+        window.__numericFormatInPlace(input);
+        expect(input.type).toBe('text');
+        expect(input.value).toBe('232,000');
     });
 });

@@ -910,6 +910,10 @@
                                             <input type="checkbox" class="column-is-variable mr-1">
                                             <span>{{ _('Is Variable') }}</span>
                                         </label>
+                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-readonly-label" style="display: none;">
+                                            <input type="checkbox" class="column-variable-readonly mr-1" checked>
+                                            <span>{{ _('Read-only') }}</span>
+                                        </label>
                                         <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-save-value-label" style="display: none;">
                                             <input type="checkbox" class="column-variable-save-value mr-1" checked>
                                             <span>{{ _('Save value') }}</span>
@@ -917,10 +921,6 @@
                                                 <i class="fas fa-question-circle text-gray-400" aria-hidden="true"></i>
                                                 <span class="tooltip-text">{{ _('When checked, the variable column value is saved with the form and restored when the form is reopened. When unchecked, the value is always resolved fresh from the variable (e.g. template variable) and not stored.') }}</span>
                                             </span>
-                                        </label>
-                                        <label class="flex items-center text-xs text-gray-600 whitespace-nowrap column-variable-readonly-label" style="display: none;">
-                                            <input type="checkbox" class="column-variable-readonly mr-1" checked>
-                                            <span>{{ _('Read-only') }}</span>
                                         </label>
                                     </div>
                                     <button type="button" class="remove-column-btn inline-flex items-center justify-center p-1 min-w-[1.75rem] min-h-[1.75rem] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-red-300 shrink-0 ml-auto" title="{{ _('Remove Column')|forceescape }}">
@@ -1151,7 +1151,7 @@
                                 <label class="flex items-center gap-2 text-gray-700 text-sm">
                                     <input type="checkbox" name="exclude_from_completion_rate" id="item-exclude-from-completion-rate" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
                                     <span>{{ _('Exclude from completion rate') }}</span>
-                                    {{ field_help(_('When enabled, this field is ignored when calculating assignment completion and will not appear in missing-field highlights.')) }}
+                                    {{ field_help(_('When enabled, this field is ignored when calculating assignment completion and will not appear in missing-field highlights. Changing this setting recalculates stored completion rates for assignments on this template that already have progress (completion rate is set and greater than 0%).')) }}
                                 </label>
                             </div>
 

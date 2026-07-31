@@ -682,10 +682,12 @@ function __toVariableTickValue(value) {
     return __isEmptyVariableValue(value) ? '' : String(value);
 }
 
-function __normalizeVariableCompareValue(value) {
+function __normalizeVariableCompareValue(value, maxDecimals) {
     if (__isEmptyVariableValue(value)) return '';
     const s = String(value);
-    return (typeof window.__numericUnformat === 'function') ? window.__numericUnformat(s) : s.replace(/,/g, '');
+    return (typeof window.__numericUnformat === 'function')
+        ? window.__numericUnformat(s, maxDecimals)
+        : s.replace(/,/g, '');
 }
 
 function __getSavedMatrixCellScalar(savedValue) {
@@ -726,23 +728,23 @@ function __formatSavedScalarForInput(inputType, savedScalar) {
     return savedScalar !== null && savedScalar !== undefined ? String(savedScalar) : '';
 }
 
-function __persistVariableCellScalar(rawValue) {
+function __persistVariableCellScalar(rawValue, maxDecimals) {
     if (rawValue === null || rawValue === undefined) return '';
     const trimmed = String(rawValue).trim();
     if (trimmed === '') return '';
-    return __normalizeVariableCompareValue(trimmed);
+    return __normalizeVariableCompareValue(trimmed, maxDecimals);
 }
 
-function __variableCellDiffersFromLookup(lookupValue, savedValue, inputType) {
+function __variableCellDiffersFromLookup(lookupValue, savedValue, inputType, maxDecimals) {
     if (inputType === 'checkbox') {
         const lookupNorm = __formatSavedScalarForInput('checkbox', lookupValue);
         if (lookupNorm === '') return false;
         const savedNorm = __formatSavedScalarForInput('checkbox', savedValue);
         return lookupNorm !== savedNorm;
     }
-    const lookupNorm = __normalizeVariableCompareValue(lookupValue);
+    const lookupNorm = __normalizeVariableCompareValue(lookupValue, maxDecimals);
     if (lookupNorm === '') return false;
-    const savedNorm = __normalizeVariableCompareValue(savedValue);
+    const savedNorm = __normalizeVariableCompareValue(savedValue, maxDecimals);
     return lookupNorm !== savedNorm;
 }
 
@@ -1583,10 +1585,11 @@ class MatrixHandler {
                 this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else if (isVariable) {
-            const rawValue = String(input.value || '').trim();
+            const maxDecimals = __readMatrixMaxDecimals(input);
+            const rawValue = __inputValueForMatrixCompare(input);
             value = rawValue;
             if (cellKey) {
-                matrix.data[cellKey] = __persistVariableCellScalar(rawValue);
+                matrix.data[cellKey] = __persistVariableCellScalar(rawValue, maxDecimals);
                 this.applyVariableLookupComparisonForInput(fieldId, input);
             }
         } else {
@@ -3637,7 +3640,12 @@ class MatrixHandler {
             const staleUnmodifiedSave = hasSaved
                 && lookupValue !== ''
                 && __savedVariableCellIsStaleLookupMirror(savedRaw)
-                && __variableCellDiffersFromLookup(lookupValue, savedScalar, input.type);
+                && __variableCellDiffersFromLookup(
+                    lookupValue,
+                    savedScalar,
+                    input.type,
+                    __readMatrixMaxDecimals(input)
+                );
 
             if (hasSaved && !staleUnmodifiedSave) {
                 const display = __formatSavedScalarForInput(input.type, savedScalar);
@@ -3654,7 +3662,10 @@ class MatrixHandler {
                 }
                 savedScalar = lookupValue;
                 if (cellKey && saveValue) {
-                    matrix.data[cellKey] = __persistVariableCellScalar(lookupValue);
+                    matrix.data[cellKey] = __persistVariableCellScalar(
+                        lookupValue,
+                        __readMatrixMaxDecimals(input)
+                    );
                 }
             }
 
@@ -4340,7 +4351,12 @@ class MatrixHandler {
         const fieldId = container?.dataset?.fieldId;
         const matrix = fieldId ? this.matrices.get(fieldId) : null;
         const resolvedLabels = labels || this.getVariableTooltipLabels(matrix?.config || {});
-        const isModified = __variableCellDiffersFromLookup(lookupValue, savedValue, input.type);
+        const isModified = __variableCellDiffersFromLookup(
+            lookupValue,
+            savedValue,
+            input.type,
+            __readMatrixMaxDecimals(input)
+        );
 
         // Find the parent cell (td) to attach tooltip to
         const cell = input.closest('td');
@@ -4526,7 +4542,10 @@ class MatrixHandler {
                             if (restoreMatrix && cellKey) {
                                 restoreMatrix.data[cellKey] = inp.type === 'checkbox'
                                     ? restoredDisplay
-                                    : __persistVariableCellScalar(restoredDisplay);
+                                    : __persistVariableCellScalar(
+                                        restoredDisplay,
+                                        __readMatrixMaxDecimals(inp)
+                                    );
                                 this.sanitizeMatrixData(restoreMatrix);
                                 if (restoreMatrix.hiddenField) {
                                     restoreMatrix.hiddenField.value = __serializeMatrixData(restoreMatrix.data);

@@ -293,3 +293,73 @@ def test_repeat_group_row_is_filled_with_value():
         imputed_value=None,
     )
     assert _repeat_group_row_is_filled(row) is True
+
+
+def test_maybe_refresh_after_exclude_change_skips_draft_version():
+    form_item = MagicMock()
+    form_item.version_id = 2
+    form_item.config = {'exclude_from_completion_rate': True}
+    form_item.template = MagicMock(published_version_id=1)
+
+    refreshed = AssignmentCompletionService.maybe_refresh_after_exclude_from_completion_change(
+        form_item, False
+    )
+
+    assert refreshed == 0
+
+
+def test_maybe_refresh_after_exclude_change_refreshes_published_version():
+    form_item = MagicMock()
+    form_item.version_id = 1
+    form_item.config = {'exclude_from_completion_rate': True}
+    form_item.template = MagicMock(id=10, published_version_id=1)
+
+    with patch.object(
+        AssignmentCompletionService,
+        'refresh_for_template_with_existing_rates',
+        return_value=3,
+    ) as refresh:
+        refreshed = AssignmentCompletionService.maybe_refresh_after_exclude_from_completion_change(
+            form_item, False
+        )
+
+    refresh.assert_called_once_with(10)
+    assert refreshed == 3
+
+
+def test_maybe_refresh_after_exclude_change_no_op_when_unchanged():
+    form_item = MagicMock()
+    form_item.version_id = 1
+    form_item.config = {'exclude_from_completion_rate': False}
+    form_item.template = MagicMock(id=10, published_version_id=1)
+
+    with patch.object(
+        AssignmentCompletionService,
+        'refresh_for_template_with_existing_rates',
+    ) as refresh:
+        refreshed = AssignmentCompletionService.maybe_refresh_after_exclude_from_completion_change(
+            form_item, False
+        )
+
+    refresh.assert_not_called()
+    assert refreshed == 0
+
+
+def test_refresh_for_template_with_existing_rates_only_targets_non_zero_rows():
+    with patch(
+        'app.services.assignments.completion_service.db.session.query',
+    ) as query, patch.object(
+        AssignmentCompletionService,
+        'refresh_and_persist',
+    ) as refresh:
+        chain = MagicMock()
+        query.return_value = chain
+        chain.join.return_value = chain
+        chain.filter.return_value = chain
+        chain.all.return_value = [(11,), (12,)]
+
+        count = AssignmentCompletionService.refresh_for_template_with_existing_rates(10)
+
+    assert count == 2
+    refresh.assert_any_call(11)
+    refresh.assert_any_call(12)

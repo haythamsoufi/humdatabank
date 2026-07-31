@@ -218,7 +218,9 @@ HEARTBEAT_INTERVAL_SECONDS = 60
 # Build defaults — baked in; no App Service variables required.
 PB_BUILD_WORKERS_LOCAL = "1"
 PB_BUILD_WORKERS_AZURE = "1"
-PLAYWRIGHT_BROWSERS_PATH = "/home/site/playwright-browsers"
+PLAYWRIGHT_BROWSERS_PATH_AZURE = "/home/site/playwright-browsers"
+PLAYWRIGHT_BROWSERS_PATH_IMAGE = "/opt/playwright-browsers"
+PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH_AZURE
 QUARTO_VERSION = "1.6.42"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
@@ -631,10 +633,49 @@ class PBProgressService:
             raise RuntimeError(message)
 
     @classmethod
+    def _chromium_installed(cls, browsers_path: str | Path) -> bool:
+        root = Path(browsers_path)
+        if not root.is_dir():
+            return False
+        return any(root.glob("chromium-*/chrome-linux/chrome"))
+
+    @classmethod
+    def _resolve_playwright_browsers_path(cls) -> str:
+        """Prefer worker-persistent Azure path when populated; else image-bundled browsers."""
+        if cls._chromium_installed(PLAYWRIGHT_BROWSERS_PATH_AZURE):
+            return PLAYWRIGHT_BROWSERS_PATH_AZURE
+        if cls._chromium_installed(PLAYWRIGHT_BROWSERS_PATH_IMAGE):
+            return PLAYWRIGHT_BROWSERS_PATH_IMAGE
+        return PLAYWRIGHT_BROWSERS_PATH_AZURE
+
+    @classmethod
+    def _playwright_launch_error_detail(cls, stdout: str, stderr: str) -> str:
+        text = f"{stderr}\n{stdout}".strip()
+        if not text:
+            return "unknown error"
+        lowered = text.lower()
+        if "missing dependencies" in lowered or "install-deps" in lowered:
+            return (
+                "Host system is missing Playwright/Chromium OS libraries. "
+                "Rebuild the container image or run: playwright install-deps chromium"
+            )
+        if "executable doesn't exist" in lowered:
+            return "Playwright Chromium browser is not installed (playwright install chromium)."
+        for line in text.splitlines():
+            cleaned = line.strip()
+            if not cleaned or cleaned[0] in "╔║╚═":
+                continue
+            sanitized = cls._sanitize_build_line(cleaned)
+            if sanitized:
+                return sanitized
+        return cls._sanitize_build_line(text.splitlines()[-1]) or "unknown error"
+
+    @classmethod
     def _verify_chromium_launch(cls) -> None:
         """Fail fast on Azure when Chromium cannot start (missing binary or sandbox)."""
         visuals_tool_dir, _, _ = _visuals_paths()
         scripts_dir = visuals_tool_dir / "scripts"
+        browsers_path = cls._resolve_playwright_browsers_path()
         code = (
             "from playwright.sync_api import sync_playwright; "
             "from pb_figures.render_html import chromium_launch_options; "
@@ -643,7 +684,7 @@ class PBProgressService:
             "b.close(); p.stop()"
         )
         env = os.environ.copy()
-        env["PLAYWRIGHT_BROWSERS_PATH"] = PLAYWRIGHT_BROWSERS_PATH
+        env["PLAYWRIGHT_BROWSERS_PATH"] = browsers_path
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         result = subprocess.run(
             [sys.executable, "-c", code],
@@ -655,9 +696,9 @@ class PBProgressService:
             check=False,
         )
         if result.returncode == 0:
+            logger.debug("P&B progress Chromium verified at %s", browsers_path)
             return
-        detail = (result.stderr or result.stdout or "unknown error").strip()
-        detail = cls._sanitize_build_line(detail.splitlines()[-1] if detail else "")
+        detail = cls._playwright_launch_error_detail(result.stdout, result.stderr)
         raise RuntimeError(
             f"Playwright Chromium cannot start on this server{f': {detail}' if detail else ''}."
         )
@@ -1165,7 +1206,7 @@ class PBProgressService:
             env["PB_QUARTO_EXE"] = quarto_exe
 
         if cls._is_azure_storage():
-            env["PLAYWRIGHT_BROWSERS_PATH"] = PLAYWRIGHT_BROWSERS_PATH
+            env["PLAYWRIGHT_BROWSERS_PATH"] = cls._resolve_playwright_browsers_path()
 
         return env
 

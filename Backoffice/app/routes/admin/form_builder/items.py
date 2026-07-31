@@ -25,6 +25,8 @@ from .helpers import (_create_form_item, _update_indicator_fields, _update_quest
     is_conditions_meaningful)
 import json
 
+from app.services.assignments.completion_service import AssignmentCompletionService
+
 
 def _form_item_audit_snapshot(form_item):
     """Serializable state for admin audit (before/after form item edits)."""
@@ -128,6 +130,16 @@ def new_section_item(template_id, section_id):
         if form_item:
             _update_version_timestamp(form_item.version_id, current_user.id)
             db.session.flush()
+            try:
+                AssignmentCompletionService.maybe_refresh_after_exclude_from_completion_change(
+                    form_item, False
+                )
+            except Exception as refresh_err:
+                current_app.logger.warning(
+                    "Completion rate refresh after new item exclude flag failed for template %s: %s",
+                    template_id,
+                    refresh_err,
+                )
             log_admin_action(
                 action_type='form_item_create',
                 description=f"Created new {item_type} in template '{template.name}'",
@@ -359,6 +371,7 @@ def edit_item(item_id):
 
         try:
             old_values_snapshot = _form_item_audit_snapshot(form_item)
+            previous_exclude = AssignmentCompletionService._item_exclude_from_completion_rate(form_item)
 
             form_item.section_id = form.section_id.data
             form_item.order = form.order.data if form.order.data is not None else form_item.order
@@ -424,6 +437,17 @@ def edit_item(item_id):
 
             _update_version_timestamp(form_item.version_id, current_user.id)
             db.session.flush()
+
+            try:
+                AssignmentCompletionService.maybe_refresh_after_exclude_from_completion_change(
+                    form_item, previous_exclude
+                )
+            except Exception as refresh_err:
+                current_app.logger.warning(
+                    "Completion rate refresh after exclude flag change failed for item %s: %s",
+                    item_id,
+                    refresh_err,
+                )
 
             item_label = form_item.label or f"{form_item.item_type.title()} {item_id}"
             new_values_snapshot = _form_item_audit_snapshot(form_item)

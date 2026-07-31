@@ -329,13 +329,29 @@ if [ "$(uname -s)" = "Linux" ]; then
   export PLAYWRIGHT_BROWSERS_PATH="/home/site/playwright-browsers"
   mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
 
-  if ! python -m playwright install chromium 2>&1 | grep -qi "chromium"; then
-    echo "P&B: installing Playwright Chromium..."
-    python -m playwright install-deps chromium 2>&1 | tail -3 || true
-    python -m playwright install chromium 2>&1 | tail -3 \
-      || echo "WARN: Playwright Chromium install failed"
+  _pb_chromium_ready() {
+    compgen -G "${1}/chromium-"*/chrome-linux/chrome > /dev/null 2>&1
+  }
+
+  if _pb_chromium_ready "/opt/playwright-browsers"; then
+    echo "✓ Playwright Chromium available in image (/opt/playwright-browsers)"
+  fi
+
+  if ! _pb_chromium_ready "$PLAYWRIGHT_BROWSERS_PATH"; then
+    echo "P&B: installing Playwright Chromium to ${PLAYWRIGHT_BROWSERS_PATH}..."
+    if ! python -m playwright install-deps chromium; then
+      echo "WARN: playwright install-deps failed"
+    fi
+    if ! python -m playwright install chromium; then
+      echo "WARN: Playwright Chromium install to ${PLAYWRIGHT_BROWSERS_PATH} failed"
+    fi
   else
-    echo "✓ Playwright Chromium already available"
+    echo "✓ Playwright Chromium already available at ${PLAYWRIGHT_BROWSERS_PATH}"
+  fi
+
+  if ! _pb_chromium_ready "$PLAYWRIGHT_BROWSERS_PATH" && _pb_chromium_ready "/opt/playwright-browsers"; then
+    export PLAYWRIGHT_BROWSERS_PATH="/opt/playwright-browsers"
+    echo "P&B: using image-bundled Chromium at ${PLAYWRIGHT_BROWSERS_PATH}"
   fi
 
   # Persist Quarto under /home/site (survives container recycle on the same worker,

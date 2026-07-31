@@ -934,6 +934,45 @@ class AssignmentCompletionService:
         return len(aes_ids)
 
     @staticmethod
+    def refresh_for_template_with_existing_rates(template_id: int) -> int:
+        """Recompute completion_rate for assignments that already have a stored rate > 0."""
+        aes_ids = [
+            aes_id
+            for (aes_id,) in (
+                db.session.query(AssignmentEntityStatus.id)
+                .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+                .filter(
+                    AssignedForm.template_id == template_id,
+                    AssignmentEntityStatus.completion_rate.isnot(None),
+                    AssignmentEntityStatus.completion_rate != 0,
+                )
+                .all()
+            )
+        ]
+        for aes_id in aes_ids:
+            AssignmentCompletionService.refresh_and_persist(aes_id)
+        return len(aes_ids)
+
+    @staticmethod
+    def _item_exclude_from_completion_rate(form_item) -> bool:
+        cfg = form_item.config if isinstance(form_item.config, dict) else {}
+        return bool(cfg.get('exclude_from_completion_rate', False))
+
+    @staticmethod
+    def maybe_refresh_after_exclude_from_completion_change(
+        form_item,
+        previous_exclude: bool,
+    ) -> int:
+        """When exclude_from_completion_rate changes on the published version, refresh in-progress rates."""
+        template = getattr(form_item, 'template', None)
+        if not template or template.published_version_id != form_item.version_id:
+            return 0
+        new_exclude = AssignmentCompletionService._item_exclude_from_completion_rate(form_item)
+        if new_exclude == previous_exclude:
+            return 0
+        return AssignmentCompletionService.refresh_for_template_with_existing_rates(template.id)
+
+    @staticmethod
     def prefetch(template_ids: set[int], assignment_entity_status_ids: list[int]) -> CompletionPrefetch:
         """Batch-read persisted completion rates for dashboard/API list views."""
         del template_ids  # kept for call-site compatibility

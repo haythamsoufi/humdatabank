@@ -375,7 +375,9 @@ window.__numericFormatInPlace = function formatInPlaceForInput(input) {
     // (e.g. "475,000") to a type="number" input makes the browser reject and clear it — blank cells.
     // Skip formatting entirely on coarse devices; the raw numeric value is already correct.
     if (IS_COARSE) return;
-    try { formatInPlace(input); } catch (_) {}
+    // Must convert to text before applying grouped display; otherwise the browser truncates at the
+    // first comma (e.g. "232,000" → "232" in matrix variable lookup cells).
+    try { markNumeric(input); formatInPlace(input); } catch (_) {}
 };
 window.__setupNumericFormatting = setupNumericFormatting;
 

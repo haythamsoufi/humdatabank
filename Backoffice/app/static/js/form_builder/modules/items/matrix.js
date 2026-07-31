@@ -259,7 +259,9 @@ export const MatrixItem = {
                 e.target.classList.contains('column-type') ||
                 e.target.classList.contains('column-decimals') ||
                 e.target.classList.contains('column-variable-select') ||
-                e.target.classList.contains('column-is-variable')
+                e.target.classList.contains('column-is-variable') ||
+                e.target.classList.contains('column-variable-readonly') ||
+                e.target.classList.contains('column-variable-save-value')
             ) {
                 // Show the "Decimals" input only for columns configured as Number (Decimal)
                 if (e.target.classList.contains('column-type')) {
@@ -290,6 +292,7 @@ export const MatrixItem = {
                             if (readonlyLabel) {
                                 readonlyLabel.style.display = 'flex';
                             }
+                            this.updateColumnVariableSaveValueState(columnDiv);
                         } else {
                             if (variableSelect) {
                                 variableSelect.style.display = 'none';
@@ -308,6 +311,12 @@ export const MatrixItem = {
                 // Update auto-load visibility when column variable status changes
                 if (e.target.classList.contains('column-is-variable')) {
                     this.updateAutoLoadVisibility(modalElement);
+                }
+                if (e.target.classList.contains('column-variable-readonly')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    if (columnDiv) {
+                        this.updateColumnVariableSaveValueState(columnDiv);
+                    }
                 }
                 this.updateConfig(modalElement);
             }
@@ -398,6 +407,28 @@ export const MatrixItem = {
         const decimalsLabel = columnDiv.querySelector('.column-decimals-label');
         if (!decimalsLabel) return;
         decimalsLabel.style.display = (typeSelect?.value === 'number_decimal') ? 'flex' : 'none';
+    },
+
+    /**
+     * Read-only variable columns cannot persist a user-edited value; disable Save value when checked.
+     */
+    updateColumnVariableSaveValueState(columnDiv) {
+        if (!columnDiv) return;
+        const saveValueLabel = columnDiv.querySelector('.column-variable-save-value-label');
+        const saveValueCheckbox = columnDiv.querySelector('.column-variable-save-value');
+        const readonlyCheckbox = columnDiv.querySelector('.column-variable-readonly');
+        if (!saveValueCheckbox || !readonlyCheckbox) return;
+
+        const isReadonly = readonlyCheckbox.checked;
+        saveValueCheckbox.disabled = isReadonly;
+        if (saveValueLabel) {
+            saveValueLabel.classList.toggle('opacity-50', isReadonly);
+            saveValueLabel.classList.toggle('cursor-not-allowed', isReadonly);
+            saveValueLabel.classList.toggle('pointer-events-none', isReadonly);
+        }
+        if (isReadonly) {
+            saveValueCheckbox.checked = false;
+        }
     },
 
     /**
@@ -500,6 +531,7 @@ export const MatrixItem = {
                 if (readonlyCheckbox) {
                     readonlyCheckbox.checked = variableReadonly !== false;
                 }
+                this.updateColumnVariableSaveValueState(columnDiv);
             } else {
                 if (variableSelect) {
                     variableSelect.style.display = 'none';
@@ -605,8 +637,11 @@ export const MatrixItem = {
             const variableOptions = columnDiv.querySelector('.column-variable-options');
             const saveValueCheckbox = variableOptions?.querySelector('.column-variable-save-value');
             const readonlyCheckbox = variableOptions?.querySelector('.column-variable-readonly');
-            columnConfig.variable_save_value = saveValueCheckbox ? saveValueCheckbox.checked : true;
-            columnConfig.variable_readonly = readonlyCheckbox ? readonlyCheckbox.checked : true;
+            const isReadonly = readonlyCheckbox ? readonlyCheckbox.checked : true;
+            columnConfig.variable_readonly = isReadonly;
+            columnConfig.variable_save_value = isReadonly
+                ? false
+                : (saveValueCheckbox ? saveValueCheckbox.checked : true);
         }
 
         return columnConfig;

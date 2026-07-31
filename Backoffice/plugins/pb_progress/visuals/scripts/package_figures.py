@@ -16,12 +16,14 @@ def _language_slug(language: str) -> str:
 
 
 def package_figures(
-    figures_dir: Path = FIGURES_DIR,
-    output_dir: Path = OUTPUT_DIR,
+    figures_dir: Path | None = None,
+    output_dir: Path | None = None,
     *,
     languages: tuple[str, ...] | None = None,
 ) -> list[Path]:
     """Create per-language and all-languages ZIP files in output_dir."""
+    figures_dir = figures_dir or resolve_figures_output()
+    output_dir = output_dir or resolve_report_output()
     if not figures_dir.is_dir():
         raise FileNotFoundError(f"Figures directory not found: {figures_dir}")
 

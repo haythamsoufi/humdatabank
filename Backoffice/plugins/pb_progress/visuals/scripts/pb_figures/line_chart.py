@@ -222,7 +222,7 @@ def render_line_chart_svg(
     stroke_width = style["line_stroke_width"]
     marker_r = style.get("marker_radius", 3.5)
     is_modern = style.get("name") == "modern"
-    font_family = '"Open Sans", "Segoe UI", sans-serif'
+    font_family = "Open Sans, Segoe UI, sans-serif"
     label_layout = target_label_layout(
         values,
         item["value_labels"],

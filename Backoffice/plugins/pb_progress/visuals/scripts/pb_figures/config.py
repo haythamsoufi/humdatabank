@@ -90,17 +90,24 @@ def resolve_report_output() -> Path:
 
 _REPORT_STATIC_FILES = ("pb-report.qmd", "_quarto.yml")
 _REPORT_STATIC_DIRS = ("styles", "partials", "fonts")
-_FONTAWESOME_FILENAME = "fontawesome-6.5.0.min.css"
 
 
-def _backoffice_root() -> Path:
-    return Path(__file__).resolve().parents[5]
+def _sync_static_tree(source: Path, target: Path) -> None:
+    """Copy static report files into target without deleting the tree first.
 
-
-def fontawesome_stylesheet_source() -> Path | None:
-    """Backoffice app static Font Awesome bundle for Quarto embed-resources."""
-    path = _backoffice_root() / "app" / "static" / "libs" / _FONTAWESOME_FILENAME
-    return path if path.is_file() else None
+    Rebuilds reuse the same workspace directory (local dev and Azure). Avoid
+    ``shutil.rmtree`` here — on Windows a prior Quarto run, Explorer preview,
+    or IDE indexing can leave handles open and make directory removal fail.
+    """
+    target.mkdir(parents=True, exist_ok=True)
+    for src_path in source.rglob("*"):
+        rel = src_path.relative_to(source)
+        dest_path = target / rel
+        if src_path.is_dir():
+            dest_path.mkdir(parents=True, exist_ok=True)
+            continue
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_path, dest_path)
 
 
 def prepare_report_workspace(source_report: Path, target_report: Path) -> Path:
@@ -115,16 +122,9 @@ def prepare_report_workspace(source_report: Path, target_report: Path) -> Path:
         dest = target_report / name
         if not src.is_dir():
             continue
-        if dest.exists():
-            shutil.rmtree(dest)
-        shutil.copytree(src, dest)
+        _sync_static_tree(src, dest)
     (target_report / "figures").mkdir(parents=True, exist_ok=True)
     (target_report / "output").mkdir(parents=True, exist_ok=True)
-    fa_src = fontawesome_stylesheet_source()
-    if fa_src is not None:
-        static_dir = target_report / "static"
-        static_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(fa_src, static_dir / _FONTAWESOME_FILENAME)
     return target_report
 
 

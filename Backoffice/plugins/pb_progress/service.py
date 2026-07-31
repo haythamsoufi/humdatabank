@@ -610,7 +610,7 @@ class PBProgressService:
                 "Ensure Backoffice requirements are installed in the container image."
             )
 
-        if not issues and cls._is_azure_storage():
+        if not issues:
             try:
                 cls._verify_render_stack()
             except RuntimeError as exc:
@@ -632,10 +632,16 @@ class PBProgressService:
             "from pathlib import Path; "
             "from weasyprint import HTML; "
             "from pb_figures.donut_chart import render_donut_svg; "
+            "from pb_figures.line_chart import render_line_chart_svg; "
             "from pb_figures.svg_raster import write_svg_png; "
             "svg = render_donut_svg({'value': 1, 'target': 2, 'value_label': '1'}); "
+            "line = render_line_chart_svg("
+            "{'values': [1.0, 2.0], 'value_labels': ['1', '2'], 'annual_target': 2.0, "
+            "'annual_target_label': '2'}, 481, chart_id='preflight', "
+            "show_value_labels=True, show_target_labels=True, target_label='T'); "
             "tmp = Path(tempfile.mkdtemp()); "
             "write_svg_png(svg, tmp / 't.png', width=64, height=64); "
+            "write_svg_png(line, tmp / 'line.png', width=481, height=110); "
             "HTML(string='<html><body>ok</body></html>').write_pdf(tmp / 't.pdf')"
         )
         env = os.environ.copy()

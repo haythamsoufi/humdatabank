@@ -92,10 +92,10 @@ If traffic passes through Application Gateway or Front Door before reaching App 
 
 ### 3c. P&B Progress report generation
 
-The P&B Progress tab generates multilingual HTML, PDF, Word, and figure packages via a background build (Quarto + Playwright). **No extra App Service settings are required** — defaults are baked into [`entrypoint.sh`](../../../entrypoint.sh) and [`plugins/pb_progress/service.py`](../../../plugins/pb_progress/service.py):
+The P&B Progress tab generates multilingual HTML, PDF, Word, and figure packages via a background build (Quarto + WeasyPrint/CairoSVG). **No extra App Service settings are required** — defaults are baked into [`entrypoint.sh`](../../../entrypoint.sh) and [`plugins/pb_progress/service.py`](../../../plugins/pb_progress/service.py):
 
-- On Linux container start, `entrypoint.sh` ensures Playwright Chromium under `/home/site/playwright-browsers` and Quarto 1.6.42 under `/home/site/quarto` when missing (both persist on the worker volume across container recycles).
-- On Azure (`azure_blob` storage), the build uses `PB_BUILD_WORKERS=1` (sequential per-language Chromium) and runs Word before PDF to stay within App Service memory limits. Local dev uses `PB_BUILD_WORKERS=2` with parallel Word/PDF when appropriate.
+- On Linux container start, `entrypoint.sh` ensures Quarto 1.6.42 under `/home/site/quarto` when missing (persists on the worker volume across container recycles). Report rendering uses WeasyPrint and cairosvg (Cairo/Pango libraries are in the Docker image).
+- On Azure (`azure_blob` storage), the build uses `PB_BUILD_WORKERS=1` (sequential per-language rendering) and runs Word before PDF to stay within App Service memory limits. Local dev uses `PB_BUILD_WORKERS=2` with parallel Word/PDF when appropriate.
 - Build subprocess uses report year `2026` and blob-persisted outputs under `pb_progress/`.
 
 Report generation is CPU- and memory-intensive; expect **5–15 minutes** per full build on P1v3. The `/generate` endpoint returns immediately after starting a background thread. Build status and outputs persist to blob storage (`pb_progress/status.json`, `pb_progress/output/*`) and survive container restarts.

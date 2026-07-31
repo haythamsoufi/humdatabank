@@ -144,8 +144,8 @@ def resolve_excel(path: Path | str | None = None) -> Path:
 def build_workers(count: int) -> int:
     """Number of worker processes to use for `count` independent parallel jobs.
 
-    Each worker launches its own Chromium instance via Playwright, so this is
-    capped (not just set to os.cpu_count()) to avoid overloading the machine.
+    Each worker runs an independent render job, so this is capped (not just set to
+    os.cpu_count()) to avoid overloading the machine.
     Override with the PB_BUILD_WORKERS environment variable, e.g. PB_BUILD_WORKERS=1
     to force fully sequential behaviour for debugging.
     """

@@ -16,7 +16,6 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from pb_figures.config import build_workers, cleanup_build_copy, resolve_excel, resolve_report_output
 from pb_figures.data import load_sg_report
 from pb_figures.languages import discover_languages, pdf_filename
-from pb_figures.render_html import PlaywrightScreenshotSession
 from pb_figures.render_pdf import render_report_pdf
 
 OUTPUT_DIR = ROOT / "report" / "output"
@@ -32,9 +31,8 @@ def _html_report() -> Path:
 
 
 def _render_one(html_path: Path, output_path: Path, language: str) -> tuple[str, Path]:
-    """Worker: open a standalone Chromium instance and render one language's PDF."""
-    with PlaywrightScreenshotSession() as session:
-        render_report_pdf(html_path, output_path, language=language, browser=session.browser)
+    """Worker: render one language's PDF via WeasyPrint."""
+    render_report_pdf(html_path, output_path, language=language)
     return language, output_path
 
 

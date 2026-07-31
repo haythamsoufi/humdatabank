@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 from pathlib import Path
 
@@ -175,8 +176,11 @@ def render_line_chart_svg(
     *,
     chart_id: str = "line",
     show_target_line: bool = True,
+    show_value_labels: bool = False,
+    show_target_labels: bool = False,
+    target_label: str | None = None,
 ) -> str:
-    """Render line geometry as SVG (labels are HTML overlays in embed/PDF)."""
+    """Render line geometry as SVG (labels optional for PNG assets)."""
     values = item["values"]
     height = CHART_HEIGHT
     pad_l = CHART_PAD_L
@@ -218,6 +222,14 @@ def render_line_chart_svg(
     stroke_width = style["line_stroke_width"]
     marker_r = style.get("marker_radius", 3.5)
     is_modern = style.get("name") == "modern"
+    font_family = '"Open Sans", "Segoe UI", sans-serif'
+    label_layout = target_label_layout(
+        values,
+        item["value_labels"],
+        annual_target,
+        item.get("annual_target_label"),
+        width,
+    )
 
     if fx.get("area_fill") or fx.get("line_shadow"):
         parts.append("<defs>")
@@ -251,6 +263,29 @@ def render_line_chart_svg(
             f'<line x1="{pad_l}" y1="{ty:.2f}" x2="{pad_l + plot_w:.2f}" y2="{ty:.2f}" '
             f'stroke="{COLOR_TARGET}" {target_stroke}/>'
         )
+        if show_target_labels and target_label:
+            tag_y = ty + 4 if label_layout["tag_below"] else ty - 5
+            tag_baseline = "hanging" if label_layout["tag_below"] else "auto"
+            parts.append(
+                f'<text x="{pad_l + 4:.2f}" y="{tag_y:.2f}" fill="{COLOR_TARGET}" '
+                f'font-size="9" font-weight="700" font-family="{font_family}" '
+                f'dominant-baseline="{tag_baseline}">{html.escape(target_label)}</text>'
+            )
+        if show_target_labels and item.get("annual_target_label"):
+            value_y = ty
+            value_baseline = "middle"
+            if label_layout["value_above"]:
+                value_y = ty - 5
+                value_baseline = "auto"
+            elif label_layout["value_below"]:
+                value_y = ty + 4
+                value_baseline = "hanging"
+            parts.append(
+                f'<text x="{pad_l + plot_w + 6:.2f}" y="{value_y:.2f}" fill="{COLOR_TARGET}" '
+                f'font-size="10" font-weight="700" font-family="{font_family}" '
+                f'dominant-baseline="{value_baseline}">'
+                f'{html.escape(str(item["annual_target_label"]))}</text>'
+            )
 
     if fx.get("area_fill"):
         bottom_y = pad_t + (height - pad_t - pad_b)
@@ -290,6 +325,16 @@ def render_line_chart_svg(
             parts.append(
                 f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{marker_r}" fill="{COLOR_VALUE}"/>'
             )
+
+        if show_value_labels:
+            label = item["value_labels"][i]
+            if label:
+                ly, _ = _value_label_y_px(i, value, values, annual_target, y_max)
+                parts.append(
+                    f'<text x="{cx:.2f}" y="{ly:.2f}" text-anchor="middle" fill="{COLOR_VALUE}" '
+                    f'font-size="10" font-weight="700" font-family="{font_family}">'
+                    f'{html.escape(str(label))}</text>'
+                )
 
     parts.append("</svg>")
     return "".join(parts)

@@ -69,7 +69,7 @@ unstructured==0.18.27
 pdf2image==1.17.0
 pytesseract==0.3.13
 python-docx==1.2.0
-playwright>=1.40
+cairosvg>=2.7.0
 matplotlib>=3.8
 argon2-cffi==23.1.0
 

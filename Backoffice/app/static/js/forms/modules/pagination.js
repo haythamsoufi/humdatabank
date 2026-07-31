@@ -1,4 +1,6 @@
 import { debugLog, debugWarn, isDebugEnabled } from './debug.js';
+import { getScrollableContainer, scrollElementIntoViewIfNeeded } from '../../core/scroll-container.js';
+import { buildFormPageStorageKey, getStableFormStorageBaseUrl, isPageReload } from './form-page-state.js';
 
 const MODULE_NAME = 'pagination';
 
@@ -65,24 +67,7 @@ function _afterFormReady(callback) {
 
 function _scrollElementIntoView(el) {
     if (!el) return;
-    const mainElement = document.querySelector('main[style*="overflow-y"]') || document.querySelector('main');
-    const isMainContainer = mainElement && mainElement.scrollHeight > mainElement.clientHeight;
-    const scrollContainer = isMainContainer ? mainElement : window;
-    const headerOffset = 100;
-    const rect = el.getBoundingClientRect();
-    debugLog(MODULE_NAME, '_scrollElementIntoView: el:', el.id || el.tagName, 'rect:', { top: Math.round(rect.top), bottom: Math.round(rect.bottom), height: Math.round(rect.height) }, 'isMainContainer:', isMainContainer);
-
-    if (isMainContainer) {
-        const containerRect = scrollContainer.getBoundingClientRect();
-        const elTopRel = rect.top - containerRect.top;
-        const targetTop = Math.max(0, scrollContainer.scrollTop + elTopRel - headerOffset);
-        debugLog(MODULE_NAME, '_scrollElementIntoView: main scrollTo:', targetTop, 'from:', scrollContainer.scrollTop);
-        scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
-    } else {
-        const targetTop = Math.max(0, window.pageYOffset + rect.top - headerOffset);
-        debugLog(MODULE_NAME, '_scrollElementIntoView: window scrollTo:', targetTop, 'from:', window.pageYOffset);
-        window.scrollTo({ top: targetTop, behavior: 'smooth' });
-    }
+    scrollElementIntoViewIfNeeded(el, { behavior: 'smooth' });
 }
 
 function _highlightField(el) {
@@ -159,6 +144,18 @@ function initPagination() {
 
     // Get the current page from sessionStorage or default to 0
     const storageKey = getFormPageStorageKey();
+    /** Captured before init can clobber sessionStorage (beforeunload often sees scrollTop 0). */
+    let reloadScrollTopTarget = null;
+    if (isPageReload()) {
+        try {
+            const raw = sessionStorage.getItem(`${storageKey}_scrollTop`);
+            if (raw !== null) {
+                const n = parseInt(raw, 10);
+                if (Number.isFinite(n) && n > 0) reloadScrollTopTarget = n;
+            }
+        } catch (e) { /* no-op */ }
+    }
+
     let currentPageIdx = getStoredPageIndex(storageKey, pages.length);
     let currentSection = getStoredSection();
     const initialHash = (window.location.hash || '').replace(/^#/, '');
@@ -208,6 +205,11 @@ function initPagination() {
 
     debugLog(MODULE_NAME, `Initializing with page index: ${currentPageIdx} (page ${pages[currentPageIdx]?.number || 'unknown'}) and section: ${currentSection}`);
 
+    // Prevent scroll-spy from clobbering the stored section before we restore scroll position.
+    if (currentSection) {
+        window.__ifrcSectionNavScrollSpy?.pause?.(5000);
+    }
+
     prevBtn.addEventListener('click', () => changePage(currentPageIdx - 1));
     nextBtn.addEventListener('click', () => changePage(currentPageIdx + 1));
 
@@ -216,6 +218,11 @@ function initPagination() {
 
     // Show initial page
     changePage(currentPageIdx, false);
+
+    // Fresh navigation: align sessionStorage with explicit URL anchors (clears stale scroll state).
+    if (!isPageReload() && currentSection) {
+        saveCurrentSection(storageKey, currentSection);
+    }
 
     // Debug-only: watch for other modules overriding page visibility after pagination runs.
     // This is the most common cause of "sections showing on the wrong page".
@@ -229,15 +236,93 @@ function initPagination() {
             debugLog(MODULE_NAME, 'afterFormReady: FIRED for field scroll:', initialHash);
             scrollToField(initialHash);
         });
-    } else if (currentSection) {
-        debugLog(MODULE_NAME, 'init: scheduling afterFormReady → scrollToSection for:', currentSection);
+    } else if (currentSection || reloadScrollTopTarget !== null) {
+        const sectionToRestore = currentSection;
+        debugLog(MODULE_NAME, 'init: scheduling afterFormReady → restore scroll for:', sectionToRestore, 'scrollTop:', reloadScrollTopTarget);
         _afterFormReady(() => {
-            debugLog(MODULE_NAME, 'afterFormReady: FIRED for section scroll:', currentSection);
-            scrollToSection(currentSection);
+            debugLog(MODULE_NAME, 'afterFormReady: FIRED for scroll restore:', sectionToRestore);
+            scheduleRestoreScroll(sectionToRestore, reloadScrollTopTarget);
         });
     } else {
         debugLog(MODULE_NAME, 'init: no field/section hash to scroll to');
     }
+
+    function isSectionScrollTarget(section) {
+        if (!section) return false;
+        if (section.classList.contains('relevance-hidden')) return false;
+        try {
+            const cs = window.getComputedStyle(section);
+            if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+        } catch (e) {
+            if (section.style.display === 'none') return false;
+        }
+        return section.getClientRects().length > 0;
+    }
+
+    /** Retry scroll restore until layout/relevance settles (main is the scroll container). */
+    function scheduleRestoreScroll(sectionId, scrollTopTarget = null) {
+        window.__ifrcSectionNavScrollSpy?.pause?.(4000);
+        if (sectionId) {
+            window.__ifrcSectionNavScrollSpy?.setActive?.(sectionId);
+        }
+
+        const attempt = () => {
+            if (scrollTopTarget !== null && canRestoreScrollTop(scrollTopTarget)) {
+                const container = getScrollableContainer();
+                if (container === window) {
+                    window.scrollTo(0, scrollTopTarget);
+                } else {
+                    const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+                    container.scrollTop = Math.min(scrollTopTarget, maxScroll);
+                }
+                const actual = container === window
+                    ? (window.pageYOffset || document.documentElement.scrollTop || 0)
+                    : container.scrollTop;
+                if (Math.abs(actual - scrollTopTarget) <= 48) {
+                    if (sectionId) {
+                        currentSection = sectionId;
+                        window.__ifrcSectionNavScrollSpy?.setActive?.(sectionId);
+                    }
+                    debugLog(MODULE_NAME, 'Restored scroll position from snapshot:', scrollTopTarget);
+                    return;
+                }
+            }
+            if (sectionId) {
+                scrollToSection(sectionId, { behavior: 'auto' });
+            }
+        };
+
+        attempt();
+        requestAnimationFrame(attempt);
+        [100, 300, 600, 1200, 2500].forEach((ms) => setTimeout(attempt, ms));
+        document.addEventListener('ifrc:relevance-settled', attempt, { once: true });
+    }
+
+    /** Persist scroll position while the user scrolls (URL is not updated live). */
+    function bindScrollPersistence() {
+        let scrollPersistTimer = null;
+        const onScrollPersist = () => {
+            if (scrollPersistTimer) return;
+            scrollPersistTimer = setTimeout(() => {
+                scrollPersistTimer = null;
+                persistScrollState();
+            }, 150);
+        };
+
+        const container = getScrollableContainer();
+        if (container === window) {
+            window.addEventListener('scroll', onScrollPersist, { passive: true });
+        } else {
+            container.addEventListener('scroll', onScrollPersist, { passive: true });
+        }
+    }
+
+    _afterFormReady(() => {
+        bindScrollPersistence();
+    });
+    document.addEventListener('ifrc:pagination:pageChanged', () => {
+        _afterFormReady(bindScrollPersistence);
+    });
 
     /** Show the specified page by index */
     function changePage(targetIdx, scrollToTop = true) {
@@ -281,7 +366,7 @@ function initPagination() {
 
         if (scrollToTop) {
             // Find the scrollable container
-            const scrollContainer = getScrollableContainer(sectionsContainer);
+            const scrollContainer = getScrollableContainer();
             const isMainContainer = scrollContainer !== window;
 
             // Scroll to top of sections container for better UX, accounting for navbar height
@@ -405,6 +490,19 @@ function initPagination() {
         });
         applyVisibilityForPage(pageNumber, { reason: 'refresh', opts });
         return true;
+    };
+    /** Keep pagination state in sync when the user scrolls (sessionStorage only; URL updated on unload). */
+    window.__ifrcPagination.syncActiveSection = (sectionId) => {
+        if (!sectionId || sectionId === currentSection) return;
+        currentSection = sectionId;
+        saveCurrentSection(storageKey, sectionId);
+        saveScrollTop(storageKey);
+    };
+    window.__ifrcPagination.persistScrollPosition = () => {
+        persistScrollState();
+    };
+    window.__ifrcPagination.scrollToSection = (sectionId, opts = {}) => {
+        return scrollToSection(sectionId, opts);
     };
 
     function applyVisibilityForPage(pageNumber, meta = {}) {
@@ -621,19 +719,39 @@ function initPagination() {
 
     /** Generate a unique storage key for this form */
     function getFormPageStorageKey() {
-        // Use the form action URL or current page URL as part of the key
-        const form = document.getElementById('focalDataEntryForm');
-        const formAction = form ? form.action : window.location.href;
-        const urlHash = btoa(formAction).replace(/[^a-zA-Z0-9]/g, '');
-        return `form_page_${urlHash}`;
+        return buildFormPageStorageKey(getStableFormStorageBaseUrl());
     }
 
     /** Get the stored page index from sessionStorage */
     function getStoredPageIndex(storageKey, maxPages) {
-        // First try to get from URL parameters (for form reloads with validation errors)
+        const readStoredIndex = () => {
+            try {
+                const stored = sessionStorage.getItem(storageKey);
+                if (stored !== null) {
+                    const pageIndex = parseInt(stored, 10);
+                    if (!isNaN(pageIndex) && pageIndex >= 0 && pageIndex < maxPages) {
+                        return pageIndex;
+                    }
+                }
+            } catch (error) {
+                debugLog(MODULE_NAME, 'Error reading from sessionStorage:', error);
+            }
+            return null;
+        };
+
+        // Reload: sessionStorage holds last scroll/section (URL is often stale — not updated while scrolling).
+        if (isPageReload()) {
+            const fromStorage = readStoredIndex();
+            if (fromStorage !== null) {
+                debugLog(MODULE_NAME, `Restored page index from storage on reload: ${fromStorage}`);
+                return fromStorage;
+            }
+        }
+
+        // URL parameters (deep links, bookmarks, validation-error redirects)
         const urlParams = new URLSearchParams(window.location.search);
         const pageParam = urlParams.get('page');
-        if (pageParam) {
+        if (pageParam !== null && pageParam !== '') {
             const pageIndex = parseInt(pageParam, 10);
             if (!isNaN(pageIndex) && pageIndex >= 0 && pageIndex < maxPages) {
                 debugLog(MODULE_NAME, `Restored page index from URL parameter: ${pageIndex}`);
@@ -641,27 +759,49 @@ function initPagination() {
             }
         }
 
-        // Then try sessionStorage
-        try {
-            const stored = sessionStorage.getItem(storageKey);
-            if (stored !== null) {
-                const pageIndex = parseInt(stored, 10);
-                if (!isNaN(pageIndex) && pageIndex >= 0 && pageIndex < maxPages) {
-                    debugLog(MODULE_NAME, `Restored page index from storage: ${pageIndex}`);
-                    return pageIndex;
-                }
-            }
-        } catch (error) {
-            debugLog(MODULE_NAME, 'Error reading from sessionStorage:', error);
+        const fromStorage = readStoredIndex();
+        if (fromStorage !== null) {
+            debugLog(MODULE_NAME, `Restored page index from storage: ${fromStorage}`);
+            return fromStorage;
         }
 
         debugLog(MODULE_NAME, 'No valid stored page found, defaulting to page 0');
         return 0;
     }
 
+    /** Read section id from sessionStorage */
+    function getStoredSectionFromStorage() {
+        try {
+            const sectionKey = storageKey + '_section';
+            const stored = sessionStorage.getItem(sectionKey);
+            if (stored !== null) {
+                debugLog(MODULE_NAME, `Restored section from storage: ${stored}`);
+                return stored;
+            }
+        } catch (error) {
+            debugLog(MODULE_NAME, 'Error reading section from sessionStorage:', error);
+        }
+        return null;
+    }
+
     /** Get the stored section from URL or sessionStorage */
     function getStoredSection() {
-        // First try to get from URL hash (for form reloads with validation errors, or dashboard activity links #field-*)
+        // Reload: sessionStorage holds last section (URL hash is often stale).
+        if (isPageReload()) {
+            const fromStorage = getStoredSectionFromStorage();
+            if (fromStorage) {
+                debugLog(MODULE_NAME, 'Reload: restored section from storage:', fromStorage);
+                return fromStorage;
+            }
+            if (reloadScrollTopTarget !== null) {
+                const urlHash = window.location.hash;
+                if (urlHash && urlHash.startsWith('#section-container-')) {
+                    return urlHash.substring(1);
+                }
+            }
+        }
+
+        // Fresh navigation: URL hash (bookmarks, deep links, dashboard activity)
         const urlHash = window.location.hash;
         debugLog(MODULE_NAME, 'getStoredSection: urlHash =', urlHash);
         if (urlHash && urlHash.startsWith('#section-container-')) {
@@ -694,17 +834,9 @@ function initPagination() {
             debugLog(MODULE_NAME, 'getStoredSection: hash does not match field pattern. regex test:', /^#field-\d+$/.test(urlHash));
         }
 
-        // Then try sessionStorage
-        try {
-            const sectionKey = storageKey + '_section';
-            const stored = sessionStorage.getItem(sectionKey);
-            if (stored !== null) {
-                debugLog(MODULE_NAME, `Restored section from storage: ${stored}`);
-                return stored;
-            }
-        } catch (error) {
-            debugLog(MODULE_NAME, 'Error reading section from sessionStorage:', error);
-        }
+        // sessionStorage fallback
+        const fromStorage = getStoredSectionFromStorage();
+        if (fromStorage) return fromStorage;
 
         debugLog(MODULE_NAME, 'No valid stored section found');
         return null;
@@ -731,6 +863,82 @@ function initPagination() {
         }
     }
 
+    function saveScrollTop(storageKey) {
+        try {
+            const container = getScrollableContainer();
+            const scrollTop = container === window
+                ? (window.pageYOffset || document.documentElement.scrollTop || 0)
+                : container.scrollTop;
+            sessionStorage.setItem(`${storageKey}_scrollTop`, String(Math.round(scrollTop)));
+        } catch (error) {
+            debugLog(MODULE_NAME, 'Error saving scroll position:', error);
+        }
+    }
+
+    /** Save scroll offset and the sidebar's active section (even when section id unchanged). */
+    function persistScrollState() {
+        try {
+            const container = getScrollableContainer();
+            const scrollTop = container === window
+                ? (window.pageYOffset || document.documentElement.scrollTop || 0)
+                : container.scrollTop;
+            const prevRaw = sessionStorage.getItem(`${storageKey}_scrollTop`);
+            const prev = prevRaw !== null ? parseInt(prevRaw, 10) : null;
+            const prevValid = Number.isFinite(prev) && prev > 0;
+            if (!(scrollTop <= 0 && prevValid)) {
+                sessionStorage.setItem(`${storageKey}_scrollTop`, String(Math.round(scrollTop)));
+            }
+        } catch (error) {
+            debugLog(MODULE_NAME, 'Error saving scroll position:', error);
+        }
+        const activeLink = document.querySelector('a.section-link.is-active');
+        const sectionId = activeLink?.dataset?.sectionId
+            || (activeLink?.getAttribute('href') || '').replace(/^#/, '');
+        if (sectionId) {
+            currentSection = sectionId;
+            saveCurrentSection(storageKey, sectionId);
+        }
+    }
+
+    function getStoredScrollTop() {
+        try {
+            const raw = sessionStorage.getItem(`${storageKey}_scrollTop`);
+            if (raw === null) return null;
+            const scrollTop = parseInt(raw, 10);
+            return Number.isFinite(scrollTop) && scrollTop >= 0 ? scrollTop : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function canRestoreScrollTop(targetScroll) {
+        const container = getScrollableContainer();
+        if (container === window) return true;
+        const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+        return maxScroll >= Math.max(200, targetScroll - 48);
+    }
+
+    function restoreScrollTopFromStorage() {
+        try {
+            const scrollTop = getStoredScrollTop();
+            if (scrollTop === null) return false;
+            if (!canRestoreScrollTop(scrollTop)) return false;
+
+            const container = getScrollableContainer();
+            if (container === window) {
+                window.scrollTo(0, scrollTop);
+            } else {
+                const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+                container.scrollTop = Math.min(scrollTop, maxScroll);
+            }
+            debugLog(MODULE_NAME, `Restored scroll position: ${scrollTop}`);
+            return true;
+        } catch (error) {
+            debugLog(MODULE_NAME, 'Error restoring scroll position:', error);
+            return false;
+        }
+    }
+
     /** Update URL with current page parameter and section */
     function updateURLWithPage(pageIndex, sectionId = null) {
         try {
@@ -751,30 +959,31 @@ function initPagination() {
     }
 
     /** Find the scrollable container (main element or window) */
-    function getScrollableContainer(element) {
-        // Check if main element is scrollable
-        const mainElement = document.querySelector('main[style*="overflow-y"]') ||
-                          document.querySelector('main');
+    function getScrollableContainerForForm() {
+        return getScrollableContainer();
+    }
 
-        if (mainElement) {
-            const isScrollable = mainElement.scrollHeight > mainElement.clientHeight;
-            debugLog(MODULE_NAME, 'Checking scrollable container:', {
-                mainElementFound: !!mainElement,
-                scrollHeight: mainElement.scrollHeight,
-                clientHeight: mainElement.clientHeight,
-                isScrollable: isScrollable,
-                computedOverflow: window.getComputedStyle(mainElement).overflowY,
-                maxHeight: window.getComputedStyle(mainElement).maxHeight
-            });
+    /** Scroll to section if it exists and is visible */
+    function scrollToSection(sectionId, { behavior = 'smooth' } = {}) {
+        if (!sectionId) return false;
 
-            if (isScrollable) {
-                return mainElement;
-            }
+        const section = document.getElementById(sectionId);
+        if (!isSectionScrollTarget(section)) {
+            debugLog(MODULE_NAME, `Section not found or not visible: ${sectionId}`);
+            return false;
         }
 
-        // Fallback to window
-        debugLog(MODULE_NAME, 'Using window as scrollable container');
-        return window;
+        currentSection = sectionId;
+        saveCurrentSection(storageKey, sectionId);
+        window.__ifrcSectionNavScrollSpy?.setActive?.(sectionId);
+
+        const didScroll = scrollElementIntoViewIfNeeded(section, { behavior });
+        debugLog(MODULE_NAME, `Scrolled to section: ${sectionId}`, {
+            scrollContainer: getScrollableContainerForForm() === window ? 'window' : 'main',
+            behavior,
+            didScroll,
+        });
+        return didScroll;
     }
 
     /** Scroll to a field element by id (e.g. "field-955") - delegates to top-level helpers */
@@ -793,87 +1002,11 @@ function initPagination() {
         });
     }
 
-    // afterFormReady: use top-level _afterFormReady
-
-    /** Scroll to section if it exists and is visible */
-    function scrollToSection(sectionId) {
-        if (!sectionId) return;
-
-        // Use setTimeout to ensure the page change has completed
-        setTimeout(() => {
-            const section = document.getElementById(sectionId);
-            if (!section || section.style.display === 'none' || section.classList.contains('relevance-hidden')) {
-                debugLog(MODULE_NAME, `Section not found or not visible: ${sectionId}`);
-                return;
-            }
-            if (section.getClientRects().length === 0) {
-                debugLog(MODULE_NAME, `Section has no layout box: ${sectionId}`);
-                return;
-            }
-
-            // Find the scrollable container
-            const scrollContainer = getScrollableContainer(section);
-            const isMainContainer = scrollContainer !== window;
-            // Use CSS scroll-margin-top (Tailwind `scroll-mt-*`) as the single source of truth
-            // for header offset. This avoids scrollIntoView() side effects (window scroll changes).
-            const sectionRect = section.getBoundingClientRect();
-            const computed = window.getComputedStyle(section);
-            const scrollMarginTop = parseInt(computed.scrollMarginTop || '0', 10) || 80;
-            const paddingBottom = 16;
-
-            let targetTop;
-            if (isMainContainer) {
-                const containerRect = scrollContainer.getBoundingClientRect();
-                const visibleTop = containerRect.top + scrollMarginTop;
-                const visibleBottom = containerRect.bottom - paddingBottom;
-                const sectionTopRel = sectionRect.top - containerRect.top;
-
-                if (sectionRect.top < visibleTop) {
-                    // Scroll up just enough to bring the top into view (below header offset)
-                    targetTop = Math.max(0, scrollContainer.scrollTop + sectionTopRel - scrollMarginTop);
-                } else if (sectionRect.bottom > visibleBottom) {
-                    // Scroll down just enough to bring the bottom into view
-                    const delta = sectionRect.bottom - visibleBottom;
-                    targetTop = Math.max(0, scrollContainer.scrollTop + delta);
-                } else {
-                    // Already in view; avoid any scroll to prevent "over-scrolling"
-                    debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
-                    return;
-                }
-
-                scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
-            } else {
-                const visibleTop = scrollMarginTop;
-                const visibleBottom = window.innerHeight - paddingBottom;
-
-                if (sectionRect.top < visibleTop) {
-                    targetTop = Math.max(0, window.pageYOffset + sectionRect.top - scrollMarginTop);
-                } else if (sectionRect.bottom > visibleBottom) {
-                    const delta = sectionRect.bottom - visibleBottom;
-                    targetTop = Math.max(0, window.pageYOffset + delta);
-                } else {
-                    debugLog(MODULE_NAME, `Section already in view, no scroll: ${sectionId}`);
-                    return;
-                }
-
-                window.scrollTo({ top: targetTop, behavior: 'smooth' });
-            }
-
-            debugLog(MODULE_NAME, `Scrolled to section: ${sectionId}`, {
-                scrollContainer: isMainContainer ? 'main' : 'window',
-                scrollMarginTop,
-                targetTop,
-                paddingBottom
-            });
-        }, 100);
-    }
-
-    // Add event listener for beforeunload to save current page and section
+    // Persist page/section on unload so reload lands on the same place (URL + sessionStorage).
     window.addEventListener('beforeunload', function() {
         saveCurrentPage(storageKey, currentPageIdx);
-        if (currentSection) {
-            saveCurrentSection(storageKey, currentSection);
-        }
+        persistScrollState();
+        updateURLWithPage(currentPageIdx, currentSection);
     });
 
     // Add event listener for form submission to save current page and section
@@ -893,23 +1026,11 @@ function initPagination() {
         try {
             sessionStorage.removeItem(storageKey);
             sessionStorage.removeItem(storageKey + '_section');
+            sessionStorage.removeItem(storageKey + '_scrollTop');
             debugLog(MODULE_NAME, 'Cleared page and section state after successful form submission');
         } catch (error) {
             debugLog(MODULE_NAME, 'Error clearing page state:', error);
         }
     });
 
-    // Clear page state when user navigates away from the form page
-    window.addEventListener('pagehide', function() {
-        // Only clear if we're actually leaving the form page (not just switching tabs)
-        if (document.visibilityState === 'hidden') {
-            try {
-                sessionStorage.removeItem(storageKey);
-                sessionStorage.removeItem(storageKey + '_section');
-                debugLog(MODULE_NAME, 'Cleared page and section state on page hide');
-            } catch (error) {
-                debugLog(MODULE_NAME, 'Error clearing page state on page hide:', error);
-            }
-        }
-    });
 }

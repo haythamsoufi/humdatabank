@@ -362,7 +362,13 @@ class AssignmentCompletionService:
                     0,
                 ),
                 func.coalesce(
-                    func.sum(case((FormItem.item_type == 'document_field', 1), else_=0)),
+                    func.sum(case((
+                        and_(
+                            FormItem.item_type == 'document_field',
+                            _countable_form_item_filter(),
+                        ),
+                        1,
+                    ), else_=0)),
                     0,
                 ),
             )
@@ -455,6 +461,7 @@ class AssignmentCompletionService:
                 *published_filters,
                 *visibility_filters,
                 FormItem.item_type != 'matrix',
+                _countable_form_item_filter(),
                 _form_data_has_value_filter(),
             )
         )
@@ -508,6 +515,7 @@ class AssignmentCompletionService:
                 *published_filters,
                 *visibility_filters,
                 FormItem.item_type == 'document_field',
+                _countable_form_item_filter(),
             )
             .scalar()
         ) or 0
@@ -555,6 +563,7 @@ class AssignmentCompletionService:
                 *published_filters,
                 *visibility_filters,
                 FormItem.item_type == 'matrix',
+                _countable_form_item_filter(),
             )
             .all()
         )
@@ -582,6 +591,7 @@ class AssignmentCompletionService:
                 *published_filters,
                 *visibility_filters,
                 FormItem.item_type == 'matrix',
+                _countable_form_item_filter(),
             )
             .all()
         )
@@ -628,6 +638,7 @@ class AssignmentCompletionService:
                 FormData.assignment_entity_status_id.in_(assignment_entity_status_ids),
                 *_published_assignment_join_filters(),
                 FormItem.item_type == 'matrix',
+                _countable_form_item_filter(),
             )
         )
         if _uses_postgresql():
@@ -652,6 +663,7 @@ class AssignmentCompletionService:
                 FormData.assignment_entity_status_id.in_(assignment_entity_status_ids),
                 *_published_assignment_join_filters(),
                 FormItem.item_type == 'matrix',
+                _countable_form_item_filter(),
             )
             .all()
         )
@@ -719,6 +731,7 @@ class AssignmentCompletionService:
                     *published_filters,
                     *visibility_filters,
                     FormItem.item_type == 'document_field',
+                    _countable_form_item_filter(),
                 )
                 .distinct()
                 .all()

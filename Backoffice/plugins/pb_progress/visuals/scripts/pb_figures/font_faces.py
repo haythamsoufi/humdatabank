@@ -68,5 +68,5 @@ def inject_open_sans_fonts(html: str) -> str:
 
 
 def inject_chart_fonts(html: str) -> str:
-    """Inject bundled Tajawal and Open Sans faces for Playwright screenshots."""
+    """Inject bundled Tajawal and Open Sans faces for chart rasterization."""
     return inject_open_sans_fonts(inject_tajawal_fonts(html))

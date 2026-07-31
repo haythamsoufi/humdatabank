@@ -113,18 +113,14 @@ def register_dev_tools_commands(app):
             db.session.flush()
 
             try:
-                from app.models.rbac import RbacRole, RbacUserRole
+                from app.seeding import _DEV_TEST_ADMIN_ROLE_CODE, _assign_role_to_user
 
-                admin_role = RbacRole.query.filter_by(code="admin_core").first()
-                if not admin_role:
-                    admin_role = RbacRole(
-                        code="admin_core",
-                        name="Admin (Core)",
-                        description="Baseline admin role",
-                    )
-                    db.session.add(admin_role)
-                    db.session.flush()
-                db.session.add(RbacUserRole(user_id=admin.id, role_id=admin_role.id))
+                _assign_role_to_user(
+                    int(admin.id),
+                    _DEV_TEST_ADMIN_ROLE_CODE,
+                    name="Admin: Full (All admin roles)",
+                    description="Full access to all admin modules (non-system-manager).",
+                )
             except Exception as e:
                 logger.debug("RBAC admin role assignment failed: %s", e)
 
@@ -137,7 +133,7 @@ def register_dev_tools_commands(app):
 
         Creates Testland country, RBAC roles, and three test users:
           - test_sys@<domain>   (System Manager)
-          - test_admin@<domain> (Admin)
+          - test_admin@<domain> (Admin with admin_full role)
           - test_focal@<domain> (Focal Point)
 
         Passwords come from TEST_SYS_MANAGER_PASSWORD, TEST_ADMIN_PASSWORD,

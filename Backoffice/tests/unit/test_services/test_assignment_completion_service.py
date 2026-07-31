@@ -7,6 +7,8 @@ from app.services.assignments.completion_service import (
     CompletionMetrics,
     CompletionPrefetch,
     MissingCompletionItem,
+    _countable_form_item_filter,
+    _published_filters_single,
     completion_rate_percent,
     matrix_entry_is_filled,
 )
@@ -242,6 +244,43 @@ def test_backfill_persisted_rates_batches_updates(app, db_session):
     assert count_filled.call_count == 2
     assert bulk_update.call_count == 2
     assert commit.call_count == 2
+
+
+def test_filled_non_matrix_query_uses_countable_form_item_filter():
+    """Excluded items with saved data must not count toward filled_items (regression for >100% rates)."""
+    filter_clauses = []
+
+    class Chain:
+        def join(self, *args, **kwargs):
+            return self
+
+        def filter(self, *args):
+            filter_clauses.extend(args)
+            return self
+
+        def all(self):
+            return []
+
+    with patch(
+        'app.services.assignments.completion_service.db.session.query',
+        return_value=Chain(),
+    ), patch(
+        'app.services.assignments.completion_service._repeat_section_id_by_section_id',
+        return_value={},
+    ), patch.object(
+        AssignmentCompletionService,
+        '_filled_repeat_non_matrix_item_ids',
+        return_value=set(),
+    ):
+        AssignmentCompletionService._filled_non_matrix_form_item_ids(
+            1,
+            10,
+            20,
+            _published_filters_single(10, 20),
+        )
+
+    countable_str = str(_countable_form_item_filter())
+    assert any(countable_str in str(clause) for clause in filter_clauses)
 
 
 def test_calculate_section_completion_skips_excluded_fields():

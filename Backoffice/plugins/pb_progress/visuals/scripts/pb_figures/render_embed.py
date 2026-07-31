@@ -306,7 +306,6 @@ def render_section_assets(
     assets_dir: Path,
     *,
     language: str = "English",
-    session=None,
 ) -> dict[str, str]:
     """Generate chart PNG assets; return map of asset key → relative filename."""
     assets_dir = Path(assets_dir)
@@ -322,7 +321,7 @@ def render_section_assets(
                 continue
             filename = f"pair_{row_idx}_{col_idx}_donut.png"
             render_donut_asset(
-                item, assets_dir / filename, language=language, show_label=False, session=session,
+                item, assets_dir / filename, language=language, show_label=False,
             )
             refs[f"pair_{row_idx}_{col_idx}_donut"] = filename
 
@@ -350,14 +349,13 @@ def build_section_embed(
     language: str = "English",
     assets_dir: Path,
     asset_url_prefix: str,
-    session=None,
     render_assets: bool = True,
     mapping=None,
 ) -> str:
     """Build full embeddable dashboard HTML for one section."""
     payload = build_payload(model, section, language, mapping=mapping)
     if render_assets:
-        local_refs = render_section_assets(payload, assets_dir, language=language, session=session)
+        local_refs = render_section_assets(payload, assets_dir, language=language)
     else:
         local_refs = expected_asset_refs(payload)
     url_refs = {key: f"{asset_url_prefix}/{filename}" for key, filename in local_refs.items()}

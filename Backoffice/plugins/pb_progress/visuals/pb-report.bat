@@ -30,19 +30,17 @@ echo   2. Regenerate figures only
 echo   3. Build Word only        (all languages, editable)
 echo   4. Exit
 echo   5. Install Python dependencies
-echo   6. Install Playwright Chromium
-echo   7. Change figure style    (classic / modern / professional)
+echo   6. Change figure style    (classic / modern / professional)
 echo.
 set "CHOICE="
-set /p "CHOICE=Select option [1-7]: "
+set /p "CHOICE=Select option [1-6]: "
 
 if "%CHOICE%"=="1" goto build_full
 if "%CHOICE%"=="2" goto build_figures
 if "%CHOICE%"=="3" goto build_word
 if "%CHOICE%"=="4" goto end
 if "%CHOICE%"=="5" goto install_deps
-if "%CHOICE%"=="6" goto install_playwright
-if "%CHOICE%"=="7" goto pick_style
+if "%CHOICE%"=="6" goto pick_style
 echo Invalid choice.
 pause
 goto menu
@@ -162,16 +160,6 @@ echo Installing Python dependencies...
 %PYTHON% -m pip install -r "%ROOT%\requirements.txt"
 echo.
 if errorlevel 1 (echo Dependency install failed.) else (echo Dependencies installed.)
-pause
-goto menu
-
-:install_playwright
-call :check_python
-echo.
-echo Installing Playwright Chromium...
-%PYTHON% -m playwright install chromium
-echo.
-if errorlevel 1 (echo Playwright install failed.) else (echo Playwright Chromium installed.)
 pause
 goto menu
 

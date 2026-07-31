@@ -1,4 +1,6 @@
 import { debugLog } from './debug.js';
+import { getScrollableContainer } from '../../core/scroll-container.js';
+import { buildFormPageStorageKey, getStableFormStorageBaseUrl } from './form-page-state.js';
 
 const MODULE_NAME = 'section-nav-scroll';
 const ACTIVE_CLASS = 'is-active';
@@ -20,7 +22,7 @@ function initSectionNavScroll() {
   if (!links.length) return;
 
   const isPaginated = sectionsContainer.dataset.isPaginated === 'true';
-  const scrollSpy = createSectionNavScrollSpy(links);
+  const scrollSpy = createSectionNavScrollSpy(links, { isPaginated });
   window.__ifrcSectionNavScrollSpy = scrollSpy;
 
   // Always highlight the active section while scrolling.
@@ -136,7 +138,7 @@ function initSectionNavScroll() {
   }
 }
 
-function createSectionNavScrollSpy(links) {
+function createSectionNavScrollSpy(links, { isPaginated = false } = {}) {
   const linkById = new Map();
   links.forEach((link) => {
     const id =
@@ -255,12 +257,27 @@ function createSectionNavScrollSpy(links) {
     debugLog(MODULE_NAME, 'Active section:', sectionId);
   }
 
+  function persistActiveSection(sectionId) {
+    if (!sectionId) return;
+    if (isPaginated) {
+      window.__ifrcPagination?.syncActiveSection?.(sectionId);
+      return;
+    }
+    try {
+      const storageKey = buildFormPageStorageKey(getStableFormStorageBaseUrl());
+      sessionStorage.setItem(`${storageKey}_section`, sectionId);
+    } catch (e) {
+      // ignore
+    }
+  }
+
   function updateActiveSection() {
     if (Date.now() < scrollSpyPausedUntil) return;
     const container = scrollContainer || getScrollableContainer();
     const nextId = pickActiveSectionId(container);
-    if (!nextId) return;
+    if (!nextId || nextId === currentActiveId) return;
     setActive(nextId, { scrollNav: true });
+    persistActiveSection(nextId);
   }
 
   function onScroll() {
@@ -268,6 +285,7 @@ function createSectionNavScrollSpy(links) {
     scrollTicking = true;
     requestAnimationFrame(() => {
       updateActiveSection();
+      window.__ifrcPagination?.persistScrollPosition?.();
       scrollTicking = false;
     });
   }
@@ -346,12 +364,3 @@ function afterFormReady(callback) {
   setTimeout(() => obs.disconnect(), 30000);
 }
 
-function getScrollableContainer() {
-  // Mirror pagination.js logic: prefer scrollable <main>, otherwise window.
-  const mainElement = document.querySelector('main[style*="overflow-y"]') || document.querySelector('main');
-  if (mainElement) {
-    const isScrollable = mainElement.scrollHeight > mainElement.clientHeight;
-    if (isScrollable) return mainElement;
-  }
-  return window;
-}

@@ -314,6 +314,30 @@ a.close-modal:not(.btn) {
     bottom: 4.5rem; /* 1.5rem base + ~3rem for offline banner height */
 }
 
+.auth-offline-status-banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2147483646;
+    padding: 10px 14px;
+    background: #f59e0b;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+    display: none;
+    text-align: center;
+}
+
+.auth-offline-status-banner.is-visible {
+    display: block;
+}
+
+#focalDataEntryForm.auth-draft-restore-pending {
+    opacity: 0.72;
+}
+
 .alert {
     position: relative;
     padding: 1rem 3rem 1rem 1.5rem;

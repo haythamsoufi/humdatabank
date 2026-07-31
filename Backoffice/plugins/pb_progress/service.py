@@ -218,9 +218,6 @@ HEARTBEAT_INTERVAL_SECONDS = 60
 # Build defaults — baked in; no App Service variables required.
 PB_BUILD_WORKERS_LOCAL = "1"
 PB_BUILD_WORKERS_AZURE = "1"
-PLAYWRIGHT_BROWSERS_PATH_AZURE = "/home/site/playwright-browsers"
-PLAYWRIGHT_BROWSERS_PATH_IMAGE = "/opt/playwright-browsers"
-PLAYWRIGHT_BROWSERS_PATH = PLAYWRIGHT_BROWSERS_PATH_AZURE
 QUARTO_VERSION = "1.6.42"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
@@ -518,14 +515,9 @@ class PBProgressService:
     def _public_error_message(cls, exc: BaseException, log_excerpt: str = "") -> str:
         """Return a client-safe error without filesystem paths or command details."""
         excerpt = (log_excerpt or "").lower()
-        if "executable doesn't exist" in excerpt or "playwright install" in excerpt:
+        if "weasyprint" in excerpt or "cairosvg" in excerpt or "cairo" in excerpt:
             return (
-                "Playwright Chromium is not installed on the server. "
-                "Contact an administrator."
-            )
-        if "browsertype.launch" in excerpt:
-            return (
-                "Report figure rendering could not start the browser. "
+                "Report rendering libraries are not available on the server. "
                 "Contact an administrator."
             )
         if "permission denied" in excerpt or "readonly file system" in excerpt:
@@ -605,25 +597,22 @@ class PBProgressService:
         else:
             logger.debug("P&B progress using Quarto at %s", quarto_exe)
 
-        # Use find_spec instead of a live import so that playwright's .pyc
-        # files are not written inside the Flask process.  A live
-        # `import playwright.sync_api` caused the Werkzeug stat reloader to
-        # detect the freshly-written __pycache__ entries (user site-packages is
-        # not covered by Werkzeug's _stat_ignore_scan on Windows) and restart
-        # Flask mid-build, emitting spurious [SCHED_SHUTDOWN] messages.
+        # Use find_spec instead of a live import so optional heavy deps do not write .pyc
+        # files inside the Flask process and trigger Werkzeug reload mid-build.
         try:
             import importlib.util
-            if importlib.util.find_spec("playwright") is None:
-                raise ImportError("playwright not found")
+            for module_name in ("weasyprint", "cairosvg"):
+                if importlib.util.find_spec(module_name) is None:
+                    raise ImportError(f"{module_name} not found")
         except (ImportError, ValueError):
             issues.append(
-                "Playwright is not installed. Run: pip install playwright "
-                "&& playwright install chromium"
+                "WeasyPrint and cairosvg are required for P&B report rendering. "
+                "Ensure Backoffice requirements are installed in the container image."
             )
 
         if not issues and cls._is_azure_storage():
             try:
-                cls._verify_chromium_launch()
+                cls._verify_render_stack()
             except RuntimeError as exc:
                 issues.append(str(exc))
 
@@ -633,58 +622,22 @@ class PBProgressService:
             raise RuntimeError(message)
 
     @classmethod
-    def _chromium_installed(cls, browsers_path: str | Path) -> bool:
-        root = Path(browsers_path)
-        if not root.is_dir():
-            return False
-        return any(root.glob("chromium-*/chrome-linux/chrome"))
-
-    @classmethod
-    def _resolve_playwright_browsers_path(cls) -> str:
-        """Prefer worker-persistent Azure path when populated; else image-bundled browsers."""
-        if cls._chromium_installed(PLAYWRIGHT_BROWSERS_PATH_AZURE):
-            return PLAYWRIGHT_BROWSERS_PATH_AZURE
-        if cls._chromium_installed(PLAYWRIGHT_BROWSERS_PATH_IMAGE):
-            return PLAYWRIGHT_BROWSERS_PATH_IMAGE
-        return PLAYWRIGHT_BROWSERS_PATH_AZURE
-
-    @classmethod
-    def _playwright_launch_error_detail(cls, stdout: str, stderr: str) -> str:
-        text = f"{stderr}\n{stdout}".strip()
-        if not text:
-            return "unknown error"
-        lowered = text.lower()
-        if "missing dependencies" in lowered or "install-deps" in lowered:
-            return (
-                "Host system is missing Playwright/Chromium OS libraries. "
-                "Rebuild the container image or run: playwright install-deps chromium"
-            )
-        if "executable doesn't exist" in lowered:
-            return "Playwright Chromium browser is not installed (playwright install chromium)."
-        for line in text.splitlines():
-            cleaned = line.strip()
-            if not cleaned or cleaned[0] in "╔║╚═":
-                continue
-            sanitized = cls._sanitize_build_line(cleaned)
-            if sanitized:
-                return sanitized
-        return cls._sanitize_build_line(text.splitlines()[-1]) or "unknown error"
-
-    @classmethod
-    def _verify_chromium_launch(cls) -> None:
-        """Fail fast on Azure when Chromium cannot start (missing binary or sandbox)."""
+    def _verify_render_stack(cls) -> None:
+        """Fail fast on Azure when WeasyPrint or CairoSVG cannot run."""
         visuals_tool_dir, _, _ = _visuals_paths()
         scripts_dir = visuals_tool_dir / "scripts"
-        browsers_path = cls._resolve_playwright_browsers_path()
         code = (
-            "from playwright.sync_api import sync_playwright; "
-            "from pb_figures.render_html import chromium_launch_options; "
-            "p = sync_playwright().start(); "
-            "b = p.chromium.launch(**chromium_launch_options()); "
-            "b.close(); p.stop()"
+            "from weasyprint import HTML; "
+            "from pb_figures.donut_chart import render_donut_svg; "
+            "from pb_figures.svg_raster import write_svg_png; "
+            "from pathlib import Path; "
+            "import tempfile; "
+            "svg = render_donut_svg({'value': 1, 'target': 2, 'value_label': '1'}); "
+            "with tempfile.TemporaryDirectory() as tmp: "
+            "  write_svg_png(svg, Path(tmp) / 't.png', width=64, height=64); "
+            "  HTML(string='<html><body>ok</body></html>').write_pdf(Path(tmp) / 't.pdf')"
         )
         env = os.environ.copy()
-        env["PLAYWRIGHT_BROWSERS_PATH"] = browsers_path
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         result = subprocess.run(
             [sys.executable, "-c", code],
@@ -696,12 +649,33 @@ class PBProgressService:
             check=False,
         )
         if result.returncode == 0:
-            logger.debug("P&B progress Chromium verified at %s", browsers_path)
+            logger.debug("P&B progress render stack verified (WeasyPrint + cairosvg)")
             return
-        detail = cls._playwright_launch_error_detail(result.stdout, result.stderr)
+        detail = cls._render_stack_error_detail(result.stdout, result.stderr)
         raise RuntimeError(
-            f"Playwright Chromium cannot start on this server{f': {detail}' if detail else ''}."
+            f"P&B report rendering is unavailable on this server{f': {detail}' if detail else ''}."
         )
+
+    @classmethod
+    def _render_stack_error_detail(cls, stdout: str, stderr: str) -> str:
+        text = f"{stderr}\n{stdout}".strip()
+        if not text:
+            return "unknown error"
+        lowered = text.lower()
+        if "cairo" in lowered or "pango" in lowered:
+            return "Missing Cairo/Pango libraries required by WeasyPrint or cairosvg."
+        if "no module named 'weasyprint'" in lowered:
+            return "WeasyPrint is not installed."
+        if "no module named 'cairosvg'" in lowered:
+            return "cairosvg is not installed."
+        for line in text.splitlines():
+            cleaned = line.strip()
+            if not cleaned:
+                continue
+            sanitized = cls._sanitize_build_line(cleaned)
+            if sanitized:
+                return sanitized
+        return cls._sanitize_build_line(text.splitlines()[-1]) or "unknown error"
 
     @classmethod
     def _format_size(cls, size_bytes: int) -> str:
@@ -1185,7 +1159,7 @@ class PBProgressService:
 
     @classmethod
     def _build_worker_cap(cls) -> str:
-        """Cap Visuals tool ProcessPoolExecutor workers — lower on Azure to limit Chromium RAM."""
+        """Cap Visuals tool ProcessPoolExecutor workers on Azure to limit build RAM."""
         return PB_BUILD_WORKERS_AZURE if cls._is_azure_storage() else PB_BUILD_WORKERS_LOCAL
 
     @classmethod
@@ -1204,9 +1178,6 @@ class PBProgressService:
         quarto_exe = cls._resolve_quarto_exe()
         if quarto_exe:
             env["PB_QUARTO_EXE"] = quarto_exe
-
-        if cls._is_azure_storage():
-            env["PLAYWRIGHT_BROWSERS_PATH"] = cls._resolve_playwright_browsers_path()
 
         return env
 

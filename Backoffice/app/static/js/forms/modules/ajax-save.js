@@ -93,6 +93,30 @@ function mergeSaveOptions(a, b) {
     return out;
 }
 
+/** True when a fetch failure is likely a connectivity problem, not an application bug. */
+function isNetworkFailure(error) {
+    if (!navigator.onLine) return true;
+    const msg = (error && error.message) ? String(error.message) : '';
+    if (error?.name === 'TypeError') {
+        return /Failed to fetch|NetworkError|Load failed|network error/i.test(msg);
+    }
+    return false;
+}
+
+async function handleSessionExpired() {
+    if (window.__ifrcAuthDrafts && typeof window.__ifrcAuthDrafts.saveNow === 'function') {
+        try { await window.__ifrcAuthDrafts.saveNow(); } catch (_) { /* best-effort */ }
+    }
+    const loginUrl = '/login?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+    showSaveMessage(
+        _t('Your session has expired. Your data has been saved as a draft locally — it will be offered for restore after you log in again.') +
+        ' <a href="' + loginUrl + '" class="underline font-semibold">' + _t('Sign in') + '</a>',
+        'warning',
+    );
+    setTimeout(() => { window.location.href = loginUrl; }, 4000);
+    throw new Error('Session expired (401)');
+}
+
 async function saveFormOnce(options = {}) {
     if (!form) {
         debugLog(MODULE_NAME, '❌ Form not found');
@@ -202,6 +226,11 @@ async function saveFormOnce(options = {}) {
         }
 
         if (result === null && !response.ok) {
+            // Session expired: 401 arrives as JSON from the middleware, but the
+            // Content-Type may still say text/html for a CSRF 400 or proxy error.
+            if (response.status === 401) {
+                await handleSessionExpired();
+            }
             const friendly403 = response.status === 403
                 ? _t('Save was rejected (403). Refresh the page and try again. If the problem continues, your session or security token may have expired.')
                 : _t('Save failed (%(status)s). Refresh the page and try again, or contact support if it persists.').replace('%(status)s', response.status);
@@ -215,6 +244,12 @@ async function saveFormOnce(options = {}) {
         if (!response.ok) {
             // Server returned an error status, but we have the JSON response
             const errorMessage = result?.message || result?.error || `HTTP error! status: ${response.status}`;
+
+            // JSON 401 from session_timeout middleware — same graceful handling as above.
+            if (response.status === 401) {
+                await handleSessionExpired();
+            }
+
             debugLog(MODULE_NAME, '❌ Save failed:', errorMessage);
             showSaveMessage('❌ ' + _t('Save failed') + ': ' + errorMessage, 'error');
             throw (window.httpErrorSync && window.httpErrorSync(response, errorMessage)) || new Error(errorMessage);
@@ -247,6 +282,7 @@ async function saveFormOnce(options = {}) {
                 detail: { action: 'save', result: result }
             }));
 
+            // success: true with offline: true means the server was not reached; draft saved locally.
             return { success: true, result };
         } else {
             debugLog(MODULE_NAME, '❌ Save failed:', result.message);
@@ -263,8 +299,7 @@ async function saveFormOnce(options = {}) {
         });
         // Offline / network failure fallback: save local draft instead of showing a hard error.
         const msg = (error && error.message) ? String(error.message) : '';
-        const looksLikeOffline = !navigator.onLine || error?.name === 'TypeError' || msg.includes('Failed to fetch');
-        if (looksLikeOffline && window.__ifrcAuthDrafts && typeof window.__ifrcAuthDrafts.saveNow === 'function') {
+        if (isNetworkFailure(error) && window.__ifrcAuthDrafts && typeof window.__ifrcAuthDrafts.saveNow === 'function') {
             try {
                 if (typeof window.__ifrcAuthDrafts.setOffline === 'function') {
                     window.__ifrcAuthDrafts.setOffline(true);
@@ -309,14 +344,16 @@ function queueSave(options = {}) {
     if (!drainPromise) {
         drainPromise = (async () => {
             debugLog(MODULE_NAME, '🚰 drain start');
+            let lastResult;
             while (queuedOptions) {
                 const opts = queuedOptions;
                 queuedOptions = null;
                 debugLog(MODULE_NAME, '🚰 drain run save', opts);
-                await saveFormOnce(opts);
+                lastResult = await saveFormOnce(opts);
             }
             debugLog(MODULE_NAME, '🚰 drain end');
             drainPromise = null;
+            return lastResult;
         })();
     }
 
@@ -460,8 +497,9 @@ export function triggerSave() {
 }
 
 /**
- * Save form and return a promise that resolves on success or rejects on failure
- * Used when we need to save before submitting
+ * Save form and return a promise that resolves on success or rejects on failure.
+ * On network failure with auth drafts enabled, resolves with `{ success: true, offline: true }`
+ * (data saved locally; `formSubmitted` is not dispatched).
  */
 export async function saveFormBeforeSubmit(options = {}) {
     // Default: presave should not hijack the Save button UI or show "Progress saved..."

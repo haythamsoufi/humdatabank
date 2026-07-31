@@ -1,111 +1,20 @@
-"""Render publication-quality dashboards via HTML/SVG + Playwright."""
+"""Render publication-quality dashboards via Python HTML/SVG + WeasyPrint."""
 
 from __future__ import annotations
 
-import json
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from .font_faces import inject_chart_fonts
+from .config import resolve_report_dir
+from .html_raster import render_dashboard_png
 from .payload import build_payload
-from .line_chart import inject_line_chart_js
-
-if TYPE_CHECKING:
-    from playwright.sync_api import Browser, Playwright
-
-TEMPLATE_PATH = Path(__file__).parent / "templates" / "dashboard.html"
-_PLACEHOLDER = "__DASHBOARD_JSON__"
+from .report_meta import report_section_assets_dir, report_section_assets_ref
+from .render_embed import build_section_embed
 
 
-def chromium_launch_options() -> dict[str, Any]:
-    """Headless Chromium options for Linux containers (Azure App Service, Docker).
-
-    Without ``--no-sandbox``, ``chromium.launch()`` typically fails immediately on
-    Azure Linux because the process cannot create a new sandbox namespace.
-    """
-    options: dict[str, Any] = {"headless": True}
-    if sys.platform == "win32":
-        return options
-    options["args"] = [
-        "--no-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-    ]
-    return options
-
-
-class PlaywrightScreenshotSession:
-    """Reuse one Chromium instance for many HTML-to-PNG screenshots."""
-
-    def __init__(self, scale: float = 2.0) -> None:
-        self.scale = scale
-        self._playwright: Playwright | None = None
-        self._browser: Browser | None = None
-
-    def __enter__(self) -> PlaywrightScreenshotSession:
-        from playwright.sync_api import sync_playwright
-
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(**chromium_launch_options())
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        if self._browser is not None:
-            self._browser.close()
-            self._browser = None
-        if self._playwright is not None:
-            self._playwright.stop()
-            self._playwright = None
-
-    @property
-    def browser(self) -> Browser:
-        if self._browser is None:
-            raise RuntimeError("PlaywrightScreenshotSession is not active")
-        return self._browser
-
-    def screenshot_html(
-        self,
-        html: str,
-        selector: str,
-        output_path: Path,
-        *,
-        width: int,
-        height: int,
-    ) -> Path:
-        if self._browser is None:
-            raise RuntimeError("PlaywrightScreenshotSession is not active")
-
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-
-        page = self._browser.new_page(
-            viewport={"width": width, "height": height},
-            device_scale_factor=self.scale,
-        )
-        try:
-            page.set_content(html, wait_until="load")
-            page.evaluate("async () => { await document.fonts.ready; }")
-            page.wait_for_function("() => document.body.getAttribute('data-ready') === 'true'")
-            page.locator(selector).screenshot(path=str(output_path), type="png")
-        finally:
-            page.close()
-        return output_path
-
-
-def _build_html(payload: dict) -> str:
-    template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    if _PLACEHOLDER not in template:
-        raise ValueError(f"Template missing placeholder {_PLACEHOLDER}")
-    data_json = json.dumps(payload, ensure_ascii=False)
-    html = template.replace(_PLACEHOLDER, data_json)
-    html = inject_chart_fonts(html)
-    return inject_line_chart_js(html)
-
-
-def _dashboard_height(payload: dict) -> int:
-    """Estimate pixel height for viewport sizing."""
-    base = 130  # title + headers + footnote
+def _embed_dashboard_height(payload: dict[str, Any]) -> int:
+    """Estimate pixel height for dashboard PNG rasterization."""
+    base = 130
     for item in payload["cumulative"]:
         if item.get("unavailable"):
             base += 96
@@ -115,11 +24,15 @@ def _dashboard_height(payload: dict) -> int:
             base += 119
         else:
             base += 155
-    for pair in payload.get("donut_pairs", []):
+    for _pair in payload.get("donut_pairs", []):
         base += 90
     for _item in payload.get("donuts", []):
         base += 90
     return max(base, 400)
+
+
+# Backward-compatible alias used by tests and legacy callers.
+_dashboard_height = _embed_dashboard_height
 
 
 def render_dashboard_html(
@@ -129,37 +42,39 @@ def render_dashboard_html(
     language: str = "English",
     output_path: Path | None = None,
     scale: float = 2.0,
-    session: PlaywrightScreenshotSession | None = None,
+    session=None,
     mapping=None,
 ) -> Path:
-    """Render dashboard to PNG using HTML/SVG layout engine."""
-    payload = build_payload(model, section, language, mapping=mapping)
-    html = _build_html(payload)
-    width = int(payload.get("width", 827))
-    height = _dashboard_height(payload)
+    """Render dashboard to PNG using the same HTML embed path as the Quarto report."""
+    del session  # kept for caller compatibility during migration
 
     if output_path is None:
         raise ValueError("output_path is required for HTML renderer")
 
-    screenshot = (
-        session.screenshot_html(html, "#dashboard", output_path, width=width, height=height)
-        if session is not None
-        else _screenshot_once(html, "#dashboard", output_path, width=width, height=height, scale=scale)
+    report_root = resolve_report_dir()
+    assets_dir = report_section_assets_dir(report_root, language, section)
+    asset_prefix = report_section_assets_ref(language, section)
+    payload = build_payload(model, section, language, mapping=mapping)
+
+    dashboard_html = build_section_embed(
+        model,
+        section,
+        language=language,
+        assets_dir=assets_dir,
+        asset_url_prefix=asset_prefix,
+        render_assets=True,
+        mapping=mapping,
     )
-    return screenshot
 
-
-def _screenshot_once(
-    html: str,
-    selector: str,
-    output_path: Path,
-    *,
-    width: int,
-    height: int,
-    scale: float,
-) -> Path:
-    with PlaywrightScreenshotSession(scale=scale) as session:
-        return session.screenshot_html(html, selector, output_path, width=width, height=height)
+    return render_dashboard_png(
+        dashboard_html,
+        Path(output_path),
+        width=827,
+        height=_embed_dashboard_height(payload),
+        scale=scale,
+        base_url=report_root,
+        language=language,
+    )
 
 
 def render_dashboard_svg(
@@ -168,13 +83,25 @@ def render_dashboard_svg(
     *,
     language: str = "English",
     output_path: Path | None = None,
+    mapping=None,
 ) -> Path:
-    """Optional: save standalone HTML preview alongside PNG."""
-    payload = build_payload(model, section, language)
-    html = _build_html(payload)
+    """Save standalone HTML preview alongside PNG."""
+    del mapping
+    report_root = resolve_report_dir()
+    assets_dir = report_section_assets_dir(report_root, language, section)
+    asset_prefix = report_section_assets_ref(language, section)
+
+    dashboard_html = build_section_embed(
+        model,
+        section,
+        language=language,
+        assets_dir=assets_dir,
+        asset_url_prefix=asset_prefix,
+        render_assets=True,
+    )
     if output_path is None:
         raise ValueError("output_path is required")
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(html, encoding="utf-8")
+    output_path.write_text(dashboard_html, encoding="utf-8")
     return output_path

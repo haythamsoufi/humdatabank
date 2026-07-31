@@ -123,32 +123,13 @@ class TestPBProgressWorkbookUpload:
         assert "archived_workbook" not in result
 
 
-class TestPBProgressPlaywrightPaths:
-    def test_playwright_launch_error_detail_detects_missing_deps(self) -> None:
-        stderr = (
-            "╔══════════════════════════════════════════╗\n"
-            "║ Host system is missing dependencies      ║\n"
-            "║     playwright install-deps              ║\n"
-            "╚══════════════════════════════════════════╝\n"
-        )
-        detail = PBProgressService._playwright_launch_error_detail("", stderr)
-        assert "missing" in detail.lower() or "install-deps" in detail.lower()
+class TestPBProgressRenderStack:
+    def test_render_stack_error_detail_detects_missing_cairo(self) -> None:
+        stderr = "OSError: no library called \"cairo-2\" was found"
+        detail = PBProgressService._render_stack_error_detail("", stderr)
+        assert "cairo" in detail.lower()
 
-    def test_resolve_playwright_browsers_path_prefers_image_when_azure_empty(self, tmp_path, monkeypatch) -> None:
-        azure = tmp_path / "azure"
-        image = tmp_path / "image"
-        azure.mkdir()
-        image.mkdir()
-        chrome = image / "chromium-1234" / "chrome-linux"
-        chrome.mkdir(parents=True)
-        (chrome / "chrome").write_text("", encoding="utf-8")
-
-        monkeypatch.setattr(
-            "plugins.pb_progress.service.PLAYWRIGHT_BROWSERS_PATH_AZURE",
-            str(azure),
-        )
-        monkeypatch.setattr(
-            "plugins.pb_progress.service.PLAYWRIGHT_BROWSERS_PATH_IMAGE",
-            str(image),
-        )
-        assert PBProgressService._resolve_playwright_browsers_path() == str(image)
+    def test_render_stack_error_detail_detects_missing_weasyprint(self) -> None:
+        stderr = "ModuleNotFoundError: No module named 'weasyprint'"
+        detail = PBProgressService._render_stack_error_detail("", stderr)
+        assert "weasyprint" in detail.lower()

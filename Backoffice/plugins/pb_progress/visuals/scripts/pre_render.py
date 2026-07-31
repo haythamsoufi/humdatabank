@@ -19,7 +19,6 @@ from pb_figures.languages import discover_languages, is_rtl  # noqa: E402
 from pb_figures.layouts import section_codes, section_has_indicators  # noqa: E402
 from pb_figures.payload import build_payload  # noqa: E402
 from pb_figures.render_embed import build_section_embed, render_section_assets  # noqa: E402
-from pb_figures.render_html import PlaywrightScreenshotSession  # noqa: E402
 from pb_figures.translations import clear_cache  # noqa: E402
 from pb_figures.report_meta import (  # noqa: E402
     load_model,
@@ -43,51 +42,38 @@ def _render_language_assets(
     renderer: str,
     mapping,
 ) -> tuple[str, int, int, list[str]]:
-    """Render all chart + dashboard assets for one language.
-
-    Runs standalone (rebuilds its own model and opens its own Chromium instance)
-    so it can be executed in a worker process alongside other languages.
-    """
+    """Render all chart + dashboard assets for one language."""
     model = build_model(excel)
     chart_total = 0
     dashboard_total = 0
     log_lines = [f"  [{language}]"]
-    with PlaywrightScreenshotSession() as session:
-        for section in section_codes(excel):
-            if not section_has_indicators(mapping, section):
-                log_lines.append(f"    {section}/ (no indicators)")
-                continue
-            assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
-            payload = build_payload(model, section, language, mapping=mapping)
-            refs = render_section_assets(
-                payload, assets_dir, language=language, session=session,
-            )
-            label = f"({len(refs)} chart assets)" if refs else "(text-only)"
-            log_lines.append(f"    {section}/ {label}")
-            chart_total += len(refs)
+    for section in section_codes(excel):
+        if not section_has_indicators(mapping, section):
+            log_lines.append(f"    {section}/ (no indicators)")
+            continue
+        assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
+        payload = build_payload(model, section, language, mapping=mapping)
+        refs = render_section_assets(payload, assets_dir, language=language)
+        label = f"({len(refs)} chart assets)" if refs else "(text-only)"
+        log_lines.append(f"    {section}/ {label}")
+        chart_total += len(refs)
 
-            dash_path = resolve_figures_output() / language / f"{section}.png"
-            render_dashboard(
-                model,
-                section,
-                language=language,
-                output_path=dash_path,
-                renderer=renderer,
-                session=session,
-                mapping=mapping,
-            )
-            dashboard_total += 1
+        dash_path = resolve_figures_output() / language / f"{section}.png"
+        render_dashboard(
+            model,
+            section,
+            language=language,
+            output_path=dash_path,
+            renderer=renderer,
+            mapping=mapping,
+        )
+        dashboard_total += 1
     log_lines.append("")
     return language, chart_total, dashboard_total, log_lines
 
 
 def _generate_assets(excel: Path, languages: tuple[str, ...], mapping) -> tuple[int, int]:
-    """Render chart assets for HTML embed and full dashboard PNGs under Figures/.
-
-    Languages are independent of one another, so they are farmed out to a pool
-    of worker processes (each with its own Chromium instance) when there is
-    more than one language to render.
-    """
+    """Render chart assets for HTML embed and full dashboard PNGs under Figures/."""
     chart_total = 0
     dashboard_total = 0
     renderer = os.environ.get("PB_FIGURES_RENDERER", "html")

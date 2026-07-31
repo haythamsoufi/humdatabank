@@ -17,9 +17,8 @@ Choose **1** to build the full report (HTML + editable Word, all languages).
 - Python 3.11+
 - [Quarto](https://quarto.org/) (`winget install Posit.Quarto`)
 - Dependencies: `pip install -r requirements.txt`
-- Playwright browser: `python -m playwright install chromium`
-
-Use menu options **5** and **6** in `pb-report.bat` to install Python dependencies and Playwright Chromium.
+- Python dependencies: menu option **5** in `pb-report.bat`, or `pip install -r visuals/requirements.txt`
+- WeasyPrint uses the same Cairo/Pango libraries as the Backoffice app (no browser install required)
 
 ## Project layout
 
@@ -76,7 +75,7 @@ Close `SG Report.xlsx` in Excel before building. If it is open, the batch tool w
 | `PB_REPORT_EXCEL` | `SG Report.xlsx` | Override Excel data path |
 | `PB_REPORT_LANGUAGE` | `all` | Target language(s) |
 | `PB_REPORT_YEAR` | `2026` | Report year |
-| `PB_FIGURES_RENDERER` | `html` | `html` (Playwright, default) or `matplotlib` (legacy fallback) |
+| `PB_FIGURES_RENDERER` | `html` | `html` (Python SVG + WeasyPrint, default) or `matplotlib` (legacy fallback) |
 | `PB_FIGURES_STYLE` | `classic` | Figure visual style: `classic`, `modern`, or `professional` |
 | `PB_QUARTO_EXE` | *(auto)* | Override Quarto executable path |
 
@@ -110,4 +109,4 @@ Optional reference workbooks (for example `FDRS.xlsx`) belong in `Archive/refere
 
 ### Legacy renderer
 
-The Matplotlib renderer (`PB_FIGURES_RENDERER=matplotlib`) remains for debugging only. Production builds always use Playwright HTML/SVG.
+The Matplotlib renderer (`PB_FIGURES_RENDERER=matplotlib`) remains for debugging only. Production builds use Python SVG + WeasyPrint.

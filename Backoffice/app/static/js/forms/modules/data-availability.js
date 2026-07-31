@@ -318,30 +318,14 @@ function toggleFieldInputs(fieldContainer, disable, processedIds = new Set()) {
             input.style.cursor = 'not-allowed';
             input.style.pointerEvents = 'none';
 
-            // Add MutationObserver to prevent value changes
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' &&
-                        (mutation.attributeName === 'value' ||
-                         mutation.attributeName === 'data-value' ||
-                         mutation.attributeName === 'valueAsNumber')) {
-                        input.value = '';
-                        input.valueAsNumber = NaN;
-                    }
+            // Add input event listener to maintain disabled state.
+            // Remove any previous handler first so we never stack duplicates.
+            if (input._availabilityInputHandler) {
+                ['input', 'change', 'keydown', 'keyup', 'mousedown', 'mouseup', 'focus'].forEach(eventType => {
+                    input.removeEventListener(eventType, input._availabilityInputHandler, true);
                 });
-            });
-
-            observer.observe(input, {
-                attributes: true,
-                attributeFilter: ['value', 'data-value', 'valueAsNumber'],
-                characterData: true,
-                subtree: true
-            });
-
-            // Store the observer for cleanup
-            input._availabilityObserver = observer;
-
-            // Add input event listener to maintain disabled state
+                delete input._availabilityInputHandler;
+            }
             const preventInput = (e) => {
                 if (input.getAttribute('data-availability-disabled') === 'true') {
                     e.preventDefault();
@@ -377,12 +361,6 @@ function toggleFieldInputs(fieldContainer, disable, processedIds = new Set()) {
 
             // Remove data-availability-disabled attribute
             input.removeAttribute('data-availability-disabled');
-
-            // Remove MutationObserver
-            if (input._availabilityObserver) {
-                input._availabilityObserver.disconnect();
-                delete input._availabilityObserver;
-            }
 
             // Remove input event listener
             if (input._availabilityInputHandler) {

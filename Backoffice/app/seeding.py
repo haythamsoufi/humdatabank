@@ -7,6 +7,59 @@ from sqlalchemy import inspect
 
 from app.extensions import db
 
+# Full admin preset for the dev test admin (includes assignment management).
+_DEV_TEST_ADMIN_ROLE_CODE = "admin_full"
+
+
+def _ensure_rbac_seeded(app_instance) -> None:
+    """Best-effort RBAC catalog seed so role-permission links exist."""
+    try:
+        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+
+        stats = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+        app_instance.logger.debug("RBAC seed during default data: %s", stats)
+    except Exception as e:
+        app_instance.logger.debug("RBAC seed skipped during default data: %s", e)
+
+
+def _assign_role_to_user(user_id: int, role_code: str, *, name: str, description: str) -> bool:
+    """Assign an RBAC role if missing. Returns True when a new link was added."""
+    from app.models.rbac import RbacRole, RbacUserRole
+
+    role = RbacRole.query.filter_by(code=role_code).first()
+    if not role:
+        role = RbacRole(code=role_code, name=name, description=description)
+        db.session.add(role)
+        db.session.flush()
+
+    existing = RbacUserRole.query.filter_by(user_id=user_id, role_id=role.id).first()
+    if existing:
+        return False
+
+    db.session.add(RbacUserRole(user_id=user_id, role_id=role.id))
+    return True
+
+
+def _ensure_dev_test_admin_roles(user, app_instance) -> None:
+    """Ensure the dev test admin has full admin permissions (not view-only core)."""
+    try:
+        added = _assign_role_to_user(
+            int(user.id),
+            _DEV_TEST_ADMIN_ROLE_CODE,
+            name="Admin: Full (All admin roles)",
+            description="Full access to all admin modules (non-system-manager).",
+        )
+        if added:
+            db.session.commit()
+            app_instance.logger.info(
+                "Granted %s role to test admin '%s'",
+                _DEV_TEST_ADMIN_ROLE_CODE,
+                user.email,
+            )
+    except Exception as e:
+        db.session.rollback()
+        app_instance.logger.debug("RBAC test admin role assignment failed: %s", e)
+
 
 def create_default_data(app_instance):
     """Seed test country, RBAC roles, and test users. Development only."""
@@ -109,6 +162,8 @@ def create_default_data(app_instance):
                     db.session.commit()
                     app_instance.logger.info("Created default National Society for Testland")
 
+            _ensure_rbac_seeded(app_instance)
+
             from app.utils.organization_helpers import get_org_email_domain
 
             org_email_domain = get_org_email_domain()
@@ -126,19 +181,12 @@ def create_default_data(app_instance):
                     db.session.flush()
 
                     try:
-                        from app.models.rbac import RbacRole, RbacUserRole
-
-                        admin_role = RbacRole.query.filter_by(code="admin_core").first()
-                        if not admin_role:
-                            admin_role = RbacRole(
-                                code="admin_core",
-                                name="Admin (Core)",
-                                description="Baseline admin role",
-                            )
-                            db.session.add(admin_role)
-                            db.session.flush()
-
-                        db.session.add(RbacUserRole(user_id=admin.id, role_id=admin_role.id))
+                        _assign_role_to_user(
+                            int(admin.id),
+                            _DEV_TEST_ADMIN_ROLE_CODE,
+                            name="Admin: Full (All admin roles)",
+                            description="Full access to all admin modules (non-system-manager).",
+                        )
                     except Exception as e:
                         app_instance.logger.debug("RBAC admin role assignment failed: %s", e)
 
@@ -160,6 +208,7 @@ def create_default_data(app_instance):
                     )
             else:
                 app_instance.logger.info("Default admin user '%s' already exists.", test_admin_email)
+                _ensure_dev_test_admin_roles(admin_exists, app_instance)
 
             focal_point_user = User.query.filter_by(email=test_focal_email).first()
             if not focal_point_user:
@@ -172,19 +221,12 @@ def create_default_data(app_instance):
                     db.session.flush()
 
                     try:
-                        from app.models.rbac import RbacRole, RbacUserRole
-
-                        fp_role = RbacRole.query.filter_by(code="assignment_editor_submitter").first()
-                        if not fp_role:
-                            fp_role = RbacRole(
-                                code="assignment_editor_submitter",
-                                name="Assignment Editor/Submitter",
-                                description="Enter/edit/submit assignments for assigned entities",
-                            )
-                            db.session.add(fp_role)
-                            db.session.flush()
-
-                        db.session.add(RbacUserRole(user_id=focal_point.id, role_id=fp_role.id))
+                        _assign_role_to_user(
+                            int(focal_point.id),
+                            "assignment_editor_submitter",
+                            name="Assignment Editor/Submitter",
+                            description="Enter/edit/submit assignments for assigned entities",
+                        )
                     except Exception as e:
                         app_instance.logger.debug("RBAC focal point role assignment failed: %s", e)
 
@@ -229,19 +271,12 @@ def create_default_data(app_instance):
                     db.session.flush()
 
                     try:
-                        from app.models.rbac import RbacRole, RbacUserRole
-
-                        sys_role = RbacRole.query.filter_by(code="system_manager").first()
-                        if not sys_role:
-                            sys_role = RbacRole(
-                                code="system_manager",
-                                name="System Manager",
-                                description="Full access (superuser).",
-                            )
-                            db.session.add(sys_role)
-                            db.session.flush()
-
-                        db.session.add(RbacUserRole(user_id=sys_manager.id, role_id=sys_role.id))
+                        _assign_role_to_user(
+                            int(sys_manager.id),
+                            "system_manager",
+                            name="System Manager",
+                            description="Full access (superuser).",
+                        )
                     except Exception as e:
                         app_instance.logger.debug("RBAC system manager role assignment failed: %s", e)
 

@@ -319,44 +319,14 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
-# P&B Progress build dependencies (Quarto CLI + Playwright Chromium)
-# Values are hardcoded — no App Service variables required.
+# P&B Progress build dependencies (Quarto CLI).
+# WeasyPrint/Cairo libraries are installed above for PDF export site-wide.
 if [ "$(uname -s)" = "Linux" ]; then
   echo "=========================================="
   echo "P&B Progress: ensuring build dependencies"
   echo "=========================================="
 
-  export PLAYWRIGHT_BROWSERS_PATH="/home/site/playwright-browsers"
-  mkdir -p "$PLAYWRIGHT_BROWSERS_PATH"
-
-  _pb_chromium_ready() {
-    compgen -G "${1}/chromium-"*/chrome-linux/chrome > /dev/null 2>&1
-  }
-
-  if _pb_chromium_ready "/opt/playwright-browsers"; then
-    echo "✓ Playwright Chromium available in image (/opt/playwright-browsers)"
-  fi
-
-  if ! _pb_chromium_ready "$PLAYWRIGHT_BROWSERS_PATH"; then
-    echo "P&B: installing Playwright Chromium to ${PLAYWRIGHT_BROWSERS_PATH}..."
-    if ! python -m playwright install-deps chromium; then
-      echo "WARN: playwright install-deps failed"
-    fi
-    if ! python -m playwright install chromium; then
-      echo "WARN: Playwright Chromium install to ${PLAYWRIGHT_BROWSERS_PATH} failed"
-    fi
-  else
-    echo "✓ Playwright Chromium already available at ${PLAYWRIGHT_BROWSERS_PATH}"
-  fi
-
-  if ! _pb_chromium_ready "$PLAYWRIGHT_BROWSERS_PATH" && _pb_chromium_ready "/opt/playwright-browsers"; then
-    export PLAYWRIGHT_BROWSERS_PATH="/opt/playwright-browsers"
-    echo "P&B: using image-bundled Chromium at ${PLAYWRIGHT_BROWSERS_PATH}"
-  fi
-
-  # Persist Quarto under /home/site (survives container recycle on the same worker,
-  # like Playwright browsers). dpkg -i into the image layer re-runs on every cold start
-  # and adds ~30s before Gunicorn can answer /health.
+  # Persist Quarto under /home/site (survives container recycle on the same worker).
   _qver="1.6.42"
   _quarto_home="/home/site/quarto"
   _quarto_bin="${_quarto_home}/bin/quarto"

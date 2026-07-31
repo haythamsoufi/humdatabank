@@ -1691,3 +1691,34 @@ def api_delete_discussion_comment(comment_id):
     except Exception as e:
         db.session.rollback()
         return handle_json_view_exception(e, 'Failed to delete discussion comment', status_code=500)
+
+
+# ===================== Session Keepalive =====================
+
+@bp.route('/session/keepalive', methods=['POST'])
+@login_required
+@limiter.limit("5 per minute")
+def api_session_keepalive():
+    """Refresh session activity for users actively editing an entry form.
+
+    Intentionally NOT listed in SKIP_ACTIVITY_ENDPOINTS so every successful
+    call resets ``session['last_activity']`` and restarts the 30-minute
+    inactivity clock.  The client sends this only when genuine user
+    interaction (keystrokes / clicks) was detected, so silent background tabs
+    let the clock expire naturally.
+
+    Returns a fresh CSRF token so callers can simultaneously refresh the form
+    token before the 1-hour WTF_CSRF_TIME_LIMIT is reached.
+    """
+    try:
+        # The endpoint is in SKIP_ACTIVITY_ENDPOINTS so the before_request hook
+        # does NOT call update_session_activity().  Update last_activity here
+        # directly so the session inactivity clock is still reset.
+        from app.i18n import update_session_activity
+        update_session_activity()
+
+        from flask_wtf import csrf as _csrf_module
+        token = _csrf_module.generate_csrf()
+        return json_ok(csrf_token=token)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

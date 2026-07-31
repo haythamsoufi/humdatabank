@@ -137,7 +137,14 @@ def main():
                                 db.session.add(ns)
                             logger.info('Created default National Society for Testland')
 
-                    # Ensure baseline RBAC roles exist (legacy-free)
+                    # Ensure baseline RBAC roles and permission links exist
+                    try:
+                        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+
+                        seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                    except Exception as e:
+                        logger.debug("RBAC seed skipped during init_data: %s", e)
+
                     from app.models.rbac import RbacRole, RbacUserRole
                     def _ensure_role(code: str, name: str) -> int:
                         role = RbacRole.query.filter_by(code=code).first()
@@ -148,7 +155,7 @@ def main():
                         db.session.flush()
                         return int(role.id)
 
-                    admin_role_id = _ensure_role("admin_core", "Admin (Core)")
+                    admin_role_id = _ensure_role("admin_full", "Admin: Full (All admin roles)")
                     focal_role_id = _ensure_role("assignment_editor_submitter", "Assignment Editor/Submitter")
                     sys_role_id = _ensure_role("system_manager", "System Manager")
 

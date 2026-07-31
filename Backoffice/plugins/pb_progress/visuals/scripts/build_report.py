@@ -56,7 +56,7 @@ def _quarto_exe() -> str | None:
 
 
 def _serialize_docx_pdf(env: dict[str, str]) -> bool:
-    """When worker cap is 1, run Word then PDF sequentially to limit Chromium RAM."""
+    """When worker cap is 1, run Word then PDF sequentially to limit build RAM."""
     raw = (env.get("PB_BUILD_WORKERS") or "").strip()
     try:
         return int(raw) <= 1

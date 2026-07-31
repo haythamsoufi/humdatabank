@@ -78,13 +78,6 @@ RUN mkdir -p /app/app/static && \
 RUN mkdir -p /data/uploads && \
     chmod 755 /data/uploads
 
-# P&B Progress: Playwright Chromium + OS libraries (used for report figure rendering).
-# Browsers live in the image; entrypoint may mirror to /home/site on Azure workers.
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN mkdir -p /opt/playwright-browsers && \
-    python -m playwright install-deps chromium && \
-    python -m playwright install chromium
-
 # Entrypoint script (runs migrations at container startup, not at build time)
 COPY entrypoint.sh /app/entrypoint.sh
 COPY sshd_config /etc/ssh/sshd_config

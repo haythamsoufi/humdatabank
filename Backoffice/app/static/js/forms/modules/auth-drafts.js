@@ -1,11 +1,110 @@
 // Local drafts (IndexedDB) for authenticated (non-public) entry forms.
 // Goal: allow users to keep filling the form offline and "save" locally, then submit when online.
 
+import { ensureRepeatEntriesFromDraftData } from './repeat-sections.js';
+import {
+  collectFormData,
+  diffAgainstBaseline,
+  DRAFT_EXCLUDED_FIELDS,
+  draftHasContent,
+  escapeFieldName,
+  getActiveSectionContext,
+  getPersistedSectionContext,
+  mergeDraftRecords,
+  resolveDraftPayloadForRestore,
+  restoreFormData,
+  storeSuffixFromName,
+} from './auth-drafts-core.js';
+
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
 const DB_NAME = 'ifrc_forms';
 const LAST_SUFFIX_KEY = 'ifrc_auth_drafts_version';
 const IDB_SCHEMA_KEY = 'ifrc_auth_drafts_idb_schema_v2';
+const SPILL_PREFIX = 'ifrc_auth_draft_spill_';
+
+/** Synchronous localStorage backup for pagehide when async IndexedDB may not finish. */
+function spillDraftSync(key, data, updatedAt, diffBased) {
+  if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return;
+  try {
+    localStorage.setItem(SPILL_PREFIX + key, JSON.stringify({
+      key, data, updatedAt, diffBased: !!diffBased,
+    }));
+  } catch (_) { /* quota / private mode */ }
+}
+
+function readSpilledDraft(key) {
+  try {
+    const raw = localStorage.getItem(SPILL_PREFIX + key);
+    if (!raw) return null;
+    const rec = JSON.parse(raw);
+    if (rec && rec.key === key && rec.data && typeof rec.data === 'object') return rec;
+  } catch (_) { /* no-op */ }
+  return null;
+}
+
+function clearSpilledDraft(key) {
+  try { localStorage.removeItem(SPILL_PREFIX + key); } catch (_) { /* no-op */ }
+}
+
+let _cachedDb = null;
+let _openDbPromise = null;
+
+function invalidateDbCache() {
+  _openDbPromise = null;
+  if (_cachedDb) {
+    try { _cachedDb.close(); } catch (_) { /* no-op */ }
+    _cachedDb = null;
+  }
+}
+
+function attachDbLifecycle(db) {
+  db.onversionchange = () => {
+    authDraftLog('openDb', { ok: true, reason: 'versionchange' });
+    invalidateDbCache();
+    try { db.close(); } catch (_) { /* no-op */ }
+  };
+  db.onclose = () => {
+    if (_cachedDb === db) {
+      _cachedDb = null;
+      _openDbPromise = null;
+    }
+  };
+}
+
+/** Migrate legacy auth_drafts_* stores sequentially within the upgrade transaction. */
+function migrateOldAuthDraftStores(tx, db, currentStoreName, oldStoreNames, index = 0) {
+  if (index >= oldStoreNames.length) return;
+  const storeName = oldStoreNames[index];
+  if (!db.objectStoreNames.contains(storeName)) {
+    migrateOldAuthDraftStores(tx, db, currentStoreName, oldStoreNames, index + 1);
+    return;
+  }
+  const oldStore = tx.objectStore(storeName);
+  const newStore = tx.objectStore(currentStoreName);
+  const migrateReq = oldStore.getAll();
+  migrateReq.onsuccess = () => {
+    (migrateReq.result || []).forEach((rec) => {
+      try { newStore.put(rec); } catch (_) { /* no-op */ }
+    });
+    try {
+      db.deleteObjectStore(storeName);
+      authDraftLog('upgrade_migrate', {
+        ok: true,
+        from: storeName,
+        to: currentStoreName,
+        count: (migrateReq.result || []).length,
+      });
+    } catch (e) {
+      authDraftLog('upgrade_migrate', { ok: false, store: storeName, err: (e && e.message) || String(e) });
+    }
+    migrateOldAuthDraftStores(tx, db, currentStoreName, oldStoreNames, index + 1);
+  };
+  migrateReq.onerror = () => {
+    authDraftLog('upgrade_migrate', { ok: false, store: storeName, err: 'getAll failed' });
+    migrateOldAuthDraftStores(tx, db, currentStoreName, oldStoreNames, index + 1);
+  };
+}
 
 /** @param {string} phase */
 function authDraftLog(phase, detail) {
@@ -60,11 +159,6 @@ let STORE_NAME = 'auth_drafts_v1';
 
 let _authDraftsStorePrepared = false;
 
-function storeSuffixFromName(name) {
-  if (!name || typeof name !== 'string') return 'v1';
-  return name.startsWith('auth_drafts_') ? name.slice('auth_drafts_'.length) : name;
-}
-
 function isIndexedDBAvailable() {
   try {
     return typeof indexedDB !== 'undefined' && indexedDB !== null;
@@ -109,10 +203,10 @@ async function ensureFlutterBridgeForDraftsIfMobile() {
  * @param {object} data
  * @param {number} updatedAt
  */
-async function pushDraftToHost(key, data, updatedAt) {
+async function pushDraftToHost(key, data, updatedAt, diffBased) {
   if (!isMobileAppBridgeAvailable()) return false;
   try {
-    const payload = JSON.stringify({ key, data, updatedAt });
+    const payload = JSON.stringify({ key, data, updatedAt, diffBased: !!diffBased });
     await window.flutter_inappwebview.callHandler('authDraftPushToHost', payload);
     authDraftLog('host_push', { ok: true, fieldCount: data && typeof data === 'object' ? Object.keys(data).length : 0 });
     return true;
@@ -184,7 +278,10 @@ export async function prepareAuthDraftsStore() {
 
 function openDb() {
   if (!isIndexedDBAvailable()) return Promise.reject(new Error('IndexedDB unavailable'));
-  return new Promise((resolve, reject) => {
+  if (_cachedDb) return Promise.resolve(_cachedDb);
+  if (_openDbPromise) return _openDbPromise;
+
+  _openDbPromise = new Promise((resolve, reject) => {
     (async () => {
       if (!_authDraftsStorePrepared) await prepareAuthDraftsStore();
 
@@ -208,12 +305,15 @@ function openDb() {
 
       const req = indexedDB.open(DB_NAME, openVersion);
       req.onerror = () => {
+        _openDbPromise = null;
         const err = req.error || new Error('IndexedDB open error');
         authDraftLog('openDb', { ok: false, err: err.message, name: err.name, openVersion });
         reject(err);
       };
       req.onsuccess = () => {
         const db = req.result;
+        attachDbLifecycle(db);
+        _cachedDb = db;
         try {
           localStorage.setItem(IDB_SCHEMA_KEY, String(db.version));
           localStorage.setItem(LAST_SUFFIX_KEY, currentSuffix);
@@ -223,30 +323,27 @@ function openDb() {
       };
       req.onupgradeneeded = (event) => {
         const db = event.target.result;
+        const tx = event.target.transaction;
         const currentStoreName = STORE_NAME;
-        const oldStores = Array.from(db.objectStoreNames).filter(name =>
-          name.startsWith('auth_drafts_') && name !== currentStoreName
-        );
-        oldStores.forEach((storeName) => {
-          try {
-            if (db.objectStoreNames.contains(storeName)) {
-              db.deleteObjectStore(storeName);
-              authDraftLog('upgrade_delete', { ok: true, deleted: storeName });
-            }
-          } catch (e) {
-            authDraftLog('upgrade_delete', { ok: false, store: storeName, err: (e && e.message) || String(e) });
-          }
-        });
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+        if (!db.objectStoreNames.contains(currentStoreName)) {
+          db.createObjectStore(currentStoreName, { keyPath: 'key' });
           authDraftLog('upgrade_create', { ok: true, idbStore: STORE_NAME });
         }
+        const oldStores = Array.from(db.objectStoreNames).filter((name) =>
+          name.startsWith('auth_drafts_') && name !== currentStoreName
+        );
+        migrateOldAuthDraftStores(tx, db, currentStoreName, oldStores);
       };
-    })().catch(reject);
+    })().catch((err) => {
+      _openDbPromise = null;
+      reject(err);
+    });
   });
+
+  return _openDbPromise;
 }
 
-async function saveDraft(key, data) {
+async function saveDraft(key, data, diffBased = false) {
   const updatedAt = Date.now();
   const t0 = Date.now();
   const fieldCount = data && typeof data === 'object' ? Object.keys(data).length : 0;
@@ -258,11 +355,12 @@ async function saveDraft(key, data) {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error || new Error('tx error'));
-        tx.objectStore(STORE_NAME).put({ key, data, updatedAt });
+        tx.objectStore(STORE_NAME).put({ key, data, updatedAt, diffBased: !!diffBased });
       });
+      clearSpilledDraft(key);
       updateDraftDiagSnapshot(data);
       idbSaved = true;
-      authDraftLog('save', { ok: true, fieldCount, ms: Date.now() - t0 });
+      authDraftLog('save', { ok: true, fieldCount, diffBased: !!diffBased, ms: Date.now() - t0 });
     } catch (e) {
       authDraftLog('save', {
         ok: false,
@@ -273,11 +371,46 @@ async function saveDraft(key, data) {
       });
     }
   }
-  const pushed = await pushDraftToHost(key, data, updatedAt);
+  const pushed = await pushDraftToHost(key, data, updatedAt, diffBased);
   if (!idbSaved && pushed) {
     updateDraftDiagSnapshot(data);
     authDraftLog('save', { ok: true, fieldCount, source: 'host_only', ms: Date.now() - t0 });
   }
+}
+
+async function deleteDraft(key) {
+  const t0 = Date.now();
+  clearSpilledDraft(key);
+  if (isIndexedDBAvailable()) {
+    try {
+      const db = await openDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error || new Error('tx error'));
+        tx.objectStore(STORE_NAME).delete(key);
+      });
+      authDraftLog('delete', { ok: true, ms: Date.now() - t0 });
+    } catch (e) {
+      authDraftLog('delete', {
+        ok: false,
+        err: (e && e.message) || String(e),
+        name: e && e.name,
+        ms: Date.now() - t0,
+      });
+    }
+  }
+  if (isMobileAppBridgeAvailable()) {
+    try {
+      await window.flutter_inappwebview.callHandler(
+        'authDraftPushToHost',
+        JSON.stringify({ key, data: null, updatedAt: 0, deleted: true }),
+      );
+    } catch (_) { /* no-op */ }
+  }
+  try {
+    window.__ifrcAuthDraftsDiagSnapshot = { fieldCount: 0, hasRecord: false, updatedAt: Date.now() };
+  } catch (_) { /* no-op */ }
 }
 
 async function loadDraft(key) {
@@ -307,21 +440,13 @@ async function loadDraft(key) {
   if (isMobileAppBridgeAvailable()) {
     hostRec = await pullDraftFromHost(key);
   }
-  let rec = null;
-  let source = 'none';
-  if (idbRec && idbRec.data && hostRec && hostRec.data) {
-    const idbT = idbRec.updatedAt || 0;
-    const hostT = hostRec.updatedAt || 0;
-    rec = idbT >= hostT ? idbRec : hostRec;
-    source = idbT >= hostT ? 'idb' : 'host';
-  } else if (idbRec && idbRec.data) {
-    rec = idbRec;
-    source = 'idb';
-  } else if (hostRec && hostRec.data) {
-    rec = hostRec;
-    source = 'host';
+  let { rec, source } = mergeDraftRecords(idbRec, hostRec);
+  const spilled = readSpilledDraft(key);
+  if (spilled && (!rec || (spilled.updatedAt || 0) > (rec.updatedAt || 0))) {
+    rec = spilled;
+    source = 'spill';
   }
-  if (rec && rec.data && source === 'host' && isIndexedDBAvailable()) {
+  if (rec && rec.data && (source === 'host' || source === 'spill') && isIndexedDBAvailable()) {
     try {
       const db = await openDb();
       await new Promise((resolve, reject) => {
@@ -332,8 +457,10 @@ async function loadDraft(key) {
           key,
           data: rec.data,
           updatedAt: rec.updatedAt || Date.now(),
+          diffBased: !!rec.diffBased,
         });
       });
+      if (source === 'spill') clearSpilledDraft(key);
       updateDraftDiagSnapshot(rec.data);
     } catch (_) { /* no-op */ }
   }
@@ -364,41 +491,6 @@ function showCustomConfirm(message) {
   });
 }
 
-function collectFormData(form) {
-  const data = {};
-  Array.from(form.elements).forEach((el) => {
-    if (!el || !el.name) return;
-    if (el.disabled) return;
-    if (el.type === 'file') return; // can't persist uploads in MVP
-
-    try {
-      if (el instanceof RadioNodeList) {
-        return;
-      }
-    } catch (_) { /* no-op */ }
-
-    if (el.type === 'checkbox') {
-      const same = form.querySelectorAll(`[name="${CSS.escape(el.name)}"]`);
-      if (same.length > 1) {
-        data[el.name] = Array.from(same).filter(n => n.checked).map(n => n.value);
-      } else {
-        data[el.name] = !!el.checked;
-      }
-      return;
-    }
-
-    if (el.type === 'radio') {
-      const group = form.elements[el.name];
-      const selected = Array.from(group).find((n) => n.checked);
-      data[el.name] = selected ? selected.value : '';
-      return;
-    }
-
-    data[el.name] = el.value;
-  });
-  return data;
-}
-
 function waitForFormInitialized(maxMs = 90000) {
   return new Promise((resolve) => {
     const done = () => resolve();
@@ -425,25 +517,230 @@ function waitForFormInitialized(maxMs = 90000) {
   });
 }
 
-function restoreFormData(form, data) {
-  if (!data) return;
-  Object.entries(data).forEach(([name, value]) => {
-    const el = form.elements.namedItem(name);
-    if (!el) return;
-    if (el instanceof RadioNodeList) {
-      Array.from(el).forEach((n) => {
-        if (n.type === 'checkbox') {
-          n.checked = Array.isArray(value) && value.includes(n.value);
-        } else if (n.type === 'radio') {
-          n.checked = value === n.value;
+/** Block edits while the restore prompt / async restore chain is in flight. */
+function setFormRestorePending(form, pending) {
+  if (!form) return;
+  if (pending) {
+    form.setAttribute('aria-busy', 'true');
+    form.classList.add('auth-draft-restore-pending');
+    form.querySelectorAll('input, select, textarea, button').forEach((el) => {
+      if (el.dataset.authDraftRestoreLock === '1') return;
+      el.dataset.authDraftRestoreLock = '1';
+      el.dataset.authDraftRestoreWasDisabled = el.disabled ? '1' : '0';
+      el.disabled = true;
+    });
+    return;
+  }
+  form.removeAttribute('aria-busy');
+  form.classList.remove('auth-draft-restore-pending');
+  form.querySelectorAll('[data-auth-draft-restore-lock="1"]').forEach((el) => {
+    el.disabled = el.dataset.authDraftRestoreWasDisabled === '1';
+    delete el.dataset.authDraftRestoreLock;
+    delete el.dataset.authDraftRestoreWasDisabled;
+  });
+}
+
+/** Scroll container for the entry form (main element or window). */
+function getFormScrollContainer() {
+  const main = document.querySelector('main[style*="overflow-y"]') || document.querySelector('main');
+  if (main && main.scrollHeight > main.clientHeight) return main;
+  return window;
+}
+
+/**
+ * Raw scroll offsets as a fallback when no section id can be resolved.
+ */
+function captureViewportAnchor() {
+  const hash = (window.location.hash || '').replace(/^#/, '');
+  const anchorEl = hash ? document.getElementById(hash) : null;
+  const container = getFormScrollContainer();
+  const sidebarNav = document.getElementById('sidebar-nav-scroll');
+
+  if (anchorEl && anchorEl.isConnected) {
+    const containerRect = container === window ? { top: 0 } : container.getBoundingClientRect();
+    const state = {
+      mode: 'anchor',
+      anchorId: hash,
+      container,
+      anchorTopInViewport: anchorEl.getBoundingClientRect().top - containerRect.top,
+      windowY: window.scrollY,
+      containerScrollTop: container === window ? null : container.scrollTop,
+      sidebarNavScroll: sidebarNav ? sidebarNav.scrollTop : null,
+    };
+    return state;
+  }
+
+  return {
+    mode: 'offset',
+    container,
+    windowY: window.scrollY,
+    containerScrollTop: container === window ? null : container.scrollTop,
+    sidebarNavScroll: sidebarNav ? sidebarNav.scrollTop : null,
+  };
+}
+
+function restoreViewportAnchorSync(state) {
+  if (!state) return;
+  if (state.mode === 'anchor' && state.anchorId) {
+    const el = document.getElementById(state.anchorId);
+    const container = state.container || getFormScrollContainer();
+    if (el && el.isConnected) {
+      const containerRect = container === window ? { top: 0 } : container.getBoundingClientRect();
+      const delta = (el.getBoundingClientRect().top - containerRect.top) - state.anchorTopInViewport;
+      if (Math.abs(delta) > 1) {
+        if (container === window) {
+          window.scrollBy(0, delta);
+        } else {
+          container.scrollTop += delta;
         }
-      });
-    } else if (el.type === 'checkbox') {
-      el.checked = !!value;
-    } else {
-      el.value = value;
+      }
+    }
+  } else {
+    if (state.containerScrollTop != null && state.container && state.container !== window) {
+      state.container.scrollTop = state.containerScrollTop;
+    }
+    window.scrollTo(window.scrollX, state.windowY);
+  }
+  if (state.sidebarNavScroll != null) {
+    const nav = document.getElementById('sidebar-nav-scroll');
+    if (nav) nav.scrollTop = state.sidebarNavScroll;
+  }
+}
+
+function needsPaginationPageChange(pageNumber) {
+  const pag = window.__ifrcPagination;
+  if (!pag || pageNumber == null || typeof pag.getCurrentPageNumber !== 'function') return false;
+  const target = parseInt(String(pageNumber), 10);
+  if (!Number.isFinite(target)) return false;
+  const current = pag.getCurrentPageNumber();
+  return current != null && current !== target;
+}
+
+/** Wait for pagination / scroll-spy to highlight the stored section before the restore dialog. */
+async function waitForInitialSectionScroll(expectedSectionId, maxMs = 4500) {
+  if (!expectedSectionId) return { matched: false, reason: 'no_expected_section' };
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    const activeLink = document.querySelector('a.section-link.is-active');
+    const activeId = activeLink?.dataset?.sectionId
+      || (activeLink?.getAttribute('href') || '').replace(/^#/, '');
+    const el = document.getElementById(expectedSectionId);
+    const rect = el ? el.getBoundingClientRect() : null;
+    const inView = rect && rect.top < window.innerHeight * 0.6 && rect.bottom > 80;
+    if (activeId === expectedSectionId || inView) {
+      return { matched: true, activeId, inView: !!inView, waitedMs: Date.now() - start };
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return { matched: false, reason: 'timeout', waitedMs: Date.now() - start };
+}
+
+/** Return user to their section after draft restore (paginated forms + anchor nudge). */
+function restoreSectionAfterDraft(ctx, viewportFallback) {
+  try {
+    window.__ifrcSectionNavScrollSpy?.pause?.(4000);
+  } catch (_) { /* no-op */ }
+
+  const pag = window.__ifrcPagination;
+  if (ctx?.sectionId && pag && typeof pag.navigateToSection === 'function' && needsPaginationPageChange(ctx.pageNumber)) {
+    pag.navigateToSection(ctx.sectionId, ctx.pageNumber);
+  }
+  if (viewportFallback) restoreViewportAnchorSync(viewportFallback);
+}
+
+/** Re-apply section scroll after async layout work (relevance, matrix repaint). */
+function scheduleSectionContextRestore(ctx, viewportFallback) {
+  restoreSectionAfterDraft(ctx, viewportFallback);
+  document.addEventListener('ifrc:relevance-settled', () => restoreSectionAfterDraft(ctx, viewportFallback), { once: true });
+  [200, 800].forEach((ms) => setTimeout(() => restoreSectionAfterDraft(ctx, viewportFallback), ms));
+}
+
+/**
+ * toggleDisaggregationInputs clears input values in the selected container for
+ * non-total modes ("prevent value replication"); re-apply the draft values it
+ * just wiped, then let the calculator recompute totals via change events.
+ */
+function reapplyDraftValuesToDisaggContainer(draftData, radio, fieldId, itemType, mode) {
+  if (mode === 'total') return;
+  const scope = radio.closest('.repeat-entry') || document;
+  const container = scope.querySelector(
+    `.disaggregation-inputs[data-parent-id="${escapeFieldName(String(fieldId))}"][data-item-type="${itemType}"][data-mode="${escapeFieldName(mode)}"]`,
+  );
+  if (!container) return;
+  container.querySelectorAll('input[name]').forEach((input) => {
+    if (!Object.prototype.hasOwnProperty.call(draftData, input.name)) return;
+    const v = draftData[input.name];
+    if (typeof v !== 'string' && typeof v !== 'number') return;
+    if (input.value === String(v)) return;
+    input.value = v;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+/** Re-sync disaggregation container visibility to match restored reporting-mode radios. */
+function syncDisaggregationModesAfterRestore(form, draftData) {
+  if (!form || !draftData || typeof window.toggleDisaggregationInputs !== 'function') return;
+  const seen = new Set();
+  Object.keys(draftData).forEach((name) => {
+    if (!name.endsWith('_reporting_mode') || seen.has(name)) return;
+    seen.add(name);
+    const mode = draftData[name];
+    if (!mode) return;
+    const radio = form.querySelector(
+      `input[type="radio"][name="${escapeFieldName(name)}"][value="${escapeFieldName(String(mode))}"]`,
+    );
+    if (!radio || !radio.checked) return;
+
+    const standardMatch = name.match(/^(indicator|dynamic)_(.+)_reporting_mode$/);
+    if (standardMatch) {
+      const itemType = standardMatch[1];
+      let fieldId = standardMatch[2];
+      if (itemType === 'dynamic') {
+        const fieldContainer = radio.closest('[data-assignment-id]');
+        const containerFieldId = fieldContainer?.getAttribute('data-item-id');
+        if (containerFieldId) fieldId = containerFieldId;
+      }
+      window.toggleDisaggregationInputs(fieldId, String(mode), itemType, radio);
+      reapplyDraftValuesToDisaggContainer(draftData, radio, fieldId, itemType, String(mode));
+      return;
+    }
+
+    const repeatMatch = name.match(/^repeat_\d+_\d+_field_\d+_reporting_mode$/);
+    if (repeatMatch) {
+      const block = radio.closest('.form-item-block');
+      const fieldId = block?.getAttribute('data-item-id');
+      const itemType = block?.getAttribute('data-item-type') === 'indicator' ? 'indicator' : 'dynamic';
+      if (fieldId) {
+        window.toggleDisaggregationInputs(fieldId, String(mode), itemType, radio);
+        reapplyDraftValuesToDisaggContainer(draftData, radio, fieldId, itemType, String(mode));
+      }
     }
   });
+}
+
+/** Fire input/change on restored fields so widgets, DNA flags, and calculators sync. */
+function dispatchRestoredFieldEvents(form, draftData) {
+  if (!form || !draftData) return;
+  const restoredNames = new Set(Object.keys(draftData));
+
+  // DNA / N/A first — toggles field disable state before value fields notify listeners.
+  Array.from(form.querySelectorAll('input[type="checkbox"]')).forEach((el) => {
+    if (!el.name || !restoredNames.has(el.name)) return;
+    if (!el.name.includes('_data_not_available') && !el.name.includes('_not_applicable')) return;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+
+  Array.from(form.querySelectorAll('input, select, textarea')).forEach((el) => {
+    if (!el.name || !restoredNames.has(el.name)) return;
+    if (DRAFT_EXCLUDED_FIELDS.has(el.name)) return;
+    if (el.name.includes('_data_not_available') || el.name.includes('_not_applicable')) return;
+    if (el.name.endsWith('_reporting_mode')) return;
+    if (el.type === 'radio' && !el.checked) return;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  syncDisaggregationModesAfterRestore(form, draftData);
 }
 
 function getAesId() {
@@ -455,7 +752,8 @@ function getAesId() {
 function getCurrentUserId() {
   const el = document.getElementById('presence-bar');
   const id = el?.getAttribute('data-current-user-id') || el?.dataset?.currentUserId;
-  return id ? String(id) : '0';
+  if (!id || String(id) === '0') return null;
+  return String(id);
 }
 
 export function initAuthDrafts() {
@@ -469,29 +767,83 @@ export function initAuthDrafts() {
   if (!aesId) return;
 
   const userId = getCurrentUserId();
+  if (!userId) return;
+
   const key = `auth:${userId}:${aesId}`;
   try {
     window.__ifrcAuthDraftsActiveKey = key;
   } catch (e) { /* no-op */ }
+
+  // ── Diff-based drafts ─────────────────────────────────────────────────
+  // Baseline = server-rendered form state captured once the form is ready.
+  // Drafts store only fields that differ from it, so a restore can never
+  // touch (let alone clear) DB-saved values the user never edited.
+  let baselineSnapshot = null;
+  let hasSavedChangesThisSession = false;
+
+  function runMatrixCollect() {
+    try {
+      if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
+        window.matrixHandler.collectMatrixData();
+      }
+    } catch (_) { /* no-op */ }
+  }
+
+  function captureBaseline(reason) {
+    runMatrixCollect();
+    baselineSnapshot = collectFormData(form);
+    authDraftLog('baseline', { ok: true, reason, fieldCount: Object.keys(baselineSnapshot).length });
+  }
+
+  const baselineReady = waitForFormInitialized().then(() => {
+    if (!baselineSnapshot) captureBaseline('form_initialized');
+  });
+
+  /** Draft payload = changes vs baseline; null until the baseline exists. */
+  function collectDraftData() {
+    if (!baselineSnapshot) return null;
+    runMatrixCollect();
+    return diffAgainstBaseline(collectFormData(form), baselineSnapshot);
+  }
+
+  /**
+   * Persist current changes as a diff-based draft.
+   * Empty diff: skip the write — this protects a declined draft from being
+   * overwritten by idle timers. If we already saved changes this session and
+   * the user reverted everything back to the baseline, delete the stale draft.
+   */
+  async function saveDraftNow(source) {
+    if (window.__ifrcConditionsIsClearing === true) {
+      authDraftLog('save_skip', { ok: true, reason: 'conditions_clearing', source });
+      return;
+    }
+    const data = collectDraftData();
+    if (!data) {
+      authDraftLog('save_skip', { ok: true, reason: 'baseline_not_ready', source });
+      return;
+    }
+    const changed = Object.keys(data).length;
+    if (changed === 0) {
+      if (hasSavedChangesThisSession) {
+        hasSavedChangesThisSession = false;
+        await deleteDraft(key);
+        authDraftLog('save_skip', { ok: true, reason: 'reverted_to_baseline', source });
+      } else {
+        authDraftLog('save_skip', { ok: true, reason: 'no_changes', source });
+      }
+      return;
+    }
+    hasSavedChangesThisSession = true;
+    await saveDraft(key, data, true);
+  }
 
   function getOfflineBanner() {
     let el = document.getElementById('auth-offline-status-banner');
     if (!el) {
       el = document.createElement('div');
       el.id = 'auth-offline-status-banner';
-      el.style.position = 'fixed';
-      el.style.left = '0';
-      el.style.right = '0';
-      el.style.bottom = '0';
-      el.style.zIndex = '2147483646';
-      el.style.padding = '10px 14px';
-      el.style.background = '#f59e0b';
-      el.style.color = '#111827';
-      el.style.fontSize = '14px';
-      el.style.fontWeight = '600';
-      el.style.boxShadow = '0 -2px 8px rgba(0,0,0,.15)';
-      el.style.display = 'none';
-      el.style.textAlign = 'center';
+      el.className = 'auth-offline-status-banner';
+      el.setAttribute('role', 'status');
       el.textContent = _t('You are offline. You can keep working; drafts will be saved locally.');
       document.body.appendChild(el);
     }
@@ -503,7 +855,7 @@ export function initAuthDrafts() {
     isOffline = !!next;
     try {
       const el = getOfflineBanner();
-      el.style.display = isOffline ? 'block' : 'none';
+      el.classList.toggle('is-visible', isOffline);
 
       const flashMessagesContainers = document.querySelectorAll('.flash-messages');
       flashMessagesContainers.forEach((container) => {
@@ -518,6 +870,7 @@ export function initAuthDrafts() {
   }
 
   void (async () => {
+    let restorePending = false;
     try {
       await ensureFlutterBridgeForDraftsIfMobile();
       const record = await loadDraft(key);
@@ -530,18 +883,39 @@ export function initAuthDrafts() {
           };
         }
       } catch (_) { /* no-op */ }
-      if (!record || !record.data) {
+      if (!draftHasContent(record)) {
         authDraftLog('restore_skip', { ok: true, reason: 'no_record' });
         return;
       }
+      restorePending = true;
+      setFormRestorePending(form, true);
       await waitForFormInitialized();
+      await baselineReady;
+      const { data: restorableData } = resolveDraftPayloadForRestore(record, baselineSnapshot);
+      if (!draftHasContent({ data: restorableData })) {
+        if (!record.diffBased) void deleteDraft(key);
+        authDraftLog('restore_skip', { ok: true, reason: 'nothing_to_restore' });
+        return;
+      }
+      const persistedContext = getPersistedSectionContext();
+      await waitForInitialSectionScroll(persistedContext?.sectionId);
       const shouldRestore = isOffline || await showCustomConfirm(_t('A local draft is available for this form. Restore it?'));
       if (!shouldRestore) {
         authDraftLog('restore_skip', { ok: true, reason: 'user_declined' });
         return;
       }
-      authDraftLog('restore_start', { ok: true, fieldCount: Object.keys(record.data).length });
-      restoreFormData(form, record.data);
+      const sectionContext = getActiveSectionContext();
+      const viewportFallback = captureViewportAnchor();
+      const draftData = restorableData;
+      authDraftLog('restore_start', {
+        ok: true,
+        fieldCount: Object.keys(draftData).length,
+        diffBased: !!record.diffBased,
+        legacyConverted: !record.diffBased,
+        sectionId: sectionContext?.sectionId || '',
+      });
+      ensureRepeatEntriesFromDraftData(draftData);
+      restoreFormData(form, draftData);
       try {
         if (window.matrixHandler && typeof window.matrixHandler.syncFromDraftRestore === 'function') {
           await window.matrixHandler.syncFromDraftRestore();
@@ -550,16 +924,15 @@ export function initAuthDrafts() {
         authDraftLog('restore_matrix', { ok: false, err: (e && e.message) || String(e), name: e && e.name });
       }
       try {
-        Array.from(form.querySelectorAll('input, select, textarea')).forEach((el) => {
-          if (!el.name) return;
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+        dispatchRestoredFieldEvents(form, draftData);
       } catch (_) { /* no-op */ }
+      scheduleSectionContextRestore(sectionContext, viewportFallback);
       authDraftLog('restore_done', { ok: true });
       if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft restored'), 'info');
     } catch (e) {
       authDraftLog('restore_chain', { ok: false, err: (e && e.message) || String(e), name: e && e.name });
+    } finally {
+      if (restorePending) setFormRestorePending(form, false);
     }
   })();
 
@@ -590,24 +963,92 @@ export function initAuthDrafts() {
   if (draftBtn) {
     draftBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
-        window.matrixHandler.collectMatrixData();
-      }
-      saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft saved'), 'success'); });
+      saveDraftNow('draft_button').then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('Draft saved'), 'success'); });
     });
   }
 
   try {
     window.__ifrcAuthDrafts = {
-      saveNow: () => {
-        if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
-          window.matrixHandler.collectMatrixData();
-        }
-        return saveDraft(key, collectFormData(form));
-      },
-      setOffline
+      saveNow: () => saveDraftNow('api_save_now'),
+      setOffline,
+      /** Current unsaved diff vs the page-load baseline (debugging). */
+      getPendingDiff: () => collectDraftData(),
     };
   } catch (e) { /* no-op */ }
+
+  // ── Debounced draft auto-save on every input change ────────────────────
+  // Saves to IndexedDB silently (no toast) within 2 seconds of the user
+  // stopping interaction.  Works while online or offline.  A 2-minute fallback
+  // timer catches changes from rich widgets (Select2, matrix, plugins) that
+  // may not fire standard DOM input events.
+
+  let autoSaveDebounceTimer = null;
+  let autoSaveFallbackTimer = null;
+
+  const AUTO_SAVE_DEBOUNCE_MS = 2000;
+  const AUTO_SAVE_FALLBACK_MS = 2 * 60 * 1000;
+
+  async function runSilentDraftSave() {
+    if (window.__ifrcConditionsIsClearing === true) return;
+    try {
+      await saveDraftNow('auto');
+      authDraftLog('auto_save', { ok: true });
+    } catch (e) {
+      authDraftLog('auto_save', { ok: false, err: (e && e.message) || String(e) });
+    }
+  }
+
+  function scheduleFallbackSave() {
+    if (autoSaveFallbackTimer) clearTimeout(autoSaveFallbackTimer);
+    autoSaveFallbackTimer = setTimeout(async () => {
+      await runSilentDraftSave();
+      scheduleFallbackSave(); // keep the safety-net ticking
+    }, AUTO_SAVE_FALLBACK_MS);
+  }
+
+  function onFormActivity() {
+    if (window.__ifrcConditionsIsClearing === true) return;
+    if (autoSaveDebounceTimer) clearTimeout(autoSaveDebounceTimer);
+    autoSaveDebounceTimer = setTimeout(runSilentDraftSave, AUTO_SAVE_DEBOUNCE_MS);
+    scheduleFallbackSave();
+  }
+
+  void waitForFormInitialized().then(() => {
+    form.addEventListener('input', onFormActivity);
+    form.addEventListener('change', onFormActivity);
+    scheduleFallbackSave();
+  });
+
+  function flushDraftOnHide(source) {
+    if (autoSaveDebounceTimer) {
+      clearTimeout(autoSaveDebounceTimer);
+      autoSaveDebounceTimer = null;
+    }
+    try {
+      const data = collectDraftData();
+      if (data && Object.keys(data).length > 0) {
+        spillDraftSync(key, data, Date.now(), true);
+      }
+    } catch (_) { /* no-op */ }
+    void saveDraftNow(source);
+  }
+
+  window.addEventListener('pagehide', () => flushDraftOnHide('pagehide'));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushDraftOnHide('visibility_hidden');
+  });
+
+  // Drop the local draft only after a confirmed server save (explicit Save or presave).
+  document.addEventListener('formSubmitted', (e) => {
+    const action = e && e.detail && e.detail.action;
+    const result = e && e.detail && e.detail.result;
+    if (action !== 'save' || !result || result.success === false) return;
+    if (autoSaveDebounceTimer) { clearTimeout(autoSaveDebounceTimer); autoSaveDebounceTimer = null; }
+    captureBaseline('server_save');
+    hasSavedChangesThisSession = false;
+    void deleteDraft(key);
+    scheduleFallbackSave();
+  });
 
   try {
     window.__ifrcAuthDraftsPeekSync = function () {
@@ -654,11 +1095,8 @@ export function initAuthDrafts() {
     e.preventDefault();
     e.stopPropagation();
     if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
-    if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
-      window.matrixHandler.collectMatrixData();
-    }
     authDraftLog('intercept_save', { ok: true, source: 'button_or_submit' });
-    saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved locally.'), 'warning'); });
+    saveDraftNow('offline_intercept').then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved locally.'), 'warning'); });
   };
 
   const submitBtn = document.querySelector('button[name="action"][value="submit"]');
@@ -668,10 +1106,18 @@ export function initAuthDrafts() {
   form.addEventListener('submit', (e) => {
     if (!isOffline) return;
     e.preventDefault();
-    if (window.matrixHandler && typeof window.matrixHandler.collectMatrixData === 'function') {
-      window.matrixHandler.collectMatrixData();
-    }
     authDraftLog('intercept_save', { ok: true, source: 'form_submit' });
-    saveDraft(key, collectFormData(form)).then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved locally.'), 'warning'); });
+    saveDraftNow('offline_form_submit').then(() => { if (typeof window.showFlashMessage === 'function') window.showFlashMessage(_t('You are offline. Draft saved locally.'), 'warning'); });
   }, true);
 }
+
+/** @internal Vitest hooks for IndexedDB persistence (not a public form API). */
+export {
+  saveDraft,
+  loadDraft,
+  deleteDraft,
+  spillDraftSync,
+  readSpilledDraft,
+  clearSpilledDraft,
+  invalidateDbCache,
+};

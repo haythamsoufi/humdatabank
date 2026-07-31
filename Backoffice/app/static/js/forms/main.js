@@ -15,6 +15,7 @@ import { initUniqueSectionOptions } from './modules/unique-section-options.js';
 import { initDisaggregationCalculator } from './modules/disaggregation-calculator.js';
 import { initializeFormValidation } from './modules/form-validation.js';
 import { initAjaxSave, triggerSave, isSavingForm } from './modules/ajax-save.js';
+import { initSessionKeepalive } from './modules/session-keepalive.js';
 import { initPublicDrafts } from './modules/public-drafts.js';
 import { initAuthDrafts, prepareAuthDraftsStore } from './modules/auth-drafts.js';
 import { initTooltips } from './modules/tooltips.js';
@@ -177,6 +178,11 @@ async function initializeEntryForm() {
 
         // Initialize AJAX save functionality
         safeInit('initAjaxSave', () => initAjaxSave());
+
+        // Keep session alive while the user is actively filling the form.
+        // The keepalive fires every 20 min (well within the 30-min inactivity
+        // window) and also refreshes the CSRF token before the 1-hour limit.
+        safeInit('initSessionKeepalive', () => initSessionKeepalive());
 
         // Initialize PDF export functionality
         if (initPDFExport) {

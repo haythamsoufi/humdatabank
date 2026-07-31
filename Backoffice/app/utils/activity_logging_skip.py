@@ -71,6 +71,9 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "admin_analytics_api.end_session_api",
         # Legacy redirect shim only — not a user-facing action worth an activity row.
         "admin.legacy_api_key_admin_redirect",
+        # Session keepalive for entry-form users: session['last_activity'] is updated
+        # directly inside the handler; this entry only suppresses the UserActivityLog row.
+        "forms_api.api_session_keepalive",
     }
 )
 

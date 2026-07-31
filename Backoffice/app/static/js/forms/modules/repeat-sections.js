@@ -2681,6 +2681,35 @@ function reinitializeFormFeatures(repeatEntry) {
 // Data availability handling is now unified with standard sections for consistency.
 // Disaggregation logic is now shared with the main disaggregation calculator module.
 
+/**
+ * Create repeat DOM rows needed before auth-drafts applies field values.
+ * Parses repeat_{sectionId}_{instanceNumber}_* keys from a flat draft map.
+ * @param {Record<string, unknown>} draftData
+ */
+export function ensureRepeatEntriesFromDraftData(draftData) {
+    if (!draftData || typeof draftData !== 'object') return;
+
+    /** @type {Map<string, number>} */
+    const maxInstanceBySection = new Map();
+    Object.keys(draftData).forEach((name) => {
+        const match = name.match(/^repeat_(\d+)_(\d+)_/);
+        if (!match) return;
+        const sectionId = match[1];
+        const instanceNumber = parseInt(match[2], 10);
+        if (!Number.isFinite(instanceNumber) || instanceNumber < 1) return;
+        const prev = maxInstanceBySection.get(sectionId) || 0;
+        if (instanceNumber > prev) maxInstanceBySection.set(sectionId, instanceNumber);
+    });
+
+    maxInstanceBySection.forEach((maxInstance, sectionId) => {
+        const repeatContainer = document.getElementById(`repeat-entries-${sectionId}`);
+        if (!repeatContainer) return;
+        for (let instanceNumber = 1; instanceNumber <= maxInstance; instanceNumber += 1) {
+            ensureRepeatEntryForInstance(sectionId, instanceNumber, repeatContainer);
+        }
+    });
+}
+
 // Export functions that might be needed by other modules
 export {
     setupRepeatSections,

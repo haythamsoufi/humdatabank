@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -13,16 +12,15 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
 
-from .font_faces import inject_chart_fonts
 from .languages import ARABIC_VISUAL_FONT, LATIN_DOCX_FONT, is_rtl
 from .calculations import not_available
 from .layouts import cumulative_table_rows, mapping_from_model, section_has_indicators
-from .line_chart import inject_line_chart_js
+from .line_chart import render_line_chart_svg
+from .donut_chart import render_donut_svg
+from .svg_raster import write_svg_png
 from .payload import build_payload
-from .styles import style_payload
 from .report_meta import report_parts, report_titles
 
-CHART_ASSET_TEMPLATE = Path(__file__).parent / "templates" / "chart_asset.html"
 CHART_WIDTH_PX = 481
 IFRC_RED = RGBColor(0xC2, 0x25, 0x26)
 _DOCX_STYLES = ("Normal", "Title", "Heading 1", "Heading 2", "List Paragraph")
@@ -111,36 +109,6 @@ def _style_body_paragraph(
         _style_run(run, language, size=size)
 
 
-def _build_asset_html(asset_type: str, data: dict, width: int = CHART_WIDTH_PX) -> str:
-    template = CHART_ASSET_TEMPLATE.read_text(encoding="utf-8")
-    html = (
-        template.replace("__TYPE__", asset_type)
-        .replace("__WIDTH__", str(width))
-        .replace("__DASHBOARD_JSON__", json.dumps(data, ensure_ascii=False))
-    )
-    html = inject_chart_fonts(html)
-    return inject_line_chart_js(html)
-
-
-def _screenshot_html(
-    html: str,
-    selector: str,
-    output_path: Path,
-    width: int,
-    height: int,
-    *,
-    session=None,
-) -> None:
-    from .render_html import PlaywrightScreenshotSession
-
-    if session is not None:
-        session.screenshot_html(html, selector, output_path, width=width, height=height)
-        return
-
-    with PlaywrightScreenshotSession() as scoped:
-        scoped.screenshot_html(html, selector, output_path, width=width, height=height)
-
-
 def render_line_chart_asset(
     item: dict[str, Any],
     target_label: str,
@@ -151,23 +119,16 @@ def render_line_chart_asset(
     show_labels: bool = True,
     session=None,
 ) -> Path:
-    html = _build_asset_html(
-        "line",
-        {
-            "type": "line",
-            "item": item,
-            "width": width,
-            "target_label": target_label,
-            "language": language,
-            "chart_options": {
-                "showValueLabels": show_labels,
-                "showTargetLabels": show_labels,
-            },
-            **style_payload(),
-        },
-        width=width,
+    del session, language
+    svg = render_line_chart_svg(
+        item,
+        width,
+        chart_id="asset-line",
+        show_value_labels=show_labels,
+        show_target_labels=show_labels,
+        target_label=target_label,
     )
-    _screenshot_html(html, "#asset", output_path, width, 110, session=session)
+    write_svg_png(svg, output_path, width=width, height=110)
     return output_path
 
 
@@ -179,12 +140,9 @@ def render_donut_asset(
     show_label: bool = True,
     session=None,
 ) -> Path:
-    html = _build_asset_html(
-        "donut",
-        {"type": "donut", "item": item, "language": language, "show_label": show_label},
-        width=64,
-    )
-    _screenshot_html(html, "#asset", output_path, 64, 64, session=session)
+    del session
+    svg = render_donut_svg(item, show_label=show_label, language=language)
+    write_svg_png(svg, output_path, width=64, height=64)
     return output_path
 
 
@@ -445,7 +403,7 @@ def _add_donut_pair_block(
     doc.add_paragraph("")
 
 
-def _add_sp_section(doc: Document, payload: dict[str, Any], assets_dir: Path, *, session=None) -> None:
+def _add_sp_section(doc: Document, payload: dict[str, Any], assets_dir: Path) -> None:
     language = payload.get("language", "English")
     title = doc.add_paragraph(payload["title"])
     _style_heading_paragraph(title, language, size=12, color=IFRC_RED)
@@ -456,19 +414,19 @@ def _add_sp_section(doc: Document, payload: dict[str, Any], assets_dir: Path, *,
     for idx, item in enumerate(payload["cumulative"]):
         _add_cumulative_block(
             doc, item, labels, target_label, assets_dir, f'{payload["section"]}_cum_{idx}',
-            language=language, session=session,
+            language=language,
         )
 
     for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
         if len(pair) >= 2:
             _add_donut_pair_block(
                 doc, pair[:2], assets_dir, f'{payload["section"]}_pair_{row_idx}',
-                language=language, session=session,
+                language=language,
             )
         elif pair:
             _add_donut_block(
                 doc, pair[0], assets_dir, f'{payload["section"]}_pair_{row_idx}_0',
-                language=language, session=session,
+                language=language,
             )
 
     foot = doc.add_paragraph(payload["footnote"])
@@ -497,21 +455,18 @@ def render_report_docx(
 
     with tempfile.TemporaryDirectory(prefix="pb_assets_") as tmp:
         assets_dir = Path(tmp)
-        from .render_html import PlaywrightScreenshotSession
+        for part in parts:
+            part_title = part["title"].get(language, part["title"]["English"])
+            part_heading = doc.add_heading(part_title, level=1)
+            _style_heading_paragraph(part_heading, language, size=14, color=IFRC_RED)
 
-        with PlaywrightScreenshotSession() as session:
-            for part in parts:
-                part_title = part["title"].get(language, part["title"]["English"])
-                part_heading = doc.add_heading(part_title, level=1)
-                _style_heading_paragraph(part_heading, language, size=14, color=IFRC_RED)
-
-                for section in part["sections"]:
-                    if section not in section_order:
-                        continue
-                    if not section_has_indicators(full_mapping, section):
-                        continue
-                    payload = build_payload(model, section, language, mapping=full_mapping)
-                    _add_sp_section(doc, payload, assets_dir, session=session)
+            for section in part["sections"]:
+                if section not in section_order:
+                    continue
+                if not section_has_indicators(full_mapping, section):
+                    continue
+                payload = build_payload(model, section, language, mapping=full_mapping)
+                _add_sp_section(doc, payload, assets_dir)
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

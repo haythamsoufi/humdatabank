@@ -741,7 +741,11 @@
         renderBuildStages(running ? stageList : []);
 
         if (showCompletion && failed) {
-            setMessage(els.buildMessage, status.error || (cfg.i18n && cfg.i18n.reportGenerationFailed) || 'Report generation failed.', 'error');
+            let failText = status.error || (cfg.i18n && cfg.i18n.reportGenerationFailed) || 'Report generation failed.';
+            if (status.build_log_excerpt) {
+                failText = failText + '\n\n' + status.build_log_excerpt;
+            }
+            setMessage(els.buildMessage, failText, 'error');
             ui.trackingBuild = false;
         } else if (showCompletion && done) {
             const successText = (cfg.i18n && cfg.i18n.reportGeneratedSuccessfully) || 'Report generated successfully.';

@@ -603,6 +603,24 @@
             if (h > 0) els.iframe.style.height = h + 'px';
             return;
         }
+
+        if (event.data.type === 'pb-report-scroll-to' && els.iframe) {
+            var offsetTop = parseInt(event.data.top, 10);
+            if (!Number.isFinite(offsetTop)) return;
+            var scrollParent = findScrollParent(els.viewerToolbarWrap || els.iframe);
+            var iframeTop = 0;
+            var node = els.iframe;
+            while (node && node !== scrollParent) {
+                iframeTop += node.offsetTop;
+                node = node.offsetParent;
+            }
+            var gap = (toolbarPinned && els.viewerToolbar) ? els.viewerToolbar.offsetHeight + 12 : 16;
+            scrollParent.scrollTo({
+                top: Math.max(0, iframeTop + offsetTop - gap),
+                behavior: 'smooth',
+            });
+            return;
+        }
     });
 
     if (els.printBtn) {

@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pb_figures.config import build_workers, resolve_excel, cleanup_build_copy
+from pb_figures.config import build_workers, cleanup_build_copy, resolve_excel, resolve_report_output
 from pb_figures.data import build_model, load_mapping, load_sg_report
 from pb_figures.languages import discover_languages, docx_filename
 from pb_figures.layouts import SECTION_CODES
@@ -64,11 +64,12 @@ def main() -> None:
 
     excel = resolve_excel(args.excel)
     languages = _resolve_languages(excel, args)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir = resolve_report_output()
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     outputs: dict[str, Path] = {}
     for language in languages:
-        output = OUTPUT_DIR / docx_filename(language)
+        output = output_dir / docx_filename(language)
         if args.output and len(languages) == 1:
             output = args.output
         outputs[language] = output
@@ -96,7 +97,7 @@ def main() -> None:
                     _, output = future.result()
                     print(f"[generate_report_docx] wrote {output}")
 
-        default_copy = OUTPUT_DIR / "pb-report.docx"
+        default_copy = output_dir / "pb-report.docx"
         shutil.copy2(outputs[languages[0]], default_copy)
         print(f"[generate_report_docx] wrote {default_copy} (default)")
     finally:

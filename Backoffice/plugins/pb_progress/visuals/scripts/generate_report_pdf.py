@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pb_figures.config import build_workers, cleanup_build_copy, resolve_excel
+from pb_figures.config import build_workers, cleanup_build_copy, resolve_excel, resolve_report_output
 from pb_figures.data import load_sg_report
 from pb_figures.languages import discover_languages, pdf_filename
 from pb_figures.render_html import PlaywrightScreenshotSession
@@ -21,6 +21,14 @@ from pb_figures.render_pdf import render_report_pdf
 
 OUTPUT_DIR = ROOT / "report" / "output"
 HTML_REPORT = OUTPUT_DIR / "pb-report.html"
+
+
+def _output_dir() -> Path:
+    return resolve_report_output()
+
+
+def _html_report() -> Path:
+    return _output_dir() / "pb-report.html"
 
 
 def _render_one(html_path: Path, output_path: Path, language: str) -> tuple[str, Path]:
@@ -50,13 +58,14 @@ def main() -> None:
         help="Generate one combined PDF per Excel language",
     )
     parser.add_argument("--excel", type=Path, default=None)
-    parser.add_argument("--html", type=Path, default=HTML_REPORT)
+    parser.add_argument("--html", type=Path, default=None)
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
 
     excel = resolve_excel(args.excel)
     languages = _resolve_languages(excel, args)
-    html_path = args.html
+    output_dir = _output_dir()
+    html_path = args.html or _html_report()
 
     if not html_path.is_file():
         raise SystemExit(
@@ -64,11 +73,11 @@ def main() -> None:
             "Run build_report.py --format html first."
         )
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     outputs: dict[str, Path] = {}
     for language in languages:
-        output = OUTPUT_DIR / pdf_filename(language)
+        output = output_dir / pdf_filename(language)
         if args.output and len(languages) == 1:
             output = args.output
         outputs[language] = output

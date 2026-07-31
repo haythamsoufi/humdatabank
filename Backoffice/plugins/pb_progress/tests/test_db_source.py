@@ -14,6 +14,7 @@ from plugins.pb_progress.db_source import (
     _section_from_area,
     copy_mapping_row,
     export_dataset_to_excel,
+    generate_system_dataset,
     resolve_build_years,
     validate_uploaded_workbook,
     WorkbookValidationError,
@@ -219,3 +220,43 @@ def test_validate_uploaded_workbook_rejects_empty_mapping(tmp_path):
 
     with pytest.raises(WorkbookValidationError, match="no indicator IDs"):
         validate_uploaded_workbook(path)
+
+
+@pytest.mark.unit
+def test_generate_system_dataset_uploads_without_downloading_blob(monkeypatch):
+    uploaded: dict[str, object] = {}
+
+    def fake_upload(category, rel, data):
+        uploaded["category"] = category
+        uploaded["rel"] = rel
+        uploaded["size"] = len(data)
+
+    monkeypatch.setattr("plugins.pb_progress.db_source.storage_service.upload", fake_upload)
+
+    def fail_get_absolute_path(*_args, **_kwargs):
+        raise AssertionError("get_absolute_path must not be used when creating a new system dataset")
+
+    monkeypatch.setattr(
+        "plugins.pb_progress.db_source.storage_service.get_absolute_path",
+        fail_get_absolute_path,
+    )
+    monkeypatch.setattr(
+        "plugins.pb_progress.db_source.export_dataset_to_excel",
+        lambda _version, path: Path(path).write_bytes(b"PK fake xlsx"),
+    )
+    monkeypatch.setattr(
+        "plugins.pb_progress.db_source.build_dataset",
+        lambda _version: {
+            "mapping": [{"id": "1"}],
+            "final": [{"id": "1", "Year": "2027"}],
+            "total_reported": [{"Year": "2027"}],
+        },
+    )
+
+    summary = generate_system_dataset("2025-2026")
+
+    assert uploaded["rel"] == "versions/2025-2026/source/system_generated.xlsx"
+    assert uploaded["size"] > 0
+    assert summary["mapping_rows"] == 1
+    assert summary["final_rows"] == 1
+    assert summary["total_reported_rows"] == 1

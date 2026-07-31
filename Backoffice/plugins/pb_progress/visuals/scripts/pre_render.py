@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pb_figures.config import build_workers, resolve_excel, resolve_figures_output  # noqa: E402
+from pb_figures.config import build_workers, resolve_excel, resolve_figures_output, resolve_report_dir  # noqa: E402
 from pb_figures.charts import render_dashboard  # noqa: E402
 from pb_figures.data import build_model, load_mapping, load_sg_report  # noqa: E402
 from pb_figures.languages import discover_languages, is_rtl  # noqa: E402
@@ -57,7 +57,7 @@ def _render_language_assets(
             if not section_has_indicators(mapping, section):
                 log_lines.append(f"    {section}/ (no indicators)")
                 continue
-            assets_dir = report_section_assets_dir(ROOT, language, section)
+            assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
             payload = build_payload(model, section, language, mapping=mapping)
             refs = render_section_assets(
                 payload, assets_dir, language=language, session=session,
@@ -162,7 +162,7 @@ def _render_language_panel(
                 f'<h3 class="report-section-title" data-anchor="{_section_anchor(section)}">'
                 f"{html.escape(heading)}</h3>"
             )
-            assets_dir = report_section_assets_dir(ROOT, language, section)
+            assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
             asset_prefix = report_section_assets_ref(language, section)
             dashboard_html = build_section_embed(
                 model,
@@ -219,7 +219,7 @@ def main() -> None:
         flush=True,
     )
 
-    _generate_body(ROOT / "report" / "_body.qmd", model, languages, excel, mapping)
+    _generate_body(resolve_report_dir() / "_body.qmd", model, languages, excel, mapping)
 
 
 if __name__ == "__main__":

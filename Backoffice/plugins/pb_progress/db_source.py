@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import math
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +25,7 @@ from plugins.pb_progress.plugin_data_store import (
     STORAGE_CATEGORY,
     SYSTEM_GENERATED_NAME,
 )
-from plugins.pb_progress.versions import REPORT_VERSIONS, validate_version
+from plugins.pb_progress.versions import REPORT_VERSIONS, validate_version, version_storage_prefix
 
 FDRS_TEMPLATE_ID = 21
 UPR_TEMPLATE_ID = 33
@@ -800,11 +802,21 @@ def compare_final_with_uploaded(version: str) -> dict[str, Any]:
 
 def generate_system_dataset(version: str) -> dict[str, Any]:
     version = validate_version(version)
-    rel = f"versions/{version}/{SYSTEM_GENERATED_NAME}"
-    local_path = Path(storage_service.get_absolute_path(STORAGE_CATEGORY, rel))
-    export_dataset_to_excel(version, local_path)
-    with open(local_path, "rb") as handle:
-        storage_service.upload(STORAGE_CATEGORY, rel, handle.read())
+    rel = f"{version_storage_prefix(version)}{SYSTEM_GENERATED_NAME}"
+    temp_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+            temp_path = tmp.name
+        local_path = Path(temp_path)
+        export_dataset_to_excel(version, local_path)
+        with open(local_path, "rb") as handle:
+            storage_service.upload(STORAGE_CATEGORY, rel, handle.read())
+    finally:
+        if temp_path:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
     sheets = build_dataset(version)
     return {
         "version": version,

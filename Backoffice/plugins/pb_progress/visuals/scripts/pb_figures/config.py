@@ -67,6 +67,12 @@ def visuals_build_root() -> Path | None:
     return Path(raw) if raw else None
 
 
+def resolve_report_dir() -> Path:
+    """Writable report project root (_body.qmd, figures/, output/)."""
+    root = visuals_build_root()
+    return (root / "report") if root is not None else _DEFAULT_VISUALS_ROOT / "report"
+
+
 def resolve_figures_output() -> Path:
     """Dashboard PNG download folder; uses writable workspace on Azure when set."""
     root = visuals_build_root()
@@ -76,10 +82,34 @@ def resolve_figures_output() -> Path:
 
 
 def resolve_report_output() -> Path:
-    """Quarto/DOCX/PDF output directory (always under the plugin report tree)."""
-    path = _DEFAULT_VISUALS_ROOT / "report" / "output"
+    """Quarto/DOCX/PDF output directory."""
+    path = resolve_report_dir() / "output"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+_REPORT_STATIC_FILES = ("pb-report.qmd", "_quarto.yml")
+_REPORT_STATIC_DIRS = ("styles", "partials", "fonts")
+
+
+def prepare_report_workspace(source_report: Path, target_report: Path) -> Path:
+    """Copy static Quarto project files into a writable build workspace."""
+    target_report.mkdir(parents=True, exist_ok=True)
+    for name in _REPORT_STATIC_FILES:
+        src = source_report / name
+        if src.is_file():
+            shutil.copy2(src, target_report / name)
+    for name in _REPORT_STATIC_DIRS:
+        src = source_report / name
+        dest = target_report / name
+        if not src.is_dir():
+            continue
+        if dest.exists():
+            shutil.rmtree(dest)
+        shutil.copytree(src, dest)
+    (target_report / "figures").mkdir(parents=True, exist_ok=True)
+    (target_report / "output").mkdir(parents=True, exist_ok=True)
+    return target_report
 
 
 def _is_readable(path: Path) -> bool:

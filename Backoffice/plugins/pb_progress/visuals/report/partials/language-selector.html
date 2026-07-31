@@ -137,6 +137,194 @@ document.addEventListener("DOMContentLoaded", function () {
     return tocHostCache;
   }
 
+  const TOC_NARROW_MAX = 1100;
+  const TOC_STATE_KEY = "pb-report-toc-user-state";
+
+  function isNarrowViewport() {
+    return window.innerWidth < TOC_NARROW_MAX;
+  }
+
+  function tocOverlapsContent() {
+    const toc = document.getElementById("toc");
+    const sample =
+      document.querySelector(".pb-lang-panel:not([hidden]) .pb-dashboard") ||
+      document.querySelector(".pb-dashboard") ||
+      main;
+    if (!toc || !sample) return isNarrowViewport();
+    const tocRect = toc.getBoundingClientRect();
+    const contentRect = sample.getBoundingClientRect();
+    return tocRect.width > 0 && tocRect.left < contentRect.right - 24;
+  }
+
+  function shouldAutoCollapseToc() {
+    return isNarrowViewport() || tocOverlapsContent();
+  }
+
+  function tocTitleText() {
+    return "Contents";
+  }
+
+  function ensureTocHeader(toc) {
+    if (!toc || toc.querySelector(".pb-toc-header")) return;
+
+    const title = toc.querySelector("#toc-title");
+    const header = document.createElement("div");
+    header.className = "pb-toc-header";
+
+    if (title) {
+      title.textContent = tocTitleText();
+      header.appendChild(title);
+    } else {
+      header.innerHTML = '<h2 id="toc-title">' + tocTitleText() + "</h2>";
+    }
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "pb-toc-toggle-btn";
+    toggleBtn.setAttribute("aria-controls", "toc");
+    toggleBtn.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleTocCollapsed(true);
+    });
+    header.appendChild(toggleBtn);
+    toc.insertBefore(header, toc.firstChild);
+  }
+
+  function updateTocToggleButton(toc) {
+    const btn = toc.querySelector(".pb-toc-toggle-btn");
+    if (!btn) return;
+    const collapsed = toc.classList.contains("pb-report-toc-collapsed");
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    btn.setAttribute(
+      "aria-label",
+      collapsed ? "Expand table of contents" : "Collapse table of contents"
+    );
+    btn.title = btn.getAttribute("aria-label");
+    if (collapsed) {
+      btn.innerHTML =
+        '<span class="pb-toc-toggle-label">' +
+        tocTitleText() +
+        '</span><span class="pb-toc-toggle-chevron" aria-hidden="true"></span>';
+    } else {
+      btn.innerHTML =
+        '<span class="pb-toc-toggle-chevron pb-toc-toggle-chevron-up" aria-hidden="true"></span>';
+    }
+  }
+
+  function setTocCollapsed(collapsed, userInitiated) {
+    const toc = document.getElementById("toc");
+    if (!toc) return;
+    ensureTocHeader(toc);
+    toc.classList.toggle("pb-report-toc-collapsed", collapsed);
+    if (userInitiated) {
+      sessionStorage.setItem(TOC_STATE_KEY, collapsed ? "collapsed" : "expanded");
+    }
+    updateTocToggleButton(toc);
+  }
+
+  function toggleTocCollapsed(userInitiated) {
+    const toc = document.getElementById("toc");
+    if (!toc) return;
+    setTocCollapsed(!toc.classList.contains("pb-report-toc-collapsed"), userInitiated);
+  }
+
+  function applyTocResponsiveState() {
+    const toc = document.getElementById("toc");
+    if (!toc) return;
+    ensureTocHeader(toc);
+    const pref = sessionStorage.getItem(TOC_STATE_KEY);
+    let collapsed;
+    if (pref === "expanded" && !shouldAutoCollapseToc()) {
+      collapsed = false;
+    } else if (pref === "collapsed") {
+      collapsed = true;
+    } else {
+      collapsed = shouldAutoCollapseToc();
+    }
+    toc.classList.toggle("pb-report-toc-collapsed", collapsed);
+    updateTocToggleButton(toc);
+  }
+
+  function scrollToReportAnchor(anchorId) {
+    const target = document.getElementById(anchorId);
+    if (!target) {
+      tocWarn("scroll skipped — anchor not found", { anchorId: anchorId });
+      return;
+    }
+
+    if (isEmbedded) {
+      let top = 0;
+      let node = target;
+      while (node) {
+        top += node.offsetTop;
+        node = node.offsetParent;
+      }
+      try {
+        window.parent.postMessage(
+          { type: "pb-report-scroll-to", top: top },
+          window.location.origin
+        );
+      } catch (e) {}
+      if (shouldAutoCollapseToc() && sessionStorage.getItem(TOC_STATE_KEY) !== "expanded") {
+        setTocCollapsed(true, false);
+      }
+      return;
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", "#" + anchorId);
+
+    if (shouldAutoCollapseToc() && sessionStorage.getItem(TOC_STATE_KEY) !== "expanded") {
+      setTocCollapsed(true, false);
+    }
+  }
+
+  function createTocLink(headingEl) {
+    const anchorId = headingEl.dataset.anchor;
+    const link = document.createElement("a");
+    link.className = "nav-link pb-toc-link";
+    link.href = "#" + anchorId;
+    link.textContent = headingEl.textContent.trim();
+    link.addEventListener("click", function (event) {
+      event.preventDefault();
+      scrollToReportAnchor(anchorId);
+    });
+    return link;
+  }
+
+  function bindTocNavigation(toc) {
+    if (!toc || toc.dataset.pbTocBound === "1") return;
+    toc.dataset.pbTocBound = "1";
+    toc.addEventListener("click", function (event) {
+      const link = event.target.closest("a.pb-toc-link");
+      if (!link) return;
+      event.preventDefault();
+      const anchorId = (link.getAttribute("href") || "").replace(/^#/, "");
+      if (anchorId) scrollToReportAnchor(anchorId);
+    });
+  }
+
+  function sanitizeTocChrome(toc) {
+    toc.classList.remove("toc-active");
+    toc.querySelectorAll("ul.collapse").forEach(function (ul) {
+      ul.classList.remove("collapse");
+    });
+    toc.querySelectorAll(".nav-link.active").forEach(function (node) {
+      node.classList.remove("active");
+    });
+  }
+
+  function syncToolbarBottomOffset() {
+    const toolbar = document.getElementById("pb-report-toolbar");
+    if (!toolbar) {
+      document.documentElement.style.setProperty("--pb-report-toolbar-bottom", "0px");
+      return;
+    }
+    const bottom = Math.ceil(toolbar.getBoundingClientRect().bottom);
+    document.documentElement.style.setProperty("--pb-report-toolbar-bottom", bottom + "px");
+  }
+
   function pinTocBelowToolbar() {
     const toc = document.getElementById("toc");
     if (!toc) {
@@ -151,14 +339,17 @@ document.addEventListener("DOMContentLoaded", function () {
       node.classList.remove("pb-report-toc-pinned");
     });
 
+    sanitizeTocChrome(toc);
+    syncToolbarBottomOffset();
     toc.classList.add("pb-report-toc-pinned");
     toc.style.removeProperty("--pb-toc-right");
     toc.style.removeProperty("--pb-toc-width");
 
-    const toolbarHeight = getComputedStyle(document.documentElement)
-      .getPropertyValue("--pb-report-toolbar-height")
+    const bottom = getComputedStyle(document.documentElement)
+      .getPropertyValue("--pb-report-toolbar-bottom")
       .trim();
-    tocLog("pinned toc", { toolbarHeight: toolbarHeight });
+    tocLog("pinned toc", { toolbarBottom: bottom });
+    applyTocResponsiveState();
   }
 
   function rebuildToc(panel) {
@@ -173,9 +364,13 @@ document.addEventListener("DOMContentLoaded", function () {
       const tocNav = document.createElement("nav");
       tocNav.id = "toc";
       tocNav.setAttribute("role", "doc-toc");
-      tocNav.className = "toc-active";
+      tocNav.className = "pb-report-toc";
       tocNav.innerHTML =
-        '<h2 id="toc-title">Table of contents</h2><ul class="toc-list"></ul>';
+        '<div class="pb-toc-header">' +
+        '<h2 id="toc-title">' + tocTitleText() + "</h2>" +
+        '<button type="button" class="pb-toc-toggle-btn" aria-controls="toc" aria-expanded="true" aria-label="Collapse table of contents" title="Collapse table of contents"><span class="pb-toc-toggle-chevron pb-toc-toggle-chevron-up" aria-hidden="true"></span></button>' +
+        "</div>" +
+        '<ul class="toc-list"></ul>';
 
       const anchor = host.firstChild;
       if (anchor) {
@@ -185,6 +380,17 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       toc = tocNav;
       tocLog("created toc nav", { hostId: host.id || host.tagName });
+    }
+    bindTocNavigation(toc);
+    ensureTocHeader(toc);
+    const toggleBtn = toc.querySelector(".pb-toc-toggle-btn");
+    if (toggleBtn && toggleBtn.dataset.pbTocToggleBound !== "1") {
+      toggleBtn.dataset.pbTocToggleBound = "1";
+      toggleBtn.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleTocCollapsed(true);
+      });
     }
 
     const list = toc.querySelector(".toc-list") || toc.querySelector("ul");
@@ -202,19 +408,13 @@ document.addEventListener("DOMContentLoaded", function () {
       partCount += 1;
 
       const partItem = document.createElement("li");
-      const partLabel = document.createElement("span");
-      partLabel.className = "nav-link pb-toc-label";
-      partLabel.textContent = h2.textContent.trim();
-      partItem.appendChild(partLabel);
+      partItem.appendChild(createTocLink(h2));
 
       const childList = document.createElement("ul");
       partEl.querySelectorAll(".report-section-title[data-anchor]").forEach((h3) => {
         sectionCount += 1;
         const childItem = document.createElement("li");
-        const childLabel = document.createElement("span");
-        childLabel.className = "nav-link pb-toc-label";
-        childLabel.textContent = h3.textContent.trim();
-        childItem.appendChild(childLabel);
+        childItem.appendChild(createTocLink(h3));
         childList.appendChild(childItem);
       });
       if (childList.children.length) partItem.appendChild(childList);
@@ -224,6 +424,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!partCount) {
       tocWarn("toc is empty — no .report-part h2[data-anchor] in active panel");
     }
+    sanitizeTocChrome(toc);
     pinTocBelowToolbar();
   }
 
@@ -275,6 +476,8 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   window.addEventListener("pb-report-toolbar-resize", pinTocBelowToolbar);
+  window.addEventListener("scroll", pinTocBelowToolbar, { passive: true });
+  window.addEventListener("resize", applyTocResponsiveState);
 
   select.addEventListener("change", function () {
     setLanguage(select.value);

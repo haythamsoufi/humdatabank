@@ -355,8 +355,11 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function updateToolbarOffset() {
-    const height = Math.ceil(toolbar.getBoundingClientRect().height);
+    const rect = toolbar.getBoundingClientRect();
+    const height = Math.ceil(rect.height);
+    const bottom = Math.ceil(rect.bottom);
     document.documentElement.style.setProperty("--pb-report-toolbar-height", height + "px");
+    document.documentElement.style.setProperty("--pb-report-toolbar-bottom", bottom + "px");
     window.dispatchEvent(new CustomEvent("pb-report-toolbar-resize"));
   }
   window.updatePbReportToolbarOffset = updateToolbarOffset;
@@ -380,6 +383,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   updateToolbarOffset();
   window.addEventListener("resize", updateToolbarOffset);
+  window.addEventListener("scroll", updateToolbarOffset, { passive: true });
   document.addEventListener("click", closeMenus);
 });
 </script>

@@ -53,43 +53,89 @@ _PB_REPORT_FA_FIX = (
     "</style>"
 )
 _PB_REPORT_TOC_PIN_FIX = (
-    '<style id="pb-report-toc-pin-fix-v4">'
+    '<style id="pb-report-toc-pin-fix-v7">'
     "#pb-scroll-headers{display:none!important;}"
     "#toc.pb-report-toc-pinned,#quarto-margin-sidebar #toc.pb-report-toc-pinned,"
     "#quarto-sidebar #toc.pb-report-toc-pinned{"
-    "position:fixed!important;top:var(--pb-report-toolbar-height,0px)!important;"
+    "position:fixed!important;"
+    "top:calc(var(--pb-report-toolbar-bottom,var(--pb-report-toolbar-height,0px)) + 0.5rem)!important;"
     "right:1.25rem!important;left:auto!important;width:12.5rem!important;"
     "max-width:12.5rem!important;min-width:0!important;"
-    "max-height:calc(100vh - var(--pb-report-toolbar-height,0px) - 1rem)!important;"
+    "max-height:calc(100vh - var(--pb-report-toolbar-bottom,var(--pb-report-toolbar-height,0px)) - 1.5rem)!important;"
     "overflow-x:hidden!important;overflow-y:auto!important;z-index:998!important;"
     "margin:0!important;padding:0.5rem 0.65rem 0.75rem!important;"
     "box-sizing:border-box!important;background:#fff!important;border:1px solid #e8e8e8!important;"
     "border-radius:0.25rem!important;box-shadow:0 1px 3px rgba(0,0,0,.06)!important;"
     "display:block!important;visibility:visible!important;font-size:0.78rem!important;line-height:1.35!important;color:#444!important;}"
-    "#toc.pb-report-toc-pinned #toc-title{margin:0 0 0.45rem!important;padding:0!important;"
-    "font-size:0.65rem!important;font-weight:700!important;letter-spacing:0.05em!important;"
-    "text-transform:uppercase!important;color:#777!important;border:0!important;}"
+    "#toc.pb-report-toc-pinned #toc-title{margin:0!important;padding:0!important;"
+    "font-size:0.8rem!important;font-weight:600!important;letter-spacing:normal!important;"
+    "text-transform:none!important;color:#333!important;border:0!important;flex:1 1 auto!important;min-width:0!important;}"
+    "#toc.pb-report-toc-pinned .pb-toc-header{display:flex!important;align-items:center!important;"
+    "justify-content:space-between!important;gap:0.35rem!important;margin:0 0 0.45rem!important;}"
+    "#toc.pb-report-toc-pinned.pb-report-toc-collapsed .pb-toc-header{margin:0!important;}"
+    "#toc.pb-report-toc-pinned.pb-report-toc-collapsed{width:auto!important;max-width:none!important;"
+    "min-width:0!important;max-height:none!important;overflow:visible!important;padding:0!important;"
+    "border-radius:999px!important;box-shadow:0 1px 4px rgba(0,0,0,.1)!important;}"
+    "#toc.pb-report-toc-pinned.pb-report-toc-collapsed .toc-list{display:none!important;}"
+    "#toc.pb-report-toc-pinned.pb-report-toc-collapsed #toc-title{display:none!important;}"
+    ".pb-toc-toggle-btn{flex:0 0 auto!important;border:0!important;background:transparent!important;color:#555!important;"
+    "cursor:pointer!important;padding:0.15rem 0.35rem!important;line-height:1!important;font-size:0.78rem!important;"
+    "font-weight:600!important;border-radius:0.2rem!important;display:inline-flex!important;align-items:center!important;gap:0.35rem!important;}"
+    "#toc.pb-report-toc-pinned.pb-report-toc-collapsed .pb-toc-toggle-btn{padding:0.45rem 0.85rem!important;border-radius:999px!important;color:#444!important;}"
+    ".pb-toc-toggle-chevron{display:inline-block!important;width:0.42rem!important;height:0.42rem!important;"
+    "border-right:2px solid currentColor!important;border-bottom:2px solid currentColor!important;"
+    "transform:rotate(45deg)!important;margin-top:-0.12rem!important;flex:0 0 auto!important;}"
+    ".pb-toc-toggle-chevron-up{transform:rotate(-135deg)!important;margin-top:0.08rem!important;}"
+    ".pb-toc-toggle-btn:hover,.pb-toc-toggle-btn:focus-visible{color:#c22526!important;background:#f5f5f5!important;outline:none!important;}"
     "#toc.pb-report-toc-pinned .toc-list,#toc.pb-report-toc-pinned>ul{margin:0!important;padding:0!important;list-style:none!important;}"
     "#toc.pb-report-toc-pinned li{margin:0.12rem 0!important;}"
     "#toc.pb-report-toc-pinned ul ul{margin:0.1rem 0 0.2rem!important;padding-left:0.65rem!important;"
     "font-size:0.72rem!important;color:#666!important;}"
-    "#toc.pb-report-toc-pinned .pb-toc-label,#toc.pb-report-toc-pinned .nav-link{display:block!important;"
+    "#toc.pb-report-toc-pinned ul.collapse{display:block!important;height:auto!important;visibility:visible!important;}"
+    "#toc.pb-report-toc-pinned .pb-toc-link,#toc.pb-report-toc-pinned .pb-toc-label,#toc.pb-report-toc-pinned .nav-link{display:block!important;"
     "padding:0.1rem 0!important;font-size:inherit!important;line-height:1.35!important;font-weight:500!important;}"
     "#pb-report-toc-host{display:contents!important;}"
-    "#quarto-margin-sidebar #toc.pb-report-toc-pinned a,"
-    "#quarto-sidebar #toc.pb-report-toc-pinned a,"
-    "#toc.pb-report-toc-pinned a,"
-    "#quarto-margin-sidebar #toc.pb-report-toc-pinned .nav-link,"
-    "#quarto-sidebar #toc.pb-report-toc-pinned .nav-link,"
-    "#toc.pb-report-toc-pinned .nav-link,"
-    ".pb-toc-label{pointer-events:none!important;cursor:default!important;text-decoration:none!important;color:inherit!important;}"
+    "#toc.pb-report-toc-pinned a.pb-toc-link{color:inherit!important;text-decoration:none!important;cursor:pointer!important;}"
+    "#toc.pb-report-toc-pinned a.pb-toc-link:hover,#toc.pb-report-toc-pinned a.pb-toc-link:focus-visible{color:#c22526!important;}"
+    "#toc.pb-report-toc-pinned ul ul a.pb-toc-link{color:#666!important;}"
+    "#toc.pb-report-toc-pinned ul ul a.pb-toc-link:hover,#toc.pb-report-toc-pinned ul ul a.pb-toc-link:focus-visible{color:#c22526!important;}"
     "</style>"
-    '<script id="pb-report-toc-pin-script-v4">'
+    '<script id="pb-report-toc-pin-script-v7">'
     "document.addEventListener('DOMContentLoaded',function(){"
+    "var TOC_NARROW_MAX=1100,TOC_STATE_KEY='pb-report-toc-user-state';"
+    "function isNarrow(){return window.innerWidth<TOC_NARROW_MAX;}"
+    "function overlaps(){var toc=document.getElementById('toc'),sample=document.querySelector('.pb-lang-panel:not([hidden]) .pb-dashboard')||document.querySelector('.pb-dashboard');"
+    "if(!toc||!sample)return isNarrow();var tr=toc.getBoundingClientRect(),cr=sample.getBoundingClientRect();"
+    "return tr.width>0&&tr.left<cr.right-24;}"
+    "function shouldAutoCollapse(){return isNarrow()||overlaps();}"
+    "function titleText(){return 'Contents';}"
+    "function ensureHeader(toc){if(!toc||toc.querySelector('.pb-toc-header'))return;"
+    "var title=toc.querySelector('#toc-title'),header=document.createElement('div');header.className='pb-toc-header';"
+    "if(title){title.textContent=titleText();header.appendChild(title);}else{header.innerHTML='<h2 id=\"toc-title\">'+titleText()+'</h2>';}"
+    "var btn=document.createElement('button');btn.type='button';btn.className='pb-toc-toggle-btn';btn.setAttribute('aria-controls','toc');"
+    "btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();toggleToc(true);});header.appendChild(btn);toc.insertBefore(header,toc.firstChild);}"
+    "function updateBtn(toc){var btn=toc.querySelector('.pb-toc-toggle-btn');if(!btn)return;var c=toc.classList.contains('pb-report-toc-collapsed');"
+    "btn.setAttribute('aria-expanded',c?'false':'true');btn.setAttribute('aria-label',c?'Expand table of contents':'Collapse table of contents');"
+    "btn.title=btn.getAttribute('aria-label');"
+    "if(c){btn.innerHTML='<span class=\"pb-toc-toggle-label\">'+titleText()+'</span><span class=\"pb-toc-toggle-chevron\" aria-hidden=\"true\"></span>';}"
+    "else{btn.innerHTML='<span class=\"pb-toc-toggle-chevron pb-toc-toggle-chevron-up\" aria-hidden=\"true\"></span>';}}"
+    "function setCollapsed(c,user){var toc=document.getElementById('toc');if(!toc)return;ensureHeader(toc);toc.classList.toggle('pb-report-toc-collapsed',c);"
+    "if(user)sessionStorage.setItem(TOC_STATE_KEY,c?'collapsed':'expanded');updateBtn(toc);}"
+    "function toggleToc(user){var toc=document.getElementById('toc');if(!toc)return;setCollapsed(!toc.classList.contains('pb-report-toc-collapsed'),user);}"
+    "function applyResponsive(){var toc=document.getElementById('toc');if(!toc)return;ensureHeader(toc);var pref=sessionStorage.getItem(TOC_STATE_KEY),c;"
+    "if(pref==='expanded'&&!shouldAutoCollapse())c=false;else if(pref==='collapsed')c=true;else c=shouldAutoCollapse();"
+    "toc.classList.toggle('pb-report-toc-collapsed',c);updateBtn(toc);}"
+    "function sanitize(toc){toc.classList.remove('toc-active');"
+    "toc.querySelectorAll('ul.collapse').forEach(function(ul){ul.classList.remove('collapse');});}"
+    "function syncBottom(){var tb=document.getElementById('pb-report-toolbar');"
+    "var bottom=tb?Math.ceil(tb.getBoundingClientRect().bottom):0;"
+    "document.documentElement.style.setProperty('--pb-report-toolbar-bottom',bottom+'px');}"
     "function pin(){var toc=document.getElementById('toc');if(!toc)return;"
-    "toc.classList.add('pb-report-toc-pinned');"
-    "toc.style.removeProperty('--pb-toc-right');toc.style.removeProperty('--pb-toc-width');}"
+    "sanitize(toc);syncBottom();toc.classList.add('pb-report-toc-pinned');"
+    "toc.style.removeProperty('--pb-toc-right');toc.style.removeProperty('--pb-toc-width');applyResponsive();}"
     "window.addEventListener('pb-report-toolbar-resize',pin);"
+    "window.addEventListener('scroll',pin,{passive:true});"
+    "window.addEventListener('resize',applyResponsive);"
     "setTimeout(pin,0);"
     "});</script>"
 )
@@ -109,19 +155,23 @@ _PB_REPORT_TOC_HOST_FIX = (
     "||document.querySelector('.pb-lang-panel');if(!panel){W('no active language panel');return;}"
     "var h=ensureHost(),toc=document.getElementById('toc');"
     "if(!toc){toc=document.createElement('nav');toc.id='toc';toc.setAttribute('role','doc-toc');"
-    "toc.className='toc-active';toc.innerHTML='<h2 id=\"toc-title\">Table of contents</h2><ul class=\"toc-list\"></ul>';"
+    "toc.className='pb-report-toc';toc.innerHTML='<h2 id=\"toc-title\">Table of contents</h2><ul class=\"toc-list\"></ul>';"
     "h.appendChild(toc);L('created #toc');}"
     "var list=toc.querySelector('.toc-list')||toc.querySelector('ul');if(!list){W('toc list missing');return;}"
     "list.innerHTML='';var parts=0,sections=0;"
+    "function scrollTo(id){var t=document.getElementById(id);if(!t)return;"
+    "if(window.self!==window.top){var top=0,n=t;while(n){top+=n.offsetTop;n=n.offsetParent;}"
+    "try{window.parent.postMessage({type:'pb-report-scroll-to',top:top},window.location.origin);}catch(e){}return;}"
+    "t.scrollIntoView({behavior:'smooth',block:'start'});history.replaceState(null,'','#'+id);}"
+    "function mkLink(h){var a=document.createElement('a');a.className='nav-link pb-toc-link';"
+    "a.href='#'+h.dataset.anchor;a.textContent=h.textContent.trim();"
+    "a.addEventListener('click',function(e){e.preventDefault();scrollTo(h.dataset.anchor);});return a;}"
     "panel.querySelectorAll('.report-part').forEach(function(part){"
     "var h2=part.querySelector('h2[data-anchor]');if(!h2)return;parts++;"
-    "var li=document.createElement('li'),lbl=document.createElement('span');"
-    "lbl.className='nav-link pb-toc-label';lbl.textContent=h2.textContent.trim();li.appendChild(lbl);"
+    "var li=document.createElement('li');li.appendChild(mkLink(h2));"
     "var ul=document.createElement('ul');"
     "part.querySelectorAll('.report-section-title[data-anchor]').forEach(function(h3){sections++;"
-    "var cli=document.createElement('li'),clbl=document.createElement('span');"
-    "clbl.className='nav-link pb-toc-label';clbl.textContent=h3.textContent.trim();"
-    "cli.appendChild(clbl);ul.appendChild(cli);});"
+    "var cli=document.createElement('li');cli.appendChild(mkLink(h3));ul.appendChild(cli);});"
     "if(ul.children.length)li.appendChild(ul);list.appendChild(li);});"
     "L('rebuilt toc',{parts:parts,sections:sections,items:list.children.length});"
     "if(!parts)W('toc empty — no report parts in active panel');"
@@ -463,8 +513,24 @@ class PBProgressService:
         cls._state_for(version)["build_stage"] = stage_id
 
     @classmethod
-    def _public_error_message(cls, exc: BaseException) -> str:
+    def _public_error_message(cls, exc: BaseException, log_excerpt: str = "") -> str:
         """Return a client-safe error without filesystem paths or command details."""
+        excerpt = (log_excerpt or "").lower()
+        if "executable doesn't exist" in excerpt or "playwright install" in excerpt:
+            return (
+                "Playwright Chromium is not installed on the server. "
+                "Contact an administrator."
+            )
+        if "browsertype.launch" in excerpt:
+            return (
+                "Report figure rendering could not start the browser. "
+                "Contact an administrator."
+            )
+        if "permission denied" in excerpt or "readonly file system" in excerpt:
+            return (
+                "Report build could not write temporary files on the server. "
+                "Contact an administrator."
+            )
         if isinstance(exc, subprocess.CalledProcessError):
             return "Report build failed. Contact an administrator if this persists."
         message = str(exc).strip()
@@ -553,10 +619,48 @@ class PBProgressService:
                 "&& playwright install chromium"
             )
 
+        if not issues and cls._is_azure_storage():
+            try:
+                cls._verify_chromium_launch()
+            except RuntimeError as exc:
+                issues.append(str(exc))
+
         if issues:
             message = " | ".join(issues)
             logger.warning("P&B progress build prerequisites not met: %s", message)
             raise RuntimeError(message)
+
+    @classmethod
+    def _verify_chromium_launch(cls) -> None:
+        """Fail fast on Azure when Chromium cannot start (missing binary or sandbox)."""
+        visuals_tool_dir, _, _ = _visuals_paths()
+        scripts_dir = visuals_tool_dir / "scripts"
+        code = (
+            "from playwright.sync_api import sync_playwright; "
+            "from pb_figures.render_html import chromium_launch_options; "
+            "p = sync_playwright().start(); "
+            "b = p.chromium.launch(**chromium_launch_options()); "
+            "b.close(); p.stop()"
+        )
+        env = os.environ.copy()
+        env["PLAYWRIGHT_BROWSERS_PATH"] = PLAYWRIGHT_BROWSERS_PATH
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(scripts_dir),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=90,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        detail = (result.stderr or result.stdout or "unknown error").strip()
+        detail = cls._sanitize_build_line(detail.splitlines()[-1] if detail else "")
+        raise RuntimeError(
+            f"Playwright Chromium cannot start on this server{f': {detail}' if detail else ''}."
+        )
 
     @classmethod
     def _format_size(cls, size_bytes: int) -> str:
@@ -958,6 +1062,7 @@ class PBProgressService:
                     "language": language or "all",
                     "outputs": [],
                     "output_names": [],
+                    "build_log_excerpt": None,
                 }
             )
             cls._persist_status(version)
@@ -980,6 +1085,14 @@ class PBProgressService:
         )
         cls._build_thread.start()
         return job_id
+
+    @classmethod
+    def _report_output_dir(cls, version: str) -> Path:
+        workspace_out = cls._build_workspace_dir(version) / "report" / "output"
+        if workspace_out.is_dir():
+            return workspace_out
+        _tool_dir, _build_script, report_output_dir = _visuals_paths()
+        return report_output_dir
 
     @classmethod
     def _build_workspace_dir(cls, version: str) -> Path:
@@ -1010,7 +1123,7 @@ class PBProgressService:
     @classmethod
     def _copy_outputs_to_storage(cls, version: str) -> list[str]:
         copied: list[str] = []
-        _tool_dir, _build_script, report_output_dir = _visuals_paths()
+        report_output_dir = cls._report_output_dir(version)
         if not report_output_dir.is_dir():
             return copied
         for path in report_output_dir.iterdir():
@@ -1269,7 +1382,8 @@ class PBProgressService:
                         {
                             "status": "failed",
                             "finished_at": cls._now_iso(),
-                            "error": cls._public_error_message(exc),
+                            "error": cls._public_error_message(exc, log_excerpt),
+                            "build_log_excerpt": log_excerpt[:4000] if log_excerpt else None,
                             "build_stage": None,
                         }
                     )
@@ -1371,8 +1485,14 @@ class PBProgressService:
             for old_toc_fix in (
                 "pb-report-toc-pin-fix-v2",
                 "pb-report-toc-pin-fix-v3",
+                "pb-report-toc-pin-fix-v4",
+                "pb-report-toc-pin-fix-v5",
+                "pb-report-toc-pin-fix-v6",
                 "pb-report-toc-pin-script-v2",
                 "pb-report-toc-pin-script-v3",
+                "pb-report-toc-pin-script-v4",
+                "pb-report-toc-pin-script-v5",
+                "pb-report-toc-pin-script-v6",
             ):
                 html = re.sub(
                     rf'<style id="{old_toc_fix}"[^>]*>.*?</style>',
@@ -1393,7 +1513,7 @@ class PBProgressService:
                     html = html.replace("</head>", _PB_REPORT_FA_FIX + "</head>", 1)
                 else:
                     html = _PB_REPORT_FA_FIX + html
-            if 'id="pb-report-toc-pin-fix-v4"' not in html and (
+            if 'id="pb-report-toc-pin-fix-v7"' not in html and (
                 "pb-language-panels" in html or "rebuildToc" in html
             ):
                 if "</head>" in html:

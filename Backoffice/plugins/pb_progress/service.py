@@ -22,10 +22,8 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.exceptions import NotFound
 
 from plugins.pb_progress.plugin_data_store import (
-    MAX_WORKBOOK_HISTORY,
     PBProgressDataStore,
     SYSTEM_GENERATED_NAME,
-    WORKBOOK_ARCHIVE_DIR,
 )
 from plugins.pb_progress.versions import (
     DEFAULT_VERSION,
@@ -267,7 +265,12 @@ BUILD_STAGE_LABELS = dict(BUILD_STAGE_ORDER)
 
 
 class PBProgressService:
-    """Orchestrates Excel upload, report generation, and output delivery."""
+    """Orchestrates Excel upload, report generation, and output delivery.
+
+    Only one build runs per process (class-level ``_build_thread``). Under multi-worker
+    WSGI, status reads merge from ``plugin_data`` so polls hit the worker that owns the
+    build or the latest persisted terminal state.
+    """
 
     _lock: ClassVar[threading.Lock] = threading.Lock()
     _states: ClassVar[dict[str, dict[str, Any]]] = {}
@@ -275,6 +278,82 @@ class PBProgressService:
     _legacy_migrated: ClassVar[bool] = False
     _build_thread: ClassVar[threading.Thread | None] = None
     _build_version: ClassVar[str | None] = None
+    _build_process: ClassVar[subprocess.Popen | None] = None
+
+    @classmethod
+    def _terminate_build_process(cls) -> None:
+        proc = cls._build_process
+        if proc is None:
+            return
+        if proc.poll() is not None:
+            cls._build_process = None
+            return
+        try:
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=10)
+        except OSError as exc:
+            logger.warning("Failed to terminate P&B build subprocess: %s", exc)
+        finally:
+            cls._build_process = None
+
+    @classmethod
+    def _build_cancel_requested(cls, version: str, job_id: str) -> bool:
+        with cls._lock:
+            state = cls._state_for(version)
+            if state.get("status") == "cancelled":
+                return True
+            if state.get("job_id") != job_id:
+                return True
+        persisted = cls._reload_status_from_storage(version)
+        if not persisted:
+            return False
+        if persisted.get("status") == "cancelled" or persisted.get("job_id") != job_id:
+            with cls._lock:
+                cls._state_for(version).update(
+                    {
+                        "status": persisted.get("status") or "cancelled",
+                        "finished_at": persisted.get("finished_at"),
+                        "error": persisted.get("error"),
+                        "build_stage": persisted.get("build_stage"),
+                        "job_id": persisted.get("job_id"),
+                    }
+                )
+            return True
+        return False
+
+    @classmethod
+    def cancel_generation(cls, version: str) -> dict[str, Any]:
+        version = validate_version(version)
+        cls._ensure_status_loaded(version)
+        cls._sync_status_from_storage(version)
+        state = cls._state_for(version)
+        if state.get("status") != "running":
+            raise RuntimeError("No report generation is in progress.")
+
+        job_id = state.get("job_id")
+        with cls._lock:
+            state.update(
+                {
+                    "status": "cancelled",
+                    "finished_at": cls._now_iso(),
+                    "error": None,
+                    "build_stage": None,
+                    "job_id": None,
+                }
+            )
+            cls._persist_status(version)
+
+        if cls._local_build_active(version):
+            cls._terminate_build_process()
+
+        if job_id:
+            cls._log_build_step(job_id, "cancelled", detail=f"version={version}")
+
+        return cls.get_status(version)
 
     @classmethod
     def _default_state(cls) -> dict[str, Any]:
@@ -383,11 +462,28 @@ class PBProgressService:
             return None
 
     @classmethod
+    def _local_build_active(cls, version: str) -> bool:
+        return (
+            cls._build_thread is not None
+            and cls._build_thread.is_alive()
+            and cls._build_version == version
+        )
+
+    @classmethod
+    def _sync_status_from_storage(cls, version: str) -> None:
+        """Merge persisted status unless this worker is actively running the build."""
+        if cls._local_build_active(version):
+            return
+        persisted = cls._reload_status_from_storage(version)
+        if persisted:
+            cls._state_for(version).update(persisted)
+
+    @classmethod
     def _ensure_status_loaded(cls, version: str) -> None:
         cls._migrate_legacy_storage()
         version = validate_version(version)
         if version in cls._loaded_versions:
-            cls._clear_orphaned_run(version)
+            cls._sync_status_from_storage(version)
             return
         cls._loaded_versions.add(version)
         persisted = cls._reload_status_from_storage(version)
@@ -526,6 +622,14 @@ class PBProgressService:
                 "Contact an administrator."
             )
         if isinstance(exc, subprocess.CalledProcessError):
+            code = exc.returncode
+            # Windows STATUS_ACCESS_VIOLATION — often WeasyPrint/Cairo teardown after success.
+            if code in (3221225477, -1073741819):
+                return (
+                    "Report build hit a native rendering crash on exit (Windows). "
+                    "If figures and _body.qmd were created, retry the build; "
+                    "otherwise contact an administrator."
+                )
             return "Report build failed. Contact an administrator if this persists."
         message = str(exc).strip()
         if not message:
@@ -813,87 +917,9 @@ class PBProgressService:
         return outputs
 
     @classmethod
-    def _workbook_archive_rel(cls, version: str, archive_id: str) -> str:
-        safe_id = cls._sanitize_archive_id(archive_id)
-        return cls._version_rel(version, f"{WORKBOOK_ARCHIVE_DIR}/{safe_id}.xlsx")
-
-    @classmethod
-    def _sanitize_archive_id(cls, archive_id: str) -> str:
-        safe = re.sub(r"[^a-zA-Z0-9_-]+", "", (archive_id or "").strip())
-        if not safe:
-            raise ValueError("Invalid archive id.")
-        return safe
-
-    @classmethod
     def workbook_exists(cls, version: str) -> bool:
         version = validate_version(version)
         return storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version))
-
-    @classmethod
-    def _make_archive_id(cls) -> str:
-        stamp = cls._now_iso().replace(":", "").replace("-", "")
-        return f"{stamp}_{uuid.uuid4().hex[:8]}"
-
-    @classmethod
-    def _append_workbook_history(cls, version: str, entry: dict[str, Any]) -> None:
-        history = PBProgressDataStore.get_workbook_history(version)
-        history.insert(0, entry)
-        while len(history) > MAX_WORKBOOK_HISTORY:
-            removed = history.pop()
-            archive_id = removed.get("id")
-            if archive_id:
-                rel = cls._workbook_archive_rel(version, str(archive_id))
-                if storage_service.exists(STORAGE_CATEGORY, rel):
-                    try:
-                        storage_service.delete(STORAGE_CATEGORY, rel)
-                    except Exception:
-                        logger.warning("Failed to delete old P&B workbook archive %s", rel)
-        PBProgressDataStore.save_workbook_history(version, history)
-
-    @classmethod
-    def _archive_current_workbook(cls, version: str) -> dict[str, Any] | None:
-        if not cls.workbook_exists(version):
-            return None
-
-        archive_id = cls._make_archive_id()
-        current_rel = cls._excel_rel(version)
-        archive_rel = cls._workbook_archive_rel(version, archive_id)
-        blob = storage_service.download(STORAGE_CATEGORY, current_rel)
-        storage_service.upload(STORAGE_CATEGORY, archive_rel, blob)
-
-        excel_meta = cls.get_excel_info(version) or {}
-        archived_at = cls._now_iso()
-        entry = {
-            "id": archive_id,
-            "filename": excel_meta.get("filename") or "SG Report.xlsx",
-            "size_bytes": excel_meta.get("size_bytes") or len(blob),
-            "size_label": excel_meta.get("size_label") or cls._format_size(len(blob)),
-            "archived_at": archived_at,
-        }
-        cls._append_workbook_history(version, entry)
-        return entry
-
-    @classmethod
-    def list_workbook_history(cls, version: str) -> list[dict[str, Any]]:
-        version = validate_version(version)
-        entries: list[dict[str, Any]] = []
-        for row in PBProgressDataStore.get_workbook_history(version):
-            archive_id = row.get("id")
-            if not archive_id:
-                continue
-            rel = cls._workbook_archive_rel(version, str(archive_id))
-            if not storage_service.exists(STORAGE_CATEGORY, rel):
-                continue
-            item = dict(row)
-            item["download_url"] = url_for(
-                "pb_progress.download_workbook_archive",
-                version=version,
-                archive_id=str(archive_id),
-            )
-            entries.append(item)
-        if len(entries) != len(PBProgressDataStore.get_workbook_history(version)):
-            PBProgressDataStore.save_workbook_history(version, entries)
-        return entries
 
     @classmethod
     def get_excel_info(cls, version: str) -> dict[str, Any] | None:
@@ -957,10 +983,6 @@ class PBProgressService:
                 except OSError:
                     pass
 
-        archived_workbook = None
-        if cls.workbook_exists(version):
-            archived_workbook = cls._archive_current_workbook(version)
-
         storage_service.upload(STORAGE_CATEGORY, cls._excel_rel(version), file_bytes or b"")
 
         uploaded_at = cls._now_iso()
@@ -980,9 +1002,6 @@ class PBProgressService:
         cls._persist_status(version)
         result = cls._import_system_config_after_excel_upload(version, excel_info)
         result["validation"] = validation
-        if archived_workbook:
-            result["archived_workbook"] = archived_workbook
-        result["workbook_history"] = cls.list_workbook_history(version)
         return result
 
     @classmethod
@@ -1017,6 +1036,7 @@ class PBProgressService:
     def get_status(cls, version: str) -> dict[str, Any]:
         version = validate_version(version)
         cls._ensure_status_loaded(version)
+        cls._sync_status_from_storage(version)
         state = cls._state_for(version)
         status = dict(state)
         status["version"] = version
@@ -1026,8 +1046,6 @@ class PBProgressService:
             cls._version_rel(version, SYSTEM_GENERATED_NAME),
         )
         status["excel"] = cls.get_excel_info(version)
-        if status.get("data_source") == "excel":
-            status["workbook_history"] = cls.list_workbook_history(version)
         if status.get("data_source") == "system":
             status["mapping_ready"] = bool(PBProgressDataStore.get_mapping_config(version))
         if status.get("status") == "done":
@@ -1324,7 +1342,26 @@ class PBProgressService:
                 finally:
                     log_handle.close()
 
-                while proc.poll() is None:
+                cls._build_process = proc
+                try:
+                    while proc.poll() is None:
+                        if cls._build_cancel_requested(version, job_id):
+                            cls._terminate_build_process()
+                            return
+
+                        log_pos, lines = cls._tail_build_log(log_path, log_pos)
+                        current_stage, stage_started, last_heartbeat = cls._consume_build_log_lines(
+                            version,
+                            job_id,
+                            language,
+                            lines,
+                            current_stage=current_stage,
+                            stage_started=stage_started,
+                            build_started=build_started,
+                            last_heartbeat=last_heartbeat,
+                        )
+                        time.sleep(0.5)
+
                     log_pos, lines = cls._tail_build_log(log_path, log_pos)
                     current_stage, stage_started, last_heartbeat = cls._consume_build_log_lines(
                         version,
@@ -1336,21 +1373,16 @@ class PBProgressService:
                         build_started=build_started,
                         last_heartbeat=last_heartbeat,
                     )
-                    time.sleep(0.5)
-
-                log_pos, lines = cls._tail_build_log(log_path, log_pos)
-                current_stage, stage_started, last_heartbeat = cls._consume_build_log_lines(
-                    version,
-                    job_id,
-                    language,
-                    lines,
-                    current_stage=current_stage,
-                    stage_started=stage_started,
-                    build_started=build_started,
-                    last_heartbeat=last_heartbeat,
-                )
-                if proc.wait() != 0:
-                    raise subprocess.CalledProcessError(proc.returncode, cmd)
+                    if cls._build_cancel_requested(version, job_id):
+                        cls._terminate_build_process()
+                        return
+                    if proc.wait() != 0:
+                        if cls._build_cancel_requested(version, job_id):
+                            return
+                        raise subprocess.CalledProcessError(proc.returncode, cmd)
+                finally:
+                    if cls._build_process is proc:
+                        cls._build_process = None
 
                 current_stage = "saving"
                 with cls._lock:
@@ -1386,6 +1418,9 @@ class PBProgressService:
             except BaseException as exc:
                 if isinstance(exc, KeyboardInterrupt):
                     raise
+                if cls._build_cancel_requested(version, job_id):
+                    cls._terminate_build_process()
+                    return
                 log_excerpt = cls._read_build_log_excerpt(cls._build_log_path(version))
                 if log_excerpt:
                     logger.error(
@@ -1466,21 +1501,6 @@ class PBProgressService:
             raise NotFound()
         info = cls.get_excel_info(version) or {}
         download_name = info.get("filename") or "SG_Report.xlsx"
-        path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
-        return send_file(path, as_attachment=True, download_name=download_name)
-
-    @classmethod
-    def serve_workbook_archive(cls, version: str, archive_id: str):
-        from flask import send_file
-
-        version = validate_version(version)
-        safe_id = cls._sanitize_archive_id(archive_id)
-        rel = cls._workbook_archive_rel(version, safe_id)
-        if not storage_service.exists(STORAGE_CATEGORY, rel):
-            raise NotFound()
-        history = PBProgressDataStore.get_workbook_history(version)
-        entry = next((row for row in history if row.get("id") == safe_id), None)
-        download_name = (entry or {}).get("filename") or f"SG_Report_{safe_id}.xlsx"
         path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
         return send_file(path, as_attachment=True, download_name=download_name)
 
@@ -1575,18 +1595,10 @@ class PBProgressService:
             response.cache_control.no_transform = True
             return response
 
-        response = storage_service.stream_response(
+        return storage_service.stream_response(
             STORAGE_CATEGORY,
             rel_path,
             filename=safe_name,
             mimetype=mimetype,
-            as_attachment=not inline,
+            as_attachment=True,
         )
-        if inline:
-            # The HTML report is static once generated; let browsers cache it for 5 minutes
-            # so repeated tab-switches don't re-download the whole file.  'private' ensures
-            # CDN/proxy caches never store it (it's behind authentication).
-            response.cache_control.private = True
-            response.cache_control.max_age = 300
-            response.cache_control.no_transform = True
-        return response

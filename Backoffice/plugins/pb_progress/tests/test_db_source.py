@@ -276,6 +276,43 @@ def test_validate_uploaded_workbook_rejects_empty_mapping(tmp_path):
 
 
 @pytest.mark.unit
+def test_validate_translations_config_normalizes_rows():
+    from plugins.pb_progress.db_source import validate_translations_config
+
+    rows = validate_translations_config([{"id": "report.title", "EN": " Title ", "FR": "Titre"}])
+    assert rows == [{"id": "report.title", "EN": "Title", "FR": "Titre", "SP": "", "AR": ""}]
+
+
+@pytest.mark.unit
+def test_validate_translations_config_rejects_duplicate_ids():
+    from plugins.pb_progress.db_source import validate_translations_config
+
+    with pytest.raises(ValueError, match="Duplicate translation id"):
+        validate_translations_config(
+            [
+                {"id": "report.title", "EN": "One"},
+                {"id": "report.title", "EN": "Two"},
+            ]
+        )
+
+
+@pytest.mark.unit
+def test_validate_section_order_config_normalizes_part():
+    from plugins.pb_progress.db_source import validate_section_order_config
+
+    rows = validate_section_order_config([{"part": "SP", "section": "SP1", "order": "2"}])
+    assert rows == [{"part": "sp", "section": "SP1", "order": 2}]
+
+
+@pytest.mark.unit
+def test_validate_section_order_config_rejects_invalid_part():
+    from plugins.pb_progress.db_source import validate_section_order_config
+
+    with pytest.raises(ValueError, match="Invalid section part"):
+        validate_section_order_config([{"part": "bad", "section": "SP1", "order": 1}])
+
+
+@pytest.mark.unit
 def test_generate_system_dataset_uploads_without_downloading_blob(monkeypatch):
     uploaded: dict[str, object] = {}
 

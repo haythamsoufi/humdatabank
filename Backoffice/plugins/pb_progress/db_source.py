@@ -19,6 +19,7 @@ from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.models.indicator_bank import IndicatorBank
 from app.services.platform import storage_service
+from app.utils.data_quality_constants import FDRS_TEMPLATE_ID, UPR_REPORTING_TEMPLATE_ID
 from plugins.pb_progress.plugin_data_store import (
     EXCEL_NAME,
     PBProgressDataStore,
@@ -27,8 +28,10 @@ from plugins.pb_progress.plugin_data_store import (
 )
 from plugins.pb_progress.versions import REPORT_VERSIONS, validate_version, version_storage_prefix
 
-FDRS_TEMPLATE_ID = 21
-UPR_TEMPLATE_ID = 33
+UPR_TEMPLATE_ID = UPR_REPORTING_TEMPLATE_ID
+
+_TRANSLATION_LANG_KEYS = frozenset({"EN", "FR", "SP", "AR"})
+_SECTION_PARTS = frozenset({"cc", "sp", "ef"})
 MAPPING_HEADER_ROW = 3
 SECTION_COLUMN = "Strategic Priority / Enabling Function"
 
@@ -135,9 +138,9 @@ def _normalize_id(value: Any) -> str:
 
 def _template_ids_for_source(source: str) -> tuple[int, ...]:
     if source == "FDRS":
-        return (FDRS_TEMPLATE_ID,)
+        return (_fdrs_template_id(),)
     if source == "UPR":
-        return (UPR_TEMPLATE_ID,)
+        return (_upr_template_id(),)
     return ()
 
 
@@ -185,8 +188,8 @@ def _form_item_templates(indicator_bank_id: int) -> dict[str, bool]:
     )
     template_ids = {row[0] for row in rows}
     return {
-        "fdrs": FDRS_TEMPLATE_ID in template_ids,
-        "upr": UPR_TEMPLATE_ID in template_ids,
+        "fdrs": _fdrs_template_id() in template_ids,
+        "upr": _upr_template_id() in template_ids,
     }
 
 
@@ -230,6 +233,82 @@ def _indicator_labels(indicator: IndicatorBank, override: str | None = None) -> 
             if isinstance(value, str) and value.strip():
                 labels[excel_col] = value.strip()
     return labels
+
+
+def validate_translations_config(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize translation rows and reject malformed admin input."""
+    validated: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Each translation row must be an object.")
+        key = str(row.get("id") or "").strip()
+        if not key:
+            raise ValueError("Each translation row requires a non-empty id.")
+        if key in seen_ids:
+            raise ValueError(f"Duplicate translation id: {key}")
+        seen_ids.add(key)
+        validated.append(
+            {
+                "id": key,
+                **{lang: str(row.get(lang) or "").strip() for lang in _TRANSLATION_LANG_KEYS},
+            }
+        )
+    return validated
+
+
+def validate_section_order_config(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize section order rows and reject malformed admin input."""
+    validated: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Each section_order row must be an object.")
+        part = str(row.get("part") or "").strip().lower()
+        section = str(row.get("section") or "").strip()
+        if part not in _SECTION_PARTS:
+            raise ValueError(f"Invalid section part: {part!r} (expected cc, sp, or ef).")
+        if not section:
+            raise ValueError("Each section_order row requires a non-empty section.")
+        try:
+            order = int(row.get("order"))
+        except (TypeError, ValueError):
+            raise ValueError(f"Invalid order for section {section!r}.") from None
+        validated.append({"part": part, "section": section, "order": order})
+    return validated
+
+
+def resolve_fdrs_template_id() -> int:
+    """FDRS template id — ``PB_FDRS_TEMPLATE_ID`` config override, else shared constant."""
+    try:
+        from flask import current_app
+
+        override = current_app.config.get("PB_FDRS_TEMPLATE_ID")
+        if override is not None:
+            return int(override)
+    except RuntimeError:
+        pass
+    return FDRS_TEMPLATE_ID
+
+
+def resolve_upr_template_id() -> int:
+    """UPR reporting template id — ``PB_UPR_TEMPLATE_ID`` config override, else shared constant."""
+    try:
+        from flask import current_app
+
+        override = current_app.config.get("PB_UPR_TEMPLATE_ID")
+        if override is not None:
+            return int(override)
+    except RuntimeError:
+        pass
+    return UPR_TEMPLATE_ID
+
+
+def _fdrs_template_id() -> int:
+    return resolve_fdrs_template_id()
+
+
+def _upr_template_id() -> int:
+    return resolve_upr_template_id()
 
 
 def validate_mapping_config(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -468,8 +547,8 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
 def list_available_years(version: str) -> list[str]:
     """Union of assignment years (FDRS/UPR) and manual mapping years."""
     version = validate_version(version)
-    years: set[str] = set(_years_for_template(FDRS_TEMPLATE_ID))
-    years.update(_years_for_template(UPR_TEMPLATE_ID))
+    years: set[str] = set(_years_for_template(_fdrs_template_id()))
+    years.update(_years_for_template(_upr_template_id()))
     for row in PBProgressDataStore.get_mapping_config(version):
         if str(row.get("source") or "").strip() != "Manual":
             continue
@@ -564,16 +643,11 @@ def _aggregate_indicator_year(template_id: int, indicator_bank_id: int, year: st
 def _build_final_rows(mapping_config: list[dict[str, Any]], *, version: str) -> list[dict[str, Any]]:
     final_rows: list[dict[str, Any]] = []
     index = 1
-    indicator_ids = [_normalize_id(row.get("id")) for row in mapping_config if _normalize_id(row.get("id"))]
-    indicators = {
-        str(item.id): item
-        for item in IndicatorBank.query.filter(IndicatorBank.id.in_([int(i) for i in indicator_ids if i.isdigit()])).all()
-    }
 
     allowed_years = resolve_build_years(version)
     years_by_source: dict[str, set[str]] = {
-        "FDRS": set(_years_for_template(FDRS_TEMPLATE_ID)) & allowed_years,
-        "UPR": set(_years_for_template(UPR_TEMPLATE_ID)) & allowed_years,
+        "FDRS": set(_years_for_template(_fdrs_template_id())) & allowed_years,
+        "UPR": set(_years_for_template(_upr_template_id())) & allowed_years,
         "Manual": set(),
     }
 
@@ -609,7 +683,7 @@ def _build_final_rows(mapping_config: list[dict[str, Any]], *, version: str) -> 
             index += 1
             continue
 
-        template_id = FDRS_TEMPLATE_ID if source == "FDRS" else UPR_TEMPLATE_ID
+        template_id = _fdrs_template_id() if source == "FDRS" else _upr_template_id()
         bank_id = int(indicator_id) if indicator_id.isdigit() else None
         if bank_id is None:
             continue
@@ -642,7 +716,7 @@ def _build_total_reported(final_df: pd.DataFrame) -> pd.DataFrame:
     for (source, year), group in grouped:
         if str(source) == "Manual":
             continue
-        template_id = FDRS_TEMPLATE_ID if str(source) == "FDRS" else UPR_TEMPLATE_ID
+        template_id = _fdrs_template_id() if str(source) == "FDRS" else _upr_template_id()
         count = (
             db.session.query(func.count(func.distinct(AssignmentEntityStatus.entity_id)))
             .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)

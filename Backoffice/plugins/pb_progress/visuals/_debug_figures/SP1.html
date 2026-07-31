@@ -1,0 +1,411 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><style>@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('C:/Humanitarian Databank/Backoffice/plugins/pb_progress/visuals/report/fonts/OpenSans-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: "Open Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('C:/Humanitarian Databank/Backoffice/plugins/pb_progress/visuals/report/fonts/OpenSans-Bold.ttf') format('truetype');
+}
+@font-face {
+  font-family: "Tajawal";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('C:/Humanitarian Databank/Backoffice/plugins/pb_progress/visuals/report/fonts/Tajawal-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: "Tajawal";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('C:/Humanitarian Databank/Backoffice/plugins/pb_progress/visuals/report/fonts/Tajawal-Bold.ttf') format('truetype');
+}
+/* Dashboard layout for WeasyPrint PNG rasterization.
+   Avoid CSS Grid — WeasyPrint grid still mishandles multi-row dashboards with
+   SVG/images (items collapse and overlap). Float + block layout matches the
+   browser dashboard in ifrc.scss without relying on grid placement. */
+
+.pb-dashboard {
+  --value: #c22526;
+  --target: #f28e2b;
+  --gap: #c1c1c1;
+  --text: #1a1a1a;
+  --muted: #666;
+  --divider: #d8d8d8;
+  --label-col: 290px;
+  --col-gap: 12px;
+  --chart-offset: 302px; /* label-col + col-gap */
+  --donut-size: 64px;
+  width: 827px;
+  margin: 0;
+  padding: 18px 22px 14px;
+  font-family: "Open Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.pb-dashboard[dir="rtl"] {
+  text-align: right;
+  font-family: "Tajawal", "Segoe UI", sans-serif;
+}
+
+.pb-dashboard .dash-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--value);
+  margin-bottom: 14px;
+}
+
+.pb-dashboard .indicator-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+  overflow: hidden;
+}
+
+.pb-dashboard .indicator-row::after,
+.pb-dashboard .donut-row::after,
+.pb-dashboard .donut-pair::after,
+.pb-dashboard .donut-pair-item::after {
+  content: "";
+  display: table;
+  clear: both;
+}
+
+.pb-dashboard .indicator-text {
+  float: left;
+  width: var(--label-col);
+  box-sizing: border-box;
+  font-size: 10.5px;
+  line-height: 1.35;
+  display: block;
+  padding: 4px 8px 4px 2px;
+  border-right: 1px solid var(--divider);
+  min-height: 110px;
+}
+
+.pb-dashboard[dir="rtl"] .indicator-text {
+  float: right;
+  border-right: none;
+  border-left: 1px solid var(--divider);
+  padding: 4px 2px 4px 8px;
+}
+
+.pb-dashboard .line-chart-wrap {
+  margin-left: var(--chart-offset);
+  min-height: 110px;
+  display: block;
+}
+
+.pb-dashboard[dir="rtl"] .line-chart-wrap {
+  margin-left: 0;
+  margin-right: var(--chart-offset);
+}
+
+.pb-dashboard .line-chart-inner {
+  position: relative;
+  width: 481px;
+  max-width: 100%;
+  min-height: 110px;
+}
+
+.pb-dashboard .line-chart-inner > svg {
+  display: block;
+  width: 481px;
+  height: 110px;
+}
+
+.pb-dashboard .chart-value-label {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--value);
+  white-space: nowrap;
+}
+
+.pb-dashboard .chart-target-tag {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--target);
+}
+
+.pb-dashboard .chart-target-value {
+  position: absolute;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--target);
+}
+
+.pb-dashboard .x-axis-divider-row {
+  clear: both;
+  overflow: hidden;
+  margin: 4px 0 2px;
+}
+
+.pb-dashboard .x-axis-divider-left {
+  float: left;
+  width: var(--label-col);
+  box-sizing: border-box;
+  border-top: 1px solid var(--divider);
+  margin-left: 50%;
+}
+
+.pb-dashboard[dir="rtl"] .x-axis-divider-left {
+  float: right;
+  margin-left: 0;
+  margin-right: 50%;
+}
+
+.pb-dashboard .x-axis-divider-right {
+  margin-left: var(--chart-offset);
+  border-top: 1px solid var(--divider);
+}
+
+.pb-dashboard[dir="rtl"] .x-axis-divider-right {
+  margin-left: 0;
+  margin-right: var(--chart-offset);
+}
+
+.pb-dashboard .x-axis-footer {
+  clear: both;
+  overflow: hidden;
+  min-height: 54px;
+}
+
+.pb-dashboard .x-axis-footer.year-only {
+  min-height: 0;
+}
+
+.pb-dashboard .metric-labels {
+  float: left;
+  width: var(--label-col);
+  box-sizing: border-box;
+  font-size: 9px;
+  color: var(--muted);
+  text-align: right;
+  padding: 2px 10px 2px 2px;
+  border-right: 1px solid var(--divider);
+}
+
+.pb-dashboard[dir="rtl"] .metric-labels {
+  float: right;
+  text-align: left;
+  border-right: none;
+  border-left: 1px solid var(--divider);
+  padding: 2px 2px 2px 10px;
+}
+
+.pb-dashboard .metric-labels span {
+  display: block;
+  line-height: 1.3;
+  min-height: 18px;
+  margin: 0 0 2px;
+}
+
+.pb-dashboard .table-data {
+  position: relative;
+  margin-left: var(--chart-offset);
+  min-height: 54px;
+}
+
+.pb-dashboard[dir="rtl"] .table-data {
+  margin-left: 0;
+  margin-right: var(--chart-offset);
+}
+
+.pb-dashboard .table-row {
+  position: relative;
+  height: 18px;
+  font-size: 9px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.pb-dashboard .table-row:first-child {
+  border-top: 1px solid var(--divider);
+}
+
+.pb-dashboard .table-vline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--divider);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pb-dashboard .table-cell {
+  position: absolute;
+  transform: translateX(-50%);
+  color: var(--text);
+  text-align: center;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.pb-dashboard .metric-labels .year-label {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.pb-dashboard .table-cell.year-cell {
+  font-weight: 700;
+}
+
+.pb-dashboard .indicator-row.indicator-unavailable .indicator-text {
+  min-height: 72px;
+}
+
+.pb-dashboard .indicator-unavailable-message {
+  margin-left: var(--chart-offset);
+  display: block;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px dashed var(--divider);
+  border-radius: 4px;
+  background: #fafafa;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.pb-dashboard[dir="rtl"] .indicator-unavailable-message {
+  margin-left: 0;
+  margin-right: var(--chart-offset);
+}
+
+.pb-dashboard .donut-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--divider);
+  overflow: hidden;
+}
+
+.pb-dashboard .donut-row .indicator-text {
+  min-height: var(--donut-size);
+}
+
+.pb-dashboard .donut-visual {
+  float: left;
+  position: relative;
+  width: var(--donut-size);
+  height: var(--donut-size);
+  margin-left: 16px;
+}
+
+.pb-dashboard[dir="rtl"] .donut-visual {
+  float: right;
+  margin-left: 0;
+  margin-right: 16px;
+}
+
+.pb-dashboard .donut-row .donut-target {
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-line;
+  padding: 8px 0 0 16px;
+}
+
+.pb-dashboard[dir="rtl"] .donut-row .donut-target {
+  padding: 8px 16px 0 0;
+}
+
+.pb-dashboard .donut-img {
+  display: block;
+  width: var(--donut-size);
+  height: var(--donut-size);
+}
+
+.pb-dashboard .donut-center-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--donut-size);
+  height: var(--donut-size);
+  line-height: var(--donut-size);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pb-dashboard .donut-pair {
+  overflow: hidden;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.pb-dashboard .donut-pair-item {
+  float: left;
+  width: calc(50% - 10px);
+  margin-right: 20px;
+  overflow: hidden;
+}
+
+.pb-dashboard .donut-pair-item:last-child {
+  margin-right: 0;
+}
+
+.pb-dashboard[dir="rtl"] .donut-pair-item {
+  float: right;
+  margin-right: 0;
+  margin-left: 20px;
+}
+
+.pb-dashboard[dir="rtl"] .donut-pair-item:last-child {
+  margin-left: 0;
+}
+
+.pb-dashboard .donut-pair-item .indicator-text {
+  float: none;
+  width: auto;
+  margin-right: calc(var(--donut-size) + 12px);
+  border-right: none;
+  min-height: auto;
+  font-size: 9.5px;
+  padding: 0;
+}
+
+.pb-dashboard[dir="rtl"] .donut-pair-item .indicator-text {
+  margin-right: 0;
+  margin-left: calc(var(--donut-size) + 12px);
+  border-left: none;
+}
+
+.pb-dashboard .donut-pair-item .donut-visual {
+  float: right;
+  margin-left: 0;
+}
+
+.pb-dashboard[dir="rtl"] .donut-pair-item .donut-visual {
+  float: left;
+}
+
+.pb-dashboard .donut-row.indicator-unavailable .indicator-unavailable-message,
+.pb-dashboard .donut-pair-item.indicator-unavailable .indicator-unavailable-message {
+  margin-left: var(--chart-offset);
+  min-height: var(--donut-size);
+}
+
+.pb-dashboard .section-tail {
+  width: 100%;
+  clear: both;
+}
+
+.pb-dashboard .footnote {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--divider);
+  font-size: 8px;
+  line-height: 1.45;
+  color: var(--muted);
+  clear: both;
+}
+</style></head><body><div class="pb-dashboard"><div class="dash-title">Strategic Priority 1</div><div class="section-tail"><div class="indicator-row"><div class="indicator-text">Example indicator</div><div class="line-chart-wrap"><div class="line-chart-inner" style="--chart-width:481"><svg class="line-chart-svg" viewBox="0 0 481 110" preserveAspectRatio="xMinYMid meet" xmlns="http://www.w3.org/2000/svg"><circle cx="24.00" cy="34.20" r="3.5" fill="#c22526"/></svg><span class="chart-value-label" style="left:4.9896%;top:22.0031%;transform:translate(-50%, -100%)">100</span></div></div><div class="x-axis-divider-row"><div class="x-axis-divider-left"></div><div class="x-axis-divider-right"></div></div><div class="x-axis-footer"><div class="metric-labels"><span class="year-label"></span><span>National Societies</span><span>National Societies</span></div><div class="table-data"><div class="table-row"><span class="table-cell year-cell" style="left:4.9896%">2027</span></div><div class="table-row"><span class="table-cell" style="left:4.9896%">5</span></div><div class="table-row"><span class="table-cell" style="left:4.9896%">10</span></div></div></div></div><div class="footnote" markdown="0"></div></div></div></body></html>

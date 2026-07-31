@@ -22,7 +22,7 @@
         {'name': _('Data Exploration'), 'url': url_for('data_exploration.explore_data')},
         {'name': _('P&B report management')}
     ],
-    info_tooltip=_('System managers only. Upload workbooks, configure system-sourced data, and generate P&B report deliverables.'),
+    info_tooltip=_('System managers only. Prepare data, generate reports, and configure system-sourced mappings.'),
     actions=[
         {
             'type': 'link',
@@ -30,6 +30,7 @@
             'url': explore_report_url,
             'icon': 'fas fa-chart-line',
             'classes': 'professional-action-btn',
+            'attributes': {'id': 'pb-progress-header-view-link'},
         }
     ]
 ) }}
@@ -37,7 +38,7 @@
 <div class="max-w-7xl mx-auto px-4 py-4">
     <div class="bg-white shadow-md border border-gray-200">
         <div class="px-3 sm:px-4 py-3 border-b border-gray-200">
-            <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <nav id="pb-progress-version-tabs" class="flex flex-wrap gap-1 -mb-px border-b border-gray-200 flex-1 min-w-0" role="tablist" aria-label="{{ _('P&B report versions') }}">
                     {% for version_id in pb_report_version_order %}
                     {% set version = pb_report_versions[version_id] %}
@@ -50,11 +51,9 @@
                     </button>
                     {% endfor %}
                 </nav>
-                <div class="flex flex-col items-end shrink-0 self-center">
-                    <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden" role="group" aria-label="{{ _('Data source') }}">
-                        <button type="button" id="pb-progress-source-excel" data-source="excel" class="px-3 py-1.5 text-sm font-medium {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'excel' else 'bg-white text-gray-700' }}">{{ _('Excel upload') }}</button>
-                        <button type="button" id="pb-progress-source-system" data-source="system" class="px-3 py-1.5 text-sm font-medium border-l border-gray-300 {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'system' else 'bg-white text-gray-700' }}">{{ _('System (DB)') }}</button>
-                    </div>
+                <div class="inline-flex rounded-lg border border-gray-300 overflow-hidden shrink-0" role="group" aria-label="{{ _('Data source') }}">
+                    <button type="button" id="pb-progress-source-excel" data-source="excel" class="px-3 py-1.5 text-sm font-medium {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'excel' else 'bg-white text-gray-700' }}">{{ _('Excel upload') }}</button>
+                    <button type="button" id="pb-progress-source-system" data-source="system" class="px-3 py-1.5 text-sm font-medium border-l border-gray-300 {{ 'bg-blue-600 text-white' if pb_initial_data_source == 'system' else 'bg-white text-gray-700' }}">{{ _('System (DB)') }}</button>
                 </div>
             </div>
         </div>
@@ -78,45 +77,44 @@
             </button>
         {% endcall %}
 
-        <div class="px-3 sm:px-4 py-3 space-y-3">
+        <div class="px-3 sm:px-4 py-4 space-y-4">
             <div id="pb-progress-build" class="hidden rounded-md border border-blue-200 bg-blue-50 px-3 py-2 space-y-2">
                 <div id="pb-progress-build-active">
-                    <div class="flex items-center gap-2 text-sm text-blue-800">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <span id="pb-progress-progress-text">{{ _('Generating report...') }}</span>
+                    <div class="flex items-center gap-2 text-sm text-blue-800 min-w-0">
+                        <i class="fas fa-spinner fa-spin shrink-0" aria-hidden="true"></i>
+                        <span id="pb-progress-progress-text" class="flex-1 min-w-0 truncate"></span>
+                        <button type="button" id="pb-progress-cancel-btn" class="hidden shrink-0 btn btn-secondary btn-sm text-xs py-1 px-2">
+                            <i class="fas fa-stop mr-1" aria-hidden="true"></i>{{ _('Cancel') }}
+                        </button>
+                        <button type="button" id="pb-progress-stages-toggle" class="hidden shrink-0 text-xs font-medium text-blue-700 hover:text-blue-900 underline-offset-2 hover:underline" aria-expanded="false" aria-controls="pb-progress-stages"></button>
                     </div>
                     <div class="w-full bg-blue-100 rounded-full h-1.5 overflow-hidden mt-1.5">
                         <div id="pb-progress-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-500" style="width: 15%;"></div>
                     </div>
                     <ul id="pb-progress-stages" class="mt-2 space-y-1 text-xs hidden"></ul>
                 </div>
-                <p id="pb-progress-build-message" class="text-xs hidden"></p>
+                <p id="pb-progress-build-message" class="text-xs whitespace-pre-wrap hidden"></p>
             </div>
 
-            <div id="pb-progress-panel-build" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'build' else '' }} space-y-3" role="tabpanel">
-                <div id="pb-progress-excel-workflow" data-pb-excel-only="true" class="pb-mode-panel {{ 'hidden' if pb_initial_data_source == 'system' else '' }}">
+            <div id="pb-progress-panel-build" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'build' else '' }} space-y-4" role="tabpanel">
+                <div id="pb-progress-excel-workflow" data-pb-excel-only="true" class="pb-mode-panel {{ 'hidden' if pb_initial_data_source == 'system' else '' }} space-y-2">
                     <div class="pb-compact-toolbar">
                         <div id="pb-progress-excel-badge" class="hidden inline-flex items-center gap-1.5 rounded-full bg-green-50 text-green-800 px-2.5 py-0.5 text-xs">
                             <i class="fas fa-file-excel"></i>
                             <span id="pb-progress-excel-badge-text"></span>
                         </div>
-                        <span id="pb-progress-no-excel-notice" class="text-xs text-amber-800">{{ _('No workbook uploaded.') }}</span>
+                        <span id="pb-progress-no-excel-notice" class="text-sm text-amber-800">{{ _('No workbook uploaded.') }}</span>
                         <input id="pb-progress-file-input" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="hidden">
                         <button type="button" id="pb-progress-upload-btn" class="btn btn-secondary btn-sm">
                             <i class="fas fa-upload mr-1.5"></i>{{ _('Upload workbook') }}
                         </button>
                         <a id="pb-progress-download-workbook-link" class="btn btn-secondary btn-sm hidden" href="#" target="_blank" rel="noopener noreferrer">
-                            <i class="fas fa-download mr-1.5"></i>{{ _('Download current') }}
+                            <i class="fas fa-download mr-1.5"></i>{{ _('Download workbook') }}
                         </a>
-                    </div>
-                    <div id="pb-progress-workbook-history-wrap" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs space-y-2">
-                        <div class="font-medium text-gray-700">{{ _('Previous workbooks') }}</div>
-                        <p class="text-gray-500">{{ _('Each new upload moves the current workbook here before activating the new file.') }}</p>
-                        <ul id="pb-progress-workbook-history-list" class="space-y-1"></ul>
                     </div>
                 </div>
 
-                <div id="pb-progress-system-workflow" data-pb-system-only="true" class="pb-mode-panel {{ '' if pb_initial_data_source == 'system' else 'hidden' }}">
+                <div id="pb-progress-system-workflow" data-pb-system-only="true" class="pb-mode-panel {{ '' if pb_initial_data_source == 'system' else 'hidden' }} space-y-3">
                     <div class="pb-compact-toolbar">
                         <span id="pb-progress-system-dataset-badge" class="hidden inline-flex items-center gap-1 rounded-full bg-green-50 text-green-800 px-2 py-0.5 text-xs">
                             <i class="fas fa-check"></i>{{ _('Dataset ready') }}
@@ -134,12 +132,11 @@
                     <div id="pb-progress-compare-summary" class="hidden rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs space-y-1"></div>
                     <div id="pb-progress-years-section" class="space-y-1.5 max-w-md">
                         <label for="pb-progress-years-multiselect" class="block text-sm font-medium text-gray-700">{{ _('Report years') }}</label>
-                        <p class="text-xs text-gray-500">{{ _('Only selected years are included when you generate the system dataset and report.') }}</p>
                         <div id="pb-progress-years-multiselect"></div>
                     </div>
                 </div>
 
-                <div id="pb-progress-build-actions" class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
+                <div class="pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
                     <button type="button" id="pb-progress-generate-btn" class="btn btn-primary btn-sm" disabled>
                         <i class="fas fa-play mr-1.5"></i>{{ _('Generate report') }}
                     </button>
@@ -151,6 +148,7 @@
                         <option value="Spanish">{{ _('Spanish') }}</option>
                         <option value="Arabic">{{ _('Arabic') }}</option>
                     </select>
+                    <p id="pb-progress-generate-hint" class="text-xs text-gray-500"></p>
                 </div>
             </div>
 
@@ -236,6 +234,7 @@
 window.PBProgressConfig = {
     pageMode: 'admin',
     apiBase: '/admin/data-exploration/pb-progress',
+    exploreReportUrl: {{ explore_report_url|tojson }},
     versions: {{ pb_report_versions|tojson }},
     versionOrder: {{ pb_report_version_order|tojson }},
     defaultVersion: {{ pb_default_version|tojson }},
@@ -243,25 +242,26 @@ window.PBProgressConfig = {
     initialDataSource: {{ pb_initial_data_source|tojson }},
     i18n: {
         generatingReport: {{ _('Generating report...')|tojson }},
+        showBuildSteps: {{ _('Show steps')|tojson }},
+        hideBuildSteps: {{ _('Hide steps')|tojson }},
         preparingReport: {{ _('Preparing dataset and report...')|tojson }},
         reportGenerationFailed: {{ _('Report generation failed.')|tojson }},
-        reportGeneratedSuccessfully: {{ _('Report generated successfully.')|tojson }},
+        reportGeneratedSuccessfully: {{ _('Report generated. Open Data Explorer to view and download deliverables.')|tojson }},
+        reportGenerationCancelled: {{ _('Report generation was cancelled.')|tojson }},
+        cancelGeneration: {{ _('Cancel generation')|tojson }},
+        cancellingGeneration: {{ _('Cancelling…')|tojson }},
         requestFailed: {{ _('Request failed.')|tojson }},
         lostConnection: {{ _('Lost connection to the server while generating. Wait for the server to come back, then refresh this page.')|tojson }},
-        workbookArchived: {{ _('Previous workbook archived.')|tojson }},
-        previousWorkbooks: {{ _('Previous workbooks')|tojson }},
-        downloadCurrentWorkbook: {{ _('Download current')|tojson }},
-        noWorkbookHistory: {{ _('No archived workbooks yet.')|tojson }},
         uploading: {{ _('Uploading...')|tojson }},
-        excelUploadedSuccessfully: {{ _('Excel uploaded successfully.')|tojson }},
-        excelUploadedWithWarnings: {{ _('Excel uploaded with warnings:')|tojson }},
+        excelUploadedSuccessfully: {{ _('Workbook uploaded successfully.')|tojson }},
+        excelUploadedWithWarnings: {{ _('Workbook uploaded with warnings:')|tojson }},
         dataSourceUpdated: {{ _('Data source updated.')|tojson }},
         mappingSaved: {{ _('Mapping saved.')|tojson }},
         translationsSaved: {{ _('Translations saved.')|tojson }},
         sectionOrderSaved: {{ _('Section order saved.')|tojson }},
         systemDatasetGenerated: {{ _('System dataset generated.')|tojson }},
         syncCompleted: {{ _('Indicator Bank sync completed.')|tojson }},
-        configImported: {{ _('Configuration imported from Excel.')|tojson }},
+        configImported: {{ _('Configuration imported from workbook.')|tojson }},
         indicatorsLabel: {{ _('indicators')|tojson }},
         compareIntro: {{ _('Comparison')|tojson }},
         compareMismatchesLabel: {{ _('mismatches of')|tojson }},
@@ -275,6 +275,8 @@ window.PBProgressConfig = {
         tagMissing: {{ _('Tag removed')|tojson }},
         sourceWarning: {{ _('Source unavailable')|tojson }},
         noMappingRows: {{ _('No mapping rows yet. Sync from Indicator Bank or import from Excel.')|tojson }},
+        generateHintExcel: {{ _('Upload a workbook first.')|tojson }},
+        generateHintSystem: {{ _('Sync mapping and generate the system dataset first.')|tojson }},
     },
 };
 </script>

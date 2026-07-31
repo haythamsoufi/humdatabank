@@ -15,6 +15,8 @@ from plugins.pb_progress.db_source import (
     import_config_from_excel,
     sync_mapping_from_indicator_bank,
     validate_mapping_config,
+    validate_section_order_config,
+    validate_translations_config,
 )
 from plugins.pb_progress.plugin_data_store import PBProgressDataStore
 from plugins.pb_progress.service import PBProgressService
@@ -91,7 +93,6 @@ def excel_info(version: str):
         return json_bad_request(str(exc))
     return json_ok(
         excel=PBProgressService.get_excel_info(version_key),
-        workbook_history=PBProgressService.list_workbook_history(version_key),
         version=version_key,
     )
 
@@ -110,25 +111,6 @@ def download_workbook(version: str):
         raise
     except Exception as exc:
         logger.exception("P&B progress workbook download failed")
-        return json_server_error(str(exc))
-
-
-@bp.route("/pb-progress/<version>/workbook-history/<archive_id>/download", methods=["GET"])
-@permission_required("admin.data_explore.pb_progress")
-@system_manager_required
-def download_workbook_archive(version: str, archive_id: str):
-    try:
-        version_key = validate_version(version)
-    except ValueError as exc:
-        return json_bad_request(str(exc))
-    try:
-        return PBProgressService.serve_workbook_archive(version_key, archive_id)
-    except NotFound:
-        raise
-    except ValueError as exc:
-        return json_bad_request(str(exc))
-    except Exception as exc:
-        logger.exception("P&B progress workbook archive download failed")
         return json_server_error(str(exc))
 
 
@@ -154,6 +136,27 @@ def generate(version: str):
         return json_bad_request(str(exc))
     except Exception as exc:
         logger.exception("P&B progress generation start failed")
+        return json_server_error(str(exc))
+
+
+@bp.route("/pb-progress/<version>/cancel", methods=["POST"])
+@permission_required("admin.data_explore.pb_progress")
+@system_manager_required
+def cancel_generation(version: str):
+    try:
+        version_key = validate_version(version)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
+    try:
+        return json_ok(
+            version=version_key,
+            status=PBProgressService.cancel_generation(version_key),
+        )
+    except RuntimeError as exc:
+        logger.warning("P&B progress cancel blocked: %s", exc)
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        logger.exception("P&B progress cancel failed")
         return json_server_error(str(exc))
 
 
@@ -248,6 +251,10 @@ def translations(version: str):
     rows = payload.get("translations")
     if not isinstance(rows, list):
         return json_bad_request("Expected a translations array.")
+    try:
+        rows = validate_translations_config(rows)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
     PBProgressDataStore.save_translations_config(version_key, rows)
     return json_ok(
         version=version_key,
@@ -274,6 +281,10 @@ def section_order(version: str):
     rows = payload.get("section_order")
     if not isinstance(rows, list):
         return json_bad_request("Expected a section_order array.")
+    try:
+        rows = validate_section_order_config(rows)
+    except ValueError as exc:
+        return json_bad_request(str(exc))
     PBProgressDataStore.save_section_order_config(version_key, rows)
     return json_ok(
         version=version_key,

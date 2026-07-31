@@ -18,7 +18,9 @@
             versionUi[versionId] = {
                 maxProgressPercent: 15,
                 trackingBuild: false,
+                cancellingBuild: false,
                 statusCache: null,
+                statusLoaded: false,
             };
         });
     }
@@ -26,6 +28,7 @@
 
     const els = {
         empty: document.getElementById('pb-progress-empty'),
+        loading: document.getElementById('pb-progress-loading'),
         build: document.getElementById('pb-progress-build'),
         buildActive: document.getElementById('pb-progress-build-active'),
         buildMessage: document.getElementById('pb-progress-build-message'),
@@ -48,7 +51,34 @@
         progressText: document.getElementById('pb-progress-progress-text'),
         progressBar: document.getElementById('pb-progress-progress-bar'),
         stages: document.getElementById('pb-progress-stages'),
+        stagesToggle: document.getElementById('pb-progress-stages-toggle'),
+        cancelBtn: document.getElementById('pb-progress-cancel-btn'),
     };
+
+    let stagesExpanded = false;
+    let wasBuildRunning = false;
+
+    function currentStageLabel(stageList, status) {
+        if (status && status.build_stage_label) return status.build_stage_label;
+        if (!stageList || !stageList.length) {
+            return (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+        }
+        let active = null;
+        stageList.forEach(function(stage) {
+            if (stage.state === 'active') active = stage;
+        });
+        if (active && active.label) return active.label;
+        return (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+    }
+
+    function updateStagesToggle(expanded, visible) {
+        if (!els.stagesToggle) return;
+        els.stagesToggle.classList.toggle('hidden', !visible);
+        els.stagesToggle.textContent = expanded
+            ? ((cfg.i18n && cfg.i18n.hideBuildSteps) || 'Hide steps')
+            : ((cfg.i18n && cfg.i18n.showBuildSteps) || 'Show steps');
+        els.stagesToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
 
     function getVersionFromUrl() {
         try {
@@ -126,16 +156,25 @@
         }
     }
 
-    function renderBuildStages(stageList) {
+    function renderBuildStages(stageList, status) {
         if (!els.stages) return;
-        if (!stageList || !stageList.length) {
+        const list = stageList || [];
+        const running = status && status.status === 'running';
+        if (!running || !list.length) {
+            els.stages.classList.add('hidden');
+            els.stages.innerHTML = '';
+            updateStagesToggle(false, false);
+            return;
+        }
+        updateStagesToggle(stagesExpanded, true);
+        if (!stagesExpanded) {
             els.stages.classList.add('hidden');
             els.stages.innerHTML = '';
             return;
         }
         els.stages.classList.remove('hidden');
         els.stages.innerHTML = '';
-        stageList.forEach(function(stage) {
+        list.forEach(function(stage) {
             const item = document.createElement('li');
             item.className = 'flex items-center gap-2';
             let iconClass = 'far fa-circle text-gray-400';
@@ -357,7 +396,22 @@
         window.setTimeout(flushPendingIframeLanguage, 500);
     }
 
+    function showLoadingState() {
+        if (els.loading) els.loading.classList.remove('hidden');
+        if (els.empty) els.empty.classList.add('hidden');
+        if (els.viewer) els.viewer.classList.add('hidden');
+        if (els.build) els.build.classList.add('hidden');
+        setToolbarPinned(false);
+    }
+
     function renderConsumerView(status) {
+        const ui = currentUi();
+        if (!ui.statusLoaded) {
+            showLoadingState();
+            return;
+        }
+        if (els.loading) els.loading.classList.add('hidden');
+
         const outputs = status.outputs || [];
         const REPORT_HTML_NAMES = ['pb-report.html', 'gb-report.html'];
         const htmlOutput = outputs.find(function(item) { return REPORT_HTML_NAMES.indexOf(item.name) !== -1; });
@@ -403,20 +457,41 @@
         }
     }
 
+    function updateCancelButton(running, cancelling) {
+        if (!els.cancelBtn || !cfg.canManage) return;
+        els.cancelBtn.classList.toggle('hidden', !running);
+        els.cancelBtn.disabled = !!cancelling;
+        els.cancelBtn.title = (cfg.i18n && cfg.i18n.cancelGeneration) || 'Cancel generation';
+        if (cancelling) {
+            els.cancelBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i>'
+                + ((cfg.i18n && cfg.i18n.cancellingGeneration) || 'Cancelling…');
+        } else {
+            els.cancelBtn.innerHTML = '<i class="fas fa-stop mr-1" aria-hidden="true"></i>'
+                + ((cfg.i18n && cfg.i18n.cancelGeneration) || 'Cancel');
+        }
+    }
+
     function updateBuildProgress(status) {
         const ui = currentUi();
         const running = status.status === 'running';
         const failed = status.status === 'failed';
         const done = status.status === 'done';
+        const cancelled = status.status === 'cancelled';
         const stageList = status.build_stages || [];
+
+        if (running && !wasBuildRunning) {
+            stagesExpanded = false;
+        }
+        wasBuildRunning = running;
 
         if (running) ui.trackingBuild = true;
 
-        const showCompletion = ui.trackingBuild && (done || failed);
+        const showCompletion = ui.trackingBuild && (done || failed || cancelled);
         const showPanel = running || showCompletion;
 
         if (els.build) els.build.classList.toggle('hidden', !showPanel);
         if (els.buildActive) els.buildActive.classList.toggle('hidden', !running);
+        updateCancelButton(running, ui.cancellingBuild);
 
         if (running && els.progressBar) {
             const pct = stageProgressPercent(stageList);
@@ -427,15 +502,22 @@
         }
 
         if (els.progressText) {
-            els.progressText.textContent = running && status.build_stage_label
-                ? status.build_stage_label
-                : (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+            els.progressText.textContent = running
+                ? currentStageLabel(stageList, status)
+                : ((cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...');
         }
 
-        renderBuildStages(running ? stageList : []);
+        renderBuildStages(running ? stageList : [], status);
 
         if (showCompletion && failed) {
             setMessage(els.buildMessage, status.error || (cfg.i18n && cfg.i18n.reportGenerationFailed) || 'Report generation failed.', 'error');
+            ui.trackingBuild = false;
+        } else if (showCompletion && cancelled) {
+            setMessage(
+                els.buildMessage,
+                (cfg.i18n && cfg.i18n.reportGenerationCancelled) || 'Report generation was cancelled.',
+                'warning'
+            );
             ui.trackingBuild = false;
         } else if (showCompletion && done) {
             setMessage(els.buildMessage, (cfg.i18n && cfg.i18n.reportGeneratedSuccessfully) || 'Report generated successfully.', 'success');
@@ -453,9 +535,13 @@
     }
 
     function renderActiveVersionFromCache() {
-        const cached = currentUi().statusCache;
-        if (cached) {
-            applyStatusToUi(cached);
+        const ui = currentUi();
+        if (!ui.statusLoaded) {
+            showLoadingState();
+            return;
+        }
+        if (ui.statusCache) {
+            applyStatusToUi(ui.statusCache);
         } else {
             applyStatusToUi({ status: 'idle', outputs: [] });
         }
@@ -485,8 +571,13 @@
             try {
                 const payload = await fetchJson(apiUrl('/status', versionId));
                 versionUi[versionId].statusCache = payload.status || {};
+                versionUi[versionId].statusLoaded = true;
             } catch (error) {
                 hadError = true;
+                versionUi[versionId].statusLoaded = true;
+                if (!versionUi[versionId].statusCache) {
+                    versionUi[versionId].statusCache = { status: 'idle', outputs: [] };
+                }
             }
         }
         renderActiveVersionFromCache();
@@ -516,6 +607,7 @@
             const payload = await fetchJson(apiUrl('/status'));
             const status = payload.status || {};
             versionUi[activeVersion].statusCache = status;
+            versionUi[activeVersion].statusLoaded = true;
             applyStatusToUi(status);
             if (status.status === 'running' || anyVersionRunning()) {
                 if (!pollTimer) {
@@ -528,6 +620,11 @@
             }
             return status;
         } catch (error) {
+            versionUi[activeVersion].statusLoaded = true;
+            if (!versionUi[activeVersion].statusCache) {
+                versionUi[activeVersion].statusCache = { status: 'idle', outputs: [] };
+            }
+            renderActiveVersionFromCache();
             if (pollTimer) {
                 window.clearInterval(pollTimer);
                 pollTimer = null;
@@ -542,6 +639,30 @@
                 );
             }
             throw error;
+        }
+    }
+
+    async function cancelGeneration() {
+        const ui = currentUi();
+        if (ui.cancellingBuild) return;
+        ui.cancellingBuild = true;
+        updateCancelButton(true, true);
+        try {
+            const payload = await fetchJson(apiUrl('/cancel'), { method: 'POST' });
+            const status = payload.status || { status: 'cancelled' };
+            versionUi[activeVersion].statusCache = status;
+            applyStatusToUi(status);
+            if (pollTimer) {
+                window.clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        } catch (error) {
+            updateCancelButton(true, false);
+            if (currentUi().trackingBuild && els.build) {
+                setMessage(els.buildMessage, error.message, 'error');
+            }
+        } finally {
+            ui.cancellingBuild = false;
         }
     }
 
@@ -565,6 +686,20 @@
 
     function bindEvents() {
         bindVersionTabs();
+        if (els.stagesToggle) {
+            els.stagesToggle.addEventListener('click', function() {
+                stagesExpanded = !stagesExpanded;
+                const cached = currentUi().statusCache;
+                if (cached && cached.status === 'running') {
+                    renderBuildStages(cached.build_stages || [], cached);
+                }
+            });
+        }
+        if (els.cancelBtn) {
+            els.cancelBtn.addEventListener('click', function() {
+                cancelGeneration().catch(function() {});
+            });
+        }
         if (els.tab) {
             els.tab.addEventListener('click', function() {
                 refreshAllStatuses().catch(function() {});
@@ -735,7 +870,15 @@
             setActiveVersionTab();
             bindEvents();
             initToolbarPin();
-            refreshAllStatuses().catch(function() {});
+            showLoadingState();
+            refreshAllStatuses().catch(function() {
+                const ui = currentUi();
+                ui.statusLoaded = true;
+                if (!ui.statusCache) {
+                    ui.statusCache = { status: 'idle', outputs: [] };
+                }
+                renderActiveVersionFromCache();
+            });
             if (els.tab && els.tab.getAttribute('aria-selected') === 'true') {
                 syncVersionToUrl(activeVersion);
             }
@@ -750,6 +893,9 @@
             setActiveVersionTab();
             renderActiveVersionFromCache();
             syncVersionToUrl(versionId);
+            if (!currentUi().statusLoaded) {
+                showLoadingState();
+            }
             refreshStatus().catch(function() {});
         },
     };

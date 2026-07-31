@@ -1,4 +1,6 @@
-/* Dashboard layout for offline PNG rasterization (mirrors report/styles/ifrc.scss). */
+/* Dashboard layout for WeasyPrint PNG rasterization.
+   Semantic <table> markup from render_embed.py — reliable in WeasyPrint. */
+
 .pb-dashboard {
   --value: #c22526;
   --target: #f28e2b;
@@ -7,6 +9,7 @@
   --muted: #666;
   --divider: #d8d8d8;
   --label-col: 290px;
+  --col-gap: 12px;
   --donut-size: 64px;
   width: 827px;
   margin: 0;
@@ -14,6 +17,7 @@
   font-family: "Open Sans", "Segoe UI", sans-serif;
   color: var(--text);
   background: #fff;
+  box-sizing: border-box;
 }
 
 .pb-dashboard[dir="rtl"] {
@@ -28,79 +32,74 @@
   margin-bottom: 14px;
 }
 
-.pb-dashboard .indicator-row {
-  display: grid;
-  grid-template-columns: var(--label-col) 1fr;
-  grid-template-rows: auto auto auto;
-  gap: 0 12px;
+.pb-dashboard table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.pb-dashboard table[role="presentation"] {
+  width: 100%;
+  table-layout: fixed;
+}
+
+/* ── Cumulative indicator rows ── */
+.pb-dashboard table.indicator-row {
+  margin: 0 0 0;
   padding: 12px 0;
   border-bottom: 1px solid var(--divider);
 }
 
-.pb-dashboard .indicator-row.indicator-unavailable {
-  grid-template-rows: auto;
-  align-items: center;
+.pb-dashboard table.indicator-row td {
+  vertical-align: middle;
+  padding: 0;
 }
 
-.pb-dashboard .indicator-unavailable-message {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 72px;
-  padding: 12px 16px;
-  border: 1px dashed var(--divider);
-  border-radius: 4px;
-  background: #fafafa;
-  color: var(--muted);
-  font-size: 10px;
-  font-style: italic;
-  text-align: center;
-}
-
-.pb-dashboard .donut-row.indicator-unavailable,
-.pb-dashboard .donut-pair-item.indicator-unavailable {
-  grid-template-columns: var(--label-col) 1fr;
-  align-items: center;
-}
-
-.pb-dashboard .donut-row.indicator-unavailable .indicator-unavailable-message,
-.pb-dashboard .donut-pair-item.indicator-unavailable .indicator-unavailable-message {
-  grid-column: 2;
-  min-height: var(--donut-size);
-}
-
-.pb-dashboard .indicator-text {
-  grid-column: 1;
-  grid-row: 1;
+.pb-dashboard table.indicator-row td.indicator-text {
+  width: var(--label-col);
+  box-sizing: border-box;
   font-size: 10.5px;
   line-height: 1.35;
-  display: flex;
-  align-items: center;
   padding: 4px 8px 4px 2px;
   border-right: 1px solid var(--divider);
   min-height: 110px;
 }
 
-.pb-dashboard .line-chart-wrap {
-  grid-column: 2;
-  grid-row: 1;
-  display: flex;
-  align-items: center;
+.pb-dashboard[dir="rtl"] table.indicator-row td.indicator-text {
+  border-right: none;
+  border-left: 1px solid var(--divider);
+  padding: 4px 2px 4px 8px;
+}
+
+.pb-dashboard table.indicator-row td.line-chart-wrap {
+  padding-left: var(--col-gap);
   min-height: 110px;
+  overflow: hidden;
+}
+
+.pb-dashboard[dir="rtl"] table.indicator-row td.line-chart-wrap {
+  padding-left: 0;
+  padding-right: var(--col-gap);
 }
 
 .pb-dashboard .line-chart-inner {
   position: relative;
-  width: 481px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 481px;
+  height: 110px;
+  min-height: 110px;
+  overflow: hidden;
 }
 
-.pb-dashboard .line-chart-inner > svg {
+.pb-dashboard .line-chart-inner > svg,
+.pb-dashboard .line-chart-inner > .line-chart-img {
   display: block;
   width: 100%;
-  height: auto;
+  max-width: 481px;
+  height: 110px;
+}
+
+.pb-dashboard .line-chart-img {
+  pointer-events: none;
 }
 
 .pb-dashboard .chart-value-label {
@@ -125,67 +124,105 @@
   color: var(--target);
 }
 
-.pb-dashboard .x-axis-divider-row {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  display: grid;
-  grid-template-columns: var(--label-col) 1fr;
-  gap: 12px;
-  margin: 4px 0 2px;
+.pb-dashboard table.indicator-row tr.x-axis-divider-row td {
+  vertical-align: bottom;
+  padding-top: 4px;
+  padding-bottom: 2px;
 }
 
-.pb-dashboard .x-axis-divider-left {
-  border-top: 1px solid var(--divider);
+.pb-dashboard table.indicator-row td.x-axis-divider-left {
+  width: var(--label-col);
+  padding-right: var(--col-gap);
+}
+
+.pb-dashboard table.indicator-row td.x-axis-divider-left::before {
+  content: "";
+  display: block;
+  width: 50%;
   margin-left: 50%;
+  border-top: 1px solid var(--divider);
 }
 
-.pb-dashboard[dir="rtl"] .x-axis-divider-left {
+.pb-dashboard[dir="rtl"] table.indicator-row td.x-axis-divider-left::before {
   margin-left: 0;
   margin-right: 50%;
 }
 
-.pb-dashboard .x-axis-divider-right {
+.pb-dashboard table.indicator-row td.x-axis-divider-right {
   border-top: 1px solid var(--divider);
 }
 
-.pb-dashboard .x-axis-footer {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  display: grid;
-  grid-template-columns: var(--label-col) 1fr;
-  gap: 12px;
-  min-height: 54px;
+.pb-dashboard table.indicator-row tr.x-axis-footer td {
+  vertical-align: top;
 }
 
-.pb-dashboard .x-axis-footer.year-only {
-  min-height: 0;
+.pb-dashboard table.indicator-row td.metric-labels {
+  width: var(--label-col);
+  padding: 0;
+  border-right: 1px solid var(--divider);
+  vertical-align: top;
 }
 
-.pb-dashboard .metric-labels {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
+.pb-dashboard[dir="rtl"] table.indicator-row td.metric-labels {
+  border-right: none;
+  border-left: 1px solid var(--divider);
+}
+
+.pb-dashboard table.metric-label-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pb-dashboard table.metric-label-grid td {
+  text-align: right;
   font-size: 9px;
   color: var(--muted);
-  text-align: right;
   padding: 2px 10px 2px 2px;
-  border-right: 1px solid var(--divider);
+  height: 18px;
+  vertical-align: middle;
+  border: none;
 }
 
-.pb-dashboard .metric-labels span {
-  line-height: 1.3;
-  min-height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+.pb-dashboard[dir="rtl"] table.metric-label-grid td {
+  text-align: left;
+  padding: 2px 2px 2px 10px;
 }
 
-.pb-dashboard .table-data {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
+.pb-dashboard table.metric-label-grid td.year-label {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.pb-dashboard table.indicator-row td.table-data {
+  padding-left: var(--col-gap);
   min-height: 54px;
+}
+
+.pb-dashboard[dir="rtl"] table.indicator-row td.table-data {
+  padding-left: 0;
+  padding-right: var(--col-gap);
+}
+
+.pb-dashboard table.year-data-grid {
+  width: 481px;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pb-dashboard table.year-data-grid td {
+  text-align: center;
+  font-size: 9px;
+  color: var(--text);
+  border-bottom: 1px solid var(--divider);
+  padding: 2px 4px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.pb-dashboard table.year-data-grid tr.year-row td {
+  font-weight: 700;
+  border-top: 1px solid var(--divider);
 }
 
 .pb-dashboard .table-row {
@@ -217,7 +254,7 @@
   z-index: 1;
 }
 
-.pb-dashboard .metric-labels .year-label {
+.pb-dashboard td.metric-labels .year-label {
   font-weight: 700;
   color: var(--text);
 }
@@ -226,19 +263,57 @@
   font-weight: 700;
 }
 
-.pb-dashboard .donut-row {
-  display: grid;
-  grid-template-columns: var(--label-col) var(--donut-size) 1fr;
-  gap: 16px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--divider);
-  align-items: center;
+/* ── Unavailable indicators ── */
+.pb-dashboard table.indicator-row.indicator-unavailable td.indicator-text {
+  min-height: 72px;
 }
 
-.pb-dashboard .donut-visual {
-  position: relative;
+.pb-dashboard td.indicator-unavailable-message {
+  vertical-align: middle;
+  min-height: 72px;
+  padding: 12px 16px;
+  border: 1px dashed var(--divider);
+  border-radius: 4px;
+  background: #fafafa;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  text-align: center;
+}
+
+/* ── Donut rows ── */
+.pb-dashboard table.donut-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.pb-dashboard table.donut-row td.indicator-text {
+  width: var(--label-col);
+  font-size: 10.5px;
+  line-height: 1.35;
+  padding: 4px 8px 4px 2px;
+  border-right: 1px solid var(--divider);
+  min-height: var(--donut-size);
+  vertical-align: middle;
+}
+
+.pb-dashboard[dir="rtl"] table.donut-row td.indicator-text {
+  border-right: none;
+  border-left: 1px solid var(--divider);
+}
+
+.pb-dashboard table.donut-row td.donut-visual {
   width: var(--donut-size);
-  height: var(--donut-size);
+  position: relative;
+  vertical-align: middle;
+  padding: 0 16px;
+}
+
+.pb-dashboard table.donut-row td.donut-target {
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-line;
+  vertical-align: middle;
 }
 
 .pb-dashboard .donut-img {
@@ -249,46 +324,67 @@
 
 .pb-dashboard .donut-center-label {
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: 0;
+  left: 16px;
+  width: var(--donut-size);
+  height: var(--donut-size);
+  line-height: var(--donut-size);
+  text-align: center;
   font-size: 11px;
   font-weight: 700;
-  text-align: center;
-  line-height: 1.15;
 }
 
-.pb-dashboard .donut-target {
-  font-size: 10px;
-  line-height: 1.4;
-  white-space: pre-line;
+.pb-dashboard[dir="rtl"] .donut-center-label {
+  left: auto;
+  right: 16px;
 }
 
-.pb-dashboard .donut-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+/* ── Donut pairs ── */
+.pb-dashboard table.donut-pair {
   padding: 14px 0;
   border-bottom: 1px solid var(--divider);
 }
 
+.pb-dashboard table.donut-pair > tbody > tr > td {
+  width: 50%;
+  vertical-align: middle;
+  padding: 0 10px 0 0;
+}
+
+.pb-dashboard table.donut-pair > tbody > tr > td:last-child {
+  padding: 0 0 0 10px;
+}
+
+.pb-dashboard table.donut-pair-item td.indicator-text {
+  font-size: 9.5px;
+  line-height: 1.35;
+  padding: 0 8px 0 0;
+  border: none;
+  vertical-align: middle;
+}
+
+.pb-dashboard[dir="rtl"] table.donut-pair-item td.indicator-text {
+  padding: 0 0 0 8px;
+}
+
+.pb-dashboard table.donut-pair-item td.donut-visual {
+  width: var(--donut-size);
+  position: relative;
+  vertical-align: middle;
+  padding: 0;
+}
+
+.pb-dashboard table.donut-pair-item .donut-center-label {
+  left: 0;
+}
+
+.pb-dashboard[dir="rtl"] table.donut-pair-item .donut-center-label {
+  right: 0;
+}
+
+/* ── Section tail / footnote ── */
 .pb-dashboard .section-tail {
   width: 100%;
-}
-
-.pb-dashboard .donut-pair-item {
-  display: grid;
-  grid-template-columns: 1fr var(--donut-size);
-  gap: 12px;
-  align-items: center;
-}
-
-.pb-dashboard .donut-pair-item .indicator-text {
-  border-right: none;
-  min-height: auto;
-  font-size: 9.5px;
-  padding: 0;
 }
 
 .pb-dashboard .footnote {

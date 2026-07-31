@@ -1,4 +1,4 @@
-"""Synthetic SG Report workbooks for pipeline integration tests."""
+"""Synthetic SG Report workbooks for P&B pipeline tests."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def write_test_workbook(
     section_order: dict[str, list[str]] | None = None,
     final_rows: list[dict[str, object]] | None = None,
 ) -> Path:
-    """Write a minimal valid SG Report workbook for visuals pipeline tests."""
+    """Write a minimal valid SG Report workbook for pipeline integration tests."""
     if section_order is None:
         section_order = {
             "cc": ["CC1"],
@@ -98,3 +98,17 @@ def sp1_mapping_row(**overrides: object) -> dict[str, object]:
     }
     row.update(overrides)
     return row
+
+
+def cumulative_docx_item() -> dict[str, object]:
+    """Minimal cumulative indicator payload used by Word line-chart assets."""
+    return {
+        "label": "People reached",
+        "values": [10.0, 20.0, 30.0, 40.0, 50.0],
+        "value_labels": ["10", "20", "30", "40", "50"],
+        "years": ["2023", "2024", "2025", "2026", "2027"],
+        "reporting": ["8", "18", "28", "38", "48"],
+        "implementing": ["5", "10", "15", "20", "25"],
+        "annual_target": 45.0,
+        "annual_target_label": "45",
+    }

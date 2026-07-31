@@ -1,6 +1,7 @@
 (function() {
     const cfg = window.PBProgressConfig || {};
     const API_BASE = cfg.apiBase || '/admin/data-exploration/pb-progress';
+    const EXPLORE_REPORT_URL = cfg.exploreReportUrl || '/admin/data-exploration?tab=pb-progress';
     const VERSIONS = cfg.versions || {};
     const VERSION_ORDER = cfg.versionOrder || [];
     let activeVersion = cfg.defaultVersion || "";
@@ -20,6 +21,7 @@
                 hasExcel: false,
                 maxProgressPercent: 15,
                 trackingBuild: false,
+                cancellingBuild: false,
                 statusCache: null,
             };
         });
@@ -47,14 +49,16 @@
         noExcelNotice: document.getElementById('pb-progress-no-excel-notice'),
         fileInput: document.getElementById('pb-progress-file-input'),
         downloadWorkbookLink: document.getElementById('pb-progress-download-workbook-link'),
-        workbookHistoryWrap: document.getElementById('pb-progress-workbook-history-wrap'),
-        workbookHistoryList: document.getElementById('pb-progress-workbook-history-list'),
         uploadBtn: document.getElementById('pb-progress-upload-btn'),
         generateBtn: document.getElementById('pb-progress-generate-btn'),
+        generateHint: document.getElementById('pb-progress-generate-hint'),
         languageSelect: document.getElementById('pb-progress-language'),
+        headerViewLink: document.getElementById('pb-progress-header-view-link'),
         progressText: document.getElementById('pb-progress-progress-text'),
         progressBar: document.getElementById('pb-progress-progress-bar'),
         stages: document.getElementById('pb-progress-stages'),
+        stagesToggle: document.getElementById('pb-progress-stages-toggle'),
+        cancelBtn: document.getElementById('pb-progress-cancel-btn'),
         sourceExcelBtn: document.getElementById('pb-progress-source-excel'),
         sourceSystemBtn: document.getElementById('pb-progress-source-system'),
         mappingBody: document.getElementById('pb-progress-mapping-body'),
@@ -87,6 +91,65 @@
     let yearsMultiselect = null;
     let yearsSaveTimer = null;
     let yearsSelectionSaved = [];
+    let stagesExpanded = false;
+    let wasBuildRunning = false;
+
+    function currentStageLabel(stageList, status) {
+        if (status && status.build_stage_label) return status.build_stage_label;
+        if (!stageList || !stageList.length) {
+            return (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+        }
+        let active = null;
+        stageList.forEach(function(stage) {
+            if (stage.state === 'active') active = stage;
+        });
+        if (active && active.label) return active.label;
+        return (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+    }
+
+    function updateStagesToggle(expanded, visible) {
+        if (!els.stagesToggle) return;
+        els.stagesToggle.classList.toggle('hidden', !visible);
+        els.stagesToggle.textContent = expanded
+            ? ((cfg.i18n && cfg.i18n.hideBuildSteps) || 'Hide steps')
+            : ((cfg.i18n && cfg.i18n.showBuildSteps) || 'Show steps');
+        els.stagesToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+
+    function renderBuildStages(stageList, status) {
+        if (!els.stages) return;
+        const list = stageList || [];
+        const running = status && status.status === 'running';
+        if (!running || !list.length) {
+            els.stages.classList.add('hidden');
+            els.stages.innerHTML = '';
+            updateStagesToggle(false, false);
+            return;
+        }
+        updateStagesToggle(stagesExpanded, true);
+        if (!stagesExpanded) {
+            els.stages.classList.add('hidden');
+            els.stages.innerHTML = '';
+            return;
+        }
+        els.stages.classList.remove('hidden');
+        els.stages.innerHTML = '';
+        list.forEach(function(stage) {
+            const item = document.createElement('li');
+            item.className = 'flex items-center gap-2';
+            let iconClass = 'far fa-circle text-gray-400';
+            let textClass = 'text-gray-500';
+            if (stage.state === 'done') {
+                iconClass = 'fas fa-check-circle text-green-600';
+                textClass = 'text-gray-700';
+            } else if (stage.state === 'active') {
+                iconClass = 'fas fa-spinner fa-spin text-blue-600';
+                textClass = 'text-blue-800 font-medium';
+            }
+            item.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i><span class="' + textClass + '">' + stage.label + '</span>';
+            els.stages.appendChild(item);
+        });
+    }
 
     function currentUi() {
         return versionUi[activeVersion];
@@ -98,6 +161,35 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function exploreUrlForVersion(versionId) {
+        try {
+            const url = new URL(EXPLORE_REPORT_URL, window.location.origin);
+            url.searchParams.set('tab', 'pb-progress');
+            if (versionId) url.searchParams.set('pb_version', versionId);
+            return url.pathname + url.search;
+        } catch (e) {
+            const join = EXPLORE_REPORT_URL.indexOf('?') >= 0 ? '&' : '?';
+            return EXPLORE_REPORT_URL + join + 'pb_version=' + encodeURIComponent(versionId || '');
+        }
+    }
+
+    function updateExploreLinks() {
+        const href = exploreUrlForVersion(activeVersion);
+        if (els.headerViewLink) els.headerViewLink.href = href;
+    }
+
+    function updateGenerateHint(status) {
+        if (!els.generateHint) return;
+        const cached = status || currentUi().statusCache || {};
+        if (canGenerateReport(cached) || cached.status === 'running') {
+            els.generateHint.textContent = '';
+            return;
+        }
+        els.generateHint.textContent = isSystemMode()
+            ? ((cfg.i18n && cfg.i18n.generateHintSystem) || '')
+            : ((cfg.i18n && cfg.i18n.generateHintExcel) || '');
     }
 
     function isSystemOnlySubtab(subtabId) {
@@ -199,32 +291,6 @@
         }
     }
 
-    function renderBuildStages(stageList) {
-        if (!els.stages) return;
-        if (!stageList || !stageList.length) {
-            els.stages.classList.add('hidden');
-            els.stages.innerHTML = '';
-            return;
-        }
-        els.stages.classList.remove('hidden');
-        els.stages.innerHTML = '';
-        stageList.forEach(function(stage) {
-            const item = document.createElement('li');
-            item.className = 'flex items-center gap-2';
-            let iconClass = 'far fa-circle text-gray-400';
-            let textClass = 'text-gray-500';
-            if (stage.state === 'done') {
-                iconClass = 'fas fa-check-circle text-green-600';
-                textClass = 'text-gray-700';
-            } else if (stage.state === 'active') {
-                iconClass = 'fas fa-spinner fa-spin text-blue-600';
-                textClass = 'text-blue-800 font-medium';
-            }
-            item.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i><span class="' + textClass + '">' + stage.label + '</span>';
-            els.stages.appendChild(item);
-        });
-    }
-
     function stageProgressPercent(stageList) {
         if (!stageList || !stageList.length) return 15;
         let completed = 0;
@@ -292,36 +358,6 @@
                 els.downloadWorkbookLink.classList.add('hidden');
             }
         }
-    }
-
-    function renderWorkbookHistory(entries) {
-        if (!els.workbookHistoryWrap || !els.workbookHistoryList) return;
-        const rows = Array.isArray(entries) ? entries : [];
-        els.workbookHistoryList.innerHTML = '';
-        if (!rows.length) {
-            els.workbookHistoryWrap.classList.add('hidden');
-            return;
-        }
-        els.workbookHistoryWrap.classList.remove('hidden');
-        rows.forEach(function(entry) {
-            const li = document.createElement('li');
-            li.className = 'flex flex-wrap items-center gap-x-2 gap-y-1';
-            const link = document.createElement('a');
-            link.href = entry.download_url || '#';
-            link.className = 'text-blue-700 hover:underline';
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.textContent = entry.filename || 'SG Report.xlsx';
-            li.appendChild(link);
-            const meta = document.createElement('span');
-            meta.className = 'text-gray-500';
-            const metaParts = [];
-            if (entry.size_label) metaParts.push(entry.size_label);
-            if (entry.archived_at) metaParts.push(formatUploadedAt(entry.archived_at));
-            meta.textContent = metaParts.join(' · ');
-            li.appendChild(meta);
-            els.workbookHistoryList.appendChild(li);
-        });
     }
 
     function applyDataSourceMode(status, syncFromStatus) {
@@ -698,9 +734,23 @@
             }
         }
         updateReferenceWorkbookActions(cachedStatus);
+        updateGenerateHint(cachedStatus);
         if (isExcelMode()) {
             renderExcelFileState(excel || cachedStatus.excel || null);
-            renderWorkbookHistory(cachedStatus.workbook_history || []);
+        }
+    }
+
+    function updateCancelButton(running, cancelling) {
+        if (!els.cancelBtn) return;
+        els.cancelBtn.classList.toggle('hidden', !running);
+        els.cancelBtn.disabled = !!cancelling;
+        els.cancelBtn.title = (cfg.i18n && cfg.i18n.cancelGeneration) || 'Cancel generation';
+        if (cancelling) {
+            els.cancelBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i>'
+                + ((cfg.i18n && cfg.i18n.cancellingGeneration) || 'Cancelling…');
+        } else {
+            els.cancelBtn.innerHTML = '<i class="fas fa-stop mr-1" aria-hidden="true"></i>'
+                + ((cfg.i18n && cfg.i18n.cancelGeneration) || 'Cancel');
         }
     }
 
@@ -709,15 +759,22 @@
         const running = status.status === 'running';
         const failed = status.status === 'failed';
         const done = status.status === 'done';
+        const cancelled = status.status === 'cancelled';
         const stageList = status.build_stages || [];
+
+        if (running && !wasBuildRunning) {
+            stagesExpanded = false;
+        }
+        wasBuildRunning = running;
 
         if (running) ui.trackingBuild = true;
 
-        const showCompletion = ui.trackingBuild && (done || failed);
+        const showCompletion = ui.trackingBuild && (done || failed || cancelled);
         const showPanel = running || showCompletion;
 
         if (els.build) els.build.classList.toggle('hidden', !showPanel);
         if (els.buildActive) els.buildActive.classList.toggle('hidden', !running);
+        updateCancelButton(running, ui.cancellingBuild);
 
         if (els.generateBtn) {
             const cached = currentUi().statusCache || status;
@@ -733,12 +790,12 @@
         }
 
         if (els.progressText) {
-            els.progressText.textContent = running && status.build_stage_label
-                ? status.build_stage_label
-                : (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+            els.progressText.textContent = running
+                ? currentStageLabel(stageList, status)
+                : ((cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...');
         }
 
-        renderBuildStages(running ? stageList : []);
+        renderBuildStages(running ? stageList : [], status);
 
         if (showCompletion && failed) {
             let failText = status.error || (cfg.i18n && cfg.i18n.reportGenerationFailed) || 'Report generation failed.';
@@ -746,6 +803,13 @@
                 failText = failText + '\n\n' + status.build_log_excerpt;
             }
             setMessage(els.buildMessage, failText, 'error');
+            ui.trackingBuild = false;
+        } else if (showCompletion && cancelled) {
+            setMessage(
+                els.buildMessage,
+                (cfg.i18n && cfg.i18n.reportGenerationCancelled) || 'Report generation was cancelled.',
+                'warning'
+            );
             ui.trackingBuild = false;
         } else if (showCompletion && done) {
             const successText = (cfg.i18n && cfg.i18n.reportGeneratedSuccessfully) || 'Report generated successfully.';
@@ -808,11 +872,9 @@
         const payload = await fetchJson(apiUrl('/excel-info'));
         const cachedStatus = Object.assign({}, currentUi().statusCache || {}, {
             excel: payload.excel || null,
-            workbook_history: payload.workbook_history || [],
         });
         versionUi[activeVersion].statusCache = cachedStatus;
         updateAdminUi(payload.excel || null, cachedStatus);
-        renderWorkbookHistory(payload.workbook_history || []);
         return payload.excel || null;
     }
 
@@ -904,18 +966,11 @@
             });
             const cachedStatus = Object.assign({}, currentUi().statusCache || {}, {
                 excel: payload.excel || null,
-                workbook_history: payload.workbook_history || [],
             });
             versionUi[activeVersion].statusCache = cachedStatus;
             updateAdminUi(payload.excel || null, cachedStatus);
-            renderWorkbookHistory(payload.workbook_history || []);
             await applyImportedConfigPayload(payload);
-            let message = configImportSuccessMessage(payload);
-            if (payload.archived_workbook) {
-                const archivedNote = (cfg.i18n && cfg.i18n.workbookArchived) || 'Previous workbook archived.';
-                message = message + ' ' + archivedNote;
-            }
-            showFlash(message, uploadResultFlashLevel(payload));
+            showFlash(configImportSuccessMessage(payload), uploadResultFlashLevel(payload));
             if (els.fileInput) els.fileInput.value = '';
         } catch (error) {
             showFlash(error.message, 'danger');
@@ -924,16 +979,39 @@
         }
     }
 
+    async function cancelGeneration() {
+        const ui = currentUi();
+        if (ui.cancellingBuild) return;
+        ui.cancellingBuild = true;
+        updateCancelButton(true, true);
+        try {
+            const payload = await fetchJson(apiUrl('/cancel'), { method: 'POST' });
+            const status = payload.status || { status: 'cancelled' };
+            versionUi[activeVersion].statusCache = status;
+            applyStatusToUi(status);
+            if (pollTimer) {
+                window.clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        } catch (error) {
+            showFlash(error.message, 'danger');
+            updateCancelButton(true, false);
+        } finally {
+            ui.cancellingBuild = false;
+        }
+    }
+
     async function startGeneration() {
         const ui = currentUi();
         ui.trackingBuild = true;
+        stagesExpanded = false;
         setMessage(els.buildMessage, '', null);
         ui.maxProgressPercent = 15;
         if (els.progressBar) els.progressBar.style.width = '15%';
         if (els.build) els.build.classList.remove('hidden');
         if (els.buildActive) els.buildActive.classList.remove('hidden');
         if (els.progressText) els.progressText.textContent = (cfg.i18n && cfg.i18n.preparingReport) || 'Preparing dataset and report...';
-        renderBuildStages([]);
+        renderBuildStages([], null);
         try {
             const payload = await fetchJson(apiUrl('/generate'), {
                 method: 'POST',
@@ -962,6 +1040,7 @@
         if (!VERSIONS[versionId] || versionId === activeVersion) return;
         activeVersion = versionId;
         setActiveVersionTab();
+        updateExploreLinks();
         renderActiveVersionFromCache();
         refreshStatus().catch(function() {});
         if (activeSubtab === 'build' && isExcelMode()) {
@@ -1013,6 +1092,7 @@
             });
         }
         if (els.generateBtn) els.generateBtn.addEventListener('click', startGeneration);
+        if (els.cancelBtn) els.cancelBtn.addEventListener('click', function() { cancelGeneration().catch(handleAdminError); });
         if (els.sourceExcelBtn) els.sourceExcelBtn.addEventListener('click', function() {
             setDataSource('excel').catch(function(error) {
                 showFlash((error && error.message) || (cfg.i18n && cfg.i18n.requestFailed) || 'Request failed.', 'danger');
@@ -1030,6 +1110,15 @@
         if (els.saveSectionOrderBtn) els.saveSectionOrderBtn.addEventListener('click', function() { saveSectionOrder().catch(handleAdminError); });
         if (els.generateSystemBtn) els.generateSystemBtn.addEventListener('click', function() { generateSystemDataset().catch(handleAdminError); });
         if (els.compareSystemBtn) els.compareSystemBtn.addEventListener('click', function() { compareSystemDataset().catch(handleAdminError); });
+        if (els.stagesToggle) {
+            els.stagesToggle.addEventListener('click', function() {
+                stagesExpanded = !stagesExpanded;
+                const cached = currentUi().statusCache;
+                if (cached && cached.status === 'running') {
+                    renderBuildStages(cached.build_stages || [], cached);
+                }
+            });
+        }
     }
 
     function handleAdminError(error) {
@@ -1042,13 +1131,10 @@
         bindAdminEvents();
     }
 
-    document.addEventListener('click', function() {
-        document.querySelectorAll('.pb-dl-menu').forEach(function(m) { m.classList.add('hidden'); });
-    });
-
     window.PBProgressAdmin = {
         init: function() {
             setActiveVersionTab();
+            updateExploreLinks();
             bindEvents();
             applyDataSourceMode({ data_source: activeDataSource }, false);
             setActiveSubtab(cfg.initialSubtab || 'build');

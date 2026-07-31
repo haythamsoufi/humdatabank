@@ -40,7 +40,7 @@ def report_titles(excel_path: Path | None = None) -> dict[str, str]:
 
 def report_section_assets_dir(root: Path, language: str, section: str) -> Path:
     """Chart-only PNG assets for one dashboard section."""
-    return root / "report" / "figures" / language / section
+    return root / "figures" / language / section
 
 
 def report_section_assets_ref(language: str, section: str) -> str:

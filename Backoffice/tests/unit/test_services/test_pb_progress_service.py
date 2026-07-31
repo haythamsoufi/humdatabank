@@ -17,6 +17,7 @@ def _reset_service_state() -> None:
     PBProgressService._legacy_migrated = True
     PBProgressService._build_thread = None
     PBProgressService._build_version = None
+    PBProgressService._build_process = None
     PBProgressService._states = {
         DEFAULT_VERSION: {
             "status": "idle",
@@ -82,48 +83,98 @@ class TestPBProgressWorkbookUpload:
     def setup_method(self) -> None:
         _reset_service_state()
 
-    def test_store_excel_archives_previous_workbook(self, app) -> None:
-        archived = {"id": "archive-1", "filename": "SG Report.xlsx"}
+    def test_store_excel_replaces_workbook_without_archiving(self, app) -> None:
         with app.app_context():
-            with patch.object(PBProgressService, "workbook_exists", return_value=True), patch.object(
-                PBProgressService, "_archive_current_workbook", return_value=archived
-            ) as archive_mock, patch(
+            with patch.object(PBProgressService, "workbook_exists", return_value=True), patch(
                 "plugins.pb_progress.db_source.validate_uploaded_workbook",
                 return_value={"valid": True, "warnings": []},
-            ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch.object(
-                PBProgressService, "list_workbook_history", return_value=[archived]
-            ), patch(
+            ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch(
                 "plugins.pb_progress.service.storage_service.upload"
             ) as upload_mock, patch.object(PBProgressService, "_persist_status"):
                 result = PBProgressService.store_excel(
                     DEFAULT_VERSION,
                     _file_storage("Updated.xlsx"),
                 )
-        archive_mock.assert_called_once_with(DEFAULT_VERSION)
         upload_mock.assert_called_once()
-        assert result["archived_workbook"] == archived
+        assert "archived_workbook" not in result
+        assert "workbook_history" not in result
 
-    def test_store_excel_first_upload_skips_archive(self, app) -> None:
+    def test_store_excel_first_upload(self, app) -> None:
         with app.app_context():
-            with patch.object(PBProgressService, "workbook_exists", return_value=False), patch.object(
-                PBProgressService, "_archive_current_workbook"
-            ) as archive_mock, patch(
+            with patch.object(PBProgressService, "workbook_exists", return_value=False), patch(
                 "plugins.pb_progress.db_source.validate_uploaded_workbook",
                 return_value={"valid": True, "warnings": []},
-            ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch.object(
-                PBProgressService, "list_workbook_history", return_value=[]
-            ), patch(
+            ), patch.object(PBProgressService, "_import_system_config_after_excel_upload", return_value={"excel": {}}), patch(
                 "plugins.pb_progress.service.storage_service.upload"
             ), patch.object(PBProgressService, "_persist_status"):
                 result = PBProgressService.store_excel(
                     DEFAULT_VERSION,
                     _file_storage(),
                 )
-        archive_mock.assert_not_called()
         assert "archived_workbook" not in result
 
 
+class TestPBProgressStatusSync:
+    def setup_method(self) -> None:
+        _reset_service_state()
+
+    def test_sync_status_from_storage_merges_persisted_running(self, app) -> None:
+        persisted = {
+            "status": "running",
+            "job_id": "remote-job",
+            "build_stage": "figures",
+            "started_at": "2026-01-01T00:00:00+00:00",
+        }
+        with app.app_context():
+            with patch.object(PBProgressService, "_reload_status_from_storage", return_value=persisted):
+                PBProgressService._sync_status_from_storage(DEFAULT_VERSION)
+        state = PBProgressService._state_for(DEFAULT_VERSION)
+        assert state["status"] == "running"
+        assert state["job_id"] == "remote-job"
+
+    def test_sync_status_skips_when_local_build_active(self, app) -> None:
+        local = {"status": "running", "job_id": "local-job", "build_stage": "html"}
+        PBProgressService._state_for(DEFAULT_VERSION).update(local)
+        PBProgressService._build_version = DEFAULT_VERSION
+        PBProgressService._build_thread = type("T", (), {"is_alive": lambda self: True})()
+        persisted = {"status": "running", "job_id": "remote-job", "build_stage": "figures"}
+        with app.app_context():
+            with patch.object(PBProgressService, "_reload_status_from_storage", return_value=persisted):
+                PBProgressService._sync_status_from_storage(DEFAULT_VERSION)
+        state = PBProgressService._state_for(DEFAULT_VERSION)
+        assert state["job_id"] == "local-job"
+        assert state["build_stage"] == "html"
+
+
+class TestPBProgressCancelGeneration:
+    def setup_method(self) -> None:
+        _reset_service_state()
+
+    def test_cancel_generation_marks_cancelled(self, app) -> None:
+        state = PBProgressService._state_for(DEFAULT_VERSION)
+        state.update({"status": "running", "job_id": "job-cancel"})
+        with app.app_context():
+            with patch.object(PBProgressService, "_ensure_status_loaded"), patch.object(
+                PBProgressService, "_sync_status_from_storage"
+            ), patch.object(PBProgressService, "_persist_status"), patch.object(
+                PBProgressService, "_terminate_build_process"
+            ), patch.object(PBProgressService, "get_status", return_value={"status": "cancelled"}):
+                result = PBProgressService.cancel_generation(DEFAULT_VERSION)
+        assert result["status"] == "cancelled"
+        assert state["status"] == "cancelled"
+        assert state["job_id"] is None
+        assert state["build_stage"] is None
+
+    def test_cancel_generation_rejects_when_idle(self, app) -> None:
+        with app.app_context():
+            with pytest.raises(RuntimeError, match="in progress"):
+                PBProgressService.cancel_generation(DEFAULT_VERSION)
+
+
 class TestPBProgressRenderStack:
+    def test_verify_render_stack_smoke(self) -> None:
+        PBProgressService._verify_render_stack()
+
     def test_render_stack_error_detail_detects_missing_cairo(self) -> None:
         stderr = "OSError: no library called \"cairo-2\" was found"
         detail = PBProgressService._render_stack_error_detail("", stderr)

@@ -18,11 +18,16 @@ from .line_chart import (
     x_percent,
     y_scale,
 )
-from .render_docx import render_donut_asset
+from .render_docx import render_donut_asset, render_line_chart_asset
 DASHBOARD_WIDTH = 827
 LABEL_COL = 290
 DASHBOARD_PAD_H = 44
 GRID_GAP = 12
+_RAW_TABLE = ' markdown="0"'
+
+
+def _indicator_colgroup() -> str:
+    return f'<colgroup><col style="width:{LABEL_COL}px"><col></colgroup>'
 
 
 def _chart_width() -> int:
@@ -103,46 +108,41 @@ def _render_target_labels(
     return "".join(parts)
 
 
-def _render_positioned_row(
-    values: list[str],
-    count: int,
-    chart_width: int,
-    *,
-    cell_class: str = "",
-) -> str:
-    cls = f"table-cell {cell_class}".strip()
-    cells = "".join(
-        f'<span class="{cls}" style="left:{x_percent(i, count, chart_width):.4f}%">'
-        f'{_esc(v)}</span>'
-        for i, v in enumerate(values)
-    )
-    return f'<div class="table-row">{cells}</div>'
-
-
-def _render_table_vlines(count: int, chart_width: int) -> str:
-    if count <= 1:
+def _render_year_data_grid(item: dict[str, Any]) -> str:
+    n = len(item["years"])
+    if n == 0:
         return ""
-    parts: list[str] = []
-    for i in range(count - 1):
-        pct = (x_percent(i, count, chart_width) + x_percent(i + 1, count, chart_width)) / 2
-        parts.append(f'<span class="table-vline" style="left:{pct:.4f}%"></span>')
+    show_reporting, show_implementing = cumulative_table_rows(item)
+    col_pct = 100.0 / n
+    colgroup = "".join(f'<col style="width:{col_pct:.6f}%">' for _ in range(n))
+
+    def _row(values: list[str], *, row_class: str = "") -> str:
+        cls = f' class="{row_class}"' if row_class else ""
+        cells = "".join(f"<td>{_esc(value)}</td>" for value in values)
+        return f"<tr{cls}>{cells}</tr>"
+
+    parts = [
+        f'<table class="year-data-grid" role="presentation"{_RAW_TABLE}>',
+        f"<colgroup>{colgroup}</colgroup>",
+        _row(item["years"], row_class="year-row"),
+    ]
+    if show_reporting:
+        parts.append(_row(item["reporting"]))
+    if show_implementing:
+        parts.append(_row(item["implementing"]))
+    parts.append("</table>")
     return "".join(parts)
+
 
 
 def _render_data_table(item: dict[str, Any], chart_width: int) -> str:
-    n = len(item["years"])
-    show_reporting, show_implementing = cumulative_table_rows(item)
-    parts = [
-        '<div class="table-data">',
-        _render_table_vlines(n, chart_width),
-        _render_positioned_row(item["years"], n, chart_width, cell_class="year-cell"),
-    ]
-    if show_reporting:
-        parts.append(_render_positioned_row(item["reporting"], n, chart_width))
-    if show_implementing:
-        parts.append(_render_positioned_row(item["implementing"], n, chart_width))
-    parts.append("</div>")
-    return "".join(parts)
+    del chart_width
+    return f'<div class="table-data">{_render_year_data_grid(item)}</div>'
+
+
+def _render_data_table_cells(item: dict[str, Any], chart_width: int) -> str:
+    del chart_width
+    return f'<td class="table-data">{_render_year_data_grid(item)}</td>'
 
 
 def _render_metric_labels(labels: dict[str, str], item: dict[str, Any]) -> str:
@@ -159,12 +159,32 @@ def _render_metric_labels(labels: dict[str, str], item: dict[str, Any]) -> str:
     return "".join(parts)
 
 
+def _render_metric_label_rows(labels: dict[str, str], item: dict[str, Any]) -> str:
+    show_reporting, show_implementing = cumulative_table_rows(item)
+    rows = [f'<tr><td class="year-label">{_esc(labels["year"])}</td></tr>']
+    if show_reporting:
+        rows.append(f"<tr><td>{_esc(labels['reporting'])}</td></tr>")
+    if show_implementing:
+        rows.append(f"<tr><td>{_esc(labels['implementing'])}</td></tr>")
+    return "".join(rows)
+
+
+def _render_metric_labels_cells(labels: dict[str, str], item: dict[str, Any]) -> str:
+    return (
+        '<td class="metric-labels">'
+        f'<table class="metric-label-grid" role="presentation"{_RAW_TABLE}>{_render_metric_label_rows(labels, item)}</table>'
+        "</td>"
+    )
+
+
 def _render_unavailable_line_block(item: dict[str, Any]) -> str:
     return (
-        '<div class="indicator-row indicator-unavailable">'
-        f'<div class="indicator-text">{_esc(item["label"])}</div>'
-        f'<div class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</div>'
-        "</div>"
+        f'<table class="indicator-row indicator-unavailable" role="presentation"{_RAW_TABLE}>'
+        f"{_indicator_colgroup()}"
+        "<tr>"
+        f'<td class="indicator-text">{_esc(item["label"])}</td>'
+        f'<td class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</td>'
+        "</tr></table>"
     )
 
 
@@ -176,77 +196,96 @@ def _render_line_block(
     table_labels: dict[str, str],
     chart_width: int,
     chart_id_prefix: str = "sp",
+    asset_refs: dict[str, str] | None = None,
 ) -> str:
     if item.get("unavailable"):
         return _render_unavailable_line_block(item)
     year_only = not item.get("show_ns_breakdown", True)
     footer_class = "x-axis-footer year-only" if year_only else "x-axis-footer"
-    chart_svg = render_line_chart_svg(
-        item, chart_width, chart_id=f"{chart_id_prefix}-line-{chart_index}",
-    )
+    asset_refs = asset_refs or {}
+    line_src = asset_refs.get(f"line_{chart_index}", "")
+    if line_src:
+        chart_inner = (
+            f'<div class="line-chart-inner" style="--chart-width:{chart_width}">'
+            f'<img class="line-chart-img" src="{_esc(line_src)}" alt="" '
+            f'width="{chart_width}" height="110" role="presentation">'
+            "</div>"
+        )
+    else:
+        chart_svg = render_line_chart_svg(
+            item, chart_width, chart_id=f"{chart_id_prefix}-line-{chart_index}",
+        )
+        chart_inner = (
+            f'<div class="line-chart-inner" style="--chart-width:{chart_width}">'
+            f"{chart_svg}"
+            f'{_render_target_labels(item, target_label, chart_width)}'
+            f'{_render_value_labels(item, chart_width)}'
+            "</div>"
+        )
     return (
-        '<div class="indicator-row">'
-        f'<div class="indicator-text">{_esc(item["label"])}</div>'
-        '<div class="line-chart-wrap">'
-        f'<div class="line-chart-inner" style="--chart-width:{chart_width}">'
-        f"{chart_svg}"
-        f'{_render_target_labels(item, target_label, chart_width)}'
-        f'{_render_value_labels(item, chart_width)}'
-        "</div>"
-        "</div>"
-        '<div class="x-axis-divider-row">'
-        '<div class="x-axis-divider-left"></div>'
-        '<div class="x-axis-divider-right"></div>'
-        "</div>"
-        f'<div class="{footer_class}">'
-        f"{_render_metric_labels(table_labels, item)}"
-        f"{_render_data_table(item, chart_width)}"
-        "</div>"
-        "</div>"
+        f'<table class="indicator-row" role="presentation"{_RAW_TABLE}>'
+        f"{_indicator_colgroup()}"
+        "<tr>"
+        f'<td class="indicator-text">{_esc(item["label"])}</td>'
+        f'<td class="line-chart-wrap">{chart_inner}</td>'
+        "</tr>"
+        '<tr class="x-axis-divider-row">'
+        '<td class="x-axis-divider-left"></td>'
+        '<td class="x-axis-divider-right"></td>'
+        "</tr>"
+        f'<tr class="{footer_class}">'
+        f"{_render_metric_labels_cells(table_labels, item)}"
+        f"{_render_data_table_cells(item, chart_width)}"
+        "</tr>"
+        "</table>"
     )
 
 
 def _render_donut_block(item: dict[str, Any], *, donut_src: str) -> str:
     if item.get("unavailable"):
         return (
-            '<div class="donut-row indicator-unavailable">'
-            f'<div class="indicator-text">{_esc(item["label"])}</div>'
-            f'<div class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</div>'
-            "</div>"
+            f'<table class="donut-row indicator-unavailable" role="presentation"{_RAW_TABLE}>'
+            "<tr>"
+            f'<td class="indicator-text">{_esc(item["label"])}</td>'
+            f'<td class="indicator-unavailable-message" colspan="2">{_esc(item.get("unavailable_label"))}</td>'
+            "</tr></table>"
         )
     label_lines = _esc(item["value_label"]).replace("\n", "<br>")
     target_html = ""
     if item.get("target_label"):
-        target_html = f'<div class="donut-target">{_esc_multiline(item["target_label"])}</div>'
+        target_html = f'<td class="donut-target">{_esc_multiline(item["target_label"])}</td>'
     return (
-        '<div class="donut-row">'
-        f'<div class="indicator-text">{_esc(item["label"])}</div>'
-        '<div class="donut-visual">'
+        f'<table class="donut-row" role="presentation"{_RAW_TABLE}>'
+        "<tr>"
+        f'<td class="indicator-text">{_esc(item["label"])}</td>'
+        '<td class="donut-visual">'
         f'<img class="donut-img" src="{_esc(donut_src)}" alt="" role="presentation">'
         f'<span class="donut-center-label">{label_lines}</span>'
-        "</div>"
+        "</td>"
         f"{target_html}"
-        "</div>"
+        "</tr></table>"
     )
 
 
 def _render_donut_pair_item(item: dict[str, Any], *, donut_src: str) -> str:
     if item.get("unavailable"):
         return (
-            '<div class="donut-pair-item indicator-unavailable">'
-            f'<div class="indicator-text">{_esc(item["label"])}</div>'
-            f'<div class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</div>'
-            "</div>"
+            f'<table class="donut-pair-item indicator-unavailable" role="presentation"{_RAW_TABLE}>'
+            "<tr>"
+            f'<td class="indicator-text">{_esc(item["label"])}</td>'
+            f'<td class="indicator-unavailable-message">{_esc(item.get("unavailable_label"))}</td>'
+            "</tr></table>"
         )
     label_lines = _esc(item["value_label"]).replace("\n", "<br>")
     return (
-        '<div class="donut-pair-item">'
-        f'<div class="indicator-text">{_esc(item["label"])}</div>'
-        '<div class="donut-visual">'
+        f'<table class="donut-pair-item" role="presentation"{_RAW_TABLE}>'
+        "<tr>"
+        f'<td class="indicator-text">{_esc(item["label"])}</td>'
+        '<td class="donut-visual">'
         f'<img class="donut-img" src="{_esc(donut_src)}" alt="" role="presentation">'
         f'<span class="donut-center-label">{label_lines}</span>'
-        "</div>"
-        "</div>"
+        "</td>"
+        "</tr></table>"
     )
 
 
@@ -278,15 +317,16 @@ def _render_sp_html(
                 table_labels=payload["table_labels"],
                 chart_width=chart_width,
                 chart_id_prefix=chart_id_prefix,
+                asset_refs=asset_refs,
             )
         )
 
     for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
-        pair_parts = ['<div class="donut-pair">']
+        pair_parts = [f'<table class="donut-pair" role="presentation"{_RAW_TABLE}><tr>']
         for col_idx, item in enumerate(pair):
             donut_src = asset_refs.get(f"pair_{row_idx}_{col_idx}_donut", "")
-            pair_parts.append(_render_donut_pair_item(item, donut_src=donut_src))
-        pair_parts.append("</div>")
+            pair_parts.append(f"<td>{_render_donut_pair_item(item, donut_src=donut_src)}</td>")
+        pair_parts.append("</tr></table>")
         parts.append("".join(pair_parts))
 
     _append_section_tail(parts, payload["footnote"])
@@ -314,6 +354,19 @@ def render_section_assets(
 
     if payload["type"] != "sp":
         return refs
+
+    target_label = payload["headers"]["target"]
+    for idx, item in enumerate(payload["cumulative"]):
+        if item.get("unavailable"):
+            continue
+        filename = f"line_{idx}.png"
+        render_line_chart_asset(
+            item,
+            target_label,
+            assets_dir / filename,
+            language=language,
+        )
+        refs[f"line_{idx}"] = filename
 
     for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
         for col_idx, item in enumerate(pair):

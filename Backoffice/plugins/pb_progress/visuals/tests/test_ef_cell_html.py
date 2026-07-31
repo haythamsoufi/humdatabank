@@ -17,15 +17,15 @@ class SectionTailTests(unittest.TestCase):
     def test_wraps_only_last_block_with_footnote(self) -> None:
         parts = [
             '<div class="dash-title">SP1</div>',
-            '<div class="indicator-row">chart 1</div>',
-            '<div class="indicator-row">chart 2</div>',
+            '<table class="indicator-row" role="presentation">chart 1</table>',
+            '<table class="indicator-row" role="presentation">chart 2</table>',
         ]
         _append_section_tail(parts, "Footnote text")
         html = "".join(parts)
-        self.assertEqual(html.count('<div class="indicator-row">'), 2)
+        self.assertEqual(html.count('<table class="indicator-row"'), 2)
         self.assertIn('<div class="section-tail">', html)
-        self.assertIn('<div class="indicator-row">chart 2</div>', html)
-        self.assertIn('<div class="indicator-row">chart 1</div>', html)
+        self.assertIn('<table class="indicator-row" role="presentation">chart 2</table>', html)
+        self.assertIn('<table class="indicator-row" role="presentation">chart 1</table>', html)
         self.assertIn("Footnote text", html)
 
     def test_sp_footnote_wraps_only_last_block(self) -> None:
@@ -55,10 +55,10 @@ class SectionTailTests(unittest.TestCase):
         }
         refs = {"pair_0_0_donut": "pair_0_0_donut.png"}
         html = _render_sp_html(payload, refs)
-        self.assertIn('<div class="indicator-row">', html)
-        self.assertIn('<div class="section-tail"><div class="donut-pair">', html)
+        self.assertIn('<table class="indicator-row"', html)
+        self.assertIn('<div class="section-tail"><table class="donut-pair"', html)
         self.assertIn("Footnote text", html)
-        self.assertLess(html.index('<div class="indicator-row">'), html.index('<div class="section-tail">'))
+        self.assertLess(html.index('<table class="indicator-row"'), html.index('<div class="section-tail">'))
 
     def test_year_only_footer_omits_ns_breakdown_rows(self) -> None:
         payload = {
@@ -116,7 +116,7 @@ class SectionTailTests(unittest.TestCase):
         }
         html = _render_sp_html(payload, {})
         self.assertNotIn("ef-table", html)
-        self.assertEqual(html.count('<div class="indicator-row">'), 2)
+        self.assertEqual(html.count('<table class="indicator-row"'), 2)
         self.assertEqual(html.count('<svg class="line-chart-svg"'), 2)
         self.assertIn("50", html)
         self.assertNotIn("50/ 107", html)

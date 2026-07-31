@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.line_chart import (  # noqa: E402
     _value_label_y_px,
+    render_line_chart_svg,
     target_label_layout,
     value_label_above,
     y_scale,
@@ -42,6 +44,24 @@ class LineChartNullValueTests(unittest.TestCase):
         ly, above = _value_label_y_px(3, values[3], values, None, y_max)
         self.assertTrue(above)
         self.assertLess(ly, point_y)
+
+    def test_render_line_chart_svg_is_valid_xml(self) -> None:
+        item = {
+            "values": [10.0, 20.0, 30.0, 40.0, 50.0],
+            "value_labels": ["10", "20", "30", "40", "50"],
+            "annual_target": 45.0,
+            "annual_target_label": "45",
+        }
+        svg = render_line_chart_svg(
+            item,
+            481,
+            chart_id="asset-line",
+            show_value_labels=True,
+            show_target_labels=True,
+            target_label="Target",
+        )
+        self.assertNotIn('font-family=""', svg)
+        ET.fromstring(svg)
 
 
 if __name__ == "__main__":

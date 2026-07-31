@@ -41,7 +41,27 @@
 
         <p id="pb-progress-last-generated" class="text-sm text-gray-500 hidden"></p>
 
-        <div id="pb-progress-empty" class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+        <div id="pb-progress-loading" class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden" role="status" aria-live="polite">
+            <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-3 animate-pulse">
+                <div class="h-5 bg-gray-200 rounded w-36"></div>
+                <div class="flex gap-2 ml-auto">
+                    <div class="h-8 bg-gray-200 rounded w-24"></div>
+                    <div class="h-8 bg-gray-200 rounded w-20"></div>
+                </div>
+            </div>
+            <div class="px-4 py-3 space-y-3 animate-pulse" style="min-height: 320px;">
+                <div class="h-4 bg-gray-200 rounded w-2/3 max-w-lg"></div>
+                <div class="h-4 bg-gray-200 rounded w-1/2 max-w-md"></div>
+                <div class="h-4 bg-gray-200 rounded w-3/5 max-w-xl"></div>
+                <div class="mt-4 h-56 bg-gray-100 rounded"></div>
+            </div>
+            <p class="px-4 pb-4 text-sm text-gray-500 flex items-center gap-2">
+                <i class="fas fa-spinner fa-spin text-gray-400" aria-hidden="true"></i>
+                {{ _('Loading report…') }}
+            </p>
+        </div>
+
+        <div id="pb-progress-empty" class="hidden rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
             <i class="fas fa-chart-line text-2xl text-gray-400 mb-3"></i>
             <p>{{ _('No report is available yet.') }}</p>
             {% if can_manage_pb_progress %}
@@ -55,9 +75,15 @@
 
         <div id="pb-progress-build" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-4 space-y-3">
             <div id="pb-progress-build-active">
-                <div class="flex items-center gap-3 text-sm text-blue-800 mb-2">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span id="pb-progress-progress-text">{{ _('Generating report...') }}</span>
+                <div class="flex items-center gap-3 text-sm text-blue-800 mb-2 min-w-0">
+                    <i class="fas fa-spinner fa-spin shrink-0" aria-hidden="true"></i>
+                    <span id="pb-progress-progress-text" class="flex-1 min-w-0 truncate"></span>
+                    {% if can_manage_pb_progress %}
+                    <button type="button" id="pb-progress-cancel-btn" class="hidden shrink-0 btn btn-secondary btn-sm text-xs py-1 px-2">
+                        <i class="fas fa-stop mr-1" aria-hidden="true"></i>{{ _('Cancel') }}
+                    </button>
+                    {% endif %}
+                    <button type="button" id="pb-progress-stages-toggle" class="hidden shrink-0 text-xs font-medium text-blue-700 hover:text-blue-900 underline-offset-2 hover:underline" aria-expanded="false" aria-controls="pb-progress-stages"></button>
                 </div>
                 <div class="w-full bg-blue-100 rounded-full h-2 overflow-hidden">
                     <div id="pb-progress-progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 15%;"></div>
@@ -121,14 +147,21 @@
 window.PBProgressConfig = {
     pageMode: 'viewer',
     apiBase: '/admin/data-exploration/pb-progress',
+    canManage: {{ can_manage_pb_progress|tojson }},
     versions: {{ pb_report_versions|tojson }},
     versionOrder: {{ pb_report_version_order|tojson }},
     defaultVersion: {{ pb_active_version|tojson }},
     i18n: {
         lastUpdated: {{ _('Last updated:')|tojson }},
+        loadingReport: {{ _('Loading report…')|tojson }},
         generatingReport: {{ _('Generating report...')|tojson }},
+        showBuildSteps: {{ _('Show steps')|tojson }},
+        hideBuildSteps: {{ _('Hide steps')|tojson }},
         reportGenerationFailed: {{ _('Report generation failed.')|tojson }},
         reportGeneratedSuccessfully: {{ _('Report generated successfully.')|tojson }},
+        reportGenerationCancelled: {{ _('Report generation was cancelled.')|tojson }},
+        cancelGeneration: {{ _('Cancel generation')|tojson }},
+        cancellingGeneration: {{ _('Cancelling…')|tojson }},
         requestFailed: {{ _('Request failed.')|tojson }},
         lostConnection: {{ _('Lost connection to the server while generating. Wait for the server to come back, then refresh this page.')|tojson }},
     },

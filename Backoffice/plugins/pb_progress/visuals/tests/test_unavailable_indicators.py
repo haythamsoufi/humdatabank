@@ -160,7 +160,7 @@ class UnavailableIndicatorTests(unittest.TestCase):
         self.assertEqual(len(payload["cumulative"]), 4)
         self.assertEqual(payload["donut_pairs"], [])
         html = build_dashboard_html(payload, {})
-        self.assertEqual(html.count('<div class="indicator-row">'), 4)
+        self.assertEqual(html.count('<table class="indicator-row"'), 4)
         self.assertEqual(html.count('<svg class="line-chart-svg"'), 4)
         self.assertNotIn("donut-pair", html)
         self.assertNotIn("donut-img", html)

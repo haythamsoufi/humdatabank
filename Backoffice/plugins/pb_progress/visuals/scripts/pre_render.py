@@ -212,3 +212,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    # WeasyPrint/Pango/Cairo can segfault during interpreter teardown on Windows
+    # (exit 3221225477 / 0xC0000005) after successful PNG export. Skip cleanup.
+    if sys.platform == "win32":
+        os._exit(0)

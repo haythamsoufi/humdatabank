@@ -71,10 +71,6 @@
                     class="{{ admin_underline_tab_btn_classes(pb_initial_subtab == 'translations') }} {{ 'hidden' if pb_initial_data_source != 'system' else '' }}">
                 <i class="fas fa-language mr-1.5"></i>{{ _('Translations') }}
             </button>
-            <button type="button" role="tab" data-pb-subtab="section-order" data-pb-system-only="true" aria-selected="{{ 'true' if pb_initial_subtab == 'section-order' else 'false' }}"
-                    class="{{ admin_underline_tab_btn_classes(pb_initial_subtab == 'section-order') }} {{ 'hidden' if pb_initial_data_source != 'system' else '' }}">
-                <i class="fas fa-list-ol mr-1.5"></i>{{ _('Section order') }}
-            </button>
         {% endcall %}
 
         <div class="px-3 sm:px-4 py-4 space-y-4">
@@ -176,7 +172,6 @@
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('ID') }}</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Section') }}</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Source') }}</th>
-                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Label override') }}</th>
                                 <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Status') }}</th>
                             </tr>
                         </thead>
@@ -186,6 +181,7 @@
             </div>
 
             <div id="pb-progress-panel-translations" data-pb-system-only="true" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'translations' else '' }} space-y-2" role="tabpanel">
+                <p class="text-sm text-gray-600">{{ _('Section titles (SP/EF codes) come from the Indicator Bank SPEF catalog and are not edited here.') }}</p>
                 <div class="pb-compact-toolbar justify-end">
                     <button type="button" id="pb-progress-save-translations-btn" class="btn btn-primary btn-sm">
                         <i class="fas fa-save mr-1"></i>{{ _('Save') }}
@@ -203,26 +199,6 @@
                             </tr>
                         </thead>
                         <tbody id="pb-progress-translations-body" class="divide-y divide-gray-100 bg-white"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="pb-progress-panel-section-order" data-pb-system-only="true" class="pb-admin-panel {{ 'is-active' if pb_initial_subtab == 'section-order' else '' }} space-y-2" role="tabpanel">
-                <div class="pb-compact-toolbar justify-end">
-                    <button type="button" id="pb-progress-save-section-order-btn" class="btn btn-primary btn-sm">
-                        <i class="fas fa-save mr-1"></i>{{ _('Save') }}
-                    </button>
-                </div>
-                <div class="overflow-x-auto border border-gray-200 rounded-lg max-h-[min(70vh,480px)]">
-                    <table class="min-w-full text-sm max-w-2xl">
-                        <thead class="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Part') }}</th>
-                                <th class="px-3 py-2 text-left font-medium text-gray-700">{{ _('Section') }}</th>
-                                <th class="px-3 py-2 text-left font-medium text-gray-700 w-28">{{ _('Order') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody id="pb-progress-section-order-body" class="divide-y divide-gray-100 bg-white"></tbody>
                     </table>
                 </div>
             </div>
@@ -258,7 +234,6 @@ window.PBProgressConfig = {
         dataSourceUpdated: {{ _('Data source updated.')|tojson }},
         mappingSaved: {{ _('Mapping saved.')|tojson }},
         translationsSaved: {{ _('Translations saved.')|tojson }},
-        sectionOrderSaved: {{ _('Section order saved.')|tojson }},
         systemDatasetGenerated: {{ _('System dataset generated.')|tojson }},
         syncCompleted: {{ _('Indicator Bank sync completed.')|tojson }},
         configImported: {{ _('Configuration imported from workbook.')|tojson }},
@@ -272,7 +247,6 @@ window.PBProgressConfig = {
         yearsPlaceholder: {{ _('Select years…')|tojson }},
         yearsSearchPlaceholder: {{ _('Search years…')|tojson }},
         yearsSelectAtLeastOne: {{ _('Select at least one year.')|tojson }},
-        tagMissing: {{ _('Tag removed')|tojson }},
         sourceWarning: {{ _('Source unavailable')|tojson }},
         noMappingRows: {{ _('No mapping rows yet. Sync from Indicator Bank or import from Excel.')|tojson }},
         generateHintExcel: {{ _('Upload a workbook first.')|tojson }},

@@ -779,6 +779,7 @@ def render_dashboard(
     renderer: str | None = None,
     session=None,
     mapping: pd.DataFrame | None = None,
+    render_assets: bool = True,
 ) -> plt.Figure | Path:
     """Render a dashboard section. Default renderer is HTML/SVG (publication quality)."""
     import os
@@ -792,6 +793,7 @@ def render_dashboard(
             output_path=output_path,
             session=session,
             mapping=mapping,
+            render_assets=render_assets,
         )
     if section.startswith("EF"):
         return render_ef_dashboard(

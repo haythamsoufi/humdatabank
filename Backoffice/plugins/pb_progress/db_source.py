@@ -8,16 +8,17 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 import pandas as pd
 from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.form_items import FormItem
 from app.models.forms import FormData
-from app.models.indicator_bank import IndicatorBank
+from app.models.indicator_bank import IndicatorBank, IndicatorBankSpef
 from app.services.platform import storage_service
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID, UPR_REPORTING_TEMPLATE_ID
 from plugins.pb_progress.plugin_data_store import (
@@ -31,12 +32,34 @@ from plugins.pb_progress.versions import REPORT_VERSIONS, validate_version, vers
 UPR_TEMPLATE_ID = UPR_REPORTING_TEMPLATE_ID
 
 _TRANSLATION_LANG_KEYS = frozenset({"EN", "FR", "SP", "AR"})
+_BANK_MANAGED_TRANSLATION_PREFIX = "section."
 _SECTION_PARTS = frozenset({"cc", "sp", "ef"})
+_PART_ORDER: tuple[str, ...] = ("cc", "sp", "ef")
 MAPPING_HEADER_ROW = 3
 SECTION_COLUMN = "Strategic Priority / Enabling Function"
 
 _LANG_KEYS = {"en": "English", "fr": "French", "es": "Spanish", "ar": "Arabic"}
 _AGG_LABEL_LANG_MAP = {"English": "en", "French": "fr", "Spanish": "es", "Arabic": "ar"}
+
+
+def _normalize_type_of_measurement(value: str | None) -> str | None:
+    """Normalize bank measurement type for value/target formatting."""
+    if not value or not str(value).strip():
+        return None
+    text = str(value).strip()
+    if text.lower() in {"percentage", "percent", "%"}:
+        return "Percentage"
+    return text
+
+
+def _chart_type_from_measurement(value: str | None) -> str:
+    """Map bank measurement type to report chart Type (Cumulative/Distinct)."""
+    if not value or not str(value).strip():
+        return "Cumulative"
+    key = str(value).strip().lower().replace(" ", "")
+    if key == "yesno":
+        return "Distinct"
+    return "Cumulative"
 
 
 class DbSourceError(RuntimeError):
@@ -121,13 +144,155 @@ def validate_uploaded_workbook(path: Path | str) -> dict[str, Any]:
     }
 
 
-def _section_from_area(area: str | None) -> str:
-    text = (area or "").strip()
-    if not text:
-        return "Cross-cutting"
-    if text.upper() == "CC1":
-        return "Cross-cutting"
+def _normalize_section_code(section: str | None) -> str:
+    text = (section or "").strip().upper()
+    if not text or text == "CROSS-CUTTING":
+        return "CC1"
     return text
+
+
+def _section_from_area(area: str | None) -> str:
+    return _normalize_section_code(area)
+
+
+def _indicator_section_code(indicator: IndicatorBank) -> str:
+    """Resolve SPEF section code from the linked catalog row, then denormalized area."""
+    spef = indicator.spef_area
+    if spef is not None and (spef.code or "").strip():
+        return _normalize_section_code(spef.code)
+    return _normalize_section_code(indicator.area)
+
+
+def _section_sort_key(code: str, sort_by_code: dict[str, int]) -> tuple[Any, ...]:
+    match = re.match(r"^(CC|SP|EF)(\d+)$", code)
+    if match:
+        return (sort_by_code.get(code, 9999), match.group(1), int(match.group(2)), code)
+    return (sort_by_code.get(code, 9999), code, 0, code)
+
+
+def _query_tagged_indicator_rows(tag: str) -> list[IndicatorBank]:
+    if not tag:
+        return []
+
+    query = IndicatorBank.query.filter(IndicatorBank.archived.is_(False)).options(
+        joinedload(IndicatorBank.spef_area)
+    )
+    dialect = db.session.bind.dialect.name if db.session.bind else ""
+    if dialect == "postgresql":
+        query = query.filter(IndicatorBank._related_programs_list.contains([tag]))  # type: ignore[attr-defined]
+        return query.order_by(IndicatorBank.id).all()
+
+    return [
+        row
+        for row in query.order_by(IndicatorBank.id).all()
+        if tag in (row.related_programs_list or [])
+    ]
+
+
+def _section_part(section: str | None) -> str:
+    code = _normalize_section_code(section)
+    if code.startswith("SP"):
+        return "sp"
+    if code.startswith("EF"):
+        return "ef"
+    return "cc"
+
+
+def _titles_from_spef_row(spef: IndicatorBankSpef) -> dict[str, str]:
+    return {
+        "en": (spef.name or "").strip(),
+        "fr": (spef.get_name_translation("fr") or spef.name or "").strip(),
+        "es": (spef.get_name_translation("es") or spef.name or "").strip(),
+        "ar": (spef.get_name_translation("ar") or spef.name or "").strip(),
+    }
+
+
+def _spef_section_titles(indicator: IndicatorBank) -> dict[str, str]:
+    spef = indicator.spef_area
+    if spef is not None:
+        return _titles_from_spef_row(spef)
+    code = _normalize_section_code(indicator.area)
+    if code:
+        catalog = _spef_rows_by_code([code]).get(code)
+        if catalog is not None:
+            return _titles_from_spef_row(catalog)
+    label = (indicator.area_label or "").strip()
+    if label:
+        return {"en": label, "fr": label, "es": label, "ar": label}
+    return {"en": "", "fr": "", "es": "", "ar": ""}
+
+
+def _spef_rows_by_code(codes: Iterable[str]) -> dict[str, IndicatorBankSpef]:
+    normalized = {_normalize_section_code(code) for code in codes}
+    normalized.discard("")
+    if not normalized:
+        return {}
+    rows = (
+        IndicatorBankSpef.query.filter(
+            IndicatorBankSpef.is_active.is_(True),
+            func.upper(IndicatorBankSpef.code).in_(sorted(normalized)),
+        )
+        .all()
+    )
+    return {(row.code or "").upper(): row for row in rows}
+
+
+def build_section_order_from_bank(version: str) -> list[dict[str, Any]]:
+    """Derive report section order from tagged indicators and SPEF catalog sort_order."""
+    version = validate_version(version)
+    tag = REPORT_VERSIONS[version].get("related_program_tag") or ""
+    if not tag:
+        return []
+
+    sections: set[str] = set()
+    for indicator in _query_tagged_indicator_rows(tag):
+        sections.add(_indicator_section_code(indicator))
+    if not sections:
+        return []
+
+    spef_by_code = _spef_rows_by_code(sections)
+    sort_by_code = {code: spef.sort_order for code, spef in spef_by_code.items()}
+
+    ordered: list[dict[str, Any]] = []
+    for section in sorted(sections, key=lambda code: _section_sort_key(code, sort_by_code)):
+        spef = spef_by_code.get(section)
+        order = spef.sort_order if spef is not None else 9999
+        ordered.append({"part": _section_part(section), "section": section, "order": order})
+    return ordered
+
+
+def _section_translation_rows(section_codes: Iterable[str]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for code in sorted({_normalize_section_code(section) for section in section_codes}):
+        if not code:
+            continue
+        spef = _spef_rows_by_code([code]).get(code)
+        if spef is None:
+            continue
+        rows.append(
+            {
+                "id": f"section.{code}",
+                "EN": (spef.name or "").strip(),
+                "FR": (spef.get_name_translation("fr") or spef.name or "").strip(),
+                "SP": (spef.get_name_translation("es") or spef.name or "").strip(),
+                "AR": (spef.get_name_translation("ar") or spef.name or "").strip(),
+            }
+        )
+    return rows
+
+
+def merge_translations_with_section_titles(
+    translations: list[dict[str, Any]],
+    section_codes: Iterable[str],
+) -> list[dict[str, Any]]:
+    merged = {
+        str(row.get("id") or "").strip(): dict(row)
+        for row in translations
+        if str(row.get("id") or "").strip()
+    }
+    for row in _section_translation_rows(section_codes):
+        merged[row["id"]] = row
+    return list(merged.values())
 
 
 def _normalize_id(value: Any) -> str:
@@ -145,22 +310,7 @@ def _template_ids_for_source(source: str) -> tuple[int, ...]:
 
 
 def list_tagged_indicators(tag: str) -> list[dict[str, Any]]:
-    if not tag:
-        return []
-
-    query = IndicatorBank.query.filter(IndicatorBank.archived.is_(False))
-    dialect = db.session.bind.dialect.name if db.session.bind else ""
-    if dialect == "postgresql":
-        query = query.filter(IndicatorBank._related_programs_list.contains([tag]))  # type: ignore[attr-defined]
-        rows = query.order_by(IndicatorBank.id).all()
-    else:
-        rows = [
-            row
-            for row in query.order_by(IndicatorBank.id).all()
-            if tag in (row.related_programs_list or [])
-        ]
-
-    return [_serialize_tagged_indicator(row) for row in rows]
+    return [_serialize_tagged_indicator(row) for row in _query_tagged_indicator_rows(tag)]
 
 
 def _serialize_tagged_indicator(indicator: IndicatorBank) -> dict[str, Any]:
@@ -168,11 +318,12 @@ def _serialize_tagged_indicator(indicator: IndicatorBank) -> dict[str, Any]:
     labels = _indicator_labels(indicator)
     return {
         "id": str(indicator.id),
-        "section": _section_from_area(indicator.area),
+        "section": _indicator_section_code(indicator),
         "aggregated_label": labels["English"],
         "labels": labels,
         "fdrs_kpi": indicator.fdrs_kpi_code,
-        "type": indicator.type,
+        "type": _chart_type_from_measurement(indicator.type),
+        "type_of_measurement": _normalize_type_of_measurement(indicator.type),
         "unit": indicator.unit,
         "source_availability": availability,
         "default_source": _default_source(availability),
@@ -216,23 +367,59 @@ def _resolve_source_for_availability(source: str, availability: dict[str, bool])
     return fallback or "Manual"
 
 
-def _indicator_labels(indicator: IndicatorBank, override: str | None = None) -> dict[str, str]:
-    labels = {lang: "" for lang in _LANG_KEYS.values()}
-    if override and str(override).strip():
-        labels["English"] = str(override).strip()
-        return labels
+def _indicator_labels(indicator: IndicatorBank) -> dict[str, str]:
+    """Report indicator text: prefer aggregated label, fall back to bank name when unset."""
+    agg_en = (getattr(indicator, "aggregated_label", None) or "").strip()
+    use_aggregated = bool(agg_en)
+    name_en = (getattr(indicator, "name", None) or "").strip()
+    english_base = agg_en if use_aggregated else name_en
 
-    english = (indicator.aggregated_label or indicator.name or "").strip()
-    labels["English"] = english
-    translations = indicator.aggregated_label_translations or {}
-    if isinstance(translations, dict):
-        for lang_code, excel_col in _AGG_LABEL_LANG_MAP.items():
-            if lang_code == "en":
-                continue
-            value = translations.get(lang_code)
-            if isinstance(value, str) and value.strip():
-                labels[excel_col] = value.strip()
+    labels = {lang: "" for lang in _LANG_KEYS.values()}
+    labels["English"] = english_base
+
+    for excel_col, lang_code in _AGG_LABEL_LANG_MAP.items():
+        if lang_code == "en":
+            continue
+        if use_aggregated:
+            getter = getattr(indicator, "get_aggregated_label_translation", None)
+            text = getter(lang_code) if callable(getter) else agg_en
+        else:
+            getter = getattr(indicator, "get_name_translation", None)
+            text = getter(lang_code) if callable(getter) else name_en
+        labels[excel_col] = (str(text or "").strip() or english_base)
     return labels
+
+
+def is_bank_managed_translation_id(key: str) -> bool:
+    """True for SPEF section titles (section.SP1, section.EF2, …) sourced from Indicator Bank."""
+    return str(key or "").strip().startswith(_BANK_MANAGED_TRANSLATION_PREFIX)
+
+
+def filter_editable_translations(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop bank-managed section title rows from admin-editable translation config."""
+    return [
+        row
+        for row in rows
+        if isinstance(row, dict) and not is_bank_managed_translation_id(str(row.get("id") or ""))
+    ]
+
+
+def get_editable_translations_config(version: str) -> list[dict[str, Any]]:
+    """Return admin-editable translations and prune legacy section.* rows from storage."""
+    version = validate_version(version)
+    stored = PBProgressDataStore.get_translations_config(version)
+    editable = filter_editable_translations(stored)
+    if len(editable) != len(stored):
+        PBProgressDataStore.save_translations_config(version, editable)
+    return editable
+
+
+def save_editable_translations_config(version: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Validate and persist admin-editable translations (never section.* rows)."""
+    version = validate_version(version)
+    validated = validate_translations_config(filter_editable_translations(rows))
+    PBProgressDataStore.save_translations_config(version, validated)
+    return validated
 
 
 def validate_translations_config(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -316,7 +503,19 @@ def validate_mapping_config(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     validated: list[dict[str, Any]] = []
     for row in rows:
         item = copy_mapping_row(row)
+        item.pop("label_override", None)
+        item.pop("sp_titles", None)
+        item.pop("tag_missing", None)
         indicator_id = _normalize_id(item.get("id"))
+        item["section"] = _normalize_section_code(item.get("section"))
+        if indicator_id.isdigit():
+            indicator = (
+                IndicatorBank.query.options(joinedload(IndicatorBank.spef_area))
+                .filter(IndicatorBank.id == int(indicator_id))
+                .first()
+            )
+            if indicator is not None:
+                item["section"] = _indicator_section_code(indicator)
         source = str(item.get("source") or "Manual").strip() or "Manual"
         if indicator_id.isdigit():
             availability = _form_item_templates(int(indicator_id))
@@ -333,6 +532,33 @@ def validate_mapping_config(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return validated
 
 
+def _tagged_indicator_ids(version: str) -> set[str]:
+    version = validate_version(version)
+    tag = REPORT_VERSIONS[version].get("related_program_tag") or ""
+    if not tag:
+        return set()
+    return {_normalize_id(row["id"]) for row in list_tagged_indicators(tag) if _normalize_id(row.get("id"))}
+
+
+def prune_untagged_mapping_rows(version: str, rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Keep only rows whose ID is tagged for this report version in the Indicator Bank."""
+    tagged_ids = _tagged_indicator_ids(version)
+    if not tagged_ids:
+        return rows, 0
+
+    kept: list[dict[str, Any]] = []
+    removed = 0
+    for row in rows:
+        indicator_id = _normalize_id(row.get("id"))
+        if indicator_id not in tagged_ids:
+            removed += 1
+            continue
+        item = copy_mapping_row(row)
+        item.pop("tag_missing", None)
+        kept.append(item)
+    return kept, removed
+
+
 def sync_mapping_from_indicator_bank(version: str) -> dict[str, Any]:
     version = validate_version(version)
     tag = REPORT_VERSIONS[version].get("related_program_tag") or ""
@@ -345,7 +571,7 @@ def sync_mapping_from_indicator_bank(version: str) -> dict[str, Any]:
 
     merged: list[dict[str, Any]] = []
     added = 0
-    flagged = 0
+    removed = len(existing_by_id) - len(existing_by_id.keys() & tagged.keys())
 
     for indicator_id, tagged_row in tagged.items():
         current = existing_by_id.get(indicator_id)
@@ -357,38 +583,32 @@ def sync_mapping_from_indicator_bank(version: str) -> dict[str, Any]:
                 current["source"] = tagged_row.get("default_source") or "Manual"
             else:
                 current["source"] = _resolve_source_for_availability(str(current.get("source")), availability)
+            current["type"] = tagged_row.get("type") or "Cumulative"
+            current["unit"] = tagged_row.get("unit")
+            current["fdrs_kpi"] = tagged_row.get("fdrs_kpi")
+            current["section"] = tagged_row.get("section") or "CC1"
             merged.append(current)
             continue
 
         merged.append(
             {
                 "id": indicator_id,
-                "section": tagged_row.get("section") or "Cross-cutting",
+                "section": tagged_row.get("section") or "CC1",
                 "core_or_other": "Core",
-                "type": "Cumulative",
+                "type": tagged_row.get("type") or "Cumulative",
                 "unit": tagged_row.get("unit"),
                 "source": tagged_row.get("default_source") or "Manual",
                 "fdrs_kpi": tagged_row.get("fdrs_kpi"),
-                "label_override": None,
                 "annual_target": "",
                 "annual_target_ar": "",
                 "target": "",
                 "target_ar": "",
                 "target_value": None,
-                "sp_titles": {"en": "", "fr": "", "es": "", "ar": ""},
                 "comments": "",
                 "manual_values": [],
             }
         )
         added += 1
-
-    for indicator_id, row in existing_by_id.items():
-        if indicator_id in tagged:
-            continue
-        updated = copy_mapping_row(row)
-        updated["tag_missing"] = True
-        merged.append(updated)
-        flagged += 1
 
     PBProgressDataStore.save_mapping_config(version, merged)
     validated = validate_mapping_config(merged)
@@ -398,7 +618,7 @@ def sync_mapping_from_indicator_bank(version: str) -> dict[str, Any]:
         "tag": tag,
         "total": len(merged),
         "added": added,
-        "flagged_missing_tag": flagged,
+        "removed": removed,
     }
 
 
@@ -428,24 +648,17 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
         mapping_rows.append(
             {
                 "id": indicator_id,
-                "section": str(row.get(SECTION_COLUMN) or "").strip() or "Cross-cutting",
+                "section": _normalize_section_code(str(row.get(SECTION_COLUMN) or "").strip() or None),
                 "core_or_other": str(row.get("Core/other") or "Core").strip() or "Core",
                 "type": str(row.get("Type") or "Cumulative").strip() or "Cumulative",
                 "unit": None if pd.isna(row.get("Unit")) else str(row.get("Unit")).strip(),
                 "source": str(row.get("Source") or "Manual").strip() or "Manual",
                 "fdrs_kpi": None if pd.isna(row.get("FDRS KPI")) else str(row.get("FDRS KPI")).strip(),
-                "label_override": None,
                 "annual_target": "" if pd.isna(row.get("Annual Target")) else str(row.get("Annual Target")).strip(),
                 "annual_target_ar": "" if pd.isna(row.get("Annual Target AR")) else str(row.get("Annual Target AR")).strip(),
                 "target": "" if pd.isna(row.get("Target")) else str(row.get("Target")).strip(),
                 "target_ar": "" if pd.isna(row.get("Target AR")) else str(row.get("Target AR")).strip(),
                 "target_value": None if pd.isna(row.get("Target value")) else row.get("Target value"),
-                "sp_titles": {
-                    "en": "" if pd.isna(row.get("SP EN")) else str(row.get("SP EN")).strip(),
-                    "fr": "" if pd.isna(row.get("SP FR")) else str(row.get("SP FR")).strip(),
-                    "es": "" if pd.isna(row.get("SP SP")) else str(row.get("SP SP")).strip(),
-                    "ar": "" if pd.isna(row.get("SP AR")) else str(row.get("SP AR")).strip(),
-                },
                 "comments": "" if pd.isna(row.get("Comments")) else str(row.get("Comments")).strip(),
                 "manual_values": [],
             }
@@ -476,13 +689,11 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
                     "unit": None,
                     "source": "Manual",
                     "fdrs_kpi": None,
-                    "label_override": str(row.get("Indicator") or "").strip() or indicator_id,
                     "annual_target": "",
                     "annual_target_ar": "",
                     "target": "",
                     "target_ar": "",
                     "target_value": None,
-                    "sp_titles": {"en": "", "fr": "", "es": "", "ar": ""},
                     "comments": "" if pd.isna(row.get("Comment")) else str(row.get("Comment")).strip(),
                     "manual_values": manual_values,
                 }
@@ -509,20 +720,6 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
     except ValueError:
         pass
 
-    section_order_rows: list[dict[str, Any]] = []
-    try:
-        section_order_df = pd.read_excel(path, sheet_name="SectionOrder")
-        for _, row in section_order_df.iterrows():
-            section_order_rows.append(
-                {
-                    "part": str(row.get("part") or "").strip(),
-                    "section": str(row.get("section") or "").strip(),
-                    "order": int(row.get("order")) if not pd.isna(row.get("order")) else 0,
-                }
-            )
-    except ValueError:
-        pass
-
     PBProgressDataStore.save_mapping_config(version, mapping_rows)
     mapping_rows = validate_mapping_config(mapping_rows)
     PBProgressDataStore.save_mapping_config(version, mapping_rows)
@@ -530,17 +727,14 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
         from plugins.pb_progress.report_defaults import default_translations_config_rows
 
         translations_rows = default_translations_config_rows()
-    if not section_order_rows:
-        from plugins.pb_progress.report_defaults import default_section_order_config_rows
+    else:
+        translations_rows = validate_translations_config(filter_editable_translations(translations_rows))
 
-        section_order_rows = default_section_order_config_rows()
     PBProgressDataStore.save_translations_config(version, translations_rows)
-    PBProgressDataStore.save_section_order_config(version, section_order_rows)
     return {
         "version": version,
         "mapping_count": len(mapping_rows),
         "translations_count": len(translations_rows),
-        "section_order_count": len(section_order_rows),
     }
 
 
@@ -656,7 +850,7 @@ def _build_final_rows(mapping_config: list[dict[str, Any]], *, version: str) -> 
         if not indicator_id:
             continue
         source = str(row.get("source") or "Manual").strip() or "Manual"
-        section = str(row.get("section") or "Cross-cutting").strip() or "Cross-cutting"
+        section = _normalize_section_code(row.get("section"))
 
         if source == "Manual":
             manual_values = row.get("manual_values") or []
@@ -741,25 +935,24 @@ def _build_total_reported(final_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _build_mapping_dataframe(mapping_config: list[dict[str, Any]]) -> pd.DataFrame:
-    indicator_ids = [_normalize_id(row.get("id")) for row in mapping_config if _normalize_id(row.get("id"))]
-    indicators = {
-        str(item.id): item
-        for item in IndicatorBank.query.filter(IndicatorBank.id.in_([int(i) for i in indicator_ids if i.isdigit()])).all()
-    }
+    indicator_ids = [int(i) for i in {_normalize_id(row.get("id")) for row in mapping_config} if i.isdigit()]
+    indicators = _load_indicators_by_id(indicator_ids)
 
     rows: list[dict[str, Any]] = []
     for row in mapping_config:
         indicator_id = _normalize_id(row.get("id"))
         indicator = indicators.get(indicator_id)
-        labels = _indicator_labels(indicator, row.get("label_override")) if indicator else {
-            lang: (row.get("label_override") or "") for lang in _LANG_KEYS.values()
-        }
+        labels = _indicator_labels(indicator) if indicator else {lang: "" for lang in _LANG_KEYS.values()}
+        type_of_measurement = _normalize_type_of_measurement(indicator.type) if indicator else None
+        section = _indicator_section_code(indicator) if indicator else _normalize_section_code(row.get("section"))
+        section_titles = _spef_section_titles(indicator) if indicator else {"en": "", "fr": "", "es": "", "ar": ""}
         rows.append(
             {
-                SECTION_COLUMN: row.get("section") or "Cross-cutting",
+                SECTION_COLUMN: section,
                 "ID": indicator_id,
                 "Core/other": row.get("core_or_other") or "Core",
                 "Type": row.get("type") or "Cumulative",
+                "typeOfMeasurement": type_of_measurement,
                 "Unit": row.get("unit"),
                 "FDRS KPI": row.get("fdrs_kpi"),
                 "Source": row.get("source") or "Manual",
@@ -772,21 +965,54 @@ def _build_mapping_dataframe(mapping_config: list[dict[str, Any]]) -> pd.DataFra
                 "Arabic": labels.get("Arabic", ""),
                 "French": labels.get("French", ""),
                 "Spanish": labels.get("Spanish", ""),
-                "SP EN": (row.get("sp_titles") or {}).get("en", ""),
-                "SP FR": (row.get("sp_titles") or {}).get("fr", ""),
-                "SP SP": (row.get("sp_titles") or {}).get("es", ""),
-                "SP AR": (row.get("sp_titles") or {}).get("ar", ""),
+                "SP EN": section_titles.get("en", ""),
+                "SP FR": section_titles.get("fr", ""),
+                "SP SP": section_titles.get("es", ""),
+                "SP AR": section_titles.get("ar", ""),
                 "Comments": row.get("comments") or "",
             }
         )
     return pd.DataFrame(rows)
 
 
+def _load_indicators_by_id(indicator_ids: list[int]) -> dict[str, IndicatorBank]:
+    if not indicator_ids:
+        return {}
+    rows = (
+        IndicatorBank.query.options(joinedload(IndicatorBank.spef_area))
+        .filter(IndicatorBank.id.in_(indicator_ids))
+        .all()
+    )
+    return {str(item.id): item for item in rows}
+
+
+def _refresh_mapping_sections_from_bank(mapping_config: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    indicator_ids = [int(i) for i in {_normalize_id(row.get("id")) for row in mapping_config} if i.isdigit()]
+    indicators = _load_indicators_by_id(indicator_ids)
+
+    refreshed: list[dict[str, Any]] = []
+    for row in mapping_config:
+        item = copy_mapping_row(row)
+        indicator_id = _normalize_id(item.get("id"))
+        indicator = indicators.get(indicator_id)
+        item["section"] = (
+            _indicator_section_code(indicator)
+            if indicator is not None
+            else _normalize_section_code(item.get("section"))
+        )
+        refreshed.append(item)
+    return refreshed
+
+
 def build_dataset(version: str) -> dict[str, pd.DataFrame]:
     version = validate_version(version)
     mapping_config = PBProgressDataStore.get_mapping_config(version)
+    mapping_config, _removed = prune_untagged_mapping_rows(version, mapping_config)
+    mapping_config = _refresh_mapping_sections_from_bank(mapping_config)
     translations_config = PBProgressDataStore.get_translations_config(version)
-    section_order_config = PBProgressDataStore.get_section_order_config(version)
+    section_order_config = build_section_order_from_bank(version)
+    section_codes = [row["section"] for row in section_order_config]
+    translations_config = merge_translations_with_section_titles(translations_config or [], section_codes)
 
     if not mapping_config:
         raise DbSourceError("Mapping config is empty. Sync from Indicator Bank or import from Excel first.")
@@ -808,10 +1034,7 @@ def build_dataset(version: str) -> dict[str, pd.DataFrame]:
 
 
 def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
-    from plugins.pb_progress.report_defaults import (
-        default_section_order_config_rows,
-        default_translations_config_rows,
-    )
+    from plugins.pb_progress.report_defaults import default_translations_config_rows
 
     sheets = build_dataset(version)
     output_path = Path(output_path)
@@ -822,8 +1045,6 @@ def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
         translations_df = pd.DataFrame(default_translations_config_rows())
 
     section_order_df = sheets["sectionorder"]
-    if section_order_df.empty:
-        section_order_df = pd.DataFrame(default_section_order_config_rows())
 
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         empty = pd.DataFrame()

@@ -387,6 +387,11 @@ def expected_asset_refs(payload: dict[str, Any]) -> dict[str, str]:
     if payload["type"] != "sp":
         return refs
 
+    for idx, item in enumerate(payload["cumulative"]):
+        if item.get("unavailable"):
+            continue
+        refs[f"line_{idx}"] = f"line_{idx}.png"
+
     for row_idx, pair in enumerate(payload.get("donut_pairs", [])):
         for col_idx, item in enumerate(pair):
             if not item.get("unavailable"):

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import os
+import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -12,10 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from pb_figures.config import build_workers, resolve_excel, resolve_figures_output, resolve_report_dir  # noqa: E402
+from pb_figures.config import build_workers, resolve_excel, resolve_figures_output, resolve_report_dir, resolve_report_output  # noqa: E402
 from pb_figures.charts import render_dashboard  # noqa: E402
-from pb_figures.data import build_model, load_mapping, load_sg_report  # noqa: E402
-from pb_figures.languages import discover_languages, is_rtl  # noqa: E402
+from pb_figures.data import build_model, load_mapping  # noqa: E402
+from pb_figures.languages import is_rtl, resolve_build_languages  # noqa: E402
 from pb_figures.layouts import section_codes, section_has_indicators  # noqa: E402
 from pb_figures.payload import build_payload  # noqa: E402
 from pb_figures.render_embed import build_section_embed, render_section_assets  # noqa: E402
@@ -28,12 +29,97 @@ from pb_figures.report_meta import (  # noqa: E402
     section_titles,
 )
 
+SectionJob = tuple[str, str, str]  # language, section, renderer
+
+# Process pool state — one Excel model per worker process (initializer).
+_pool_excel: Path | None = None
+_pool_model = None
+_pool_mapping = None
+
 
 def _resolve_languages(excel: Path) -> tuple[str, ...]:
-    requested = os.environ.get("PB_REPORT_LANGUAGE")
-    if requested and requested.lower() not in ("all", "*"):
-        return (requested,)
-    return discover_languages(load_sg_report(excel)["mapping"])
+    return resolve_build_languages(excel)
+
+
+def _clean_build_workspace(languages: tuple[str, ...]) -> None:
+    """Drop stale figure/output files from prior builds in the writable workspace."""
+    keep = set(languages)
+    figures_dir = resolve_figures_output()
+    if figures_dir.is_dir():
+        for path in figures_dir.iterdir():
+            if path.is_dir() and path.name not in keep:
+                shutil.rmtree(path, ignore_errors=True)
+    output_dir = resolve_report_output()
+    if output_dir.is_dir():
+        for path in output_dir.iterdir():
+            if path.is_file():
+                path.unlink(missing_ok=True)
+
+
+def _section_jobs(
+    excel: Path,
+    languages: tuple[str, ...],
+    mapping,
+    renderer: str,
+) -> list[SectionJob]:
+    jobs: list[SectionJob] = []
+    for language in languages:
+        for section in section_codes(excel):
+            if section_has_indicators(mapping, section):
+                jobs.append((language, section, renderer))
+    return jobs
+
+
+def _render_section_job(
+    excel: Path,
+    language: str,
+    section: str,
+    renderer: str,
+    mapping,
+    *,
+    model=None,
+) -> tuple[str, str, int, int, list[str]]:
+    """Render chart + dashboard assets for one language/section pair."""
+    if model is None:
+        model = build_model(excel)
+    assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
+    payload = build_payload(model, section, language, mapping=mapping)
+    refs = render_section_assets(payload, assets_dir, language=language)
+    label = f"({len(refs)} chart assets)" if refs else "(text-only)"
+    log_lines = [f"    {section}/ {label}"]
+
+    dash_path = resolve_figures_output() / language / f"{section}.png"
+    render_dashboard(
+        model,
+        section,
+        language=language,
+        output_path=dash_path,
+        renderer=renderer,
+        mapping=mapping,
+        render_assets=False,
+    )
+    return language, section, len(refs), 1, log_lines
+
+
+def _init_render_pool(excel_path: str) -> None:
+    """Load the Excel model once per worker process."""
+    global _pool_excel, _pool_model, _pool_mapping
+    _pool_excel = Path(excel_path)
+    _pool_model = build_model(_pool_excel)
+    _pool_mapping = load_mapping(_pool_excel)
+
+
+def _render_section_job_pooled(job: SectionJob) -> tuple[str, str, int, int, list[str]]:
+    language, section, renderer = job
+    assert _pool_excel is not None and _pool_model is not None and _pool_mapping is not None
+    return _render_section_job(
+        _pool_excel,
+        language,
+        section,
+        renderer,
+        _pool_mapping,
+        model=_pool_model,
+    )
 
 
 def _render_language_assets(
@@ -42,7 +128,7 @@ def _render_language_assets(
     renderer: str,
     mapping,
 ) -> tuple[str, int, int, list[str]]:
-    """Render all chart + dashboard assets for one language."""
+    """Render all chart + dashboard assets for one language (sequential sections)."""
     model = build_model(excel)
     chart_total = 0
     dashboard_total = 0
@@ -51,65 +137,85 @@ def _render_language_assets(
         if not section_has_indicators(mapping, section):
             log_lines.append(f"    {section}/ (no indicators)")
             continue
-        assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
-        payload = build_payload(model, section, language, mapping=mapping)
-        refs = render_section_assets(payload, assets_dir, language=language)
-        label = f"({len(refs)} chart assets)" if refs else "(text-only)"
-        log_lines.append(f"    {section}/ {label}")
-        chart_total += len(refs)
-
-        dash_path = resolve_figures_output() / language / f"{section}.png"
-        render_dashboard(
-            model,
-            section,
-            language=language,
-            output_path=dash_path,
-            renderer=renderer,
-            mapping=mapping,
+        _, _, charts, dashboards, section_lines = _render_section_job(
+            excel, language, section, renderer, mapping, model=model,
         )
-        dashboard_total += 1
+        chart_total += charts
+        dashboard_total += dashboards
+        log_lines.extend(section_lines)
     log_lines.append("")
     return language, chart_total, dashboard_total, log_lines
 
 
-def _generate_assets(excel: Path, languages: tuple[str, ...], mapping) -> tuple[int, int]:
-    """Render chart assets for HTML embed and full dashboard PNGs under Figures/."""
+def _print_section_results(
+    languages: tuple[str, ...],
+    results: dict[SectionJob, tuple[str, str, int, int, list[str]]],
+    jobs: list[SectionJob],
+) -> tuple[int, int]:
     chart_total = 0
     dashboard_total = 0
-    renderer = os.environ.get("PB_FIGURES_RENDERER", "html")
-    max_workers = build_workers(len(languages))
-
-    if max_workers <= 1:
-        for language in languages:
-            _, charts, dashboards, log_lines = _render_language_assets(excel, language, renderer, mapping)
+    for language in languages:
+        print(f"  [{language}]", flush=True)
+        language_jobs = [job for job in jobs if job[0] == language]
+        for job in language_jobs:
+            _, _, charts, dashboards, log_lines = results[job]
             chart_total += charts
             dashboard_total += dashboards
             for line in log_lines:
                 print(line, flush=True)
+        print("", flush=True)
+    return chart_total, dashboard_total
+
+
+def _generate_assets(excel: Path, languages: tuple[str, ...], mapping) -> tuple[int, int]:
+    """Render chart assets for HTML embed and full dashboard PNGs under Figures/."""
+    renderer = os.environ.get("PB_FIGURES_RENDERER", "html")
+    jobs = _section_jobs(excel, languages, mapping, renderer)
+    if not jobs:
+        return 0, 0
+
+    max_workers = build_workers(len(jobs))
+
+    if max_workers <= 1:
+        model = build_model(excel)
+        chart_total = 0
+        dashboard_total = 0
+        for language in languages:
+            print(f"  [{language}]", flush=True)
+            for section in section_codes(excel):
+                if not section_has_indicators(mapping, section):
+                    print(f"    {section}/ (no indicators)", flush=True)
+                    continue
+                _, _, charts, dashboards, log_lines = _render_section_job(
+                    excel, language, section, renderer, mapping, model=model,
+                )
+                chart_total += charts
+                dashboard_total += dashboards
+                for line in log_lines:
+                    print(line, flush=True)
+            print("", flush=True)
         return chart_total, dashboard_total
 
     print(
-        f"[pre_render] rendering {len(languages)} languages across "
+        f"[pre_render] rendering {len(jobs)} section(s) across "
         f"{max_workers} worker process(es)",
         flush=True,
     )
-    results: dict[str, tuple[str, int, int, list[str]]] = {}
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+    results: dict[SectionJob, tuple[str, str, int, int, list[str]]] = {}
+    with ProcessPoolExecutor(
+        max_workers=max_workers,
+        initializer=_init_render_pool,
+        initargs=(str(excel.resolve()),),
+    ) as executor:
         futures = {
-            executor.submit(_render_language_assets, excel, language, renderer, mapping): language
-            for language in languages
+            executor.submit(_render_section_job_pooled, job): job
+            for job in jobs
         }
         for future in as_completed(futures):
-            language = futures[future]
-            results[language] = future.result()
+            job = futures[future]
+            results[job] = future.result()
 
-    for language in languages:
-        _, charts, dashboards, log_lines = results[language]
-        chart_total += charts
-        dashboard_total += dashboards
-        for line in log_lines:
-            print(line, flush=True)
-    return chart_total, dashboard_total
+    return _print_section_results(languages, results, jobs)
 
 
 def _part_anchor(part_id: str) -> str:
@@ -195,6 +301,7 @@ def main() -> None:
     clear_cache()
     excel = resolve_excel()
     languages = _resolve_languages(excel)
+    _clean_build_workspace(languages)
     model = build_model(excel)
     mapping = load_mapping(excel)
 

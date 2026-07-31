@@ -35,6 +35,7 @@ from pb_figures.config import (  # noqa: E402
     resolve_report_output,
     visuals_build_root,
 )
+from pb_figures.languages import resolve_build_languages  # noqa: E402
 from pb_figures.styles import ENV_VAR, STYLE_NAMES  # noqa: E402
 
 QUARTO_ENV_VAR = "PB_QUARTO_EXE"
@@ -73,16 +74,25 @@ def _ensure_report_project(env: dict[str, str]) -> Path:
     return report_dir
 
 
+def _language_subprocess_args(env: dict[str, str]) -> list[str]:
+    """Pass --language or --all-languages to Word/PDF generators."""
+    lang = (env.get("PB_REPORT_LANGUAGE") or "all").strip()
+    if lang.lower() not in ("all", "*"):
+        return ["--language", lang]
+    return ["--all-languages"]
+
+
 def _run_docx_and_pdf(env: dict[str, str]) -> None:
+    lang_args = _language_subprocess_args(env)
     docx_cmd = [
         sys.executable,
         str(ROOT / "scripts" / "generate_report_docx.py"),
-        "--all-languages",
+        *lang_args,
     ]
     pdf_cmd = [
         sys.executable,
         str(ROOT / "scripts" / "generate_report_pdf.py"),
-        "--all-languages",
+        *lang_args,
     ]
 
     if _serialize_docx_pdf(env):
@@ -190,7 +200,12 @@ def main() -> None:
                 from package_figures import package_figures  # noqa: E402
                 from package_documents import package_documents  # noqa: E402
 
-                package_figures(resolve_figures_output(), resolve_report_output())
+                build_languages = resolve_build_languages(excel)
+                package_figures(
+                    resolve_figures_output(),
+                    resolve_report_output(),
+                    languages=build_languages,
+                )
                 _run_docx_and_pdf(env)
                 package_documents(resolve_report_output())
         finally:

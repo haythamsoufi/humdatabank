@@ -157,6 +157,14 @@ def resolve_excel(path: Path | str | None = None) -> Path:
     return copy
 
 
+def default_worker_cap(*, conservative: bool = False) -> int:
+    """Default ProcessPoolExecutor cap when PB_BUILD_WORKERS is unset."""
+    cpu = os.cpu_count() or 4
+    if conservative:
+        return max(1, min(2, cpu))
+    return max(1, min(4, cpu))
+
+
 def build_workers(count: int) -> int:
     """Number of worker processes to use for `count` independent parallel jobs.
 
@@ -168,14 +176,14 @@ def build_workers(count: int) -> int:
     if count <= 1:
         return 1
 
-    env_value = os.environ.get("PB_BUILD_WORKERS")
+    env_value = (os.environ.get("PB_BUILD_WORKERS") or "").strip()
     if env_value:
         try:
             cap = int(env_value)
         except ValueError:
-            cap = min(4, os.cpu_count() or 4)
+            cap = default_worker_cap()
     else:
-        cap = min(4, os.cpu_count() or 4)
+        cap = default_worker_cap()
 
     return max(1, min(count, cap))
 

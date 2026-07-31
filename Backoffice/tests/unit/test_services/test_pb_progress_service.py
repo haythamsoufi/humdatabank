@@ -171,6 +171,116 @@ class TestPBProgressCancelGeneration:
                 PBProgressService.cancel_generation(DEFAULT_VERSION)
 
 
+class TestPBProgressCopyOutputsToStorage:
+    def setup_method(self) -> None:
+        _reset_service_state()
+
+    def test_copy_outputs_uploads_publishable_files(self, app, tmp_path) -> None:
+        output_dir = tmp_path / "report" / "output"
+        output_dir.mkdir(parents=True)
+        (output_dir / "pb-report.html").write_bytes(b"<html></html>")
+        (output_dir / "pb-report-english.pdf").write_bytes(b"%PDF")
+        (output_dir / "pb-report.pdf").write_bytes(b"%PDF-default")
+        (output_dir / "_internal.txt").write_bytes(b"skip")
+
+        uploads: list[tuple[str, str, bytes]] = []
+
+        def fake_upload(category, rel_path, data):
+            uploads.append((category, rel_path, data))
+            return rel_path
+
+        with app.app_context():
+            with patch.object(PBProgressService, "_report_output_dir", return_value=output_dir), patch(
+                "plugins.pb_progress.service.storage_service.upload",
+                side_effect=fake_upload,
+            ), patch(
+                "plugins.pb_progress.service.storage_service.exists",
+                return_value=True,
+            ), patch(
+                "plugins.pb_progress.service.storage_service.get_size",
+                return_value=123,
+            ):
+                copied = PBProgressService._copy_outputs_to_storage(DEFAULT_VERSION)
+
+        assert sorted(copied) == ["pb-report-english.pdf", "pb-report.html"]
+        assert len(uploads) == 2
+        assert all(category == "pb_progress" for category, _, _ in uploads)
+        rel_paths = {rel for _, rel, _ in uploads}
+        assert rel_paths == {
+            "versions/2025-2026/output/pb-report.html",
+            "versions/2025-2026/output/pb-report-english.pdf",
+        }
+
+    def test_copy_outputs_raises_when_storage_verify_fails(self, app, tmp_path) -> None:
+        output_dir = tmp_path / "report" / "output"
+        output_dir.mkdir(parents=True)
+        (output_dir / "pb-report.html").write_bytes(b"<html></html>")
+
+        with app.app_context():
+            with patch.object(PBProgressService, "_report_output_dir", return_value=output_dir), patch(
+                "plugins.pb_progress.service.storage_service.upload",
+                return_value="versions/2025-2026/output/pb-report.html",
+            ), patch(
+                "plugins.pb_progress.service.storage_service.exists",
+                return_value=False,
+            ):
+                with pytest.raises(RuntimeError, match="not persisted"):
+                    PBProgressService._copy_outputs_to_storage(DEFAULT_VERSION)
+
+
+class TestPBProgressOutputRetention:
+    def setup_method(self) -> None:
+        _reset_service_state()
+
+    def test_get_status_rebuilds_outputs_when_cancelled(self, app) -> None:
+        state = PBProgressService._state_for(DEFAULT_VERSION)
+        state.update(
+            {
+                "status": "cancelled",
+                "output_names": ["pb-report.html"],
+            }
+        )
+        with app.app_context():
+            with patch.object(PBProgressService, "_ensure_status_loaded"), patch.object(
+                PBProgressService, "_sync_status_from_storage"
+            ), patch("plugins.pb_progress.service.storage_service.exists", return_value=True), patch(
+                "plugins.pb_progress.service.storage_service.get_size", return_value=1024
+            ), patch.object(
+                PBProgressService, "_output_url", return_value="/admin/data-exploration/pb-progress/2025-2026/output/pb-report.html"
+            ):
+                status = PBProgressService.get_status(DEFAULT_VERSION)
+        assert len(status["outputs"]) == 1
+        assert status["outputs"][0]["name"] == "pb-report.html"
+
+    def test_start_generation_preserves_output_names(self, app) -> None:
+        state = PBProgressService._state_for(DEFAULT_VERSION)
+        state.update(
+            {
+                "status": "idle",
+                "output_names": ["pb-report.html", "pb-report-pdf-all.zip"],
+            }
+        )
+        with app.app_context():
+            with patch.object(PBProgressService, "_check_build_prerequisites"), patch.object(
+                PBProgressService, "_ensure_status_loaded"
+            ), patch.object(PBProgressService, "_reload_status_from_storage", return_value=dict(state)), patch.object(
+                PBProgressService, "_clear_orphaned_run"
+            ), patch(
+                "plugins.pb_progress.service.PBProgressDataStore.get_data_source", return_value="excel"
+            ), patch(
+                "plugins.pb_progress.service.storage_service.exists", return_value=True
+            ), patch(
+                "plugins.pb_progress.service.PBProgressDataStore.get_version_status", return_value=dict(state)
+            ), patch(
+                "plugins.pb_progress.service.PBProgressDataStore.try_set_version_status_if_not_running",
+                return_value=True,
+            ) as claim_mock, patch("plugins.pb_progress.service.threading.Thread") as thread_cls:
+                thread_cls.return_value.start = MagicMock()
+                PBProgressService.start_generation(DEFAULT_VERSION)
+        running_status = claim_mock.call_args[0][1]
+        assert running_status["output_names"] == ["pb-report.html", "pb-report-pdf-all.zip"]
+
+
 class TestPBProgressRenderStack:
     def test_verify_render_stack_smoke(self) -> None:
         PBProgressService._verify_render_stack()

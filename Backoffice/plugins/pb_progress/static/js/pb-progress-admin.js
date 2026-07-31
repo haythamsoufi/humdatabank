@@ -37,7 +37,6 @@
         panelBuild: document.getElementById('pb-progress-panel-build'),
         panelMapping: document.getElementById('pb-progress-panel-mapping'),
         panelTranslations: document.getElementById('pb-progress-panel-translations'),
-        panelSectionOrder: document.getElementById('pb-progress-panel-section-order'),
         excelWorkflow: document.getElementById('pb-progress-excel-workflow'),
         systemWorkflow: document.getElementById('pb-progress-system-workflow'),
         systemDatasetBadge: document.getElementById('pb-progress-system-dataset-badge'),
@@ -63,12 +62,10 @@
         sourceSystemBtn: document.getElementById('pb-progress-source-system'),
         mappingBody: document.getElementById('pb-progress-mapping-body'),
         translationsBody: document.getElementById('pb-progress-translations-body'),
-        sectionOrderBody: document.getElementById('pb-progress-section-order-body'),
         syncMappingBtn: document.getElementById('pb-progress-sync-mapping-btn'),
         importConfigBtn: document.getElementById('pb-progress-import-config-btn'),
         saveMappingBtn: document.getElementById('pb-progress-save-mapping-btn'),
         saveTranslationsBtn: document.getElementById('pb-progress-save-translations-btn'),
-        saveSectionOrderBtn: document.getElementById('pb-progress-save-section-order-btn'),
         generateSystemBtn: document.getElementById('pb-progress-generate-system-btn'),
         compareSystemBtn: document.getElementById('pb-progress-compare-system-btn'),
         downloadSystemLink: document.getElementById('pb-progress-download-system-link'),
@@ -79,14 +76,12 @@
         build: els.panelBuild,
         mapping: els.panelMapping,
         translations: els.panelTranslations,
-        'section-order': els.panelSectionOrder,
     };
-    const SYSTEM_ONLY_SUBTABS = ['mapping', 'translations', 'section-order'];
+    const SYSTEM_ONLY_SUBTABS = ['mapping', 'translations'];
 
     let mappingRows = [];
     let mappingFilterText = '';
     let translationRows = [];
-    let sectionOrderRows = [];
     let activeDataSource = cfg.initialDataSource || 'excel';
     let yearsMultiselect = null;
     let yearsSaveTimer = null;
@@ -244,8 +239,6 @@
             loadMappingPanel().catch(handleAdminError);
         } else if (subtabId === 'translations') {
             loadTranslationsPanel().catch(handleAdminError);
-        } else if (subtabId === 'section-order') {
-            loadSectionOrderPanel().catch(handleAdminError);
         }
         if (subtabId === 'build') {
             refreshStatus().catch(function() {});
@@ -412,7 +405,6 @@
             row.id,
             row.section,
             row.source,
-            row.label_override,
         ].join(' ').toLowerCase();
         return haystack.indexOf(filterText) !== -1;
     }
@@ -435,10 +427,8 @@
             if (!mappingRowMatchesFilter(row, filterText)) return;
             visible += 1;
             const tr = document.createElement('tr');
-            if (row.tag_missing) tr.classList.add('bg-amber-50/60');
 
             const statusParts = [];
-            if (row.tag_missing) statusParts.push('<span class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs">' + escapeHtml((cfg.i18n && cfg.i18n.tagMissing) || 'Tag removed') + '</span>');
             if (row.source_warning) statusParts.push('<span class="inline-flex items-center rounded-full bg-red-100 text-red-800 px-2 py-0.5 text-xs" title="' + escapeHtml(row.source_warning) + '">' + escapeHtml((cfg.i18n && cfg.i18n.sourceWarning) || 'Source unavailable') + '</span>');
 
             tr.innerHTML =
@@ -450,14 +440,13 @@
                         return '<option value="' + source + '"' + selected + '>' + source + '</option>';
                     }).join('') +
                 '</select></td>' +
-                '<td class="px-3 py-2"><input type="text" class="pb-mapping-override w-full border border-gray-300 rounded px-2 py-1 text-sm" data-index="' + index + '" value="' + escapeHtml(row.label_override || '') + '" placeholder="' + escapeHtml((cfg.i18n && cfg.i18n.labelOverridePlaceholder) || 'Optional') + '"></td>' +
                 '<td class="px-3 py-2"><div class="flex flex-wrap gap-1">' + (statusParts.join('') || '<span class="text-gray-400">—</span>') + '</div></td>';
             els.mappingBody.appendChild(tr);
         });
 
         if (!visible) {
             const empty = document.createElement('tr');
-            empty.innerHTML = '<td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">' + escapeHtml((cfg.i18n && cfg.i18n.noMappingRows) || 'No mapping rows yet.') + '</td>';
+            empty.innerHTML = '<td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500">' + escapeHtml((cfg.i18n && cfg.i18n.noMappingRows) || 'No mapping rows yet.') + '</td>';
             els.mappingBody.appendChild(empty);
         }
 
@@ -467,12 +456,6 @@
             select.addEventListener('change', function() {
                 const idx = parseInt(select.getAttribute('data-index'), 10);
                 if (mappingRows[idx]) mappingRows[idx].source = select.value;
-            });
-        });
-        els.mappingBody.querySelectorAll('.pb-mapping-override').forEach(function(input) {
-            input.addEventListener('input', function() {
-                const idx = parseInt(input.getAttribute('data-index'), 10);
-                if (mappingRows[idx]) mappingRows[idx].label_override = input.value;
             });
         });
     }
@@ -499,32 +482,6 @@
                 tr.appendChild(td);
             });
             els.translationsBody.appendChild(tr);
-        });
-    }
-
-    function renderSectionOrderTable(rows) {
-        sectionOrderRows = Array.isArray(rows) ? rows.slice() : [];
-        if (!els.sectionOrderBody) return;
-        els.sectionOrderBody.innerHTML = '';
-        sectionOrderRows.forEach(function(row, index) {
-            const tr = document.createElement('tr');
-            ['part', 'section', 'order'].forEach(function(field) {
-                const td = document.createElement('td');
-                td.className = 'px-3 py-2';
-                const input = document.createElement('input');
-                input.type = field === 'order' ? 'number' : 'text';
-                input.className = 'pb-section-order-field w-full border border-gray-300 rounded px-2 py-1';
-                input.setAttribute('data-index', String(index));
-                input.setAttribute('data-field', field);
-                input.value = row[field] != null ? row[field] : '';
-                input.addEventListener('input', function() {
-                    if (!sectionOrderRows[index]) return;
-                    sectionOrderRows[index][field] = field === 'order' ? parseInt(input.value, 10) || 0 : input.value;
-                });
-                td.appendChild(input);
-                tr.appendChild(td);
-            });
-            els.sectionOrderBody.appendChild(tr);
         });
     }
 
@@ -598,11 +555,6 @@
         renderTranslationsTable(payload.translations || []);
     }
 
-    async function loadSectionOrderPanel() {
-        const payload = await fetchJson(apiUrl('/section-order'));
-        renderSectionOrderTable(payload.section_order || []);
-    }
-
     function showFlash(message, category) {
         if (typeof window.showFlashMessage === 'function') {
             window.showFlashMessage(message, category || 'info');
@@ -630,7 +582,6 @@
     async function applyImportedConfigPayload(payload) {
         if (payload.mapping) renderMappingTable(payload.mapping);
         if (payload.translations) renderTranslationsTable(payload.translations);
-        if (payload.section_order) renderSectionOrderTable(payload.section_order);
     }
 
     function configImportSuccessMessage(payload) {
@@ -669,15 +620,6 @@
             body: JSON.stringify({ translations: translationRows }),
         });
         showFlash((cfg.i18n && cfg.i18n.translationsSaved) || 'Translations saved.', 'success');
-    }
-
-    async function saveSectionOrder() {
-        await fetchJson(apiUrl('/section-order'), {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ section_order: sectionOrderRows }),
-        });
-        showFlash((cfg.i18n && cfg.i18n.sectionOrderSaved) || 'Section order saved.', 'success');
     }
 
     async function generateSystemDataset() {
@@ -1051,8 +993,6 @@
             loadMappingPanel().catch(handleAdminError);
         } else if (isSystemMode() && activeSubtab === 'translations') {
             loadTranslationsPanel().catch(handleAdminError);
-        } else if (isSystemMode() && activeSubtab === 'section-order') {
-            loadSectionOrderPanel().catch(handleAdminError);
         }
     }
 
@@ -1107,7 +1047,6 @@
         if (els.importConfigBtn) els.importConfigBtn.addEventListener('click', function() { importConfigFromExcel().catch(handleAdminError); });
         if (els.saveMappingBtn) els.saveMappingBtn.addEventListener('click', function() { saveMapping().catch(handleAdminError); });
         if (els.saveTranslationsBtn) els.saveTranslationsBtn.addEventListener('click', function() { saveTranslations().catch(handleAdminError); });
-        if (els.saveSectionOrderBtn) els.saveSectionOrderBtn.addEventListener('click', function() { saveSectionOrder().catch(handleAdminError); });
         if (els.generateSystemBtn) els.generateSystemBtn.addEventListener('click', function() { generateSystemDataset().catch(handleAdminError); });
         if (els.compareSystemBtn) els.compareSystemBtn.addEventListener('click', function() { compareSystemDataset().catch(handleAdminError); });
         if (els.stagesToggle) {

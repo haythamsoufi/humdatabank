@@ -12,11 +12,12 @@ from flask_login import current_user
 from plugins.pb_progress import bp, _PLUGIN_DIR
 from plugins.pb_progress.db_source import (
     DbSourceError,
+    get_editable_translations_config,
     import_config_from_excel,
+    prune_untagged_mapping_rows,
+    save_editable_translations_config,
     sync_mapping_from_indicator_bank,
     validate_mapping_config,
-    validate_section_order_config,
-    validate_translations_config,
 )
 from plugins.pb_progress.plugin_data_store import PBProgressDataStore
 from plugins.pb_progress.service import PBProgressService
@@ -27,7 +28,7 @@ from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 
 logger = logging.getLogger(__name__)
 
-_ADMIN_SUBTABS = frozenset({"build", "mapping", "translations", "section-order"})
+_ADMIN_SUBTABS = frozenset({"build", "mapping", "translations"})
 
 
 @bp.route("/pb-progress/static/<path:filename>", methods=["GET"])
@@ -201,6 +202,11 @@ def mapping(version: str):
 
     if request.method == "GET":
         rows = PBProgressDataStore.get_mapping_config(version_key)
+        pruned, removed = prune_untagged_mapping_rows(version_key, rows)
+        if removed:
+            pruned = validate_mapping_config(pruned)
+            PBProgressDataStore.save_mapping_config(version_key, pruned)
+            rows = pruned
         return json_ok(
             version=version_key,
             mapping=validate_mapping_config(rows),
@@ -211,6 +217,7 @@ def mapping(version: str):
     if not isinstance(rows, list):
         return json_bad_request("Expected a mapping array.")
     rows = validate_mapping_config(rows)
+    rows, _removed = prune_untagged_mapping_rows(version_key, rows)
     PBProgressDataStore.save_mapping_config(version_key, rows)
     return json_ok(version=version_key, mapping=rows)
 
@@ -244,7 +251,7 @@ def translations(version: str):
     if request.method == "GET":
         return json_ok(
             version=version_key,
-            translations=PBProgressDataStore.get_translations_config(version_key),
+            translations=get_editable_translations_config(version_key),
         )
 
     payload = request.get_json(silent=True) or {}
@@ -252,43 +259,12 @@ def translations(version: str):
     if not isinstance(rows, list):
         return json_bad_request("Expected a translations array.")
     try:
-        rows = validate_translations_config(rows)
+        rows = save_editable_translations_config(version_key, rows)
     except ValueError as exc:
         return json_bad_request(str(exc))
-    PBProgressDataStore.save_translations_config(version_key, rows)
     return json_ok(
         version=version_key,
-        translations=PBProgressDataStore.get_translations_config(version_key),
-    )
-
-
-@bp.route("/pb-progress/<version>/section-order", methods=["GET", "PUT"])
-@permission_required("admin.data_explore.pb_progress")
-@system_manager_required
-def section_order(version: str):
-    try:
-        version_key = validate_version(version)
-    except ValueError as exc:
-        return json_bad_request(str(exc))
-
-    if request.method == "GET":
-        return json_ok(
-            version=version_key,
-            section_order=PBProgressDataStore.get_section_order_config(version_key),
-        )
-
-    payload = request.get_json(silent=True) or {}
-    rows = payload.get("section_order")
-    if not isinstance(rows, list):
-        return json_bad_request("Expected a section_order array.")
-    try:
-        rows = validate_section_order_config(rows)
-    except ValueError as exc:
-        return json_bad_request(str(exc))
-    PBProgressDataStore.save_section_order_config(version_key, rows)
-    return json_ok(
-        version=version_key,
-        section_order=PBProgressDataStore.get_section_order_config(version_key),
+        translations=rows,
     )
 
 
@@ -303,8 +279,7 @@ def config_import_from_excel(version: str):
             version=version_key,
             summary=summary,
             mapping=PBProgressDataStore.get_mapping_config(version_key),
-            translations=PBProgressDataStore.get_translations_config(version_key),
-            section_order=PBProgressDataStore.get_section_order_config(version_key),
+            translations=get_editable_translations_config(version_key),
         )
     except ValueError as exc:
         return json_bad_request(str(exc))

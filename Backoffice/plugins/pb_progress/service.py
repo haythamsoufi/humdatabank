@@ -214,8 +214,12 @@ _PB_REPORT_TOOLBAR_TITLE_FIX = (
 HEARTBEAT_INTERVAL_SECONDS = 60
 
 # Build defaults — baked in; no App Service variables required.
-PB_BUILD_WORKERS_LOCAL = "1"
-PB_BUILD_WORKERS_AZURE = "1"
+# Override per deployment via Flask config PB_BUILD_WORKERS (see _build_worker_cap).
+PB_BUILD_WORKERS_AZURE = "2"
+
+
+def _default_local_build_workers() -> str:
+    return str(min(4, os.cpu_count() or 4))
 QUARTO_VERSION = "1.6.42"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
@@ -1013,13 +1017,12 @@ class PBProgressService:
         """Load mapping, translations, and section order from the uploaded workbook."""
         result: dict[str, Any] = {"excel": excel_info}
         try:
-            from plugins.pb_progress.db_source import DbSourceError, import_config_from_excel
+            from plugins.pb_progress.db_source import DbSourceError, get_editable_translations_config, import_config_from_excel
 
             summary = import_config_from_excel(version)
             result["config_import"] = summary
             result["mapping"] = PBProgressDataStore.get_mapping_config(version)
-            result["translations"] = PBProgressDataStore.get_translations_config(version)
-            result["section_order"] = PBProgressDataStore.get_section_order_config(version)
+            result["translations"] = get_editable_translations_config(version)
         except DbSourceError as exc:
             logger.warning(
                 "P&B Excel uploaded for %s but system config import failed: %s",
@@ -1048,10 +1051,7 @@ class PBProgressService:
         status["excel"] = cls.get_excel_info(version)
         if status.get("data_source") == "system":
             status["mapping_ready"] = bool(PBProgressDataStore.get_mapping_config(version))
-        if status.get("status") == "done":
-            status["outputs"] = cls._build_output_manifest(version)
-        else:
-            status["outputs"] = status.get("outputs") or []
+        status["outputs"] = cls._build_output_manifest(version)
         return cls._attach_build_progress(status)
 
     @classmethod
@@ -1080,41 +1080,42 @@ class PBProgressService:
                 f"A report generation is already in progress ({running_label})."
             )
 
+        source = PBProgressDataStore.get_data_source(version)
+        if source == "system":
+            from plugins.pb_progress.db_source import DbSourceError, generate_system_dataset as _generate_system_dataset
+
+            try:
+                _generate_system_dataset(version)
+            except DbSourceError as exc:
+                raise RuntimeError(str(exc)) from exc
+        elif not storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version)):
+            raise RuntimeError("Upload an Excel file before generating the report.")
+
+        job_id = str(uuid.uuid4())
+        started_at = cls._now_iso()
+
         with cls._lock:
+            persisted = cls._reload_status_from_storage(version)
+            if persisted:
+                cls._state_for(version).update(persisted)
             cls._clear_orphaned_run(version)
-            state = cls._state_for(version)
-            if state.get("status") == "running":
+
+            base_status = dict(PBProgressDataStore.get_version_status(version))
+            running_status = {
+                **base_status,
+                "status": "running",
+                "job_id": job_id,
+                "started_at": started_at,
+                "heartbeat": started_at,
+                "finished_at": None,
+                "error": None,
+                "build_stage": "preparing",
+                "language": language or "all",
+                "build_log_excerpt": None,
+            }
+            if not PBProgressDataStore.try_set_version_status_if_not_running(version, running_status):
                 raise RuntimeError("A report generation is already in progress.")
-
-            source = PBProgressDataStore.get_data_source(version)
-            if source == "system":
-                from plugins.pb_progress.db_source import DbSourceError, generate_system_dataset as _generate_system_dataset
-
-                try:
-                    _generate_system_dataset(version)
-                except DbSourceError as exc:
-                    raise RuntimeError(str(exc)) from exc
-            elif not storage_service.exists(STORAGE_CATEGORY, cls._excel_rel(version)):
-                raise RuntimeError("Upload an Excel file before generating the report.")
-
-            job_id = str(uuid.uuid4())
-            started_at = cls._now_iso()
-            state.update(
-                {
-                    "status": "running",
-                    "job_id": job_id,
-                    "started_at": started_at,
-                    "heartbeat": started_at,
-                    "finished_at": None,
-                    "error": None,
-                    "build_stage": "preparing",
-                    "language": language or "all",
-                    "outputs": [],
-                    "output_names": [],
-                    "build_log_excerpt": None,
-                }
-            )
-            cls._persist_status(version)
+            cls._state_for(version).update(running_status)
 
         cls._log_build_step(
             job_id,
@@ -1171,19 +1172,33 @@ class PBProgressService:
 
     @classmethod
     def _copy_outputs_to_storage(cls, version: str) -> list[str]:
+        """Upload publishable build artifacts from the local workspace to blob/filesystem storage."""
         copied: list[str] = []
         report_output_dir = cls._report_output_dir(version)
         if not report_output_dir.is_dir():
+            logger.warning(
+                "P&B progress output dir missing for %s: %s",
+                version,
+                report_output_dir,
+            )
             return copied
         for path in report_output_dir.iterdir():
             if not path.is_file() or not cls._is_publishable_output(path.name):
                 continue
+            rel_name = cls._output_rel(version, path.name)
             with open(path, "rb") as handle:
-                storage_service.upload(
-                    STORAGE_CATEGORY,
-                    cls._output_rel(version, path.name),
-                    handle.read(),
-                )
+                storage_service.upload(STORAGE_CATEGORY, rel_name, handle.read())
+            if not storage_service.exists(STORAGE_CATEGORY, rel_name):
+                raise RuntimeError(f"Output file was not persisted to storage: {path.name}")
+            size = storage_service.get_size(STORAGE_CATEGORY, rel_name)
+            logger.info(
+                "P&B progress saved output | version=%s | file=%s | storage=%s/%s | bytes=%s",
+                version,
+                path.name,
+                STORAGE_CATEGORY,
+                rel_name,
+                size,
+            )
             copied.append(path.name)
         return copied
 
@@ -1193,8 +1208,16 @@ class PBProgressService:
 
     @classmethod
     def _build_worker_cap(cls) -> str:
-        """Cap Visuals tool ProcessPoolExecutor workers on Azure to limit build RAM."""
-        return PB_BUILD_WORKERS_AZURE if cls._is_azure_storage() else PB_BUILD_WORKERS_LOCAL
+        """Cap Visuals tool ProcessPoolExecutor workers; lower on Azure to limit build RAM."""
+        try:
+            override = current_app.config.get("PB_BUILD_WORKERS")
+            if override is not None:
+                return str(max(1, int(override)))
+        except (RuntimeError, ValueError, TypeError):
+            pass
+        if cls._is_azure_storage():
+            return PB_BUILD_WORKERS_AZURE
+        return _default_local_build_workers()
 
     @classmethod
     def _build_env(cls, version: str, excel_path: str, language: str) -> dict[str, str]:

@@ -101,7 +101,7 @@ def main() -> None:
                     _, output = future.result()
                     print(f"[generate_report_pdf] wrote {output}")
 
-        default_copy = OUTPUT_DIR / "pb-report.pdf"
+        default_copy = output_dir / "pb-report.pdf"
         shutil.copy2(outputs[languages[0]], default_copy)
         print(f"[generate_report_pdf] wrote {default_copy} (default)")
     finally:

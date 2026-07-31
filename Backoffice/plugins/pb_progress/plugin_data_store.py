@@ -27,8 +27,6 @@ STORAGE_CATEGORY = "pb_progress"
 STATUS_NAME = "status.json"
 EXCEL_NAME = "source/SG_Report.xlsx"
 SYSTEM_GENERATED_NAME = "source/system_generated.xlsx"
-WORKBOOK_ARCHIVE_DIR = "source/archive"
-MAX_WORKBOOK_HISTORY = 20
 
 
 def _default_version_bucket() -> dict[str, Any]:
@@ -49,7 +47,6 @@ def _default_version_bucket() -> dict[str, Any]:
         "translations_config": [],
         "section_order_config": [],
         "selected_years": [],
-        "workbook_history": [],
     }
 
 
@@ -99,7 +96,6 @@ class PBProgressDataStore:
         bucket.setdefault("translations_config", [])
         bucket.setdefault("section_order_config", [])
         bucket.setdefault("selected_years", [])
-        bucket.setdefault("workbook_history", [])
         return bucket
 
     @classmethod
@@ -179,15 +175,32 @@ class PBProgressDataStore:
         return cls.save_version_bucket(version, bucket)
 
     @classmethod
-    def get_workbook_history(cls, version: str) -> list[dict[str, Any]]:
-        rows = cls.get_version_bucket(version).get("workbook_history") or []
-        return copy.deepcopy(rows) if isinstance(rows, list) else []
+    def try_set_version_status_if_not_running(cls, version: str, status: dict[str, Any]) -> bool:
+        """Atomically persist running status under a row lock (multi-worker safe)."""
+        from app.extensions import db
 
-    @classmethod
-    def save_workbook_history(cls, version: str, rows: list[dict[str, Any]]) -> bool:
-        bucket = cls.get_version_bucket(version)
-        bucket["workbook_history"] = copy.deepcopy(rows)
-        return cls.save_version_bucket(version, bucket)
+        version = validate_version(version)
+        store = cls._store()
+        row = store._get_or_create_row(for_update=True)
+        raw = row.data if isinstance(row.data, dict) else {}
+        data = store._merge_with_defaults(raw)
+        versions = data.setdefault("versions", {})
+        for version_id in VERSION_ORDER:
+            bucket = versions.get(version_id)
+            if not isinstance(bucket, dict):
+                versions[version_id] = _default_version_bucket()
+        bucket = versions[version]
+        current = bucket.get("status")
+        if not isinstance(current, dict):
+            current = _default_version_bucket()["status"]
+        if current.get("status") == "running":
+            db.session.rollback()
+            return False
+        bucket["status"] = copy.deepcopy(status)
+        row.data = data
+        store.config = copy.deepcopy(data)
+        db.session.commit()
+        return True
 
     @classmethod
     def _version_rel(cls, version: str, name: str) -> str:

@@ -10,7 +10,7 @@ from .calculations import part_title, section_title
 from .config import resolve_excel
 from .languages import LANGUAGES
 from .layouts import section_codes
-from .translations import load_parts_order, load_section_order
+from .translations import load_parts_order, load_section_order, section_title_for
 
 
 def report_parts(excel_path: Path | None = None) -> list[dict]:
@@ -56,12 +56,17 @@ def section_titles(
     """Map section code (EF1, SP1, …) to localized dashboard title."""
     titles: dict[str, str] = {}
     for section in section_codes(excel_path):
-        subset = model[model["section"] == section]
+        title = section_title_for(section, language, excel_path)
+        if title:
+            titles[section] = title
+            continue
+        subset = model[model["section"].astype(str).str.strip() == section]
         if subset.empty:
             titles[section] = section
             continue
         meta = subset.groupby("ID").first().iloc[0]
-        titles[section] = section_title(meta, language)
+        fallback = section_title(meta, language)
+        titles[section] = fallback or section
     return titles
 
 

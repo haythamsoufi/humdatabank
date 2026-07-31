@@ -86,6 +86,22 @@ class TranslationDefaultsTests(unittest.TestCase):
             order = load_section_order(path)
             self.assertEqual(order, DEFAULT_SECTION_ORDER)
 
+    def test_parts_order_prefers_sp_before_ef_when_legacy_per_part_orders(self) -> None:
+        from pb_figures.translations import _parse_section_order_sheet
+
+        order_df = pd.DataFrame(
+            [
+                {"part": "sp", "section": "SP1", "order": 1},
+                {"part": "sp", "section": "SP2", "order": 2},
+                {"part": "ef", "section": "EF2", "order": 1},
+                {"part": "ef", "section": "EF3", "order": 2},
+            ]
+        )
+        section_order, parts_order = _parse_section_order_sheet(order_df)
+        self.assertEqual(parts_order, ("sp", "ef"))
+        self.assertEqual(section_order["sp"], ["SP1", "SP2"])
+        self.assertEqual(section_order["ef"], ["EF2", "EF3"])
+
 
 if __name__ == "__main__":
     unittest.main()

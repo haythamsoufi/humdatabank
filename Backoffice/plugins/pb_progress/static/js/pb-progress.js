@@ -547,8 +547,21 @@
         }
     }
 
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
     async function fetchJson(url, options) {
         const opts = Object.assign({ credentials: 'same-origin' }, options || {});
+        const method = (opts.method || 'GET').toUpperCase();
+        if (method !== 'GET' && method !== 'HEAD') {
+            const headers = Object.assign({}, opts.headers || {});
+            const token = getCsrfToken();
+            if (token) {
+                headers['X-CSRFToken'] = token;
+            }
+            opts.headers = headers;
+        }
         const response = await fetch(url, opts);
         const payload = await response.json().catch(function() { return {}; });
         if (!response.ok) {

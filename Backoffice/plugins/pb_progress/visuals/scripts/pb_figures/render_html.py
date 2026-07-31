@@ -44,6 +44,7 @@ def render_dashboard_html(
     scale: float = 2.0,
     session=None,
     mapping=None,
+    render_assets: bool = True,
 ) -> Path:
     """Render dashboard to PNG using the same HTML embed path as the Quarto report."""
     del session  # kept for caller compatibility during migration
@@ -62,7 +63,7 @@ def render_dashboard_html(
         language=language,
         assets_dir=assets_dir,
         asset_url_prefix=asset_prefix,
-        render_assets=True,
+        render_assets=render_assets,
         mapping=mapping,
     )
 

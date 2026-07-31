@@ -19,6 +19,9 @@ EXCEL_TO_LANG = {
 
 REQUIRED_SHEETS = ("Translations", "SectionOrder")
 
+# Tie-break when multiple parts share the same minimum SectionOrder value (legacy per-part rows).
+_PART_RANK = {"cc": 0, "sp": 1, "ef": 2}
+
 
 def _translation_cell(value: object) -> str | None:
     """Return stripped cell text, or None for blank/NaN cells."""
@@ -73,7 +76,10 @@ def _parse_section_order_sheet(order_df: pd.DataFrame) -> tuple[dict[str, list[s
         return {}, ()
 
     parts_order = tuple(
-        sorted(part_min_order.keys(), key=lambda part_id: (part_min_order[part_id], part_id))
+        sorted(
+            part_min_order.keys(),
+            key=lambda part_id: (part_min_order[part_id], _PART_RANK.get(part_id, 99), part_id),
+        )
     )
     return section_order, parts_order
 

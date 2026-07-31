@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import os
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -93,6 +95,18 @@ def discover_languages(mapping: pd.DataFrame) -> tuple[str, ...]:
             continue
         found.append(language)
     return tuple(found) if found else ("English",)
+
+
+def resolve_build_languages(excel: Path | str | None = None) -> tuple[str, ...]:
+    """Languages to build — honours PB_REPORT_LANGUAGE, else all Excel languages."""
+    requested = (os.environ.get("PB_REPORT_LANGUAGE") or "").strip()
+    if requested.lower() not in ("", "all", "*"):
+        return (requested,)
+    from .config import resolve_excel
+    from .data import load_sg_report
+
+    path = resolve_excel(excel)
+    return discover_languages(load_sg_report(path)["mapping"])
 
 
 def excel_text(row: pd.Series, language: str, field: str) -> str:

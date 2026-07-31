@@ -113,9 +113,9 @@ def register_dev_tools_commands(app):
             db.session.flush()
 
             try:
-                from app.seeding import _DEV_TEST_ADMIN_ROLE_CODES, _assign_roles_to_user
+                from app.seeding import _DEV_TEST_ADMIN_ALL_ROLE_CODES, _assign_roles_to_user
 
-                _assign_roles_to_user(int(admin.id), list(_DEV_TEST_ADMIN_ROLE_CODES))
+                _assign_roles_to_user(int(admin.id), list(_DEV_TEST_ADMIN_ALL_ROLE_CODES))
             except Exception as e:
                 logger.debug("RBAC admin role assignment failed: %s", e)
 

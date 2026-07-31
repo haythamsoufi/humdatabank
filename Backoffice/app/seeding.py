@@ -36,6 +36,15 @@ _DEV_TEST_ADMIN_ROLE_CODES = (
     "admin_api_manager",
 )
 
+# Assignment participation roles so the dev test admin can enter, submit, and approve.
+_DEV_TEST_ADMIN_ASSIGNMENT_ROLE_CODES = (
+    "assignment_viewer",
+    "assignment_editor_submitter",
+    "assignment_approver",
+)
+
+_DEV_TEST_ADMIN_ALL_ROLE_CODES = _DEV_TEST_ADMIN_ROLE_CODES + _DEV_TEST_ADMIN_ASSIGNMENT_ROLE_CODES
+
 # Backward-compatible alias used by create_admin CLI.
 _DEV_TEST_ADMIN_ROLE_CODE = "admin_full"
 
@@ -124,13 +133,13 @@ def _ensure_user_country_entity_permission(user, country_id: int | None, app_ins
 
 
 def _ensure_dev_test_admin_roles(user, app_instance) -> None:
-    """Ensure the dev test admin has full admin permissions and matching UI roles."""
+    """Ensure the dev test admin has full admin + assignment participation roles."""
     try:
-        added = _assign_roles_to_user(int(user.id), _DEV_TEST_ADMIN_ROLE_CODES)
+        added = _assign_roles_to_user(int(user.id), _DEV_TEST_ADMIN_ALL_ROLE_CODES)
         if added:
             db.session.commit()
             app_instance.logger.info(
-                "Granted %d dev admin role(s) to test admin '%s'",
+                "Granted %d dev admin/assignment role(s) to test admin '%s'",
                 added,
                 user.email,
             )
@@ -260,7 +269,7 @@ def create_default_data(app_instance):
                     db.session.flush()
 
                     try:
-                        _assign_roles_to_user(int(admin.id), _DEV_TEST_ADMIN_ROLE_CODES)
+                        _assign_roles_to_user(int(admin.id), _DEV_TEST_ADMIN_ALL_ROLE_CODES)
                         if test_country_id:
                             admin.add_entity_permission(entity_type="country", entity_id=test_country_id)
                     except Exception as e:

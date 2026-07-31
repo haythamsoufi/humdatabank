@@ -99,12 +99,22 @@ def validate_uploaded_workbook(path: Path | str) -> dict[str, Any]:
         raise WorkbookValidationError(str(exc)) from exc
 
     sections = sorted(model["section"].dropna().astype(str).unique())
+    from pb_figures.workbook_validation import sections_without_indicators
+
+    unmapped_sections = sections_without_indicators(workbook_path)
+    for section in unmapped_sections:
+        warnings.append(
+            f"Section '{section}' appears in SectionOrder but has no Mapping indicators; "
+            "it will be omitted from the generated report."
+        )
+
     return {
         "valid": True,
         "warnings": warnings,
         "indicator_count": int(model["ID"].nunique()),
         "row_count": len(model),
         "sections": sections,
+        "sections_without_indicators": unmapped_sections,
     }
 
 

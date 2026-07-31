@@ -174,7 +174,60 @@ def test_validate_uploaded_workbook_accepts_minimal_valid_file(tmp_path):
     assert summary["indicator_count"] == 1
     assert summary["row_count"] == 1
     assert summary["sections"] == ["SP1"]
-    assert len(summary["warnings"]) == 2
+    assert any("Translations" in warning for warning in summary["warnings"])
+    assert any("SectionOrder" in warning for warning in summary["warnings"])
+    assert "SP1" not in summary["sections_without_indicators"]
+    assert len(summary["sections_without_indicators"]) >= 1
+
+
+@pytest.mark.unit
+def test_validate_uploaded_workbook_warns_on_section_order_gaps(tmp_path):
+    path = tmp_path / "section_gap.xlsx"
+    mapping = pd.DataFrame(
+        {
+            "Strategic Priority / Enabling Function": ["SP1"],
+            "ID": ["1"],
+            "Source": ["Manual"],
+            "English": ["Indicator one"],
+            "SP EN": ["Priority 1"],
+            "Type": ["Cumulative"],
+            "Unit": ["People"],
+        }
+    )
+    final = pd.DataFrame(
+        {
+            "Index": [1],
+            "Strategic Priority / Enabling Function": ["SP1"],
+            "ID": ["1"],
+            "Source": ["Manual"],
+            "Year": ["2027"],
+            "Value": [100],
+            "Implementing": [10],
+            "Count": [5],
+        }
+    )
+    total_reported = pd.DataFrame({"Source": ["Manual"], "Year": ["2027"], "TotalReported": [10]})
+    translations = pd.DataFrame({"id": ["report.title"], "EN": ["Title"]})
+    section_order = pd.DataFrame(
+        [
+            {"part": "cc", "section": "CC1", "order": 1},
+            {"part": "sp", "section": "SP1", "order": 2},
+        ]
+    )
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        empty = pd.DataFrame()
+        empty.to_excel(writer, sheet_name="Mapping", index=False, startrow=3)
+        mapping.to_excel(writer, sheet_name="Mapping", index=False, startrow=3)
+        final.to_excel(writer, sheet_name="Final", index=False)
+        total_reported.to_excel(writer, sheet_name="TotalReported", index=False)
+        translations.to_excel(writer, sheet_name="Translations", index=False)
+        section_order.to_excel(writer, sheet_name="SectionOrder", index=False)
+
+    summary = validate_uploaded_workbook(path)
+
+    assert summary["valid"] is True
+    assert summary["sections_without_indicators"] == ["CC1"]
+    assert any("CC1" in warning for warning in summary["warnings"])
 
 
 @pytest.mark.unit

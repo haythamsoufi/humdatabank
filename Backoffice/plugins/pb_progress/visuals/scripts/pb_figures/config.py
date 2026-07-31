@@ -90,6 +90,17 @@ def resolve_report_output() -> Path:
 
 _REPORT_STATIC_FILES = ("pb-report.qmd", "_quarto.yml")
 _REPORT_STATIC_DIRS = ("styles", "partials", "fonts")
+_FONTAWESOME_FILENAME = "fontawesome-6.5.0.min.css"
+
+
+def _backoffice_root() -> Path:
+    return Path(__file__).resolve().parents[5]
+
+
+def fontawesome_stylesheet_source() -> Path | None:
+    """Backoffice app static Font Awesome bundle for Quarto embed-resources."""
+    path = _backoffice_root() / "app" / "static" / "libs" / _FONTAWESOME_FILENAME
+    return path if path.is_file() else None
 
 
 def prepare_report_workspace(source_report: Path, target_report: Path) -> Path:
@@ -109,6 +120,11 @@ def prepare_report_workspace(source_report: Path, target_report: Path) -> Path:
         shutil.copytree(src, dest)
     (target_report / "figures").mkdir(parents=True, exist_ok=True)
     (target_report / "output").mkdir(parents=True, exist_ok=True)
+    fa_src = fontawesome_stylesheet_source()
+    if fa_src is not None:
+        static_dir = target_report / "static"
+        static_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(fa_src, static_dir / _FONTAWESOME_FILENAME)
     return target_report
 
 

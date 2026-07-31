@@ -142,6 +142,8 @@ def _render_language_panel(
             f"{html.escape(part_title)}</h2>"
         )
         for section in part["sections"]:
+            if not section_has_indicators(mapping, section):
+                continue
             heading = titles.get(section, section)
             lines.append('<section class="report-section">')
             lines.append(

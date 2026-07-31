@@ -155,9 +155,9 @@ def main():
                         db.session.flush()
                         return int(role.id)
 
-                    from app.seeding import _DEV_TEST_ADMIN_ROLE_CODES, _assign_roles_to_user
+                    from app.seeding import _DEV_TEST_ADMIN_ALL_ROLE_CODES, _assign_roles_to_user
 
-                    admin_role_codes = list(_DEV_TEST_ADMIN_ROLE_CODES)
+                    admin_role_codes = list(_DEV_TEST_ADMIN_ALL_ROLE_CODES)
                     focal_role_id = _ensure_role("assignment_editor_submitter", "Assignment Editor/Submitter")
                     sys_role_id = _ensure_role("system_manager", "System Manager")
 

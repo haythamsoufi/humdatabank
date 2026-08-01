@@ -249,24 +249,22 @@ class TestGetScopedGrantEffect:
 # ---------------------------------------------------------------------------
 
 class TestAssignmentIsEffectivelyClosed:
-    def test_reopened_after_close_is_not_closed(self, db_session, app):
+    def test_fail_closed_when_round_check_raises_even_if_reopened(self, db_session, app):
         with app.app_context():
             aes = create_test_assignment_entity_status(db_session)
             aes.assigned_form.is_closed = True
             aes.reopened_after_close = True
-            # Patch is_round_closed_for_entity to raise so we hit the fallback
             with patch.object(type(aes), "is_round_closed_for_entity", side_effect=Exception("no round")):
                 result = AuthorizationService._assignment_is_effectively_closed(aes)
-            # reopened_after_close=True means not effectively closed
-            assert result is False
+            assert result is True
 
-    def test_returns_false_when_no_assigned_form(self, app):
+    def test_fail_closed_when_round_check_raises_without_assigned_form(self, app):
         aes = MagicMock()
         aes.reopened_after_close = False
         aes.assigned_form = None
         aes.is_round_closed_for_entity = MagicMock(side_effect=Exception("no round"))
         result = AuthorizationService._assignment_is_effectively_closed(aes)
-        assert result is False
+        assert result is True
 
     def test_returns_true_when_round_closed_bool(self, db_session, app):
         """is_round_closed_for_entity() returning True bool → effectively closed."""

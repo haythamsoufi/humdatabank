@@ -72,7 +72,7 @@ class TestValidationQuestionsPeriods:
 
     def test_returns_periods(self, logged_in_client, db_session, app):
         with _perm_patch(), \
-             patch("app.routes.admin.validation_questions.global_periods_for_template", return_value=["2025", "2024"]):
+             patch("app.routes.admin.validation_scope_api.global_periods_for_template", return_value=["2025", "2024"]):
             resp = logged_in_client.get("/admin/validation-questions/api/periods?template_id=1")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -97,7 +97,7 @@ class TestValidationQuestionsCountries:
 
     def test_returns_countries(self, logged_in_client, db_session, app):
         with _perm_patch(), \
-             patch("app.routes.admin.validation_questions.list_countries_for_period", return_value=[{"id": 1}]):
+             patch("app.routes.admin.validation_scope_api.list_countries_for_period", return_value=[{"id": 1}]):
             resp = logged_in_client.get("/admin/validation-questions/api/countries?template_id=1&period=2024")
         assert resp.status_code == 200
         data = resp.get_json()

@@ -513,9 +513,11 @@ export class InteractiveMapField {
                         this.config.allow_marker_editing = pluginSettings.allow_marker_editing;
                     }
 
-                    // Store Mapbox token if available
-                    if (pluginSettings.mapbox_token || pluginSettings.api_keys?.mapbox) {
-                        this.config.mapbox_token = pluginSettings.mapbox_token || pluginSettings.api_keys?.mapbox;
+                    if (pluginSettings.mapbox_configured) {
+                        this.config.mapbox_configured = true;
+                        if (pluginSettings.mapbox_tile_url) {
+                            this.config.mapbox_tile_url = pluginSettings.mapbox_tile_url;
+                        }
                     }
 
                     debugPluginLog(this.pluginName, 'Plugin settings applied:', pluginSettings);
@@ -756,27 +758,27 @@ export class InteractiveMapField {
     }
 
     addMapboxTiles() {
-        // Use the same Mapbox style as CountryMapboxMap.js
-        // Style URL: mapbox://styles/go-ifrc/ckrfe16ru4c8718phmckdfjh0
-        // Convert to Leaflet tile URL format
-        const mapboxToken = this.config.mapbox_token || window.MAPBOX_TOKEN;
         const styleId = 'go-ifrc/ckrfe16ru4c8718phmckdfjh0';
+        const mapboxToken = this.config.mapbox_token || window.MAPBOX_TOKEN;
+        const proxiedTileUrl = this.config.mapbox_tile_url
+            || '/admin/plugins/interactive_map/api/tiles/mapbox/{z}/{x}/{y}.png';
 
-        if (!mapboxToken) {
-            debugPluginWarn(this.pluginName, 'Mapbox token not found, falling back to OpenStreetMap');
-            this.addOpenStreetMapTiles();
+        if (this.config.mapbox_configured || mapboxToken) {
+            const tileUrl = this.config.mapbox_configured
+                ? proxiedTileUrl
+                : `https://api.mapbox.com/styles/v1/${styleId}/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
+
+            L.tileLayer(tileUrl, {
+                attribution: '© Mapbox © OpenStreetMap',
+                maxZoom: 22,
+                tileSize: 512,
+                zoomOffset: -1
+            }).addTo(this.map);
             return;
         }
 
-        // Mapbox tile URL format for Leaflet
-        const tileUrl = `https://api.mapbox.com/styles/v1/${styleId}/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
-
-        L.tileLayer(tileUrl, {
-            attribution: '© Mapbox © OpenStreetMap',
-            maxZoom: 22,
-            tileSize: 512,
-            zoomOffset: -1
-        }).addTo(this.map);
+        debugPluginWarn(this.pluginName, 'Mapbox is not configured, falling back to OpenStreetMap');
+        this.addOpenStreetMapTiles();
     }
 
     addOpenStreetMapTiles() {

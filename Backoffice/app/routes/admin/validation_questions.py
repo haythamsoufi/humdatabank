@@ -9,11 +9,8 @@ from app.models import FormTemplate, Country
 from app.models.validation import ValidationQuestion
 from app.routes.admin import bp
 from app.routes.admin.shared import VALIDATION_QUESTIONS_PERMISSION, permission_required
-from app.services.validation.dashboard_service import (
-    global_periods_for_template,
-    list_countries_for_period,
-    template_options,
-)
+from app.routes.admin.validation_scope_api import register_validation_scope_routes
+from app.services.validation.dashboard_service import template_options
 from app.services.validation.questions_excel_service import (
     apply_manual_question_update,
     build_import_template_workbook,
@@ -44,25 +41,12 @@ def validation_questions_admin():
     )
 
 
-@bp.route("/validation-questions/api/periods", methods=["GET"])
-@login_required
-@permission_required(VALIDATION_QUESTIONS_PERMISSION)
-def validation_questions_periods_api():
-    template_id = request.args.get("template_id", type=int)
-    if not template_id:
-        return json_bad_request("template_id is required")
-    return json_ok(periods=global_periods_for_template(template_id))
-
-
-@bp.route("/validation-questions/api/countries", methods=["GET"])
-@login_required
-@permission_required(VALIDATION_QUESTIONS_PERMISSION)
-def validation_questions_countries_api():
-    template_id = request.args.get("template_id", type=int)
-    period = request.args.get("period", type=str)
-    if not template_id or not period:
-        return json_bad_request("template_id and period are required")
-    return json_ok(countries=list_countries_for_period(template_id, period))
+register_validation_scope_routes(
+    bp,
+    "/validation-questions",
+    VALIDATION_QUESTIONS_PERMISSION,
+    endpoint_prefix="validation_questions",
+)
 
 
 @bp.route("/validation-questions/api/list", methods=["GET"])

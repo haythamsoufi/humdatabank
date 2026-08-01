@@ -243,6 +243,69 @@ class TestRenderPluginFieldEntry:
 
 
 # ---------------------------------------------------------------------------
+# Interactive map plugin security
+# ---------------------------------------------------------------------------
+
+class TestInteractiveMapPluginSecurity:
+    def test_field_config_does_not_expose_raw_api_keys(self, client, app):
+        mock_user = MagicMock(is_authenticated=True)
+        with patch("flask_login.utils._get_user", return_value=mock_user), \
+             patch(
+                 "plugins.interactive_map.routes.plugin_config.get_all_config",
+                 return_value={
+                     "global_settings": {"default_map_provider": "mapbox"},
+                     "api_keys": {"mapbox": "pk.secret-token-should-not-leak"},
+                 },
+             ):
+            with client.session_transaction() as sess:
+                sess["_user_id"] = "1"
+                sess["_fresh"] = True
+            resp = client.get("/admin/plugins/interactive_map/api/config/field")
+
+        assert resp.status_code == 200
+        payload = json.loads(resp.data)
+        config = payload.get("config") or {}
+        assert "mapbox_token" not in config
+        assert "api_keys" not in config
+        assert config.get("mapbox_configured") is True
+        assert "pk.secret-token-should-not-leak" not in resp.get_data(as_text=True)
+
+    def test_focal_point_cannot_post_plugin_settings(self, client, app):
+        mock_user = MagicMock(is_authenticated=True)
+        with patch("flask_login.utils._get_user", return_value=mock_user), \
+             patch("app.routes.admin.shared.user_has_permission", return_value=False):
+            with client.session_transaction() as sess:
+                sess["_user_id"] = "1"
+                sess["_fresh"] = True
+            resp = client.post(
+                "/admin/plugins/interactive_map/api/settings",
+                json={"default_map_provider": "mapbox"},
+            )
+        assert resp.status_code == 403
+
+    def test_admin_can_post_plugin_settings(self, client, app):
+        with patch("app.routes.admin.shared.user_has_permission", return_value=True):
+            with client.session_transaction() as sess:
+                sess["_user_id"] = "999999"
+                sess["_fresh"] = True
+            with patch("flask_login.utils._get_user", return_value=MagicMock(is_authenticated=True)), \
+                 patch("plugins.interactive_map.routes.plugin_config.set_global_setting", return_value=True), \
+                 patch("plugins.interactive_map.routes.plugin_config.set_api_key", return_value=True), \
+                 patch("plugins.interactive_map.routes.clear_plugin_cache", return_value=0):
+                resp = client.post(
+                    "/admin/plugins/interactive_map/api/settings",
+                    json={
+                        "default_map_provider": "mapbox",
+                        "default_zoom_level": 10,
+                        "max_markers_per_field": 10,
+                        "geocoding_service": "nominatim",
+                        "mapbox_api_key": "pk.test",
+                    },
+                )
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # get_plugin_info  GET /admin/api/plugins/<plugin_name>
 # ---------------------------------------------------------------------------
 

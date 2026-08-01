@@ -91,7 +91,7 @@ class TestBuildDocUrl:
         from app.routes.help_docs import _build_doc_url
 
         with app.test_request_context("/"):
-            with patch("app.routes.help_docs.url_for", return_value="/help/docs/") as mock_url_for:
+            with patch("app.routes.docs._shared.url_for", return_value="/help/docs/") as mock_url_for:
                 result = _build_doc_url("")
         mock_url_for.assert_called_with("help_docs.index")
 
@@ -99,7 +99,7 @@ class TestBuildDocUrl:
         from app.routes.help_docs import _build_doc_url
 
         with app.test_request_context("/"):
-            with patch("app.routes.help_docs.url_for", return_value="/help/docs/user-guides/nav"):
+            with patch("app.routes.docs._shared.url_for", return_value="/help/docs/user-guides/nav"):
                 result = _build_doc_url("user-guides/nav.md")
         assert "nav" in result or "/help/docs" in result
 
@@ -107,7 +107,7 @@ class TestBuildDocUrl:
         from app.routes.help_docs import _build_doc_url
 
         with app.test_request_context("/"):
-            with patch("app.routes.help_docs.url_for", return_value="/help/docs/") as mock_url_for:
+            with patch("app.routes.docs._shared.url_for", return_value="/help/docs/") as mock_url_for:
                 result = _build_doc_url("README.md")
         mock_url_for.assert_called_with("help_docs.index")
 
@@ -123,7 +123,7 @@ class TestHelpDocsIndex:
         mock_root.exists.return_value = False
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/")
         assert resp.status_code == 404
@@ -133,8 +133,8 @@ class TestHelpDocsIndex:
         mock_root.exists.return_value = True
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs, \
-             patch("app.routes.help_docs.render_template", return_value=make_response("ok", 200)) as mock_render:
+             patch("app.routes.docs._shared.docs") as mock_docs, \
+             patch("app.routes.docs._shared.render_template", return_value=make_response("ok", 200)) as mock_render:
             mock_docs.docs_root.return_value = mock_root
             mock_docs.resolve_doc_path.return_value = (mock_root / "README.md", "")
             mock_docs.ensure_doc_page_access.return_value = None
@@ -161,7 +161,7 @@ class TestHelpDocsViewDoc:
         mock_root.exists.return_value = False
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/user-guides/some-guide")
         assert resp.status_code == 404
@@ -171,7 +171,7 @@ class TestHelpDocsViewDoc:
         mock_root.exists.return_value = True
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/user-guides/some-guide.md")
         assert resp.status_code == 404
@@ -181,7 +181,7 @@ class TestHelpDocsViewDoc:
         mock_root.exists.return_value = True
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/README")
         assert resp.status_code == 404
@@ -191,8 +191,8 @@ class TestHelpDocsViewDoc:
         mock_root.exists.return_value = True
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs, \
-             patch("app.routes.help_docs.render_template", return_value=make_response("ok", 200)) as mock_render:
+             patch("app.routes.docs._shared.docs") as mock_docs, \
+             patch("app.routes.docs._shared.render_template", return_value=make_response("ok", 200)) as mock_render:
             mock_docs.docs_root.return_value = mock_root
             mock_docs.resolve_doc_path.return_value = (mock_root / "user-guides/guide.md", "user-guides/guide")
             mock_docs.ensure_doc_page_access.return_value = None
@@ -219,7 +219,7 @@ class TestHelpDocsAsset:
         mock_root.exists.return_value = False
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/assets/image.png")
         assert resp.status_code == 404
@@ -239,7 +239,7 @@ class TestHelpDocsAsset:
         mock_root.resolve.return_value = Path("/tmp/fake_docs_root")
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/assets/../../etc/passwd")
         assert resp.status_code == 404
@@ -250,7 +250,7 @@ class TestHelpDocsAsset:
         mock_root = Path(tmp_dir)
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = mock_root
             resp = client.get("/help/docs/assets/nonexistent.png")
         assert resp.status_code == 404
@@ -268,7 +268,7 @@ class TestHelpDocsAsset:
             f.write(b"\x89PNG fake content")
 
         with _bypass_login_required(), \
-             patch("app.routes.help_docs.docs") as mock_docs:
+             patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = resolved_root
             mock_docs.ensure_docs_asset_access.return_value = None
             resp = client.get("/help/docs/assets/image.png")

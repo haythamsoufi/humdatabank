@@ -6,27 +6,8 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 
 logger = logging.getLogger(__name__)
-
-
-_USAGE_HELP_RE = re.compile(
-    r"\b("
-    r"how\s+to|how\s+do\s+i|how\s+can\s+i|where\s+is|where\s+can\s+i\s+find|"
-    r"where\s+do\s+i\s+find|guide|help|steps?|workflow|menu|screen|page|"
-    r"click|navigate|open|create|assign|assignment|template"
-    r")\b",
-    re.IGNORECASE,
-)
-
-_DOCUMENT_LOOKUP_RE = re.compile(
-    r"\b("
-    r"document|pdf|report|file|download|upload|excerpt|page\s+\d+|"
-    r"search\s+documents|in\s+the\s+documents|from\s+documents"
-    r")\b",
-    re.IGNORECASE,
-)
 
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -284,71 +265,3 @@ def bulk_databank_tool_satisfied(steps: Optional[List[Dict[str, Any]]]) -> bool:
             if isinstance(rows, list) and len(rows) > 0:
                 return True
     return False
-
-
-# Pattern: user is describing what they see on screen (one country / "only X" in the list).
-# DEPRECATED: Do not use for tool routing — see AgentRoutingPolicy.turn_system_prompt_supplement.
-_DASHBOARD_COUNTRY_LIST_RE = re.compile(
-    r"\b("
-    r"why\s+(?:am\s+i\s+)?only\s+seeing|"
-    r"only\s+seeing\s+(?:(?:one\s+)?country|\w+)\s+(?:in\s+the\s+)?(?:list|list\s+of\s+countries)|"
-    r"why\s+(?:do\s+i\s+)?(?:only\s+)?see\s+(?:one\s+)?\w+\s+in\s+the\s+list|"
-    r"(?:the\s+)?list\s+of\s+countries\s+(?:only\s+shows|shows\s+only)|"
-    r"why\s+(?:does\s+)?(?:the\s+)?dashboard\s+show\s+only"
-    r")\b",
-    re.IGNORECASE,
-)
-
-
-def is_dashboard_country_list_question(query: str) -> bool:
-    """
-    DEPRECATED — not used for agent routing. Dashboard context is injected via
-    ``AgentRoutingPolicy.turn_system_prompt_supplement`` from page type only.
-    """
-    if not query or not isinstance(query, str):
-        return False
-    q = query.strip()
-    if len(q) < 10:
-        return False
-    return bool(_DASHBOARD_COUNTRY_LIST_RE.search(q))
-
-
-def is_platform_usage_help_question(query: str) -> bool:
-    """
-    DEPRECATED — not used for agent routing. Platform navigation guidance is
-    LLM-driven via system prompts.
-    """
-    if not query or not isinstance(query, str):
-        return False
-    q = query.strip()
-    if len(q) < 6:
-        return False
-
-    has_usage_signal = bool(_USAGE_HELP_RE.search(q))
-    has_document_signal = bool(_DOCUMENT_LOOKUP_RE.search(q))
-    has_question_form = "?" in q or q.lower().startswith(("how", "where", "what", "can i"))
-
-    return bool(
-        (has_usage_signal and not has_document_signal)
-        or (has_usage_signal and has_question_form)
-    )
-
-
-def is_template_assignment_ambiguous(query: str) -> bool:
-    """
-    DEPRECATED — not used for agent routing. Template vs document disambiguation
-    is LLM-driven via system prompts.
-    """
-    if not query or not isinstance(query, str):
-        return False
-    q = query.strip().lower()
-    if "template" not in q:
-        return False
-    if bool(_DOCUMENT_LOOKUP_RE.search(q)):
-        return False
-    # If users mention period/country/assignment around template, this is very
-    # likely assignment workflow intent rather than document lookup.
-    if any(k in q for k in ("assignment", "assign", "period", "country", "form", "fdrs")):
-        return True
-    # Bare "template" asks are frequently workflow/navigation asks in this app.
-    return True

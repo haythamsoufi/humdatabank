@@ -14,8 +14,6 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "api.heartbeat",
         "api.status",
         "public.health_check",
-        "forms_api.api_presence_heartbeat",
-        "forms_api.api_presence_active_users",
         "forms_api.api_presence_sync",
         "forms_api.api_presence_leave",
         "main.api_get_notifications_count",

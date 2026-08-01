@@ -332,7 +332,12 @@ def get_submission_details(submission_id):
             'country_info': format_country_info(country),
             'status': submission.status,
             'due_date': submission.due_date.isoformat() if submission.due_date is not None else None,
-            'submitted_at': submission.data_entries.order_by(desc(FormData.submitted_at)).first().submitted_at.isoformat() if submission.data_entries.first() else None,
+            'submitted_at': (
+                latest_entry.submitted_at.isoformat()
+                if (latest_entry := submission.data_entries.order_by(desc(FormData.submitted_at)).first())
+                and latest_entry.submitted_at is not None
+                else None
+            ),
             'created_at': assigned_form.assigned_at.isoformat() if assigned_form and assigned_form.assigned_at is not None else None,
             'updated_at': None,
         })

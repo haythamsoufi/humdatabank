@@ -79,14 +79,15 @@
         resolved: 'rgba(16, 185, 129, 0.85)',
     };
 
-    function esc(s) {
+    var esc = window.esc || function (s) {
         if (s == null) return '';
         return String(s)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
-    }
+    };
+    var scopeLoader = window.ValidationScopeLoader || {};
 
     function showFeedback(message, type) {
         if (!feedbackEl) return;
@@ -435,24 +436,15 @@
         var periodEl = document.getElementById('vqs-period');
         if (!periodEl) return;
         if (!templateId) {
-            periodEl.innerHTML = '<option value="">' + esc('Select template first') + '</option>';
-            periodEl.disabled = true;
             resetCountrySelect();
-            return;
         }
-        periodEl.disabled = true;
-        try {
-            var data = await window.apiFetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            var periods = data.periods || [];
-            periodEl.innerHTML = '<option value="">' + esc('Choose period') + '</option>' +
-                periods.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
-            periodEl.disabled = !periods.length;
-        } catch (err) {
-            console.error(err);
-        }
+        await scopeLoader.loadPeriodsIntoSelect({
+            selectEl: periodEl,
+            periodsUrl: config.periodsUrl,
+            templateId: templateId,
+            emptyLabel: 'Select template first',
+            chooseLabel: 'Choose period',
+        });
     }
 
     async function loadCountrySummary() {
@@ -464,9 +456,11 @@
         }
         var preferredCountryId = document.getElementById('vqs-country')?.value || null;
         try {
-            var url = config.countriesUrl + '?template_id=' + encodeURIComponent(templateId) + '&period=' + encodeURIComponent(period);
-            var data = await window.apiFetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-            var rows = data.countries || [];
+            var rows = await scopeLoader.loadCountries({
+                countriesUrl: config.countriesUrl,
+                templateId: templateId,
+                period: period,
+            });
             if (summaryApi) {
                 summaryApi.setGridOption('rowData', rows);
             }
@@ -474,7 +468,6 @@
             populateCountrySelect(rows, preferredCountryId);
             showFeedback('Loaded summary for ' + rows.length + ' countries.', 'info');
         } catch (err) {
-            console.error(err);
             resetCountrySelect();
             showFeedback(t.summaryFailed || 'Summary failed', 'error');
         }

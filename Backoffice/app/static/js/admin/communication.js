@@ -1,5 +1,6 @@
 /**
  * Admin Communication Center - Send communications and view notifications with email delivery
+ * Requires campaign-audience-common.js (window.CampaignAudienceCommon) loaded first.
  */
 
 async function _anFetch(url, options = {}) {
@@ -101,15 +102,7 @@ class AdminNotifications {
      * Input: array of role codes (strings)
      */
     formatRbacRoleCodes(codes) {
-        const list = Array.isArray(codes) ? codes.filter(Boolean).map(String) : [];
-        if (list.length === 0) return '—';
-        const labelByCode = {
-            system_manager: 'System Manager',
-            admin_core: 'Admin',
-            assignment_editor_submitter: 'Focal Point',
-            assignment_viewer: 'Viewer',
-        };
-        return list.map(c => labelByCode[c] || c).join(', ');
+        return window.CampaignAudienceCommon.formatRbacRoleCodes(codes);
     }
 
     init() {
@@ -892,10 +885,7 @@ class AdminNotifications {
                 assignmentStatuses.forEach(status => {
                     params.append('assignment_status', status);
                 });
-                // Add template IDs if any are selected
-                selectedTemplateIds.forEach(templateId => {
-                    params.append('template_id', templateId);
-                });
+                window.CampaignAudienceCommon.appendTemplateIdParams(params, selectedTemplateIds);
             }
 
             const data = await _anFetch(`/notifications/api/admin/users/bulk?${params.toString()}`);
@@ -2344,9 +2334,7 @@ class AdminNotifications {
     }
 
     escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return window.CampaignAudienceCommon.escapeHtml(text);
     }
 
     closeCampaignRecipientsModal() {
@@ -2807,10 +2795,7 @@ class AdminNotifications {
     // All filtering is handled by AG Grid's built-in column filters
 
     escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return window.CampaignAudienceCommon.escapeHtml(text);
     }
 
     // ========== Bulk Selection Enhanced Features ==========
@@ -3063,80 +3048,33 @@ class AdminNotifications {
     }
 
     updateTemplateFilterCount() {
-        const templateFilterSelect = document.getElementById('bulk-select-template-filter');
-        const countEl = document.getElementById('bulk-template-filter-count');
-        if (templateFilterSelect && countEl) {
-            let selected = 0;
-            if (window.jQuery && window.jQuery.fn.select2 && $(templateFilterSelect).hasClass('select2-hidden-accessible')) {
-                selected = $(templateFilterSelect).val() ? $(templateFilterSelect).val().length : 0;
-            } else {
-                selected = templateFilterSelect.selectedOptions.length;
-            }
-            if (selected > 0) {
-                countEl.textContent = `${selected} template${selected === 1 ? '' : 's'} selected`;
-                countEl.className = 'text-xs text-blue-600 font-medium mt-1';
-            } else {
-                countEl.textContent = 'No templates selected';
-                countEl.className = 'text-xs text-gray-500 mt-1';
-            }
-        }
+        window.CampaignAudienceCommon.updateMultiSelectCountDisplay(
+            document.getElementById('bulk-select-template-filter'),
+            document.getElementById('bulk-template-filter-count'),
+            { none: 'No templates selected', singular: 'template', plural: 'templates' }
+        );
     }
 
     updateAssignmentFormCount() {
-        const assignmentFormSelect = document.getElementById('bulk-select-assignment-form');
-        const countEl = document.getElementById('bulk-assignment-form-count');
-        if (assignmentFormSelect && countEl) {
-            let selected = 0;
-            if (window.jQuery && window.jQuery.fn.select2 && $(assignmentFormSelect).hasClass('select2-hidden-accessible')) {
-                selected = $(assignmentFormSelect).val() ? $(assignmentFormSelect).val().length : 0;
-            } else {
-                selected = assignmentFormSelect.selectedOptions.length;
-            }
-            if (selected > 0) {
-                countEl.textContent = `${selected} assignment${selected === 1 ? '' : 's'} selected`;
-                countEl.className = 'text-xs text-blue-600 font-medium mt-1';
-            } else {
-                countEl.textContent = 'No assignments selected';
-                countEl.className = 'text-xs text-gray-500 mt-1';
-            }
-        }
+        window.CampaignAudienceCommon.updateMultiSelectCountDisplay(
+            document.getElementById('bulk-select-assignment-form'),
+            document.getElementById('bulk-assignment-form-count'),
+            { none: 'No assignments selected', singular: 'assignment', plural: 'assignments' }
+        );
     }
 
     loadAssignmentsDropdown() {
         const assignmentFormSelect = document.getElementById('bulk-select-assignment-form');
         if (!assignmentFormSelect || !this.allAssignments) return;
 
-        // Get selected template IDs
-        const templateFilterSelect = document.getElementById('bulk-select-template-filter');
-        let selectedTemplateIds = [];
-        if (templateFilterSelect) {
-            if (window.jQuery && window.jQuery.fn.select2 && $(templateFilterSelect).hasClass('select2-hidden-accessible')) {
-                const selected = $(templateFilterSelect).val();
-                selectedTemplateIds = selected ? (Array.isArray(selected) ? selected : [selected]).map(id => parseInt(id)) : [];
-            } else {
-                selectedTemplateIds = Array.from(templateFilterSelect.selectedOptions).map(opt => parseInt(opt.value)).filter(v => !isNaN(v));
-            }
-        }
-
-        // Store currently selected assignment IDs to restore after filtering
-        let currentSelected = [];
-        if (window.jQuery && window.jQuery.fn.select2 && $(assignmentFormSelect).hasClass('select2-hidden-accessible')) {
-            const selected = $(assignmentFormSelect).val();
-            currentSelected = selected ? (Array.isArray(selected) ? selected : [selected]).map(id => parseInt(id)) : [];
-        } else {
-            currentSelected = Array.from(assignmentFormSelect.selectedOptions).map(opt => parseInt(opt.value)).filter(v => !isNaN(v));
-        }
+        const cac = window.CampaignAudienceCommon;
+        const selectedTemplateIds = cac.getSelectedTemplateFilterIds();
+        const currentSelected = cac.getMultiSelectIntValues(assignmentFormSelect);
 
         // Clear existing options
         assignmentFormSelect.replaceChildren();
 
-        // Filter assignments by selected templates (if any)
-        let assignmentsToShow = this.allAssignments;
-        if (selectedTemplateIds.length > 0) {
-            assignmentsToShow = this.allAssignments.filter(assignment =>
-                selectedTemplateIds.includes(assignment.template_id)
-            );
-        }
+        const assignmentsToShow = cac.filterAssignmentsByTemplateIds(this.allAssignments, selectedTemplateIds);
 
         // Populate dropdown with filtered assignments
         assignmentsToShow.forEach(assignment => {
@@ -3274,113 +3212,9 @@ class AdminNotifications {
     }
 
     buildFilterParams() {
-        const params = new URLSearchParams();
-
-        // Text search
-        const search = document.getElementById('bulk-search-users')?.value.trim();
-        if (search) {
-            params.append('search', search);
-        }
-
-        // Roles (multi-select checkboxes)
-        const selectedRoles = Array.from(document.querySelectorAll('.bulk-role-checkbox:checked')).map(cb => cb.value);
-        if (selectedRoles.length > 0) {
-            selectedRoles.forEach(role => params.append('role', role));
-        }
-
-        // Active status (checkboxes)
-        const activeStatuses = Array.from(document.querySelectorAll('.bulk-account-status-checkbox:checked')).map(cb => cb.value);
-        if (activeStatuses.length > 0) {
-            // If both are selected, don't filter by active status
-            // If only one is selected, filter by that value
-            if (activeStatuses.length === 1) {
-                params.append('active', activeStatuses[0]);
-            }
-        }
-
-        // Countries (multi-select) - support both Select2 and native select
-        const countrySelect = document.getElementById('bulk-select-country');
-        if (countrySelect) {
-            let selectedCountries = [];
-            if (window.jQuery && window.jQuery.fn.select2 && $(countrySelect).hasClass('select2-hidden-accessible')) {
-                // Select2 is initialized
-                const selected = $(countrySelect).val();
-                selectedCountries = selected ? (Array.isArray(selected) ? selected : [selected]) : [];
-            } else {
-                // Native select
-                selectedCountries = Array.from(countrySelect.selectedOptions).map(opt => opt.value).filter(v => v);
-            }
-            if (selectedCountries.length > 0) {
-                selectedCountries.forEach(cid => params.append('country_id', cid));
-            }
-        }
-
-        // Entity type
-        const entityType = document.getElementById('bulk-select-entity')?.value;
-        if (entityType) {
-            params.append('entity_type', entityType);
-        }
-
-        // Assignment status (checkboxes)
-        const assignmentStatuses = Array.from(document.querySelectorAll('.bulk-assignment-status-checkbox:checked')).map(cb => cb.value);
-        if (assignmentStatuses.length > 0) {
-            assignmentStatuses.forEach(status => {
-                params.append('assignment_status', status);
-            });
-            const templateSelect = document.getElementById('bulk-select-template');
-            if (templateSelect) {
-                let selectedTemplates = [];
-                // Support both Select2 and native select
-                if (window.jQuery && window.jQuery.fn.select2 && $(templateSelect).hasClass('select2-hidden-accessible')) {
-                    const selected = $(templateSelect).val();
-                    selectedTemplates = selected ? (Array.isArray(selected) ? selected : [selected]) : [];
-                } else {
-                    selectedTemplates = Array.from(templateSelect.selectedOptions).map(opt => opt.value).filter(v => v);
-                }
-                selectedTemplates.forEach(tid => params.append('template_id', tid));
-            }
-        }
-
-        // Template filter (standalone, not requiring assignment status)
-        const templateFilterSelect = document.getElementById('bulk-select-template-filter');
-        if (templateFilterSelect) {
-            let selectedTemplates = [];
-            if (window.jQuery && window.jQuery.fn.select2 && $(templateFilterSelect).hasClass('select2-hidden-accessible')) {
-                const selected = $(templateFilterSelect).val();
-                selectedTemplates = selected ? (Array.isArray(selected) ? selected : [selected]) : [];
-            } else {
-                selectedTemplates = Array.from(templateFilterSelect.selectedOptions).map(opt => opt.value).filter(v => v);
-            }
-            if (selectedTemplates.length > 0 && assignmentStatuses.length === 0) {
-                // Only add template filter if assignment status is not selected (to avoid conflicts)
-                selectedTemplates.forEach(tid => params.append('template_id', tid));
-            }
-        }
-
-        // Assignment form filter (standalone)
-        const assignmentFormSelect = document.getElementById('bulk-select-assignment-form');
-        if (assignmentFormSelect) {
-            let selectedAssignments = [];
-            if (window.jQuery && window.jQuery.fn.select2 && $(assignmentFormSelect).hasClass('select2-hidden-accessible')) {
-                const selected = $(assignmentFormSelect).val();
-                selectedAssignments = selected ? (Array.isArray(selected) ? selected : [selected]) : [];
-            } else {
-                selectedAssignments = Array.from(assignmentFormSelect.selectedOptions).map(opt => opt.value).filter(v => v);
-            }
-            if (selectedAssignments.length > 0) {
-                selectedAssignments.forEach(afid => params.append('assigned_form_id', afid));
-            }
-        }
-
-        // Exclude already selected
-        const excludeSelected = document.getElementById('bulk-exclude-selected')?.checked;
-        if (excludeSelected) {
-            Array.from(this.selectedUsers.keys()).forEach(uid => {
-                params.append('exclude_user_id', uid);
-            });
-        }
-
-        return params;
+        return window.CampaignAudienceCommon.buildBulkAudienceFilterParams(
+            Array.from(this.selectedUsers.keys())
+        );
     }
 
     renderPreviewUsers() {
@@ -3746,13 +3580,9 @@ class AdminNotifications {
     renderHierarchicalEntityList(data) {
         let html = '';
 
-        const esc = (v) => this.escapeHtml(v);
-        const safeId = (v) =>
-            String(v || '')
-                .toLowerCase()
-                .trim()
-                .replace(/\s+/g, '-')
-                .replace(/[^a-z0-9_-]/g, '');
+        const cac = window.CampaignAudienceCommon;
+        const esc = (v) => cac.esc(v);
+        const safeId = (v) => cac.safeDomId(v);
 
         // Countries grouped by region
         if (data.countries) {
@@ -4236,33 +4066,11 @@ class AdminNotifications {
     }
 
     getEntityIcon(entityType) {
-        const icons = {
-            'country': 'fa-flag',
-            'national_society': 'fa-hand-holding-heart',
-            'ns_branch': 'fa-sitemap',
-            'ns_subbranch': 'fa-code-branch',
-            'ns_localunit': 'fa-map-marker-alt',
-            'division': 'fa-building',
-            'department': 'fa-briefcase',
-            'regional_office': 'fa-globe-americas',
-            'cluster_office': 'fa-map-pin'
-        };
-        return icons[entityType] || 'fa-folder';
+        return window.CampaignAudienceCommon.getEntityIcon(entityType);
     }
 
     formatEntityType(entityType) {
-        const names = {
-            'country': 'Country',
-            'national_society': 'National Society',
-            'ns_branch': 'NS Branch',
-            'ns_subbranch': 'NS Sub-branch',
-            'ns_localunit': 'NS Local Unit',
-            'division': 'Secretariat Division',
-            'department': 'Secretariat Department',
-            'regional_office': 'Regional Office',
-            'cluster_office': 'Cluster Office'
-        };
-        return names[entityType] || entityType;
+        return window.CampaignAudienceCommon.formatEntityType(entityType);
     }
 
     initDragAndDrop() {

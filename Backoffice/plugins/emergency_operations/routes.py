@@ -5,7 +5,7 @@ import requests
 import logging
 import json
 from app.plugins.template_utils import render_plugin_template
-from app.plugins.plugin_utils import BasePluginRoutes, plugin_route_wrapper, measure_performance, cache_plugin_result, clear_plugin_cache
+from app.plugins.plugin_utils import BasePluginRoutes, plugin_route_wrapper, plugin_admin_route_wrapper, measure_performance, cache_plugin_result, clear_plugin_cache
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
 
@@ -202,7 +202,7 @@ def create_blueprint():
 
     # Custom route for section mapping (override default)
     @bp.route('/api/config/<section>', methods=['POST'])
-    @plugin_route_wrapper('Emergency Operations Plugin')
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def update_config_section_custom(section):
         """Update specific configuration section with section mapping."""
         payload = get_json_safe()
@@ -227,7 +227,7 @@ def create_blueprint():
         return json_ok(success=True, cache_cleared=cleared_count)
 
     @bp.route('/api/cache/clear', methods=['POST'])
-    @plugin_route_wrapper('Emergency Operations Plugin')
+    @plugin_admin_route_wrapper('Emergency Operations Plugin')
     def clear_cache():
         """Clear plugin cache manually."""
         try:

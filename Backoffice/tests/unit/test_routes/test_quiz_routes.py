@@ -137,6 +137,19 @@ class TestSubmitQuizScore:
             )
         assert resp.status_code == 400
 
+    def test_score_over_100_returns_400(self, client, app):
+        """Score above 100 per submission returns 400."""
+        mock_user = _setup_mock_user(client)
+        with patch.object(db.session, "get", side_effect=_db_get_for_user(mock_user)), \
+             _csrf_ok():
+            resp = client.post(
+                "/api/v1/quiz/submit-score",
+                json={"score": 101},
+                content_type="application/json",
+            )
+        assert resp.status_code == 400
+        assert "100" in resp.get_json().get("error", "")
+
     def test_float_score(self, client, app):
         """Float score (not int) returns 400."""
         mock_user = _setup_mock_user(client)

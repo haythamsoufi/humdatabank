@@ -22,7 +22,6 @@ Targets significant coverage improvement of:
 - _validate_for_submission
 - _validate_repeat_section
 - _is_repeat_instance_complete
-- _process_data_availability_flags (deprecated)
 - FormDataService._is_auto_managed_request
 """
 import json
@@ -1206,17 +1205,6 @@ class TestIsRepeatInstanceComplete:
         section = MagicMock()
         result = FormDataService._is_repeat_instance_complete(instance, section)
         assert result is True
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FormDataService._process_data_availability_flags (deprecated)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class TestProcessDataAvailabilityFlags:
-    def test_returns_empty_list(self):
-        from app.services.forms.data_service import FormDataService
-        result = FormDataService._process_data_availability_flags([], MagicMock())
-        assert result == []
 
 
 # ─────────────────────────────────────────────────────────────────────────────

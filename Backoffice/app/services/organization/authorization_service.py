@@ -884,8 +884,14 @@ class AuthorizationService:
             round_closed = assignment_entity_status.is_round_closed_for_entity()
             if isinstance(round_closed, bool):
                 return round_closed
-        except Exception:
-            pass
+        except Exception as exc:
+            current_app.logger.warning(
+                "is_round_closed_for_entity failed for assignment entity status %s: %s",
+                getattr(assignment_entity_status, "id", "?"),
+                exc,
+                exc_info=True,
+            )
+            return True
         if getattr(assignment_entity_status, "reopened_after_close", False) is True:
             return False
         assigned_form = getattr(assignment_entity_status, "assigned_form", None)
@@ -893,8 +899,14 @@ class AuthorizationService:
             return False
         try:
             return assigned_form.is_effectively_closed is True
-        except Exception:
-            return False
+        except Exception as exc:
+            current_app.logger.warning(
+                "assigned_form.is_effectively_closed check failed for assignment entity status %s: %s",
+                getattr(assignment_entity_status, "id", "?"),
+                exc,
+                exc_info=True,
+            )
+            return True
 
     @staticmethod
     def _assignment_needs_reopen(assignment_entity_status: AssignmentEntityStatus) -> bool:

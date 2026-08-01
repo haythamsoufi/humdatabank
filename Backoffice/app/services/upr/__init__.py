@@ -17,12 +17,10 @@ Sub-modules (import directly when you need specific pieces):
     upr.document_answering   – deterministic QA from metadata["upr"]
     upr.data_retrieval       – SQL queries against AIDocumentChunk UPR metadata
     upr.query_detection      – regex-based UPR query detection
-    upr.tools                – AI tool wrapper implementations
     upr.tool_specs           – OpenAI-format tool definitions + constants
     upr.prompts              – prompt fragments, rewriter rules, gap-fill text
     upr.validation           – form-data validation helpers
     upr.ux                   – step labels, tool humanisation, source qualifiers
-    upr.config               – AI_UPR_* configuration reader
     upr.focus_area_analysis  – fast-path for Unified Plans focus-area review
     upr.country_reporting_excel_service – UPR country reporting Excel templates
     upr.excel_import_service – bulk UPR Excel import pipeline

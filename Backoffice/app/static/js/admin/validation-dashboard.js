@@ -25,6 +25,12 @@
 
     function el(id) { return document.getElementById(id); }
 
+    var esc = window.esc || function (s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+    var scopeLoader = window.ValidationScopeLoader || {};
+
     function getTemplateId() {
         return el('vd-template')?.value || '';
     }
@@ -85,11 +91,6 @@
         if (hidden) hidden.value = matched ? target : '';
         syncUprSubtabs(matched ? target : '');
         return matched || !target;
-    }
-
-    function esc(s) {
-        if (s == null) return '';
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
     function showFeedback(message, type) {
@@ -473,27 +474,15 @@
         var templateId = getTemplateId();
         var periodEl = el('vd-period');
         if (!periodEl) return;
-        if (!templateId) {
-            periodEl.innerHTML = '<option value="">' + esc(t.selectTemplatePeriod || 'Select template first') + '</option>';
-            periodEl.disabled = true;
-            return;
-        }
-        periodEl.disabled = true;
-        try {
-            var data = await window.apiFetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            var periods = data.periods || [];
-            periodEl.innerHTML = '<option value="">' + esc('Choose period') + '</option>' +
-                periods.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
-            periodEl.disabled = !periods.length;
-            if (preferredPeriod) selectOptionValue(periodEl, preferredPeriod);
-            if (!periodEl.value && periods.length) periodEl.value = periods[0];
-            saveScope();
-        } catch (err) {
-            console.error(err);
-        }
+        await scopeLoader.loadPeriodsIntoSelect({
+            selectEl: periodEl,
+            periodsUrl: config.periodsUrl,
+            templateId: templateId,
+            preferredPeriod: preferredPeriod,
+            emptyLabel: t.selectTemplatePeriod || 'Select template first',
+            chooseLabel: 'Choose period',
+        });
+        saveScope();
     }
 
     async function loadCountriesForPeriod(preferredCountryId) {
@@ -505,14 +494,13 @@
             return null;
         }
         try {
-            var data = await window.apiFetch(
-                config.countriesUrl + '?template_id=' + encodeURIComponent(templateId) + '&period=' + encodeURIComponent(period),
-                { headers: { Accept: 'application/json' }, credentials: 'same-origin' }
-            );
-            state.countries = data.countries || [];
+            state.countries = await scopeLoader.loadCountries({
+                countriesUrl: config.countriesUrl,
+                templateId: templateId,
+                period: period,
+            });
             return populateCountrySelect(state.countries, preferredCountryId);
         } catch (err) {
-            console.error(err);
             showFeedback(t.loadFailed || 'Load failed', 'error');
             return null;
         }

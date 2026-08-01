@@ -32,6 +32,7 @@ from app.utils.error_handling import handle_json_view_exception
 from app.routes.admin.shared import admin_required, permission_required
 from app.utils.request_utils import is_json_request
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
@@ -670,7 +671,8 @@ def remove_country_from_assignment(assignment_id, country_id):
     ).first_or_404()
 
     try:
-        country_name = Country.query.get(country_id).name if Country.query.get(country_id) else 'Country'
+        country = Country.query.get(country_id)
+        country_name = country.name if country else 'Country'
         _delete_assignment_entity_status_with_children(aes)
         db.session.flush()
         flash(f"Removed {country_name} from assignment.", "success")
@@ -750,9 +752,10 @@ def add_entity_to_assignment(assignment_id):
     """Add an entity to an assignment."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
 
-    entity_type = request.json.get('entity_type')
-    entity_id = request.json.get('entity_id')
-    due_date = request.json.get('due_date')
+    data = get_json_safe()
+    entity_type = data.get('entity_type')
+    entity_id = data.get('entity_id')
+    due_date = data.get('due_date')
 
     if not entity_type or not entity_id:
         return json_error('entity_type and entity_id are required', 400)
@@ -786,7 +789,11 @@ def add_entity_to_assignment(assignment_id):
         due_date=due_date_obj
     )
     db.session.add(new_aes)
-    db.session.flush()
+    try:
+        db.session.flush()
+    except IntegrityError:
+        request_transaction_rollback()
+        return json_error('Entity already assigned to this assignment', 409)
 
     # Send notification to focal points for all entity types
     try:
@@ -815,9 +822,10 @@ def update_entity_status(assignment_id, status_id):
     """Update the status of an entity assignment."""
     aes = AssignmentEntityStatus.query.filter_by(id=status_id, assigned_form_id=assignment_id).first_or_404()
 
-    status = request.json.get('status')
-    due_date = request.json.get('due_date')
-    is_public_available = request.json.get('is_public_available')
+    data = get_json_safe()
+    status = data.get('status')
+    due_date = data.get('due_date')
+    is_public_available = data.get('is_public_available')
 
     if status:
         aes.status = AssignmentEntityStatusValue.normalize(status)

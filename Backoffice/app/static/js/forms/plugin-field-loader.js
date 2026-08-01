@@ -743,6 +743,29 @@ class PluginFieldLoader {
         }
     }
 
+    _getAssignmentEntityStatusId(container) {
+        const jsContext = document.getElementById('entry-form-js-context');
+        if (jsContext?.dataset?.assignmentEntityStatusId) {
+            const value = parseInt(jsContext.dataset.assignmentEntityStatusId, 10);
+            if (!Number.isNaN(value)) return value;
+        }
+
+        const formEl = container?.closest('form');
+        const hiddenInput = formEl?.querySelector('input[name="assignment_entity_status_id"]')
+            || document.querySelector('input[name="assignment_entity_status_id"]');
+        if (hiddenInput?.value) {
+            const value = parseInt(hiddenInput.value, 10);
+            if (!Number.isNaN(value)) return value;
+        }
+
+        if (formEl?.dataset?.assignmentEntityStatusId) {
+            const value = parseInt(formEl.dataset.assignmentEntityStatusId, 10);
+            if (!Number.isNaN(value)) return value;
+        }
+
+        return null;
+    }
+
     async fetchPluginTemplatePublic(pluginType, fieldId) {
         try {
             const fieldData = this.pluginFields.get(fieldId);
@@ -752,6 +775,8 @@ class PluginFieldLoader {
                 if (cfg) params.set('field_config', cfg);
                 const ex = fieldData?.container?.dataset?.existingData;
                 if (ex) params.set('existing_data', ex);
+                const aesId = this._getAssignmentEntityStatusId(fieldData?.container);
+                if (aesId) params.set('assignment_entity_status_id', String(aesId));
             } catch (e) { /* no-op */ }
 
             const url = `/api/plugins/field-types/${pluginType}/render-entry?${params.toString()}`;

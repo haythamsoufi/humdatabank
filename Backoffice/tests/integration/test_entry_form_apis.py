@@ -415,36 +415,6 @@ class TestEntryFormFormsApiPresence:
                 data = resp.get_json()
                 assert data["success"] is True
 
-    def test_presence_heartbeat_returns_success(self, client, db_session, app):
-        with app.app_context():
-            user = create_test_user(db_session, role="admin")
-            _login(client, user.id)
-
-            # Create a minimal AES for access checks
-            country = create_test_country(db_session)
-            template = create_test_template(db_session)
-            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
-            db_session.add(assigned_form)
-            db_session.flush()
-            aes = AssignmentEntityStatus(
-                assigned_form_id=assigned_form.id,
-                entity_type=EntityType.country.value,
-                entity_id=country.id,
-                status="in_progress",
-            )
-            db_session.add(aes)
-            db_session.flush()
-            aes_id = aes.id
-            db_session.commit()
-
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
-                 patch("app.utils.user_analytics.log_user_activity", return_value=None):
-                resp = client.post(f"/api/forms/presence/assignment/{aes_id}/heartbeat")
-                assert resp.status_code == 200
-                data = resp.get_json()
-                assert data["success"] is True
-
-
 @pytest.mark.integration
 class TestEntryFormFormsApiDynamicIndicatorsUpdate:
     def test_dynamic_indicators_update_happy_path(self, client, db_session, app):
@@ -600,47 +570,6 @@ class TestEntryFormFormsApiDynamicIndicatorsRemove:
 
             resp = client.delete("/api/forms/dynamic-indicators/999999/remove")
             assert resp.status_code in (404, 500)
-
-
-@pytest.mark.integration
-class TestEntryFormFormsApiPresenceActiveUsers:
-    def test_presence_active_users_returns_list(self, client, db_session, app):
-        with app.app_context():
-            from datetime import datetime, timezone
-
-            user = create_test_user(db_session, role="admin")
-            _login(client, user.id)
-
-            country = create_test_country(db_session)
-            template = create_test_template(db_session)
-            assigned_form = AssignedForm(template_id=template.id, period_name="2024")
-            db_session.add(assigned_form)
-            db_session.flush()
-            aes = AssignmentEntityStatus(
-                assigned_form_id=assigned_form.id,
-                entity_type=EntityType.country.value,
-                entity_id=country.id,
-                status="in_progress",
-            )
-            db_session.add(aes)
-            db_session.flush()
-            aes_id = aes.id
-            db_session.commit()
-
-            now = datetime.now(timezone.utc)
-            with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": aes}), \
-                 patch(
-                     "app.routes.forms_api.get_active_presence",
-                     return_value={user.id: now},
-                 ):
-                resp = client.get(f"/api/forms/presence/assignment/{aes_id}/active-users")
-
-            assert resp.status_code == 200
-            data = resp.get_json()
-            assert data["success"] is True
-            assert isinstance(data["users"], list)
-            assert len(data["users"]) == 1
-            assert data["users"][0]["id"] == user.id
 
 
 @pytest.mark.integration

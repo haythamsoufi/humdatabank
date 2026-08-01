@@ -15,7 +15,10 @@ from app.utils.api_responses import json_ok, json_server_error
 from app.utils.api_helpers import get_json_safe
 from app.utils.request_utils import is_json_request
 from flask_login import login_required
+from app.routes.admin.shared import permission_required
 import json
+
+PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
 
 
 class PluginError(Exception):
@@ -75,7 +78,7 @@ def plugin_error_handler(plugin_name: str):
 
 
 def plugin_route_wrapper(plugin_name: str):
-    """Decorator for plugin routes with standardized error handling and logging."""
+    """Decorator for read-only plugin routes (login + error handling)."""
     def decorator(func: Callable):
         @wraps(func)
         @login_required
@@ -84,6 +87,22 @@ def plugin_route_wrapper(plugin_name: str):
             current_app.logger.debug(f"[{plugin_name}] Route {func.__name__} called with args={args}, kwargs={kwargs}")
             result = func(*args, **kwargs)
             current_app.logger.debug(f"[{plugin_name}] Route {func.__name__} completed successfully")
+            return result
+        return wrapper
+    return decorator
+
+
+def plugin_admin_route_wrapper(plugin_name: str, permission: str = PLUGIN_MANAGE_PERMISSION):
+    """Decorator for mutating/admin plugin routes (login + RBAC + error handling)."""
+    def decorator(func: Callable):
+        @wraps(func)
+        @login_required
+        @permission_required(permission)
+        @plugin_error_handler(plugin_name)
+        def wrapper(*args, **kwargs):
+            current_app.logger.debug(f"[{plugin_name}] Admin route {func.__name__} called with args={args}, kwargs={kwargs}")
+            result = func(*args, **kwargs)
+            current_app.logger.debug(f"[{plugin_name}] Admin route {func.__name__} completed successfully")
             return result
         return wrapper
     return decorator
@@ -102,7 +121,7 @@ class BasePluginRoutes:
         """Create standard routes that most plugins need."""
 
         @blueprint.route('/api/config', methods=['GET'])
-        @plugin_route_wrapper(self.display_name)
+        @plugin_admin_route_wrapper(self.display_name)
         def get_config():
             """Get plugin configuration."""
             if not self.plugin_config:
@@ -111,7 +130,7 @@ class BasePluginRoutes:
             return json_ok(config=self.plugin_config.get_all_config())
 
         @blueprint.route('/api/config', methods=['POST'])
-        @plugin_route_wrapper(self.display_name)
+        @plugin_admin_route_wrapper(self.display_name)
         def update_full_config():
             """Update full plugin configuration."""
             if not self.plugin_config:
@@ -126,7 +145,7 @@ class BasePluginRoutes:
             return json_ok()
 
         @blueprint.route('/api/config/<section>', methods=['POST'])
-        @plugin_route_wrapper(self.display_name)
+        @plugin_admin_route_wrapper(self.display_name)
         def update_config_section(section):
             """Update specific configuration section."""
             if not self.plugin_config:
@@ -142,7 +161,7 @@ class BasePluginRoutes:
 
         if template_renderer:
             @blueprint.route('/settings')
-            @plugin_route_wrapper(self.display_name)
+            @plugin_admin_route_wrapper(self.display_name)
             def settings_page():
                 """Plugin settings page."""
                 return template_renderer(self.plugin_id, 'settings.html')

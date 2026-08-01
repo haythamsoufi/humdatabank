@@ -21,7 +21,19 @@ from app.services.notification.core import (
     get_user_preferences_batch,
     create_notification,
 )
+from app.services.notification.validators import validate_notification_url as _validate_from_validators
 from app.models.enums import NotificationType
+
+
+# ---------------------------------------------------------------------------
+# validate_notification_url (direct validators module import)
+# ---------------------------------------------------------------------------
+
+class TestValidateNotificationUrlDirectImport:
+    def test_validators_module_matches_core_reexport(self, app, db_session):
+        with app.app_context():
+            assert _validate_from_validators('/dashboard') is True
+            assert _validate_from_validators('javascript:alert(1)') is False
 
 
 # ---------------------------------------------------------------------------
@@ -311,7 +323,7 @@ class TestCheckDuplicateNotification:
 
     def test_error_returns_false(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.core.Notification') as mock_n:
+            with patch('app.services.notification.dedup.Notification') as mock_n:
                 mock_n.query.filter.side_effect = Exception('fail')
                 result = check_duplicate_notification(1, 'hash')
         assert result is False
@@ -431,7 +443,7 @@ class TestCalculateNotificationExpiration:
 
     def test_error_returns_none(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.core.current_app') as mock_app:
+            with patch('app.services.notification.dedup.current_app') as mock_app:
                 mock_app.config.get.side_effect = Exception('fail')
                 mock_app.logger = MagicMock()
                 result = calculate_notification_expiration(NotificationType.admin_message)
@@ -562,7 +574,7 @@ class TestIsNotificationTypeEnabledForUser:
 
     def test_error_returns_true(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.core.NotificationPreferences') as mock_np:
+            with patch('app.services.notification.creation.NotificationPreferences') as mock_np:
                 mock_np.query.filter_by.side_effect = Exception('fail')
                 result = is_notification_type_enabled_for_user(1, NotificationType.admin_message)
         assert result is True
@@ -619,7 +631,7 @@ class TestGetUserPreferencesBatch:
 
     def test_error_returns_empty_dict(self, app, db_session):
         with app.app_context():
-            with patch('app.services.notification.core.NotificationPreferences') as mock_np:
+            with patch('app.services.notification.creation.NotificationPreferences') as mock_np:
                 mock_np.query.filter.side_effect = Exception('fail')
                 result = get_user_preferences_batch([1, 2, 3])
         assert result == {}
@@ -641,10 +653,10 @@ class TestCreateNotification:
             db.session.flush()
             db.session.commit()
 
-            with patch('app.services.notification.core.send_instant_notification_email'):
-                with patch('app.services.notification.core.PushNotificationService'):
-                    with patch('app.services.notification.core.broadcast_notification'):
-                        with patch('app.services.notification.core.broadcast_unread_count'):
+            with patch('app.services.notification.emails.send_instant_notification_email'):
+                with patch('app.services.notification.push.PushNotificationService'):
+                    with patch('app.utils.ws_manager.broadcast_notification'):
+                        with patch('app.utils.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=user.id,
                                 notification_type=NotificationType.admin_message,
@@ -697,10 +709,10 @@ class TestCreateNotification:
                 users.append(u)
             db.session.commit()
 
-            with patch('app.services.notification.core.send_instant_notification_email'):
-                with patch('app.services.notification.core.PushNotificationService'):
-                    with patch('app.services.notification.core.broadcast_notification'):
-                        with patch('app.services.notification.core.broadcast_unread_count'):
+            with patch('app.services.notification.emails.send_instant_notification_email'):
+                with patch('app.services.notification.push.PushNotificationService'):
+                    with patch('app.utils.ws_manager.broadcast_notification'):
+                        with patch('app.utils.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=[u.id for u in users],
                                 notification_type=NotificationType.admin_message,
@@ -773,10 +785,10 @@ class TestCreateNotification:
             db.session.flush()
             db.session.commit()
 
-            with patch('app.services.notification.core.send_instant_notification_email'):
-                with patch('app.services.notification.core.PushNotificationService'):
-                    with patch('app.services.notification.core.broadcast_notification'):
-                        with patch('app.services.notification.core.broadcast_unread_count'):
+            with patch('app.services.notification.emails.send_instant_notification_email'):
+                with patch('app.services.notification.push.PushNotificationService'):
+                    with patch('app.utils.ws_manager.broadcast_notification'):
+                        with patch('app.utils.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=user.id,
                                 notification_type=NotificationType.admin_message,
@@ -798,10 +810,10 @@ class TestCreateNotification:
             db.session.flush()
             db.session.commit()
 
-            with patch('app.services.notification.core.send_instant_notification_email'):
-                with patch('app.services.notification.core.PushNotificationService'):
-                    with patch('app.services.notification.core.broadcast_notification'):
-                        with patch('app.services.notification.core.broadcast_unread_count'):
+            with patch('app.services.notification.emails.send_instant_notification_email'):
+                with patch('app.services.notification.push.PushNotificationService'):
+                    with patch('app.utils.ws_manager.broadcast_notification'):
+                        with patch('app.utils.ws_manager.broadcast_unread_count'):
                             result = create_notification(
                                 user_ids=user.id,
                                 notification_type=NotificationType.admin_message,

@@ -1060,72 +1060,18 @@ class TestApiPresenceLeave:
 
 
 # =====================================================================
-# api_presence_heartbeat
+# Deprecated presence routes (removed — use /sync)
 # =====================================================================
 
 
-class TestApiPresenceHeartbeat:
-    def test_heartbeat_access_denied_returns_403(self, app, admin_user, db_session, client):
-        client = _make_logged_in_client(client, admin_user.id)
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "No access"}):
-            resp = _json_post(client, "/api/forms/presence/assignment/1/heartbeat", {})
-        assert resp.status_code == 403
+class TestDeprecatedPresenceRoutes:
+    def test_heartbeat_route_returns_404(self, app, client):
+        resp = client.post("/api/forms/presence/assignment/1/heartbeat")
+        assert resp.status_code == 404
 
-    def test_heartbeat_success_returns_200(self, app, admin_user, db_session, client):
-        client = _make_logged_in_client(client, admin_user.id)
-        mock_aes = MagicMock()
-
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
-             patch("app.routes.forms_api.record_presence"):
-            resp = _json_post(client, "/api/forms/presence/assignment/1/heartbeat", {})
-        assert resp.status_code == 200
-
-
-# =====================================================================
-# api_presence_active_users
-# =====================================================================
-
-
-class TestApiPresenceActiveUsers:
-    def test_active_users_access_denied_returns_403(self, app, admin_user, db_session, client):
-        client = _make_logged_in_client(client, admin_user.id)
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"error": "No access"}):
-            resp = client.get("/api/forms/presence/assignment/1/active-users")
-        assert resp.status_code == 403
-
-    def test_active_users_no_presence_returns_empty(self, app, admin_user, db_session, client):
-        client = _make_logged_in_client(client, admin_user.id)
-        mock_aes = MagicMock()
-
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
-             patch("app.routes.forms_api.get_active_presence", return_value=None):
-            resp = client.get("/api/forms/presence/assignment/1/active-users")
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data.get("users") == []
-
-    def test_active_users_with_presence_returns_users(self, app, admin_user, db_session, client):
-        from app.utils.datetime_helpers import utcnow
-
-        client = _make_logged_in_client(client, admin_user.id)
-        mock_aes = MagicMock()
-        mock_user = MagicMock()
-        mock_user.id = 1
-        mock_user.name = "Alice"
-        mock_user.email = "alice@example.com"
-        mock_user.profile_color = "#FF0000"
-
-        presence_map = {1: utcnow()}
-
-        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
-             patch("app.routes.forms_api.get_active_presence", return_value=presence_map), \
-             patch("app.routes.forms_api.User") as MockUser:
-            MockUser.query.filter.return_value.all.return_value = [mock_user]
-            resp = client.get("/api/forms/presence/assignment/1/active-users")
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert len(data.get("users", [])) == 1
-        assert data["users"][0]["name"] == "Alice"
+    def test_active_users_route_returns_404(self, app, client):
+        resp = client.get("/api/forms/presence/assignment/1/active-users")
+        assert resp.status_code == 404
 
 
 # =====================================================================
@@ -1139,7 +1085,7 @@ class TestPresenceRateLimitKey:
         from flask_login import login_user
         from app.models import User
 
-        with app.test_request_context("/api/forms/presence/assignment/5/heartbeat"):
+        with app.test_request_context("/api/forms/presence/assignment/5/sync"):
             with app.app_context():
                 user = User.query.get(int(admin_user.id))
             login_user(user)
@@ -1149,7 +1095,7 @@ class TestPresenceRateLimitKey:
     def test_unauthenticated_user_key(self, app):
         from app.routes.forms_api import _presence_rate_limit_key
 
-        with app.test_request_context("/api/forms/presence/assignment/5/heartbeat"):
+        with app.test_request_context("/api/forms/presence/assignment/5/sync"):
             with patch("app.routes.forms_api.current_user") as mock_user:
                 mock_user.is_authenticated = False
                 key = _presence_rate_limit_key()
@@ -1366,6 +1312,26 @@ class TestDiscussionCommentsApi:
         assert payload["success"] is True
         assert len(payload["comments"]) == 1
         assert payload["comments"][0]["body"] == "Hello team"
+
+    def test_get_eager_loads_created_by_user(self, app, client):
+        mock_aes = MagicMock()
+        mock_aes.id = 42
+
+        with patch("app.routes.forms_api.ensure_aes_access", return_value={"aes": mock_aes}), \
+             patch("app.routes.forms_api.SubmissionDiscussionComment.query") as mock_query, \
+             patch("app.routes.forms_api.joinedload") as mock_joinedload, \
+             patch("app.routes.forms_api.current_user") as mock_user:
+            mock_user.is_authenticated = True
+            mock_query.filter_by.return_value.options.return_value.order_by.return_value.all.return_value = []
+            mock_joinedload.return_value = MagicMock()
+            with client.session_transaction() as sess:
+                sess["_user_id"] = "1"
+                sess["_fresh"] = True
+            resp = client.get("/api/forms/discussion/comments?assignment_entity_status_id=42")
+
+        assert resp.status_code == 200
+        mock_joinedload.assert_called_once()
+        mock_query.filter_by.return_value.options.assert_called_once()
 
     def test_post_missing_body_returns_400(self, app, admin_user, db_session, client):
         client = _make_logged_in_client(client, admin_user.id)

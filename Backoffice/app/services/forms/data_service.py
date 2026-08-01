@@ -3106,11 +3106,6 @@ class FormDataService:
         return None
 
     @classmethod
-    def _process_data_availability_flags(cls, all_sections: List, assignment_entity_status) -> List[Dict]:
-        """Deprecated: availability flags are saved during field processing."""
-        return []
-
-    @classmethod
     def _validate_for_submission(cls, all_sections: List, assignment_entity_status) -> Dict[str, Any]:
         """Validate form data for submission"""
         validation_errors = []

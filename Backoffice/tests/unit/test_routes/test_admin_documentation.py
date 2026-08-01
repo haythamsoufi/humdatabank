@@ -61,7 +61,7 @@ class TestDocsIndex:
     def test_index_docs_root_missing_returns_404(self, docs_client, db_session, app):
         """When the docs root directory does not exist, abort(404)."""
         non_existent = Path("/non/existent/path/docs")
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = non_existent
             resp = docs_client.get("/admin/docs/")
         assert resp.status_code == 404
@@ -69,7 +69,7 @@ class TestDocsIndex:
     def test_index_renders_with_valid_docs_root(self, docs_client, db_session, app, temp_docs_dir):
         """When the docs root exists, the page should render (200)."""
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             mock_docs.resolve_doc_path.return_value = (root / "README.md", "")
             mock_docs.ensure_doc_page_access.return_value = None
@@ -99,7 +99,7 @@ class TestViewDoc:
     def test_view_doc_with_md_extension_returns_404(self, docs_client, db_session, app, temp_docs_dir):
         """Legacy .md URLs should 404."""
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             resp = docs_client.get("/admin/docs/user-guides/intro.md")
         assert resp.status_code == 404
@@ -107,21 +107,21 @@ class TestViewDoc:
     def test_view_doc_readme_url_returns_404(self, docs_client, db_session, app, temp_docs_dir):
         """Explicit 'readme' or 'README.md' path is 404."""
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             resp = docs_client.get("/admin/docs/readme")
         assert resp.status_code == 404
 
     def test_view_doc_readme_md_returns_404(self, docs_client, db_session, app, temp_docs_dir):
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             resp = docs_client.get("/admin/docs/README.md")
         assert resp.status_code == 404
 
     def test_view_doc_root_missing_returns_404(self, docs_client, db_session, app):
         non_existent = Path("/non/existent/path/docs")
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = non_existent
             resp = docs_client.get("/admin/docs/user-guides/intro")
         assert resp.status_code == 404
@@ -129,7 +129,7 @@ class TestViewDoc:
     def test_view_doc_valid_path_renders(self, docs_client, db_session, app, temp_docs_dir):
         root = Path(temp_docs_dir)
         intro_path = root / "user-guides" / "intro.md"
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             mock_docs.resolve_doc_path.return_value = (intro_path, "user-guides/intro")
             mock_docs.ensure_doc_page_access.return_value = None
@@ -152,7 +152,7 @@ class TestViewDoc:
 class TestDocAsset:
     def test_asset_root_missing_returns_404(self, docs_client, db_session, app):
         non_existent = Path("/non/existent/docs")
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = non_existent
             resp = docs_client.get("/admin/docs/assets/screenshot.png")
         assert resp.status_code == 404
@@ -160,7 +160,7 @@ class TestDocAsset:
     def test_asset_path_traversal_returns_404(self, docs_client, db_session, app, temp_docs_dir):
         """Path traversal attempts should be rejected."""
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             # Requesting ../../etc/passwd style
             resp = docs_client.get("/admin/docs/assets/../../../etc/passwd")
@@ -168,7 +168,7 @@ class TestDocAsset:
 
     def test_asset_nonexistent_file_returns_404(self, docs_client, db_session, app, temp_docs_dir):
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             mock_docs.ensure_docs_asset_access.return_value = None
             resp = docs_client.get("/admin/docs/assets/no_such_file.png")
@@ -176,7 +176,7 @@ class TestDocAsset:
 
     def test_asset_valid_file_served(self, docs_client, db_session, app, temp_docs_dir):
         root = Path(temp_docs_dir)
-        with patch("app.routes.admin.documentation.docs") as mock_docs:
+        with patch("app.routes.docs._shared.docs") as mock_docs:
             mock_docs.docs_root.return_value = root
             mock_docs.ensure_docs_asset_access.return_value = None
             # The PNG file we wrote to the temp dir

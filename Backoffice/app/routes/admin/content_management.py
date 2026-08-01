@@ -2227,23 +2227,22 @@ def _generate_pdf_thumbnail_to_storage(pdf_full_path, unique_folder_name, langua
 
         import fitz
         from PIL import Image
-        pdf_document = fitz.open(pdf_full_path)
-        page = pdf_document[0]
+        with fitz.open(pdf_full_path) as pdf_document:
+            page = pdf_document[0]
 
-        mat = fitz.Matrix(1.5, 1.5)
-        pix = page.get_pixmap(matrix=mat)
-        img_data = pix.tobytes("png")
+            mat = fitz.Matrix(1.5, 1.5)
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
 
-        img = Image.open(io.BytesIO(img_data))
-        img.thumbnail((300, 400), Image.Resampling.LANCZOS)
+            img = Image.open(io.BytesIO(img_data))
+            img.thumbnail((300, 400), Image.Resampling.LANCZOS)
 
-        thumbnail_filename = f"thumbnail_{language_code}.png" if language_code else "thumbnail.png"
-        rel_path = f"{unique_folder_name}/thumbnails/{thumbnail_filename}"
+            thumbnail_filename = f"thumbnail_{language_code}.png" if language_code else "thumbnail.png"
+            rel_path = f"{unique_folder_name}/thumbnails/{thumbnail_filename}"
 
-        buf = io.BytesIO()
-        img.save(buf, "PNG")
-        png_bytes = buf.getvalue()
-        pdf_document.close()
+            buf = io.BytesIO()
+            img.save(buf, "PNG")
+            png_bytes = buf.getvalue()
 
         cat = category or storage.ADMIN_DOCUMENTS
         return storage.upload(cat, rel_path, png_bytes)

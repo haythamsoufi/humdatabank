@@ -43,6 +43,7 @@ __pycache__/
 .coverage.*
 coverage.xml
 htmlcov/
+Backoffice/coverage/
 build/
 dist/
 *.egg-info/

@@ -176,6 +176,42 @@ class TestGetSubmissionDetails:
         data = resp.get_json()
         assert data["id"] == 1
 
+    def test_assigned_submission_null_submitted_at(self, client, app):
+        """Latest data entry with null submitted_at returns submitted_at=None."""
+        mock_aes = MagicMock()
+        mock_aes.id = 1
+        mock_aes.assigned_form = MagicMock()
+        mock_aes.assigned_form.id = 10
+        mock_aes.assigned_form.template_id = 10
+        mock_aes.assigned_form.template = MagicMock()
+        mock_aes.assigned_form.template.name = "Test Template"
+        mock_aes.assigned_form.period_name = "2024"
+        mock_aes.assigned_form.assigned_at = None
+        mock_aes.country = MagicMock()
+        mock_aes.country.id = 5
+        mock_aes.organization = None
+        mock_aes.due_date = None
+        mock_aes.status = "submitted"
+        latest_entry = MagicMock()
+        latest_entry.submitted_at = None
+        data_entries_mock = MagicMock()
+        data_entries_mock.__iter__ = MagicMock(return_value=iter([]))
+        data_entries_mock.order_by.return_value.first.return_value = latest_entry
+        mock_aes.data_entries = data_entries_mock
+        mock_aes.submitted_documents = []
+
+        with patch("app.utils.auth.authenticate_db_api_key_only", return_value=_FakeKey()), \
+             patch("app.routes.api.submissions.AssignmentEntityStatus.query") as mock_aes_q, \
+             patch("app.routes.api.submissions.PublicSubmission.query") as mock_pub_q, \
+             patch("app.routes.api.submissions.format_form_data_response", return_value=[]), \
+             patch("app.routes.api.submissions.format_country_info", return_value={"id": 5}), \
+             patch("app.routes.api.submissions.format_indicator_details", return_value={}):
+            mock_aes_q.get.return_value = mock_aes
+            mock_pub_q.get.return_value = None
+            resp = client.get(self._url(1), headers=_API_HEADERS)
+        assert resp.status_code == 200
+        assert resp.get_json()["submitted_at"] is None
+
     def test_exception_returns_500(self, client, app):
         """Route has no try/except; exception from query propagates with TESTING=True."""
         import pytest

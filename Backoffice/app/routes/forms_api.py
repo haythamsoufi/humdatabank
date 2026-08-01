@@ -1447,44 +1447,6 @@ def api_presence_leave(aes_id):
     return json_ok()
 
 
-# DEPRECATED: use /sync — kept for one release cycle.
-@bp.route('/presence/assignment/<int:aes_id>/heartbeat', methods=['POST'])
-@login_required
-@limiter.limit("30 per minute", key_func=_presence_rate_limit_key, override_defaults=True)
-def api_presence_heartbeat(aes_id):
-    """Record a presence heartbeat for the current user on this assignment."""
-    try:
-        # Verify access to assignment
-        access_result = ensure_aes_access(aes_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-
-        record_presence(aes_id=aes_id, user_id=current_user.id)
-
-        return json_ok()
-    except Exception as e:
-        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
-
-
-# DEPRECATED: use /sync — kept for one release cycle.
-@bp.route('/presence/assignment/<int:aes_id>/active-users', methods=['GET'])
-@login_required
-@limiter.limit("30 per minute", key_func=_presence_rate_limit_key, override_defaults=True)
-def api_presence_active_users(aes_id):
-    """Return users active in this assignment in the last PRESENCE_TTL_SECONDS."""
-    try:
-        # Verify access to assignment
-        access_result = ensure_aes_access(aes_id)
-        if 'error' in access_result:
-            return json_forbidden(access_result['error'])
-
-        presence_map = get_active_presence(aes_id=aes_id)
-        users = _build_presence_users(presence_map)
-        return json_ok(users=users)
-    except Exception as e:
-        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
-
-
 # ===================== Discussion Comments APIs =====================
 
 def _discussion_comment_mutation_context(comment_id):
@@ -1553,6 +1515,7 @@ def api_get_discussion_comments():
         comments = (
             SubmissionDiscussionComment.query
             .filter_by(assignment_entity_status_id=aes_id)
+            .options(joinedload(SubmissionDiscussionComment.created_by_user))
             .order_by(SubmissionDiscussionComment.created_at.asc())
             .all()
         )

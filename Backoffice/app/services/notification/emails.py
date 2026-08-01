@@ -587,8 +587,13 @@ def send_notification_emails():
         if use_pg_lock and lock_id is not None:
             try:
                 release_session_advisory_lock(db.session, lock_id, acquired=lock_acquired)
-            except Exception:
-                pass
+            except Exception as lock_err:
+                current_app.logger.warning(
+                    "Failed to release digest email advisory lock %s: %s",
+                    lock_id,
+                    lock_err,
+                    exc_info=True,
+                )
 
 
 def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_log=None):

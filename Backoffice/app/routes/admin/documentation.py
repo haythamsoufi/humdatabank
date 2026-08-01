@@ -7,226 +7,38 @@ as a navigable documentation area within the admin UI with hierarchical navigati
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from flask import (
-    Blueprint,
-    abort,
-    current_app,
-    render_template,
-    send_from_directory,
-    url_for,
-)
+from flask import Blueprint, url_for
 from flask_babel import _
-from flask_login import current_user
 
 from app.routes.admin.shared import admin_permission_required
-from app.services.documentation import service as docs
+from app.routes.docs._shared import (
+    canonical_doc_path_for_url,
+    make_build_doc_url,
+    register_docs_routes,
+)
 
 
 bp = Blueprint("admin_docs", __name__, url_prefix="/admin/docs")
 
 VISIBLE_TOP_LEVEL_DIRS = {
-    # Keep the admin docs UI user-focused.
     "getting-started",
     "user-guides",
     "data-reporting",
 }
 
-def _canonical_doc_path_for_url(doc_path: str) -> str:
-    """
-    Convert a docs-relative markdown path into a clean, extensionless URL path.
+# Backward-compatible aliases for tests and callers.
+_canonical_doc_path_for_url = canonical_doc_path_for_url
+_build_doc_url = make_build_doc_url("admin_docs")
 
-    Examples:
-      - "user-guides/admin/user-roles.md"    -> "user-guides/admin/user-roles"
-      - "user-guides/admin/add-user.fr.md"   -> "user-guides/admin/add-user.fr"
-      - "README.md" / "README" / ""          -> ""
-    """
-    raw = (doc_path or "").strip().lstrip("/").replace("\\", "/")
-    if not raw:
-        return ""
-    if raw.lower() in ("readme", "readme.md"):
-        return ""
-    if raw.lower().endswith(".md"):
-        raw = raw[: -len(".md")]
-    return raw
-
-def _build_doc_url(rel: str) -> str:
-    clean = _canonical_doc_path_for_url(rel)
-    if not clean:
-        return url_for("admin_docs.index")
-    return url_for("admin_docs.view_doc", doc_path=clean)
-
-
-@bp.route("/export.pdf", methods=["GET"])
-@admin_permission_required("admin.docs.view")
-def export_pdf_index():
-    """Download the documentation index as PDF."""
-    if not docs.is_pdf_export_enabled():
-        abort(404)
-    root = docs.docs_root()
-    if not root.exists():
-        abort(404)
-    from app.services.documentation.pdf_service import send_doc_pdf
-
-    return send_doc_pdf(
-        root=root,
-        doc_path="",
-        user=current_user,
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-        doc_url_builder=_build_doc_url,
-    )
-
-
-@bp.route("/<path:doc_path>/export.pdf", methods=["GET"])
-@admin_permission_required("admin.docs.view")
-def export_pdf_doc(doc_path: str):
-    """Download a documentation page as PDF."""
-    if not docs.is_pdf_export_enabled():
-        abort(404)
-    root = docs.docs_root()
-    if not root.exists():
-        abort(404)
-
-    requested = (doc_path or "").strip().lstrip("/").replace("\\", "/")
-    if requested.lower().endswith(".md") or requested.lower() in ("readme", "readme.md"):
-        abort(404)
-
-    from app.services.documentation.pdf_service import send_doc_pdf
-
-    return send_doc_pdf(
-        root=root,
-        doc_path=doc_path,
-        user=current_user,
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-        doc_url_builder=_build_doc_url,
-    )
-
-
-@bp.route("/", methods=["GET"])
-@admin_permission_required("admin.docs.view")
-def index():
-    """Main documentation index page."""
-    root = docs.docs_root()
-    if not root.exists():
-        abort(404)
-
-    build_doc_url = _build_doc_url
-    build_asset_url = lambda rel_asset: url_for("admin_docs.asset", asset_path=rel_asset)
-
-    file_path, current_rel = docs.resolve_doc_path(root, "", current_user)
-    docs.ensure_doc_page_access(
-        current_user,
-        current_rel,
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-    )
-    nav_categories = docs.build_hierarchical_nav(
-        root=root,
-        doc_url_builder=build_doc_url,
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-        user=current_user,
-    )
-    content_html = docs.render_markdown_file(
-        root=root,
-        file_path=file_path,
-        current_rel=current_rel,
-        doc_url_builder=build_doc_url,
-        asset_url_builder=build_asset_url,
-    )
-    title = docs.extract_page_title(file_path)
-    workflow_id = docs.get_workflow_id_for_doc(file_path, root)
-
-    return render_template(
-        "admin/docs/documentation.html",
-        title=_("Documentation"),
-        page_title=title,
-        nav_categories=nav_categories,
-        current_rel=current_rel,
-        content_html=content_html,
-        workflow_id=workflow_id,
-        breadcrumbs=[
-            {"name": _("Admin"), "url": url_for("admin.admin_dashboard")},
-            {"name": _("Documentation")},
-        ],
-    )
-
-
-@bp.route("/<path:doc_path>", methods=["GET"])
-@admin_permission_required("admin.docs.view")
-def view_doc(doc_path: str):
-    """View a specific documentation file."""
-    root = docs.docs_root()
-    if not root.exists():
-        abort(404)
-
-    requested = (doc_path or "").strip().lstrip("/").replace("\\", "/")
-    # Only allow extensionless doc URLs (do not support legacy ".md" URLs).
-    if requested.lower().endswith(".md") or requested.lower() in ("readme", "readme.md"):
-        abort(404)
-
-    build_doc_url = _build_doc_url
-    build_asset_url = lambda rel_asset: url_for("admin_docs.asset", asset_path=rel_asset)
-
-    file_path, current_rel = docs.resolve_doc_path(root, doc_path, current_user)
-    docs.ensure_doc_page_access(
-        current_user,
-        current_rel,
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-    )
-    nav_categories = docs.build_hierarchical_nav(
-        root=root,
-        doc_url_builder=build_doc_url,
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-        user=current_user,
-    )
-    content_html = docs.render_markdown_file(
-        root=root,
-        file_path=file_path,
-        current_rel=current_rel,
-        doc_url_builder=build_doc_url,
-        asset_url_builder=build_asset_url,
-    )
-    title = docs.extract_page_title(file_path)
-    workflow_id = docs.get_workflow_id_for_doc(file_path, root)
-
-    return render_template(
-        "admin/docs/documentation.html",
-        title=_("Documentation"),
-        page_title=title,
-        nav_categories=nav_categories,
-        current_rel=current_rel,
-        content_html=content_html,
-        workflow_id=workflow_id,
-        breadcrumbs=[
-            {"name": _("Admin"), "url": url_for("admin.admin_dashboard")},
-            {"name": _("Documentation")},
-        ],
-    )
-
-
-@bp.route("/assets/<path:asset_path>", methods=["GET"])
-@admin_permission_required("admin.docs.view")
-def asset(asset_path: str):
-    """Serve static assets (images, etc.) from docs directory."""
-    root = docs.docs_root()
-    if not root.exists():
-        abort(404)
-
-    raw = (asset_path or "").strip().lstrip("/").replace("\\", "/")
-    candidate = (root / raw).resolve()
-    try:
-        candidate.resolve().relative_to(root.resolve())
-    except Exception as e:
-        current_app.logger.debug("Docs asset path validation: %s", e)
-        abort(404)
-    if not candidate.exists() or not candidate.is_file():
-        abort(404)
-
-    docs.ensure_docs_asset_access(
-        current_user,
-        candidate.relative_to(root).as_posix(),
-        visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
-    )
-
-    # Serve as-is; docs are admin-only and paths are rooted/validated.
-    return send_from_directory(root, candidate.relative_to(root).as_posix())
+register_docs_routes(
+    bp,
+    admin_permission_required("admin.docs.view"),
+    visible_top_level_dirs=VISIBLE_TOP_LEVEL_DIRS,
+    page_title=_("Documentation"),
+    prefer_user_landing=False,
+    asset_cache_max_age=None,
+    breadcrumbs=lambda: [
+        {"name": _("Admin"), "url": url_for("admin.admin_dashboard")},
+        {"name": _("Documentation")},
+    ],
+)

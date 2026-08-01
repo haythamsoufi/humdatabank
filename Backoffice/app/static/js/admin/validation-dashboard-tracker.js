@@ -27,10 +27,11 @@
 
     function el(id) { return document.getElementById(id); }
 
-    function esc(s) {
+    var esc = window.esc || function (s) {
         if (s == null) return '';
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+    var scopeLoader = window.ValidationScopeLoader || {};
 
     function getTemplateId() {
         return el('vd-template')?.value || '';
@@ -701,36 +702,14 @@
         var templateId = getTemplateId();
         var periodEl = el('vd-tracker-period');
         if (!periodEl) return;
-        if (!templateId) {
-            periodEl.innerHTML = '<option value="">' + esc(t.selectTemplatePeriod || 'Select template first') + '</option>';
-            periodEl.disabled = true;
-            return;
-        }
-        periodEl.disabled = true;
-        try {
-            var data = await window.apiFetch(config.periodsUrl + '?template_id=' + encodeURIComponent(templateId), {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            var periods = data.periods || [];
-            periodEl.innerHTML = '<option value="">' + esc('Choose period') + '</option>' +
-                periods.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
-            periodEl.disabled = !periods.length;
-            if (preferredPeriod) {
-                var found = Array.prototype.some.call(periodEl.options, function (opt) {
-                    if (opt.value === String(preferredPeriod)) {
-                        periodEl.value = preferredPeriod;
-                        return true;
-                    }
-                    return false;
-                });
-                if (!found && periods.length) periodEl.value = periods[0];
-            } else if (!periodEl.value && periods.length) {
-                periodEl.value = periods[0];
-            }
-        } catch (err) {
-            console.error(err);
-        }
+        await scopeLoader.loadPeriodsIntoSelect({
+            selectEl: periodEl,
+            periodsUrl: config.periodsUrl,
+            templateId: templateId,
+            preferredPeriod: preferredPeriod,
+            emptyLabel: t.selectTemplatePeriod || 'Select template first',
+            chooseLabel: 'Choose period',
+        });
     }
 
     async function loadTrackerData() {

@@ -190,6 +190,45 @@ class TestPluginRouteWrapper:
         assert my_view.__name__ == "my_view"
 
 
+@pytest.mark.unit
+class TestPluginAdminRouteWrapper:
+    def test_admin_wrapper_preserves_function_name(self):
+        from app.plugins.plugin_utils import plugin_admin_route_wrapper
+
+        @plugin_admin_route_wrapper("test_plugin")
+        def admin_view():
+            return "admin_result"
+
+        assert admin_view.__name__ == "admin_view"
+
+    def test_focal_point_gets_403_on_plugin_config_post(self, client, app):
+        mock_user = MagicMock(is_authenticated=True)
+        with patch("flask_login.utils._get_user", return_value=mock_user), \
+             patch("app.routes.admin.shared.user_has_permission", return_value=False):
+            with client.session_transaction() as sess:
+                sess["_user_id"] = "1"
+                sess["_fresh"] = True
+            resp = client.post(
+                "/admin/plugins/interactive_map/api/config",
+                json={"global_settings": {"default_zoom_level": 12}},
+            )
+        assert resp.status_code == 403
+
+    def test_admin_with_manage_permission_succeeds_on_plugin_config_post(self, client, app):
+        with patch("app.routes.admin.shared.user_has_permission", return_value=True):
+            with client.session_transaction() as sess:
+                sess["_user_id"] = "999999"
+                sess["_fresh"] = True
+            with patch("flask_login.utils._get_user", return_value=MagicMock(is_authenticated=True)), \
+                 patch("app.plugins.plugin_utils.get_json_safe", return_value={"global_settings": {}}), \
+                 patch("app.plugins.db_config.DbPluginConfig.update_config", return_value=True):
+                resp = client.post(
+                    "/admin/plugins/interactive_map/api/config",
+                    json={"global_settings": {"default_zoom_level": 12}},
+                )
+        assert resp.status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # BasePluginRoutes
 # ---------------------------------------------------------------------------
@@ -233,8 +272,9 @@ class TestBasePluginRoutes:
 
     def test_create_standard_routes_no_config_raises(self):
         from app.plugins.plugin_utils import BasePluginRoutes, PluginConfigError
-        # Patch login_required to be a no-op before routes are decorated
-        with patch("app.plugins.plugin_utils.login_required", lambda f: f):
+        # Patch login_required and permission_required to be no-ops before routes are decorated
+        with patch("app.plugins.plugin_utils.login_required", lambda f: f), \
+             patch("app.plugins.plugin_utils.permission_required", lambda _perm: (lambda f: f)):
             app = _make_flask_app()
             bp = Blueprint("test_bp2", __name__)
             bpr = BasePluginRoutes("test_plugin")  # No config
@@ -284,7 +324,8 @@ class TestBasePluginRoutes:
     def test_update_full_config_route_failure(self):
         """update_full_config raises PluginConfigError when save fails."""
         from app.plugins.plugin_utils import BasePluginRoutes
-        with patch("app.plugins.plugin_utils.login_required", lambda f: f):
+        with patch("app.plugins.plugin_utils.login_required", lambda f: f), \
+             patch("app.plugins.plugin_utils.permission_required", lambda _perm: (lambda f: f)):
             app = _make_flask_app()
             bp = Blueprint("test_upd_bp", __name__)
             cfg = MagicMock()
@@ -305,7 +346,8 @@ class TestBasePluginRoutes:
     def test_update_config_section_route_failure(self):
         """update_config_section raises PluginConfigError when save fails."""
         from app.plugins.plugin_utils import BasePluginRoutes
-        with patch("app.plugins.plugin_utils.login_required", lambda f: f):
+        with patch("app.plugins.plugin_utils.login_required", lambda f: f), \
+             patch("app.plugins.plugin_utils.permission_required", lambda _perm: (lambda f: f)):
             app = _make_flask_app()
             bp = Blueprint("test_sec_bp", __name__)
             cfg = MagicMock()
@@ -845,7 +887,8 @@ class TestCreateStandardRoutesSuccessPaths:
     """Cover lines 111, 118, 126, 133, 141, 148 — route handler paths."""
 
     def _setup_with_config(self, url_prefix="/p"):
-        with patch("app.plugins.plugin_utils.login_required", lambda f: f):
+        with patch("app.plugins.plugin_utils.login_required", lambda f: f), \
+             patch("app.plugins.plugin_utils.permission_required", lambda _perm: (lambda f: f)):
             from app.plugins.plugin_utils import BasePluginRoutes
             app = _make_flask_app()
             bp = Blueprint(f"sr_bp_{id(self)}_{url_prefix.replace('/', '_')}", __name__)
@@ -861,7 +904,8 @@ class TestCreateStandardRoutesSuccessPaths:
             return app, cfg, renderer
 
     def _setup_no_config(self, url_prefix="/pnc"):
-        with patch("app.plugins.plugin_utils.login_required", lambda f: f):
+        with patch("app.plugins.plugin_utils.login_required", lambda f: f), \
+             patch("app.plugins.plugin_utils.permission_required", lambda _perm: (lambda f: f)):
             from app.plugins.plugin_utils import BasePluginRoutes
             app = _make_flask_app()
             bp = Blueprint(f"sr_nc_bp_{id(self)}", __name__)

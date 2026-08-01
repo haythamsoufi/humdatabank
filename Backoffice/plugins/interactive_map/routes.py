@@ -1,6 +1,6 @@
 # Backoffice/plugins/interactive_map/routes.py
 
-from flask import Blueprint, render_template, request, current_app
+from flask import Blueprint, render_template, request, current_app, Response
 from flask_login import login_required
 
 try:
@@ -8,7 +8,7 @@ try:
 except ImportError:  # pragma: no cover - handled at runtime
     requests = None
 from app.plugins.template_utils import render_plugin_template
-from app.plugins.plugin_utils import BasePluginRoutes, plugin_route_wrapper, measure_performance, clear_plugin_cache
+from app.plugins.plugin_utils import BasePluginRoutes, plugin_route_wrapper, plugin_admin_route_wrapper, measure_performance, clear_plugin_cache
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_error, json_not_found, json_ok, json_server_error
 
@@ -75,13 +75,64 @@ def create_blueprint():
         if not provider_config or not provider_config.get('enabled', False):
             return json_bad_request('Map provider not enabled or not found', error='Map provider not enabled or not found')
 
-        # Return provider configuration
+        # Return provider configuration (never expose raw API keys to the client)
+        tile_url = provider_config.get('base_url')
+        if map_type == 'mapbox' and provider_config.get('requires_api_key'):
+            tile_url = '/admin/plugins/interactive_map/api/tiles/mapbox/{z}/{x}/{y}.png'
+
         return json_ok(
-            url=provider_config.get('base_url'),
+            url=tile_url,
             attribution=provider_config.get('attribution'),
             max_zoom=provider_config.get('max_zoom'),
-            requires_api_key=provider_config.get('requires_api_key', False)
+            requires_api_key=provider_config.get('requires_api_key', False),
+            use_tile_proxy=map_type == 'mapbox',
         )
+
+    @bp.route('/api/tiles/mapbox/<int:z>/<int:x>/<int:y>.png')
+    @plugin_route_wrapper('Interactive Map Plugin')
+    @measure_performance('Interactive Map Plugin', 'proxy_mapbox_tile')
+    def proxy_mapbox_tile(z, x, y):
+        """Proxy Mapbox raster tiles so the access token stays server-side."""
+        if requests is None:
+            return json_server_error(
+                'Server missing HTTP client support (requests).',
+                success=False,
+                error='Server missing HTTP client support (requests).',
+            )
+
+        if z < 0 or z > 22:
+            return json_bad_request('Invalid zoom level', error='Invalid zoom level')
+
+        mapbox_token = plugin_config.get_api_key('mapbox')
+        if not mapbox_token:
+            return json_bad_request('Mapbox is not configured', error='Mapbox is not configured')
+
+        style_id = 'go-ifrc/ckrfe16ru4c8718phmckdfjh0'
+        tile_url = (
+            f'https://api.mapbox.com/styles/v1/{style_id}/tiles/{z}/{x}/{y}'
+            f'?access_token={mapbox_token}'
+        )
+
+        try:
+            upstream = requests.get(tile_url, timeout=10)
+            if upstream.status_code != 200:
+                current_app.logger.warning(
+                    'Mapbox tile proxy upstream status %s for z=%s x=%s y=%s',
+                    upstream.status_code,
+                    z,
+                    x,
+                    y,
+                )
+                return Response(status=upstream.status_code)
+
+            headers = {
+                'Content-Type': upstream.headers.get('Content-Type', 'image/png'),
+                'Cache-Control': 'public, max-age=86400',
+            }
+            return Response(upstream.content, status=200, headers=headers)
+        except requests.exceptions.RequestException as exc:
+            current_app.logger.error('Mapbox tile proxy request failed: %s', exc)
+            return json_server_error('Failed to fetch map tile', success=False, error='Failed to fetch map tile')
 
     @bp.route('/api/config/field', methods=['GET'])
     @plugin_route_wrapper('Interactive Map Plugin')
@@ -92,14 +143,15 @@ def create_blueprint():
 
             # Return settings relevant to field rendering
             api_keys = plugin_config.get_all_config().get('api_keys', {})
+            mapbox_key = api_keys.get('mapbox', '')
             field_config = {
                 'default_map_provider': global_settings.get('default_map_provider', 'mapbox'),
                 'default_zoom_level': global_settings.get('default_zoom_level', 10),
                 'max_markers_per_field': global_settings.get('max_markers_per_field', 10),
                 'allow_marker_editing': global_settings.get('allow_marker_editing', True),
                 'geocoding_service': global_settings.get('geocoding_service', 'nominatim'),
-                'mapbox_token': api_keys.get('mapbox', ''),
-                'api_keys': api_keys
+                'mapbox_configured': bool(mapbox_key),
+                'mapbox_tile_url': '/admin/plugins/interactive_map/api/tiles/mapbox/{z}/{x}/{y}.png',
             }
 
             return json_ok(success=True, config=field_config)
@@ -279,7 +331,7 @@ def create_blueprint():
             return json_server_error('An unexpected error occurred during geocoding', success=False, error='An unexpected error occurred during geocoding')
 
     @bp.route('/api/settings', methods=['GET'])
-    @plugin_route_wrapper('Interactive Map Plugin')
+    @plugin_admin_route_wrapper('Interactive Map Plugin')
     def get_settings():
         """Get plugin settings."""
         try:
@@ -290,7 +342,7 @@ def create_blueprint():
             return json_server_error(str(e), success=False, error=str(e))
 
     @bp.route('/api/settings', methods=['POST'])
-    @plugin_route_wrapper('Interactive Map Plugin')
+    @plugin_admin_route_wrapper('Interactive Map Plugin')
     def save_settings():
         """Save plugin settings."""
         try:
@@ -380,7 +432,7 @@ def create_blueprint():
             return json_server_error('Failed to save settings. Please try again.', success=False, error='Failed to save settings. Please try again.')
 
     @bp.route('/api/cache/clear', methods=['POST'])
-    @plugin_route_wrapper('Interactive Map Plugin')
+    @plugin_admin_route_wrapper('Interactive Map Plugin')
     def clear_cache():
         """Clear plugin cache manually."""
         try:

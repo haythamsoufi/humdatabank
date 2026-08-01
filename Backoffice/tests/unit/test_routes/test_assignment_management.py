@@ -537,6 +537,64 @@ class TestAddEntityToAssignment:
 
 
 # ---------------------------------------------------------------------------
+# add_entity_to_assignment — direct mock tests (no DB)
+# ---------------------------------------------------------------------------
+
+class TestAddEntityToAssignmentDirect:
+    """Mock-based tests for entity add edge cases without DB fixtures."""
+
+    def test_add_entity_non_json_body_returns_400(self, app):
+        from contextlib import ExitStack
+        from app.routes.admin.assignment_management import add_entity_to_assignment
+
+        mock_assignment = MagicMock()
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        with app.test_request_context(
+            "/admin/assignments/1/entities/add",
+            method="POST",
+            data="not json",
+            content_type="text/plain",
+        ), ExitStack() as stack:
+            stack.enter_context(patch("app.routes.admin.shared.user_has_permission", return_value=True))
+            stack.enter_context(patch("app.routes.admin.shared.current_user", mock_user))
+            mock_af = stack.enter_context(patch("app.routes.admin.assignment_management.AssignedForm"))
+            mock_af.query.get_or_404.return_value = mock_assignment
+            resp = add_entity_to_assignment(1)
+        assert resp.status_code == 400
+        data = json.loads(resp.get_data(as_text=True))
+        assert "entity_type" in data.get("error", "").lower() or data.get("success") is False
+
+    def test_add_entity_integrity_error_returns_409(self, app):
+        from contextlib import ExitStack
+        from sqlalchemy.exc import IntegrityError
+        from app.routes.admin.assignment_management import add_entity_to_assignment
+
+        mock_assignment = MagicMock()
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        with app.test_request_context(
+            "/admin/assignments/1/entities/add",
+            method="POST",
+            json={"entity_type": "country", "entity_id": 99},
+        ), ExitStack() as stack:
+            stack.enter_context(patch("app.routes.admin.shared.user_has_permission", return_value=True))
+            stack.enter_context(patch("app.routes.admin.shared.current_user", mock_user))
+            mock_af = stack.enter_context(patch("app.routes.admin.assignment_management.AssignedForm"))
+            stack.enter_context(patch("app.services.organization.entity_service.EntityService.get_entity", return_value=MagicMock()))
+            stack.enter_context(patch("app.routes.admin.assignment_management.request_transaction_rollback"))
+            stack.enter_context(patch("app.routes.admin.assignment_management.db.session.add"))
+            stack.enter_context(patch("app.routes.admin.assignment_management.db.session.flush", side_effect=IntegrityError("", "", "")))
+            mock_query = stack.enter_context(patch("app.routes.admin.assignment_management.AssignmentEntityStatus.query"))
+            mock_af.query.get_or_404.return_value = mock_assignment
+            mock_query.filter_by.return_value.first.return_value = None
+            resp = add_entity_to_assignment(1)
+        assert resp.status_code == 409
+        data = json.loads(resp.get_data(as_text=True))
+        assert "already assigned" in data.get("error", "").lower()
+
+
+# ---------------------------------------------------------------------------
 # remove_entity_from_assignment
 # ---------------------------------------------------------------------------
 
@@ -656,6 +714,28 @@ class TestUpdateEntityStatus:
             json={"status": "in_progress"},
         )
         assert resp.status_code in (404, 302)
+
+    def test_update_non_json_body_does_not_crash(self, app):
+        from contextlib import ExitStack
+        from app.routes.admin.assignment_management import update_entity_status
+
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        mock_user.id = 1
+        mock_aes = MagicMock()
+        with app.test_request_context(
+            "/admin/assignments/1/entities/10",
+            method="PUT",
+            data="not json",
+            content_type="text/plain",
+        ), ExitStack() as stack:
+            stack.enter_context(patch("app.routes.admin.shared.user_has_permission", return_value=True))
+            stack.enter_context(patch("app.routes.admin.shared.current_user", mock_user))
+            mock_aes_cls = stack.enter_context(patch("app.routes.admin.assignment_management.AssignmentEntityStatus"))
+            stack.enter_context(patch("app.routes.admin.assignment_management.db.session.flush"))
+            mock_aes_cls.query.filter_by.return_value.first_or_404.return_value = mock_aes
+            resp = update_entity_status(1, 10)
+        assert resp.status_code == 200
 
 
 # ---------------------------------------------------------------------------

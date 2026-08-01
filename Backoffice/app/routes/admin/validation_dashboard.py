@@ -11,11 +11,10 @@ from app.routes.admin.shared import (
     permission_required,
     permission_required_any,
 )
+from app.routes.admin.validation_scope_api import register_validation_scope_routes
 from app.services.validation.check_service import run_validation_checks
 from app.services.validation.dispatch_service import preview_dispatch, send_dispatch
 from app.services.validation.dashboard_service import (
-    global_periods_for_template,
-    list_countries_for_period,
     preview_country_validation,
     summarize_period,
     template_tab_options,
@@ -38,25 +37,12 @@ def validation_dashboard():
     )
 
 
-@bp.route("/validation-dashboard/api/periods", methods=["GET"])
-@login_required
-@permission_required(VALIDATION_DASHBOARD_PERMISSION)
-def validation_dashboard_periods_api():
-    template_id = request.args.get("template_id", type=int)
-    if not template_id:
-        return json_bad_request("template_id is required")
-    return json_ok(periods=global_periods_for_template(template_id))
-
-
-@bp.route("/validation-dashboard/api/countries", methods=["GET"])
-@login_required
-@permission_required(VALIDATION_DASHBOARD_PERMISSION)
-def validation_dashboard_countries_api():
-    template_id = request.args.get("template_id", type=int)
-    period = request.args.get("period", type=str)
-    if not template_id or not period:
-        return json_bad_request("template_id and period are required")
-    return json_ok(countries=list_countries_for_period(template_id, period))
+register_validation_scope_routes(
+    bp,
+    "/validation-dashboard",
+    VALIDATION_DASHBOARD_PERMISSION,
+    endpoint_prefix="validation_dashboard",
+)
 
 
 @bp.route("/validation-dashboard/api/tracker", methods=["GET"])

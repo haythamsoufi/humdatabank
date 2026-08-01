@@ -43,6 +43,8 @@ def submit_quiz_score():
         score = data.get('score', 0)
         if not isinstance(score, int) or score < 0:
             return api_error('Invalid score. Must be a non-negative integer.', 400)
+        if score > 100:
+            return api_error('Invalid score. Must be at most 100 per submission.', 400)
 
         # Update user's quiz score (additive - accumulates points)
         user = current_user

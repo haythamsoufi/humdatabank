@@ -33,13 +33,13 @@ class TestDashboardStats:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False), \
-                 patch('app.services.get_platform_stats', return_value={
-                     'total_users': 5,
-                     'total_countries': 3,
-                     'total_templates': 2,
-                     'total_indicators': 10,
-                 }):
+            with patch('app.routes.api.mobile.admin_analytics.get_admin_dashboard_stats', return_value={
+                'user_count': 5,
+                'country_count': 3,
+                'template_count': 2,
+                'indicator_bank_count': 10,
+                'unresolved_security_events': 0,
+            }):
                 resp = dashboard_stats()
 
         body, status = _parse(resp)
@@ -56,10 +56,10 @@ class TestDashboardStats:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=True), \
-                 patch('app.services.get_platform_stats', return_value={
-                     'total_users': 10,
-                 }):
+            with patch('app.routes.api.mobile.admin_analytics.get_admin_dashboard_stats', return_value={
+                'user_count': 10,
+                'unresolved_security_events': 2,
+            }):
                 resp = dashboard_stats()
 
         _, status = _parse(resp)
@@ -73,7 +73,7 @@ class TestDashboardStats:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.services.get_platform_stats', side_effect=RuntimeError('fail')):
+            with patch('app.routes.api.mobile.admin_analytics.get_admin_dashboard_stats', side_effect=RuntimeError('fail')):
                 resp = dashboard_stats()
 
         _, status = _parse(resp)
@@ -93,7 +93,7 @@ class TestDashboardActivity:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.services.platform.user_analytics_query_service.has_table', return_value=False):
                 resp = dashboard_activity()
 
         body, status = _parse(resp)
@@ -109,7 +109,7 @@ class TestDashboardActivity:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.services.platform.user_analytics_query_service.has_table', return_value=False):
                 resp = dashboard_activity()
 
         _, status = _parse(resp)
@@ -123,7 +123,7 @@ class TestDashboardActivity:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', side_effect=RuntimeError('fail')):
+            with patch('app.services.platform.user_analytics_query_service.has_table', side_effect=RuntimeError('fail')):
                 resp = dashboard_activity()
 
         _, status = _parse(resp)
@@ -143,7 +143,9 @@ class TestLoginLogs:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.routes.api.mobile.admin_analytics.paginate_login_logs', return_value={
+                'items': [], 'total': 0, 'page': 1, 'per_page': 50, 'pages': 0,
+            }):
                 resp = login_logs()
 
         body, status = _parse(resp)
@@ -157,7 +159,9 @@ class TestLoginLogs:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.routes.api.mobile.admin_analytics.paginate_login_logs', return_value={
+                'items': [], 'total': 0, 'page': 1, 'per_page': 50, 'pages': 0,
+            }):
                 resp = login_logs()
 
         _, status = _parse(resp)
@@ -168,7 +172,7 @@ class TestLoginLogs:
 
         with app.test_request_context('/api/mobile/v1/admin/analytics/login-logs', method='GET'):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', side_effect=RuntimeError('fail')):
+            with patch('app.routes.api.mobile.admin_analytics.paginate_login_logs', side_effect=RuntimeError('fail')):
                 resp = login_logs()
 
         _, status = _parse(resp)
@@ -188,7 +192,9 @@ class TestSessionLogs:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.routes.api.mobile.admin_analytics.paginate_session_logs', return_value={
+                'items': [], 'total': 0, 'page': 1, 'per_page': 50, 'pages': 0,
+            }):
                 resp = session_logs()
 
         body, status = _parse(resp)
@@ -202,7 +208,9 @@ class TestSessionLogs:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.routes.api.mobile.admin_analytics.paginate_session_logs', return_value={
+                'items': [], 'total': 0, 'page': 1, 'per_page': 50, 'pages': 0,
+            }):
                 resp = session_logs()
 
         _, status = _parse(resp)
@@ -213,7 +221,7 @@ class TestSessionLogs:
 
         with app.test_request_context('/api/mobile/v1/admin/analytics/session-logs', method='GET'):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', side_effect=RuntimeError('fail')):
+            with patch('app.routes.api.mobile.admin_analytics.paginate_session_logs', side_effect=RuntimeError('fail')):
                 resp = session_logs()
 
         _, status = _parse(resp)
@@ -227,6 +235,7 @@ class TestSessionLogs:
 class TestEndSession:
     def test_session_not_found(self, app, db_session, route_admin):
         from app.routes.api.mobile.admin_analytics import end_session
+        from app.services.platform.user_analytics_query_service import EndSessionResult
 
         with app.test_request_context(
             '/api/mobile/v1/admin/analytics/sessions/99999/end',
@@ -234,7 +243,7 @@ class TestEndSession:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+                 patch('app.routes.api.mobile.admin_analytics.execute_end_session', return_value=EndSessionResult(ok=False, error='not_found')):
                 resp = end_session(99999)
 
         _, status = _parse(resp)
@@ -249,7 +258,7 @@ class TestEndSession:
         ):
             login_user(route_admin)
             with patch('app.utils.mobile_auth.enforce_api_or_csrf_protection'), \
-                 patch('app.routes.api.mobile.admin_analytics._has_table', side_effect=RuntimeError('fail')):
+                 patch('app.routes.api.mobile.admin_analytics.execute_end_session', side_effect=RuntimeError('fail')):
                 resp = end_session(1)
 
         _, status = _parse(resp)
@@ -269,7 +278,7 @@ class TestAuditTrail:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.services.platform.user_analytics_query_service.has_table', return_value=False):
                 resp = audit_trail()
 
         body, status = _parse(resp)
@@ -285,7 +294,7 @@ class TestAuditTrail:
             method='GET',
         ):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', return_value=False):
+            with patch('app.services.platform.user_analytics_query_service.has_table', return_value=False):
                 resp = audit_trail()
 
         _, status = _parse(resp)
@@ -296,7 +305,7 @@ class TestAuditTrail:
 
         with app.test_request_context('/api/mobile/v1/admin/analytics/audit-trail', method='GET'):
             login_user(route_admin)
-            with patch('app.routes.api.mobile.admin_analytics._has_table', side_effect=RuntimeError('fail')):
+            with patch('app.services.platform.user_analytics_query_service.has_table', side_effect=RuntimeError('fail')):
                 resp = audit_trail()
 
         _, status = _parse(resp)

@@ -30,6 +30,7 @@ from fdrs_sync_constants import (
     FDRS_DOCUMENT_TYPE_TO_ITEM,
     FdrsSyncCancelled,
     fdrs_document_approval_rank,
+    fdrs_document_is_public_visibility,
     fdrs_document_status_from_approval,
 )
 
@@ -106,16 +107,30 @@ def _save_fdrs_document_bytes(
     )
 
 
+def _fdrs_local_file_exists(storage_path: Optional[str]) -> bool:
+    """True when ``storage_path`` points at a file in the active storage provider."""
+    sp = (storage_path or "").strip()
+    if not sp:
+        return False
+    from app.services.platform import storage_service as storage
+
+    return storage.submitted_source_exists(sp)
+
+
 def _should_attempt_download(
     row: Dict[str, Any],
     existing: Optional[Any],
 ) -> bool:
+    if not row.get("is_public"):
+        return False
     source_url = (row.get("source_url") or "").strip()
     if not source_url:
         return False
     if existing is None:
         return True
     if existing.file_pending or not existing.storage_path:
+        return True
+    if not _fdrs_local_file_exists(existing.storage_path):
         return True
     if (existing.source_url or "").strip() != source_url:
         return True
@@ -134,7 +149,12 @@ def _resolve_download_outcome(
     """
     if http_status in (200, 206) and data:
         return data, False
-    if existing is not None and existing.storage_path and not existing.file_pending:
+    if (
+        existing is not None
+        and existing.storage_path
+        and not existing.file_pending
+        and _fdrs_local_file_exists(existing.storage_path)
+    ):
         return None, False
     return None, True
 
@@ -327,11 +347,11 @@ def build_document_import_plan(
         form_item_id = FDRS_DOCUMENT_TYPE_TO_ITEM[doc_type]
         period = (doc.get("YearText") or year_str).strip()
         lang = (doc.get("LangCode") or "en").strip().lower() or "en"
-        try:
-            is_public = int(doc.get("Public") or 0) == 1
-        except (TypeError, ValueError):
-            is_public = False
         approval_status = (doc.get("ApprovalStatus") or "").strip()
+        is_public = fdrs_document_is_public_visibility(
+            approval_status,
+            public_code=doc.get("Public"),
+        )
         plan.append(
             {
                 "fdrs_import_key": import_key,
@@ -487,8 +507,15 @@ def upsert_fdrs_document_metadata(
             storage_path = existing.storage_path if existing else None
             file_pending = True
             source_url = (row.get("source_url") or "").strip()
+            is_public_doc = bool(row.get("is_public"))
 
-            if not source_url:
+            if not is_public_doc:
+                file_pending = False
+                if existing and existing.storage_path and _fdrs_local_file_exists(existing.storage_path):
+                    storage_path = existing.storage_path
+                else:
+                    storage_path = None
+            elif not source_url:
                 if existing and existing.storage_path and not existing.file_pending:
                     file_pending = False
             elif _should_attempt_download(row, existing):
@@ -523,16 +550,29 @@ def upsert_fdrs_document_metadata(
                     stats["downloaded"] += 1
                 elif download_status in (403, 404):
                     stats["pending"] += 1
-                    storage_path = existing.storage_path if existing else None
+                    if existing and _fdrs_local_file_exists(existing.storage_path):
+                        storage_path = existing.storage_path
+                    else:
+                        storage_path = None
                 elif download_status not in (200, 206):
                     stats["download_errors"] += 1
-                    storage_path = existing.storage_path if existing else None
+                    if existing and _fdrs_local_file_exists(existing.storage_path):
+                        storage_path = existing.storage_path
+                    else:
+                        storage_path = None
                 else:
                     stats["pending"] += 1
-                    storage_path = existing.storage_path if existing else None
+                    if existing and _fdrs_local_file_exists(existing.storage_path):
+                        storage_path = existing.storage_path
+                    else:
+                        storage_path = None
             elif existing is not None:
-                file_pending = False
-                storage_path = existing.storage_path
+                if existing.storage_path and _fdrs_local_file_exists(existing.storage_path):
+                    file_pending = False
+                    storage_path = existing.storage_path
+                else:
+                    file_pending = True
+                    storage_path = None
 
             if dry_run:
                 if existing:

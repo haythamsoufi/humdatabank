@@ -136,6 +136,38 @@ FDRS_DOCUMENT_APPROVAL_OK = frozenset(
 )
 FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3})
 
+# FDRS ``Public`` codes where the file may be fetched from ``url`` (metadata import still
+# includes private codes in FDRS_DOCUMENT_PUBLIC_OK above).
+FDRS_DOCUMENT_DOWNLOAD_PUBLIC_CODES = frozenset({1, 2, 3})
+
+
+def fdrs_document_is_public_visibility(
+    approval_status: str | None = None,
+    *,
+    public_code: Any = None,
+) -> bool:
+    """
+    Whether FDRS document bytes may be downloaded from ``url``.
+
+    Private (Validated Private, Public code 0) → metadata only, no file fetch.
+    Public codes 1–3 or ApprovalStatus ending in ``(Public)`` → fetch allowed.
+    """
+    approval = (approval_status or "").strip()
+    if approval.endswith("(Private)"):
+        return False
+    if approval.endswith("(Public)"):
+        return True
+    try:
+        code = int(public_code) if public_code is not None else None
+    except (TypeError, ValueError):
+        code = None
+    if code is not None:
+        if code == 0:
+            return False
+        if code in FDRS_DOCUMENT_DOWNLOAD_PUBLIC_CODES:
+            return True
+    return False
+
 
 def fdrs_document_approval_rank(approval_status: str | None) -> int:
     """Higher rank wins dedupe within (iso3, year, document_type)."""

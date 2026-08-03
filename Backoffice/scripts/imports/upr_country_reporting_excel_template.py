@@ -549,6 +549,11 @@ def _workbook_yes_no_value(applicable_text: str) -> str:
     return "no"
 
 
+def _yes_no_value_is_applicable(value: Any) -> bool:
+    """True when a Yes/No form answer should export as Applicable in the workbook."""
+    return str(value or "").strip().lower() in ("yes", "y", "1", "true")
+
+
 def _resolve_indicator_import_value(
     row: Dict[str, Any],
     bank_id: Optional[int],
@@ -616,8 +621,22 @@ def _write_indicator_entry(
         )
         return
 
-    disagg = _entry_disagg_payload(entry)
+    is_yes_no = yes_no if yes_no is not None else _entry_is_yes_no(entry)
     val = fallback_value if fallback_value is not None else _scalar_value(entry)
+
+    if is_yes_no:
+        if _yes_no_value_is_applicable(val):
+            _write_indicator_applicable_cell(
+                wb,
+                sheet_name,
+                table_name,
+                row_offset,
+                data_not_available=False,
+                applicable=True,
+            )
+        return
+
+    disagg = _entry_disagg_payload(entry)
     disagg_cells: Dict[str, Any] = {}
     if disagg:
         disagg_cells = _disagg_payload_to_workbook_cells(disagg, key_to_header)
@@ -635,8 +654,7 @@ def _write_indicator_entry(
     )
     for header, cell_val in disagg_cells.items():
         write_table_cell(wb, sheet_name, table_name, row_offset, header, cell_val)
-    is_yes_no = yes_no if yes_no is not None else _entry_is_yes_no(entry)
-    if not disagg_cells and val is not None and not is_yes_no:
+    if not disagg_cells and val is not None:
         direct_header = key_to_header.get("direct")
         if direct_header:
             write_table_cell(wb, sheet_name, table_name, row_offset, direct_header, val)

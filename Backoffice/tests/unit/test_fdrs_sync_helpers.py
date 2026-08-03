@@ -28,6 +28,7 @@ from fdrs_sync_constants import (  # noqa: E402
     FDRS_INCOME_SOURCES_MATRIX_ITEM_ID,
     FDRS_NETWORK_SUPPORT_GIVEN_ITEM_ID,
     FDRS_NETWORK_SUPPORT_RECEIVED_ITEM_ID,
+    fdrs_document_is_public_visibility,
     fdrs_document_status_from_approval,
 )
 from fdrs_data_fetcher import (  # noqa: E402
@@ -688,24 +689,84 @@ def test_fetch_fdrs_document_bytes_403(monkeypatch):
     assert data is None
 
 
-def test_should_attempt_download_skips_when_already_stored():
+def test_should_attempt_download_skips_when_already_stored(monkeypatch):
     class Doc:
         file_pending = False
         storage_path = "country/1/99/file.pdf"
         source_url = "https://example.test/same.pdf"
 
-    row = {"source_url": "https://example.test/same.pdf"}
+    monkeypatch.setattr("fdrs_documents_sync._fdrs_local_file_exists", lambda _path: True)
+    row = {"source_url": "https://example.test/same.pdf", "is_public": True}
     assert _should_attempt_download(row, Doc()) is False
 
 
-def test_resolve_download_outcome_keeps_existing_file_on_403():
+def test_should_attempt_download_skips_private_documents():
+    row = {"source_url": "https://example.test/doc.pdf", "is_public": False}
+    assert _should_attempt_download(row, None) is False
+
+
+def test_should_attempt_download_retries_when_storage_path_missing_on_disk(monkeypatch):
+    class Doc:
+        file_pending = False
+        storage_path = "country/1/99/file.pdf"
+        source_url = "https://example.test/same.pdf"
+
+    monkeypatch.setattr("fdrs_documents_sync._fdrs_local_file_exists", lambda _path: False)
+    row = {"source_url": "https://example.test/same.pdf", "is_public": True}
+    assert _should_attempt_download(row, Doc()) is True
+
+
+def test_fdrs_document_is_public_visibility_private_and_public_codes():
+    assert fdrs_document_is_public_visibility("Validated (Private)", public_code=0) is False
+    assert fdrs_document_is_public_visibility("Validated (Public)", public_code=1) is True
+    assert fdrs_document_is_public_visibility("Under Validation (Public)", public_code=2) is True
+
+
+def test_build_document_import_plan_marks_under_validation_public_as_public():
+    documents = [
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "Annual Report_USA_2024_en.pdf",
+            "url": "https://data-api.ifrc.org/documents/US/Annual Report_USA_2024_en.pdf",
+            "LangCode": "en",
+            "Public": 2,
+            "ApprovalStatus": "Under Validation (Public)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        }
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 1
+    assert plan[0]["is_public"] is True
+
+
+def test_resolve_download_outcome_keeps_existing_file_on_403(monkeypatch):
     class Doc:
         storage_path = "country/1/99/file.pdf"
         file_pending = False
 
+    monkeypatch.setattr("fdrs_documents_sync._fdrs_local_file_exists", lambda _path: True)
     data, pending = _resolve_download_outcome(Doc(), 403, None)
     assert data is None
     assert pending is False
+
+
+def test_resolve_download_outcome_pending_on_403_when_local_file_missing(monkeypatch):
+    class Doc:
+        storage_path = "country/1/99/file.pdf"
+        file_pending = False
+
+    monkeypatch.setattr("fdrs_documents_sync._fdrs_local_file_exists", lambda _path: False)
+    data, pending = _resolve_download_outcome(Doc(), 403, None)
+    assert data is None
+    assert pending is True
 
 
 def test_resolve_download_outcome_pending_when_no_file_and_404():

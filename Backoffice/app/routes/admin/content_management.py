@@ -1334,9 +1334,30 @@ def download_document(doc_id):
 
     try:
         main_cat = _storage_category_for_submitted_document(document)
-        if not storage.exists(main_cat, document.storage_path):
-            flash("File not found on server.", "danger")
-            return safe_redirect(request.args.get("next"), default_route="content_management.manage_documents")
+        has_local_file = bool(
+            document.storage_path
+            and storage.submitted_source_exists(document.storage_path)
+        )
+        if not has_local_file:
+            from app.services.imports.fdrs_document_fetch_service import (
+                try_materialize_public_fdrs_document,
+            )
+
+            materialized, user_msg = try_materialize_public_fdrs_document(document)
+            has_local_file = materialized or bool(
+                document.storage_path
+                and storage.submitted_source_exists(document.storage_path)
+            )
+            if not has_local_file:
+                flash(
+                    user_msg
+                    or (
+                        "This document is not stored locally yet (FDRS import could not download the file). "
+                        "Re-run FDRS sync after IFRC enables document URLs, or upload the file manually."
+                    ),
+                    "warning" if document.source_url or document.fdrs_import_key else "danger",
+                )
+                return safe_redirect(request.args.get("next"), default_route="content_management.manage_documents")
         return storage.stream_response(
             main_cat, document.storage_path,
             filename=document.filename, as_attachment=True,

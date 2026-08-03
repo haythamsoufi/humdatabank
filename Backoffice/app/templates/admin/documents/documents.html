@@ -31,6 +31,8 @@
 {% endblock %}
 
 {% block content %}
+{# Admin manage_documents loads rows via JSON (documents=[]); still render the grid. #}
+{% set documents_grid_enabled = documents or (documents_load_async|default(false)) %}
 {# Precompute assigned country IDs for per-document UI gating #}
 {% set _user_countries = (current_user.countries.all() if current_user.is_authenticated and hasattr(current_user, 'countries') and hasattr(current_user.countries, 'all') else (current_user.countries if current_user.is_authenticated and hasattr(current_user, 'countries') else [])) %}
 {% set current_user_country_ids = _user_countries | map(attribute='id') | list %}
@@ -65,12 +67,12 @@
                     <p class="text-sm text-gray-800 font-medium leading-snug m-0 pr-2">{{ documents_entity_repo_label }}</p>
                 {% endif %}
             </div>
-            {% if documents %}
+            {% if documents_grid_enabled %}
             <div id="{{ DOCUMENTS_GRID_COLVIS_PH }}" class="flex-shrink-0 self-start sm:self-center"></div>
             {% endif %}
         </div>
         {% endif %}
-        {% if documents %}
+        {% if documents_grid_enabled %}
             {% if user_entities is defined and user_entities %}
             {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), grid_height='600px', include_card=false, show_placeholder=false, placeholder_id=DOCUMENTS_GRID_COLVIS_PH) }}
             {% else %}
@@ -822,6 +824,10 @@
         if (!documentsLoadAsync || !documentsJsonUrl) {
             return Promise.resolve();
         }
+        var loadingId = 'documentsGrid-loading';
+        if (typeof AgGridHelper !== 'undefined' && AgGridHelper.showGridLoadingOverlay) {
+            AgGridHelper.showGridLoadingOverlay(loadingId);
+        }
         var perPage = 200;
         var page = 1;
         var allRows = [];
@@ -857,13 +863,19 @@
             });
         }
 
-        return fetchPage().catch(function (error) {
-            if (typeof showToast === 'function') {
-                showToast(error && error.message ? error.message : 'Failed to load documents.', 'error');
-            } else if (window.__clientWarn) {
-                window.__clientWarn('Failed to load documents:', error);
-            }
-        });
+        return fetchPage()
+            .catch(function (error) {
+                if (typeof showToast === 'function') {
+                    showToast(error && error.message ? error.message : 'Failed to load documents.', 'error');
+                } else if (window.__clientWarn) {
+                    window.__clientWarn('Failed to load documents:', error);
+                }
+            })
+            .finally(function () {
+                if (typeof AgGridHelper !== 'undefined' && AgGridHelper.hideGridLoadingOverlay) {
+                    AgGridHelper.hideGridLoadingOverlay(loadingId);
+                }
+            });
     }
 
     function initializeGrid() {

@@ -37,6 +37,9 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _upsert_emergency_repeat_choice,
     _workbook_yes_no_value,
     _resolve_indicator_import_value,
+    _yes_no_value_is_applicable,
+    _write_indicator_entry,
+    read_table_cell,
     _collect_workbook_indicator_bank_ids,
     _reporting_funding_matrix_column,
     _entry_is_yes_no,
@@ -566,6 +569,73 @@ def test_workbook_yes_no_value_mapping():
     assert _workbook_yes_no_value(" applicable ") == "yes"
     assert _workbook_yes_no_value("Data not available") == "no"
     assert _workbook_yes_no_value("") == "no"
+
+
+def test_yes_no_value_is_applicable():
+    assert _yes_no_value_is_applicable("yes")
+    assert _yes_no_value_is_applicable("YES")
+    assert not _yes_no_value_is_applicable("no")
+    assert not _yes_no_value_is_applicable("")
+    assert not _yes_no_value_is_applicable(None)
+
+
+def test_export_yes_no_indicator_writes_applicable_only_for_yes(upr_country_reporting_workbook):
+    import openpyxl
+    from upr_country_reporting_excel_template import INDICATOR_DNA_HEADER
+
+    wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    yes_entry = type(
+        "Entry",
+        (),
+        {
+            "value": "yes",
+            "is_data_not_available": False,
+            "indicator_bank": type("Bank", (), {"type": "YesNo"})(),
+            "disagg_data": None,
+            "form_item": None,
+        },
+    )()
+    no_entry = type(
+        "Entry",
+        (),
+        {
+            "value": "no",
+            "is_data_not_available": False,
+            "indicator_bank": type("Bank", (), {"type": "YesNo"})(),
+            "disagg_data": None,
+            "form_item": None,
+        },
+    )()
+    dna_entry = type(
+        "Entry",
+        (),
+        {
+            "value": "no",
+            "is_data_not_available": True,
+            "indicator_bank": type("Bank", (), {"type": "YesNo"})(),
+            "disagg_data": None,
+            "form_item": None,
+        },
+    )()
+
+    _write_indicator_entry(wb, "Overall action Indicators", "Data_core", 0, yes_entry, {}, yes_no=True)
+    assert read_table_cell(wb, "Overall action Indicators", "Data_core", 0, INDICATOR_DNA_HEADER) == INDICATOR_APPLICABLE_VALUE
+
+    _write_indicator_entry(wb, "Overall action Indicators", "Data_core", 1, no_entry, {}, yes_no=True)
+    assert read_table_cell(wb, "Overall action Indicators", "Data_core", 1, INDICATOR_DNA_HEADER) in (None, "")
+
+    _write_indicator_entry(
+        wb,
+        "Overall action Indicators",
+        "Data_core",
+        2,
+        dna_entry,
+        {},
+        data_not_available=True,
+        yes_no=True,
+    )
+    assert read_table_cell(wb, "Overall action Indicators", "Data_core", 2, INDICATOR_DNA_HEADER) == INDICATOR_DNA_VALUE
+    wb.close()
 
 
 def test_collect_workbook_indicator_bank_ids_includes_table_id_column(

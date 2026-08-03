@@ -568,6 +568,11 @@
 }
 
 /* Mobile layout for AI Knowledge Base page */
+.ai-docs-page {
+    min-width: 0;
+    max-width: 100%;
+}
+
 @media (max-width: 639px) {
     .ai-docs-filters .ai-docs-filter-control {
         width: 100%;
@@ -601,6 +606,7 @@
         max-width: calc(100vw - 1rem);
         margin-left: auto;
         margin-right: auto;
+        padding: 1rem;
     }
 
     #uploadImportModal .tab-button {

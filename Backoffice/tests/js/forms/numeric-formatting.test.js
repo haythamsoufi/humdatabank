@@ -99,4 +99,53 @@ describe('numeric-formatting unformat with maxDecimals (EU locale)', () => {
     it('preserves US-style decimal paste for whole-number validation', () => {
         expect(window.__numericUnformat('1234.56', 0)).toBe('1234.56');
     });
+
+    it('does not flag locale-grouped display values as decimal violations', () => {
+        expect(window.__matrixWholeNumberHasFraction('488.516')).toBe(false);
+        expect(window.__matrixWholeNumberHasFraction('232.000')).toBe(false);
+        expect(window.__matrixWholeNumberHasFraction('187.700')).toBe(false);
+        expect(window.__matrixWholeNumberHasFraction('1234.56')).toBe(true);
+        expect(window.__matrixWholeNumberHasFraction('1234,56')).toBe(true);
+    });
+});
+
+describe('numeric-formatting unformat with maxDecimals (de-AT space grouping)', () => {
+    beforeAll(async () => {
+        vi.stubGlobal('Intl', {
+            NumberFormat: class {
+                constructor(_locale, _options) {}
+                formatToParts() {
+                    return [
+                        { type: 'integer', value: '232' },
+                        { type: 'group', value: '\u00a0' },
+                        { type: 'integer', value: '000' },
+                        { type: 'decimal', value: ',' },
+                        { type: 'fraction', value: '5' },
+                    ];
+                }
+                format(value) {
+                    return String(value);
+                }
+            },
+        });
+        vi.resetModules();
+        await import('../../../app/static/js/forms/modules/numeric-formatting.js');
+    });
+
+    afterAll(() => {
+        vi.unstubAllGlobals();
+        vi.resetModules();
+    });
+
+    it('parses space-grouped display and dot-formatted Excel paste', () => {
+        expect(window.__numericUnformat('232\u00a0000', 0)).toBe('232000');
+        expect(window.__numericUnformat('488\u00a0516', 0)).toBe('488516');
+        expect(window.__numericUnformat('232.000', 0)).toBe('232000');
+    });
+
+    it('does not flag grouped values as decimal violations', () => {
+        expect(window.__matrixWholeNumberHasFraction('232\u00a0000')).toBe(false);
+        expect(window.__matrixWholeNumberHasFraction('232.000')).toBe(false);
+        expect(window.__matrixWholeNumberHasFraction('488\u00a0516')).toBe(false);
+    });
 });

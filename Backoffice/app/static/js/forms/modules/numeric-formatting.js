@@ -94,11 +94,18 @@ function __unformatWithMaxDecimals(str, maxDecimals) {
         const looksLikeGrouping = __singleSeparatorLooksLikeGrouping(str, '.');
         const trailingZeroGroup = digitsAfter === 3 && /^0+$/.test(fractionPart);
 
-        if (__decimalSep === ',' && __groupSep === '.') {
+        // Locale uses comma as decimal (de-DE, de-AT, …) → a lone "." is thousands grouping,
+        // including de-AT where Intl may use spaces for display but Excel paste still uses dots.
+        if (__decimalSep === ',') {
             if (looksLikeGrouping || trailingZeroGroup) {
                 return removeAll(str, '.');
             }
             return str;
+        }
+
+        // Locale uses dot as decimal (en-US, …) → a lone "," is thousands grouping.
+        if (__decimalSep === '.' && __singleSeparatorLooksLikeGrouping(str, ',')) {
+            return removeAll(str, ',');
         }
 
         return str;
@@ -209,6 +216,22 @@ function isNumericString(value, maxDecimals) {
     return !isNaN(Number(raw));
 }
 
+/**
+ * True when a whole-number matrix cell still holds a real decimal fraction after
+ * locale-aware unformatting (display grouping must not count as a violation).
+ */
+function __matrixWholeNumberHasFraction(rawValue) {
+    if (rawValue === null || rawValue === undefined || rawValue === '') return false;
+    const normalized = unformat(String(rawValue), 0);
+    if (normalized === '' || normalized === '-' || normalized === '+') return false;
+    const num = Number(normalized);
+    if (!isFinite(num)) return false;
+    if (!normalized.includes('.')) return false;
+    const fractional = (normalized.split('.')[1] || '').replace(/0+$/, '');
+    if (fractional === '') return false;
+    return Math.abs(num - Math.round(num)) > 1e-9;
+}
+
 /** Read an input's `data-max-decimals` attribute, if any (e.g. set by matrix number/whole columns). */
 function __readMaxDecimals(input) {
     const attr = input && input.dataset ? input.dataset.maxDecimals : undefined;
@@ -255,7 +278,7 @@ function formatInPlace(input) {
     if (raw === '' || !isNumericString(raw, maxDecimals)) return;
     const num = Number(raw);
     if (typeof maxDecimals === 'number' && maxDecimals === 0 && input.closest?.('.matrix-container')) {
-        if (isFinite(num) && Math.abs(num - Math.round(num)) > 1e-9) {
+        if (__matrixWholeNumberHasFraction(input.value)) {
             input.value = raw;
             return;
         }
@@ -403,6 +426,7 @@ if (typeof MutationObserver !== 'undefined') {
 
 // Expose helpers if needed elsewhere (e.g. matrix-handler for autoloaded variable values)
 window.__numericUnformat = unformat;
+window.__matrixWholeNumberHasFraction = __matrixWholeNumberHasFraction;
 window.__sanitizeMatrixNumericInputValue = __sanitizeMatrixNumericInputValue;
 window.__numericFormatInPlace = function formatInPlaceForInput(input) {
     if (!input || typeof input.value === 'undefined') return;

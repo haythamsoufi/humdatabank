@@ -85,6 +85,10 @@ export function __readMatrixMaxDecimals(input) {
 
 export function __rawValueHasNonZeroFraction(rawValue, maxDecimals) {
     if (rawValue === null || rawValue === undefined || rawValue === '') return false;
+    if (maxDecimals === 0 && typeof window !== 'undefined'
+        && typeof window.__matrixWholeNumberHasFraction === 'function') {
+        return window.__matrixWholeNumberHasFraction(rawValue);
+    }
     const unformatFn = typeof window !== 'undefined' ? window.__numericUnformat : null;
     const rawString = (typeof unformatFn === 'function')
         ? unformatFn(String(rawValue), maxDecimals)

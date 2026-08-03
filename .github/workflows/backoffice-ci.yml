@@ -77,7 +77,7 @@ jobs:
       - name: Translations catalog is current and all .po files compile cleanly
         working-directory: Backoffice
         run: |
-          pip install polib babel --quiet
+          pip install polib babel Jinja2 --quiet
           python scripts/ci/check_translations_current.py
 
   # ── Bandit static security analysis ────────────────────────────────────────

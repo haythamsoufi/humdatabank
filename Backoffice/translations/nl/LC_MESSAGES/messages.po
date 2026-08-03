@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-03 21:07+0000\n"
+"POT-Creation-Date: 2026-08-03 21:16+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: en <LL@li.org>\n"
@@ -346,7 +346,7 @@ msgstr ""
 
 #: app/routes/main/views.py:161 app/templates/admin/ai/_trace_card.html:65
 #: app/templates/admin/ai/conversation_traces.html:80
-#: app/templates/admin/ai/documents.html:140
+#: app/templates/admin/ai/documents.html:142
 #: app/templates/core/layout.html:463
 #: app/templates/forms/form_builder/form_builder.html:54
 msgid "AI Assistant"
@@ -367,7 +367,7 @@ msgstr ""
 msgid "AI Knowledge Base"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:93
+#: app/templates/admin/ai/documents.html:95
 msgid "AI Query Assistant"
 msgstr ""
 
@@ -432,7 +432,7 @@ msgid ""
 "RBAC permissions."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:516
+#: app/templates/admin/ai/documents.html:524
 msgid "AI import"
 msgstr ""
 
@@ -1503,7 +1503,7 @@ msgstr ""
 msgid "Advanced (List Library)"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:154
+#: app/templates/admin/ai/documents.html:156
 msgid "Advanced Options"
 msgstr ""
 
@@ -1579,7 +1579,6 @@ msgstr ""
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/api_management.html:312
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
-#: app/templates/admin/templates/data_sync_imputation.html:133
 #: app/templates/components/auto_translate_modal_js.html:30
 #: app/templates/forms/entry_form/entry_form.html:3874
 #: app/templates/forms/form_builder/field_mapping.html:303
@@ -1605,14 +1604,14 @@ msgstr ""
 msgid "All Clear"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:368
-#: app/templates/admin/ai/documents.html:517
+#: app/templates/admin/ai/documents.html:370
+#: app/templates/admin/ai/documents.html:525
 #: app/templates/admin/data_exploration/explore_data.html:121
 #: app/templates/admin/data_exploration/explore_data.html:1834
 #: app/templates/admin/data_exploration/explore_data.html:1890
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:33
-#: app/templates/admin/templates/data_sync_imputation.html:354
-#: app/templates/admin/templates/data_sync_imputation.html:830
+#: app/templates/admin/templates/data_sync_imputation.html:304
+#: app/templates/admin/templates/data_sync_imputation.html:780
 msgid "All Countries"
 msgstr ""
 
@@ -1643,8 +1642,8 @@ msgstr ""
 msgid "All Indicators"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:360
-#: app/templates/admin/templates/data_sync_imputation.html:831
+#: app/templates/admin/templates/data_sync_imputation.html:310
+#: app/templates/admin/templates/data_sync_imputation.html:781
 msgid "All Items"
 msgstr ""
 
@@ -1693,8 +1692,8 @@ msgstr ""
 msgid "All Templates"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:188
-#: app/templates/admin/templates/data_sync_imputation.html:366
+#: app/templates/admin/ai/documents.html:190
+#: app/templates/admin/templates/data_sync_imputation.html:316
 #: app/templates/forms/form_builder/partials/_item_modal.html:65
 #: app/templates/notifications/center.html:94
 msgid "All Types"
@@ -1721,7 +1720,7 @@ msgstr ""
 msgid "All approved"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:454
+#: app/templates/admin/ai/documents.html:458
 msgid "All categories"
 msgstr ""
 
@@ -1754,7 +1753,7 @@ msgstr ""
 msgid "All language fields are already filled."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:460
+#: app/templates/admin/ai/documents.html:464
 msgid "All languages"
 msgstr ""
 
@@ -1804,7 +1803,7 @@ msgstr ""
 msgid "All sections completed."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:441
+#: app/templates/admin/ai/documents.html:445
 msgid "All statuses"
 msgstr ""
 
@@ -1828,9 +1827,9 @@ msgid ""
 "API key events, and more."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:346
-#: app/templates/admin/ai/documents.html:448
-#: app/templates/admin/ai/documents.html:518
+#: app/templates/admin/ai/documents.html:348
+#: app/templates/admin/ai/documents.html:452
+#: app/templates/admin/ai/documents.html:526
 #: app/templates/admin/analytics/login_logs.html:43
 msgid "All types"
 msgstr ""
@@ -2153,7 +2152,7 @@ msgid ""
 "support sex/age disaggregation."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:467
+#: app/templates/admin/ai/documents.html:472
 #: app/templates/admin/ai/reasoning_traces.html:133
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
@@ -2596,7 +2595,7 @@ msgid ""
 "Submitter, or Assignment Approver if this user should work with assignments."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:117
+#: app/templates/admin/ai/documents.html:119
 msgid "Ask a question (AI will answer using the document library)..."
 msgstr ""
 
@@ -2609,7 +2608,7 @@ msgstr ""
 msgid "Ask questions about platform data, indicators, and documents."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:94
+#: app/templates/admin/ai/documents.html:96
 msgid "Ask questions about your document library"
 msgstr ""
 
@@ -2617,7 +2616,7 @@ msgstr ""
 msgid "Aspect Ratio"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:520
+#: app/templates/admin/ai/documents.html:528
 msgid "Assessment"
 msgstr ""
 
@@ -2647,7 +2646,7 @@ msgid ""
 " Do you want to continue?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:656
+#: app/templates/admin/ai/documents.html:664
 #: app/templates/admin/assignments/public_submissions.html:225
 #: app/templates/admin/communication/center.html:669
 #: app/templates/admin/communication/center.html:730
@@ -2834,7 +2833,7 @@ msgstr ""
 msgid "Assignment status workflow"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:660
+#: app/templates/admin/ai/documents.html:668
 msgid "Assignment submission"
 msgstr ""
 
@@ -3322,8 +3321,8 @@ msgstr ""
 msgid "Basic Information"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:167
-#: app/templates/admin/templates/data_sync_imputation.html:1533
+#: app/templates/admin/templates/data_sync_imputation.html:117
+#: app/templates/admin/templates/data_sync_imputation.html:1395
 #: app/templates/admin/templates/upr_excel_import.html:87
 msgid "Batch size"
 msgstr ""
@@ -3561,7 +3560,7 @@ msgstr ""
 msgid "Cache usage"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1538
+#: app/templates/admin/templates/data_sync_imputation.html:1399
 msgid "Cached imputed values"
 msgstr ""
 
@@ -3611,8 +3610,8 @@ msgstr ""
 msgid "Can't find an indicator? Propose a new one here"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:53
-#: app/templates/admin/ai/documents.html:521
+#: app/templates/admin/ai/documents.html:55
+#: app/templates/admin/ai/documents.html:529
 #: app/templates/admin/ai/reasoning_traces.html:725
 #: app/templates/admin/analytics/security_events.html:133
 #: app/templates/admin/api_keys/create.html:90
@@ -3664,7 +3663,7 @@ msgstr ""
 #: app/templates/admin/plugin_management.html:181
 #: app/templates/admin/settings/manage_settings.html:1157
 #: app/templates/admin/settings/manage_settings.html:1488
-#: app/templates/admin/templates/data_sync_imputation.html:255
+#: app/templates/admin/templates/data_sync_imputation.html:205
 #: app/templates/admin/templates/templates.html:325
 #: app/templates/admin/translations/manage_translations.html:541
 #: app/templates/admin/translations/manage_translations.html:668
@@ -3719,7 +3718,7 @@ msgstr ""
 msgid "Cancel failed (connection issue)."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:54
+#: app/templates/admin/ai/documents.html:56
 msgid "Cancel import"
 msgstr ""
 
@@ -3728,7 +3727,7 @@ msgstr ""
 msgid "Cancelled"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:522
+#: app/templates/admin/ai/documents.html:530
 msgid "Cancelling..."
 msgstr ""
 
@@ -3783,7 +3782,7 @@ msgstr ""
 msgid "Carry-forward data"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:523
+#: app/templates/admin/ai/documents.html:531
 #: app/templates/admin/communication/center.html:665
 #: app/templates/admin/embed_content/manage_embed_content.html:46
 #: app/templates/admin/embed_content/manage_embed_content.html:135
@@ -3970,7 +3969,7 @@ msgstr ""
 msgid "Checking…"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:371
+#: app/templates/admin/templates/data_sync_imputation.html:321
 msgid "Choice"
 msgstr ""
 
@@ -4029,12 +4028,6 @@ msgstr ""
 msgid "Choose the type of item you want to add"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:111
-msgid ""
-"Choose which FDRS reporting years to fetch. All years in the default range "
-"are selected initially."
-msgstr ""
-
 #: app/templates/admin/templates/new_template.html:536
 msgid "Choose which breakdowns to allow"
 msgstr ""
@@ -4052,7 +4045,7 @@ msgid ""
 "content and sample placeholder values."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:524
+#: app/templates/admin/ai/documents.html:532
 msgid "Chunks"
 msgstr ""
 
@@ -4067,8 +4060,8 @@ msgstr ""
 msgid "Cleaned up %(count)d expired sessions."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:354
-#: app/templates/admin/ai/documents.html:470
+#: app/templates/admin/ai/documents.html:356
+#: app/templates/admin/ai/documents.html:475
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:34
 #: app/templates/admin/analytics/audit_trail.html:289
 #: app/templates/admin/analytics/page_path_analytics.html:54
@@ -4099,7 +4092,7 @@ msgstr ""
 msgid "Clear Filter"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:393
+#: app/templates/admin/templates/data_sync_imputation.html:343
 msgid "Clear Filters"
 msgstr ""
 
@@ -4208,7 +4201,7 @@ msgid ""
 "assignment to persist."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:388
+#: app/templates/admin/ai/documents.html:390
 msgid "Click Search or Refresh to load documents from the IFRC API."
 msgstr ""
 
@@ -4250,7 +4243,7 @@ msgid ""
 "dashboard and reporting tools."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:439
+#: app/templates/admin/templates/data_sync_imputation.html:389
 msgid "Click on the method to change how data is imputed for each item."
 msgstr ""
 
@@ -4291,7 +4284,7 @@ msgid ""
 "Click suggestions or type a programme code (e.g. PB27-28) and press Enter."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:525
+#: app/templates/admin/ai/documents.html:533
 msgid "Click to change category"
 msgstr ""
 
@@ -4308,11 +4301,11 @@ msgstr ""
 msgid "Click to expand"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:526
+#: app/templates/admin/ai/documents.html:534
 msgid "Click to make not public"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:527
+#: app/templates/admin/ai/documents.html:535
 msgid "Click to make public"
 msgstr ""
 
@@ -4382,7 +4375,7 @@ msgstr ""
 #: app/templates/admin/organization/_countries_component.html:181
 #: app/templates/admin/organization/_nss_component.html:86
 #: app/templates/admin/plugin_management.html:157
-#: app/templates/admin/templates/data_sync_imputation.html:276
+#: app/templates/admin/templates/data_sync_imputation.html:226
 #: app/templates/admin/translations/manage_translations.html:234
 #: app/templates/admin/translations/manage_translations.html:485
 #: app/templates/admin/user_management/user_form.html:1487
@@ -4436,7 +4429,7 @@ msgstr ""
 msgid "Closest indicators in the Indicator Bank (by semantic similarity):"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:528
+#: app/templates/admin/ai/documents.html:536
 msgid "Cluster"
 msgstr ""
 
@@ -4718,9 +4711,9 @@ msgstr ""
 msgid "Complete — click ▲ to restore"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:66
-#: app/templates/admin/ai/documents.html:442
-#: app/templates/admin/ai/documents.html:529
+#: app/templates/admin/ai/documents.html:68
+#: app/templates/admin/ai/documents.html:446
+#: app/templates/admin/ai/documents.html:537
 #: app/templates/admin/ai/reasoning_traces.html:248
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/analytics/_user_detail_partial.html:255
@@ -5305,7 +5298,7 @@ msgstr ""
 msgid "Count of entries"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:531
+#: app/templates/admin/ai/documents.html:539
 #: app/templates/admin/analytics/audit_trail.html:325
 #: app/templates/admin/communication/center.html:198
 #: app/templates/admin/communication/center.html:1036
@@ -5355,8 +5348,8 @@ msgstr ""
 
 #: app/services/ai/planning/payload_inference.py:179
 #: app/services/ai/runtime/step_ux.py:195
-#: app/templates/admin/ai/documents.html:366
-#: app/templates/admin/ai/documents.html:532
+#: app/templates/admin/ai/documents.html:368
+#: app/templates/admin/ai/documents.html:540
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
 #: app/templates/admin/assignments/manage_assignment.html:738
@@ -5373,8 +5366,8 @@ msgstr ""
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:329
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:485
 #: app/templates/admin/organization/index.html:867
-#: app/templates/admin/templates/data_sync_imputation.html:352
-#: app/templates/admin/templates/data_sync_imputation.html:1879
+#: app/templates/admin/templates/data_sync_imputation.html:302
+#: app/templates/admin/templates/data_sync_imputation.html:1732
 #: app/templates/admin/user_management/access_requests.html:1192
 #: app/templates/admin/user_management/access_requests.html:1242
 #: app/templates/admin/user_management/user_form.html:938
@@ -5391,7 +5384,7 @@ msgstr ""
 msgid "Country"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:535
+#: app/templates/admin/ai/documents.html:543
 msgid "Country / Scope"
 msgstr ""
 
@@ -5421,11 +5414,11 @@ msgstr ""
 msgid "Country Names in Other Languages"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:533
+#: app/templates/admin/ai/documents.html:541
 msgid "Country Plan"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:534
+#: app/templates/admin/ai/documents.html:542
 msgid "Country Report"
 msgstr ""
 
@@ -5682,7 +5675,7 @@ msgstr ""
 
 #: app/templates/admin/ai/_trace_card.html:101
 #: app/templates/admin/ai/conversation_traces.html:112
-#: app/templates/admin/ai/documents.html:536
+#: app/templates/admin/ai/documents.html:544
 #: app/templates/admin/ai/reasoning_traces.html:438
 #: app/templates/admin/analytics/audit_trail.html:385
 #: app/templates/admin/api_keys/details.html:264
@@ -5730,7 +5723,7 @@ msgstr ""
 msgid "Critical error"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:372
+#: app/templates/admin/templates/data_sync_imputation.html:322
 msgid "Currency"
 msgstr ""
 
@@ -5755,7 +5748,7 @@ msgstr ""
 msgid "Current System Metrics"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1898
+#: app/templates/admin/templates/data_sync_imputation.html:1751
 msgid "Current Value"
 msgstr ""
 
@@ -5962,7 +5955,7 @@ msgstr ""
 msgid "Data Owner"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:291
+#: app/templates/admin/templates/data_sync_imputation.html:241
 msgid "Data Preview"
 msgstr ""
 
@@ -5984,7 +5977,7 @@ msgstr ""
 msgid "Data Reporting"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:537
+#: app/templates/admin/ai/documents.html:545
 msgid "Data Sheet"
 msgstr ""
 
@@ -6059,7 +6052,7 @@ msgstr ""
 msgid "Data sources:"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1534
+#: app/templates/admin/templates/data_sync_imputation.html:1396
 msgid "Data status"
 msgstr ""
 
@@ -6067,7 +6060,7 @@ msgstr ""
 msgid "Data stays on archived version"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:288
+#: app/templates/admin/templates/data_sync_imputation.html:238
 msgid "Data sync & imputation sections"
 msgstr ""
 
@@ -6179,8 +6172,12 @@ msgstr ""
 msgid "Default"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1526
+#: app/templates/admin/templates/data_sync_imputation.html:1388
 msgid "Default (1000)"
+msgstr ""
+
+#: app/templates/admin/templates/data_sync_imputation.html:1385
+msgid "Default (2010–2024)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:122
@@ -6262,8 +6259,8 @@ msgstr ""
 msgid "Delegation focal point"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:427
-#: app/templates/admin/ai/documents.html:541
+#: app/templates/admin/ai/documents.html:429
+#: app/templates/admin/ai/documents.html:549
 #: app/templates/admin/ai/reasoning_traces.html:725
 #: app/templates/admin/assignments/assignments.html:131
 #: app/templates/admin/assignments/public_submissions.html:277
@@ -6339,11 +6336,11 @@ msgstr ""
 msgid "Delete Document"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:539
+#: app/templates/admin/ai/documents.html:547
 msgid "Delete Document?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:540
+#: app/templates/admin/ai/documents.html:548
 msgid "Delete Documents?"
 msgstr ""
 
@@ -6407,7 +6404,7 @@ msgstr ""
 msgid "Delete data & import"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:538
+#: app/templates/admin/ai/documents.html:546
 msgid "Delete document"
 msgstr ""
 
@@ -6445,7 +6442,7 @@ msgstr ""
 msgid "Delete selected"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:542
+#: app/templates/admin/ai/documents.html:550
 msgid "Delete selected documents?"
 msgstr ""
 
@@ -6736,7 +6733,7 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:543
+#: app/templates/admin/ai/documents.html:551
 msgid "Detecting countries"
 msgstr ""
 
@@ -7135,14 +7132,14 @@ msgstr ""
 msgid "Do not share this key or commit it to version control"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:544
+#: app/templates/admin/ai/documents.html:552
 msgid "Doc Date"
 msgstr ""
 
 #: app/services/notification/notifiers/documents.py:39
 #: app/services/notification/notifiers/documents.py:176
 #: app/services/notification/notifiers/documents.py:322
-#: app/templates/admin/ai/documents.html:545
+#: app/templates/admin/ai/documents.html:553
 #: app/templates/admin/templates/partials/imputation_badges.html:16
 #: app/templates/forms/entry_form/validation_summary_pdf.html:80
 #: app/templates/forms/entry_form/validation_summary_pdf.html:82
@@ -7190,7 +7187,7 @@ msgstr ""
 msgid "Document Status"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:657
+#: app/templates/admin/ai/documents.html:665
 #: app/templates/admin/api_management.html:1168
 #: app/templates/admin/documents/documents.html:184
 #: app/templates/admin/documents/documents.html:655
@@ -7233,7 +7230,7 @@ msgstr ""
 msgid "Document declined."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:546
+#: app/templates/admin/ai/documents.html:554
 msgid "Document deleted"
 msgstr ""
 
@@ -7241,7 +7238,7 @@ msgstr ""
 msgid "Document deleted successfully."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:662
+#: app/templates/admin/ai/documents.html:670
 msgid "Document library"
 msgstr ""
 
@@ -7257,12 +7254,12 @@ msgstr ""
 msgid "Document status:"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:284
+#: app/templates/admin/ai/documents.html:286
 msgid "Document title (optional)"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:351
-#: app/templates/admin/ai/documents.html:357
+#: app/templates/admin/ai/documents.html:353
+#: app/templates/admin/ai/documents.html:359
 msgid "Document types"
 msgstr ""
 
@@ -7293,8 +7290,7 @@ msgid "Documentation"
 msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:70
-#: app/templates/admin/ai/documents.html:406
-#: app/templates/admin/templates/data_sync_imputation.html:156
+#: app/templates/admin/ai/documents.html:408
 #: app/templates/admin/validation_dashboard.html:262
 #: app/templates/core/dashboard.html:1214
 #: app/templates/public_submission_export_pdf.html:61
@@ -7321,7 +7317,7 @@ msgid ""
 " the assistant."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:549
+#: app/templates/admin/ai/documents.html:557
 #: app/templates/forms/entry_form/validation_summary_progress.html:312
 #: app/templates/tours/tours.html:15
 msgid "Done"
@@ -7331,7 +7327,7 @@ msgstr ""
 msgid "Done — reviewing what I found…"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:548
+#: app/templates/admin/ai/documents.html:556
 msgid "Done."
 msgstr ""
 
@@ -7339,10 +7335,10 @@ msgstr ""
 msgid "Double-click"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:411
-#: app/templates/admin/ai/documents.html:550
+#: app/templates/admin/ai/documents.html:413
+#: app/templates/admin/ai/documents.html:558
 #: app/templates/admin/monitoring/system_monitoring.html:181
-#: app/templates/admin/templates/data_sync_imputation.html:1658
+#: app/templates/admin/templates/data_sync_imputation.html:1519
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:32
 msgid "Download"
 msgstr ""
@@ -7423,8 +7419,8 @@ msgstr ""
 msgid "Drag"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:279
-#: app/templates/admin/ai/documents.html:552
+#: app/templates/admin/ai/documents.html:281
+#: app/templates/admin/ai/documents.html:560
 msgid "Drag and drop files here, or click to select"
 msgstr ""
 
@@ -7465,7 +7461,7 @@ msgstr ""
 msgid "Drop your saved workbook here"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1536
+#: app/templates/admin/templates/data_sync_imputation.html:1397
 msgid "Dry run"
 msgstr ""
 
@@ -7473,7 +7469,7 @@ msgstr ""
 msgid "Dry run (preview counts + Excel, no DB write)"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:211
+#: app/templates/admin/templates/data_sync_imputation.html:161
 msgid "Dry run (preview only, no DB write)"
 msgstr ""
 
@@ -8045,7 +8041,7 @@ msgid "Embed type"
 msgstr ""
 
 #: app/templates/admin/ai/dashboard.html:81
-#: app/templates/admin/ai/documents.html:78
+#: app/templates/admin/ai/documents.html:80
 msgid "Embeddings"
 msgstr ""
 
@@ -8252,7 +8248,7 @@ msgid ""
 "translations button to set display labels in English and other languages."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:433
+#: app/templates/admin/templates/data_sync_imputation.html:383
 msgid "Enter a target year and click \"Load Data\" to preview imputation results."
 msgstr ""
 
@@ -8307,7 +8303,7 @@ msgstr ""
 msgid "Entities"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:658
+#: app/templates/admin/ai/documents.html:666
 #: app/templates/admin/analytics/audit_trail.html:447
 #: app/templates/admin/documents/documents.html:124
 #: app/templates/admin/documents/documents.html:177
@@ -8474,7 +8470,7 @@ msgstr ""
 msgid "Error loading chart data"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:554
+#: app/templates/admin/ai/documents.html:562
 #: app/templates/admin/data_exploration/explore_data.html:1905
 msgid "Error loading countries"
 msgstr ""
@@ -8487,7 +8483,7 @@ msgstr ""
 msgid "Error loading deletion information. Please try again."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:555
+#: app/templates/admin/ai/documents.html:563
 msgid "Error loading documents"
 msgstr ""
 
@@ -8507,7 +8503,7 @@ msgstr ""
 msgid "Error loading years"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:556
+#: app/templates/admin/ai/documents.html:564
 msgid "Error processing documents:"
 msgstr ""
 
@@ -8523,7 +8519,7 @@ msgstr ""
 msgid "Error updating suggestion status."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:553
+#: app/templates/admin/ai/documents.html:561
 #: app/templates/admin/documents/documents.html:427
 #: app/templates/admin/documents/documents.html:462
 #: app/templates/admin/documents/documents.html:503
@@ -8552,7 +8548,7 @@ msgstr ""
 msgid "Errors"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:557
+#: app/templates/admin/ai/documents.html:565
 msgid "Errors:"
 msgstr ""
 
@@ -8956,7 +8952,7 @@ msgid "Export the pre-filled workbook for this country and reporting period."
 msgstr ""
 
 #: app/templates/admin/indicator_bank/_panel_common_words_body.html:46
-#: app/templates/admin/templates/data_sync_imputation.html:402
+#: app/templates/admin/templates/data_sync_imputation.html:352
 #: app/templates/macros/excel_io_toolbar.html:12
 msgid "Export to Excel"
 msgstr ""
@@ -9069,9 +9065,9 @@ msgstr ""
 
 #: app/templates/admin/ai/_trace_card.html:431
 #: app/templates/admin/ai/conversation_traces.html:234
-#: app/templates/admin/ai/documents.html:74
-#: app/templates/admin/ai/documents.html:445
-#: app/templates/admin/ai/documents.html:561
+#: app/templates/admin/ai/documents.html:76
+#: app/templates/admin/ai/documents.html:449
+#: app/templates/admin/ai/documents.html:569
 #: app/templates/admin/analytics/_user_detail_partial.html:257
 #: app/templates/admin/analytics/login_logs.html:139
 #: app/templates/admin/settings/manage_settings.html:1495
@@ -9121,7 +9117,7 @@ msgstr ""
 msgid "Failed to create follow-up question"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:562
+#: app/templates/admin/ai/documents.html:570
 msgid "Failed to delete document."
 msgstr ""
 
@@ -9133,7 +9129,7 @@ msgstr ""
 msgid "Failed to delete traces."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:563
+#: app/templates/admin/ai/documents.html:571
 msgid "Failed to generate answer."
 msgstr ""
 
@@ -9157,11 +9153,11 @@ msgstr ""
 msgid "Failed to load data"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:564
+#: app/templates/admin/ai/documents.html:572
 msgid "Failed to load documents"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:565
+#: app/templates/admin/ai/documents.html:573
 msgid "Failed to load documents from external API"
 msgstr ""
 
@@ -9187,8 +9183,8 @@ msgstr ""
 msgid "Failed to load subsector data. Please try again."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:633
-#: app/templates/admin/templates/data_sync_imputation.html:656
+#: app/templates/admin/templates/data_sync_imputation.html:583
+#: app/templates/admin/templates/data_sync_imputation.html:606
 msgid "Failed to load template"
 msgstr ""
 
@@ -9208,7 +9204,7 @@ msgstr ""
 msgid "Failed to load validation questions"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:566
+#: app/templates/admin/ai/documents.html:574
 msgid "Failed to process request."
 msgstr ""
 
@@ -9251,11 +9247,11 @@ msgstr ""
 msgid "Failed to start download"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:567
+#: app/templates/admin/ai/documents.html:575
 msgid "Failed to start import"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:568
+#: app/templates/admin/ai/documents.html:576
 msgid "Failed to start metadata reprocess."
 msgstr ""
 
@@ -9264,8 +9260,8 @@ msgstr ""
 msgid "Failed to start sync."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1744
-#: app/templates/admin/templates/data_sync_imputation.html:1750
+#: app/templates/admin/templates/data_sync_imputation.html:1605
+#: app/templates/admin/templates/data_sync_imputation.html:1611
 msgid "Failed to stop sync"
 msgstr ""
 
@@ -9287,15 +9283,15 @@ msgstr ""
 msgid "Failed to uninstall plugin"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:570
+#: app/templates/admin/ai/documents.html:578
 msgid "Failed to update category."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:569
+#: app/templates/admin/ai/documents.html:577
 msgid "Failed to update."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:560
+#: app/templates/admin/ai/documents.html:568
 #, python-brace-format
 msgid "Failed: {count}"
 msgstr ""
@@ -9399,7 +9395,7 @@ msgstr ""
 msgid "Fields can be repeated multiple times (like Kobo repeat groups)"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:185
+#: app/templates/admin/ai/documents.html:187
 msgid "File Type"
 msgstr ""
 
@@ -9441,7 +9437,7 @@ msgstr ""
 msgid "File type: %(t)s"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:571
+#: app/templates/admin/ai/documents.html:579
 #: app/templates/admin/documents/documents.html:663
 msgid "Filename"
 msgstr ""
@@ -9472,7 +9468,7 @@ msgstr ""
 msgid "Filter"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:336
+#: app/templates/admin/templates/data_sync_imputation.html:286
 msgid "Filter Options"
 msgstr ""
 
@@ -9620,7 +9616,7 @@ msgid ""
 "create the template."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:226
+#: app/templates/admin/ai/documents.html:228
 msgid "Filter low-relevance chunks"
 msgstr ""
 
@@ -9636,7 +9632,7 @@ msgstr ""
 msgid "Filtered to session:"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:439
+#: app/templates/admin/ai/documents.html:443
 #: app/templates/admin/analytics/audit_trail.html:238
 #: app/templates/admin/analytics/login_logs.html:34
 #: app/templates/admin/analytics/page_path_analytics.html:30
@@ -9917,7 +9913,7 @@ msgstr ""
 msgid "Forms"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:572
+#: app/templates/admin/ai/documents.html:580
 #: app/templates/components/auto_translate_modal_js.html:32
 msgid "Found"
 msgstr ""
@@ -10141,7 +10137,7 @@ msgstr ""
 msgid "Ghost Access"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:573
+#: app/templates/admin/ai/documents.html:581
 #: app/templates/admin/rbac/grants.html:96
 #: app/templates/admin/user_management/users.html:298
 msgid "Global"
@@ -10280,7 +10276,7 @@ msgstr ""
 msgid "Group matrix table rows"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:574
+#: app/templates/admin/ai/documents.html:582
 msgid "Guideline"
 msgstr ""
 
@@ -10532,7 +10528,7 @@ msgstr ""
 msgid "How it works"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:174
+#: app/templates/admin/templates/data_sync_imputation.html:124
 msgid ""
 "How many rows to process before committing to the database. Smaller batches "
 "are safer but slower; larger batches are faster but use more memory. Leave "
@@ -10563,7 +10559,7 @@ msgstr ""
 msgid "Humanitarian Databank"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:175
+#: app/templates/admin/ai/documents.html:177
 msgid "Hybrid (keywords and embeddings)"
 msgstr ""
 
@@ -10614,7 +10610,7 @@ msgstr ""
 msgid "IFRC Strategy 2030 area code (e.g. EF2, SP3)."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:179
+#: app/templates/admin/templates/data_sync_imputation.html:129
 msgid ""
 "IFRC row status: choose which stages count as importable reported values "
 "when there is no imputed value. Several can be selected (same idea as comma-"
@@ -10764,12 +10760,6 @@ msgstr ""
 msgid "Import Excel"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:157
-msgid ""
-"Import FDRS submission documents (metadata and file download when IFRC URLs "
-"are available). Uncheck to sync indicator data only."
-msgstr ""
-
 #: app/templates/admin/dashboard.html:308
 #: app/templates/admin/templates/kobo_data_import.html:8
 #: app/templates/admin/templates/kobo_data_import.html:69
@@ -10789,7 +10779,7 @@ msgstr ""
 msgid "Import PO ZIP"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:395
+#: app/templates/admin/ai/documents.html:397
 msgid "Import Selected"
 msgstr ""
 
@@ -10817,7 +10807,7 @@ msgstr ""
 msgid "Import and Create Template"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:306
+#: app/templates/admin/ai/documents.html:308
 msgid ""
 "Import and process existing documents from the Document Management system"
 msgstr ""
@@ -10826,11 +10816,11 @@ msgstr ""
 msgid "Import applied successfully."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:575
+#: app/templates/admin/ai/documents.html:583
 msgid "Import cancelled"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:576
+#: app/templates/admin/ai/documents.html:584
 msgid "Import complete"
 msgstr ""
 
@@ -10841,7 +10831,7 @@ msgid ""
 "Reports (AR*): templates 33 and 23. Mid-Year Reviews (MYR*): template 33."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:337
+#: app/templates/admin/ai/documents.html:339
 msgid ""
 "Import documents from the connected external document API. Filter by "
 "document type, year, and country."
@@ -10874,7 +10864,7 @@ msgstr ""
 msgid "Import from Kobo XLSForm"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:260
+#: app/templates/admin/ai/documents.html:262
 msgid "Import from System"
 msgstr ""
 
@@ -10882,7 +10872,7 @@ msgstr ""
 msgid "Import from UPR Master Excel workbook"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:268
+#: app/templates/admin/ai/documents.html:270
 msgid "Import from external API"
 msgstr ""
 
@@ -10898,7 +10888,7 @@ msgstr ""
 msgid "Import into existing draft (Version %(num)s)"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:577
+#: app/templates/admin/ai/documents.html:585
 msgid "Import is in progress. Are you sure you want to leave?"
 msgstr ""
 
@@ -10923,7 +10913,7 @@ msgstr ""
 msgid "Import settings"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:245
+#: app/templates/admin/ai/documents.html:247
 msgid "Import source"
 msgstr ""
 
@@ -10979,7 +10969,7 @@ msgstr ""
 msgid "Importing"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:578
+#: app/templates/admin/ai/documents.html:586
 msgid "Importing documents"
 msgstr ""
 
@@ -10987,7 +10977,7 @@ msgstr ""
 msgid "Importing template…"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:579
+#: app/templates/admin/ai/documents.html:587
 msgid "Importing..."
 msgstr ""
 
@@ -10995,15 +10985,15 @@ msgstr ""
 msgid "Improvement"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:295
+#: app/templates/admin/templates/data_sync_imputation.html:245
 msgid "Imputation Methods"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:310
+#: app/templates/admin/templates/data_sync_imputation.html:260
 msgid "Impute all data"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:309
+#: app/templates/admin/templates/data_sync_imputation.html:259
 msgid "Impute only missing data"
 msgstr ""
 
@@ -11013,7 +11003,7 @@ msgstr ""
 msgid "Imputed"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1913
+#: app/templates/admin/templates/data_sync_imputation.html:1766
 msgid "Imputed Value"
 msgstr ""
 
@@ -11427,7 +11417,7 @@ msgstr ""
 msgid "Invalid Azure callback."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1779
+#: app/templates/admin/templates/data_sync_imputation.html:1640
 msgid "Invalid batch size. Please enter a number >= 100 (or leave empty)."
 msgstr ""
 
@@ -11547,9 +11537,9 @@ msgstr ""
 msgid "Italic"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:358
-#: app/templates/admin/templates/data_sync_imputation.html:445
-#: app/templates/admin/templates/data_sync_imputation.html:1888
+#: app/templates/admin/templates/data_sync_imputation.html:308
+#: app/templates/admin/templates/data_sync_imputation.html:395
+#: app/templates/admin/templates/data_sync_imputation.html:1741
 msgid "Item"
 msgstr ""
 
@@ -11583,7 +11573,7 @@ msgstr ""
 msgid "Item Translations"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:364
+#: app/templates/admin/templates/data_sync_imputation.html:314
 msgid "Item Type"
 msgstr ""
 
@@ -11859,7 +11849,7 @@ msgid ""
 "current lookup."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:580
+#: app/templates/admin/ai/documents.html:588
 #: app/templates/admin/communication/registry.html:124
 #: app/templates/admin/documents/documents.html:193
 #: app/templates/admin/documents/documents.html:676
@@ -12198,7 +12188,7 @@ msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:129
 #: app/templates/admin/data_exploration/explore_data.html:988
-#: app/templates/admin/templates/data_sync_imputation.html:385
+#: app/templates/admin/templates/data_sync_imputation.html:335
 msgid "Load Data"
 msgstr ""
 
@@ -12320,12 +12310,12 @@ msgstr ""
 msgid "Loading documentation"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:385
+#: app/templates/admin/ai/documents.html:387
 msgid "Loading documents from IFRC API..."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:319
-#: app/templates/admin/ai/documents.html:475
+#: app/templates/admin/ai/documents.html:321
+#: app/templates/admin/ai/documents.html:481
 #: app/templates/admin/documents/documents.html:81
 #: app/templates/admin/documents/documents.html:83
 msgid "Loading documents..."
@@ -12403,11 +12393,11 @@ msgstr ""
 msgid "Loading periods…"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:412
+#: app/templates/admin/templates/data_sync_imputation.html:362
 msgid "Loading preview data..."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:425
+#: app/templates/admin/templates/data_sync_imputation.html:375
 #: app/templates/admin/templates/kobo_data_import.html:391
 msgid "Loading preview..."
 msgstr ""
@@ -12524,10 +12514,10 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:23
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:16
 #: app/templates/admin/indicator_bank/measurement_lookups.html:138
-#: app/templates/admin/templates/data_sync_imputation.html:342
-#: app/templates/admin/templates/data_sync_imputation.html:348
-#: app/templates/admin/templates/data_sync_imputation.html:833
-#: app/templates/admin/templates/data_sync_imputation.html:834
+#: app/templates/admin/templates/data_sync_imputation.html:292
+#: app/templates/admin/templates/data_sync_imputation.html:298
+#: app/templates/admin/templates/data_sync_imputation.html:783
+#: app/templates/admin/templates/data_sync_imputation.html:784
 #: app/templates/admin/templates/new_template.html:1202
 #: app/templates/core/chat_immersive.html:36
 msgid "Loading…"
@@ -13202,11 +13192,11 @@ msgstr ""
 msgid "Messages"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:581
+#: app/templates/admin/ai/documents.html:589
 msgid "Metadata reprocess cancelled"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:582
+#: app/templates/admin/ai/documents.html:590
 msgid "Metadata reprocess complete"
 msgstr ""
 
@@ -13214,8 +13204,8 @@ msgstr ""
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:59
 #: app/templates/admin/analytics/audit_trail.html:461
 #: app/templates/admin/api_keys/details.html:185
-#: app/templates/admin/templates/data_sync_imputation.html:448
-#: app/templates/admin/templates/data_sync_imputation.html:1928
+#: app/templates/admin/templates/data_sync_imputation.html:398
+#: app/templates/admin/templates/data_sync_imputation.html:1781
 msgid "Method"
 msgstr ""
 
@@ -13232,7 +13222,7 @@ msgstr ""
 msgid "Migrants"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:214
+#: app/templates/admin/ai/documents.html:216
 msgid "Min Score"
 msgstr ""
 
@@ -13416,7 +13406,7 @@ msgstr ""
 msgid "My Work"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:583
+#: app/templates/admin/ai/documents.html:591
 #: app/templates/admin/assignments/public_submissions.html:144
 #: app/templates/admin/assignments/public_submissions.html:145
 #: app/templates/admin/assignments/public_submissions.html:146
@@ -13852,7 +13842,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:77
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:239
 #: app/templates/admin/indicator_bank/measurement_lookups.html:127
-#: app/templates/admin/templates/data_sync_imputation.html:1517
+#: app/templates/admin/templates/data_sync_imputation.html:1379
 #: app/templates/admin/validation_rules.html:226
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:85
@@ -14041,7 +14031,7 @@ msgstr ""
 msgid "No conversations match your search."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:584
+#: app/templates/admin/ai/documents.html:592
 msgid "No countries"
 msgstr ""
 
@@ -14142,7 +14132,7 @@ msgstr ""
 msgid "No divisions found."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:475
+#: app/templates/admin/ai/documents.html:481
 msgid "No documents found. Upload a document to get started."
 msgstr ""
 
@@ -14542,7 +14532,7 @@ msgstr ""
 msgid "No sex or age disaggregation found for the current parameters."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:585
+#: app/templates/admin/ai/documents.html:593
 msgid "No sources found."
 msgstr ""
 
@@ -14643,7 +14633,7 @@ msgstr ""
 msgid "No types found. Run database migrations, then refresh."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:586
+#: app/templates/admin/ai/documents.html:594
 msgid "No types loaded"
 msgstr ""
 
@@ -14691,10 +14681,6 @@ msgstr ""
 msgid "No years"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1384
-msgid "No years selected"
-msgstr ""
-
 #: app/templates/admin/data_exploration/explore_data.html:2711
 #: app/templates/admin/data_exploration/explore_data.html:2904
 msgid "Non-Compliant"
@@ -14708,10 +14694,9 @@ msgstr ""
 msgid "Non-English versions fall back to English when empty."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:588
+#: app/templates/admin/ai/documents.html:596
 #: app/templates/admin/analytics/audit_trail.html:315
 #: app/templates/admin/indicator_bank/indicator_bank.html:2373
-#: app/templates/admin/templates/data_sync_imputation.html:137
 msgid "None"
 msgstr ""
 
@@ -14736,7 +14721,7 @@ msgstr ""
 msgid "Not Applicable"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:589
+#: app/templates/admin/ai/documents.html:597
 msgid "Not Processed"
 msgstr ""
 
@@ -14796,8 +14781,8 @@ msgstr ""
 msgid "Not equal"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:183
-#: app/templates/admin/templates/data_sync_imputation.html:1353
+#: app/templates/admin/templates/data_sync_imputation.html:133
+#: app/templates/admin/templates/data_sync_imputation.html:1303
 msgid "Not filled"
 msgstr ""
 
@@ -14815,7 +14800,7 @@ msgstr ""
 msgid "Not provided"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:590
+#: app/templates/admin/ai/documents.html:598
 msgid "Not public"
 msgstr ""
 
@@ -14993,7 +14978,7 @@ msgstr ""
 msgid "Nov"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:367
+#: app/templates/admin/templates/data_sync_imputation.html:317
 #: app/utils/form_localization.py:76 app/utils/form_localization.py:77
 msgid "Number"
 msgstr ""
@@ -15222,7 +15207,7 @@ msgstr ""
 msgid "Open data guidance"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:591
+#: app/templates/admin/ai/documents.html:599
 msgid "Open document"
 msgstr ""
 
@@ -15382,7 +15367,7 @@ msgstr ""
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:265
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:419
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:587
-#: app/templates/admin/templates/data_sync_imputation.html:444
+#: app/templates/admin/templates/data_sync_imputation.html:394
 #: app/templates/components/_builder_items.html:39
 #: app/templates/forms/form_builder/partials/_item_modal.html:1089
 #: app/templates/forms/form_builder/partials/_section_modal.html:43
@@ -15474,7 +15459,7 @@ msgid "Orphaned"
 msgstr ""
 
 #: app/services/documentation/service.py:354
-#: app/templates/admin/ai/documents.html:592
+#: app/templates/admin/ai/documents.html:600
 #: app/templates/admin/analytics/audit_trail.html:372
 #: app/templates/admin/data_exploration/explore_data.html:2014
 #: app/templates/admin/embed_content/manage_embed_content.html:141
@@ -15641,7 +15626,7 @@ msgstr ""
 #: app/routes/forms_validation_summary.py:598
 #: app/routes/forms_validation_summary.py:1537
 #: app/services/documentation/pdf_service.py:121
-#: app/templates/admin/ai/documents.html:593
+#: app/templates/admin/ai/documents.html:601
 #: app/templates/admin/api_management.html:1094
 #: app/templates/admin/api_management.html:1112
 #: app/templates/admin/api_management.html:1131
@@ -15866,9 +15851,9 @@ msgstr ""
 msgid "Paused"
 msgstr ""
 
-#: app/routes/main/helpers.py:1206 app/templates/admin/ai/documents.html:70
-#: app/templates/admin/ai/documents.html:443
-#: app/templates/admin/ai/documents.html:594
+#: app/routes/main/helpers.py:1206 app/templates/admin/ai/documents.html:72
+#: app/templates/admin/ai/documents.html:447
+#: app/templates/admin/ai/documents.html:602
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/assignments/public_submissions.html:53
 #: app/templates/admin/assignments/public_submissions.html:104
@@ -15934,7 +15919,7 @@ msgstr ""
 msgid "Percent"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:368
+#: app/templates/admin/templates/data_sync_imputation.html:318
 #: app/utils/form_localization.py:78 app/utils/form_localization.py:79
 msgid "Percentage"
 msgstr ""
@@ -15959,7 +15944,7 @@ msgstr ""
 
 #: app/services/ai/planning/payload_inference.py:181
 #: app/services/ai/runtime/step_ux.py:201
-#: app/templates/admin/ai/documents.html:659
+#: app/templates/admin/ai/documents.html:667
 #: app/templates/admin/assignments/assignments.html:115
 #: app/templates/admin/documents/documents.html:683
 #: app/templates/admin/validation_dashboard.html:208
@@ -16079,7 +16064,7 @@ msgid ""
 " be removed or changed."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:595
+#: app/templates/admin/ai/documents.html:603
 msgid "Plan"
 msgstr ""
 
@@ -16125,7 +16110,7 @@ msgstr ""
 msgid "Please enter a primary name to translate from."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:596
+#: app/templates/admin/ai/documents.html:604
 msgid "Please enter a query."
 msgstr ""
 
@@ -16163,7 +16148,7 @@ msgstr ""
 msgid "Please select a Year/Period for the document."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:597
+#: app/templates/admin/ai/documents.html:605
 msgid "Please select a file"
 msgstr ""
 
@@ -16201,7 +16186,7 @@ msgstr ""
 msgid "Please select at least one country."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:598
+#: app/templates/admin/ai/documents.html:606
 msgid "Please select at least one document"
 msgstr ""
 
@@ -16326,7 +16311,7 @@ msgstr ""
 msgid "Plugins will appear here once they are installed"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:599
+#: app/templates/admin/ai/documents.html:607
 msgid "Policy"
 msgstr ""
 
@@ -16393,8 +16378,8 @@ msgstr ""
 msgid "Preparing request..."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:50
-#: app/templates/admin/ai/documents.html:600
+#: app/templates/admin/ai/documents.html:52
+#: app/templates/admin/ai/documents.html:608
 msgid "Preparing..."
 msgstr ""
 
@@ -16420,11 +16405,11 @@ msgstr ""
 msgid "Preview"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1656
+#: app/templates/admin/templates/data_sync_imputation.html:1517
 msgid "Preview Excel ready:"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:320
+#: app/templates/admin/templates/data_sync_imputation.html:270
 msgid "Preview Imputation"
 msgstr ""
 
@@ -16437,7 +16422,7 @@ msgstr ""
 msgid "Preview Template"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:305
+#: app/templates/admin/templates/data_sync_imputation.html:255
 msgid "Preview current data and imputed values per country and item."
 msgstr ""
 
@@ -16567,27 +16552,27 @@ msgstr ""
 msgid "Probe"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:601
+#: app/templates/admin/ai/documents.html:609
 msgid "Process"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:603
+#: app/templates/admin/ai/documents.html:611
 msgid "Process Documents?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:328
-#: app/templates/admin/ai/documents.html:604
+#: app/templates/admin/ai/documents.html:330
+#: app/templates/admin/ai/documents.html:612
 msgid "Process Selected"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:602
+#: app/templates/admin/ai/documents.html:610
 #, python-brace-format
 msgid ""
 "Process {count} document(s) with AI? This will extract text, create chunks, "
 "and generate embeddings."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:605
+#: app/templates/admin/ai/documents.html:613
 msgid "Processed"
 msgstr ""
 
@@ -16599,33 +16584,33 @@ msgstr ""
 msgid "Processed By"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:444
-#: app/templates/admin/ai/documents.html:607
+#: app/templates/admin/ai/documents.html:448
+#: app/templates/admin/ai/documents.html:615
 msgid "Processing"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:608
+#: app/templates/admin/ai/documents.html:616
 msgid "Processing complete"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:609
+#: app/templates/admin/ai/documents.html:617
 msgid "Processing documents"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:610
+#: app/templates/admin/ai/documents.html:618
 msgid "Processing failed"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:611
+#: app/templates/admin/ai/documents.html:619
 msgid "Processing finished"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:612
+#: app/templates/admin/ai/documents.html:620
 msgid "Processing upload"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:49
-#: app/templates/admin/ai/documents.html:606
+#: app/templates/admin/ai/documents.html:51
+#: app/templates/admin/ai/documents.html:614
 msgid "Processing..."
 msgstr ""
 
@@ -16710,8 +16695,8 @@ msgstr ""
 msgid "Provider Priority"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:287
-#: app/templates/admin/ai/documents.html:613
+#: app/templates/admin/ai/documents.html:289
+#: app/templates/admin/ai/documents.html:621
 #: app/templates/admin/api_management.html:1660
 #: app/templates/components/ag_grid_i18n_js.html:39
 msgid "Public"
@@ -16761,7 +16746,7 @@ msgstr ""
 msgid "Public reporting"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:661
+#: app/templates/admin/ai/documents.html:669
 msgid "Public submission"
 msgstr ""
 
@@ -16787,8 +16772,8 @@ msgstr ""
 msgid "Publish this draft and remap submission data"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:203
-#: app/templates/admin/templates/data_sync_imputation.html:1358
+#: app/templates/admin/templates/data_sync_imputation.html:153
+#: app/templates/admin/templates/data_sync_imputation.html:1308
 msgid "Published"
 msgstr ""
 
@@ -16855,7 +16840,7 @@ msgstr ""
 msgid "Putting together your answer…"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:614
+#: app/templates/admin/ai/documents.html:622
 msgid "Quality"
 msgstr ""
 
@@ -17016,21 +17001,21 @@ msgstr ""
 msgid "Rating"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:417
+#: app/templates/admin/ai/documents.html:419
 msgid "Re-run country detection (no re-chunk)"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:615
+#: app/templates/admin/ai/documents.html:623
 msgid "Re-run country detection for selected documents?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:616
+#: app/templates/admin/ai/documents.html:624
 msgid ""
 "Re-run metadata enrichment (date, language, category, quality, source org) "
 "for selected documents?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:421
+#: app/templates/admin/ai/documents.html:423
 msgid ""
 "Re-run metadata enrichment: date, language, category, quality, source org "
 "(no re-chunk)"
@@ -17274,16 +17259,16 @@ msgstr ""
 msgid "Red"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:618
+#: app/templates/admin/ai/documents.html:626
 msgid "Redetect Country"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:419
-#: app/templates/admin/ai/documents.html:617
+#: app/templates/admin/ai/documents.html:421
+#: app/templates/admin/ai/documents.html:625
 msgid "Redetect country"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:619
+#: app/templates/admin/ai/documents.html:627
 msgid "Redetecting..."
 msgstr ""
 
@@ -17305,8 +17290,8 @@ msgstr ""
 msgid "Reference count:"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:311
-#: app/templates/admin/ai/documents.html:377
+#: app/templates/admin/ai/documents.html:313
+#: app/templates/admin/ai/documents.html:379
 #: app/templates/admin/communication/center.html:1075
 #: app/templates/admin/communication/center.html:1160
 #: app/templates/admin/data_exploration/explore_data.html:474
@@ -17337,7 +17322,7 @@ msgstr ""
 msgid "Refresh preview data"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:620
+#: app/templates/admin/ai/documents.html:628
 msgid "Refreshing document list..."
 msgstr ""
 
@@ -17366,7 +17351,7 @@ msgstr ""
 msgid "Region"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:621
+#: app/templates/admin/ai/documents.html:629
 msgid "Regional"
 msgstr ""
 
@@ -17504,7 +17489,7 @@ msgstr ""
 msgid "Reload all plugins to detect changes"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:282
+#: app/templates/admin/templates/data_sync_imputation.html:232
 msgid "Reload page"
 msgstr ""
 
@@ -17672,8 +17657,8 @@ msgstr ""
 msgid "Reopen Assignment?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:191
-#: app/templates/admin/templates/data_sync_imputation.html:1355
+#: app/templates/admin/templates/data_sync_imputation.html:141
+#: app/templates/admin/templates/data_sync_imputation.html:1305
 msgid "Reopened"
 msgstr ""
 
@@ -17722,7 +17707,7 @@ msgstr ""
 msgid "Replace organization logo"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:622
+#: app/templates/admin/ai/documents.html:630
 msgid "Report"
 msgstr ""
 
@@ -17779,10 +17764,6 @@ msgstr ""
 msgid "Reporting periods"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:110
-msgid "Reporting years"
-msgstr ""
-
 #: app/templates/admin/data_exploration/explore_data.html:73
 #: app/templates/admin/reports/builder.html:20
 #: app/templates/admin/reports/list.html:4
@@ -17795,53 +17776,53 @@ msgstr ""
 msgid "Reports"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:415
-#: app/templates/admin/ai/documents.html:623
+#: app/templates/admin/ai/documents.html:417
+#: app/templates/admin/ai/documents.html:631
 msgid "Reprocess"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:626
+#: app/templates/admin/ai/documents.html:634
 msgid "Reprocess Document?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:627
+#: app/templates/admin/ai/documents.html:635
 msgid "Reprocess Documents?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:629
+#: app/templates/admin/ai/documents.html:637
 msgid "Reprocess Metadata?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:624
+#: app/templates/admin/ai/documents.html:632
 msgid "Reprocess cancelled"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:625
+#: app/templates/admin/ai/documents.html:633
 msgid "Reprocess complete"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:423
-#: app/templates/admin/ai/documents.html:628
+#: app/templates/admin/ai/documents.html:425
+#: app/templates/admin/ai/documents.html:636
 msgid "Reprocess metadata"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:630
+#: app/templates/admin/ai/documents.html:638
 msgid "Reprocess selected documents?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:631
+#: app/templates/admin/ai/documents.html:639
 msgid "Reprocess this document?"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:632
+#: app/templates/admin/ai/documents.html:640
 msgid "Reprocessing documents"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:633
+#: app/templates/admin/ai/documents.html:641
 msgid "Reprocessing metadata"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:634
+#: app/templates/admin/ai/documents.html:642
 msgid "Reprocessing started"
 msgstr ""
 
@@ -17896,8 +17877,8 @@ msgstr ""
 msgid "Request changes?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1692
-#: app/templates/admin/templates/data_sync_imputation.html:1844
+#: app/templates/admin/templates/data_sync_imputation.html:1553
+#: app/templates/admin/templates/data_sync_imputation.html:1697
 msgid "Request failed"
 msgstr ""
 
@@ -18039,7 +18020,7 @@ msgstr ""
 msgid "Reset to template"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:635
+#: app/templates/admin/ai/documents.html:643
 #: app/templates/admin/security/event_detail.html:55
 #: app/templates/admin/user_management/access_requests.html:425
 msgid "Resolution"
@@ -18119,7 +18100,7 @@ msgstr ""
 msgid "Resume"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:636
+#: app/templates/admin/ai/documents.html:644
 msgid "Resuming..."
 msgstr ""
 
@@ -18445,12 +18426,12 @@ msgstr ""
 msgid "Run AI validation"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:328
+#: app/templates/admin/templates/data_sync_imputation.html:278
 msgid "Run Imputation"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:261
-#: app/templates/admin/templates/data_sync_imputation.html:1578
+#: app/templates/admin/templates/data_sync_imputation.html:211
+#: app/templates/admin/templates/data_sync_imputation.html:1439
 msgid "Run Sync"
 msgstr ""
 
@@ -18474,7 +18455,7 @@ msgstr ""
 msgid "Running validations…"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1805
+#: app/templates/admin/templates/data_sync_imputation.html:1659
 msgid "Running..."
 msgstr ""
 
@@ -18571,7 +18552,7 @@ msgstr ""
 msgid "Save & Continue"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:464
+#: app/templates/admin/templates/data_sync_imputation.html:414
 msgid "Save All Changes"
 msgstr ""
 
@@ -18650,8 +18631,8 @@ msgid ""
 " continue editing later."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:187
-#: app/templates/admin/templates/data_sync_imputation.html:1354
+#: app/templates/admin/templates/data_sync_imputation.html:137
+#: app/templates/admin/templates/data_sync_imputation.html:1304
 #: app/templates/admin/validation_rules.html:217
 msgid "Saved"
 msgstr ""
@@ -18743,7 +18724,7 @@ msgstr ""
 msgid "Scroll"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:374
+#: app/templates/admin/ai/documents.html:376
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:24
 #: app/templates/admin/api_keys/list.html:91
 #: app/templates/admin/communication/registry.html:22
@@ -18765,7 +18746,7 @@ msgstr ""
 msgid "Search Definition"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:172
+#: app/templates/admin/ai/documents.html:174
 msgid "Search Mode"
 msgstr ""
 
@@ -18911,7 +18892,7 @@ msgstr ""
 msgid "Search documentation..."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:309
+#: app/templates/admin/ai/documents.html:311
 msgid "Search documents..."
 msgstr ""
 
@@ -18968,7 +18949,7 @@ msgstr ""
 msgid "Search terms or meanings…"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:465
+#: app/templates/admin/ai/documents.html:469
 msgid "Search title/filename..."
 msgstr ""
 
@@ -19419,7 +19400,7 @@ msgstr ""
 msgid "Select activity types..."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:353
+#: app/templates/admin/ai/documents.html:355
 #: app/templates/admin/user_management/user_form.html:1117
 #: app/templates/admin/user_management/user_form.html:1124
 #: app/templates/admin/validation_dashboard.html:253
@@ -19439,7 +19420,7 @@ msgstr ""
 msgid "Select an entity"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1794
+#: app/templates/admin/templates/data_sync_imputation.html:1648
 msgid "Select at least one data status to include."
 msgstr ""
 
@@ -19449,10 +19430,6 @@ msgstr ""
 
 #: app/templates/admin/templates/new_template.html:1205
 msgid "Select at least one indicator to continue."
-msgstr ""
-
-#: app/templates/admin/templates/data_sync_imputation.html:1787
-msgid "Select at least one reporting year."
 msgstr ""
 
 #: app/templates/admin/user_management/user_form.html:1483
@@ -19503,7 +19480,7 @@ msgid ""
 "them."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:277
+#: app/templates/admin/ai/documents.html:279
 msgid "Select files to upload"
 msgstr ""
 
@@ -19634,10 +19611,6 @@ msgstr ""
 msgid "Select year"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:129
-msgid "Select years"
-msgstr ""
-
 #: app/templates/tours/tours.html:39
 msgid ""
 "Select your country to view your assignments and country-specific data."
@@ -19651,7 +19624,7 @@ msgstr ""
 msgid "Select:"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:637
+#: app/templates/admin/ai/documents.html:645
 msgid "Selected"
 msgstr ""
 
@@ -19702,7 +19675,7 @@ msgstr ""
 msgid "Semantic Thresholds"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:121
+#: app/templates/admin/ai/documents.html:123
 #: app/templates/components/_fb_ai_config.html:18
 #: app/templates/core/chat_immersive.html:51
 #: app/templates/core/chat_immersive.html:259
@@ -20432,7 +20405,7 @@ msgstr ""
 msgid "Single section"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:638
+#: app/templates/admin/ai/documents.html:646
 msgid "Situation Report"
 msgstr ""
 
@@ -20464,11 +20437,11 @@ msgstr ""
 msgid "Some countries could not be processed. Please try again."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:639
+#: app/templates/admin/ai/documents.html:647
 msgid "Some documents failed"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:640
+#: app/templates/admin/ai/documents.html:648
 msgid "Some documents failed."
 msgstr ""
 
@@ -20524,19 +20497,19 @@ msgstr ""
 msgid "Sound"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:663
+#: app/templates/admin/ai/documents.html:671
 #: app/templates/admin/data_exploration/explore_data.html:1552
-#: app/templates/admin/templates/data_sync_imputation.html:1937
+#: app/templates/admin/templates/data_sync_imputation.html:1790
 #: app/templates/admin/translations/manage_translations.html:656
 #: app/templates/admin/validation_questions.html:243
 msgid "Source"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:641
+#: app/templates/admin/ai/documents.html:649
 msgid "Source Org"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:346
+#: app/templates/admin/templates/data_sync_imputation.html:296
 msgid "Source Period"
 msgstr ""
 
@@ -20544,7 +20517,7 @@ msgstr ""
 msgid "Source Template"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:161
+#: app/templates/admin/ai/documents.html:163
 #: app/templates/admin/data_exploration/explore_data.html:1511
 #: app/templates/forms/entry_form/validation_summary_pdf.html:71
 msgid "Sources"
@@ -20574,7 +20547,7 @@ msgstr ""
 msgid "Staff and local units in Nigeria"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:643
+#: app/templates/admin/ai/documents.html:651
 msgid "Stage:"
 msgstr ""
 
@@ -20673,7 +20646,7 @@ msgstr ""
 msgid "Starting"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:645
+#: app/templates/admin/ai/documents.html:653
 msgid "Starting import"
 msgstr ""
 
@@ -20685,8 +20658,8 @@ msgstr ""
 msgid "Starting translation for"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:644
-#: app/templates/admin/templates/data_sync_imputation.html:1803
+#: app/templates/admin/ai/documents.html:652
+#: app/templates/admin/templates/data_sync_imputation.html:1657
 msgid "Starting..."
 msgstr ""
 
@@ -20706,7 +20679,7 @@ msgstr ""
 #: app/templates/admin/ai/_trace_card.html:418
 #: app/templates/admin/ai/conversation_traces.html:106
 #: app/templates/admin/ai/conversation_traces.html:221
-#: app/templates/admin/ai/documents.html:646
+#: app/templates/admin/ai/documents.html:654
 #: app/templates/admin/ai/reasoning_traces.html:353
 #: app/templates/admin/ai/review_queue.html:57
 #: app/templates/admin/analytics/_user_detail_partial.html:150
@@ -20742,7 +20715,7 @@ msgstr ""
 #: app/templates/admin/security/dashboard.html:166
 #: app/templates/admin/security/event_detail.html:38
 #: app/templates/admin/security/event_detail.html:85
-#: app/templates/admin/templates/data_sync_imputation.html:237
+#: app/templates/admin/templates/data_sync_imputation.html:187
 #: app/templates/admin/templates/templates.html:191
 #: app/templates/admin/templates/upr_excel_import.html:118
 #: app/templates/admin/user_management/access_requests.html:1254
@@ -20770,7 +20743,7 @@ msgstr ""
 msgid "Status Updated"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:178
+#: app/templates/admin/templates/data_sync_imputation.html:128
 msgid "Status of the data"
 msgstr ""
 
@@ -20839,8 +20812,8 @@ msgstr ""
 msgid "Stop Translation?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:269
-#: app/templates/admin/templates/data_sync_imputation.html:1590
+#: app/templates/admin/templates/data_sync_imputation.html:219
+#: app/templates/admin/templates/data_sync_imputation.html:1451
 msgid "Stop sync"
 msgstr ""
 
@@ -20848,7 +20821,7 @@ msgstr ""
 msgid "Stopped"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1597
+#: app/templates/admin/templates/data_sync_imputation.html:1458
 msgid "Stopping..."
 msgstr ""
 
@@ -20864,7 +20837,7 @@ msgstr ""
 msgid "Store this key securely - it provides full API access"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:647
+#: app/templates/admin/ai/documents.html:655
 msgid "Strategic Plan"
 msgstr ""
 
@@ -20980,8 +20953,8 @@ msgstr ""
 #: app/routes/main/helpers.py:1208
 #: app/templates/admin/communication/center.html:919
 #: app/templates/admin/reports/partials/_filter_panel.html:24
-#: app/templates/admin/templates/data_sync_imputation.html:195
-#: app/templates/admin/templates/data_sync_imputation.html:1356
+#: app/templates/admin/templates/data_sync_imputation.html:145
+#: app/templates/admin/templates/data_sync_imputation.html:1306
 #: app/templates/admin/validation_dashboard.html:247
 msgid "Submitted"
 msgstr ""
@@ -21081,7 +21054,7 @@ msgid ""
 "browser or client."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:648
+#: app/templates/admin/ai/documents.html:656
 #, python-brace-format
 msgid "Successfully processed: {count}"
 msgstr ""
@@ -21163,7 +21136,7 @@ msgstr ""
 msgid "Supported formats: JSON, HTML, CSS, JavaScript"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:280
+#: app/templates/admin/ai/documents.html:282
 msgid "Supported: PDF, Word, Excel, Text, Markdown, HTML"
 msgstr ""
 
@@ -21204,11 +21177,7 @@ msgstr ""
 msgid "Switch to this version"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:163
-msgid "Sync FDRS documents"
-msgstr ""
-
-#: app/templates/admin/templates/data_sync_imputation.html:1677
+#: app/templates/admin/templates/data_sync_imputation.html:1538
 msgid "Sync cancelled."
 msgstr ""
 
@@ -21220,7 +21189,7 @@ msgstr ""
 msgid "Sync completed."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:230
+#: app/templates/admin/templates/data_sync_imputation.html:180
 msgid "Sync configuration"
 msgstr ""
 
@@ -21234,12 +21203,8 @@ msgid ""
 " template."
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1535
-msgid "Sync documents"
-msgstr ""
-
-#: app/templates/admin/templates/data_sync_imputation.html:1669
-#: app/templates/admin/templates/data_sync_imputation.html:1836
+#: app/templates/admin/templates/data_sync_imputation.html:1530
+#: app/templates/admin/templates/data_sync_imputation.html:1689
 msgid "Sync failed"
 msgstr ""
 
@@ -21399,7 +21364,7 @@ msgstr ""
 msgid "Target"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:340
+#: app/templates/admin/templates/data_sync_imputation.html:290
 msgid "Target Period"
 msgstr ""
 
@@ -21434,7 +21399,7 @@ msgid "Technical safeguards include:"
 msgstr ""
 
 #: app/services/ai/runtime/step_ux.py:200
-#: app/templates/admin/ai/documents.html:664
+#: app/templates/admin/ai/documents.html:672
 #: app/templates/admin/assignments/assignments.html:117
 #: app/templates/admin/assignments/gantt_chart.html:117
 #: app/templates/admin/assignments/public_submissions.html:234
@@ -21662,16 +21627,16 @@ msgstr ""
 msgid "Test email sent to"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1537
+#: app/templates/admin/templates/data_sync_imputation.html:1398
 msgid "Test mode"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:217
+#: app/templates/admin/templates/data_sync_imputation.html:167
 msgid "Test mode (year 2024 only, max 1000 records)"
 msgstr ""
 
 #: app/templates/admin/reports/partials/_widget_palette.html:8
-#: app/templates/admin/templates/data_sync_imputation.html:369
+#: app/templates/admin/templates/data_sync_imputation.html:319
 #: app/utils/form_localization.py:80 app/utils/form_localization.py:81
 msgid "Text"
 msgstr ""
@@ -22557,7 +22522,7 @@ msgstr ""
 msgid "Top Endpoints"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:200
+#: app/templates/admin/ai/documents.html:202
 msgid "Top K (Initial retrieval size)"
 msgstr ""
 
@@ -22566,7 +22531,7 @@ msgstr ""
 msgid "Top Tools Used"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:62
+#: app/templates/admin/ai/documents.html:64
 #: app/templates/admin/governance/dashboard.html:1021
 #: app/templates/forms/entry_form/export_pdf.html:197
 #: app/templates/forms/entry_form/export_pdf.html:275
@@ -22778,7 +22743,7 @@ msgstr ""
 msgid "Tracker"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:650
+#: app/templates/admin/ai/documents.html:658
 msgid "Training"
 msgstr ""
 
@@ -23157,8 +23122,8 @@ msgstr ""
 msgid "Two-letter locale code for localization"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:341
-#: app/templates/admin/ai/documents.html:651
+#: app/templates/admin/ai/documents.html:343
+#: app/templates/admin/ai/documents.html:659
 #: app/templates/admin/communication/center.html:1343
 #: app/templates/admin/embed_content/manage_embed_content.html:47
 #: app/templates/admin/indicator_bank/indicator_bank.html:820
@@ -23166,7 +23131,7 @@ msgstr ""
 #: app/templates/admin/security/alerts.html:24
 #: app/templates/admin/security/event_detail.html:83
 #: app/templates/admin/settings/manage_settings.html:1503
-#: app/templates/admin/templates/data_sync_imputation.html:446
+#: app/templates/admin/templates/data_sync_imputation.html:396
 #: app/templates/admin/user_management/user_form.html:1102
 #: app/templates/components/_builder_items.html:49
 #: app/templates/components/_builder_items.html:72
@@ -23230,7 +23195,7 @@ msgstr ""
 msgid "Types & units"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:652
+#: app/templates/admin/ai/documents.html:660
 msgid "Typing"
 msgstr ""
 
@@ -23395,7 +23360,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:832
 #: app/templates/admin/indicator_bank/measurement_lookups.html:104
 #: app/templates/admin/indicator_bank/neural_map.html:194
-#: app/templates/admin/templates/data_sync_imputation.html:447
+#: app/templates/admin/templates/data_sync_imputation.html:397
 #: app/templates/components/_builder_items.html:50
 #: app/templates/forms/entry_form/entry_form.html:1059
 #: app/templates/forms/entry_form/entry_form.html:1093
@@ -23618,7 +23583,7 @@ msgstr ""
 msgid "Updates"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:290
+#: app/templates/admin/ai/documents.html:292
 #: app/templates/admin/documents/documents.html:516
 #: app/templates/admin/documents/documents.html:519
 #: app/templates/admin/settings/manage_settings.html:502
@@ -23634,7 +23599,7 @@ msgstr ""
 msgid "Upload & import"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:665
+#: app/templates/admin/ai/documents.html:673
 #: app/templates/admin/documents/documents.html:725
 msgid "Upload Date"
 msgstr ""
@@ -23653,7 +23618,7 @@ msgstr ""
 msgid "Upload Modal Fields"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:252
+#: app/templates/admin/ai/documents.html:254
 msgid "Upload New"
 msgstr ""
 
@@ -23701,11 +23666,11 @@ msgstr ""
 msgid "Upload below"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:654
+#: app/templates/admin/ai/documents.html:662
 msgid "Upload complete"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:653
+#: app/templates/admin/ai/documents.html:661
 msgid "Upload complete!"
 msgstr ""
 
@@ -23714,7 +23679,7 @@ msgstr ""
 msgid "Upload failed"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:655
+#: app/templates/admin/ai/documents.html:663
 msgid "Upload failed:"
 msgstr ""
 
@@ -23739,21 +23704,21 @@ msgid ""
 "Upload your saved .xlsx. Load into form is enabled after validation passes."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:432
+#: app/templates/admin/ai/documents.html:435
 msgid "Upload/Import"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:243
+#: app/templates/admin/ai/documents.html:245
 msgid "Upload/Import Documents"
 msgstr ""
 
 #: app/services/notification/preview.py:19
-#: app/templates/admin/ai/documents.html:667
+#: app/templates/admin/ai/documents.html:675
 #: app/templates/admin/validation_dashboard.html:241
 msgid "Uploaded"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:666
+#: app/templates/admin/ai/documents.html:674
 #: app/templates/admin/documents/documents.html:705
 msgid "Uploaded By"
 msgstr ""
@@ -23768,8 +23733,8 @@ msgstr ""
 msgid "Uploaded by %(user)s on %(date)s"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:298
-#: app/templates/admin/ai/documents.html:668
+#: app/templates/admin/ai/documents.html:300
+#: app/templates/admin/ai/documents.html:676
 msgid "Uploading..."
 msgstr ""
 
@@ -23818,7 +23783,7 @@ msgstr ""
 msgid "Use as repeat entry title (dropdown in header)"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:224
+#: app/templates/admin/templates/data_sync_imputation.html:174
 msgid ""
 "Use cached imputed values (recommended; uncheck to fetch fresh from API — "
 "can take a long time)"
@@ -24181,8 +24146,8 @@ msgstr ""
 msgid "Validate Assignment?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:199
-#: app/templates/admin/templates/data_sync_imputation.html:1357
+#: app/templates/admin/templates/data_sync_imputation.html:149
+#: app/templates/admin/templates/data_sync_imputation.html:1307
 msgid "Validated"
 msgstr ""
 
@@ -24361,7 +24326,7 @@ msgstr ""
 msgid "Vector chunks"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:176
+#: app/templates/admin/ai/documents.html:178
 msgid "Vector only"
 msgstr ""
 
@@ -24580,7 +24545,7 @@ msgstr ""
 msgid "View options"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:669
+#: app/templates/admin/ai/documents.html:677
 msgid "View or download"
 msgstr ""
 
@@ -24939,7 +24904,7 @@ msgstr ""
 msgid "Women in Volunteering"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:670
+#: app/templates/admin/ai/documents.html:678
 msgid "Work Plan"
 msgstr ""
 
@@ -24955,7 +24920,7 @@ msgstr ""
 msgid "Working Offline"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:671
+#: app/templates/admin/ai/documents.html:679
 msgid "Working..."
 msgstr ""
 
@@ -24982,8 +24947,8 @@ msgstr ""
 msgid "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:362
-#: app/templates/admin/ai/documents.html:672
+#: app/templates/admin/ai/documents.html:364
+#: app/templates/admin/ai/documents.html:680
 #: app/templates/admin/assignments/manage_assignment.html:96
 #: app/templates/admin/data_exploration/explore_data.html:248
 #: app/templates/admin/settings/manage_settings.html:990
@@ -25002,8 +24967,12 @@ msgstr ""
 msgid "Year Range"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1532
+#: app/templates/admin/templates/data_sync_imputation.html:1394
 msgid "Years"
+msgstr ""
+
+#: app/templates/admin/templates/data_sync_imputation.html:110
+msgid "Years (comma-separated)"
 msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:244
@@ -25017,7 +24986,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:76
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:239
 #: app/templates/admin/indicator_bank/measurement_lookups.html:126
-#: app/templates/admin/templates/data_sync_imputation.html:1515
+#: app/templates/admin/templates/data_sync_imputation.html:1377
 #: app/templates/admin/validation_rules.html:225
 #: app/templates/components/_builder_items.html:51
 #: app/templates/components/_builder_items.html:73
@@ -25059,7 +25028,7 @@ msgstr ""
 msgid "Yes, rotate key"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:370
+#: app/templates/admin/templates/data_sync_imputation.html:320
 #: app/utils/form_localization.py:82 app/utils/form_localization.py:83
 msgid "Yes/No"
 msgstr ""
@@ -25219,7 +25188,7 @@ msgstr ""
 msgid "You have received an admin message"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:663
+#: app/templates/admin/templates/data_sync_imputation.html:613
 msgid "You have unsaved imputation method changes. Switch template anyway?"
 msgstr ""
 
@@ -25400,7 +25369,7 @@ msgstr ""
 msgid "and"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:519
+#: app/templates/admin/ai/documents.html:527
 #, python-brace-format
 msgid "and {count} more"
 msgstr ""
@@ -25491,7 +25460,7 @@ msgstr ""
 msgid "completed"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:530
+#: app/templates/admin/ai/documents.html:538
 #: app/templates/admin/data_exploration/explore_data.html:1900
 #: app/templates/admin/organization/index.html:2468
 #: app/templates/admin/templates/upr_excel_import.html:429
@@ -25550,11 +25519,11 @@ msgstr ""
 msgid "divisions"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:547
+#: app/templates/admin/ai/documents.html:555
 msgid "document(s) updated."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:551
+#: app/templates/admin/ai/documents.html:559
 msgid "downloading"
 msgstr ""
 
@@ -25606,7 +25575,7 @@ msgstr ""
 msgid "e.g., 123 or [some_variable]"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:363
+#: app/templates/admin/ai/documents.html:365
 msgid "e.g., 2023, 2024"
 msgstr ""
 
@@ -25710,14 +25679,14 @@ msgstr ""
 msgid "extra \"Other\" entries (beyond the option count limit)"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:558
+#: app/templates/admin/ai/documents.html:566
 #: app/templates/admin/analytics/dashboard.html:84
 #: app/templates/forms/entry_form/validation_summary_pdf.html:38
 #: app/templates/forms/entry_form/validation_summary_progress.html:307
 msgid "failed"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:559
+#: app/templates/admin/ai/documents.html:567
 msgid "failed."
 msgstr ""
 
@@ -26180,7 +26149,7 @@ msgstr ""
 msgid "short name"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:642
+#: app/templates/admin/ai/documents.html:650
 msgid "source(s)"
 msgstr ""
 
@@ -26267,7 +26236,7 @@ msgstr ""
 msgid "to zoom in/out"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:649
+#: app/templates/admin/ai/documents.html:657
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:48
 #: app/templates/admin/analytics/page_path_analytics.html:75
 #: app/templates/admin/communication/registry.html:47
@@ -26371,11 +26340,6 @@ msgstr ""
 msgid "will be unassigned"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1391
-#: app/templates/admin/templates/data_sync_imputation.html:1396
-msgid "years"
-msgstr ""
-
 #: app/templates/core/dashboard/_admin_panel.html:686
 #: app/templates/core/dashboard/_assignments_tab.html:656
 msgid "yet."
@@ -26414,7 +26378,7 @@ msgstr ""
 
 #: app/forms/form_builder/template_forms.py:42
 #: app/forms/form_builder/template_forms.py:62
-#: app/templates/admin/ai/documents.html:587
+#: app/templates/admin/ai/documents.html:595
 msgid "— None —"
 msgstr ""
 
@@ -27960,4 +27924,44 @@ msgstr ""
 
 # [Removed] was: app/templates/admin/translations/manage_translations.html:708
 #~ msgid "translation fields."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:111
+#~ msgid ""
+#~ "Choose which FDRS reporting years to fetch. All years in the default range "
+#~ "are selected initially."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:157
+#~ msgid ""
+#~ "Import FDRS submission documents (metadata and file download when IFRC URLs "
+#~ "are available). Uncheck to sync indicator data only."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1384
+#~ msgid "No years selected"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:110
+#~ msgid "Reporting years"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1787
+#~ msgid "Select at least one reporting year."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:129
+#~ msgid "Select years"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:163
+#~ msgid "Sync FDRS documents"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1535
+#~ msgid "Sync documents"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1391
+#~ msgid "years"
 #~ msgstr ""

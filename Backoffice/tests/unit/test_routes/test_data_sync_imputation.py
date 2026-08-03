@@ -771,6 +771,20 @@ class TestRunDataSync:
             )
         assert resp.status_code in (200, 400, 500)
 
+    def test_sync_documents_false_passed_to_run_import(self, logged_in_client, db_session, app):
+        template = create_test_template(db_session, name="FDRS No Docs Template")
+        mock_run_import = MagicMock(return_value={"loaded": 0, "skipped": 0, "inserted": 0, "updated": 0, "errors": 0})
+        with _auth(), \
+             patch.dict("sys.modules", {"import_fdrs_form_data": MagicMock(run_import=mock_run_import)}):
+            resp = self._post_data_sync(
+                logged_in_client, template.id,
+                {"sync_documents": False}
+            )
+        assert resp.status_code in (200, 400, 500)
+        if resp.status_code == 200:
+            mock_run_import.assert_called_once()
+            assert mock_run_import.call_args.kwargs.get("sync_documents") is False
+
 
 # ---------------------------------------------------------------------------
 # GET /<template_id>/data-sync-status/<job_id>

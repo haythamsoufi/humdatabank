@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-03 21:16+0000\n"
+"POT-Creation-Date: 2026-08-03 21:49+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ar <LL@li.org>\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: Babel 2.10.3\n"
 
 #: app/routes/admin/utilities/translations.py:1541
 #, python-format
@@ -45,7 +45,7 @@ msgstr ""
 "اكتمل IFRC المكاني · فشل IFRCHOLDERB · آثار %(total)s %(completed)s "
 "%(failed)s"
 
-#: app/services/notification/core.py:192
+#: app/services/notification/core.py:191
 #, python-format
 msgid ""
 "%(count)s data validation question(s) for %(entity)s require your response."
@@ -107,7 +107,7 @@ msgstr "%(old)s %(field)s : %(new)s"
 msgid "%(frequency)s Notification Digest"
 msgstr "ملخص إشعارات %(frequency)s"
 
-#: app/services/notification/core.py:184
+#: app/services/notification/core.py:183
 #, python-format
 msgid "%(frequency)s email digest delivered with %(count)s notification(s)."
 msgstr "ملخص البريد الإلكتروني %(frequency)s تم التسليم مع إشعار %(count)s."
@@ -152,32 +152,32 @@ msgstr "قالب %(num)d"
 msgid "%(num)s indicator"
 msgstr "مؤشر %(num)s"
 
-#: app/services/notification/core.py:118
+#: app/services/notification/core.py:117
 #, python-format
 msgid ""
 "%(submitter_name)s escalated the %(template)s assignment for %(country)s "
 "(period %(period)s) for delegation review."
 msgstr ""
 
-#: app/services/notification/core.py:112
+#: app/services/notification/core.py:111
 #, python-format
 msgid ""
 "%(submitter_name)s sent the %(template)s assignment for %(country)s (period "
 "%(period)s) for your review before submission."
 msgstr ""
 
-#: app/services/notification/core.py:142
+#: app/services/notification/core.py:141
 #, python-format
 msgid "%(user_name)s requested access to %(country_name)s."
 msgstr "طلب %(user_name)s الوصول إلى %(country_name)s."
 
-#: app/services/notification/core.py:136
+#: app/services/notification/core.py:135
 #, python-format
 msgid ""
 "'%(document)s' (%(document_type)s) has been uploaded and requires approval."
 msgstr "تم رفع '%(document)s' (%(document_type)s) ويتطلب موافقة."
 
-#: app/services/notification/core.py:131
+#: app/services/notification/core.py:130
 #, python-format
 msgid "'%(document)s' (%(document_type)s) was uploaded."
 msgstr "تم رفع '%(document)s' (%(document_type)s)."
@@ -1321,7 +1321,7 @@ msgid "Added"
 msgstr "مضاف"
 
 # Activity descriptions
-#: app/routes/main/helpers.py:1306
+#: app/routes/main/helpers.py:1305
 #, python-format
 msgid "Added %(count)d field in %(template)s"
 msgstr "%(count)d ميدان مضاف %(template)s"
@@ -1636,6 +1636,7 @@ msgstr "المحاذاة"
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/api_management.html:312
 #: app/templates/admin/indicator_bank/indicator_bank.html:2370
+#: app/templates/admin/templates/data_sync_imputation.html:133
 #: app/templates/components/auto_translate_modal_js.html:30
 #: app/templates/forms/entry_form/entry_form.html:3874
 #: app/templates/forms/form_builder/field_mapping.html:303
@@ -1669,8 +1670,8 @@ msgstr "All clear"
 #: app/templates/admin/data_exploration/explore_data.html:1834
 #: app/templates/admin/data_exploration/explore_data.html:1890
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:33
-#: app/templates/admin/templates/data_sync_imputation.html:304
-#: app/templates/admin/templates/data_sync_imputation.html:780
+#: app/templates/admin/templates/data_sync_imputation.html:354
+#: app/templates/admin/templates/data_sync_imputation.html:830
 msgid "All Countries"
 msgstr "جميع البلدان"
 
@@ -1701,8 +1702,8 @@ msgstr "قوالب النماذج"
 msgid "All Indicators"
 msgstr "جميع المؤشرات"
 
-#: app/templates/admin/templates/data_sync_imputation.html:310
-#: app/templates/admin/templates/data_sync_imputation.html:781
+#: app/templates/admin/templates/data_sync_imputation.html:360
+#: app/templates/admin/templates/data_sync_imputation.html:831
 msgid "All Items"
 msgstr "جميع العناصر"
 
@@ -1752,7 +1753,7 @@ msgid "All Templates"
 msgstr "جميع القوالب"
 
 #: app/templates/admin/ai/documents.html:190
-#: app/templates/admin/templates/data_sync_imputation.html:316
+#: app/templates/admin/templates/data_sync_imputation.html:366
 #: app/templates/forms/form_builder/partials/_item_modal.html:65
 #: app/templates/notifications/center.html:94
 msgid "All Types"
@@ -2777,17 +2778,17 @@ msgstr "تم إغلاق مهمة '%(name)s'."
 msgid "Assignment '%(template)s' for %(entity)s has been reopened."
 msgstr "تم إعادة فتح التعيين '%(template)s' ل %(entity)s."
 
-#: app/routes/main/assignments.py:99
+#: app/routes/main/assignments.py:98
 #, python-format
 msgid "Assignment '%(template)s' has been reopened for %(entity)s only."
 msgstr "تم إعادة فتح التعيين '%(template)s' ل %(entity)s فقط."
 
-#: app/services/notification/core.py:105
+#: app/services/notification/core.py:104
 #, python-format
 msgid "Assignment '%(template)s' has been reopened."
 msgstr "تم إعادة فتح المهمة '%(template)s'."
 
-#: app/services/notification/core.py:158
+#: app/services/notification/core.py:157
 #, python-format
 msgid "Assignment '%(template)s' is due on %(due_date)s."
 msgstr "التعيين '%(template)s' مستحق على %(due_date)s."
@@ -3461,8 +3462,8 @@ msgstr "التعليم الأساسي"
 msgid "Basic Information"
 msgstr "معلومات أساسية"
 
-#: app/templates/admin/templates/data_sync_imputation.html:117
-#: app/templates/admin/templates/data_sync_imputation.html:1395
+#: app/templates/admin/templates/data_sync_imputation.html:167
+#: app/templates/admin/templates/data_sync_imputation.html:1533
 #: app/templates/admin/templates/upr_excel_import.html:87
 msgid "Batch size"
 msgstr "حجم الدفعة"
@@ -3708,7 +3709,7 @@ msgstr "الصفحة"
 msgid "Cache usage"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1399
+#: app/templates/admin/templates/data_sync_imputation.html:1538
 msgid "Cached imputed values"
 msgstr "القيم المحسوبة مؤقتا"
 
@@ -3811,7 +3812,7 @@ msgstr "لا يمكن العثور على مؤشر؟ إقتراح واحد جد�
 #: app/templates/admin/plugin_management.html:181
 #: app/templates/admin/settings/manage_settings.html:1157
 #: app/templates/admin/settings/manage_settings.html:1488
-#: app/templates/admin/templates/data_sync_imputation.html:205
+#: app/templates/admin/templates/data_sync_imputation.html:255
 #: app/templates/admin/templates/templates.html:325
 #: app/templates/admin/translations/manage_translations.html:541
 #: app/templates/admin/translations/manage_translations.html:668
@@ -4021,12 +4022,12 @@ msgstr ""
 "التغييرات التي تجري هنا ستؤثر على النموذج الحي النظر في وضع مشروع صيغة بدلاً"
 " من تحرير أكثر أماناً."
 
-#: app/services/notification/core.py:122
+#: app/services/notification/core.py:121
 #, python-format
 msgid "Changes requested: %(template)s"
 msgstr "التغييرات المطلوبة: %(template)s"
 
-#: app/routes/main/helpers.py:1172
+#: app/routes/main/helpers.py:1171
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr "تم طلب تغييرات. قم بتحديث النموذج وقدم مرة أخرى عندما تكون جاهزا."
 
@@ -4123,7 +4124,7 @@ msgstr "تتحقق من مهامك..."
 msgid "Checking…"
 msgstr "أتحقق..."
 
-#: app/templates/admin/templates/data_sync_imputation.html:321
+#: app/templates/admin/templates/data_sync_imputation.html:371
 msgid "Choice"
 msgstr "الاختيار"
 
@@ -4181,6 +4182,12 @@ msgstr "اختر المؤشرات التي ستدرجها في قالبك الج
 #: app/templates/forms/form_builder/partials/_item_type_picker_modal.html:52
 msgid "Choose the type of item you want to add"
 msgstr "اختر نوع العنصر الذي تريد إضافته"
+
+#: app/templates/admin/templates/data_sync_imputation.html:111
+msgid ""
+"Choose which FDRS reporting years to fetch. All years in the default range "
+"are selected initially."
+msgstr ""
 
 #: app/templates/admin/templates/new_template.html:536
 msgid "Choose which breakdowns to allow"
@@ -4251,7 +4258,7 @@ msgstr "محادثة واضحة؟"
 msgid "Clear Filter"
 msgstr "فلتر شفاف"
 
-#: app/templates/admin/templates/data_sync_imputation.html:343
+#: app/templates/admin/templates/data_sync_imputation.html:393
 msgid "Clear Filters"
 msgstr "المرشحات الشفافة"
 
@@ -4411,7 +4418,7 @@ msgstr ""
 "انقر هنا لتوسيع أو طي الشريط الجانبي. يحتوي الشريط الجانبي على لوحة التحكم "
 "وأدوات التقارير الخاصة بك."
 
-#: app/templates/admin/templates/data_sync_imputation.html:389
+#: app/templates/admin/templates/data_sync_imputation.html:439
 msgid "Click on the method to change how data is imputed for each item."
 msgstr "انقر على الطريقة لتغيير كيفية احتساب البيانات لكل عنصر."
 
@@ -4545,7 +4552,7 @@ msgstr "قالب النسخ"
 #: app/templates/admin/organization/_countries_component.html:181
 #: app/templates/admin/organization/_nss_component.html:86
 #: app/templates/admin/plugin_management.html:157
-#: app/templates/admin/templates/data_sync_imputation.html:226
+#: app/templates/admin/templates/data_sync_imputation.html:276
 #: app/templates/admin/translations/manage_translations.html:234
 #: app/templates/admin/translations/manage_translations.html:485
 #: app/templates/admin/user_management/user_form.html:1487
@@ -5558,8 +5565,8 @@ msgstr "الدول – إكسل"
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:329
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:485
 #: app/templates/admin/organization/index.html:867
-#: app/templates/admin/templates/data_sync_imputation.html:302
-#: app/templates/admin/templates/data_sync_imputation.html:1732
+#: app/templates/admin/templates/data_sync_imputation.html:352
+#: app/templates/admin/templates/data_sync_imputation.html:1879
 #: app/templates/admin/user_management/access_requests.html:1192
 #: app/templates/admin/user_management/access_requests.html:1242
 #: app/templates/admin/user_management/user_form.html:938
@@ -5933,7 +5940,7 @@ msgstr "الأحداث الحرجة"
 msgid "Critical error"
 msgstr "حرج"
 
-#: app/templates/admin/templates/data_sync_imputation.html:322
+#: app/templates/admin/templates/data_sync_imputation.html:372
 msgid "Currency"
 msgstr "العملة"
 
@@ -5958,7 +5965,7 @@ msgstr "الاستخدام الحالي للذاكرة"
 msgid "Current System Metrics"
 msgstr "مقاييس النظام الحالية"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1751
+#: app/templates/admin/templates/data_sync_imputation.html:1898
 msgid "Current Value"
 msgstr "القيمة الحالية"
 
@@ -6175,7 +6182,7 @@ msgstr "مؤشرات متاحة"
 msgid "Data Owner"
 msgstr "مالك البيانات"
 
-#: app/templates/admin/templates/data_sync_imputation.html:241
+#: app/templates/admin/templates/data_sync_imputation.html:291
 msgid "Data Preview"
 msgstr "معاينة البيانات"
 
@@ -6240,7 +6247,7 @@ msgstr "مؤشر جودة البيانات"
 msgid "Data collection launch"
 msgstr "إطلاق جمع البيانات"
 
-#: app/routes/main/helpers.py:1169
+#: app/routes/main/helpers.py:1168
 msgid ""
 "Data entry is underway. You can save drafts and continue completing the "
 "form."
@@ -6272,7 +6279,7 @@ msgstr ""
 msgid "Data sources:"
 msgstr "مصادر البيانات:"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1396
+#: app/templates/admin/templates/data_sync_imputation.html:1534
 msgid "Data status"
 msgstr "حالة البيانات"
 
@@ -6280,7 +6287,7 @@ msgstr "حالة البيانات"
 msgid "Data stays on archived version"
 msgstr "تبقى البيانات على النسخة المؤرشفة"
 
-#: app/templates/admin/templates/data_sync_imputation.html:238
+#: app/templates/admin/templates/data_sync_imputation.html:288
 msgid "Data sync & imputation sections"
 msgstr "أقسام مزامنة البيانات والحساب"
 
@@ -6394,13 +6401,9 @@ msgstr "رفض المستند"
 msgid "Default"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1388
+#: app/templates/admin/templates/data_sync_imputation.html:1526
 msgid "Default (1000)"
 msgstr "الافتراضي (1000)"
-
-#: app/templates/admin/templates/data_sync_imputation.html:1385
-msgid "Default (2010–2024)"
-msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:122
 msgid "Default Value (Optional)"
@@ -7522,6 +7525,7 @@ msgstr "حالة المستند"
 
 #: app/templates/admin/ai/dashboard.html:70
 #: app/templates/admin/ai/documents.html:408
+#: app/templates/admin/templates/data_sync_imputation.html:156
 #: app/templates/admin/validation_dashboard.html:262
 #: app/templates/core/dashboard.html:1214
 #: app/templates/public_submission_export_pdf.html:61
@@ -7571,7 +7575,7 @@ msgstr "نقرة مزدوجة"
 #: app/templates/admin/ai/documents.html:413
 #: app/templates/admin/ai/documents.html:558
 #: app/templates/admin/monitoring/system_monitoring.html:181
-#: app/templates/admin/templates/data_sync_imputation.html:1519
+#: app/templates/admin/templates/data_sync_imputation.html:1658
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:32
 msgid "Download"
 msgstr "تحميل"
@@ -7698,7 +7702,7 @@ msgstr "يمكنك Master.xlsx UPR هنا أو انقر للتصفح"
 msgid "Drop your saved workbook here"
 msgstr "ضع كتاب العمل المحفوظ الخاص بك هنا"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1397
+#: app/templates/admin/templates/data_sync_imputation.html:1536
 msgid "Dry run"
 msgstr "التجربة الجافة"
 
@@ -7706,7 +7710,7 @@ msgstr "التجربة الجافة"
 msgid "Dry run (preview counts + Excel, no DB write)"
 msgstr "تجربة تجريبية (عدد المعاينات + إكسل، لا كتابة قاعدة بيانات)"
 
-#: app/templates/admin/templates/data_sync_imputation.html:161
+#: app/templates/admin/templates/data_sync_imputation.html:211
 msgid "Dry run (preview only, no DB write)"
 msgstr "تجربة تجريبية (معاينة فقط، بدون كتابة قاعدة بيانات)"
 
@@ -8536,7 +8540,7 @@ msgstr ""
 "أدخل رمزا مستقرا لكل عمود (مثل total_beneficiaries). استخدم زر الترجمات "
 "لتعيين تسميات العرض بالإنجليزية ولغات أخرى."
 
-#: app/templates/admin/templates/data_sync_imputation.html:383
+#: app/templates/admin/templates/data_sync_imputation.html:433
 msgid "Enter a target year and click \"Load Data\" to preview imputation results."
 msgstr "أدخل سنة مستهدفة وانقر على \"تحميل البيانات\" لمعاينة نتائج الحساب."
 
@@ -8976,7 +8980,7 @@ msgstr ""
 msgid "Excel file is empty or header row not found."
 msgstr "ملف (إكسل) فارغ أو لم يعثر على صف رئيسي."
 
-#: app/routes/admin/utilities/translations.py:1084
+#: app/routes/admin/utilities/translations.py:1083
 #, python-format
 msgid ""
 "Excel import finished. Updated: %(u)d, skipped missing msgids: %(m)d. (Empty"
@@ -9254,7 +9258,7 @@ msgid "Export the pre-filled workbook for this country and reporting period."
 msgstr "تصدير دفتر العمل المملوء مسبقا لهذا البلد وفترة التقارير."
 
 #: app/templates/admin/indicator_bank/_panel_common_words_body.html:46
-#: app/templates/admin/templates/data_sync_imputation.html:352
+#: app/templates/admin/templates/data_sync_imputation.html:402
 #: app/templates/macros/excel_io_toolbar.html:12
 msgid "Export to Excel"
 msgstr "التصدير إلى إكسل"
@@ -9489,8 +9493,8 @@ msgstr "فشل في تحميل بيانات القطاع. يرجى المحاو�
 msgid "Failed to load subsector data. Please try again."
 msgstr "فشل في تحميل بيانات القطاع الفرعي. يرجى المحاولة مرة أخرى."
 
-#: app/templates/admin/templates/data_sync_imputation.html:583
-#: app/templates/admin/templates/data_sync_imputation.html:606
+#: app/templates/admin/templates/data_sync_imputation.html:633
+#: app/templates/admin/templates/data_sync_imputation.html:656
 msgid "Failed to load template"
 msgstr "فشل تحميل القالب"
 
@@ -9566,8 +9570,8 @@ msgstr "فشل في بدء إعادة معالجة البيانات الوصفي
 msgid "Failed to start sync."
 msgstr "فشل في بدء مزامنة."
 
-#: app/templates/admin/templates/data_sync_imputation.html:1605
-#: app/templates/admin/templates/data_sync_imputation.html:1611
+#: app/templates/admin/templates/data_sync_imputation.html:1744
+#: app/templates/admin/templates/data_sync_imputation.html:1750
 msgid "Failed to stop sync"
 msgstr "فشل في إيقاف التزامن"
 
@@ -9779,7 +9783,7 @@ msgstr ""
 msgid "Filter"
 msgstr "الفلتر"
 
-#: app/templates/admin/templates/data_sync_imputation.html:286
+#: app/templates/admin/templates/data_sync_imputation.html:336
 msgid "Filter Options"
 msgstr "خيارات المرشح"
 
@@ -10297,7 +10301,7 @@ msgstr "الجمعة"
 msgid "From"
 msgstr "من"
 
-#: app/services/notification/core.py:168
+#: app/services/notification/core.py:167
 #, python-format
 msgid "From %(submitter)s (%(country)s) for '%(template)s'."
 msgstr "من %(submitter)s (%(country)s) ل '%(template)s'."
@@ -10616,7 +10620,7 @@ msgstr "HTML"
 msgid "HTML email with optional template"
 msgstr "بريد HTML مع قالب اختياري"
 
-#: app/routes/admin/ai_management.py:1899
+#: app/routes/admin/ai_management.py:1898
 msgid "HTML event handler (onerror=, onload=, …) — common in XSS probes"
 msgstr "معالج الأحداث HTML (onerror=, onload=, ...) — شائع في مجسات XSS"
 
@@ -10879,7 +10883,7 @@ msgstr "كيف يتم حساب ذلك؟"
 msgid "How it works"
 msgstr "كيف يعمل"
 
-#: app/templates/admin/templates/data_sync_imputation.html:124
+#: app/templates/admin/templates/data_sync_imputation.html:174
 msgid ""
 "How many rows to process before committing to the database. Smaller batches "
 "are safer but slower; larger batches are faster but use more memory. Leave "
@@ -10968,7 +10972,7 @@ msgstr ""
 "رمز منطقة استراتيجية الاتحاد الدولي لبحوث الحقوق الدولية 2030 (مثل EF2، "
 "SP3)."
 
-#: app/templates/admin/templates/data_sync_imputation.html:129
+#: app/templates/admin/templates/data_sync_imputation.html:179
 msgid ""
 "IFRC row status: choose which stages count as importable reported values "
 "when there is no imputed value. Several can be selected (same idea as comma-"
@@ -11121,6 +11125,12 @@ msgstr "استيراد البيانات"
 #: app/templates/admin/translations/manage_translations.html:352
 msgid "Import Excel"
 msgstr "Import Excel"
+
+#: app/templates/admin/templates/data_sync_imputation.html:157
+msgid ""
+"Import FDRS submission documents (metadata and file download when IFRC URLs "
+"are available). Uncheck to sync indicator data only."
+msgstr ""
 
 #: app/templates/admin/dashboard.html:308
 #: app/templates/admin/templates/kobo_data_import.html:8
@@ -11358,15 +11368,15 @@ msgstr "استيراد..."
 msgid "Improvement"
 msgstr "التحسين"
 
-#: app/templates/admin/templates/data_sync_imputation.html:245
+#: app/templates/admin/templates/data_sync_imputation.html:295
 msgid "Imputation Methods"
 msgstr "طرق الحساب"
 
-#: app/templates/admin/templates/data_sync_imputation.html:260
+#: app/templates/admin/templates/data_sync_imputation.html:310
 msgid "Impute all data"
 msgstr "تعيين جميع البيانات"
 
-#: app/templates/admin/templates/data_sync_imputation.html:259
+#: app/templates/admin/templates/data_sync_imputation.html:309
 msgid "Impute only missing data"
 msgstr "اجعل فقط البيانات المفقودة"
 
@@ -11376,7 +11386,7 @@ msgstr "اجعل فقط البيانات المفقودة"
 msgid "Imputed"
 msgstr "الاتهام"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1766
+#: app/templates/admin/templates/data_sync_imputation.html:1913
 msgid "Imputed Value"
 msgstr "القيمة المحسوبة"
 
@@ -11806,7 +11816,7 @@ msgstr ""
 msgid "Invalid Azure callback."
 msgstr "إعادة استدعاء Azure غير صالحة."
 
-#: app/templates/admin/templates/data_sync_imputation.html:1640
+#: app/templates/admin/templates/data_sync_imputation.html:1779
 msgid "Invalid batch size. Please enter a number >= 100 (or leave empty)."
 msgstr "حجم الدفعة غير صحيح. يرجى إدخال رقم >= 100 (أو ترك الرقم فارغا)."
 
@@ -11931,9 +11941,9 @@ msgstr "القضايا"
 msgid "Italic"
 msgstr "خط مائل"
 
-#: app/templates/admin/templates/data_sync_imputation.html:308
-#: app/templates/admin/templates/data_sync_imputation.html:395
-#: app/templates/admin/templates/data_sync_imputation.html:1741
+#: app/templates/admin/templates/data_sync_imputation.html:358
+#: app/templates/admin/templates/data_sync_imputation.html:445
+#: app/templates/admin/templates/data_sync_imputation.html:1888
 msgid "Item"
 msgstr "العنصر"
 
@@ -11967,7 +11977,7 @@ msgstr "تم استعادة العنصر"
 msgid "Item Translations"
 msgstr "البند"
 
-#: app/templates/admin/templates/data_sync_imputation.html:314
+#: app/templates/admin/templates/data_sync_imputation.html:364
 msgid "Item Type"
 msgstr "نوع العنصر"
 
@@ -12598,7 +12608,7 @@ msgstr "الحمل"
 
 #: app/templates/admin/data_exploration/explore_data.html:129
 #: app/templates/admin/data_exploration/explore_data.html:988
-#: app/templates/admin/templates/data_sync_imputation.html:335
+#: app/templates/admin/templates/data_sync_imputation.html:385
 msgid "Load Data"
 msgstr "تاريخ الرفع"
 
@@ -12804,11 +12814,11 @@ msgstr "فترات التحميل..."
 msgid "Loading periods…"
 msgstr "فترات التحميل..."
 
-#: app/templates/admin/templates/data_sync_imputation.html:362
+#: app/templates/admin/templates/data_sync_imputation.html:412
 msgid "Loading preview data..."
 msgstr "جاري تحميل بيانات المعاينة..."
 
-#: app/templates/admin/templates/data_sync_imputation.html:375
+#: app/templates/admin/templates/data_sync_imputation.html:425
 #: app/templates/admin/templates/kobo_data_import.html:391
 msgid "Loading preview..."
 msgstr ""
@@ -12925,10 +12935,10 @@ msgstr "جاري التحميل..."
 #: app/templates/admin/indicator_bank/_panel_measurement_scripts.html:23
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:16
 #: app/templates/admin/indicator_bank/measurement_lookups.html:138
-#: app/templates/admin/templates/data_sync_imputation.html:292
-#: app/templates/admin/templates/data_sync_imputation.html:298
-#: app/templates/admin/templates/data_sync_imputation.html:783
-#: app/templates/admin/templates/data_sync_imputation.html:784
+#: app/templates/admin/templates/data_sync_imputation.html:342
+#: app/templates/admin/templates/data_sync_imputation.html:348
+#: app/templates/admin/templates/data_sync_imputation.html:833
+#: app/templates/admin/templates/data_sync_imputation.html:834
 #: app/templates/admin/templates/new_template.html:1202
 #: app/templates/core/chat_immersive.html:36
 msgid "Loading…"
@@ -13640,8 +13650,8 @@ msgstr "اكتملت إعادة معالجة البيانات الوصفية"
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:59
 #: app/templates/admin/analytics/audit_trail.html:461
 #: app/templates/admin/api_keys/details.html:185
-#: app/templates/admin/templates/data_sync_imputation.html:398
-#: app/templates/admin/templates/data_sync_imputation.html:1781
+#: app/templates/admin/templates/data_sync_imputation.html:448
+#: app/templates/admin/templates/data_sync_imputation.html:1928
 msgid "Method"
 msgstr "الطريقة"
 
@@ -14294,7 +14304,7 @@ msgstr "العام القادم"
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:77
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:239
 #: app/templates/admin/indicator_bank/measurement_lookups.html:127
-#: app/templates/admin/templates/data_sync_imputation.html:1379
+#: app/templates/admin/templates/data_sync_imputation.html:1517
 #: app/templates/admin/validation_rules.html:226
 #: app/templates/components/_form_item_renderer.html:236
 #: app/templates/components/_status_label.html:85
@@ -15149,6 +15159,10 @@ msgstr "لم يتم العثور على قيم"
 msgid "No years"
 msgstr "لا سنوات"
 
+#: app/templates/admin/templates/data_sync_imputation.html:1384
+msgid "No years selected"
+msgstr ""
+
 #: app/templates/admin/data_exploration/explore_data.html:2711
 #: app/templates/admin/data_exploration/explore_data.html:2904
 msgid "Non-Compliant"
@@ -15165,6 +15179,7 @@ msgstr "النسخ غير الإنجليزية تعود إلى الإنجليز�
 #: app/templates/admin/ai/documents.html:596
 #: app/templates/admin/analytics/audit_trail.html:315
 #: app/templates/admin/indicator_bank/indicator_bank.html:2373
+#: app/templates/admin/templates/data_sync_imputation.html:137
 msgid "None"
 msgstr "لا شيء"
 
@@ -15249,8 +15264,8 @@ msgstr "لا يوجد تاريخ كاف ليظهر اتجاها بعد."
 msgid "Not equal"
 msgstr "غير متساوي"
 
-#: app/templates/admin/templates/data_sync_imputation.html:133
-#: app/templates/admin/templates/data_sync_imputation.html:1303
+#: app/templates/admin/templates/data_sync_imputation.html:183
+#: app/templates/admin/templates/data_sync_imputation.html:1353
 msgid "Not filled"
 msgstr "غير ممتلئة"
 
@@ -15449,7 +15464,7 @@ msgstr "إشعار نقاط اتصال (محرر التعيين/المقدم)"
 msgid "Nov"
 msgstr "لا"
 
-#: app/templates/admin/templates/data_sync_imputation.html:317
+#: app/templates/admin/templates/data_sync_imputation.html:367
 #: app/utils/form_localization.py:76 app/utils/form_localization.py:77
 msgid "Number"
 msgstr "رقم"
@@ -15623,7 +15638,7 @@ msgstr "اطلب الوصول فقط للدول التي تتولى إدارة �
 msgid "Only routes under /api/v1 (public and partner REST API)."
 msgstr "فقط التوجيهات تحت /api/v1 (واجهة REST العامة والشريكة)."
 
-#: app/routes/main/assignments.py:246
+#: app/routes/main/assignments.py:245
 msgid ""
 "Only users with an organization email can request access to multiple "
 "countries at once. Please select a single country."
@@ -15631,7 +15646,7 @@ msgstr ""
 "فقط المستخدمون الذين لديهم بريد إلكتروني للمنظمة يمكنهم طلب الوصول إلى عدة "
 "دول في نفس الوقت. يرجى اختيار دولة واحدة."
 
-#: app/routes/auth.py:734
+#: app/routes/auth.py:733
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -15869,7 +15884,7 @@ msgstr "برتقالي"
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:265
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:419
 #: app/templates/admin/organization/_manage_ns_hierarchy.html:587
-#: app/templates/admin/templates/data_sync_imputation.html:394
+#: app/templates/admin/templates/data_sync_imputation.html:444
 #: app/templates/components/_builder_items.html:39
 #: app/templates/forms/form_builder/partials/_item_modal.html:1089
 #: app/templates/forms/form_builder/partials/_section_modal.html:43
@@ -16106,7 +16121,7 @@ msgstr "PO Import Tabs"
 msgid "PO ZIP (all languages)"
 msgstr "PO ZIP (all languages)"
 
-#: app/routes/admin/utilities/translations.py:882
+#: app/routes/admin/utilities/translations.py:881
 #, python-format
 msgid ""
 "PO ZIP import finished. Locales processed: %(p)d, skipped: %(s)d. Updated: "
@@ -16121,7 +16136,7 @@ msgstr ""
 msgid "PO file not found for %(lang)s."
 msgstr "%(lang)s لم يعثر على ملف لـ (بو)."
 
-#: app/routes/admin/utilities/translations.py:944
+#: app/routes/admin/utilities/translations.py:943
 #, python-format
 msgid ""
 "PO import finished for %(lang)s. Updated: %(u)d, skipped missing: %(m)d, "
@@ -16428,7 +16443,7 @@ msgstr ""
 msgid "Percent"
 msgstr "في المئة"
 
-#: app/templates/admin/templates/data_sync_imputation.html:318
+#: app/templates/admin/templates/data_sync_imputation.html:368
 #: app/utils/form_localization.py:78 app/utils/form_localization.py:79
 msgid "Percentage"
 msgstr "نسبة مئوية"
@@ -16469,7 +16484,7 @@ msgstr "القيمة المئوية (0–100)."
 msgid "Period"
 msgstr "الفترة"
 
-#: app/services/notification/core.py:88
+#: app/services/notification/core.py:87
 #, python-format
 msgid ""
 "Period %(period)s: another focal point in your entity submitted this form. "
@@ -16478,7 +16493,7 @@ msgstr ""
 "نقطة IFRCHOLDERA: نقطة اتصال أخرى في كيانك قدمت هذا النموذج. لا حاجة لأي "
 "إجراء منك. %(period)s"
 
-#: app/services/notification/core.py:125
+#: app/services/notification/core.py:124
 #, python-format
 msgid ""
 "Period %(period)s: delegation returned this assignment for your changes "
@@ -16659,7 +16674,7 @@ msgstr ""
 "يرجى مراجعة الأسئلة والإجابة عليها أدناه. إجاباتك تؤثر على درجة جودة "
 "بياناتك."
 
-#: app/services/notification/core.py:95
+#: app/services/notification/core.py:94
 msgid "Please review and validate this submission in the Backoffice."
 msgstr "يرجى مراجعة هذا التقديم والتحقق منه في قسم الخلفية."
 
@@ -16933,11 +16948,11 @@ msgstr "Presets"
 msgid "Preview"
 msgstr "معاينة"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1517
+#: app/templates/admin/templates/data_sync_imputation.html:1656
 msgid "Preview Excel ready:"
 msgstr "معاينة إكسل جاهزة:"
 
-#: app/templates/admin/templates/data_sync_imputation.html:270
+#: app/templates/admin/templates/data_sync_imputation.html:320
 msgid "Preview Imputation"
 msgstr "التعدين التمهيدي"
 
@@ -16950,7 +16965,7 @@ msgstr "الفترة السابقة"
 msgid "Preview Template"
 msgstr "معاينة القالب"
 
-#: app/templates/admin/templates/data_sync_imputation.html:255
+#: app/templates/admin/templates/data_sync_imputation.html:305
 msgid "Preview current data and imputed values per country and item."
 msgstr "معاينة البيانات الحالية والقيم المحسوبة لكل دولة وعنصر."
 
@@ -17306,8 +17321,8 @@ msgstr ""
 msgid "Publish this draft and remap submission data"
 msgstr "انشر هذه المسودة وأعد رسم بيانات التقديم"
 
-#: app/templates/admin/templates/data_sync_imputation.html:153
-#: app/templates/admin/templates/data_sync_imputation.html:1308
+#: app/templates/admin/templates/data_sync_imputation.html:203
+#: app/templates/admin/templates/data_sync_imputation.html:1358
 msgid "Published"
 msgstr "منشور"
 
@@ -18040,7 +18055,7 @@ msgstr "إعادة تحميل الترجمات"
 msgid "Reload all plugins to detect changes"
 msgstr "أعد تحميل جميع الإضافات لاكتشاف التغييرات"
 
-#: app/templates/admin/templates/data_sync_imputation.html:232
+#: app/templates/admin/templates/data_sync_imputation.html:282
 msgid "Reload page"
 msgstr "صفحة إعادة التحميل"
 
@@ -18147,12 +18162,12 @@ msgstr "إزالة هذا المؤشر"
 msgid "Removed"
 msgstr "إزالة"
 
-#: app/routes/main/helpers.py:1314
+#: app/routes/main/helpers.py:1313
 #, python-format
 msgid "Removed %(count)d field in %(template)s"
 msgstr "%(count)d نقل الحقل في %(template)s"
 
-#: app/routes/admin/utilities/translations.py:1387
+#: app/routes/admin/utilities/translations.py:1386
 #, python-format
 msgid ""
 "Removed %(entries)d obsolete translation entries from %(count)d file(s)"
@@ -18212,8 +18227,8 @@ msgstr "إعادة فتح"
 msgid "Reopen Assignment?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:141
-#: app/templates/admin/templates/data_sync_imputation.html:1305
+#: app/templates/admin/templates/data_sync_imputation.html:191
+#: app/templates/admin/templates/data_sync_imputation.html:1355
 msgid "Reopened"
 msgstr "أعيد فتحه"
 
@@ -18319,6 +18334,10 @@ msgstr "فترة التقرير"
 
 #: app/templates/admin/reports/partials/_filter_panel.html:17
 msgid "Reporting periods"
+msgstr ""
+
+#: app/templates/admin/templates/data_sync_imputation.html:110
+msgid "Reporting years"
 msgstr ""
 
 #: app/templates/admin/data_exploration/explore_data.html:73
@@ -18436,8 +18455,8 @@ msgstr "طلبات التغييرات"
 msgid "Request changes?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:1553
-#: app/templates/admin/templates/data_sync_imputation.html:1697
+#: app/templates/admin/templates/data_sync_imputation.html:1692
+#: app/templates/admin/templates/data_sync_imputation.html:1844
 msgid "Request failed"
 msgstr "فشل الطلب"
 
@@ -18773,7 +18792,7 @@ msgstr "نتائج المراجعة"
 msgid "Review recommended"
 msgstr "المراجعة موصى بها"
 
-#: app/services/notification/core.py:109
+#: app/services/notification/core.py:108
 #, python-format
 msgid "Review requested: %(template)s — %(country)s"
 msgstr ""
@@ -19004,12 +19023,12 @@ msgstr "سجل القواعد"
 msgid "Run AI validation"
 msgstr "تشغيل التحقق من الذكاء الاصطناعي"
 
-#: app/templates/admin/templates/data_sync_imputation.html:278
+#: app/templates/admin/templates/data_sync_imputation.html:328
 msgid "Run Imputation"
 msgstr "تشغيل الحسابات"
 
-#: app/templates/admin/templates/data_sync_imputation.html:211
-#: app/templates/admin/templates/data_sync_imputation.html:1439
+#: app/templates/admin/templates/data_sync_imputation.html:261
+#: app/templates/admin/templates/data_sync_imputation.html:1578
 msgid "Run Sync"
 msgstr "تشغيل التزامن"
 
@@ -19033,7 +19052,7 @@ msgstr "الجري في الخلفية..."
 msgid "Running validations…"
 msgstr "جاري إجراء التحقق..."
 
-#: app/templates/admin/templates/data_sync_imputation.html:1659
+#: app/templates/admin/templates/data_sync_imputation.html:1805
 msgid "Running..."
 msgstr "الجري..."
 
@@ -19134,7 +19153,7 @@ msgstr "حفظ"
 msgid "Save & Continue"
 msgstr "أنقذ واستمر"
 
-#: app/templates/admin/templates/data_sync_imputation.html:414
+#: app/templates/admin/templates/data_sync_imputation.html:464
 msgid "Save All Changes"
 msgstr "حفظ جميع التغييرات"
 
@@ -19214,8 +19233,8 @@ msgid ""
 msgstr ""
 "احفظ تقدمك في أي وقت. يتم حفظ بياناتك ويمكنك العودة لمواصلة التحرير لاحقا."
 
-#: app/templates/admin/templates/data_sync_imputation.html:137
-#: app/templates/admin/templates/data_sync_imputation.html:1304
+#: app/templates/admin/templates/data_sync_imputation.html:187
+#: app/templates/admin/templates/data_sync_imputation.html:1354
 #: app/templates/admin/validation_rules.html:217
 msgid "Saved"
 msgstr "تم إنقاذها"
@@ -20012,7 +20031,7 @@ msgstr "اختر كل ما يظهر"
 msgid "Select an entity"
 msgstr "اختر كيانا"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1648
+#: app/templates/admin/templates/data_sync_imputation.html:1794
 msgid "Select at least one data status to include."
 msgstr "اختر على الأقل حالة بيانات واحدة لتضمينها."
 
@@ -20023,6 +20042,10 @@ msgstr "اختر على الأقل طريقة توصيل واحدة أعلاه �
 #: app/templates/admin/templates/new_template.html:1205
 msgid "Select at least one indicator to continue."
 msgstr "اختر على الأقل مؤشرا واحدا للمتابعة."
+
+#: app/templates/admin/templates/data_sync_imputation.html:1787
+msgid "Select at least one reporting year."
+msgstr ""
 
 #: app/templates/admin/user_management/user_form.html:1483
 msgid "Select colour"
@@ -20209,6 +20232,10 @@ msgstr ""
 #: app/templates/forms/form_builder/partials/_item_modal.html:614
 msgid "Select year"
 msgstr "السنة المختارة"
+
+#: app/templates/admin/templates/data_sync_imputation.html:129
+msgid "Select years"
+msgstr ""
 
 #: app/templates/tours/tours.html:39
 msgid ""
@@ -20426,7 +20453,7 @@ msgstr "تم إرسالها للمراجعة"
 msgid "Sent for review"
 msgstr "تم إرساله للمراجعة"
 
-#: app/services/notification/core.py:115
+#: app/services/notification/core.py:114
 #, python-format
 msgid "Sent for review: %(template)s — %(country)s"
 msgstr ""
@@ -21105,8 +21132,8 @@ msgstr ""
 "تعرض بعض الحقول البيانات المنقولة من مصدر بيانات سابق تم تكوينه (مميزة "
 "باللون الأصفر). يرجى مراجعة وتحديث أي أرقام تغيرت قبل الحفظ."
 
-#: app/routes/admin/utilities/translations.py:1358
-#: app/routes/admin/utilities/translations.py:1393
+#: app/routes/admin/utilities/translations.py:1359
+#: app/routes/admin/utilities/translations.py:1394
 #, python-format
 msgid "Some languages could not be updated: %(langs)s"
 msgstr "بعض اللغات لم يتم تحديثها: %(langs)s"
@@ -21139,7 +21166,7 @@ msgstr "الصوت"
 
 #: app/templates/admin/ai/documents.html:671
 #: app/templates/admin/data_exploration/explore_data.html:1552
-#: app/templates/admin/templates/data_sync_imputation.html:1790
+#: app/templates/admin/templates/data_sync_imputation.html:1937
 #: app/templates/admin/translations/manage_translations.html:656
 #: app/templates/admin/validation_questions.html:243
 msgid "Source"
@@ -21149,7 +21176,7 @@ msgstr "المصدر"
 msgid "Source Org"
 msgstr "المصدر أورغ"
 
-#: app/templates/admin/templates/data_sync_imputation.html:296
+#: app/templates/admin/templates/data_sync_imputation.html:346
 msgid "Source Period"
 msgstr "فترة المصدر"
 
@@ -21305,7 +21332,7 @@ msgid "Starting translation for"
 msgstr "بدء الترجمة لـ"
 
 #: app/templates/admin/ai/documents.html:652
-#: app/templates/admin/templates/data_sync_imputation.html:1657
+#: app/templates/admin/templates/data_sync_imputation.html:1803
 msgid "Starting..."
 msgstr "يبدأ..."
 
@@ -21361,7 +21388,7 @@ msgstr "الملحقات الثابتة"
 #: app/templates/admin/security/dashboard.html:166
 #: app/templates/admin/security/event_detail.html:38
 #: app/templates/admin/security/event_detail.html:85
-#: app/templates/admin/templates/data_sync_imputation.html:187
+#: app/templates/admin/templates/data_sync_imputation.html:237
 #: app/templates/admin/templates/templates.html:191
 #: app/templates/admin/templates/upr_excel_import.html:118
 #: app/templates/admin/user_management/access_requests.html:1254
@@ -21389,7 +21416,7 @@ msgstr "توزيع الأجهزة"
 msgid "Status Updated"
 msgstr "تحديث الحالة"
 
-#: app/templates/admin/templates/data_sync_imputation.html:128
+#: app/templates/admin/templates/data_sync_imputation.html:178
 msgid "Status of the data"
 msgstr "حالة البيانات"
 
@@ -21460,8 +21487,8 @@ msgstr "إيقاف الترجمة"
 msgid "Stop Translation?"
 msgstr "توقف الترجمة؟"
 
-#: app/templates/admin/templates/data_sync_imputation.html:219
-#: app/templates/admin/templates/data_sync_imputation.html:1451
+#: app/templates/admin/templates/data_sync_imputation.html:269
+#: app/templates/admin/templates/data_sync_imputation.html:1590
 msgid "Stop sync"
 msgstr "إيقاف التزامن"
 
@@ -21469,7 +21496,7 @@ msgstr "إيقاف التزامن"
 msgid "Stopped"
 msgstr "توقفت"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1458
+#: app/templates/admin/templates/data_sync_imputation.html:1597
 msgid "Stopping..."
 msgstr "يتوقف..."
 
@@ -21606,8 +21633,8 @@ msgstr "قدم طلبك"
 #: app/routes/main/helpers.py:1208
 #: app/templates/admin/communication/center.html:919
 #: app/templates/admin/reports/partials/_filter_panel.html:24
-#: app/templates/admin/templates/data_sync_imputation.html:145
-#: app/templates/admin/templates/data_sync_imputation.html:1306
+#: app/templates/admin/templates/data_sync_imputation.html:195
+#: app/templates/admin/templates/data_sync_imputation.html:1356
 #: app/templates/admin/validation_dashboard.html:247
 msgid "Submitted"
 msgstr "مُقدّم"
@@ -21834,7 +21861,11 @@ msgstr "التبديل بين اللغات، بما في ذلك لغات الأ�
 msgid "Switch to this version"
 msgstr "انتقل إلى هذا الإصدار"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1538
+#: app/templates/admin/templates/data_sync_imputation.html:163
+msgid "Sync FDRS documents"
+msgstr ""
+
+#: app/templates/admin/templates/data_sync_imputation.html:1677
 msgid "Sync cancelled."
 msgstr "تم إلغاء المزامنة."
 
@@ -21846,7 +21877,7 @@ msgstr "أنجز"
 msgid "Sync completed."
 msgstr "أنجز (سينك)."
 
-#: app/templates/admin/templates/data_sync_imputation.html:180
+#: app/templates/admin/templates/data_sync_imputation.html:230
 msgid "Sync configuration"
 msgstr "تكوين التزامن"
 
@@ -21862,8 +21893,12 @@ msgstr ""
 "قم بمزامنة البيانات من نقطة النهاية الخارجية التي تم تكوينها في واجهة برمجة "
 "التطبيقات مع بيانات النموذج لهذا القالب."
 
-#: app/templates/admin/templates/data_sync_imputation.html:1530
-#: app/templates/admin/templates/data_sync_imputation.html:1689
+#: app/templates/admin/templates/data_sync_imputation.html:1535
+msgid "Sync documents"
+msgstr ""
+
+#: app/templates/admin/templates/data_sync_imputation.html:1669
+#: app/templates/admin/templates/data_sync_imputation.html:1836
 msgid "Sync failed"
 msgstr "فشل المزامنة"
 
@@ -22024,7 +22059,7 @@ msgstr "يفتح اللمس"
 msgid "Target"
 msgstr "الهدف"
 
-#: app/templates/admin/templates/data_sync_imputation.html:290
+#: app/templates/admin/templates/data_sync_imputation.html:340
 msgid "Target Period"
 msgstr "فترة الهدف"
 
@@ -22097,7 +22132,7 @@ msgid ""
 "Template '%(template)s' has been added to your assignments for %(country)s."
 msgstr "%(country)s %(template)s تم إضافتها إلى مهامك."
 
-#: app/services/notification/core.py:83
+#: app/services/notification/core.py:82
 #, python-format
 msgid "Template '%(template)s', period '%(period)s'. Due date: %(due_date)s."
 msgstr ""
@@ -22296,16 +22331,16 @@ msgstr ""
 msgid "Test email sent to"
 msgstr "أرسل بريد الاختبار إلى"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1398
+#: app/templates/admin/templates/data_sync_imputation.html:1537
 msgid "Test mode"
 msgstr "وضع الاختبار"
 
-#: app/templates/admin/templates/data_sync_imputation.html:167
+#: app/templates/admin/templates/data_sync_imputation.html:217
 msgid "Test mode (year 2024 only, max 1000 records)"
 msgstr "وضع الاختبار (عام 2024 فقط، الحد الأقصى 1000 سجل)"
 
 #: app/templates/admin/reports/partials/_widget_palette.html:8
-#: app/templates/admin/templates/data_sync_imputation.html:319
+#: app/templates/admin/templates/data_sync_imputation.html:369
 #: app/utils/form_localization.py:80 app/utils/form_localization.py:81
 msgid "Text"
 msgstr "نص"
@@ -22355,7 +22390,7 @@ msgstr ""
 "النسخة الإنجليزية من هذا القالب فارغة. أضف أو احفظ النص الإنجليزي أولا، ثم "
 "حاول مرة أخرى."
 
-#: app/routes/main/helpers.py:1166
+#: app/routes/main/helpers.py:1165
 msgid "The assignment is available but data entry has not started yet."
 msgstr "المهمة متاحة لكن إدخال البيانات لم يبدأ بعد."
 
@@ -22390,11 +22425,11 @@ msgid ""
 "The form is taking longer than expected to load. Please reload the page."
 msgstr "ويستغرق الشكل وقتا أطول مما كان متوقعا. من فضلك أعد تحميل الصفحة."
 
-#: app/routes/main/helpers.py:1175
+#: app/routes/main/helpers.py:1174
 msgid "The form was sent for delegation review before final submission."
 msgstr "تم إرسال النموذج لمراجعة الوفد قبل التقديم النهائي."
 
-#: app/routes/main/helpers.py:1178
+#: app/routes/main/helpers.py:1177
 msgid "The form was submitted and is awaiting validation by an administrator."
 msgstr "تم تقديم النموذج وهو ينتظر التحقق من قبل المسؤول."
 
@@ -22460,7 +22495,7 @@ msgstr ""
 "يعرض الشريط الجانبي لوحة التحكم الخاصة بك ونماذج التقارير المتاحة. يمكنك "
 "توسيع أو تسريع الأقسام، وتستمر الحالة عبر الزيارات."
 
-#: app/routes/main/helpers.py:1181
+#: app/routes/main/helpers.py:1180
 msgid "The submission was validated and approved. Data entry is complete."
 msgstr ""
 "تم التحقق من صحة التقديم والموافقة عليه. تم الانتهاء من إدخال البيانات."
@@ -22590,7 +22625,7 @@ msgstr "تم إغلاق هذا التعيين ولا يتوقع تغييرات �
 msgid "This assignment is currently inactive."
 msgstr "هذه المهمة غير نشطة حاليا."
 
-#: app/routes/main/helpers.py:1184
+#: app/routes/main/helpers.py:1183
 msgid ""
 "This assignment was cancelled and is no longer required for submission."
 msgstr ""
@@ -22943,7 +22978,7 @@ msgid ""
 msgstr ""
 "%(count)s وقد وفر هذا النموذج قيودا على البيانات ستحذف بصورة دائمة. أكمل؟?"
 
-#: app/routes/admin/form_builder/templates.py:285
+#: app/routes/admin/form_builder/templates.py:284
 #, python-format
 msgid ""
 "This template has %(count)s saved data entry that will be permanently "
@@ -23902,7 +23937,7 @@ msgstr "رمز الموقع المكون من حرفين للتوطين"
 #: app/templates/admin/security/alerts.html:24
 #: app/templates/admin/security/event_detail.html:83
 #: app/templates/admin/settings/manage_settings.html:1503
-#: app/templates/admin/templates/data_sync_imputation.html:396
+#: app/templates/admin/templates/data_sync_imputation.html:446
 #: app/templates/admin/user_management/user_form.html:1102
 #: app/templates/components/_builder_items.html:49
 #: app/templates/components/_builder_items.html:72
@@ -24135,7 +24170,7 @@ msgstr ""
 #: app/templates/admin/indicator_bank/indicator_bank.html:832
 #: app/templates/admin/indicator_bank/measurement_lookups.html:104
 #: app/templates/admin/indicator_bank/neural_map.html:194
-#: app/templates/admin/templates/data_sync_imputation.html:397
+#: app/templates/admin/templates/data_sync_imputation.html:447
 #: app/templates/components/_builder_items.html:50
 #: app/templates/forms/entry_form/entry_form.html:1059
 #: app/templates/forms/entry_form/entry_form.html:1093
@@ -24351,7 +24386,7 @@ msgstr ""
 msgid "Updated"
 msgstr "محدث"
 
-#: app/routes/main/helpers.py:1322
+#: app/routes/main/helpers.py:1321
 #, python-format
 msgid "Updated %(count)d field in %(template)s"
 msgstr "%(count)d ميدان مستكمل %(template)s"
@@ -24574,7 +24609,7 @@ msgstr ""
 msgid "Use as repeat entry title (dropdown in header)"
 msgstr "استخدم عنوان الإدخال المتكرر (القائمة المنسدلة في الرأس)"
 
-#: app/templates/admin/templates/data_sync_imputation.html:174
+#: app/templates/admin/templates/data_sync_imputation.html:224
 msgid ""
 "Use cached imputed values (recommended; uncheck to fetch fresh from API — "
 "can take a long time)"
@@ -24851,12 +24886,12 @@ msgstr "ملاحظة المستخدم"
 msgid "User rating"
 msgstr "تقييم المستخدم"
 
-#: app/services/platform/user_analytics_service.py:307
+#: app/services/platform/user_analytics_service.py:306
 #, python-format
 msgid "User-Agent contains an automation-related keyword: \"%(keyword)s\"."
 msgstr "يحتوي User-Agent على كلمة مفتاحية متعلقة بأتمتة: \"%(keyword)s\"."
 
-#: app/services/platform/user_analytics_service.py:321
+#: app/services/platform/user_analytics_service.py:320
 msgid ""
 "User-Agent does not include typical browser tokens (Mozilla, WebKit, Chrome,"
 " Safari, Firefox, Edge, etc.)."
@@ -24864,7 +24899,7 @@ msgstr ""
 "لا يشمل User-Agent رموز المتصفح التقليدية (مثل Mozilla، WebKit، Chrome، "
 "Safari، Firefox، Edge، إلخ)."
 
-#: app/services/platform/user_analytics_service.py:313
+#: app/services/platform/user_analytics_service.py:312
 msgid ""
 "User-Agent is very short (under 10 characters), which often indicates an "
 "automated client."
@@ -24910,14 +24945,14 @@ msgstr ""
 "يستخدم نص القالب الإنجليزي لهذا النموذج كمصدر للكتابة. متغيرات جينجا مثل "
 "org_name محفوظة."
 
-#: app/services/notification/preview.py:176
+#: app/services/notification/preview.py:175
 msgid ""
 "Uses the hardcoded instant notification email layout with sample copy. "
 "High/urgent types send immediately; others may go in daily/weekly digests "
 "instead."
 msgstr ""
 
-#: app/services/notification/preview.py:182
+#: app/services/notification/preview.py:181
 msgid ""
 "Uses the hardcoded instant notification email layout with sample copy. "
 "Normal-priority types are usually batched into digests unless the user chose"
@@ -24971,8 +25006,8 @@ msgstr "التحقق من صحتك"
 msgid "Validate Assignment?"
 msgstr ""
 
-#: app/templates/admin/templates/data_sync_imputation.html:149
-#: app/templates/admin/templates/data_sync_imputation.html:1307
+#: app/templates/admin/templates/data_sync_imputation.html:199
+#: app/templates/admin/templates/data_sync_imputation.html:1357
 msgid "Validated"
 msgstr "تم التحقق منه"
 
@@ -25062,7 +25097,7 @@ msgstr "فشل التحقق: "
 msgid "Validation questions"
 msgstr "أسئلة التحقق من الصحة"
 
-#: app/services/notification/core.py:189
+#: app/services/notification/core.py:188
 #, python-format
 msgid "Validation questions for %(template)s (%(period)s)"
 msgstr "أسئلة التحقق من صحة %(template)s (%(period)s)"
@@ -25589,7 +25624,7 @@ msgstr "مرحبا بك في"
 msgid "Welcome to the %(org_name)s!"
 msgstr "مرحبا بكم في %(org_name)s!"
 
-#: app/services/notification/core.py:178
+#: app/services/notification/core.py:177
 #, python-format
 msgid ""
 "Welcome to the %(org_name)s! Your account has been created. Open your "
@@ -25835,13 +25870,9 @@ msgstr "السنة"
 msgid "Year Range"
 msgstr "نطاق السنة"
 
-#: app/templates/admin/templates/data_sync_imputation.html:1394
+#: app/templates/admin/templates/data_sync_imputation.html:1532
 msgid "Years"
 msgstr "السنوات"
-
-#: app/templates/admin/templates/data_sync_imputation.html:110
-msgid "Years (comma-separated)"
-msgstr ""
 
 #: app/templates/forms/form_builder/partials/_item_modal.html:244
 msgid "Yellow"
@@ -25854,7 +25885,7 @@ msgstr "الأصفر"
 #: app/templates/admin/indicator_bank/_panel_spef_scripts.html:76
 #: app/templates/admin/indicator_bank/edit_indicator_bank.html:239
 #: app/templates/admin/indicator_bank/measurement_lookups.html:126
-#: app/templates/admin/templates/data_sync_imputation.html:1377
+#: app/templates/admin/templates/data_sync_imputation.html:1515
 #: app/templates/admin/validation_rules.html:225
 #: app/templates/components/_builder_items.html:51
 #: app/templates/components/_builder_items.html:73
@@ -25896,7 +25927,7 @@ msgstr "إجابة نعم أو لا."
 msgid "Yes, rotate key"
 msgstr "نعم، تدوير المفتاح"
 
-#: app/templates/admin/templates/data_sync_imputation.html:320
+#: app/templates/admin/templates/data_sync_imputation.html:370
 #: app/utils/form_localization.py:82 app/utils/form_localization.py:83
 msgid "Yes/No"
 msgstr "نعم/لا"
@@ -25946,7 +25977,7 @@ msgstr "أنت تقوم بتحرير نسخة مسودة"
 msgid "You are not authorized to access this assignment for %(entity)s."
 msgstr "%(entity)s لا يحق لك الدخول لهذه المهمة."
 
-#: app/services/notification/core.py:148
+#: app/services/notification/core.py:147
 #, python-format
 msgid "You are now a focal point for %(country)s."
 msgstr "أنت الآن نقطة اتصال ل%(country)s."
@@ -26064,7 +26095,7 @@ msgstr "لديك وصول مبكر إلى النسخة التجريبية — ش
 msgid "You have received an admin message"
 msgstr "لقد تلقيت رسالة من المسؤول"
 
-#: app/templates/admin/templates/data_sync_imputation.html:613
+#: app/templates/admin/templates/data_sync_imputation.html:663
 msgid "You have unsaved imputation method changes. Switch template anyway?"
 msgstr ""
 "لديك تغييرات في طريقة التحويل غير محفوظة. هل يمكن أن أبدل قالب على أي حال؟"
@@ -26160,7 +26191,7 @@ msgstr "تم تحديث إعدادات حسابك بنجاح."
 msgid "Your answer…"
 msgstr "إجابتك..."
 
-#: app/services/notification/core.py:100
+#: app/services/notification/core.py:99
 #, python-format
 msgid "Your assignment '%(template)s' has been approved."
 msgstr "تم الموافقة على تعيينك '%(template)s'."
@@ -27236,6 +27267,11 @@ msgstr "وسوف تترجم )ترجمة التحريرات القائمة من �
 msgid "will be unassigned"
 msgstr "مُسند"
 
+#: app/templates/admin/templates/data_sync_imputation.html:1391
+#: app/templates/admin/templates/data_sync_imputation.html:1396
+msgid "years"
+msgstr ""
+
 #: app/templates/core/dashboard/_admin_panel.html:686
 #: app/templates/core/dashboard/_assignments_tab.html:656
 msgid "yet."
@@ -27252,7 +27288,7 @@ msgstr "مؤشرات {عد}"
 msgid "{count} selected"
 msgstr "{العد} تم اختياره"
 
-#: app/services/notification/core.py:92
+#: app/services/notification/core.py:91
 #, python-brace-format
 msgid "{submitter_name} has submitted this assignment for period {period}."
 msgstr "{submitter_name} قدمت هذه المهمة لفترة {period}."
@@ -27357,9 +27393,9 @@ msgstr "✓"
 #~ msgid "Cleared 1 translation field."
 #~ msgstr "تم مسح حقل ترجمة واحد."
 
-# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1371
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1385
 #~ msgid "Default (2010–2024)"
-#~ msgstr "التعثر (2010–2024)"
+#~ msgstr ""
 
 # [Removed] was: app/templates/admin/documents/documents.html:80
 #~ msgid "Documents are uploaded through form submissions."
@@ -27405,9 +27441,9 @@ msgstr "✓"
 #~ msgid "Sent for review: %(template)s"
 #~ msgstr "تم إرسالها للمراجعة: %(template)s"
 
-# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:109
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:110
 #~ msgid "Years (comma-separated)"
-#~ msgstr "السنوات (مفصولة بفاصل)"
+#~ msgstr ""
 
 # [Removed] was: app/templates/core/dashboard.html:1326
 #~ msgid "at: %(datetime)s"

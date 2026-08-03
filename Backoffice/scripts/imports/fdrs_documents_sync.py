@@ -37,6 +37,28 @@ from fdrs_sync_constants import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_DOCUMENTS_PATH = "/api/documents"
+
+
+def _format_documents_upsert_progress(index: int, total: int, stats: Dict[str, int]) -> str:
+    """Human-readable progress while upserting FDRS document metadata and optional file bytes."""
+    return (
+        f"FDRS documents: record {index} of {total} "
+        f"(files saved this run: {stats['downloaded']}, "
+        f"awaiting IFRC file download: {stats['pending']})"
+    )
+
+
+def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
+    inserted = doc_stats.get("inserted", 0)
+    updated = doc_stats.get("updated", 0)
+    downloaded = doc_stats.get("downloaded", 0)
+    pending = doc_stats.get("pending", 0)
+    download_errors = doc_stats.get("download_errors", 0)
+    return (
+        f"FDRS documents complete: {inserted} inserted, {updated} updated; "
+        f"files saved: {downloaded}, awaiting IFRC file download: {pending}, "
+        f"download errors: {download_errors}"
+    )
 _FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
 _DEFAULT_DOWNLOAD_TIMEOUT = 120
 _PROGRESS_REPORT_EVERY = 10
@@ -468,7 +490,10 @@ def upsert_fdrs_document_metadata(
         except Exception as e:
             logger.debug("documents upsert progress_cb failed: %s", e)
 
-    _emit_progress(0, message=f"Starting FDRS documents upsert ({total_rows} planned)...")
+    _emit_progress(
+        0,
+        message=f"Starting FDRS document sync ({total_rows} records from IFRC API)...",
+    )
 
     keys = [r["fdrs_import_key"] for r in plan_rows if r.get("fdrs_import_key")]
     existing_by_key: Dict[str, SubmittedDocument] = {}
@@ -624,7 +649,7 @@ def upsert_fdrs_document_metadata(
             if i == 1 or i % _PROGRESS_REPORT_EVERY == 0 or i == total_rows:
                 _emit_progress(
                     i,
-                    message=f"FDRS documents {i}/{total_rows} (downloaded={stats['downloaded']} pending={stats['pending']})",
+                    message=_format_documents_upsert_progress(i, total_rows, stats),
                 )
         except FdrsSyncCancelled:
             raise
@@ -665,7 +690,7 @@ def run_fdrs_documents_sync(
     fetch_pct = progress_start_pct
     _progress(
         stage="fetch_documents",
-        message="Fetching FDRS documents API...",
+        message="Fetching FDRS document list from IFRC API...",
         percent=fetch_pct,
         current=0,
         total=0,
@@ -675,7 +700,7 @@ def run_fdrs_documents_sync(
     planned = int(summary.get("planned") or 0)
     _progress(
         stage="documents_plan",
-        message=f"FDRS documents planned: {planned}",
+        message=f"FDRS documents: {planned} records to sync (metadata + file download when available)",
         percent=progress_start_pct,
         current=0,
         total=planned,
@@ -693,11 +718,7 @@ def run_fdrs_documents_sync(
     )
     _progress(
         stage="documents_done",
-        message=(
-            f"FDRS documents: downloaded={doc_stats.get('downloaded', 0)} "
-            f"pending={doc_stats.get('pending', 0)} "
-            f"errors={doc_stats.get('download_errors', 0)}"
-        ),
+        message=_format_documents_done_message(doc_stats),
         percent=progress_end_pct,
         current=planned,
         total=planned,

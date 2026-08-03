@@ -201,7 +201,7 @@ DEFAULT_DATA_API_BASE = "https://data-api.ifrc.org"
 # When years aren't explicitly provided, keep a conservative default window.
 # This should match the importer/UI expectation (see import_fdrs_form_data.py help text).
 DEFAULT_FDRS_YEARS_START = 2010
-DEFAULT_FDRS_YEARS_END = 2024  # inclusive
+DEFAULT_FDRS_YEARS_END = 2025  # inclusive
 
 # KPI codes that use the full code as BaseKPI (indicator bank uses full code, not first-two-tokens)
 # KPI_pr_sex and KPI_sg_sex are questions linked directly to form_items (no indicator bank)

@@ -20,29 +20,20 @@ class AdminDashboardProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Convenience getters - mapped to API response fields
+  // Convenience getters - mapped to mobile dashboard-stats payload
   int get userCount => _stats?['user_count'] ?? 0;
-  int get adminCount =>
-      _stats?['admin_count'] ?? 0; // Not provided by API, default to 0
-  int get focalPointCount =>
-      _stats?['focal_point_count'] ?? 0; // Not provided by API, default to 0
+  int get adminCount => _stats?['admin_count'] ?? 0;
+  int get focalPointCount => _stats?['focal_point_count'] ?? 0;
   int get templateCount => _stats?['template_count'] ?? 0;
   int get assignmentCount => _stats?['assignment_count'] ?? 0;
   int get todayLogins => _stats?['today_logins'] ?? 0;
   int get recentLogins => _stats?['recent_logins'] ?? 0;
-  int get recentActivities =>
-      _stats?['recent_submissions'] ?? 0; // API returns 'recent_submissions'
-  int get activeSessions =>
-      _stats?['active_users'] ??
-      0; // API returns 'active_users', not 'active_sessions'
+  int get recentActivities => _stats?['recent_submissions'] ?? 0;
+  int get activeSessions => _stats?['active_users'] ?? 0;
   int get pendingSubmissions =>
-      _stats?['pending_public_submissions_count'] ??
-      0; // Not provided by API, default to 0
-  int get overdueAssignments =>
-      _stats?['overdue_assignments'] ?? 0; // Not provided by API, default to 0
-  int get securityAlerts =>
-      _stats?['unresolved_security_events'] ??
-      0; // Not provided by API, default to 0
+      _stats?['pending_public_submissions_count'] ?? 0;
+  int get overdueAssignments => _stats?['overdue_assignments'] ?? 0;
+  int get securityAlerts => 0; // omitted from mobile dashboard-stats payload
 
   Future<void> loadDashboardStats() async {
     if (shouldDeferRemoteFetch) {

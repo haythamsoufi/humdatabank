@@ -55,10 +55,10 @@ async function syncData() {
     };
 
     // 1. Fetch comprehensive dataset with disaggregation data
-    const url = `${API_BASE_URL}/api/v1/data/tables?related=all&per_page=100000&disagg=true`;
+    const url = `${API_BASE_URL}/api/v1/data?related=all&per_page=100000&disagg=true`;
     console.log(`📥 Fetching data from: ${url}`);
 
-    const response = await fetchWithAuthFallback('/api/v1/data/tables?related=all&per_page=100000&disagg=true');
+    const response = await fetchWithAuthFallback('/api/v1/data?related=all&per_page=100000&disagg=true');
     if (!response.ok) {
       throw new Error(`API error: ${response.status} ${response.statusText}`);
     }

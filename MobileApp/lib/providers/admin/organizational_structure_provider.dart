@@ -61,30 +61,30 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
         }
       }
 
-      // Use HTML route
+      // Mobile org structure JSON API (/api/mobile/v1/admin/org/structure)
       final response = await _api.get(
         AppConfig.mobileOrgStructureEndpoint,
         queryParams: queryParams.isNotEmpty ? queryParams : null,
       );
 
       if (response.statusCode == 200) {
-        // Try to parse as JSON first
         try {
           final jsonData = decodeJsonObject(response.body);
           if (mobileResponseIsSuccess(jsonData)) {
             final rawData = jsonData['data'] is Map<String, dynamic>
                 ? jsonData['data'] as Map<String, dynamic>
                 : jsonData;
-            final activeTab = rawData['active_tab'] as String? ?? jsonData['active_tab'] as String? ?? levelFilter ?? 'countries';
-            _organizations = _parseOrganizationsFromJson(rawData, activeTab);
+            // Server always returns all entity lists; pick the slice from the UI filter.
+            final effectiveTab = _effectiveTabFromFilter(levelFilter);
+            _organizations = _parseOrganizationsFromJson(rawData, effectiveTab);
           } else {
-            // Fallback to HTML parsing
-            _organizations = _parseOrganizationsFromHtml(response.body, levelFilter);
+            _organizations = [];
+            throw Exception('Failed to load organizations: invalid API response');
           }
         } catch (e) {
-          // If JSON parsing fails, try HTML parsing as fallback
-          DebugLogger.logWarn('ORGS', 'JSON parse failed, trying HTML: $e');
-          _organizations = _parseOrganizationsFromHtml(response.body, levelFilter);
+          DebugLogger.logErrorWithTag('ORGS', 'JSON parse failed: $e');
+          _organizations = [];
+          rethrow;
         }
 
         DebugLogger.logInfo('ORGS',
@@ -116,6 +116,23 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
       rethrow;
     }
     }); // end runAsyncOperation
+  }
+
+  /// Maps UI entity filter to the JSON slice returned by the mobile org API.
+  String _effectiveTabFromFilter(String? levelFilter) {
+    if (levelFilter == null || levelFilter.isEmpty || levelFilter == 'countries') {
+      return 'countries';
+    }
+    if (levelFilter == 'nss') return 'nss';
+    if (levelFilter == 'ns_structure') return 'ns-structure';
+    if (levelFilter == 'secretariat' ||
+        levelFilter == 'divisions' ||
+        levelFilter == 'departments' ||
+        levelFilter == 'regions' ||
+        levelFilter == 'clusters') {
+      return 'secretariat';
+    }
+    return 'countries';
   }
 
   List<Map<String, dynamic>> _parseOrganizationsFromJson(
@@ -150,30 +167,46 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
         }
       }
     } else if (activeTab == 'ns-structure') {
-      // Parse branches
-      if (jsonData['branches'] != null) {
-        final branches = jsonData['branches'] as List<dynamic>;
-        for (final branch in branches) {
-          organizations.add({
-            'id': branch['id'],
-            'name': branch['name'] ?? '',
-            'level': 'Branch',
-            'country': branch['country_name'] ?? '',
-            'country_id': branch['country_id'],
-            'is_active': branch['is_active'] ?? true,
-          });
+      final branches = jsonData['branches'] is List<dynamic>
+          ? jsonData['branches'] as List<dynamic>
+          : const <dynamic>[];
+      final branchNames = <int, String>{};
+      final branchCountries = <int, String>{};
+      for (final branch in branches) {
+        if (branch is! Map<String, dynamic>) continue;
+        final id = branch['id'];
+        if (id is int) {
+          branchNames[id] = branch['name']?.toString() ?? '';
+          branchCountries[id] = branch['country_name']?.toString() ?? '';
         }
+      }
+
+      // Parse branches
+      for (final branch in branches) {
+        if (branch is! Map<String, dynamic>) continue;
+        organizations.add({
+          'id': branch['id'],
+          'name': branch['name'] ?? '',
+          'level': 'Branch',
+          'country': branch['country_name'] ?? '',
+          'country_id': branch['country_id'],
+          'is_active': branch['is_active'] ?? true,
+        });
       }
       // Parse subbranches
       if (jsonData['subbranches'] != null) {
         final subbranches = jsonData['subbranches'] as List<dynamic>;
         for (final subbranch in subbranches) {
+          if (subbranch is! Map<String, dynamic>) continue;
+          final branchId = subbranch['branch_id'];
           organizations.add({
             'id': subbranch['id'],
             'name': subbranch['name'] ?? '',
             'level': 'Sub-branch',
-            'country': subbranch['branch_name'] ?? '',
-            'branch_id': subbranch['branch_id'],
+            'country': subbranch['branch_name'] ??
+                (branchId is int ? branchCountries[branchId] : null) ??
+                '',
+            'branch_id': branchId,
             'is_active': subbranch['is_active'] ?? true,
           });
         }
@@ -247,408 +280,6 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
     }
 
     return organizations;
-  }
-
-  List<Map<String, dynamic>> _parseOrganizationsFromHtml(String html,
-      [String? requestedEntityType]) {
-    final organizations = <Map<String, dynamic>>[];
-
-    // Determine which tab to parse based on requested entity type or active tab in HTML
-    String? activeTab;
-    String? secretariatSubTab;
-
-    // If we have a requested entity type, use it to determine the tab
-    if (requestedEntityType != null && requestedEntityType.isNotEmpty) {
-      switch (requestedEntityType) {
-        case 'countries':
-          activeTab = 'countries';
-          break;
-        case 'nss':
-          activeTab = 'nss';
-          break;
-        case 'ns_structure':
-          activeTab = 'ns-structure';
-          break;
-        case 'secretariat':
-        case 'divisions':
-        case 'departments':
-        case 'regions':
-        case 'clusters':
-          activeTab = 'secretariat';
-          if (requestedEntityType != 'secretariat') {
-            secretariatSubTab = requestedEntityType;
-          }
-          break;
-      }
-    }
-
-    // If we couldn't determine from requested type, try to detect from HTML
-    if (activeTab == null) {
-      // Check for active tab by looking for tab-panel without "hidden" class
-      final countriesPanelMatch = RegExp(
-        r'id="countries-tab-panel"[^>]*class="[^"]*tab-panel[^"]*"',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (countriesPanelMatch != null &&
-          !countriesPanelMatch.group(0)!.contains('hidden')) {
-        activeTab = 'countries';
-      }
-
-      final nssPanelMatch = RegExp(
-        r'id="nss-tab-panel"[^>]*class="[^"]*tab-panel[^"]*"',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (nssPanelMatch != null &&
-          !nssPanelMatch.group(0)!.contains('hidden')) {
-        activeTab = 'nss';
-      }
-
-      final nsStructurePanelMatch = RegExp(
-        r'id="ns-structure-tab-panel"[^>]*class="[^"]*tab-panel[^"]*"',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (nsStructurePanelMatch != null &&
-          !nsStructurePanelMatch.group(0)!.contains('hidden')) {
-        activeTab = 'ns-structure';
-      }
-
-      final secretariatPanelMatch = RegExp(
-        r'id="secretariat-tab-panel"[^>]*class="[^"]*tab-panel[^"]*"',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (secretariatPanelMatch != null &&
-          !secretariatPanelMatch.group(0)!.contains('hidden')) {
-        activeTab = 'secretariat';
-      }
-    }
-
-    // Determine secretariat sub-tab if not already set
-    if (activeTab == 'secretariat' && secretariatSubTab == null) {
-      // Check which sub-tab div is visible (not hidden)
-      final divisionsMatch = RegExp(
-        r'id="divisions"[^>]*class="[^"]*tab-content[^"]*"[^>]*>',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (divisionsMatch != null) {
-        // Check if it's not hidden by looking at the full tag
-        final divisionsFullMatch = RegExp(
-          r'id="divisions"[^>]*>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(html);
-        if (divisionsFullMatch != null &&
-            !divisionsFullMatch.group(0)!.contains('style="display: none;"')) {
-          secretariatSubTab = 'divisions';
-        }
-      }
-
-      final departmentsMatch = RegExp(
-        r'id="departments"[^>]*class="[^"]*tab-content[^"]*"[^>]*>',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (departmentsMatch != null) {
-        final departmentsFullMatch = RegExp(
-          r'id="departments"[^>]*>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(html);
-        if (departmentsFullMatch != null &&
-            !departmentsFullMatch
-                .group(0)!
-                .contains('style="display: none;"')) {
-          secretariatSubTab = 'departments';
-        }
-      }
-
-      final regionsMatch = RegExp(
-        r'id="regions"[^>]*class="[^"]*tab-content[^"]*"[^>]*>',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (regionsMatch != null) {
-        final regionsFullMatch = RegExp(
-          r'id="regions"[^>]*>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(html);
-        if (regionsFullMatch != null &&
-            !regionsFullMatch.group(0)!.contains('style="display: none;"')) {
-          secretariatSubTab = 'regions';
-        }
-      }
-
-      final clustersMatch = RegExp(
-        r'id="clusters"[^>]*class="[^"]*tab-content[^"]*"[^>]*>',
-        caseSensitive: false,
-      ).firstMatch(html);
-      if (clustersMatch != null) {
-        final clustersFullMatch = RegExp(
-          r'id="clusters"[^>]*>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(html);
-        if (clustersFullMatch != null &&
-            !clustersFullMatch.group(0)!.contains('style="display: none;"')) {
-          secretariatSubTab = 'clusters';
-        }
-      }
-    }
-
-    // Extract the relevant table HTML based on active tab
-    String? tableHtml;
-    if (activeTab == 'countries') {
-      final match = RegExp(
-        r'<table[^>]*id="countriesTable"[^>]*>([\s\S]*?)</table>',
-        caseSensitive: false,
-        dotAll: true,
-      ).firstMatch(html);
-      tableHtml = match?.group(0);
-      DebugLogger.log('ORGS', 'Found countries table: ${tableHtml != null}');
-    } else if (activeTab == 'nss') {
-      final match = RegExp(
-        r'<table[^>]*id="nssTable"[^>]*>([\s\S]*?)</table>',
-        caseSensitive: false,
-        dotAll: true,
-      ).firstMatch(html);
-      tableHtml = match?.group(0);
-      DebugLogger.log('ORGS', 'Found nss table: ${tableHtml != null}');
-    } else if (activeTab == 'ns-structure') {
-      // NS Structure might have multiple tables or a different structure
-      // Try to find tables within the ns-structure tab panel
-      final panelMatch = RegExp(
-        r'id="ns-structure-tab-panel"([\s\S]*?)</div>\s*</div>',
-        caseSensitive: false,
-        dotAll: true,
-      ).firstMatch(html);
-      if (panelMatch != null) {
-        final panelHtml = panelMatch.group(1) ?? '';
-        final match = RegExp(
-          r'<table[^>]*>([\s\S]*?)</table>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(panelHtml);
-        tableHtml = match?.group(0);
-      }
-      DebugLogger.log('ORGS', 'Found ns-structure table: ${tableHtml != null}');
-    } else if (activeTab == 'secretariat') {
-      // Get the specific secretariat sub-tab table
-      String? tableId;
-      if (secretariatSubTab == 'divisions') {
-        tableId = 'divisionsTable';
-      } else if (secretariatSubTab == 'departments') {
-        tableId = 'departmentsTable';
-      } else if (secretariatSubTab == 'regions') {
-        tableId = 'regionsTable';
-      } else if (secretariatSubTab == 'clusters') {
-        tableId = 'clustersTable';
-      }
-
-      if (tableId != null) {
-        // Try multiple regex patterns to find the table
-        RegExpMatch? match;
-
-        // Pattern 1: Standard table with id attribute
-        match = RegExp(
-          r'<table[^>]*id="' + tableId + r'"[^>]*>([\s\S]*?)</table>',
-          caseSensitive: false,
-          dotAll: true,
-        ).firstMatch(html);
-
-        // Pattern 2: Table with id in quotes (different spacing)
-        match ??= RegExp(
-            r'<table[^>]*\sid="' + tableId + r'"[^>]*>([\s\S]*?)</table>',
-            caseSensitive: false,
-            dotAll: true,
-          ).firstMatch(html);
-
-        // Pattern 3: Find by table ID anywhere in attributes
-        if (match == null) {
-          final tableStart = html.indexOf('id="$tableId"');
-          if (tableStart != -1) {
-            // Find the opening <table> tag before this id
-            final tableTagStart = html.lastIndexOf('<table', tableStart);
-            if (tableTagStart != -1) {
-              // Find the closing </table> tag
-              final tableTagEnd = html.indexOf('</table>', tableStart);
-              if (tableTagEnd != -1) {
-                tableHtml = html.substring(tableTagStart, tableTagEnd + 8);
-                match = RegExp(r'.*', dotAll: true).firstMatch(tableHtml);
-              }
-            }
-          }
-        }
-
-        if (match != null) {
-          tableHtml = match.group(0);
-        }
-
-        DebugLogger.log('ORGS',
-            'Found $tableId table: ${tableHtml != null}, subTab: $secretariatSubTab, tableHtml length: ${tableHtml?.length ?? 0}');
-      } else {
-        DebugLogger.log('ORGS',
-            'No tableId determined for secretariat, subTab: $secretariatSubTab');
-      }
-    }
-
-    // If no specific table found, parse all tables (fallback)
-    if (tableHtml == null) {
-      DebugLogger.log('ORGS', 'No specific table found, parsing all HTML');
-      tableHtml = html;
-    } else {
-      DebugLogger.log('ORGS', 'Parsing table with ${tableHtml.length} chars');
-    }
-
-    // Parse HTML table rows from the relevant table
-    final rowPattern = RegExp(
-      r'<tr[^>]*>([\s\S]*?)</tr>',
-      caseSensitive: false,
-    );
-
-    final rows = rowPattern.allMatches(tableHtml);
-    int index = 0;
-
-    for (final row in rows) {
-      final rowHtml = row.group(1) ?? '';
-
-      // Skip header rows
-      if (rowHtml.contains('<th') ||
-          rowHtml.contains('thead') ||
-          rowHtml.trim().isEmpty) {
-        continue;
-      }
-
-      // Extract cells
-      final cells = RegExp(
-        r'<td[^>]*>([\s\S]*?)</td>',
-        caseSensitive: false,
-      ).allMatches(rowHtml).toList();
-
-      if (cells.isNotEmpty) {
-        // Try to extract organization ID from edit/delete/view links first
-        final idMatch = RegExp(
-          r'/admin/organization/(?:edit|delete|view)/(\d+)',
-          caseSensitive: false,
-        ).firstMatch(rowHtml);
-
-        final id = idMatch != null
-            ? int.tryParse(idMatch.group(1) ?? '0') ?? index
-            : index;
-
-        // Extract entity label/name - look for links or text in cells
-        String name = '';
-
-        // Try all cells to find the entity label (skip IDs)
-        for (int i = 0; i < cells.length; i++) {
-          final cellHtml = cells[i].group(1) ?? '';
-
-          // Try to extract from link text first (usually the entity label)
-          final linkMatch = RegExp(
-            r'<a[^>]*>([\s\S]*?)</a>',
-            caseSensitive: false,
-          ).firstMatch(cellHtml);
-
-          String candidateName;
-          if (linkMatch != null) {
-            candidateName = _extractText(linkMatch.group(1) ?? '');
-          } else {
-            candidateName = _extractText(cellHtml);
-          }
-
-          // Skip if it's empty, just a number (ID), or matches the ID
-          if (candidateName.isNotEmpty &&
-              candidateName != id.toString() &&
-              !RegExp(r'^\d+$').hasMatch(candidateName) &&
-              candidateName.length > 2) {
-            name = candidateName;
-            break; // Found a good name, stop searching
-          }
-        }
-
-        // If still no name found, use a default
-        if (name.isEmpty) {
-          name = 'Organization #$id';
-        }
-
-        // Extract level/type from second or third cell (if exists)
-        String? level;
-        if (cells.length > 1) {
-          final levelHtml = cells[1].group(1) ?? '';
-          final levelText = _extractText(levelHtml);
-          // Only use if it doesn't look like a name/label
-          if (levelText.isNotEmpty &&
-              !RegExp(r'^[A-Z][a-z]+').hasMatch(levelText)) {
-            level = levelText;
-          } else if (cells.length > 2) {
-            final levelHtml2 = cells[2].group(1) ?? '';
-            level = _extractText(levelHtml2);
-          }
-        }
-
-        // Extract country from remaining cells
-        String? country;
-        for (int i = 2; i < cells.length; i++) {
-          final countryHtml = cells[i].group(1) ?? '';
-          final countryText = _extractText(countryHtml);
-          if (countryText.isNotEmpty && countryText.length < 50) {
-            country = countryText;
-            break;
-          }
-        }
-
-        if (name.isNotEmpty && name != id.toString()) {
-          // Determine entity type based on context
-          String? entityType;
-          if (activeTab == 'countries') {
-            entityType = 'countries';
-          } else if (activeTab == 'nss') {
-            entityType = 'nss';
-          } else if (activeTab == 'ns-structure') {
-            entityType = 'ns_structure';
-          } else if (activeTab == 'secretariat') {
-            entityType = secretariatSubTab ?? 'secretariat';
-          }
-
-          organizations.add({
-            'id': id,
-            'name': name,
-            'level': level?.isNotEmpty == true ? level : null,
-            'country': country?.isNotEmpty == true ? country : null,
-            'entityType': entityType,
-          });
-          index++;
-        }
-      }
-    }
-
-    // If no table rows found, try to parse from other structures
-    if (organizations.isEmpty) {
-      // Try to find organization names in divs or other containers
-      final orgPattern = RegExp(
-        r'<div[^>]*class="[^"]*organization[^"]*"[^>]*>([\s\S]*?)</div>',
-        caseSensitive: false,
-      );
-
-      final orgMatches = orgPattern.allMatches(html);
-      for (final match in orgMatches) {
-        final orgHtml = match.group(1) ?? '';
-        final name = _extractText(orgHtml);
-        if (name.isNotEmpty && name.length < 200) {
-          // Filter out very long text
-          organizations.add({
-            'id': index++,
-            'name': name,
-          });
-        }
-      }
-    }
-
-    return organizations;
-  }
-
-  String _extractText(String html) {
-    return html
-        .replaceAll(RegExp(r'<[^>]+>'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
   }
 
   void clearError() => clearOpError();

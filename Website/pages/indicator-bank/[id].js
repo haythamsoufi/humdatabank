@@ -486,8 +486,8 @@ export default function IndicatorDetailPage() {
         additional_notes: suggestForm.additional_notes
       };
 
-      // Submit to backend API
-      const response = await fetch(`${API_BASE_URL}/api/v1/indicator-suggestions?api_key=${API_KEY}`, {
+      // Submit via same-origin proxy (avoids CORS; server adds API key)
+      const response = await fetch('/api/indicator-suggestions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

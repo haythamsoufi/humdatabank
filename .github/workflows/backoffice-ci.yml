@@ -113,7 +113,8 @@ jobs:
 
     services:
       postgres:
-        image: postgres:14
+        # pgvector required: tests and migrations use CREATE EXTENSION vector (see conftest.py).
+        image: pgvector/pgvector:pg15
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

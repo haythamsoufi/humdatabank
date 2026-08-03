@@ -36,7 +36,7 @@ Options:
     --fdrs-data-api-base     Base URL for FDRS data API (default: https://data-api.ifrc.org)
     --fdrs-data-api-key      API key for data-api.ifrc.org (required if using --fdrs-from-data-api)
     --fdrs-imputed-url       Optional URL for imputed values (e.g. Power Platform export)
-    --fdrs-years             Comma-separated years for FDRS fetch (default: 2010-2024)
+    --fdrs-years             Comma-separated years for FDRS fetch (default: 2010-2025)
     --fdrs-reported-states   Comma-separated IFRC row State codes to treat as importable reported values
                              (0=Not filled, 100=Saved, 200=Reopened, 300=Submitted, 400=Validated, 500=Published).
                              Default when omitted: 100,200,300,400,500 (all except Not filled) or FDRS_REPORTED_IMPORT_STATES env.
@@ -2820,13 +2820,16 @@ def run_import(
                 stats["documents_errors"] = ds.get("errors", 0)
                 stats["documents_downloaded"] = ds.get("downloaded", 0)
                 stats["documents_pending"] = ds.get("pending", 0)
+                stats["documents_download_errors"] = ds.get("download_errors", 0)
                 stats["documents_summary"] = doc_result.get("documents_summary")
                 logger.info(
-                    "FDRS documents: inserted=%s updated=%s downloaded=%s pending=%s errors=%s planned=%s",
+                    "FDRS documents complete: inserted=%s updated=%s files_saved=%s "
+                    "awaiting_file_download=%s download_errors=%s row_errors=%s planned=%s",
                     stats["documents_inserted"],
                     stats["documents_updated"],
                     stats["documents_downloaded"],
                     stats["documents_pending"],
+                    stats["documents_download_errors"],
                     stats["documents_errors"],
                     (doc_result.get("documents_summary") or {}).get("planned"),
                 )
@@ -2835,6 +2838,15 @@ def run_import(
             except Exception as e:
                 stats["documents_errors"] = stats.get("documents_errors", 0) + 1
                 logger.error("FDRS documents sync failed: %s", e, exc_info=True)
+        elif fdrs_from_data_api and not sync_documents:
+            _progress(
+                stage="documents_skipped",
+                message="FDRS documents skipped (indicator data only).",
+                current=0,
+                total=0,
+                percent=_PROGRESS_DOCUMENTS_END,
+            )
+            logger.info("FDRS documents skipped (sync_documents=False)")
 
         if fdrs_from_data_api and sync_assignment_status and assignment_rows:
             _check_cancel()
@@ -2927,7 +2939,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--fdrs-years",
-        help="Comma-separated years for FDRS fetch (e.g. 2019,2020,2021). Default: 2010-2024.",
+        help="Comma-separated years for FDRS fetch (e.g. 2019,2020,2021). Default: 2010-2025.",
     )
     parser.add_argument(
         "--fdrs-reported-states",
@@ -2977,6 +2989,11 @@ def main() -> int:
         "--no-sync-assignment-status",
         action="store_true",
         help="Skip syncing FDRS section workflow KPIs to assignment_entity_status (data-api mode only).",
+    )
+    parser.add_argument(
+        "--no-sync-documents",
+        action="store_true",
+        help="Skip syncing FDRS submission documents (data-api mode only; indicator data still imports).",
     )
     parser.add_argument("--batch-size", type=int, default=1000, help="Commit every N rows (default: 1000)")
     parser.add_argument(
@@ -3162,6 +3179,7 @@ def main() -> int:
             batch_size=args.batch_size,
             template_id=template_id,
             sync_assignment_status=not getattr(args, "no_sync_assignment_status", False),
+            sync_documents=not getattr(args, "no_sync_documents", False),
         )
     except (ValueError, RuntimeError) as e:
         logger.error("Error: %s", e)

@@ -40,6 +40,8 @@
 </div>
 {% endif %}
 
+<div class="ai-docs-page min-w-0 max-w-full">
+
 {{ floating_progress_banner(
     'processingStatusBanner',
     'processingStatusTitle',
@@ -56,26 +58,26 @@
 
 <!-- Statistics -->
 <div class="mb-6">
-    <div class="grid gap-4" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
-        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
-            <div class="text-3xl font-bold text-gray-900 mb-2">{{ stats.total_documents or 0 }}</div>
-            <div class="text-sm font-medium text-gray-600">{{ _('Total') }}</div>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">{{ stats.total_documents or 0 }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Total') }}</div>
         </div>
-        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
-            <div class="text-3xl font-bold text-green-600 mb-2">{{ stats.completed or 0 }}</div>
-            <div class="text-sm font-medium text-gray-600">{{ _('Completed') }}</div>
+        <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-2xl sm:text-3xl font-bold text-green-600 mb-1 sm:mb-2">{{ stats.completed or 0 }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Completed') }}</div>
         </div>
-        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
-            <div class="text-3xl font-bold text-yellow-600 mb-2">{{ stats.pending or 0 }}</div>
-            <div class="text-sm font-medium text-gray-600">{{ _('Pending') }}</div>
+        <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-2xl sm:text-3xl font-bold text-yellow-600 mb-1 sm:mb-2">{{ stats.pending or 0 }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Pending') }}</div>
         </div>
-        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
-            <div class="text-3xl font-bold text-red-600 mb-2">{{ stats.failed or 0 }}</div>
-            <div class="text-sm font-medium text-gray-600">{{ _('Failed') }}</div>
+        <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
+            <div class="text-2xl sm:text-3xl font-bold text-red-600 mb-1 sm:mb-2">{{ stats.failed or 0 }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Failed') }}</div>
         </div>
-        <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 text-center">
-            <div class="text-3xl font-bold text-purple-600 mb-2">{{ stats.total_embeddings or 0 }}</div>
-            <div class="text-sm font-medium text-gray-600">{{ _('Embeddings') }}</div>
+        <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center col-span-2 sm:col-span-1">
+            <div class="text-2xl sm:text-3xl font-bold text-purple-600 mb-1 sm:mb-2">{{ stats.total_embeddings or 0 }}</div>
+            <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Embeddings') }}</div>
         </div>
     </div>
 </div>
@@ -83,25 +85,25 @@
 <!-- AI Query -->
 <div class="bg-white rounded-xl shadow-lg border border-gray-200 mb-6 overflow-hidden">
     <!-- Header -->
-    <div class="ai-query-header px-6 py-5" style="background: linear-gradient(to right, #2563eb, #1d4ed8) !important; color: #ffffff !important;">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="p-2.5 bg-white/25 rounded-lg backdrop-blur-sm border border-white/30">
-                    <i class="fas fa-robot text-xl" style="color: #ffffff !important;"></i>
+    <div class="ai-query-header px-4 sm:px-6 py-4 sm:py-5" style="background: linear-gradient(to right, #2563eb, #1d4ed8) !important; color: #ffffff !important;">
+        <div class="flex items-center justify-between min-w-0">
+            <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div class="p-2 sm:p-2.5 bg-white/25 rounded-lg backdrop-blur-sm border border-white/30 shrink-0">
+                    <i class="fas fa-robot text-lg sm:text-xl" style="color: #ffffff !important;"></i>
                 </div>
-                <div>
-                    <h3 class="text-xl font-bold leading-tight drop-shadow-sm" style="color: #ffffff !important;">{{ _('AI Query Assistant') }}</h3>
-                    <p class="text-sm mt-1 font-medium opacity-95" style="color: #ffffff !important;">{{ _('Ask questions about your document library') }}</p>
+                <div class="min-w-0">
+                    <h3 class="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm truncate" style="color: #ffffff !important;">{{ _('AI Query Assistant') }}</h3>
+                    <p class="text-xs sm:text-sm mt-0.5 sm:mt-1 font-medium opacity-95" style="color: #ffffff !important;">{{ _('Ask questions about your document library') }}</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Query Form -->
-    <div class="p-6 bg-white">
+    <div class="p-4 sm:p-6 bg-white">
         <form id="aiSearchForm" class="no-submit-guard">
-            <div class="mb-6">
-                <div class="flex items-center gap-3">
+            <div class="mb-4 sm:mb-6">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div class="flex-shrink-0">
                         {% if current_user %}
                             <div class="w-10 h-10 rounded-full text-white text-xs font-semibold flex items-center justify-center shadow-sm"
@@ -115,7 +117,7 @@
                     <div id="aiSearchInputShell" class="relative flex-1 flex items-center min-w-0 overflow-hidden rounded-full border-2 border-gray-300 bg-white shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
                         <input type="text" id="aiSearchQuery"
                                placeholder="{{ _('Ask a question (AI will answer using the document library)...')|forceescape }}"
-                               class="flex-1 min-w-0 py-3 pl-4 pr-2 border-0 bg-transparent text-base focus:outline-none focus:ring-0">
+                               class="flex-1 min-w-0 py-2.5 sm:py-3 pl-3 sm:pl-4 pr-2 border-0 bg-transparent text-sm sm:text-base focus:outline-none focus:ring-0">
                         <button type="submit" id="aiSearchBtn"
                                 class="btn btn-icon btn-sm btn-primary shrink-0 border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="{{ _('Send')|forceescape }}">
@@ -131,7 +133,7 @@
             <span></span>
         </div>
 
-        <div id="aiAnswerSection" class="hidden mt-6 flex items-start gap-3">
+        <div id="aiAnswerSection" class="hidden mt-4 sm:mt-6 flex items-start gap-2 sm:gap-3 min-w-0">
             <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-md" style="background: linear-gradient(to bottom right, #3b82f6, #2563eb) !important;">
                 <i class="fas fa-robot" style="color: #ffffff !important; font-size: 1rem !important;"></i>
             </div>
@@ -147,7 +149,7 @@
         </div>
 
         <div class="mt-6">
-            <div class="flex items-center gap-4 mb-2">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-4 mb-2">
                 <button type="button" id="toggleAdvancedOptions"
                         class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 bg-transparent border-0 p-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500">
                     <i class="fas fa-cog text-gray-500" aria-hidden="true"></i>
@@ -401,79 +403,85 @@
 {% endcall %}
 
 <!-- Documents Table -->
-<div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-    <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <h3 class="text-lg font-semibold text-gray-900">{{ _('Documents') }}</h3>
-        <div class="flex items-center gap-3">
-            <div id="documentsBulkActions" class="hidden items-center gap-2">
-                <button type="button" id="bulkDownloadBtn" class="btn btn-success" disabled>
+<div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6 min-w-0 overflow-hidden">
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between min-w-0">
+        <h3 class="text-lg font-semibold text-gray-900 shrink-0">{{ _('Documents') }}</h3>
+        <div class="flex flex-col gap-2 w-full min-w-0 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div id="documentsBulkActions" class="hidden flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+                <button type="button" id="bulkDownloadBtn" class="btn btn-success btn-sm" disabled>
                     <i class="fas fa-download"></i>
                     <span id="bulkDownloadBtnLabel">{{ _('Download') }}</span>
                 </button>
-                <button type="button" id="bulkReprocessBtn" class="btn btn-primary" disabled>
+                <button type="button" id="bulkReprocessBtn" class="btn btn-primary btn-sm" disabled>
                     <i class="fas fa-redo"></i>
                     <span id="bulkReprocessBtnLabel">{{ _('Reprocess') }}</span>
                 </button>
-                <button type="button" id="bulkRedetectCountryBtn" class="btn btn-primary" disabled title="{{ _('Re-run country detection (no re-chunk)')|forceescape }}">
+                <button type="button" id="bulkRedetectCountryBtn" class="btn btn-primary btn-sm" disabled title="{{ _('Re-run country detection (no re-chunk)')|forceescape }}">
                     <i class="fas fa-globe-americas"></i>
                     <span id="bulkRedetectCountryBtnLabel">{{ _('Redetect country') }}</span>
                 </button>
-                <button type="button" id="bulkReprocessMetaBtn" class="btn btn-primary" disabled title="{{ _('Re-run metadata enrichment: date, language, category, quality, source org (no re-chunk)')|forceescape }}">
+                <button type="button" id="bulkReprocessMetaBtn" class="btn btn-primary btn-sm" disabled title="{{ _('Re-run metadata enrichment: date, language, category, quality, source org (no re-chunk)')|forceescape }}">
                     <i class="fas fa-tags"></i>
                     <span id="bulkReprocessMetaBtnLabel">{{ _('Reprocess metadata') }}</span>
                 </button>
-                <button type="button" id="bulkDeleteBtn" class="btn btn-danger" disabled>
+                <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-sm" disabled>
                     <i class="fas fa-trash"></i>
                     <span id="bulkDeleteBtnLabel">{{ _('Delete') }}</span>
                 </button>
             </div>
-            <button type="button" id="openUploadModalBtn" class="btn btn-primary">
-                <i class="fas fa-plus"></i>
-                <span>{{ _('Upload/Import') }}</span>
-            </button>
-            <div id="column-visibility-button-placeholder"></div>
+            <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end">
+                <button type="button" id="openUploadModalBtn" class="btn btn-primary btn-sm w-full sm:w-auto justify-center">
+                    <i class="fas fa-plus"></i>
+                    <span>{{ _('Upload/Import') }}</span>
+                </button>
+                <div id="column-visibility-button-placeholder" class="w-full sm:w-auto flex justify-end"></div>
+            </div>
         </div>
     </div>
 
-    <form method="get" action="{{ url_for('ai_management.document_library') }}" class="px-6 py-3 border-b border-gray-200 flex flex-wrap items-center gap-3 bg-gray-50">
-        <span class="text-sm font-medium text-gray-700">{{ _('Filters') }}:</span>
-        <select name="status" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+    <form method="get" action="{{ url_for('ai_management.document_library') }}" class="ai-docs-filters px-4 sm:px-6 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 bg-gray-50">
+        <span class="text-sm font-medium text-gray-700 w-full sm:w-auto">{{ _('Filters') }}:</span>
+        <select name="status" class="ai-docs-filter-control border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
             <option value="">{{ _('All statuses') }}</option>
             <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>{{ _('Completed') }}</option>
             <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>{{ _('Pending') }}</option>
             <option value="processing" {% if current_status == 'processing' %}selected{% endif %}>{{ _('Processing') }}</option>
             <option value="failed" {% if current_status == 'failed' %}selected{% endif %}>{{ _('Failed') }}</option>
         </select>
-        <select name="file_type" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+        <select name="file_type" class="ai-docs-filter-control border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
             <option value="">{{ _('All types') }}</option>
             {% for ft in file_types or [] %}
             <option value="{{ ft }}" {% if current_file_type == ft %}selected{% endif %}>{{ ft|upper }}</option>
             {% endfor %}
         </select>
-        <select name="category" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+        <select name="category" class="ai-docs-filter-control border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
             <option value="">{{ _('All categories') }}</option>
             {% for c in categories or [] %}
             <option value="{{ c }}" {% if current_category == c %}selected{% endif %}>{{ c.replace('_', ' ') }}</option>
             {% endfor %}
         </select>
-        <select name="language" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+        <select name="language" class="ai-docs-filter-control border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
             <option value="">{{ _('All languages') }}</option>
             {% for la in languages or [] %}
             <option value="{{ la }}" {% if current_language == la %}selected{% endif %}>{{ la|upper }}</option>
             {% endfor %}
         </select>
-        <input type="text" name="q" value="{{ search_query or '' }}" placeholder="{{ _('Search title/filename...')|forceescape }}" class="border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5 w-48">
-        <button type="submit" class="btn btn-primary">
+        <input type="text" name="q" value="{{ search_query or '' }}" placeholder="{{ _('Search title/filename...')|forceescape }}" class="ai-docs-filter-control ai-docs-filter-search border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <button type="submit" class="btn btn-primary btn-sm flex-1 sm:flex-none justify-center">
             <i class="fas fa-filter mr-1"></i>{{ _('Apply') }}
         </button>
         {% if current_status or current_file_type or current_category or current_language or search_query %}
-        <a href="{{ url_for('ai_management.document_library') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ _('Clear') }}</a>
+        <a href="{{ url_for('ai_management.document_library') }}" class="text-sm text-gray-600 hover:text-gray-900 py-2 px-1">{{ _('Clear') }}</a>
         {% endif %}
+        </div>
     </form>
 
-    <div class="p-4 sm:p-6 relative">
+    <div class="p-3 sm:p-4 md:p-6 relative min-w-0 overflow-hidden">
         {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), show_placeholder=false, grid_height='600px', include_card=false, empty_message=_('No documents found. Upload a document to get started.')) }}
     </div>
+</div>
+
 </div>
 
 {% endblock %}

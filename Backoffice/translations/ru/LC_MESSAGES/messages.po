@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-03 21:07+0000\n"
+"POT-Creation-Date: 2026-08-03 21:49+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: ru <LL@li.org>\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: Babel 2.10.3\n"
 
 #: app/routes/admin/utilities/translations.py:1541
 #, python-format
@@ -43,7 +43,7 @@ msgstr "%(active)s активных сессий"
 msgid "%(completed)s completed · %(failed)s failed · %(total)s traces"
 msgstr "%(completed)s завершён · %(failed)s провалился · Следы %(total)s"
 
-#: app/services/notification/core.py:192
+#: app/services/notification/core.py:191
 #, python-format
 msgid ""
 "%(count)s data validation question(s) for %(entity)s require your response."
@@ -106,7 +106,7 @@ msgstr "%(field)s: %(old)s → %(new)s"
 msgid "%(frequency)s Notification Digest"
 msgstr "Дайджест уведомлений %(frequency)s"
 
-#: app/services/notification/core.py:184
+#: app/services/notification/core.py:183
 #, python-format
 msgid "%(frequency)s email digest delivered with %(count)s notification(s)."
 msgstr ""
@@ -153,32 +153,32 @@ msgstr "%(num)d шаблон"
 msgid "%(num)s indicator"
 msgstr "Индикатор %(num)s"
 
-#: app/services/notification/core.py:118
+#: app/services/notification/core.py:117
 #, python-format
 msgid ""
 "%(submitter_name)s escalated the %(template)s assignment for %(country)s "
 "(period %(period)s) for delegation review."
 msgstr ""
 
-#: app/services/notification/core.py:112
+#: app/services/notification/core.py:111
 #, python-format
 msgid ""
 "%(submitter_name)s sent the %(template)s assignment for %(country)s (period "
 "%(period)s) for your review before submission."
 msgstr ""
 
-#: app/services/notification/core.py:142
+#: app/services/notification/core.py:141
 #, python-format
 msgid "%(user_name)s requested access to %(country_name)s."
 msgstr "%(user_name)s запросила доступ к %(country_name)s."
 
-#: app/services/notification/core.py:136
+#: app/services/notification/core.py:135
 #, python-format
 msgid ""
 "'%(document)s' (%(document_type)s) has been uploaded and requires approval."
 msgstr "'%(document)s' (%(document_type)s) загружен и требует одобрения."
 
-#: app/services/notification/core.py:131
+#: app/services/notification/core.py:130
 #, python-format
 msgid "'%(document)s' (%(document_type)s) was uploaded."
 msgstr "Был загружен '%(document)s' (%(document_type)s)."
@@ -374,7 +374,7 @@ msgstr "Ответ ИИ"
 
 #: app/routes/main/views.py:161 app/templates/admin/ai/_trace_card.html:65
 #: app/templates/admin/ai/conversation_traces.html:80
-#: app/templates/admin/ai/documents.html:140
+#: app/templates/admin/ai/documents.html:142
 #: app/templates/core/layout.html:463
 #: app/templates/forms/form_builder/form_builder.html:54
 msgid "AI Assistant"
@@ -395,7 +395,7 @@ msgstr "Панель управления искусственным интел�
 msgid "AI Knowledge Base"
 msgstr "База знаний ИИ"
 
-#: app/templates/admin/ai/documents.html:93
+#: app/templates/admin/ai/documents.html:95
 msgid "AI Query Assistant"
 msgstr "Помощник запросов ИИ"
 
@@ -470,7 +470,7 @@ msgstr ""
 "Инструменты искусственного интеллекта всё ещё могут применять "
 "детализированные RBAC разрешения."
 
-#: app/templates/admin/ai/documents.html:516
+#: app/templates/admin/ai/documents.html:524
 msgid "AI import"
 msgstr "Импорт ИИ"
 
@@ -1339,7 +1339,7 @@ msgid "Added"
 msgstr "Добавлено"
 
 # Activity descriptions
-#: app/routes/main/helpers.py:1306
+#: app/routes/main/helpers.py:1305
 #, python-format
 msgid "Added %(count)d field in %(template)s"
 msgstr "Добавлено %(count)d поле в %(template)s"
@@ -1576,7 +1576,7 @@ msgstr "Грамотность взрослого населения"
 msgid "Advanced (List Library)"
 msgstr "Продвинутый (библиотека списков)"
 
-#: app/templates/admin/ai/documents.html:154
+#: app/templates/admin/ai/documents.html:156
 msgid "Advanced Options"
 msgstr "Расширенные опции"
 
@@ -1687,8 +1687,8 @@ msgstr "Категории пола"
 msgid "All Clear"
 msgstr "Всё понятно"
 
-#: app/templates/admin/ai/documents.html:368
-#: app/templates/admin/ai/documents.html:517
+#: app/templates/admin/ai/documents.html:370
+#: app/templates/admin/ai/documents.html:525
 #: app/templates/admin/data_exploration/explore_data.html:121
 #: app/templates/admin/data_exploration/explore_data.html:1834
 #: app/templates/admin/data_exploration/explore_data.html:1890
@@ -1775,7 +1775,7 @@ msgstr "Все шаблоны"
 msgid "All Templates"
 msgstr "Все шаблоны"
 
-#: app/templates/admin/ai/documents.html:188
+#: app/templates/admin/ai/documents.html:190
 #: app/templates/admin/templates/data_sync_imputation.html:366
 #: app/templates/forms/form_builder/partials/_item_modal.html:65
 #: app/templates/notifications/center.html:94
@@ -1804,7 +1804,7 @@ msgstr "Все годы"
 msgid "All approved"
 msgstr "Все одобрены"
 
-#: app/templates/admin/ai/documents.html:454
+#: app/templates/admin/ai/documents.html:458
 msgid "All categories"
 msgstr "Все категории"
 
@@ -1837,7 +1837,7 @@ msgstr "Все ключи"
 msgid "All language fields are already filled."
 msgstr "Все языковые поля уже заполнены."
 
-#: app/templates/admin/ai/documents.html:460
+#: app/templates/admin/ai/documents.html:464
 msgid "All languages"
 msgstr "Все языки"
 
@@ -1891,7 +1891,7 @@ msgstr "Все права защищены."
 msgid "All sections completed."
 msgstr "Все разделы завершены."
 
-#: app/templates/admin/ai/documents.html:441
+#: app/templates/admin/ai/documents.html:445
 msgid "All statuses"
 msgstr "Все статусы"
 
@@ -1919,9 +1919,9 @@ msgstr ""
 "данных, обновления профилей, взаимодействие с ИИ, события ключей API и "
 "многое другое."
 
-#: app/templates/admin/ai/documents.html:346
-#: app/templates/admin/ai/documents.html:448
-#: app/templates/admin/ai/documents.html:518
+#: app/templates/admin/ai/documents.html:348
+#: app/templates/admin/ai/documents.html:452
+#: app/templates/admin/ai/documents.html:526
 #: app/templates/admin/analytics/login_logs.html:43
 msgid "All types"
 msgstr "Все типы"
@@ -2261,7 +2261,7 @@ msgstr ""
 "Применяется к {eligable} из {выбранных} индикаторов с единицами, "
 "поддерживающими дезагрегацию по полу/возрасту."
 
-#: app/templates/admin/ai/documents.html:467
+#: app/templates/admin/ai/documents.html:472
 #: app/templates/admin/ai/reasoning_traces.html:133
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
@@ -2734,7 +2734,7 @@ msgstr ""
 "Editor & Submitter или Assignment Approver, если этот пользователь должен "
 "работать с заданиями."
 
-#: app/templates/admin/ai/documents.html:117
+#: app/templates/admin/ai/documents.html:119
 msgid "Ask a question (AI will answer using the document library)..."
 msgstr "Задайте вопрос (ИИ ответит с помощью библиотеки документов)..."
 
@@ -2747,7 +2747,7 @@ msgstr "Спрашивай что угодно"
 msgid "Ask questions about platform data, indicators, and documents."
 msgstr "Задавайте вопросы о данных платформы, индикаторах и документах."
 
-#: app/templates/admin/ai/documents.html:94
+#: app/templates/admin/ai/documents.html:96
 msgid "Ask questions about your document library"
 msgstr "Задавайте вопросы о вашей библиотеке документов"
 
@@ -2755,7 +2755,7 @@ msgstr "Задавайте вопросы о вашей библиотеке д�
 msgid "Aspect Ratio"
 msgstr "Соотношение сторон"
 
-#: app/templates/admin/ai/documents.html:520
+#: app/templates/admin/ai/documents.html:528
 msgid "Assessment"
 msgstr "Оценка"
 
@@ -2794,7 +2794,7 @@ msgstr ""
 "Назначенные объекты (фокусные точки) будут уведомлены об этом новом "
 "назначениях. Хочешь продолжить?"
 
-#: app/templates/admin/ai/documents.html:656
+#: app/templates/admin/ai/documents.html:664
 #: app/templates/admin/assignments/public_submissions.html:225
 #: app/templates/admin/communication/center.html:669
 #: app/templates/admin/communication/center.html:730
@@ -2818,17 +2818,17 @@ msgstr "Задание '%(name)s' закрыто."
 msgid "Assignment '%(template)s' for %(entity)s has been reopened."
 msgstr "Назначение '%(template)s' для %(entity)s было вновь открыто."
 
-#: app/routes/main/assignments.py:99
+#: app/routes/main/assignments.py:98
 #, python-format
 msgid "Assignment '%(template)s' has been reopened for %(entity)s only."
 msgstr "Назначение '%(template)s' было вновь открыто только для %(entity)s."
 
-#: app/services/notification/core.py:105
+#: app/services/notification/core.py:104
 #, python-format
 msgid "Assignment '%(template)s' has been reopened."
 msgstr "Задание '%(template)s' было вновь открыто."
 
-#: app/services/notification/core.py:158
+#: app/services/notification/core.py:157
 #, python-format
 msgid "Assignment '%(template)s' is due on %(due_date)s."
 msgstr "Назначение '%(template)s' должно быть оформлено на %(due_date)s."
@@ -2985,7 +2985,7 @@ msgstr "Статус назначения для этой страны не на
 msgid "Assignment status workflow"
 msgstr "Рабочий процесс статуса назначения"
 
-#: app/templates/admin/ai/documents.html:660
+#: app/templates/admin/ai/documents.html:668
 msgid "Assignment submission"
 msgstr ""
 
@@ -3810,8 +3810,8 @@ msgstr "Администраторы"
 msgid "Can't find an indicator? Propose a new one here"
 msgstr "Не можете найти индикатор? Предложите новый вариант здесь"
 
-#: app/templates/admin/ai/documents.html:53
-#: app/templates/admin/ai/documents.html:521
+#: app/templates/admin/ai/documents.html:55
+#: app/templates/admin/ai/documents.html:529
 #: app/templates/admin/ai/reasoning_traces.html:725
 #: app/templates/admin/analytics/security_events.html:133
 #: app/templates/admin/api_keys/create.html:90
@@ -3918,7 +3918,7 @@ msgstr "Отменить редактирование"
 msgid "Cancel failed (connection issue)."
 msgstr "Отмена не получилась (проблема с подключением)."
 
-#: app/templates/admin/ai/documents.html:54
+#: app/templates/admin/ai/documents.html:56
 msgid "Cancel import"
 msgstr "Отменить импорт"
 
@@ -3927,7 +3927,7 @@ msgstr "Отменить импорт"
 msgid "Cancelled"
 msgstr "Отменён"
 
-#: app/templates/admin/ai/documents.html:522
+#: app/templates/admin/ai/documents.html:530
 msgid "Cancelling..."
 msgstr "Отмена..."
 
@@ -3984,7 +3984,7 @@ msgstr "Перенос из предыдущего раунда"
 msgid "Carry-forward data"
 msgstr "Данные переноса вперед"
 
-#: app/templates/admin/ai/documents.html:523
+#: app/templates/admin/ai/documents.html:531
 #: app/templates/admin/communication/center.html:665
 #: app/templates/admin/embed_content/manage_embed_content.html:46
 #: app/templates/admin/embed_content/manage_embed_content.html:135
@@ -4074,12 +4074,12 @@ msgstr ""
 "Изменения, внесённые здесь, сразу же повлияют на живой шаблон. Подумайте о "
 "создании черновика для более безопасного редактирования."
 
-#: app/services/notification/core.py:122
+#: app/services/notification/core.py:121
 #, python-format
 msgid "Changes requested: %(template)s"
 msgstr "Запрашиваются изменения: %(template)s"
 
-#: app/routes/main/helpers.py:1172
+#: app/routes/main/helpers.py:1171
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr ""
 "Были запрошены изменения. Обновите форму и отправьте снова, когда будете "
@@ -4268,7 +4268,7 @@ msgstr ""
 "Выберите того, кто должен получить это тестовое сообщение. Он использует "
 "текущее содержимое шаблона и примерные значения заполнятелей."
 
-#: app/templates/admin/ai/documents.html:524
+#: app/templates/admin/ai/documents.html:532
 msgid "Chunks"
 msgstr "Чанки"
 
@@ -4283,8 +4283,8 @@ msgstr "Активность"
 msgid "Cleaned up %(count)d expired sessions."
 msgstr "Очистил истекшие сессии %(count)d."
 
-#: app/templates/admin/ai/documents.html:354
-#: app/templates/admin/ai/documents.html:470
+#: app/templates/admin/ai/documents.html:356
+#: app/templates/admin/ai/documents.html:475
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:34
 #: app/templates/admin/analytics/audit_trail.html:289
 #: app/templates/admin/analytics/page_path_analytics.html:54
@@ -4430,7 +4430,7 @@ msgstr ""
 "Нажмите «Загрузить в форму», просмотрите данные на этой странице, затем "
 "нажмите «Сохранить на задании», чтобы сохранить её."
 
-#: app/templates/admin/ai/documents.html:388
+#: app/templates/admin/ai/documents.html:390
 msgid "Click Search or Refresh to load documents from the IFRC API."
 msgstr ""
 "Нажмите «Поиск или обновление», чтобы загрузить документы из API IFRC."
@@ -4524,7 +4524,7 @@ msgid ""
 "Click suggestions or type a programme code (e.g. PB27-28) and press Enter."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:525
+#: app/templates/admin/ai/documents.html:533
 msgid "Click to change category"
 msgstr "Нажмите, чтобы сменить категорию"
 
@@ -4541,11 +4541,11 @@ msgstr "Нажмите, чтобы свернуть"
 msgid "Click to expand"
 msgstr "Нажмите, чтобы развернуть"
 
-#: app/templates/admin/ai/documents.html:526
+#: app/templates/admin/ai/documents.html:534
 msgid "Click to make not public"
 msgstr "Нажмите, чтобы сделать непубличным"
 
-#: app/templates/admin/ai/documents.html:527
+#: app/templates/admin/ai/documents.html:535
 msgid "Click to make public"
 msgstr "Нажмите, чтобы сделать публичным"
 
@@ -4672,7 +4672,7 @@ msgstr "Закрыто"
 msgid "Closest indicators in the Indicator Bank (by semantic similarity):"
 msgstr "Ближайшие индикаторы в Indicator Bank (по семантическому сходству):"
 
-#: app/templates/admin/ai/documents.html:528
+#: app/templates/admin/ai/documents.html:536
 msgid "Cluster"
 msgstr "Кластер"
 
@@ -4957,9 +4957,9 @@ msgstr "Заполните свой профиль"
 msgid "Complete — click ▲ to restore"
 msgstr "Завершено — нажмите ▲ для восстановления"
 
-#: app/templates/admin/ai/documents.html:66
-#: app/templates/admin/ai/documents.html:442
-#: app/templates/admin/ai/documents.html:529
+#: app/templates/admin/ai/documents.html:68
+#: app/templates/admin/ai/documents.html:446
+#: app/templates/admin/ai/documents.html:537
 #: app/templates/admin/ai/reasoning_traces.html:248
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/analytics/_user_detail_partial.html:255
@@ -5568,7 +5568,7 @@ msgstr "Граф"
 msgid "Count of entries"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:531
+#: app/templates/admin/ai/documents.html:539
 #: app/templates/admin/analytics/audit_trail.html:325
 #: app/templates/admin/communication/center.html:198
 #: app/templates/admin/communication/center.html:1036
@@ -5621,8 +5621,8 @@ msgstr "Страны — Excel"
 # Core Dashboard
 #: app/services/ai/planning/payload_inference.py:179
 #: app/services/ai/runtime/step_ux.py:195
-#: app/templates/admin/ai/documents.html:366
-#: app/templates/admin/ai/documents.html:532
+#: app/templates/admin/ai/documents.html:368
+#: app/templates/admin/ai/documents.html:540
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
 #: app/templates/admin/assignments/manage_assignment.html:738
@@ -5657,7 +5657,7 @@ msgstr "Страны — Excel"
 msgid "Country"
 msgstr "Страна"
 
-#: app/templates/admin/ai/documents.html:535
+#: app/templates/admin/ai/documents.html:543
 msgid "Country / Scope"
 msgstr "Страна / Область действия"
 
@@ -5687,11 +5687,11 @@ msgstr "Название страны"
 msgid "Country Names in Other Languages"
 msgstr "Названия стран на других языках"
 
-#: app/templates/admin/ai/documents.html:533
+#: app/templates/admin/ai/documents.html:541
 msgid "Country Plan"
 msgstr "План страны"
 
-#: app/templates/admin/ai/documents.html:534
+#: app/templates/admin/ai/documents.html:542
 msgid "Country Report"
 msgstr "Отчёт по стране"
 
@@ -5968,7 +5968,7 @@ msgstr "Создайте ваш первый подсектор"
 
 #: app/templates/admin/ai/_trace_card.html:101
 #: app/templates/admin/ai/conversation_traces.html:112
-#: app/templates/admin/ai/documents.html:536
+#: app/templates/admin/ai/documents.html:544
 #: app/templates/admin/ai/reasoning_traces.html:438
 #: app/templates/admin/analytics/audit_trail.html:385
 #: app/templates/admin/api_keys/details.html:264
@@ -6286,7 +6286,7 @@ msgstr "Тенденция индекса качества данных"
 msgid "Data Reporting"
 msgstr "Отчетность по данным"
 
-#: app/templates/admin/ai/documents.html:537
+#: app/templates/admin/ai/documents.html:545
 msgid "Data Sheet"
 msgstr "Технический лист"
 
@@ -6329,7 +6329,7 @@ msgstr "Индекс качества данных"
 msgid "Data collection launch"
 msgstr "Запуск сбора данных"
 
-#: app/routes/main/helpers.py:1169
+#: app/routes/main/helpers.py:1168
 msgid ""
 "Data entry is underway. You can save drafts and continue completing the "
 "form."
@@ -6571,8 +6571,8 @@ msgstr "Определения"
 msgid "Delegation focal point"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:427
-#: app/templates/admin/ai/documents.html:541
+#: app/templates/admin/ai/documents.html:429
+#: app/templates/admin/ai/documents.html:549
 #: app/templates/admin/ai/reasoning_traces.html:725
 #: app/templates/admin/assignments/assignments.html:131
 #: app/templates/admin/assignments/public_submissions.html:277
@@ -6648,11 +6648,11 @@ msgstr "Удалить данные и удалить их"
 msgid "Delete Document"
 msgstr "Удалить документ"
 
-#: app/templates/admin/ai/documents.html:539
+#: app/templates/admin/ai/documents.html:547
 msgid "Delete Document?"
 msgstr "Удалить документ?"
 
-#: app/templates/admin/ai/documents.html:540
+#: app/templates/admin/ai/documents.html:548
 msgid "Delete Documents?"
 msgstr "Удалить документы?"
 
@@ -6717,7 +6717,7 @@ msgstr "Удалить переписку?"
 msgid "Delete data & import"
 msgstr "Удаление данных и импорт"
 
-#: app/templates/admin/ai/documents.html:538
+#: app/templates/admin/ai/documents.html:546
 msgid "Delete document"
 msgstr "Удалить документ"
 
@@ -6757,7 +6757,7 @@ msgstr "Удалить сектор"
 msgid "Delete selected"
 msgstr "Удаление выбрано"
 
-#: app/templates/admin/ai/documents.html:542
+#: app/templates/admin/ai/documents.html:550
 msgid "Delete selected documents?"
 msgstr "Удалять отдельные документы?"
 
@@ -7051,7 +7051,7 @@ msgstr "Подробное определение/описание этого в
 msgid "Details"
 msgstr "Подробности"
 
-#: app/templates/admin/ai/documents.html:543
+#: app/templates/admin/ai/documents.html:551
 msgid "Detecting countries"
 msgstr "Страны-обнаружение"
 
@@ -7459,14 +7459,14 @@ msgstr "Сделай это позже"
 msgid "Do not share this key or commit it to version control"
 msgstr "Не делитесь этим ключем и не коммитите его в систему контроля версий"
 
-#: app/templates/admin/ai/documents.html:544
+#: app/templates/admin/ai/documents.html:552
 msgid "Doc Date"
 msgstr "Дата документа"
 
 #: app/services/notification/notifiers/documents.py:39
 #: app/services/notification/notifiers/documents.py:176
 #: app/services/notification/notifiers/documents.py:322
-#: app/templates/admin/ai/documents.html:545
+#: app/templates/admin/ai/documents.html:553
 #: app/templates/admin/templates/partials/imputation_badges.html:16
 #: app/templates/forms/entry_form/validation_summary_pdf.html:80
 #: app/templates/forms/entry_form/validation_summary_pdf.html:82
@@ -7516,7 +7516,7 @@ msgid "Document Status"
 msgstr "Статус документа"
 
 # Documents
-#: app/templates/admin/ai/documents.html:657
+#: app/templates/admin/ai/documents.html:665
 #: app/templates/admin/api_management.html:1168
 #: app/templates/admin/documents/documents.html:184
 #: app/templates/admin/documents/documents.html:655
@@ -7560,7 +7560,7 @@ msgstr ""
 msgid "Document declined."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:546
+#: app/templates/admin/ai/documents.html:554
 msgid "Document deleted"
 msgstr "Документ удален"
 
@@ -7568,7 +7568,7 @@ msgstr "Документ удален"
 msgid "Document deleted successfully."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:662
+#: app/templates/admin/ai/documents.html:670
 msgid "Document library"
 msgstr ""
 
@@ -7584,12 +7584,12 @@ msgstr "Хранилище документов"
 msgid "Document status:"
 msgstr "Статус документа:"
 
-#: app/templates/admin/ai/documents.html:284
+#: app/templates/admin/ai/documents.html:286
 msgid "Document title (optional)"
 msgstr "Название документа (необязательно)"
 
-#: app/templates/admin/ai/documents.html:351
-#: app/templates/admin/ai/documents.html:357
+#: app/templates/admin/ai/documents.html:353
+#: app/templates/admin/ai/documents.html:359
 msgid "Document types"
 msgstr "Типы документов"
 
@@ -7620,7 +7620,7 @@ msgid "Documentation"
 msgstr "Статус документа"
 
 #: app/templates/admin/ai/dashboard.html:70
-#: app/templates/admin/ai/documents.html:406
+#: app/templates/admin/ai/documents.html:408
 #: app/templates/admin/templates/data_sync_imputation.html:156
 #: app/templates/admin/validation_dashboard.html:262
 #: app/templates/core/dashboard.html:1214
@@ -7652,7 +7652,7 @@ msgstr ""
 "Не делитесь конфиденциальной информацией. Мы используем системные "
 "трассировки/телеметрию для улучшения ассистента."
 
-#: app/templates/admin/ai/documents.html:549
+#: app/templates/admin/ai/documents.html:557
 #: app/templates/forms/entry_form/validation_summary_progress.html:312
 #: app/templates/tours/tours.html:15
 msgid "Done"
@@ -7662,7 +7662,7 @@ msgstr "Готово"
 msgid "Done — reviewing what I found…"
 msgstr "Готово — пересматриваю то, что нашёл..."
 
-#: app/templates/admin/ai/documents.html:548
+#: app/templates/admin/ai/documents.html:556
 msgid "Done."
 msgstr "Готово."
 
@@ -7670,8 +7670,8 @@ msgstr "Готово."
 msgid "Double-click"
 msgstr "Двойной клик"
 
-#: app/templates/admin/ai/documents.html:411
-#: app/templates/admin/ai/documents.html:550
+#: app/templates/admin/ai/documents.html:413
+#: app/templates/admin/ai/documents.html:558
 #: app/templates/admin/monitoring/system_monitoring.html:181
 #: app/templates/admin/templates/data_sync_imputation.html:1658
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:32
@@ -7758,8 +7758,8 @@ msgstr "Черновик обновлен — обновляю конструк�
 msgid "Drag"
 msgstr "Перетащить"
 
-#: app/templates/admin/ai/documents.html:279
-#: app/templates/admin/ai/documents.html:552
+#: app/templates/admin/ai/documents.html:281
+#: app/templates/admin/ai/documents.html:560
 msgid "Drag and drop files here, or click to select"
 msgstr "Перетаскивайте файлы здесь или нажмите для выбора"
 
@@ -8438,7 +8438,7 @@ msgid "Embed type"
 msgstr "Тип встраивания"
 
 #: app/templates/admin/ai/dashboard.html:81
-#: app/templates/admin/ai/documents.html:78
+#: app/templates/admin/ai/documents.html:80
 msgid "Embeddings"
 msgstr "Вложения"
 
@@ -8723,7 +8723,7 @@ msgstr "Введите свою должность или должность"
 msgid "Entities"
 msgstr "Объект"
 
-#: app/templates/admin/ai/documents.html:658
+#: app/templates/admin/ai/documents.html:666
 #: app/templates/admin/analytics/audit_trail.html:447
 #: app/templates/admin/documents/documents.html:124
 #: app/templates/admin/documents/documents.html:177
@@ -8890,7 +8890,7 @@ msgstr "Ошибка загрузки данных страны. Пожалуй�
 msgid "Error loading chart data"
 msgstr "Ошибка загрузки уведомлений"
 
-#: app/templates/admin/ai/documents.html:554
+#: app/templates/admin/ai/documents.html:562
 #: app/templates/admin/data_exploration/explore_data.html:1905
 msgid "Error loading countries"
 msgstr "Страны загрузки ошибок"
@@ -8903,7 +8903,7 @@ msgstr "Ошибка загрузки данных страны. Пожалуй�
 msgid "Error loading deletion information. Please try again."
 msgstr "Ошибка загрузки данных страны. Пожалуйста, попробуйте снова."
 
-#: app/templates/admin/ai/documents.html:555
+#: app/templates/admin/ai/documents.html:563
 msgid "Error loading documents"
 msgstr "Ошибка загрузки документов"
 
@@ -8923,7 +8923,7 @@ msgstr "Ошибка загрузки служб перевода"
 msgid "Error loading years"
 msgstr "Годы загрузки ошибок"
 
-#: app/templates/admin/ai/documents.html:556
+#: app/templates/admin/ai/documents.html:564
 msgid "Error processing documents:"
 msgstr "Документы по обработке ошибок:"
 
@@ -8939,7 +8939,7 @@ msgstr "Ошибка при возврате назначения для дор�
 msgid "Error updating suggestion status."
 msgstr "Ошибка при обновлении статуса предложения."
 
-#: app/templates/admin/ai/documents.html:553
+#: app/templates/admin/ai/documents.html:561
 #: app/templates/admin/documents/documents.html:427
 #: app/templates/admin/documents/documents.html:462
 #: app/templates/admin/documents/documents.html:503
@@ -8970,7 +8970,7 @@ msgstr ""
 msgid "Errors"
 msgstr "Ошибки"
 
-#: app/templates/admin/ai/documents.html:557
+#: app/templates/admin/ai/documents.html:565
 msgid "Errors:"
 msgstr "Ошибки:"
 
@@ -9109,7 +9109,7 @@ msgstr ""
 msgid "Excel file is empty or header row not found."
 msgstr "Файл Excel пуст или заголовок не найден."
 
-#: app/routes/admin/utilities/translations.py:1084
+#: app/routes/admin/utilities/translations.py:1083
 #, python-format
 msgid ""
 "Excel import finished. Updated: %(u)d, skipped missing msgids: %(m)d. (Empty"
@@ -9515,9 +9515,9 @@ msgstr "Объекты"
 
 #: app/templates/admin/ai/_trace_card.html:431
 #: app/templates/admin/ai/conversation_traces.html:234
-#: app/templates/admin/ai/documents.html:74
-#: app/templates/admin/ai/documents.html:445
-#: app/templates/admin/ai/documents.html:561
+#: app/templates/admin/ai/documents.html:76
+#: app/templates/admin/ai/documents.html:449
+#: app/templates/admin/ai/documents.html:569
 #: app/templates/admin/analytics/_user_detail_partial.html:257
 #: app/templates/admin/analytics/login_logs.html:139
 #: app/templates/admin/settings/manage_settings.html:1495
@@ -9567,7 +9567,7 @@ msgstr "Не удалось скопировать URL. Пожалуйста, п
 msgid "Failed to create follow-up question"
 msgstr "Не удалось создать дополнительный вопрос"
 
-#: app/templates/admin/ai/documents.html:562
+#: app/templates/admin/ai/documents.html:570
 msgid "Failed to delete document."
 msgstr "Не удалось удалить документ."
 
@@ -9579,7 +9579,7 @@ msgstr "Не удалось удалить индикатор"
 msgid "Failed to delete traces."
 msgstr "Не удалось удалить следы."
 
-#: app/templates/admin/ai/documents.html:563
+#: app/templates/admin/ai/documents.html:571
 msgid "Failed to generate answer."
 msgstr "Не удалось получить ответ."
 
@@ -9603,11 +9603,11 @@ msgstr "Не удалось загрузить данные панели упр�
 msgid "Failed to load data"
 msgstr "Не удалось загрузить данные"
 
-#: app/templates/admin/ai/documents.html:564
+#: app/templates/admin/ai/documents.html:572
 msgid "Failed to load documents"
 msgstr "Не удалось загрузить документы"
 
-#: app/templates/admin/ai/documents.html:565
+#: app/templates/admin/ai/documents.html:573
 msgid "Failed to load documents from external API"
 msgstr "Не удалось загрузить документы из внешнего API"
 
@@ -9654,7 +9654,7 @@ msgstr "Не удалось загрузить службы перевода"
 msgid "Failed to load validation questions"
 msgstr "Не удалось загрузить вопросы на валидацию"
 
-#: app/templates/admin/ai/documents.html:566
+#: app/templates/admin/ai/documents.html:574
 msgid "Failed to process request."
 msgstr "Не удалось обработать запрос."
 
@@ -9697,11 +9697,11 @@ msgstr "Не удалось отправить вопросы на валида�
 msgid "Failed to start download"
 msgstr "Failed to start download"
 
-#: app/templates/admin/ai/documents.html:567
+#: app/templates/admin/ai/documents.html:575
 msgid "Failed to start import"
 msgstr "Не удалось запустить импорт"
 
-#: app/templates/admin/ai/documents.html:568
+#: app/templates/admin/ai/documents.html:576
 msgid "Failed to start metadata reprocess."
 msgstr "Не удалось начать обработку метаданных."
 
@@ -9733,15 +9733,15 @@ msgstr "Не удалось перевести"
 msgid "Failed to uninstall plugin"
 msgstr "Failed to uninstall plugin"
 
-#: app/templates/admin/ai/documents.html:570
+#: app/templates/admin/ai/documents.html:578
 msgid "Failed to update category."
 msgstr "Не удалось обновить категорию."
 
-#: app/templates/admin/ai/documents.html:569
+#: app/templates/admin/ai/documents.html:577
 msgid "Failed to update."
 msgstr "Не удалось обновить."
 
-#: app/templates/admin/ai/documents.html:560
+#: app/templates/admin/ai/documents.html:568
 #, python-brace-format
 msgid "Failed: {count}"
 msgstr "Failed: {count}"
@@ -9848,7 +9848,7 @@ msgid "Fields can be repeated multiple times (like Kobo repeat groups)"
 msgstr ""
 "Поля могут повторяться несколько раз (например, группы повторений Кобо)"
 
-#: app/templates/admin/ai/documents.html:185
+#: app/templates/admin/ai/documents.html:187
 msgid "File Type"
 msgstr "Тип файла"
 
@@ -9891,7 +9891,7 @@ msgstr "Размер файла должен быть менее 10 МБ."
 msgid "File type: %(t)s"
 msgstr "Тип файла: %(t)s"
 
-#: app/templates/admin/ai/documents.html:571
+#: app/templates/admin/ai/documents.html:579
 #: app/templates/admin/documents/documents.html:663
 msgid "Filename"
 msgstr "Имя файла"
@@ -10080,7 +10080,7 @@ msgstr ""
 "Отфильтруйте индикаторы, выберите нужные, сгруппируйте их по разделам, затем"
 " создайте шаблон."
 
-#: app/templates/admin/ai/documents.html:226
+#: app/templates/admin/ai/documents.html:228
 msgid "Filter low-relevance chunks"
 msgstr "Фильтруйте низкорелевантные чанки"
 
@@ -10096,7 +10096,7 @@ msgstr "Фильтр..."
 msgid "Filtered to session:"
 msgstr "Отфильтровано в сессию:"
 
-#: app/templates/admin/ai/documents.html:439
+#: app/templates/admin/ai/documents.html:443
 #: app/templates/admin/analytics/audit_trail.html:238
 #: app/templates/admin/analytics/login_logs.html:34
 #: app/templates/admin/analytics/page_path_analytics.html:30
@@ -10394,7 +10394,7 @@ msgstr "Панель форматирования"
 msgid "Forms"
 msgstr "Формы"
 
-#: app/templates/admin/ai/documents.html:572
+#: app/templates/admin/ai/documents.html:580
 #: app/templates/components/auto_translate_modal_js.html:32
 msgid "Found"
 msgstr "Найдено"
@@ -10452,7 +10452,7 @@ msgstr "Пятница"
 msgid "From"
 msgstr "Из"
 
-#: app/services/notification/core.py:168
+#: app/services/notification/core.py:167
 #, python-format
 msgid "From %(submitter)s (%(country)s) for '%(template)s'."
 msgstr "От %(submitter)s (%(country)s) для '%(template)s'."
@@ -10620,7 +10620,7 @@ msgstr "Начало"
 msgid "Ghost Access"
 msgstr "Ghost Access"
 
-#: app/templates/admin/ai/documents.html:573
+#: app/templates/admin/ai/documents.html:581
 #: app/templates/admin/rbac/grants.html:96
 #: app/templates/admin/user_management/users.html:298
 msgid "Global"
@@ -10759,7 +10759,7 @@ msgstr "Групповой лейбл, например, Male"
 msgid "Group matrix table rows"
 msgstr "Групповые матричные таблицы строк"
 
-#: app/templates/admin/ai/documents.html:574
+#: app/templates/admin/ai/documents.html:582
 msgid "Guideline"
 msgstr "Руководство"
 
@@ -10773,7 +10773,7 @@ msgstr "HTML"
 msgid "HTML email with optional template"
 msgstr "HTML-письмо с необязательным шаблоном"
 
-#: app/routes/admin/ai_management.py:1899
+#: app/routes/admin/ai_management.py:1898
 msgid "HTML event handler (onerror=, onload=, …) — common in XSS probes"
 msgstr ""
 "Обработчик событий HTML (onerror=, onload=, ...) — часто встречается в XSS-"
@@ -11073,7 +11073,7 @@ msgstr "С чего бы вы хотели начать?"
 msgid "Humanitarian Databank"
 msgstr "Гуманитарная база данных"
 
-#: app/templates/admin/ai/documents.html:175
+#: app/templates/admin/ai/documents.html:177
 msgid "Hybrid (keywords and embeddings)"
 msgstr "Гибрид (ключевые слова и эмбеддинги)"
 
@@ -11313,7 +11313,7 @@ msgstr "Импорт PO"
 msgid "Import PO ZIP"
 msgstr "Импорт PO ZIP"
 
-#: app/templates/admin/ai/documents.html:395
+#: app/templates/admin/ai/documents.html:397
 msgid "Import Selected"
 msgstr "Выбранный импорт"
 
@@ -11346,7 +11346,7 @@ msgstr ""
 msgid "Import and Create Template"
 msgstr "Импорт и создание шаблона"
 
-#: app/templates/admin/ai/documents.html:306
+#: app/templates/admin/ai/documents.html:308
 msgid ""
 "Import and process existing documents from the Document Management system"
 msgstr ""
@@ -11356,11 +11356,11 @@ msgstr ""
 msgid "Import applied successfully."
 msgstr "Импорт успешно подал заявку."
 
-#: app/templates/admin/ai/documents.html:575
+#: app/templates/admin/ai/documents.html:583
 msgid "Import cancelled"
 msgstr "Импорт отменён"
 
-#: app/templates/admin/ai/documents.html:576
+#: app/templates/admin/ai/documents.html:584
 msgid "Import complete"
 msgstr "Импорт завершен"
 
@@ -11375,7 +11375,7 @@ msgstr ""
 "Годовые отчёты (AR*): шаблоны 33 и 23. Обзоры середины года (MYR*): шаблон "
 "33."
 
-#: app/templates/admin/ai/documents.html:337
+#: app/templates/admin/ai/documents.html:339
 msgid ""
 "Import documents from the connected external document API. Filter by "
 "document type, year, and country."
@@ -11410,7 +11410,7 @@ msgstr "Импорт из Kobo"
 msgid "Import from Kobo XLSForm"
 msgstr "Импорт из Kobo XLSForm"
 
-#: app/templates/admin/ai/documents.html:260
+#: app/templates/admin/ai/documents.html:262
 msgid "Import from System"
 msgstr "Импорт из системы"
 
@@ -11418,7 +11418,7 @@ msgstr "Импорт из системы"
 msgid "Import from UPR Master Excel workbook"
 msgstr "Импорт из рабочей тетради UPR Master Excel"
 
-#: app/templates/admin/ai/documents.html:268
+#: app/templates/admin/ai/documents.html:270
 msgid "Import from external API"
 msgstr "Импорт из внешнего API"
 
@@ -11434,7 +11434,7 @@ msgstr "Импорт в текущую версию (Версия %(num)s)"
 msgid "Import into existing draft (Version %(num)s)"
 msgstr "Импорт в существующий черновик (версия %(num)s)"
 
-#: app/templates/admin/ai/documents.html:577
+#: app/templates/admin/ai/documents.html:585
 msgid "Import is in progress. Are you sure you want to leave?"
 msgstr "Импорт идёт. Ты уверен, что хочешь уйти?"
 
@@ -11459,7 +11459,7 @@ msgstr "Прогресс импорта"
 msgid "Import settings"
 msgstr "Настройки импорта"
 
-#: app/templates/admin/ai/documents.html:245
+#: app/templates/admin/ai/documents.html:247
 msgid "Import source"
 msgstr "Импортный источник"
 
@@ -11519,7 +11519,7 @@ msgstr ""
 msgid "Importing"
 msgstr "Импорт"
 
-#: app/templates/admin/ai/documents.html:578
+#: app/templates/admin/ai/documents.html:586
 msgid "Importing documents"
 msgstr "Импорт документов"
 
@@ -11527,7 +11527,7 @@ msgstr "Импорт документов"
 msgid "Importing template…"
 msgstr "Импортный шаблон..."
 
-#: app/templates/admin/ai/documents.html:579
+#: app/templates/admin/ai/documents.html:587
 msgid "Importing..."
 msgstr "Импорт..."
 
@@ -12433,7 +12433,7 @@ msgstr ""
 "Метки, отображаемые в подсказке, когда значение сохраненной переменной "
 "отличается от текущего поиска."
 
-#: app/templates/admin/ai/documents.html:580
+#: app/templates/admin/ai/documents.html:588
 #: app/templates/admin/communication/registry.html:124
 #: app/templates/admin/documents/documents.html:193
 #: app/templates/admin/documents/documents.html:676
@@ -12912,12 +12912,12 @@ msgstr ""
 msgid "Loading documentation"
 msgstr "Загрузка документации"
 
-#: app/templates/admin/ai/documents.html:385
+#: app/templates/admin/ai/documents.html:387
 msgid "Loading documents from IFRC API..."
 msgstr "Загрузка документов из IFRC API..."
 
-#: app/templates/admin/ai/documents.html:319
-#: app/templates/admin/ai/documents.html:475
+#: app/templates/admin/ai/documents.html:321
+#: app/templates/admin/ai/documents.html:481
 #: app/templates/admin/documents/documents.html:81
 #: app/templates/admin/documents/documents.html:83
 msgid "Loading documents..."
@@ -13840,11 +13840,11 @@ msgstr "Сообщение, показывающее, если валидаци�
 msgid "Messages"
 msgstr "Сообщения"
 
-#: app/templates/admin/ai/documents.html:581
+#: app/templates/admin/ai/documents.html:589
 msgid "Metadata reprocess cancelled"
 msgstr "Обработка метаданных отменена"
 
-#: app/templates/admin/ai/documents.html:582
+#: app/templates/admin/ai/documents.html:590
 msgid "Metadata reprocess complete"
 msgstr "Повторная обработка метаданных завершена"
 
@@ -13870,7 +13870,7 @@ msgstr "Метрика"
 msgid "Migrants"
 msgstr "Мигранты"
 
-#: app/templates/admin/ai/documents.html:214
+#: app/templates/admin/ai/documents.html:216
 msgid "Min Score"
 msgstr "Мин-скор"
 
@@ -14063,7 +14063,7 @@ msgstr "Моя панель управления"
 msgid "My Work"
 msgstr "Моя работа"
 
-#: app/templates/admin/ai/documents.html:583
+#: app/templates/admin/ai/documents.html:591
 #: app/templates/admin/assignments/public_submissions.html:144
 #: app/templates/admin/assignments/public_submissions.html:145
 #: app/templates/admin/assignments/public_submissions.html:146
@@ -14715,7 +14715,7 @@ msgstr "Данных о соблюдении требований отсутст
 msgid "No conversations match your search."
 msgstr "Ни один разговор не соответствует вашему поиску."
 
-#: app/templates/admin/ai/documents.html:584
+#: app/templates/admin/ai/documents.html:592
 msgid "No countries"
 msgstr "Нет стран"
 
@@ -14818,7 +14818,7 @@ msgstr "Ни одного подразделения, соответствующ
 msgid "No divisions found."
 msgstr "Секторы не найдены."
 
-#: app/templates/admin/ai/documents.html:475
+#: app/templates/admin/ai/documents.html:481
 msgid "No documents found. Upload a document to get started."
 msgstr "Документов не найдено. Загрузите документ, чтобы начать."
 
@@ -15237,7 +15237,7 @@ msgstr "Настройки не менялись."
 msgid "No sex or age disaggregation found for the current parameters."
 msgstr "По текущим параметрам не обнаружено распределения пола или возраста."
 
-#: app/templates/admin/ai/documents.html:585
+#: app/templates/admin/ai/documents.html:593
 msgid "No sources found."
 msgstr "Источников не найдено."
 
@@ -15340,7 +15340,7 @@ msgid "No types found. Run database migrations, then refresh."
 msgstr ""
 "Типов не найдено. Запускайте миграции базы данных, затем обновляйте её."
 
-#: app/templates/admin/ai/documents.html:586
+#: app/templates/admin/ai/documents.html:594
 msgid "No types loaded"
 msgstr "Типы не заряжены"
 
@@ -15410,7 +15410,7 @@ msgstr "Страны, не соответствующие требованиям
 msgid "Non-English versions fall back to English when empty."
 msgstr "Неанглийские варианты возвращаются к английскому, когда пустые."
 
-#: app/templates/admin/ai/documents.html:588
+#: app/templates/admin/ai/documents.html:596
 #: app/templates/admin/analytics/audit_trail.html:315
 #: app/templates/admin/indicator_bank/indicator_bank.html:2373
 #: app/templates/admin/templates/data_sync_imputation.html:137
@@ -15438,7 +15438,7 @@ msgstr "Не разрешено"
 msgid "Not Applicable"
 msgstr "Не применимо"
 
-#: app/templates/admin/ai/documents.html:589
+#: app/templates/admin/ai/documents.html:597
 msgid "Not Processed"
 msgstr "Не обработано"
 
@@ -15519,7 +15519,7 @@ msgstr "Нет в каталоге (по URL)"
 msgid "Not provided"
 msgstr "Не предоставляется"
 
-#: app/templates/admin/ai/documents.html:590
+#: app/templates/admin/ai/documents.html:598
 msgid "Not public"
 msgstr "Не публично"
 
@@ -15882,7 +15882,7 @@ msgstr ""
 "Маршрутизация проходит только через /api/v1 (публичный и партнёрский REST "
 "API)."
 
-#: app/routes/main/assignments.py:246
+#: app/routes/main/assignments.py:245
 msgid ""
 "Only users with an organization email can request access to multiple "
 "countries at once. Please select a single country."
@@ -15890,7 +15890,7 @@ msgstr ""
 "Только пользователи с электронной почтой организации могут запрашивать "
 "доступ сразу в несколько стран. Пожалуйста, выберите одну страну."
 
-#: app/routes/auth.py:734
+#: app/routes/auth.py:733
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -15957,7 +15957,7 @@ msgstr "Открытый ассистент"
 msgid "Open data guidance"
 msgstr "Руководство по открытым данным"
 
-#: app/templates/admin/ai/documents.html:591
+#: app/templates/admin/ai/documents.html:599
 msgid "Open document"
 msgstr "Открытый документ"
 
@@ -16228,7 +16228,7 @@ msgid "Orphaned"
 msgstr "Сирота"
 
 #: app/services/documentation/service.py:354
-#: app/templates/admin/ai/documents.html:592
+#: app/templates/admin/ai/documents.html:600
 #: app/templates/admin/analytics/audit_trail.html:372
 #: app/templates/admin/data_exploration/explore_data.html:2014
 #: app/templates/admin/embed_content/manage_embed_content.html:141
@@ -16376,7 +16376,7 @@ msgstr "Вкладки импорта PO"
 msgid "PO ZIP (all languages)"
 msgstr "PO ZIP (на всех языках)"
 
-#: app/routes/admin/utilities/translations.py:882
+#: app/routes/admin/utilities/translations.py:881
 #, python-format
 msgid ""
 "PO ZIP import finished. Locales processed: %(p)d, skipped: %(s)d. Updated: "
@@ -16391,7 +16391,7 @@ msgstr ""
 msgid "PO file not found for %(lang)s."
 msgstr "Файл PO не найден для %(lang)s."
 
-#: app/routes/admin/utilities/translations.py:944
+#: app/routes/admin/utilities/translations.py:943
 #, python-format
 msgid ""
 "PO import finished for %(lang)s. Updated: %(u)d, skipped missing: %(m)d, "
@@ -16404,7 +16404,7 @@ msgstr ""
 #: app/routes/forms_validation_summary.py:598
 #: app/routes/forms_validation_summary.py:1537
 #: app/services/documentation/pdf_service.py:121
-#: app/templates/admin/ai/documents.html:593
+#: app/templates/admin/ai/documents.html:601
 #: app/templates/admin/api_management.html:1094
 #: app/templates/admin/api_management.html:1112
 #: app/templates/admin/api_management.html:1131
@@ -16633,9 +16633,9 @@ msgstr "Пауза"
 msgid "Paused"
 msgstr "Пауза"
 
-#: app/routes/main/helpers.py:1206 app/templates/admin/ai/documents.html:70
-#: app/templates/admin/ai/documents.html:443
-#: app/templates/admin/ai/documents.html:594
+#: app/routes/main/helpers.py:1206 app/templates/admin/ai/documents.html:72
+#: app/templates/admin/ai/documents.html:447
+#: app/templates/admin/ai/documents.html:602
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/assignments/public_submissions.html:53
 #: app/templates/admin/assignments/public_submissions.html:104
@@ -16734,7 +16734,7 @@ msgstr "Процентное значение (0–100)."
 
 #: app/services/ai/planning/payload_inference.py:181
 #: app/services/ai/runtime/step_ux.py:201
-#: app/templates/admin/ai/documents.html:659
+#: app/templates/admin/ai/documents.html:667
 #: app/templates/admin/assignments/assignments.html:115
 #: app/templates/admin/documents/documents.html:683
 #: app/templates/admin/validation_dashboard.html:208
@@ -16744,7 +16744,7 @@ msgstr "Процентное значение (0–100)."
 msgid "Period"
 msgstr "Период"
 
-#: app/services/notification/core.py:88
+#: app/services/notification/core.py:87
 #, python-format
 msgid ""
 "Period %(period)s: another focal point in your entity submitted this form. "
@@ -16753,7 +16753,7 @@ msgstr ""
 "Точка %(period)s: ещё один ключевой человек в вашей организации подал эту "
 "форму. От тебя никаких действий не нужно."
 
-#: app/services/notification/core.py:125
+#: app/services/notification/core.py:124
 #, python-format
 msgid ""
 "Period %(period)s: delegation returned this assignment for your changes "
@@ -16862,7 +16862,7 @@ msgstr ""
 "Заглушки (например, %%(name)s, %%(count)s, %%s, %%d) ЗАЩИЩЕНЫ И НЕ МОГУТ "
 "БЫТЬ УДАЛЕНЫ ИЛИ ИЗМЕНЕНЫ."
 
-#: app/templates/admin/ai/documents.html:595
+#: app/templates/admin/ai/documents.html:603
 msgid "Plan"
 msgstr "План"
 
@@ -16910,7 +16910,7 @@ msgstr "Пожалуйста, введите имя."
 msgid "Please enter a primary name to translate from."
 msgstr "Пожалуйста, введите основное имя для перевода."
 
-#: app/templates/admin/ai/documents.html:596
+#: app/templates/admin/ai/documents.html:604
 msgid "Please enter a query."
 msgstr "Пожалуйста, введите запрос."
 
@@ -16938,7 +16938,7 @@ msgstr ""
 "Пожалуйста, ознакомьтесь и ответьте на вопросы ниже. Ваши ответы влияют на "
 "ваш рейтинг качества данных."
 
-#: app/services/notification/core.py:95
+#: app/services/notification/core.py:94
 msgid "Please review and validate this submission in the Backoffice."
 msgstr "Пожалуйста, ознакомьтесь и проверьте эту заявку в Бэк-офисе."
 
@@ -16951,7 +16951,7 @@ msgstr ""
 msgid "Please select a Year/Period for the document."
 msgstr "Пожалуйста, выберите год/период для документа."
 
-#: app/templates/admin/ai/documents.html:597
+#: app/templates/admin/ai/documents.html:605
 msgid "Please select a file"
 msgstr "Пожалуйста, выберите файл"
 
@@ -16993,7 +16993,7 @@ msgstr ""
 msgid "Please select at least one country."
 msgstr "Пожалуйста, выберите хотя бы одну страну."
 
-#: app/templates/admin/ai/documents.html:598
+#: app/templates/admin/ai/documents.html:606
 msgid "Please select at least one document"
 msgstr "Пожалуйста, выберите хотя бы один документ"
 
@@ -17122,7 +17122,7 @@ msgstr ""
 msgid "Plugins will appear here once they are installed"
 msgstr "Plugins will appear here once they are installed"
 
-#: app/templates/admin/ai/documents.html:599
+#: app/templates/admin/ai/documents.html:607
 msgid "Policy"
 msgstr "Политика"
 
@@ -17190,8 +17190,8 @@ msgstr "Подготовка запроса..."
 msgid "Preparing request..."
 msgstr "Подготовка запроса..."
 
-#: app/templates/admin/ai/documents.html:50
-#: app/templates/admin/ai/documents.html:600
+#: app/templates/admin/ai/documents.html:52
+#: app/templates/admin/ai/documents.html:608
 msgid "Preparing..."
 msgstr "Подготовка..."
 
@@ -17368,20 +17368,20 @@ msgstr "Приватный"
 msgid "Probe"
 msgstr "Зонд"
 
-#: app/templates/admin/ai/documents.html:601
+#: app/templates/admin/ai/documents.html:609
 msgid "Process"
 msgstr "Процесс"
 
-#: app/templates/admin/ai/documents.html:603
+#: app/templates/admin/ai/documents.html:611
 msgid "Process Documents?"
 msgstr "Оформление документов?"
 
-#: app/templates/admin/ai/documents.html:328
-#: app/templates/admin/ai/documents.html:604
+#: app/templates/admin/ai/documents.html:330
+#: app/templates/admin/ai/documents.html:612
 msgid "Process Selected"
 msgstr "Выбранный процесс"
 
-#: app/templates/admin/ai/documents.html:602
+#: app/templates/admin/ai/documents.html:610
 #, python-brace-format
 msgid ""
 "Process {count} document(s) with AI? This will extract text, create chunks, "
@@ -17390,7 +17390,7 @@ msgstr ""
 "Обработать {count} документ(ы) с помощью ИИ? Это будет извлекать текст, "
 "создавать чанки и генерировать вложения."
 
-#: app/templates/admin/ai/documents.html:605
+#: app/templates/admin/ai/documents.html:613
 msgid "Processed"
 msgstr "В процессе"
 
@@ -17402,33 +17402,33 @@ msgstr "Создано"
 msgid "Processed By"
 msgstr "Загружено"
 
-#: app/templates/admin/ai/documents.html:444
-#: app/templates/admin/ai/documents.html:607
+#: app/templates/admin/ai/documents.html:448
+#: app/templates/admin/ai/documents.html:615
 msgid "Processing"
 msgstr "Обработка"
 
-#: app/templates/admin/ai/documents.html:608
+#: app/templates/admin/ai/documents.html:616
 msgid "Processing complete"
 msgstr "Обработка завершена"
 
-#: app/templates/admin/ai/documents.html:609
+#: app/templates/admin/ai/documents.html:617
 msgid "Processing documents"
 msgstr "Обработка документов"
 
-#: app/templates/admin/ai/documents.html:610
+#: app/templates/admin/ai/documents.html:618
 msgid "Processing failed"
 msgstr "Обработка не получилась"
 
-#: app/templates/admin/ai/documents.html:611
+#: app/templates/admin/ai/documents.html:619
 msgid "Processing finished"
 msgstr "Обработка завершена"
 
-#: app/templates/admin/ai/documents.html:612
+#: app/templates/admin/ai/documents.html:620
 msgid "Processing upload"
 msgstr "Обработка загрузки"
 
-#: app/templates/admin/ai/documents.html:49
-#: app/templates/admin/ai/documents.html:606
+#: app/templates/admin/ai/documents.html:51
+#: app/templates/admin/ai/documents.html:614
 msgid "Processing..."
 msgstr "Обработка..."
 
@@ -17515,8 +17515,8 @@ msgstr "Предоставить переводы значения на разн
 msgid "Provider Priority"
 msgstr "Приоритет поставщика"
 
-#: app/templates/admin/ai/documents.html:287
-#: app/templates/admin/ai/documents.html:613
+#: app/templates/admin/ai/documents.html:289
+#: app/templates/admin/ai/documents.html:621
 #: app/templates/admin/api_management.html:1660
 #: app/templates/components/ag_grid_i18n_js.html:39
 msgid "Public"
@@ -17566,7 +17566,7 @@ msgstr "Публичный URL скопирован в буфер обмена!"
 msgid "Public reporting"
 msgstr "Публичная журналистика"
 
-#: app/templates/admin/ai/documents.html:661
+#: app/templates/admin/ai/documents.html:669
 msgid "Public submission"
 msgstr ""
 
@@ -17668,7 +17668,7 @@ msgstr "Push title"
 msgid "Putting together your answer…"
 msgstr "Собирая ответ..."
 
-#: app/templates/admin/ai/documents.html:614
+#: app/templates/admin/ai/documents.html:622
 msgid "Quality"
 msgstr "Качество"
 
@@ -17831,15 +17831,15 @@ msgstr "Ограниченная ставка"
 msgid "Rating"
 msgstr "Рейтинг"
 
-#: app/templates/admin/ai/documents.html:417
+#: app/templates/admin/ai/documents.html:419
 msgid "Re-run country detection (no re-chunk)"
 msgstr "Повторное запуск обнаружения страны (без повторного чанка)"
 
-#: app/templates/admin/ai/documents.html:615
+#: app/templates/admin/ai/documents.html:623
 msgid "Re-run country detection for selected documents?"
 msgstr "Заново запускать определение стран для отдельных документов?"
 
-#: app/templates/admin/ai/documents.html:616
+#: app/templates/admin/ai/documents.html:624
 msgid ""
 "Re-run metadata enrichment (date, language, category, quality, source org) "
 "for selected documents?"
@@ -17847,7 +17847,7 @@ msgstr ""
 "Перезапускать обогащение метаданных (дата, язык, категория, качество, "
 "исходная организация) для выбранных документов?"
 
-#: app/templates/admin/ai/documents.html:421
+#: app/templates/admin/ai/documents.html:423
 msgid ""
 "Re-run metadata enrichment: date, language, category, quality, source org "
 "(no re-chunk)"
@@ -18094,16 +18094,16 @@ msgstr "Фиксирует метку времени одобрения в эк�
 msgid "Red"
 msgstr "Красный"
 
-#: app/templates/admin/ai/documents.html:618
+#: app/templates/admin/ai/documents.html:626
 msgid "Redetect Country"
 msgstr "Страну повторного обнаружения"
 
-#: app/templates/admin/ai/documents.html:419
-#: app/templates/admin/ai/documents.html:617
+#: app/templates/admin/ai/documents.html:421
+#: app/templates/admin/ai/documents.html:625
 msgid "Redetect country"
 msgstr "Страна повторного обнаружения"
 
-#: app/templates/admin/ai/documents.html:619
+#: app/templates/admin/ai/documents.html:627
 msgid "Redetecting..."
 msgstr "Повторное обнаружение..."
 
@@ -18125,8 +18125,8 @@ msgstr "Справочные данные"
 msgid "Reference count:"
 msgstr "Количество ссылок:"
 
-#: app/templates/admin/ai/documents.html:311
-#: app/templates/admin/ai/documents.html:377
+#: app/templates/admin/ai/documents.html:313
+#: app/templates/admin/ai/documents.html:379
 #: app/templates/admin/communication/center.html:1075
 #: app/templates/admin/communication/center.html:1160
 #: app/templates/admin/data_exploration/explore_data.html:474
@@ -18157,7 +18157,7 @@ msgstr ""
 msgid "Refresh preview data"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:620
+#: app/templates/admin/ai/documents.html:628
 msgid "Refreshing document list..."
 msgstr "Обновляющий список документов..."
 
@@ -18186,7 +18186,7 @@ msgstr "Сгенерированный URL"
 msgid "Region"
 msgstr "Регион"
 
-#: app/templates/admin/ai/documents.html:621
+#: app/templates/admin/ai/documents.html:629
 msgid "Regional"
 msgstr "Региональные"
 
@@ -18435,12 +18435,12 @@ msgstr "Удалить этот индикатор"
 msgid "Removed"
 msgstr "Удалить"
 
-#: app/routes/main/helpers.py:1314
+#: app/routes/main/helpers.py:1313
 #, python-format
 msgid "Removed %(count)d field in %(template)s"
 msgstr "Удалено %(count)d поле в %(template)s"
 
-#: app/routes/admin/utilities/translations.py:1387
+#: app/routes/admin/utilities/translations.py:1386
 #, python-format
 msgid ""
 "Removed %(entries)d obsolete translation entries from %(count)d file(s)"
@@ -18552,7 +18552,7 @@ msgstr "Заменить файл"
 msgid "Replace organization logo"
 msgstr "Заменить логотип организации"
 
-#: app/templates/admin/ai/documents.html:622
+#: app/templates/admin/ai/documents.html:630
 msgid "Report"
 msgstr "Отчёт"
 
@@ -18625,53 +18625,53 @@ msgstr ""
 msgid "Reports"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:415
-#: app/templates/admin/ai/documents.html:623
+#: app/templates/admin/ai/documents.html:417
+#: app/templates/admin/ai/documents.html:631
 msgid "Reprocess"
 msgstr "Переработка"
 
-#: app/templates/admin/ai/documents.html:626
+#: app/templates/admin/ai/documents.html:634
 msgid "Reprocess Document?"
 msgstr "Повторная обработка документа?"
 
-#: app/templates/admin/ai/documents.html:627
+#: app/templates/admin/ai/documents.html:635
 msgid "Reprocess Documents?"
 msgstr "Повторная обработка документов?"
 
-#: app/templates/admin/ai/documents.html:629
+#: app/templates/admin/ai/documents.html:637
 msgid "Reprocess Metadata?"
 msgstr "Переработка метаданных?"
 
-#: app/templates/admin/ai/documents.html:624
+#: app/templates/admin/ai/documents.html:632
 msgid "Reprocess cancelled"
 msgstr "Повторная обработка отменена"
 
-#: app/templates/admin/ai/documents.html:625
+#: app/templates/admin/ai/documents.html:633
 msgid "Reprocess complete"
 msgstr "Повторная обработка завершена"
 
-#: app/templates/admin/ai/documents.html:423
-#: app/templates/admin/ai/documents.html:628
+#: app/templates/admin/ai/documents.html:425
+#: app/templates/admin/ai/documents.html:636
 msgid "Reprocess metadata"
 msgstr "Переобработка метаданных"
 
-#: app/templates/admin/ai/documents.html:630
+#: app/templates/admin/ai/documents.html:638
 msgid "Reprocess selected documents?"
 msgstr "Переосмыслить выбранные документы?"
 
-#: app/templates/admin/ai/documents.html:631
+#: app/templates/admin/ai/documents.html:639
 msgid "Reprocess this document?"
 msgstr "Переработать этот документ?"
 
-#: app/templates/admin/ai/documents.html:632
+#: app/templates/admin/ai/documents.html:640
 msgid "Reprocessing documents"
 msgstr "Документы по переработке"
 
-#: app/templates/admin/ai/documents.html:633
+#: app/templates/admin/ai/documents.html:641
 msgid "Reprocessing metadata"
 msgstr "Переработка метаданных"
 
-#: app/templates/admin/ai/documents.html:634
+#: app/templates/admin/ai/documents.html:642
 msgid "Reprocessing started"
 msgstr "Началась переработка"
 
@@ -18877,7 +18877,7 @@ msgstr "Сброс к настройкам по умолчанию"
 msgid "Reset to template"
 msgstr "Сброс к шаблону"
 
-#: app/templates/admin/ai/documents.html:635
+#: app/templates/admin/ai/documents.html:643
 #: app/templates/admin/security/event_detail.html:55
 #: app/templates/admin/user_management/access_requests.html:425
 msgid "Resolution"
@@ -18960,7 +18960,7 @@ msgstr ""
 msgid "Resume"
 msgstr "Возобновить"
 
-#: app/templates/admin/ai/documents.html:636
+#: app/templates/admin/ai/documents.html:644
 msgid "Resuming..."
 msgstr "Продолжаем..."
 
@@ -19071,7 +19071,7 @@ msgstr "Результаты обзора"
 msgid "Review recommended"
 msgstr "Рекомендуется обзор"
 
-#: app/services/notification/core.py:109
+#: app/services/notification/core.py:108
 #, python-format
 msgid "Review requested: %(template)s — %(country)s"
 msgstr ""
@@ -19617,7 +19617,7 @@ msgstr "Тег script или closing script в тексте"
 msgid "Scroll"
 msgstr "Скролл"
 
-#: app/templates/admin/ai/documents.html:374
+#: app/templates/admin/ai/documents.html:376
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:24
 #: app/templates/admin/api_keys/list.html:91
 #: app/templates/admin/communication/registry.html:22
@@ -19639,7 +19639,7 @@ msgstr "Поиск %(label)s..."
 msgid "Search Definition"
 msgstr "Определение поиска"
 
-#: app/templates/admin/ai/documents.html:172
+#: app/templates/admin/ai/documents.html:174
 msgid "Search Mode"
 msgstr "Режим поиска"
 
@@ -19785,7 +19785,7 @@ msgstr "Поисковые подразделения..."
 msgid "Search documentation..."
 msgstr "Документация по поиску..."
 
-#: app/templates/admin/ai/documents.html:309
+#: app/templates/admin/ai/documents.html:311
 msgid "Search documents..."
 msgstr "Обыск документов..."
 
@@ -19842,7 +19842,7 @@ msgstr "Искать"
 msgid "Search terms or meanings…"
 msgstr "Поисковые запросы или значения..."
 
-#: app/templates/admin/ai/documents.html:465
+#: app/templates/admin/ai/documents.html:469
 msgid "Search title/filename..."
 msgstr "Поиск названия/файла..."
 
@@ -20302,7 +20302,7 @@ msgstr "Выберите пользователя..."
 msgid "Select activity types..."
 msgstr "Все типы активности"
 
-#: app/templates/admin/ai/documents.html:353
+#: app/templates/admin/ai/documents.html:355
 #: app/templates/admin/user_management/user_form.html:1117
 #: app/templates/admin/user_management/user_form.html:1124
 #: app/templates/admin/validation_dashboard.html:253
@@ -20392,7 +20392,7 @@ msgstr ""
 "Выберите сущности, ставя галочку в полях, затем нажмите «Сохранить "
 "изменения» для их применения."
 
-#: app/templates/admin/ai/documents.html:277
+#: app/templates/admin/ai/documents.html:279
 msgid "Select files to upload"
 msgstr "Выберите файлы для загрузки"
 
@@ -20551,7 +20551,7 @@ msgstr "Выбрать..."
 msgid "Select:"
 msgstr "Выбрать..."
 
-#: app/templates/admin/ai/documents.html:637
+#: app/templates/admin/ai/documents.html:645
 msgid "Selected"
 msgstr "Избранные"
 
@@ -20604,7 +20604,7 @@ msgstr ""
 msgid "Semantic Thresholds"
 msgstr "Семантические пороги"
 
-#: app/templates/admin/ai/documents.html:121
+#: app/templates/admin/ai/documents.html:123
 #: app/templates/components/_fb_ai_config.html:18
 #: app/templates/core/chat_immersive.html:51
 #: app/templates/core/chat_immersive.html:259
@@ -20762,7 +20762,7 @@ msgstr "Отправлено на рассмотрение"
 msgid "Sent for review"
 msgstr "Отправлено на рассмотрение"
 
-#: app/services/notification/core.py:115
+#: app/services/notification/core.py:114
 #, python-format
 msgid "Sent for review: %(template)s — %(country)s"
 msgstr ""
@@ -21389,7 +21389,7 @@ msgstr ""
 msgid "Single section"
 msgstr "Односекционный участок"
 
-#: app/templates/admin/ai/documents.html:638
+#: app/templates/admin/ai/documents.html:646
 msgid "Situation Report"
 msgstr "Отчёт о ситуации"
 
@@ -21424,11 +21424,11 @@ msgid "Some countries could not be processed. Please try again."
 msgstr ""
 "Некоторые страны не могли быть обработаны. Пожалуйста, попробуйте ещё раз."
 
-#: app/templates/admin/ai/documents.html:639
+#: app/templates/admin/ai/documents.html:647
 msgid "Some documents failed"
 msgstr "Некоторые документы не работали"
 
-#: app/templates/admin/ai/documents.html:640
+#: app/templates/admin/ai/documents.html:648
 msgid "Some documents failed."
 msgstr "Некоторые документы не сработали."
 
@@ -21461,8 +21461,8 @@ msgstr ""
 "источника данных (выделенных жёлтыми цветами). Пожалуйста, проверьте и "
 "обновите любые изменённые данные перед сохранением."
 
-#: app/routes/admin/utilities/translations.py:1358
-#: app/routes/admin/utilities/translations.py:1393
+#: app/routes/admin/utilities/translations.py:1359
+#: app/routes/admin/utilities/translations.py:1394
 #, python-format
 msgid "Some languages could not be updated: %(langs)s"
 msgstr "Некоторые языки не удалось обновить: %(langs)s"
@@ -21493,7 +21493,7 @@ msgstr "Отсортируйте результаты по любому полю
 msgid "Sound"
 msgstr "Звук"
 
-#: app/templates/admin/ai/documents.html:663
+#: app/templates/admin/ai/documents.html:671
 #: app/templates/admin/data_exploration/explore_data.html:1552
 #: app/templates/admin/templates/data_sync_imputation.html:1937
 #: app/templates/admin/translations/manage_translations.html:656
@@ -21501,7 +21501,7 @@ msgstr "Звук"
 msgid "Source"
 msgstr "Источник"
 
-#: app/templates/admin/ai/documents.html:641
+#: app/templates/admin/ai/documents.html:649
 msgid "Source Org"
 msgstr "Source Org"
 
@@ -21513,7 +21513,7 @@ msgstr "Период источника"
 msgid "Source Template"
 msgstr "Сохранить шаблон"
 
-#: app/templates/admin/ai/documents.html:161
+#: app/templates/admin/ai/documents.html:163
 #: app/templates/admin/data_exploration/explore_data.html:1511
 #: app/templates/forms/entry_form/validation_summary_pdf.html:71
 msgid "Sources"
@@ -21543,7 +21543,7 @@ msgstr "Персонал"
 msgid "Staff and local units in Nigeria"
 msgstr "Персонал и местные подразделения в Нигерии"
 
-#: app/templates/admin/ai/documents.html:643
+#: app/templates/admin/ai/documents.html:651
 msgid "Stage:"
 msgstr "Сцена:"
 
@@ -21649,7 +21649,7 @@ msgstr ""
 msgid "Starting"
 msgstr "Settings"
 
-#: app/templates/admin/ai/documents.html:645
+#: app/templates/admin/ai/documents.html:653
 msgid "Starting import"
 msgstr "Стартовый импорт"
 
@@ -21661,7 +21661,7 @@ msgstr "Начинаем импорт..."
 msgid "Starting translation for"
 msgstr "Начало перевода для"
 
-#: app/templates/admin/ai/documents.html:644
+#: app/templates/admin/ai/documents.html:652
 #: app/templates/admin/templates/data_sync_imputation.html:1803
 msgid "Starting..."
 msgstr "Начинаю..."
@@ -21682,7 +21682,7 @@ msgstr "Статическое прикрепление(а)"
 #: app/templates/admin/ai/_trace_card.html:418
 #: app/templates/admin/ai/conversation_traces.html:106
 #: app/templates/admin/ai/conversation_traces.html:221
-#: app/templates/admin/ai/documents.html:646
+#: app/templates/admin/ai/documents.html:654
 #: app/templates/admin/ai/reasoning_traces.html:353
 #: app/templates/admin/ai/review_queue.html:57
 #: app/templates/admin/analytics/_user_detail_partial.html:150
@@ -21844,7 +21844,7 @@ msgstr ""
 msgid "Store this key securely - it provides full API access"
 msgstr "Храните этот ключ безопасно — он обеспечивает полный доступ к API"
 
-#: app/templates/admin/ai/documents.html:647
+#: app/templates/admin/ai/documents.html:655
 msgid "Strategic Plan"
 msgstr "Стратегический план"
 
@@ -22064,7 +22064,7 @@ msgstr ""
 "Успешный вход будет включать тип устройства, когда его можно обнаружить "
 "браузером или клиентом."
 
-#: app/templates/admin/ai/documents.html:648
+#: app/templates/admin/ai/documents.html:656
 #, python-brace-format
 msgid "Successfully processed: {count}"
 msgstr "Успешно обработан: {count}"
@@ -22150,7 +22150,7 @@ msgstr ""
 msgid "Supported formats: JSON, HTML, CSS, JavaScript"
 msgstr "Поддерживаемые форматы: .xlsx, .xls"
 
-#: app/templates/admin/ai/documents.html:280
+#: app/templates/admin/ai/documents.html:282
 msgid "Supported: PDF, Word, Excel, Text, Markdown, HTML"
 msgstr "Поддерживается: PDF, Word, Excel, Text, Markdown, HTML"
 
@@ -22429,7 +22429,7 @@ msgid "Technical safeguards include:"
 msgstr "Технические гарантии включают:"
 
 #: app/services/ai/runtime/step_ux.py:200
-#: app/templates/admin/ai/documents.html:664
+#: app/templates/admin/ai/documents.html:672
 #: app/templates/admin/assignments/assignments.html:117
 #: app/templates/admin/assignments/gantt_chart.html:117
 #: app/templates/admin/assignments/public_submissions.html:234
@@ -22467,7 +22467,7 @@ msgid ""
 "Template '%(template)s' has been added to your assignments for %(country)s."
 msgstr "Шаблон '%(template)s' был добавлен в ваши задания для %(country)s."
 
-#: app/services/notification/core.py:83
+#: app/services/notification/core.py:82
 #, python-format
 msgid "Template '%(template)s', period '%(period)s'. Due date: %(due_date)s."
 msgstr "Шаблон '%(template)s', точка '%(period)s'. Срок сдачи: %(due_date)s."
@@ -22729,7 +22729,7 @@ msgstr ""
 "Английская версия этого шаблона пуста. Сначала добавьте или сохраните "
 "английский текст, затем попробуйте снова."
 
-#: app/routes/main/helpers.py:1166
+#: app/routes/main/helpers.py:1165
 msgid "The assignment is available but data entry has not started yet."
 msgstr "Задание доступно, но ввод данных ещё не начался."
 
@@ -22766,13 +22766,13 @@ msgid ""
 msgstr ""
 "Форма загружается дольше, чем ожидалось. Пожалуйста, перезагрузите страницу."
 
-#: app/routes/main/helpers.py:1175
+#: app/routes/main/helpers.py:1174
 msgid "The form was sent for delegation review before final submission."
 msgstr ""
 "Форма была отправлена на рассмотрение делегацией перед окончательной "
 "подачей."
 
-#: app/routes/main/helpers.py:1178
+#: app/routes/main/helpers.py:1177
 msgid "The form was submitted and is awaiting validation by an administrator."
 msgstr "Форма была подана и ожидает проверки администратором."
 
@@ -22843,7 +22843,7 @@ msgstr ""
 "отчётов. Вы можете расширять или сжимать секции, и состояние сохраняется при"
 " посещениях."
 
-#: app/routes/main/helpers.py:1181
+#: app/routes/main/helpers.py:1180
 msgid "The submission was validated and approved. Data entry is complete."
 msgstr "Заявка была одобрена и одобрена. Ввод данных завершен."
 
@@ -22978,7 +22978,7 @@ msgstr "Это задание закрыто, и дальнейших измен
 msgid "This assignment is currently inactive."
 msgstr "Это задание в настоящее время неактивно."
 
-#: app/routes/main/helpers.py:1184
+#: app/routes/main/helpers.py:1183
 msgid ""
 "This assignment was cancelled and is no longer required for submission."
 msgstr ""
@@ -23347,7 +23347,7 @@ msgstr ""
 "В этом шаблоне есть сохранённые записи данных %(count)s, которые будут "
 "навсегда удалены. Продолжать?"
 
-#: app/routes/admin/form_builder/templates.py:285
+#: app/routes/admin/form_builder/templates.py:284
 #, python-format
 msgid ""
 "This template has %(count)s saved data entry that will be permanently "
@@ -23681,7 +23681,7 @@ msgstr "Лучшие страны по разбору покрытия"
 msgid "Top Endpoints"
 msgstr "Лучшие эндпоинты"
 
-#: app/templates/admin/ai/documents.html:200
+#: app/templates/admin/ai/documents.html:202
 msgid "Top K (Initial retrieval size)"
 msgstr "Верхний K (начальный размер извлекания)"
 
@@ -23690,7 +23690,7 @@ msgstr "Верхний K (начальный размер извлекания)"
 msgid "Top Tools Used"
 msgstr "Лучшие используемые инструменты"
 
-#: app/templates/admin/ai/documents.html:62
+#: app/templates/admin/ai/documents.html:64
 #: app/templates/admin/governance/dashboard.html:1021
 #: app/templates/forms/entry_form/export_pdf.html:197
 #: app/templates/forms/entry_form/export_pdf.html:275
@@ -23912,7 +23912,7 @@ msgstr ""
 msgid "Tracker"
 msgstr "Трекер"
 
-#: app/templates/admin/ai/documents.html:650
+#: app/templates/admin/ai/documents.html:658
 msgid "Training"
 msgstr "Обучение"
 
@@ -24317,8 +24317,8 @@ msgstr "Две трети (12.08)"
 msgid "Two-letter locale code for localization"
 msgstr "Двухбуквенный код локализации для локализации"
 
-#: app/templates/admin/ai/documents.html:341
-#: app/templates/admin/ai/documents.html:651
+#: app/templates/admin/ai/documents.html:343
+#: app/templates/admin/ai/documents.html:659
 #: app/templates/admin/communication/center.html:1343
 #: app/templates/admin/embed_content/manage_embed_content.html:47
 #: app/templates/admin/indicator_bank/indicator_bank.html:820
@@ -24390,7 +24390,7 @@ msgstr "Типы и единицы"
 msgid "Types & units"
 msgstr "Типы и единицы"
 
-#: app/templates/admin/ai/documents.html:652
+#: app/templates/admin/ai/documents.html:660
 msgid "Typing"
 msgstr "Типизация"
 
@@ -24778,7 +24778,7 @@ msgstr ""
 msgid "Updated"
 msgstr "Обновлено"
 
-#: app/routes/main/helpers.py:1322
+#: app/routes/main/helpers.py:1321
 #, python-format
 msgid "Updated %(count)d field in %(template)s"
 msgstr "Обновлено %(count)d поле в %(template)s"
@@ -24788,7 +24788,7 @@ msgstr "Обновлено %(count)d поле в %(template)s"
 msgid "Updates"
 msgstr "Обновления"
 
-#: app/templates/admin/ai/documents.html:290
+#: app/templates/admin/ai/documents.html:292
 #: app/templates/admin/documents/documents.html:516
 #: app/templates/admin/documents/documents.html:519
 #: app/templates/admin/settings/manage_settings.html:502
@@ -24804,7 +24804,7 @@ msgstr "Закачать"
 msgid "Upload & import"
 msgstr "Загрузка и импорт"
 
-#: app/templates/admin/ai/documents.html:665
+#: app/templates/admin/ai/documents.html:673
 #: app/templates/admin/documents/documents.html:725
 msgid "Upload Date"
 msgstr "Дата загрузки"
@@ -24823,7 +24823,7 @@ msgstr "Загрузить документ"
 msgid "Upload Modal Fields"
 msgstr "Загрузка модальных полей"
 
-#: app/templates/admin/ai/documents.html:252
+#: app/templates/admin/ai/documents.html:254
 msgid "Upload New"
 msgstr "Загрузить новое"
 
@@ -24876,11 +24876,11 @@ msgstr "Загрузите изображение, которое служит �
 msgid "Upload below"
 msgstr "Загрузка ниже"
 
-#: app/templates/admin/ai/documents.html:654
+#: app/templates/admin/ai/documents.html:662
 msgid "Upload complete"
 msgstr "Загрузка завершена"
 
-#: app/templates/admin/ai/documents.html:653
+#: app/templates/admin/ai/documents.html:661
 msgid "Upload complete!"
 msgstr "Загрузка завершена!"
 
@@ -24889,7 +24889,7 @@ msgstr "Загрузка завершена!"
 msgid "Upload failed"
 msgstr "Загрузка не удалась"
 
-#: app/templates/admin/ai/documents.html:655
+#: app/templates/admin/ai/documents.html:663
 msgid "Upload failed:"
 msgstr "Загрузка не удалась:"
 
@@ -24917,21 +24917,21 @@ msgstr ""
 "Загрузите сохранённые .xlsx. Загрузка в форму включается после прохождения "
 "валидации."
 
-#: app/templates/admin/ai/documents.html:432
+#: app/templates/admin/ai/documents.html:435
 msgid "Upload/Import"
 msgstr "Загрузка/Импорт"
 
-#: app/templates/admin/ai/documents.html:243
+#: app/templates/admin/ai/documents.html:245
 msgid "Upload/Import Documents"
 msgstr "Загрузка/импорт документов"
 
 #: app/services/notification/preview.py:19
-#: app/templates/admin/ai/documents.html:667
+#: app/templates/admin/ai/documents.html:675
 #: app/templates/admin/validation_dashboard.html:241
 msgid "Uploaded"
 msgstr "Загружен"
 
-#: app/templates/admin/ai/documents.html:666
+#: app/templates/admin/ai/documents.html:674
 #: app/templates/admin/documents/documents.html:705
 msgid "Uploaded By"
 msgstr "Загружено"
@@ -24946,8 +24946,8 @@ msgstr "Uploaded Files:"
 msgid "Uploaded by %(user)s on %(date)s"
 msgstr "Загружено пользователем %(user)s %(date)s"
 
-#: app/templates/admin/ai/documents.html:298
-#: app/templates/admin/ai/documents.html:668
+#: app/templates/admin/ai/documents.html:300
+#: app/templates/admin/ai/documents.html:676
 msgid "Uploading..."
 msgstr "Загружаю..."
 
@@ -25290,14 +25290,14 @@ msgstr "Примечание пользователя"
 msgid "User rating"
 msgstr "Рейтинг пользователей"
 
-#: app/services/platform/user_analytics_service.py:307
+#: app/services/platform/user_analytics_service.py:306
 #, python-format
 msgid "User-Agent contains an automation-related keyword: \"%(keyword)s\"."
 msgstr ""
 "User-Agent содержит ключевое слово, связанное с автоматизацией: "
 "«%(keyword)s»."
 
-#: app/services/platform/user_analytics_service.py:321
+#: app/services/platform/user_analytics_service.py:320
 msgid ""
 "User-Agent does not include typical browser tokens (Mozilla, WebKit, Chrome,"
 " Safari, Firefox, Edge, etc.)."
@@ -25305,7 +25305,7 @@ msgstr ""
 "User-Agent не включает типичные токены браузера (Mozilla, WebKit, Chrome, "
 "Safari, Firefox, Edge и др.)."
 
-#: app/services/platform/user_analytics_service.py:313
+#: app/services/platform/user_analytics_service.py:312
 msgid ""
 "User-Agent is very short (under 10 characters), which often indicates an "
 "automated client."
@@ -25353,14 +25353,14 @@ msgstr ""
 "Используется английский шаблон для этой формы в качестве источника. "
 "Переменные Джиндзя, такие как org_name, сохраняются."
 
-#: app/services/notification/preview.py:176
+#: app/services/notification/preview.py:175
 msgid ""
 "Uses the hardcoded instant notification email layout with sample copy. "
 "High/urgent types send immediately; others may go in daily/weekly digests "
 "instead."
 msgstr ""
 
-#: app/services/notification/preview.py:182
+#: app/services/notification/preview.py:181
 msgid ""
 "Uses the hardcoded instant notification email layout with sample copy. "
 "Normal-priority types are usually batched into digests unless the user chose"
@@ -25506,7 +25506,7 @@ msgstr "Проверка не удалась: "
 msgid "Validation questions"
 msgstr "Вопросы по валидации"
 
-#: app/services/notification/core.py:189
+#: app/services/notification/core.py:188
 #, python-format
 msgid "Validation questions for %(template)s (%(period)s)"
 msgstr "Вопросы валидации для %(template)s (%(period)s)"
@@ -25604,7 +25604,7 @@ msgstr "Пороги вариации"
 msgid "Vector chunks"
 msgstr "Векторные блоки"
 
-#: app/templates/admin/ai/documents.html:176
+#: app/templates/admin/ai/documents.html:178
 msgid "Vector only"
 msgstr "Только вектор"
 
@@ -25828,7 +25828,7 @@ msgstr "Рекомендации по индикаторам"
 msgid "View options"
 msgstr "Варианты просмотра"
 
-#: app/templates/admin/ai/documents.html:669
+#: app/templates/admin/ai/documents.html:677
 msgid "View or download"
 msgstr "Просмотр или скачать"
 
@@ -26044,7 +26044,7 @@ msgstr "Добро пожаловать в"
 msgid "Welcome to the %(org_name)s!"
 msgstr "Добро пожаловать на %(org_name)s!"
 
-#: app/services/notification/core.py:178
+#: app/services/notification/core.py:177
 #, python-format
 msgid ""
 "Welcome to the %(org_name)s! Your account has been created. Open your "
@@ -26235,7 +26235,7 @@ msgstr "Женщины в штате"
 msgid "Women in Volunteering"
 msgstr "Женщины в волонтёрстве"
 
-#: app/templates/admin/ai/documents.html:670
+#: app/templates/admin/ai/documents.html:678
 msgid "Work Plan"
 msgstr "План работ"
 
@@ -26251,7 +26251,7 @@ msgstr "Рабочие процессы"
 msgid "Working Offline"
 msgstr "Работа офлайн"
 
-#: app/templates/admin/ai/documents.html:671
+#: app/templates/admin/ai/documents.html:679
 msgid "Working..."
 msgstr "Работаю..."
 
@@ -26278,8 +26278,8 @@ msgstr "Неправильный пароль / неизвестный акка�
 msgid "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 msgstr "ГГГГ-ММ-ДД или ГГГГ-ММ-ДДТХ:ММ:СС"
 
-#: app/templates/admin/ai/documents.html:362
-#: app/templates/admin/ai/documents.html:672
+#: app/templates/admin/ai/documents.html:364
+#: app/templates/admin/ai/documents.html:680
 #: app/templates/admin/assignments/manage_assignment.html:96
 #: app/templates/admin/data_exploration/explore_data.html:248
 #: app/templates/admin/settings/manage_settings.html:990
@@ -26407,7 +26407,7 @@ msgstr "Вы редактируете черновик"
 msgid "You are not authorized to access this assignment for %(entity)s."
 msgstr "Вы не уполномочены на доступ к этому заданию для %(entity)s."
 
-#: app/services/notification/core.py:148
+#: app/services/notification/core.py:147
 #, python-format
 msgid "You are now a focal point for %(country)s."
 msgstr "Теперь вы — ключевой человек для %(country)s."
@@ -26643,7 +26643,7 @@ msgstr "Настройки вашего аккаунта были успешно
 msgid "Your answer…"
 msgstr "Твой ответ..."
 
-#: app/services/notification/core.py:100
+#: app/services/notification/core.py:99
 #, python-format
 msgid "Your assignment '%(template)s' has been approved."
 msgstr "Ваше задание '%(template)s' одобрено."
@@ -26748,7 +26748,7 @@ msgstr "Разрешить"
 msgid "and"
 msgstr "и"
 
-#: app/templates/admin/ai/documents.html:519
+#: app/templates/admin/ai/documents.html:527
 #, python-brace-format
 msgid "and {count} more"
 msgstr "и {count} more"
@@ -26839,7 +26839,7 @@ msgstr "Связь"
 msgid "completed"
 msgstr "Завершено"
 
-#: app/templates/admin/ai/documents.html:530
+#: app/templates/admin/ai/documents.html:538
 #: app/templates/admin/data_exploration/explore_data.html:1900
 #: app/templates/admin/organization/index.html:2468
 #: app/templates/admin/templates/upr_excel_import.html:429
@@ -26898,11 +26898,11 @@ msgstr "Отдельные пути"
 msgid "divisions"
 msgstr "Определения"
 
-#: app/templates/admin/ai/documents.html:547
+#: app/templates/admin/ai/documents.html:555
 msgid "document(s) updated."
 msgstr "Документ(ы) обновлены."
 
-#: app/templates/admin/ai/documents.html:551
+#: app/templates/admin/ai/documents.html:559
 msgid "downloading"
 msgstr "Скачивание"
 
@@ -26956,7 +26956,7 @@ msgstr "например, 0-4,5-9,10-14,15+"
 msgid "e.g., 123 or [some_variable]"
 msgstr "например, 123 или [some_variable]"
 
-#: app/templates/admin/ai/documents.html:363
+#: app/templates/admin/ai/documents.html:365
 msgid "e.g., 2023, 2024"
 msgstr "например, 2023, 2024"
 
@@ -27060,14 +27060,14 @@ msgstr "Обмен(ы)"
 msgid "extra \"Other\" entries (beyond the option count limit)"
 msgstr "Дополнительные «Другие» записи (сверх лимита по количеству опционов)"
 
-#: app/templates/admin/ai/documents.html:558
+#: app/templates/admin/ai/documents.html:566
 #: app/templates/admin/analytics/dashboard.html:84
 #: app/templates/forms/entry_form/validation_summary_pdf.html:38
 #: app/templates/forms/entry_form/validation_summary_progress.html:307
 msgid "failed"
 msgstr "неудачных"
 
-#: app/templates/admin/ai/documents.html:559
+#: app/templates/admin/ai/documents.html:567
 msgid "failed."
 msgstr "провал."
 
@@ -27536,7 +27536,7 @@ msgstr "Сеттинг"
 msgid "short name"
 msgstr "Короткое название"
 
-#: app/templates/admin/ai/documents.html:642
+#: app/templates/admin/ai/documents.html:650
 msgid "source(s)"
 msgstr "Источник(и)"
 
@@ -27623,7 +27623,7 @@ msgstr "вращать (3D) или панораму (2D)"
 msgid "to zoom in/out"
 msgstr "Чтобы увеличить/уменьшить масштаб"
 
-#: app/templates/admin/ai/documents.html:649
+#: app/templates/admin/ai/documents.html:657
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:48
 #: app/templates/admin/analytics/page_path_analytics.html:75
 #: app/templates/admin/communication/registry.html:47
@@ -27748,7 +27748,7 @@ msgstr "{count} индикаторы"
 msgid "{count} selected"
 msgstr "{count} Selected"
 
-#: app/services/notification/core.py:92
+#: app/services/notification/core.py:91
 #, python-brace-format
 msgid "{submitter_name} has submitted this assignment for period {period}."
 msgstr "{submitter_name} подал это задание за период {period}."
@@ -27770,7 +27770,7 @@ msgstr "— Нет автосгенерированного PDF —"
 
 #: app/forms/form_builder/template_forms.py:42
 #: app/forms/form_builder/template_forms.py:62
-#: app/templates/admin/ai/documents.html:587
+#: app/templates/admin/ai/documents.html:595
 msgid "— None —"
 msgstr "— Нет —"
 
@@ -27859,9 +27859,9 @@ msgstr "✓"
 #~ msgid "Cleared 1 translation field."
 #~ msgstr "Очищено 1 поле перевода."
 
-# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1371
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1385
 #~ msgid "Default (2010–2024)"
-#~ msgstr "Дефолт (2010–2024)"
+#~ msgstr ""
 
 # [Removed] was: app/templates/admin/documents/documents.html:80
 #~ msgid "Documents are uploaded through form submissions."
@@ -27907,9 +27907,9 @@ msgstr "✓"
 #~ msgid "Sent for review: %(template)s"
 #~ msgstr "Отправлено на рецензию: %(template)s"
 
-# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:109
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:110
 #~ msgid "Years (comma-separated)"
-#~ msgstr "Годы (с разделением запятой)"
+#~ msgstr ""
 
 # [Removed] was: app/templates/core/dashboard.html:1326
 #~ msgid "at: %(datetime)s"
@@ -27918,3 +27918,43 @@ msgstr "✓"
 # [Removed] was: app/templates/admin/translations/manage_translations.html:708
 #~ msgid "translation fields."
 #~ msgstr "Поля перевода."
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:111
+#~ msgid ""
+#~ "Choose which FDRS reporting years to fetch. All years in the default range "
+#~ "are selected initially."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:157
+#~ msgid ""
+#~ "Import FDRS submission documents (metadata and file download when IFRC URLs "
+#~ "are available). Uncheck to sync indicator data only."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1384
+#~ msgid "No years selected"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:110
+#~ msgid "Reporting years"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1787
+#~ msgid "Select at least one reporting year."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:129
+#~ msgid "Select years"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:163
+#~ msgid "Sync FDRS documents"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1535
+#~ msgid "Sync documents"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1391
+#~ msgid "years"
+#~ msgstr ""

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Humanitarian Databank 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-03 21:07+0000\n"
+"POT-Creation-Date: 2026-08-03 21:49+0000\n"
 "PO-Revision-Date: 2024-01-01 12:00+0000\n"
 "Last-Translator: \n"
 "Language-Team: fr <LL@li.org>\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
-"Generated-By: Babel 2.18.0\n"
+"Generated-By: Babel 2.10.3\n"
 
 #: app/routes/admin/utilities/translations.py:1541
 #, python-format
@@ -43,7 +43,7 @@ msgstr "%(active)s sessions actives"
 msgid "%(completed)s completed · %(failed)s failed · %(total)s traces"
 msgstr "%(completed)s complété · %(failed)s échoué · %(total)s traces"
 
-#: app/services/notification/core.py:192
+#: app/services/notification/core.py:191
 #, python-format
 msgid ""
 "%(count)s data validation question(s) for %(entity)s require your response."
@@ -108,7 +108,7 @@ msgstr "%(champ)s : %(ancien)s → %(nouveau)s"
 msgid "%(frequency)s Notification Digest"
 msgstr "%(frequency)sDigest de notification"
 
-#: app/services/notification/core.py:184
+#: app/services/notification/core.py:183
 #, python-format
 msgid "%(frequency)s email digest delivered with %(count)s notification(s)."
 msgstr "Résumé par email %(frequency)s livré avec notification(s) %(count)s."
@@ -153,26 +153,26 @@ msgstr "Modèle %(num)d"
 msgid "%(num)s indicator"
 msgstr "Indicateur %(num)s"
 
-#: app/services/notification/core.py:118
+#: app/services/notification/core.py:117
 #, python-format
 msgid ""
 "%(submitter_name)s escalated the %(template)s assignment for %(country)s "
 "(period %(period)s) for delegation review."
 msgstr ""
 
-#: app/services/notification/core.py:112
+#: app/services/notification/core.py:111
 #, python-format
 msgid ""
 "%(submitter_name)s sent the %(template)s assignment for %(country)s (period "
 "%(period)s) for your review before submission."
 msgstr ""
 
-#: app/services/notification/core.py:142
+#: app/services/notification/core.py:141
 #, python-format
 msgid "%(user_name)s requested access to %(country_name)s."
 msgstr "%(user_name)s a demandé l’accès à %(country_name)s."
 
-#: app/services/notification/core.py:136
+#: app/services/notification/core.py:135
 #, python-format
 msgid ""
 "'%(document)s' (%(document_type)s) has been uploaded and requires approval."
@@ -180,7 +180,7 @@ msgstr ""
 "'%(document)s' (%(document_type)s) a été téléchargé et nécessite une "
 "approbation."
 
-#: app/services/notification/core.py:131
+#: app/services/notification/core.py:130
 #, python-format
 msgid "'%(document)s' (%(document_type)s) was uploaded."
 msgstr "'%(document)s' (%(document_type)s) a été téléchargé."
@@ -377,7 +377,7 @@ msgstr "Réponse IA"
 
 #: app/routes/main/views.py:161 app/templates/admin/ai/_trace_card.html:65
 #: app/templates/admin/ai/conversation_traces.html:80
-#: app/templates/admin/ai/documents.html:140
+#: app/templates/admin/ai/documents.html:142
 #: app/templates/core/layout.html:463
 #: app/templates/forms/form_builder/form_builder.html:54
 msgid "AI Assistant"
@@ -398,7 +398,7 @@ msgstr "Tableau de bord IA"
 msgid "AI Knowledge Base"
 msgstr "Base de connaissances en IA"
 
-#: app/templates/admin/ai/documents.html:93
+#: app/templates/admin/ai/documents.html:95
 msgid "AI Query Assistant"
 msgstr "Assistant de requête IA"
 
@@ -472,7 +472,7 @@ msgstr ""
 "grossier est public / utilisateur / administrateur / system_manager ; Les "
 "outils d’IA peuvent toujours appliquer des permissions RBAC granulaires."
 
-#: app/templates/admin/ai/documents.html:516
+#: app/templates/admin/ai/documents.html:524
 msgid "AI import"
 msgstr "Importation IA"
 
@@ -1346,7 +1346,7 @@ msgid "Added"
 msgstr "Ajouté"
 
 # Activity descriptions
-#: app/routes/main/helpers.py:1306
+#: app/routes/main/helpers.py:1305
 #, python-format
 msgid "Added %(count)d field in %(template)s"
 msgstr "Ajouté %(count)d champ dans %(template)s"
@@ -1581,7 +1581,7 @@ msgstr "Alphabétisation des adultes"
 msgid "Advanced (List Library)"
 msgstr "Advanced (bibliothèque de listes)"
 
-#: app/templates/admin/ai/documents.html:154
+#: app/templates/admin/ai/documents.html:156
 msgid "Advanced Options"
 msgstr "Options avancées"
 
@@ -1693,8 +1693,8 @@ msgstr "Catégories de sexe"
 msgid "All Clear"
 msgstr "Tout est clair"
 
-#: app/templates/admin/ai/documents.html:368
-#: app/templates/admin/ai/documents.html:517
+#: app/templates/admin/ai/documents.html:370
+#: app/templates/admin/ai/documents.html:525
 #: app/templates/admin/data_exploration/explore_data.html:121
 #: app/templates/admin/data_exploration/explore_data.html:1834
 #: app/templates/admin/data_exploration/explore_data.html:1890
@@ -1781,7 +1781,7 @@ msgstr "Tous les modèles"
 msgid "All Templates"
 msgstr "Tous les modèles"
 
-#: app/templates/admin/ai/documents.html:188
+#: app/templates/admin/ai/documents.html:190
 #: app/templates/admin/templates/data_sync_imputation.html:366
 #: app/templates/forms/form_builder/partials/_item_modal.html:65
 #: app/templates/notifications/center.html:94
@@ -1809,7 +1809,7 @@ msgstr "Toutes les années"
 msgid "All approved"
 msgstr "Tout est approuvé"
 
-#: app/templates/admin/ai/documents.html:454
+#: app/templates/admin/ai/documents.html:458
 msgid "All categories"
 msgstr "Toutes les catégories"
 
@@ -1842,7 +1842,7 @@ msgstr "Toutes les clés"
 msgid "All language fields are already filled."
 msgstr "Tous les champs linguistiques sont déjà remplis."
 
-#: app/templates/admin/ai/documents.html:460
+#: app/templates/admin/ai/documents.html:464
 msgid "All languages"
 msgstr "Toutes les langues"
 
@@ -1896,7 +1896,7 @@ msgstr "Tous droits réservés."
 msgid "All sections completed."
 msgstr "Toutes les sections sont terminées."
 
-#: app/templates/admin/ai/documents.html:441
+#: app/templates/admin/ai/documents.html:445
 msgid "All statuses"
 msgstr "Tous les statuts"
 
@@ -1924,9 +1924,9 @@ msgstr ""
 "téléchargements de fichiers, exportations de données, mises à jour de "
 "profils, interactions avec l’IA, événements clés API, et plus encore."
 
-#: app/templates/admin/ai/documents.html:346
-#: app/templates/admin/ai/documents.html:448
-#: app/templates/admin/ai/documents.html:518
+#: app/templates/admin/ai/documents.html:348
+#: app/templates/admin/ai/documents.html:452
+#: app/templates/admin/ai/documents.html:526
 #: app/templates/admin/analytics/login_logs.html:43
 msgid "All types"
 msgstr "Tous types"
@@ -2270,7 +2270,7 @@ msgstr ""
 "S’applique à {éligible} des indicateurs {sélectionnés} sélectionnés avec des"
 " unités soutenant la désagrégation sexe/âge."
 
-#: app/templates/admin/ai/documents.html:467
+#: app/templates/admin/ai/documents.html:472
 #: app/templates/admin/ai/reasoning_traces.html:133
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:32
 #: app/templates/admin/analytics/audit_trail.html:287
@@ -2753,7 +2753,7 @@ msgstr ""
 "l’Éditeur et le Soumissionnaire d’Assignations, ou un Approver d’Attribution"
 " si cet utilisateur doit travailler avec des attributions."
 
-#: app/templates/admin/ai/documents.html:117
+#: app/templates/admin/ai/documents.html:119
 msgid "Ask a question (AI will answer using the document library)..."
 msgstr ""
 "Posez une question (l’IA répondra en utilisant la bibliothèque de "
@@ -2770,7 +2770,7 @@ msgstr ""
 "Posez des questions sur les données, indicateurs et documents de la "
 "plateforme."
 
-#: app/templates/admin/ai/documents.html:94
+#: app/templates/admin/ai/documents.html:96
 msgid "Ask questions about your document library"
 msgstr "Posez des questions sur votre bibliothèque de documents"
 
@@ -2778,7 +2778,7 @@ msgstr "Posez des questions sur votre bibliothèque de documents"
 msgid "Aspect Ratio"
 msgstr "Format d’image"
 
-#: app/templates/admin/ai/documents.html:520
+#: app/templates/admin/ai/documents.html:528
 msgid "Assessment"
 msgstr "Évaluation"
 
@@ -2817,7 +2817,7 @@ msgstr ""
 "Les entités assignées (points focaux) seront informées de cette nouvelle "
 "affectation. Tu veux continuer ?"
 
-#: app/templates/admin/ai/documents.html:656
+#: app/templates/admin/ai/documents.html:664
 #: app/templates/admin/assignments/public_submissions.html:225
 #: app/templates/admin/communication/center.html:669
 #: app/templates/admin/communication/center.html:730
@@ -2841,18 +2841,18 @@ msgstr "La mission « %(name)s » a été clôturée."
 msgid "Assignment '%(template)s' for %(entity)s has been reopened."
 msgstr "L’affectation « %(template)s » pour %(entity)s a été rouverte."
 
-#: app/routes/main/assignments.py:99
+#: app/routes/main/assignments.py:98
 #, python-format
 msgid "Assignment '%(template)s' has been reopened for %(entity)s only."
 msgstr ""
 "L’attribution « %(template)s » a été rouverte uniquement pour %(entity)s."
 
-#: app/services/notification/core.py:105
+#: app/services/notification/core.py:104
 #, python-format
 msgid "Assignment '%(template)s' has been reopened."
 msgstr "La mission « %(template)s » a été rouverte."
 
-#: app/services/notification/core.py:158
+#: app/services/notification/core.py:157
 #, python-format
 msgid "Assignment '%(template)s' is due on %(due_date)s."
 msgstr "L’attribution « %(template)s » est due sur %(due_date)s."
@@ -3011,7 +3011,7 @@ msgstr "Statut d'affectation pour ce pays non trouvé."
 msgid "Assignment status workflow"
 msgstr "Flux de travail sur l’état de l’affectation"
 
-#: app/templates/admin/ai/documents.html:660
+#: app/templates/admin/ai/documents.html:668
 msgid "Assignment submission"
 msgstr ""
 
@@ -3851,8 +3851,8 @@ msgstr "Administrateurs"
 msgid "Can't find an indicator? Propose a new one here"
 msgstr "Vous ne trouvez pas d’indicateur ? Proposez-en un nouveau ici"
 
-#: app/templates/admin/ai/documents.html:53
-#: app/templates/admin/ai/documents.html:521
+#: app/templates/admin/ai/documents.html:55
+#: app/templates/admin/ai/documents.html:529
 #: app/templates/admin/ai/reasoning_traces.html:725
 #: app/templates/admin/analytics/security_events.html:133
 #: app/templates/admin/api_keys/create.html:90
@@ -3959,7 +3959,7 @@ msgstr "Annuler la modification"
 msgid "Cancel failed (connection issue)."
 msgstr "Annulation échouée (problème de connexion)."
 
-#: app/templates/admin/ai/documents.html:54
+#: app/templates/admin/ai/documents.html:56
 msgid "Cancel import"
 msgstr "Annuler l’importation"
 
@@ -3968,7 +3968,7 @@ msgstr "Annuler l’importation"
 msgid "Cancelled"
 msgstr "Annulé"
 
-#: app/templates/admin/ai/documents.html:522
+#: app/templates/admin/ai/documents.html:530
 msgid "Cancelling..."
 msgstr "Annulation..."
 
@@ -4026,7 +4026,7 @@ msgstr "Reportage du tour précédent"
 msgid "Carry-forward data"
 msgstr "Données de report"
 
-#: app/templates/admin/ai/documents.html:523
+#: app/templates/admin/ai/documents.html:531
 #: app/templates/admin/communication/center.html:665
 #: app/templates/admin/embed_content/manage_embed_content.html:46
 #: app/templates/admin/embed_content/manage_embed_content.html:135
@@ -4118,12 +4118,12 @@ msgstr ""
 "direct. Envisager de créer une version provisoire pour une édition plus "
 "sûre."
 
-#: app/services/notification/core.py:122
+#: app/services/notification/core.py:121
 #, python-format
 msgid "Changes requested: %(template)s"
 msgstr "Modifications demandées : %(template)s"
 
-#: app/routes/main/helpers.py:1172
+#: app/routes/main/helpers.py:1171
 msgid "Changes were requested. Update the form and submit again when ready."
 msgstr ""
 "Des modifications ont été demandées. Mettez à jour le formulaire et "
@@ -4313,7 +4313,7 @@ msgstr ""
 "Choisissez qui doit recevoir ce message de test. Il utilise le contenu "
 "actuel du modèle et des valeurs provisoires d’exemple."
 
-#: app/templates/admin/ai/documents.html:524
+#: app/templates/admin/ai/documents.html:532
 msgid "Chunks"
 msgstr "Chunks"
 
@@ -4328,8 +4328,8 @@ msgstr "Activité"
 msgid "Cleaned up %(count)d expired sessions."
 msgstr "Nettoyage %(count)d des sessions expirées."
 
-#: app/templates/admin/ai/documents.html:354
-#: app/templates/admin/ai/documents.html:470
+#: app/templates/admin/ai/documents.html:356
+#: app/templates/admin/ai/documents.html:475
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:34
 #: app/templates/admin/analytics/audit_trail.html:289
 #: app/templates/admin/analytics/page_path_analytics.html:54
@@ -4479,7 +4479,7 @@ msgstr ""
 "Cliquez sur Charger dans le formulaire, relisez les données de cette page, "
 "puis cliquez sur Enregistrer l’attribution pour qu’elle continue."
 
-#: app/templates/admin/ai/documents.html:388
+#: app/templates/admin/ai/documents.html:390
 msgid "Click Search or Refresh to load documents from the IFRC API."
 msgstr ""
 "Cliquez sur Rechercher ou Rafraîchir pour charger des documents depuis l’API"
@@ -4574,7 +4574,7 @@ msgid ""
 "Click suggestions or type a programme code (e.g. PB27-28) and press Enter."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:525
+#: app/templates/admin/ai/documents.html:533
 msgid "Click to change category"
 msgstr "Cliquez pour changer de catégorie"
 
@@ -4591,11 +4591,11 @@ msgstr "Cliquez pour faire replier"
 msgid "Click to expand"
 msgstr "Cliquez pour développer"
 
-#: app/templates/admin/ai/documents.html:526
+#: app/templates/admin/ai/documents.html:534
 msgid "Click to make not public"
 msgstr "Cliquez pour rendre non public"
 
-#: app/templates/admin/ai/documents.html:527
+#: app/templates/admin/ai/documents.html:535
 msgid "Click to make public"
 msgstr "Cliquez pour rendre public"
 
@@ -4725,7 +4725,7 @@ msgstr ""
 "Indicateurs les plus proches dans la Banque des Indicateurs (par similarité "
 "sémantique) :"
 
-#: app/templates/admin/ai/documents.html:528
+#: app/templates/admin/ai/documents.html:536
 msgid "Cluster"
 msgstr "Cluster"
 
@@ -5014,9 +5014,9 @@ msgstr "Complétez votre profil"
 msgid "Complete — click ▲ to restore"
 msgstr "Terminé — cliquez sur ▲ pour restaurer"
 
-#: app/templates/admin/ai/documents.html:66
-#: app/templates/admin/ai/documents.html:442
-#: app/templates/admin/ai/documents.html:529
+#: app/templates/admin/ai/documents.html:68
+#: app/templates/admin/ai/documents.html:446
+#: app/templates/admin/ai/documents.html:537
 #: app/templates/admin/ai/reasoning_traces.html:248
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/analytics/_user_detail_partial.html:255
@@ -5630,7 +5630,7 @@ msgstr "Comte"
 msgid "Count of entries"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:531
+#: app/templates/admin/ai/documents.html:539
 #: app/templates/admin/analytics/audit_trail.html:325
 #: app/templates/admin/communication/center.html:198
 #: app/templates/admin/communication/center.html:1036
@@ -5682,8 +5682,8 @@ msgstr "Pays – Excel"
 
 #: app/services/ai/planning/payload_inference.py:179
 #: app/services/ai/runtime/step_ux.py:195
-#: app/templates/admin/ai/documents.html:366
-#: app/templates/admin/ai/documents.html:532
+#: app/templates/admin/ai/documents.html:368
+#: app/templates/admin/ai/documents.html:540
 #: app/templates/admin/analytics/audit_trail.html:245
 #: app/templates/admin/analytics/audit_trail.html:448
 #: app/templates/admin/assignments/manage_assignment.html:738
@@ -5718,7 +5718,7 @@ msgstr "Pays – Excel"
 msgid "Country"
 msgstr "Pays"
 
-#: app/templates/admin/ai/documents.html:535
+#: app/templates/admin/ai/documents.html:543
 msgid "Country / Scope"
 msgstr "Pays / Portée"
 
@@ -5748,11 +5748,11 @@ msgstr "Nom du pays"
 msgid "Country Names in Other Languages"
 msgstr "Noms de pays dans d'autres langues"
 
-#: app/templates/admin/ai/documents.html:533
+#: app/templates/admin/ai/documents.html:541
 msgid "Country Plan"
 msgstr "Plan du pays"
 
-#: app/templates/admin/ai/documents.html:534
+#: app/templates/admin/ai/documents.html:542
 msgid "Country Report"
 msgstr "Rapport pays"
 
@@ -6032,7 +6032,7 @@ msgstr "Créez votre premier sous-secteur"
 
 #: app/templates/admin/ai/_trace_card.html:101
 #: app/templates/admin/ai/conversation_traces.html:112
-#: app/templates/admin/ai/documents.html:536
+#: app/templates/admin/ai/documents.html:544
 #: app/templates/admin/ai/reasoning_traces.html:438
 #: app/templates/admin/analytics/audit_trail.html:385
 #: app/templates/admin/api_keys/details.html:264
@@ -6349,7 +6349,7 @@ msgstr "Tendance de l'indice de qualité des données"
 msgid "Data Reporting"
 msgstr "Reporting des données"
 
-#: app/templates/admin/ai/documents.html:537
+#: app/templates/admin/ai/documents.html:545
 msgid "Data Sheet"
 msgstr "Fiche technique"
 
@@ -6392,7 +6392,7 @@ msgstr "Indice de qualité des données"
 msgid "Data collection launch"
 msgstr "Lancement de la collecte de données"
 
-#: app/routes/main/helpers.py:1169
+#: app/routes/main/helpers.py:1168
 msgid ""
 "Data entry is underway. You can save drafts and continue completing the "
 "form."
@@ -6634,8 +6634,8 @@ msgstr "Définitions"
 msgid "Delegation focal point"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:427
-#: app/templates/admin/ai/documents.html:541
+#: app/templates/admin/ai/documents.html:429
+#: app/templates/admin/ai/documents.html:549
 #: app/templates/admin/ai/reasoning_traces.html:725
 #: app/templates/admin/assignments/assignments.html:131
 #: app/templates/admin/assignments/public_submissions.html:277
@@ -6711,11 +6711,11 @@ msgstr "Supprimer les données et supprimer"
 msgid "Delete Document"
 msgstr "Supprimer le document"
 
-#: app/templates/admin/ai/documents.html:539
+#: app/templates/admin/ai/documents.html:547
 msgid "Delete Document?"
 msgstr "Supprimer un document ?"
 
-#: app/templates/admin/ai/documents.html:540
+#: app/templates/admin/ai/documents.html:548
 msgid "Delete Documents?"
 msgstr "Supprimer des documents ?"
 
@@ -6780,7 +6780,7 @@ msgstr "Supprimer une conversation ?"
 msgid "Delete data & import"
 msgstr "Supprimer les données et importer"
 
-#: app/templates/admin/ai/documents.html:538
+#: app/templates/admin/ai/documents.html:546
 msgid "Delete document"
 msgstr "Supprimer le document"
 
@@ -6820,7 +6820,7 @@ msgstr "Supprimer le secteur"
 msgid "Delete selected"
 msgstr "Supprimer sélectionné"
 
-#: app/templates/admin/ai/documents.html:542
+#: app/templates/admin/ai/documents.html:550
 msgid "Delete selected documents?"
 msgstr "Supprimer certains documents ?"
 
@@ -7115,7 +7115,7 @@ msgstr "Définition/description détaillée de cette question"
 msgid "Details"
 msgstr "Détails"
 
-#: app/templates/admin/ai/documents.html:543
+#: app/templates/admin/ai/documents.html:551
 msgid "Detecting countries"
 msgstr "Détection des pays"
 
@@ -7524,14 +7524,14 @@ msgstr "Faites-le plus tard"
 msgid "Do not share this key or commit it to version control"
 msgstr "Ne partagez pas cette clé et ne la mettez pas en contrôle de version"
 
-#: app/templates/admin/ai/documents.html:544
+#: app/templates/admin/ai/documents.html:552
 msgid "Doc Date"
 msgstr "Date du documentaire"
 
 #: app/services/notification/notifiers/documents.py:39
 #: app/services/notification/notifiers/documents.py:176
 #: app/services/notification/notifiers/documents.py:322
-#: app/templates/admin/ai/documents.html:545
+#: app/templates/admin/ai/documents.html:553
 #: app/templates/admin/templates/partials/imputation_badges.html:16
 #: app/templates/forms/entry_form/validation_summary_pdf.html:80
 #: app/templates/forms/entry_form/validation_summary_pdf.html:82
@@ -7579,7 +7579,7 @@ msgstr "Document Field"
 msgid "Document Status"
 msgstr "Statut du document"
 
-#: app/templates/admin/ai/documents.html:657
+#: app/templates/admin/ai/documents.html:665
 #: app/templates/admin/api_management.html:1168
 #: app/templates/admin/documents/documents.html:184
 #: app/templates/admin/documents/documents.html:655
@@ -7622,7 +7622,7 @@ msgstr ""
 msgid "Document declined."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:546
+#: app/templates/admin/ai/documents.html:554
 msgid "Document deleted"
 msgstr "Document supprimé"
 
@@ -7630,7 +7630,7 @@ msgstr "Document supprimé"
 msgid "Document deleted successfully."
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:662
+#: app/templates/admin/ai/documents.html:670
 msgid "Document library"
 msgstr ""
 
@@ -7646,12 +7646,12 @@ msgstr "Dépôt de documents"
 msgid "Document status:"
 msgstr "Statut du document :"
 
-#: app/templates/admin/ai/documents.html:284
+#: app/templates/admin/ai/documents.html:286
 msgid "Document title (optional)"
 msgstr "Titre du document (optionnel)"
 
-#: app/templates/admin/ai/documents.html:351
-#: app/templates/admin/ai/documents.html:357
+#: app/templates/admin/ai/documents.html:353
+#: app/templates/admin/ai/documents.html:359
 msgid "Document types"
 msgstr "Types de documents"
 
@@ -7683,7 +7683,7 @@ msgid "Documentation"
 msgstr "Statut du document"
 
 #: app/templates/admin/ai/dashboard.html:70
-#: app/templates/admin/ai/documents.html:406
+#: app/templates/admin/ai/documents.html:408
 #: app/templates/admin/templates/data_sync_imputation.html:156
 #: app/templates/admin/validation_dashboard.html:262
 #: app/templates/core/dashboard.html:1214
@@ -7715,7 +7715,7 @@ msgstr ""
 "Ne partagez pas d’informations sensibles. Nous utilisons des traces "
 "système/télémétrie pour améliorer l’assistant."
 
-#: app/templates/admin/ai/documents.html:549
+#: app/templates/admin/ai/documents.html:557
 #: app/templates/forms/entry_form/validation_summary_progress.html:312
 #: app/templates/tours/tours.html:15
 msgid "Done"
@@ -7725,7 +7725,7 @@ msgstr "Marché conclu"
 msgid "Done — reviewing what I found…"
 msgstr "C’est fait — en revisant ce que j’ai trouvé..."
 
-#: app/templates/admin/ai/documents.html:548
+#: app/templates/admin/ai/documents.html:556
 msgid "Done."
 msgstr "Fait."
 
@@ -7733,8 +7733,8 @@ msgstr "Fait."
 msgid "Double-click"
 msgstr "Double-clic"
 
-#: app/templates/admin/ai/documents.html:411
-#: app/templates/admin/ai/documents.html:550
+#: app/templates/admin/ai/documents.html:413
+#: app/templates/admin/ai/documents.html:558
 #: app/templates/admin/monitoring/system_monitoring.html:181
 #: app/templates/admin/templates/data_sync_imputation.html:1658
 #: app/templates/macros/upr_country_reporting_excel_instructions.html:32
@@ -7821,8 +7821,8 @@ msgstr "Version mise à jour — rafraîchissement du constructeur..."
 msgid "Drag"
 msgstr "Glisser"
 
-#: app/templates/admin/ai/documents.html:279
-#: app/templates/admin/ai/documents.html:552
+#: app/templates/admin/ai/documents.html:281
+#: app/templates/admin/ai/documents.html:560
 msgid "Drag and drop files here, or click to select"
 msgstr "Glisser-déposer des fichiers ici, ou cliquez pour sélectionner"
 
@@ -8509,7 +8509,7 @@ msgid "Embed type"
 msgstr "Type d’insertion"
 
 #: app/templates/admin/ai/dashboard.html:81
-#: app/templates/admin/ai/documents.html:78
+#: app/templates/admin/ai/documents.html:80
 msgid "Embeddings"
 msgstr "Encastrements"
 
@@ -8800,7 +8800,7 @@ msgstr "Saisissez votre poste ou votre poste"
 msgid "Entities"
 msgstr "Entité"
 
-#: app/templates/admin/ai/documents.html:658
+#: app/templates/admin/ai/documents.html:666
 #: app/templates/admin/analytics/audit_trail.html:447
 #: app/templates/admin/documents/documents.html:124
 #: app/templates/admin/documents/documents.html:177
@@ -8967,7 +8967,7 @@ msgstr "Erreur lors du chargement des données du pays. Veuillez réessayer."
 msgid "Error loading chart data"
 msgstr "Erreur lors du chargement des notifications"
 
-#: app/templates/admin/ai/documents.html:554
+#: app/templates/admin/ai/documents.html:562
 #: app/templates/admin/data_exploration/explore_data.html:1905
 msgid "Error loading countries"
 msgstr "Pays de chargement d’erreur"
@@ -8980,7 +8980,7 @@ msgstr "Erreur lors du chargement des données du pays. Veuillez réessayer."
 msgid "Error loading deletion information. Please try again."
 msgstr "Erreur lors du chargement des données du pays. Veuillez réessayer."
 
-#: app/templates/admin/ai/documents.html:555
+#: app/templates/admin/ai/documents.html:563
 msgid "Error loading documents"
 msgstr "Chargement des documents par erreur"
 
@@ -9000,7 +9000,7 @@ msgstr "Erreur lors du chargement des services de traduction"
 msgid "Error loading years"
 msgstr "Années de chargement d’erreur"
 
-#: app/templates/admin/ai/documents.html:556
+#: app/templates/admin/ai/documents.html:564
 msgid "Error processing documents:"
 msgstr "Documents de traitement des erreurs :"
 
@@ -9016,7 +9016,7 @@ msgstr "Erreur de retour de l’attribution pour révision."
 msgid "Error updating suggestion status."
 msgstr "Erreur mise à jour du statut de la suggestion."
 
-#: app/templates/admin/ai/documents.html:553
+#: app/templates/admin/ai/documents.html:561
 #: app/templates/admin/documents/documents.html:427
 #: app/templates/admin/documents/documents.html:462
 #: app/templates/admin/documents/documents.html:503
@@ -9047,7 +9047,7 @@ msgstr ""
 msgid "Errors"
 msgstr "Erreurs"
 
-#: app/templates/admin/ai/documents.html:557
+#: app/templates/admin/ai/documents.html:565
 msgid "Errors:"
 msgstr "Erreurs :"
 
@@ -9187,7 +9187,7 @@ msgstr ""
 msgid "Excel file is empty or header row not found."
 msgstr "Le fichier Excel est vide ou la ligne d’en-tête non trouvée."
 
-#: app/routes/admin/utilities/translations.py:1084
+#: app/routes/admin/utilities/translations.py:1083
 #, python-format
 msgid ""
 "Excel import finished. Updated: %(u)d, skipped missing msgids: %(m)d. (Empty"
@@ -9599,9 +9599,9 @@ msgstr "Installations"
 
 #: app/templates/admin/ai/_trace_card.html:431
 #: app/templates/admin/ai/conversation_traces.html:234
-#: app/templates/admin/ai/documents.html:74
-#: app/templates/admin/ai/documents.html:445
-#: app/templates/admin/ai/documents.html:561
+#: app/templates/admin/ai/documents.html:76
+#: app/templates/admin/ai/documents.html:449
+#: app/templates/admin/ai/documents.html:569
 #: app/templates/admin/analytics/_user_detail_partial.html:257
 #: app/templates/admin/analytics/login_logs.html:139
 #: app/templates/admin/settings/manage_settings.html:1495
@@ -9651,7 +9651,7 @@ msgstr "Échec de la copie de l'URL. Veuillez réessayer."
 msgid "Failed to create follow-up question"
 msgstr "Oubli de créer une question de suivi"
 
-#: app/templates/admin/ai/documents.html:562
+#: app/templates/admin/ai/documents.html:570
 msgid "Failed to delete document."
 msgstr "Échec de suppression du document."
 
@@ -9663,7 +9663,7 @@ msgstr "Échec de la suppression de l'indicateur"
 msgid "Failed to delete traces."
 msgstr "Échec à supprimer les traces."
 
-#: app/templates/admin/ai/documents.html:563
+#: app/templates/admin/ai/documents.html:571
 msgid "Failed to generate answer."
 msgstr "Échec à obtenir une réponse."
 
@@ -9687,11 +9687,11 @@ msgstr "Échec de charger les données du tableau de bord"
 msgid "Failed to load data"
 msgstr "Échec du chargement des données"
 
-#: app/templates/admin/ai/documents.html:564
+#: app/templates/admin/ai/documents.html:572
 msgid "Failed to load documents"
 msgstr "Échec du chargement des documents"
 
-#: app/templates/admin/ai/documents.html:565
+#: app/templates/admin/ai/documents.html:573
 msgid "Failed to load documents from external API"
 msgstr "Échec du chargement des documents depuis une API externe"
 
@@ -9738,7 +9738,7 @@ msgstr "Échec du chargement des services de traduction"
 msgid "Failed to load validation questions"
 msgstr "Échec de chargement des questions de validation"
 
-#: app/templates/admin/ai/documents.html:566
+#: app/templates/admin/ai/documents.html:574
 msgid "Failed to process request."
 msgstr "Échec de traitement de la demande."
 
@@ -9781,11 +9781,11 @@ msgstr "Échec d’envoyer des questions de validation"
 msgid "Failed to start download"
 msgstr "Failed to start download"
 
-#: app/templates/admin/ai/documents.html:567
+#: app/templates/admin/ai/documents.html:575
 msgid "Failed to start import"
 msgstr "Échec à démarrer l’importation"
 
-#: app/templates/admin/ai/documents.html:568
+#: app/templates/admin/ai/documents.html:576
 msgid "Failed to start metadata reprocess."
 msgstr "Échec de démarrer le retraitement des métadonnées."
 
@@ -9817,15 +9817,15 @@ msgstr "Échec de la traduction"
 msgid "Failed to uninstall plugin"
 msgstr "Failed to uninstall plugin"
 
-#: app/templates/admin/ai/documents.html:570
+#: app/templates/admin/ai/documents.html:578
 msgid "Failed to update category."
 msgstr "Échec de mettre à jour la catégorie."
 
-#: app/templates/admin/ai/documents.html:569
+#: app/templates/admin/ai/documents.html:577
 msgid "Failed to update."
 msgstr "Échec de mise à jour."
 
-#: app/templates/admin/ai/documents.html:560
+#: app/templates/admin/ai/documents.html:568
 #, python-brace-format
 msgid "Failed: {count}"
 msgstr "Échec : {count}"
@@ -9934,7 +9934,7 @@ msgstr ""
 "Les champs peuvent être répétés plusieurs fois (comme les groupes de "
 "répétition de Kobo)"
 
-#: app/templates/admin/ai/documents.html:185
+#: app/templates/admin/ai/documents.html:187
 msgid "File Type"
 msgstr "Type de fichier"
 
@@ -9978,7 +9978,7 @@ msgstr "La taille du fichier doit être inférieure à 10 Mo."
 msgid "File type: %(t)s"
 msgstr "Type de fichier : %(t)s"
 
-#: app/templates/admin/ai/documents.html:571
+#: app/templates/admin/ai/documents.html:579
 #: app/templates/admin/documents/documents.html:663
 msgid "Filename"
 msgstr "Nom de fichier"
@@ -10165,7 +10165,7 @@ msgstr ""
 "Filtrez les indicateurs, sélectionnez ceux dont vous avez besoin, regroupez-"
 "les en sections, puis créez le modèle."
 
-#: app/templates/admin/ai/documents.html:226
+#: app/templates/admin/ai/documents.html:228
 msgid "Filter low-relevance chunks"
 msgstr "Segments à faible pertinence de filtre"
 
@@ -10183,7 +10183,7 @@ msgstr "Filtre..."
 msgid "Filtered to session:"
 msgstr "Filtré à la session :"
 
-#: app/templates/admin/ai/documents.html:439
+#: app/templates/admin/ai/documents.html:443
 #: app/templates/admin/analytics/audit_trail.html:238
 #: app/templates/admin/analytics/login_logs.html:34
 #: app/templates/admin/analytics/page_path_analytics.html:30
@@ -10487,7 +10487,7 @@ msgstr "Barre d’outils de mise en forme"
 msgid "Forms"
 msgstr "Formes"
 
-#: app/templates/admin/ai/documents.html:572
+#: app/templates/admin/ai/documents.html:580
 #: app/templates/components/auto_translate_modal_js.html:32
 msgid "Found"
 msgstr "Trouvé"
@@ -10545,7 +10545,7 @@ msgstr "Vendredi"
 msgid "From"
 msgstr "De"
 
-#: app/services/notification/core.py:168
+#: app/services/notification/core.py:167
 #, python-format
 msgid "From %(submitter)s (%(country)s) for '%(template)s'."
 msgstr "De %(submitter)s (%(country)s) pour « %(template)s »."
@@ -10715,7 +10715,7 @@ msgstr "Commencer"
 msgid "Ghost Access"
 msgstr "Accès Fantôme"
 
-#: app/templates/admin/ai/documents.html:573
+#: app/templates/admin/ai/documents.html:581
 #: app/templates/admin/rbac/grants.html:96
 #: app/templates/admin/user_management/users.html:298
 msgid "Global"
@@ -10855,7 +10855,7 @@ msgstr "Étiquette de groupe, par exemple Masculin"
 msgid "Group matrix table rows"
 msgstr "Lignes de tables matricielles de groupe"
 
-#: app/templates/admin/ai/documents.html:574
+#: app/templates/admin/ai/documents.html:582
 msgid "Guideline"
 msgstr "Directives"
 
@@ -10869,7 +10869,7 @@ msgstr "HTML"
 msgid "HTML email with optional template"
 msgstr "Email HTML avec modèle optionnel"
 
-#: app/routes/admin/ai_management.py:1899
+#: app/routes/admin/ai_management.py:1898
 msgid "HTML event handler (onerror=, onload=, …) — common in XSS probes"
 msgstr ""
 "Gestionnaire d’événements HTML (onerror=, onload=, ...) — courant dans les "
@@ -11173,7 +11173,7 @@ msgstr "Comment aimeriez-vous commencer ?"
 msgid "Humanitarian Databank"
 msgstr "Banque de données humanitaire"
 
-#: app/templates/admin/ai/documents.html:175
+#: app/templates/admin/ai/documents.html:177
 msgid "Hybrid (keywords and embeddings)"
 msgstr "Hybride (mots-clés et embeddings)"
 
@@ -11416,7 +11416,7 @@ msgstr "Importation PO"
 msgid "Import PO ZIP"
 msgstr "Importer PO ZIP"
 
-#: app/templates/admin/ai/documents.html:395
+#: app/templates/admin/ai/documents.html:397
 msgid "Import Selected"
 msgstr "Importation sélectionnée"
 
@@ -11450,7 +11450,7 @@ msgstr ""
 msgid "Import and Create Template"
 msgstr "Importer et créer un modèle"
 
-#: app/templates/admin/ai/documents.html:306
+#: app/templates/admin/ai/documents.html:308
 msgid ""
 "Import and process existing documents from the Document Management system"
 msgstr ""
@@ -11461,11 +11461,11 @@ msgstr ""
 msgid "Import applied successfully."
 msgstr "L’importation a été appliquée avec succès."
 
-#: app/templates/admin/ai/documents.html:575
+#: app/templates/admin/ai/documents.html:583
 msgid "Import cancelled"
 msgstr "Importation annulée"
 
-#: app/templates/admin/ai/documents.html:576
+#: app/templates/admin/ai/documents.html:584
 msgid "Import complete"
 msgstr "Importation terminée"
 
@@ -11480,7 +11480,7 @@ msgstr ""
 "modèles 24 et 22. Rapports annuels (AR*) : modèles 33 et 23. Revues de mi-"
 "année (MYR*) : modèle 33."
 
-#: app/templates/admin/ai/documents.html:337
+#: app/templates/admin/ai/documents.html:339
 msgid ""
 "Import documents from the connected external document API. Filter by "
 "document type, year, and country."
@@ -11515,7 +11515,7 @@ msgstr "Importation depuis Kobo"
 msgid "Import from Kobo XLSForm"
 msgstr "Importation depuis Kobo XLSForm"
 
-#: app/templates/admin/ai/documents.html:260
+#: app/templates/admin/ai/documents.html:262
 msgid "Import from System"
 msgstr "Importation depuis System"
 
@@ -11523,7 +11523,7 @@ msgstr "Importation depuis System"
 msgid "Import from UPR Master Excel workbook"
 msgstr "Importation depuis un classeur Excel UPR Master"
 
-#: app/templates/admin/ai/documents.html:268
+#: app/templates/admin/ai/documents.html:270
 msgid "Import from external API"
 msgstr "Importation depuis une API externe"
 
@@ -11539,7 +11539,7 @@ msgstr "Importation dans la version actuelle (Version %(num)s)"
 msgid "Import into existing draft (Version %(num)s)"
 msgstr "Importation dans un brouillon existant (Version %(num)s)"
 
-#: app/templates/admin/ai/documents.html:577
+#: app/templates/admin/ai/documents.html:585
 msgid "Import is in progress. Are you sure you want to leave?"
 msgstr "L’importation est en cours. Tu es sûr de vouloir partir ?"
 
@@ -11564,7 +11564,7 @@ msgstr "Progrès des importations"
 msgid "Import settings"
 msgstr "Paramètres d’importation"
 
-#: app/templates/admin/ai/documents.html:245
+#: app/templates/admin/ai/documents.html:247
 msgid "Import source"
 msgstr "Source d’importation"
 
@@ -11626,7 +11626,7 @@ msgstr ""
 msgid "Importing"
 msgstr "Importation"
 
-#: app/templates/admin/ai/documents.html:578
+#: app/templates/admin/ai/documents.html:586
 msgid "Importing documents"
 msgstr "Importation de documents"
 
@@ -11634,7 +11634,7 @@ msgstr "Importation de documents"
 msgid "Importing template…"
 msgstr "Importation du modèle..."
 
-#: app/templates/admin/ai/documents.html:579
+#: app/templates/admin/ai/documents.html:587
 msgid "Importing..."
 msgstr "Importer..."
 
@@ -12543,7 +12543,7 @@ msgstr ""
 "Les étiquettes sont affichées dans l’infobulle lorsqu’une valeur de variable"
 " enregistrée diffère de la recherche actuelle."
 
-#: app/templates/admin/ai/documents.html:580
+#: app/templates/admin/ai/documents.html:588
 #: app/templates/admin/communication/registry.html:124
 #: app/templates/admin/documents/documents.html:193
 #: app/templates/admin/documents/documents.html:676
@@ -13023,12 +13023,12 @@ msgstr ""
 msgid "Loading documentation"
 msgstr "Chargement de la documentation"
 
-#: app/templates/admin/ai/documents.html:385
+#: app/templates/admin/ai/documents.html:387
 msgid "Loading documents from IFRC API..."
 msgstr "Chargement de documents depuis l’API IFRC..."
 
-#: app/templates/admin/ai/documents.html:319
-#: app/templates/admin/ai/documents.html:475
+#: app/templates/admin/ai/documents.html:321
+#: app/templates/admin/ai/documents.html:481
 #: app/templates/admin/documents/documents.html:81
 #: app/templates/admin/documents/documents.html:83
 msgid "Loading documents..."
@@ -13951,11 +13951,11 @@ msgstr "Message à montrer en cas d’échec de validation"
 msgid "Messages"
 msgstr "Messages"
 
-#: app/templates/admin/ai/documents.html:581
+#: app/templates/admin/ai/documents.html:589
 msgid "Metadata reprocess cancelled"
 msgstr "Retraitement des métadonnées annulé"
 
-#: app/templates/admin/ai/documents.html:582
+#: app/templates/admin/ai/documents.html:590
 msgid "Metadata reprocess complete"
 msgstr "Retraitement des métadonnées terminé"
 
@@ -13981,7 +13981,7 @@ msgstr "Métrique"
 msgid "Migrants"
 msgstr "Migrants"
 
-#: app/templates/admin/ai/documents.html:214
+#: app/templates/admin/ai/documents.html:216
 msgid "Min Score"
 msgstr "Note minimale"
 
@@ -14175,7 +14175,7 @@ msgstr "Mon tableau de bord"
 msgid "My Work"
 msgstr "Mon travail"
 
-#: app/templates/admin/ai/documents.html:583
+#: app/templates/admin/ai/documents.html:591
 #: app/templates/admin/assignments/public_submissions.html:144
 #: app/templates/admin/assignments/public_submissions.html:145
 #: app/templates/admin/assignments/public_submissions.html:146
@@ -14824,7 +14824,7 @@ msgstr "Aucune donnée de conformité disponible."
 msgid "No conversations match your search."
 msgstr "Aucune conversation ne correspond à votre recherche."
 
-#: app/templates/admin/ai/documents.html:584
+#: app/templates/admin/ai/documents.html:592
 msgid "No countries"
 msgstr "Aucun pays"
 
@@ -14929,7 +14929,7 @@ msgstr "Aucune division trouvée correspondant à votre recherche."
 msgid "No divisions found."
 msgstr "Aucun secteur trouvé."
 
-#: app/templates/admin/ai/documents.html:475
+#: app/templates/admin/ai/documents.html:481
 msgid "No documents found. Upload a document to get started."
 msgstr "Aucun document trouvé. Téléchargez un document pour commencer."
 
@@ -15347,7 +15347,7 @@ msgstr ""
 "Aucune désagrégation par sexe ou âge n’a été trouvée pour les paramètres "
 "actuels."
 
-#: app/templates/admin/ai/documents.html:585
+#: app/templates/admin/ai/documents.html:593
 msgid "No sources found."
 msgstr "Aucune source trouvée."
 
@@ -15452,7 +15452,7 @@ msgstr ""
 "Aucun type trouvé. Effectuez des migrations de bases de données, puis "
 "rafraîchissez."
 
-#: app/templates/admin/ai/documents.html:586
+#: app/templates/admin/ai/documents.html:594
 msgid "No types loaded"
 msgstr "Aucun type chargé"
 
@@ -15528,7 +15528,7 @@ msgid "Non-English versions fall back to English when empty."
 msgstr ""
 "Les versions non anglaises reviennent à l’anglais lorsqu’elles sont vides."
 
-#: app/templates/admin/ai/documents.html:588
+#: app/templates/admin/ai/documents.html:596
 #: app/templates/admin/analytics/audit_trail.html:315
 #: app/templates/admin/indicator_bank/indicator_bank.html:2373
 #: app/templates/admin/templates/data_sync_imputation.html:137
@@ -15557,7 +15557,7 @@ msgstr "Non autorisé"
 msgid "Not Applicable"
 msgstr "Non applicable"
 
-#: app/templates/admin/ai/documents.html:589
+#: app/templates/admin/ai/documents.html:597
 msgid "Not Processed"
 msgstr "Non traité"
 
@@ -15637,7 +15637,7 @@ msgstr "Pas dans le répertoire (depuis URL)"
 msgid "Not provided"
 msgstr "Non fourni"
 
-#: app/templates/admin/ai/documents.html:590
+#: app/templates/admin/ai/documents.html:598
 msgid "Not public"
 msgstr "Pas public"
 
@@ -16006,7 +16006,7 @@ msgstr ""
 msgid "Only routes under /api/v1 (public and partner REST API)."
 msgstr "Uniquement les routes sous /api/v1 (API REST publique et partenaire)."
 
-#: app/routes/main/assignments.py:246
+#: app/routes/main/assignments.py:245
 msgid ""
 "Only users with an organization email can request access to multiple "
 "countries at once. Please select a single country."
@@ -16015,7 +16015,7 @@ msgstr ""
 " demander l’accès à plusieurs pays simultanément. Veuillez sélectionner un "
 "seul pays."
 
-#: app/routes/auth.py:734
+#: app/routes/auth.py:733
 msgid ""
 "Oops, something went wrong! We weren't able to complete your sign-in. Please"
 " try again or contact support if the problem continues."
@@ -16080,7 +16080,7 @@ msgstr "Assistant ouvert"
 msgid "Open data guidance"
 msgstr "Guides pour les données ouvertes"
 
-#: app/templates/admin/ai/documents.html:591
+#: app/templates/admin/ai/documents.html:599
 msgid "Open document"
 msgstr "Document ouvert"
 
@@ -16352,7 +16352,7 @@ msgid "Orphaned"
 msgstr "Orphelin"
 
 #: app/services/documentation/service.py:354
-#: app/templates/admin/ai/documents.html:592
+#: app/templates/admin/ai/documents.html:600
 #: app/templates/admin/analytics/audit_trail.html:372
 #: app/templates/admin/data_exploration/explore_data.html:2014
 #: app/templates/admin/embed_content/manage_embed_content.html:141
@@ -16503,7 +16503,7 @@ msgstr "Onglets d’importation PO"
 msgid "PO ZIP (all languages)"
 msgstr "PO ZIP (toutes les langues)"
 
-#: app/routes/admin/utilities/translations.py:882
+#: app/routes/admin/utilities/translations.py:881
 #, python-format
 msgid ""
 "PO ZIP import finished. Locales processed: %(p)d, skipped: %(s)d. Updated: "
@@ -16518,7 +16518,7 @@ msgstr ""
 msgid "PO file not found for %(lang)s."
 msgstr "Fichier PO non trouvé pour %(lang)s."
 
-#: app/routes/admin/utilities/translations.py:944
+#: app/routes/admin/utilities/translations.py:943
 #, python-format
 msgid ""
 "PO import finished for %(lang)s. Updated: %(u)d, skipped missing: %(m)d, "
@@ -16531,7 +16531,7 @@ msgstr ""
 #: app/routes/forms_validation_summary.py:598
 #: app/routes/forms_validation_summary.py:1537
 #: app/services/documentation/pdf_service.py:121
-#: app/templates/admin/ai/documents.html:593
+#: app/templates/admin/ai/documents.html:601
 #: app/templates/admin/api_management.html:1094
 #: app/templates/admin/api_management.html:1112
 #: app/templates/admin/api_management.html:1131
@@ -16763,9 +16763,9 @@ msgstr "Pause"
 msgid "Paused"
 msgstr "Pause"
 
-#: app/routes/main/helpers.py:1206 app/templates/admin/ai/documents.html:70
-#: app/templates/admin/ai/documents.html:443
-#: app/templates/admin/ai/documents.html:594
+#: app/routes/main/helpers.py:1206 app/templates/admin/ai/documents.html:72
+#: app/templates/admin/ai/documents.html:447
+#: app/templates/admin/ai/documents.html:602
 #: app/templates/admin/ai/review_queue.html:28
 #: app/templates/admin/assignments/public_submissions.html:53
 #: app/templates/admin/assignments/public_submissions.html:104
@@ -16864,7 +16864,7 @@ msgstr "Valeur en pourcentage (0–100)."
 
 #: app/services/ai/planning/payload_inference.py:181
 #: app/services/ai/runtime/step_ux.py:201
-#: app/templates/admin/ai/documents.html:659
+#: app/templates/admin/ai/documents.html:667
 #: app/templates/admin/assignments/assignments.html:115
 #: app/templates/admin/documents/documents.html:683
 #: app/templates/admin/validation_dashboard.html:208
@@ -16874,7 +16874,7 @@ msgstr "Valeur en pourcentage (0–100)."
 msgid "Period"
 msgstr "Période"
 
-#: app/services/notification/core.py:88
+#: app/services/notification/core.py:87
 #, python-format
 msgid ""
 "Period %(period)s: another focal point in your entity submitted this form. "
@@ -16883,7 +16883,7 @@ msgstr ""
 "Période %(period)s : un autre point focal de votre entité a soumis ce "
 "formulaire. Aucune action de ta part."
 
-#: app/services/notification/core.py:125
+#: app/services/notification/core.py:124
 #, python-format
 msgid ""
 "Period %(period)s: delegation returned this assignment for your changes "
@@ -16995,7 +16995,7 @@ msgstr ""
 "Les placeholders (par exemple %%(name)s, %%(count)s, %%s, %%d) sont protégés"
 " et ne peuvent pas être supprimés ou modifiés."
 
-#: app/templates/admin/ai/documents.html:595
+#: app/templates/admin/ai/documents.html:603
 msgid "Plan"
 msgstr "Plan"
 
@@ -17043,7 +17043,7 @@ msgstr "Veuillez entrer un nom."
 msgid "Please enter a primary name to translate from."
 msgstr "Veuillez entrer un nom principal pour la traduction."
 
-#: app/templates/admin/ai/documents.html:596
+#: app/templates/admin/ai/documents.html:604
 msgid "Please enter a query."
 msgstr "Veuillez soumettre une requête."
 
@@ -17071,7 +17071,7 @@ msgstr ""
 "Veuillez consulter et répondre aux questions ci-dessous. Vos réponses "
 "influencent votre score de qualité des données."
 
-#: app/services/notification/core.py:95
+#: app/services/notification/core.py:94
 msgid "Please review and validate this submission in the Backoffice."
 msgstr "Veuillez examiner et valider cette soumission dans le Backoffice."
 
@@ -17084,7 +17084,7 @@ msgstr ""
 msgid "Please select a Year/Period for the document."
 msgstr "Veuillez sélectionner une année/période pour le document."
 
-#: app/templates/admin/ai/documents.html:597
+#: app/templates/admin/ai/documents.html:605
 msgid "Please select a file"
 msgstr "Veuillez sélectionner un fichier"
 
@@ -17127,7 +17127,7 @@ msgstr ""
 msgid "Please select at least one country."
 msgstr "Veuillez sélectionner au moins un pays."
 
-#: app/templates/admin/ai/documents.html:598
+#: app/templates/admin/ai/documents.html:606
 msgid "Please select at least one document"
 msgstr "Veuillez sélectionner au moins un document"
 
@@ -17257,7 +17257,7 @@ msgstr ""
 msgid "Plugins will appear here once they are installed"
 msgstr "Plugins will appear here once they are installed"
 
-#: app/templates/admin/ai/documents.html:599
+#: app/templates/admin/ai/documents.html:607
 msgid "Policy"
 msgstr "Politique"
 
@@ -17326,8 +17326,8 @@ msgstr "Préparation de la demande..."
 msgid "Preparing request..."
 msgstr "Préparation de la demande..."
 
-#: app/templates/admin/ai/documents.html:50
-#: app/templates/admin/ai/documents.html:600
+#: app/templates/admin/ai/documents.html:52
+#: app/templates/admin/ai/documents.html:608
 msgid "Preparing..."
 msgstr "Préparation..."
 
@@ -17504,20 +17504,20 @@ msgstr "Privé"
 msgid "Probe"
 msgstr "Sonde"
 
-#: app/templates/admin/ai/documents.html:601
+#: app/templates/admin/ai/documents.html:609
 msgid "Process"
 msgstr "Processus"
 
-#: app/templates/admin/ai/documents.html:603
+#: app/templates/admin/ai/documents.html:611
 msgid "Process Documents?"
 msgstr "Documents de traitement ?"
 
-#: app/templates/admin/ai/documents.html:328
-#: app/templates/admin/ai/documents.html:604
+#: app/templates/admin/ai/documents.html:330
+#: app/templates/admin/ai/documents.html:612
 msgid "Process Selected"
 msgstr "Processus sélectionné"
 
-#: app/templates/admin/ai/documents.html:602
+#: app/templates/admin/ai/documents.html:610
 #, python-brace-format
 msgid ""
 "Process {count} document(s) with AI? This will extract text, create chunks, "
@@ -17526,7 +17526,7 @@ msgstr ""
 "Traiter un ou plusieurs documents {count} avec l’IA ? Cela extrait du texte,"
 " crée des chunks et génère des embeddings."
 
-#: app/templates/admin/ai/documents.html:605
+#: app/templates/admin/ai/documents.html:613
 msgid "Processed"
 msgstr "En cours"
 
@@ -17538,33 +17538,33 @@ msgstr "Créé le"
 msgid "Processed By"
 msgstr "Téléchargé par"
 
-#: app/templates/admin/ai/documents.html:444
-#: app/templates/admin/ai/documents.html:607
+#: app/templates/admin/ai/documents.html:448
+#: app/templates/admin/ai/documents.html:615
 msgid "Processing"
 msgstr "Traitement"
 
-#: app/templates/admin/ai/documents.html:608
+#: app/templates/admin/ai/documents.html:616
 msgid "Processing complete"
 msgstr "Traitement terminé"
 
-#: app/templates/admin/ai/documents.html:609
+#: app/templates/admin/ai/documents.html:617
 msgid "Processing documents"
 msgstr "Traitement des documents"
 
-#: app/templates/admin/ai/documents.html:610
+#: app/templates/admin/ai/documents.html:618
 msgid "Processing failed"
 msgstr "Échec du traitement"
 
-#: app/templates/admin/ai/documents.html:611
+#: app/templates/admin/ai/documents.html:619
 msgid "Processing finished"
 msgstr "Fin du traitement"
 
-#: app/templates/admin/ai/documents.html:612
+#: app/templates/admin/ai/documents.html:620
 msgid "Processing upload"
 msgstr "Traitement de l’envoi"
 
-#: app/templates/admin/ai/documents.html:49
-#: app/templates/admin/ai/documents.html:606
+#: app/templates/admin/ai/documents.html:51
+#: app/templates/admin/ai/documents.html:614
 msgid "Processing..."
 msgstr "Traitement..."
 
@@ -17651,8 +17651,8 @@ msgstr "Fournir des traductions du sens dans différentes langues (optionnel)"
 msgid "Provider Priority"
 msgstr "Priorité des fournisseurs"
 
-#: app/templates/admin/ai/documents.html:287
-#: app/templates/admin/ai/documents.html:613
+#: app/templates/admin/ai/documents.html:289
+#: app/templates/admin/ai/documents.html:621
 #: app/templates/admin/api_management.html:1660
 #: app/templates/components/ag_grid_i18n_js.html:39
 msgid "Public"
@@ -17702,7 +17702,7 @@ msgstr "URL publique copiée dans le presse-papiers !"
 msgid "Public reporting"
 msgstr "Reportage public"
 
-#: app/templates/admin/ai/documents.html:661
+#: app/templates/admin/ai/documents.html:669
 msgid "Public submission"
 msgstr ""
 
@@ -17805,7 +17805,7 @@ msgstr "Titre Push"
 msgid "Putting together your answer…"
 msgstr "En train de préparer ta réponse..."
 
-#: app/templates/admin/ai/documents.html:614
+#: app/templates/admin/ai/documents.html:622
 msgid "Quality"
 msgstr "Qualité"
 
@@ -17969,15 +17969,15 @@ msgstr "Tarif limité"
 msgid "Rating"
 msgstr "Classement"
 
-#: app/templates/admin/ai/documents.html:417
+#: app/templates/admin/ai/documents.html:419
 msgid "Re-run country detection (no re-chunk)"
 msgstr "Détection de pays de reprise (pas de re-chunk)"
 
-#: app/templates/admin/ai/documents.html:615
+#: app/templates/admin/ai/documents.html:623
 msgid "Re-run country detection for selected documents?"
 msgstr "Relancer la détection par pays pour certains documents ?"
 
-#: app/templates/admin/ai/documents.html:616
+#: app/templates/admin/ai/documents.html:624
 msgid ""
 "Re-run metadata enrichment (date, language, category, quality, source org) "
 "for selected documents?"
@@ -17985,7 +17985,7 @@ msgstr ""
 "Relancer l’enrichissement des métadonnées (date, langue, catégorie, qualité,"
 " organisation source) pour certains documents sélectionnés ?"
 
-#: app/templates/admin/ai/documents.html:421
+#: app/templates/admin/ai/documents.html:423
 msgid ""
 "Re-run metadata enrichment: date, language, category, quality, source org "
 "(no re-chunk)"
@@ -18236,16 +18236,16 @@ msgstr "Enregistre l’heure de l’approbation dans l’export Excel."
 msgid "Red"
 msgstr "Rouge"
 
-#: app/templates/admin/ai/documents.html:618
+#: app/templates/admin/ai/documents.html:626
 msgid "Redetect Country"
 msgstr "Redétecter le pays"
 
-#: app/templates/admin/ai/documents.html:419
-#: app/templates/admin/ai/documents.html:617
+#: app/templates/admin/ai/documents.html:421
+#: app/templates/admin/ai/documents.html:625
 msgid "Redetect country"
 msgstr "Redétecter le pays"
 
-#: app/templates/admin/ai/documents.html:619
+#: app/templates/admin/ai/documents.html:627
 msgid "Redetecting..."
 msgstr "Redétectant..."
 
@@ -18267,8 +18267,8 @@ msgstr "Données de référence"
 msgid "Reference count:"
 msgstr "Nombre de références :"
 
-#: app/templates/admin/ai/documents.html:311
-#: app/templates/admin/ai/documents.html:377
+#: app/templates/admin/ai/documents.html:313
+#: app/templates/admin/ai/documents.html:379
 #: app/templates/admin/communication/center.html:1075
 #: app/templates/admin/communication/center.html:1160
 #: app/templates/admin/data_exploration/explore_data.html:474
@@ -18299,7 +18299,7 @@ msgstr ""
 msgid "Refresh preview data"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:620
+#: app/templates/admin/ai/documents.html:628
 msgid "Refreshing document list..."
 msgstr "Liste de documents rafraîchissante..."
 
@@ -18328,7 +18328,7 @@ msgstr "URL générée"
 msgid "Region"
 msgstr "Région"
 
-#: app/templates/admin/ai/documents.html:621
+#: app/templates/admin/ai/documents.html:629
 msgid "Regional"
 msgstr "Régional"
 
@@ -18580,12 +18580,12 @@ msgstr "Supprimer cet indicateur"
 msgid "Removed"
 msgstr "Supprimer"
 
-#: app/routes/main/helpers.py:1314
+#: app/routes/main/helpers.py:1313
 #, python-format
 msgid "Removed %(count)d field in %(template)s"
 msgstr "Supprimé %(count)d champ dans %(template)s"
 
-#: app/routes/admin/utilities/translations.py:1387
+#: app/routes/admin/utilities/translations.py:1386
 #, python-format
 msgid ""
 "Removed %(entries)d obsolete translation entries from %(count)d file(s)"
@@ -18701,7 +18701,7 @@ msgstr "Remplacer le fichier"
 msgid "Replace organization logo"
 msgstr "Remplacer le logo de l’organisation"
 
-#: app/templates/admin/ai/documents.html:622
+#: app/templates/admin/ai/documents.html:630
 msgid "Report"
 msgstr "Rapport"
 
@@ -18774,53 +18774,53 @@ msgstr ""
 msgid "Reports"
 msgstr ""
 
-#: app/templates/admin/ai/documents.html:415
-#: app/templates/admin/ai/documents.html:623
+#: app/templates/admin/ai/documents.html:417
+#: app/templates/admin/ai/documents.html:631
 msgid "Reprocess"
 msgstr "Retraitement"
 
-#: app/templates/admin/ai/documents.html:626
+#: app/templates/admin/ai/documents.html:634
 msgid "Reprocess Document?"
 msgstr "Retraiter un document ?"
 
-#: app/templates/admin/ai/documents.html:627
+#: app/templates/admin/ai/documents.html:635
 msgid "Reprocess Documents?"
 msgstr "Retraiter des documents ?"
 
-#: app/templates/admin/ai/documents.html:629
+#: app/templates/admin/ai/documents.html:637
 msgid "Reprocess Metadata?"
 msgstr "Retraiter les métadonnées ?"
 
-#: app/templates/admin/ai/documents.html:624
+#: app/templates/admin/ai/documents.html:632
 msgid "Reprocess cancelled"
 msgstr "Retraitement annulé"
 
-#: app/templates/admin/ai/documents.html:625
+#: app/templates/admin/ai/documents.html:633
 msgid "Reprocess complete"
 msgstr "Retraitement terminé"
 
-#: app/templates/admin/ai/documents.html:423
-#: app/templates/admin/ai/documents.html:628
+#: app/templates/admin/ai/documents.html:425
+#: app/templates/admin/ai/documents.html:636
 msgid "Reprocess metadata"
 msgstr "Retraitement des métadonnées"
 
-#: app/templates/admin/ai/documents.html:630
+#: app/templates/admin/ai/documents.html:638
 msgid "Reprocess selected documents?"
 msgstr "Retraiter certains documents ?"
 
-#: app/templates/admin/ai/documents.html:631
+#: app/templates/admin/ai/documents.html:639
 msgid "Reprocess this document?"
 msgstr "Retraiter ce document ?"
 
-#: app/templates/admin/ai/documents.html:632
+#: app/templates/admin/ai/documents.html:640
 msgid "Reprocessing documents"
 msgstr "Retraitement des documents"
 
-#: app/templates/admin/ai/documents.html:633
+#: app/templates/admin/ai/documents.html:641
 msgid "Reprocessing metadata"
 msgstr "Retraitement des métadonnées"
 
-#: app/templates/admin/ai/documents.html:634
+#: app/templates/admin/ai/documents.html:642
 msgid "Reprocessing started"
 msgstr "Le retraitement a commencé"
 
@@ -19026,7 +19026,7 @@ msgstr "Réinitialisation aux paramètres par défaut"
 msgid "Reset to template"
 msgstr "Réinitialisation au modèle"
 
-#: app/templates/admin/ai/documents.html:635
+#: app/templates/admin/ai/documents.html:643
 #: app/templates/admin/security/event_detail.html:55
 #: app/templates/admin/user_management/access_requests.html:425
 msgid "Resolution"
@@ -19110,7 +19110,7 @@ msgstr ""
 msgid "Resume"
 msgstr "Reprendre"
 
-#: app/templates/admin/ai/documents.html:636
+#: app/templates/admin/ai/documents.html:644
 msgid "Resuming..."
 msgstr "Reprendre..."
 
@@ -19222,7 +19222,7 @@ msgstr "Résultat de la révision"
 msgid "Review recommended"
 msgstr "Avis recommandé"
 
-#: app/services/notification/core.py:109
+#: app/services/notification/core.py:108
 #, python-format
 msgid "Review requested: %(template)s — %(country)s"
 msgstr ""
@@ -19773,7 +19773,7 @@ msgstr "Balise script ou balise script de clôture dans le texte"
 msgid "Scroll"
 msgstr "Rouleau"
 
-#: app/templates/admin/ai/documents.html:374
+#: app/templates/admin/ai/documents.html:376
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:24
 #: app/templates/admin/api_keys/list.html:91
 #: app/templates/admin/communication/registry.html:22
@@ -19795,7 +19795,7 @@ msgstr "Cherchez %(label)s..."
 msgid "Search Definition"
 msgstr "Définition de la recherche"
 
-#: app/templates/admin/ai/documents.html:172
+#: app/templates/admin/ai/documents.html:174
 msgid "Search Mode"
 msgstr "Mode recherche"
 
@@ -19941,7 +19941,7 @@ msgstr "Divisions de recherche..."
 msgid "Search documentation..."
 msgstr "Recherchez la documentation..."
 
-#: app/templates/admin/ai/documents.html:309
+#: app/templates/admin/ai/documents.html:311
 msgid "Search documents..."
 msgstr "Recherchez des documents..."
 
@@ -19998,7 +19998,7 @@ msgstr "Rechercher"
 msgid "Search terms or meanings…"
 msgstr "Termes de recherche ou significations..."
 
-#: app/templates/admin/ai/documents.html:465
+#: app/templates/admin/ai/documents.html:469
 msgid "Search title/filename..."
 msgstr "Recherche dans le titre/nom du fichier..."
 
@@ -20459,7 +20459,7 @@ msgstr "Sélectionnez un utilisateur..."
 msgid "Select activity types..."
 msgstr "Tous les types d'activité"
 
-#: app/templates/admin/ai/documents.html:353
+#: app/templates/admin/ai/documents.html:355
 #: app/templates/admin/user_management/user_form.html:1117
 #: app/templates/admin/user_management/user_form.html:1124
 #: app/templates/admin/validation_dashboard.html:253
@@ -20549,7 +20549,7 @@ msgstr ""
 "Sélectionnez les entités en cochant les cases, puis cliquez sur « "
 "Enregistrer les modifications » pour les appliquer."
 
-#: app/templates/admin/ai/documents.html:277
+#: app/templates/admin/ai/documents.html:279
 msgid "Select files to upload"
 msgstr "Sélectionnez les fichiers à télécharger"
 
@@ -20708,7 +20708,7 @@ msgstr "Sélectionner..."
 msgid "Select:"
 msgstr "Sélectionner..."
 
-#: app/templates/admin/ai/documents.html:637
+#: app/templates/admin/ai/documents.html:645
 msgid "Selected"
 msgstr "Sélectionné"
 
@@ -20761,7 +20761,7 @@ msgstr ""
 msgid "Semantic Thresholds"
 msgstr "Seuils sémantiques"
 
-#: app/templates/admin/ai/documents.html:121
+#: app/templates/admin/ai/documents.html:123
 #: app/templates/components/_fb_ai_config.html:18
 #: app/templates/core/chat_immersive.html:51
 #: app/templates/core/chat_immersive.html:259
@@ -20919,7 +20919,7 @@ msgstr "Envoyé pour révision"
 msgid "Sent for review"
 msgstr "Envoyé pour révision"
 
-#: app/services/notification/core.py:115
+#: app/services/notification/core.py:114
 #, python-format
 msgid "Sent for review: %(template)s — %(country)s"
 msgstr ""
@@ -21557,7 +21557,7 @@ msgstr ""
 msgid "Single section"
 msgstr "Section unique"
 
-#: app/templates/admin/ai/documents.html:638
+#: app/templates/admin/ai/documents.html:646
 msgid "Situation Report"
 msgstr "Rapport de situation"
 
@@ -21591,11 +21591,11 @@ msgstr ""
 msgid "Some countries could not be processed. Please try again."
 msgstr "Certains pays n’ont pas pu être traités. Veuillez réessayer."
 
-#: app/templates/admin/ai/documents.html:639
+#: app/templates/admin/ai/documents.html:647
 msgid "Some documents failed"
 msgstr "Certains documents ont échoué"
 
-#: app/templates/admin/ai/documents.html:640
+#: app/templates/admin/ai/documents.html:648
 msgid "Some documents failed."
 msgstr "Certains documents ont échoué."
 
@@ -21628,8 +21628,8 @@ msgstr ""
 "données antérieure configurée (surlignées en jaune). Veuillez consulter et "
 "mettre à jour les chiffres qui ont changé avant de sauvegarder."
 
-#: app/routes/admin/utilities/translations.py:1358
-#: app/routes/admin/utilities/translations.py:1393
+#: app/routes/admin/utilities/translations.py:1359
+#: app/routes/admin/utilities/translations.py:1394
 #, python-format
 msgid "Some languages could not be updated: %(langs)s"
 msgstr "Certains langages n’ont pas pu être mis à jour : %(langs)s"
@@ -21660,7 +21660,7 @@ msgstr "Triez les résultats par n’importe quel champ :"
 msgid "Sound"
 msgstr "Son"
 
-#: app/templates/admin/ai/documents.html:663
+#: app/templates/admin/ai/documents.html:671
 #: app/templates/admin/data_exploration/explore_data.html:1552
 #: app/templates/admin/templates/data_sync_imputation.html:1937
 #: app/templates/admin/translations/manage_translations.html:656
@@ -21668,7 +21668,7 @@ msgstr "Son"
 msgid "Source"
 msgstr "Source"
 
-#: app/templates/admin/ai/documents.html:641
+#: app/templates/admin/ai/documents.html:649
 msgid "Source Org"
 msgstr "Source Org"
 
@@ -21680,7 +21680,7 @@ msgstr "Période source"
 msgid "Source Template"
 msgstr "Enregistrer le modèle"
 
-#: app/templates/admin/ai/documents.html:161
+#: app/templates/admin/ai/documents.html:163
 #: app/templates/admin/data_exploration/explore_data.html:1511
 #: app/templates/forms/entry_form/validation_summary_pdf.html:71
 msgid "Sources"
@@ -21710,7 +21710,7 @@ msgstr "Personnel"
 msgid "Staff and local units in Nigeria"
 msgstr "État-major et unités locales au Nigeria"
 
-#: app/templates/admin/ai/documents.html:643
+#: app/templates/admin/ai/documents.html:651
 msgid "Stage:"
 msgstr "Scène :"
 
@@ -21820,7 +21820,7 @@ msgstr ""
 msgid "Starting"
 msgstr "Settings"
 
-#: app/templates/admin/ai/documents.html:645
+#: app/templates/admin/ai/documents.html:653
 msgid "Starting import"
 msgstr "Importation de départ"
 
@@ -21832,7 +21832,7 @@ msgstr "Importation de départ..."
 msgid "Starting translation for"
 msgstr "Début de la traduction pour"
 
-#: app/templates/admin/ai/documents.html:644
+#: app/templates/admin/ai/documents.html:652
 #: app/templates/admin/templates/data_sync_imputation.html:1803
 msgid "Starting..."
 msgstr "Commencer..."
@@ -21853,7 +21853,7 @@ msgstr "Attachement(s) statique(s)"
 #: app/templates/admin/ai/_trace_card.html:418
 #: app/templates/admin/ai/conversation_traces.html:106
 #: app/templates/admin/ai/conversation_traces.html:221
-#: app/templates/admin/ai/documents.html:646
+#: app/templates/admin/ai/documents.html:654
 #: app/templates/admin/ai/reasoning_traces.html:353
 #: app/templates/admin/ai/review_queue.html:57
 #: app/templates/admin/analytics/_user_detail_partial.html:150
@@ -22018,7 +22018,7 @@ msgid "Store this key securely - it provides full API access"
 msgstr ""
 "Stockez cette clé de manière sécurisée - elle offre un accès complet à l’API"
 
-#: app/templates/admin/ai/documents.html:647
+#: app/templates/admin/ai/documents.html:655
 msgid "Strategic Plan"
 msgstr "Plan stratégique"
 
@@ -22239,7 +22239,7 @@ msgstr ""
 "Les connexions réussies incluent le type d’appareil lorsqu’il peut être "
 "détecté depuis le navigateur ou le client."
 
-#: app/templates/admin/ai/documents.html:648
+#: app/templates/admin/ai/documents.html:656
 #, python-brace-format
 msgid "Successfully processed: {count}"
 msgstr "Traité avec succès : {count}"
@@ -22325,7 +22325,7 @@ msgstr ""
 msgid "Supported formats: JSON, HTML, CSS, JavaScript"
 msgstr "Formats pris en charge : .xlsx, .xls"
 
-#: app/templates/admin/ai/documents.html:280
+#: app/templates/admin/ai/documents.html:282
 msgid "Supported: PDF, Word, Excel, Text, Markdown, HTML"
 msgstr "Pris en charge : PDF, Word, Excel, Text, Markdown, HTML"
 
@@ -22606,7 +22606,7 @@ msgid "Technical safeguards include:"
 msgstr "Les garanties techniques incluent :"
 
 #: app/services/ai/runtime/step_ux.py:200
-#: app/templates/admin/ai/documents.html:664
+#: app/templates/admin/ai/documents.html:672
 #: app/templates/admin/assignments/assignments.html:117
 #: app/templates/admin/assignments/gantt_chart.html:117
 #: app/templates/admin/assignments/public_submissions.html:234
@@ -22644,7 +22644,7 @@ msgid ""
 "Template '%(template)s' has been added to your assignments for %(country)s."
 msgstr "Le modèle '%(template)s' a été ajouté à vos devoirs pour %(country)s."
 
-#: app/services/notification/core.py:83
+#: app/services/notification/core.py:82
 #, python-format
 msgid "Template '%(template)s', period '%(period)s'. Due date: %(due_date)s."
 msgstr ""
@@ -22909,7 +22909,7 @@ msgstr ""
 "La version anglaise de ce modèle est vide. Ajoutez ou enregistrez d’abord du"
 " texte en anglais, puis réessayez."
 
-#: app/routes/main/helpers.py:1166
+#: app/routes/main/helpers.py:1165
 msgid "The assignment is available but data entry has not started yet."
 msgstr ""
 "Le devoir est disponible mais la saisie de données n’a pas encore commencé."
@@ -22953,13 +22953,13 @@ msgstr ""
 "Le formulaire prend plus de temps que prévu à se charger. Veuillez recharger"
 " la page."
 
-#: app/routes/main/helpers.py:1175
+#: app/routes/main/helpers.py:1174
 msgid "The form was sent for delegation review before final submission."
 msgstr ""
 "Le formulaire a été envoyé pour examen de délégation avant la soumission "
 "finale."
 
-#: app/routes/main/helpers.py:1178
+#: app/routes/main/helpers.py:1177
 msgid "The form was submitted and is awaiting validation by an administrator."
 msgstr ""
 "Le formulaire a été soumis et attend la validation d’un administrateur."
@@ -23034,7 +23034,7 @@ msgstr ""
 "signalement disponibles. Vous pouvez étendre ou réduire certaines sections, "
 "et l’État persiste à travers les visites."
 
-#: app/routes/main/helpers.py:1181
+#: app/routes/main/helpers.py:1180
 msgid "The submission was validated and approved. Data entry is complete."
 msgstr ""
 "La soumission a été validée et approuvée. La saisie des données est "
@@ -23172,7 +23172,7 @@ msgstr "Cette mission est close et aucun autre changement n’est attendu."
 msgid "This assignment is currently inactive."
 msgstr "Cette affectation est actuellement inactive."
 
-#: app/routes/main/helpers.py:1184
+#: app/routes/main/helpers.py:1183
 msgid ""
 "This assignment was cancelled and is no longer required for submission."
 msgstr ""
@@ -23551,7 +23551,7 @@ msgstr ""
 "Ce modèle contient des entrées de données enregistrées par %(count)s qui "
 "seront supprimées définitivement. Continuer ?"
 
-#: app/routes/admin/form_builder/templates.py:285
+#: app/routes/admin/form_builder/templates.py:284
 #, python-format
 msgid ""
 "This template has %(count)s saved data entry that will be permanently "
@@ -23890,7 +23890,7 @@ msgstr "Principaux pays par couverture de désagrégation"
 msgid "Top Endpoints"
 msgstr "Points de terminaison principaux"
 
-#: app/templates/admin/ai/documents.html:200
+#: app/templates/admin/ai/documents.html:202
 msgid "Top K (Initial retrieval size)"
 msgstr "Top K (taille initiale de la récupération)"
 
@@ -23899,7 +23899,7 @@ msgstr "Top K (taille initiale de la récupération)"
 msgid "Top Tools Used"
 msgstr "Outils principaux utilisés"
 
-#: app/templates/admin/ai/documents.html:62
+#: app/templates/admin/ai/documents.html:64
 #: app/templates/admin/governance/dashboard.html:1021
 #: app/templates/forms/entry_form/export_pdf.html:197
 #: app/templates/forms/entry_form/export_pdf.html:275
@@ -24120,7 +24120,7 @@ msgstr ""
 msgid "Tracker"
 msgstr "Traceur"
 
-#: app/templates/admin/ai/documents.html:650
+#: app/templates/admin/ai/documents.html:658
 msgid "Training"
 msgstr "Formation"
 
@@ -24534,8 +24534,8 @@ msgstr "Deux tiers (8/12)"
 msgid "Two-letter locale code for localization"
 msgstr "Code local à deux lettres pour la localisation"
 
-#: app/templates/admin/ai/documents.html:341
-#: app/templates/admin/ai/documents.html:651
+#: app/templates/admin/ai/documents.html:343
+#: app/templates/admin/ai/documents.html:659
 #: app/templates/admin/communication/center.html:1343
 #: app/templates/admin/embed_content/manage_embed_content.html:47
 #: app/templates/admin/indicator_bank/indicator_bank.html:820
@@ -24607,7 +24607,7 @@ msgstr "Types & Unités"
 msgid "Types & units"
 msgstr "Types & unités"
 
-#: app/templates/admin/ai/documents.html:652
+#: app/templates/admin/ai/documents.html:660
 msgid "Typing"
 msgstr "Dactylographie"
 
@@ -24996,7 +24996,7 @@ msgstr ""
 msgid "Updated"
 msgstr "Mis à jour"
 
-#: app/routes/main/helpers.py:1322
+#: app/routes/main/helpers.py:1321
 #, python-format
 msgid "Updated %(count)d field in %(template)s"
 msgstr "Mis à jour %(count)d champ dans %(template)s"
@@ -25006,7 +25006,7 @@ msgstr "Mis à jour %(count)d champ dans %(template)s"
 msgid "Updates"
 msgstr "Mises à jour"
 
-#: app/templates/admin/ai/documents.html:290
+#: app/templates/admin/ai/documents.html:292
 #: app/templates/admin/documents/documents.html:516
 #: app/templates/admin/documents/documents.html:519
 #: app/templates/admin/settings/manage_settings.html:502
@@ -25022,7 +25022,7 @@ msgstr "Télécharger"
 msgid "Upload & import"
 msgstr "Téléverser et importer"
 
-#: app/templates/admin/ai/documents.html:665
+#: app/templates/admin/ai/documents.html:673
 #: app/templates/admin/documents/documents.html:725
 msgid "Upload Date"
 msgstr "Date de téléchargement"
@@ -25041,7 +25041,7 @@ msgstr "Télécharger un document"
 msgid "Upload Modal Fields"
 msgstr "Téléverser les champs modaux"
 
-#: app/templates/admin/ai/documents.html:252
+#: app/templates/admin/ai/documents.html:254
 msgid "Upload New"
 msgstr "Télécharger Nouveau"
 
@@ -25095,11 +25095,11 @@ msgstr "Téléchargez une image pour servir de vignette (optionnel)."
 msgid "Upload below"
 msgstr "Téléchargez ci-dessous"
 
-#: app/templates/admin/ai/documents.html:654
+#: app/templates/admin/ai/documents.html:662
 msgid "Upload complete"
 msgstr "Téléchargement terminé"
 
-#: app/templates/admin/ai/documents.html:653
+#: app/templates/admin/ai/documents.html:661
 msgid "Upload complete!"
 msgstr "Téléchargement terminé !"
 
@@ -25108,7 +25108,7 @@ msgstr "Téléchargement terminé !"
 msgid "Upload failed"
 msgstr "Téléchargement échoué"
 
-#: app/templates/admin/ai/documents.html:655
+#: app/templates/admin/ai/documents.html:663
 msgid "Upload failed:"
 msgstr "Téléchargement échoué :"
 
@@ -25135,21 +25135,21 @@ msgstr ""
 "Téléchargez vos .xlsx sauvegardées. Le chargement dans le formulaire est "
 "activé après validation passée."
 
-#: app/templates/admin/ai/documents.html:432
+#: app/templates/admin/ai/documents.html:435
 msgid "Upload/Import"
 msgstr "Téléversement/Importation"
 
-#: app/templates/admin/ai/documents.html:243
+#: app/templates/admin/ai/documents.html:245
 msgid "Upload/Import Documents"
 msgstr "Téléversement/Importation de documents"
 
 #: app/services/notification/preview.py:19
-#: app/templates/admin/ai/documents.html:667
+#: app/templates/admin/ai/documents.html:675
 #: app/templates/admin/validation_dashboard.html:241
 msgid "Uploaded"
 msgstr "Téléchargé"
 
-#: app/templates/admin/ai/documents.html:666
+#: app/templates/admin/ai/documents.html:674
 #: app/templates/admin/documents/documents.html:705
 msgid "Uploaded By"
 msgstr "Téléchargé par"
@@ -25164,8 +25164,8 @@ msgstr "Uploaded Files:"
 msgid "Uploaded by %(user)s on %(date)s"
 msgstr "Téléchargé par %(user)s le %(date)s"
 
-#: app/templates/admin/ai/documents.html:298
-#: app/templates/admin/ai/documents.html:668
+#: app/templates/admin/ai/documents.html:300
+#: app/templates/admin/ai/documents.html:676
 msgid "Uploading..."
 msgstr "Téléchargement..."
 
@@ -25513,13 +25513,13 @@ msgstr "Note utilisateur"
 msgid "User rating"
 msgstr "Note des utilisateurs"
 
-#: app/services/platform/user_analytics_service.py:307
+#: app/services/platform/user_analytics_service.py:306
 #, python-format
 msgid "User-Agent contains an automation-related keyword: \"%(keyword)s\"."
 msgstr ""
 "User-Agent contient un mot-clé lié à l’automatisation : « %(keyword)s »."
 
-#: app/services/platform/user_analytics_service.py:321
+#: app/services/platform/user_analytics_service.py:320
 msgid ""
 "User-Agent does not include typical browser tokens (Mozilla, WebKit, Chrome,"
 " Safari, Firefox, Edge, etc.)."
@@ -25527,7 +25527,7 @@ msgstr ""
 "User-Agent n’inclut pas les jetons navigateurs typiques (Mozilla, WebKit, "
 "Chrome, Safari, Firefox, Edge, etc.)."
 
-#: app/services/platform/user_analytics_service.py:313
+#: app/services/platform/user_analytics_service.py:312
 msgid ""
 "User-Agent is very short (under 10 characters), which often indicates an "
 "automated client."
@@ -25575,14 +25575,14 @@ msgstr ""
 "Utilise le texte modèle anglais de ce formulaire comme source. Les variables"
 " Jinja comme org_name sont préservées."
 
-#: app/services/notification/preview.py:176
+#: app/services/notification/preview.py:175
 msgid ""
 "Uses the hardcoded instant notification email layout with sample copy. "
 "High/urgent types send immediately; others may go in daily/weekly digests "
 "instead."
 msgstr ""
 
-#: app/services/notification/preview.py:182
+#: app/services/notification/preview.py:181
 msgid ""
 "Uses the hardcoded instant notification email layout with sample copy. "
 "Normal-priority types are usually batched into digests unless the user chose"
@@ -25729,7 +25729,7 @@ msgstr "Échec de la validation : "
 msgid "Validation questions"
 msgstr "Questions de validation"
 
-#: app/services/notification/core.py:189
+#: app/services/notification/core.py:188
 #, python-format
 msgid "Validation questions for %(template)s (%(period)s)"
 msgstr "Questions de validation pour %(template)s (%(period)s)"
@@ -25827,7 +25827,7 @@ msgstr "Seuils de variation"
 msgid "Vector chunks"
 msgstr "Chunks vectoriels"
 
-#: app/templates/admin/ai/documents.html:176
+#: app/templates/admin/ai/documents.html:178
 msgid "Vector only"
 msgstr "Vecteur uniquement"
 
@@ -26050,7 +26050,7 @@ msgstr "Suggestions d'indicateurs"
 msgid "View options"
 msgstr "Options de vue"
 
-#: app/templates/admin/ai/documents.html:669
+#: app/templates/admin/ai/documents.html:677
 msgid "View or download"
 msgstr "Voir ou télécharger"
 
@@ -26267,7 +26267,7 @@ msgstr "Bienvenue à la"
 msgid "Welcome to the %(org_name)s!"
 msgstr "Bienvenue sur %(org_name)s !"
 
-#: app/services/notification/core.py:178
+#: app/services/notification/core.py:177
 #, python-format
 msgid ""
 "Welcome to the %(org_name)s! Your account has been created. Open your "
@@ -26460,7 +26460,7 @@ msgstr "Femmes au sein du personnel"
 msgid "Women in Volunteering"
 msgstr "Les femmes dans le bénévolat"
 
-#: app/templates/admin/ai/documents.html:670
+#: app/templates/admin/ai/documents.html:678
 msgid "Work Plan"
 msgstr "Plan de travail"
 
@@ -26476,7 +26476,7 @@ msgstr "Flux de travail"
 msgid "Working Offline"
 msgstr "Travailler hors ligne"
 
-#: app/templates/admin/ai/documents.html:671
+#: app/templates/admin/ai/documents.html:679
 msgid "Working..."
 msgstr "Travailler..."
 
@@ -26503,8 +26503,8 @@ msgstr "Mauvais mot de passe / compte inconnu"
 msgid "YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
 msgstr "YYYY-MM-DD ou YYYY-MM-DDTHH :MM :SS"
 
-#: app/templates/admin/ai/documents.html:362
-#: app/templates/admin/ai/documents.html:672
+#: app/templates/admin/ai/documents.html:364
+#: app/templates/admin/ai/documents.html:680
 #: app/templates/admin/assignments/manage_assignment.html:96
 #: app/templates/admin/data_exploration/explore_data.html:248
 #: app/templates/admin/settings/manage_settings.html:990
@@ -26633,7 +26633,7 @@ msgid "You are not authorized to access this assignment for %(entity)s."
 msgstr ""
 "Vous n’êtes pas autorisé à accéder à cette attribution pour %(entity)s."
 
-#: app/services/notification/core.py:148
+#: app/services/notification/core.py:147
 #, python-format
 msgid "You are now a focal point for %(country)s."
 msgstr "Vous êtes désormais un point central pour %(country)s."
@@ -26880,7 +26880,7 @@ msgstr "Les paramètres de votre compte ont été mis à jour avec succès."
 msgid "Your answer…"
 msgstr "Ta réponse..."
 
-#: app/services/notification/core.py:100
+#: app/services/notification/core.py:99
 #, python-format
 msgid "Your assignment '%(template)s' has been approved."
 msgstr "Votre devoir '%(template)s' a été approuvé."
@@ -26990,7 +26990,7 @@ msgstr "Autoriser"
 msgid "and"
 msgstr "et"
 
-#: app/templates/admin/ai/documents.html:519
+#: app/templates/admin/ai/documents.html:527
 #, python-brace-format
 msgid "and {count} more"
 msgstr "et {compte} plus"
@@ -27081,7 +27081,7 @@ msgstr "Communications"
 msgid "completed"
 msgstr "Achevé"
 
-#: app/templates/admin/ai/documents.html:530
+#: app/templates/admin/ai/documents.html:538
 #: app/templates/admin/data_exploration/explore_data.html:1900
 #: app/templates/admin/organization/index.html:2468
 #: app/templates/admin/templates/upr_excel_import.html:429
@@ -27140,11 +27140,11 @@ msgstr "Chemins distincts"
 msgid "divisions"
 msgstr "Définitions"
 
-#: app/templates/admin/ai/documents.html:547
+#: app/templates/admin/ai/documents.html:555
 msgid "document(s) updated."
 msgstr "Document(s) mis à jour."
 
-#: app/templates/admin/ai/documents.html:551
+#: app/templates/admin/ai/documents.html:559
 msgid "downloading"
 msgstr "Téléchargement"
 
@@ -27198,7 +27198,7 @@ msgstr "par exemple, 0-4,5-9,10-14,15+"
 msgid "e.g., 123 or [some_variable]"
 msgstr "par exemple, 123 ou [some_variable]"
 
-#: app/templates/admin/ai/documents.html:363
+#: app/templates/admin/ai/documents.html:365
 msgid "e.g., 2023, 2024"
 msgstr "par exemple, 2023, 2024"
 
@@ -27302,14 +27302,14 @@ msgstr "Échange(s)"
 msgid "extra \"Other\" entries (beyond the option count limit)"
 msgstr "entrées supplémentaires « Autres » (au-delà de la limite d’options)"
 
-#: app/templates/admin/ai/documents.html:558
+#: app/templates/admin/ai/documents.html:566
 #: app/templates/admin/analytics/dashboard.html:84
 #: app/templates/forms/entry_form/validation_summary_pdf.html:38
 #: app/templates/forms/entry_form/validation_summary_progress.html:307
 msgid "failed"
 msgstr "échouées"
 
-#: app/templates/admin/ai/documents.html:559
+#: app/templates/admin/ai/documents.html:567
 msgid "failed."
 msgstr "échoué."
 
@@ -27780,7 +27780,7 @@ msgstr "Décors"
 msgid "short name"
 msgstr "Nom court"
 
-#: app/templates/admin/ai/documents.html:642
+#: app/templates/admin/ai/documents.html:650
 msgid "source(s)"
 msgstr "Source(s)"
 
@@ -27867,7 +27867,7 @@ msgstr "pour tourner (3D) ou panoramiquer (2D)"
 msgid "to zoom in/out"
 msgstr "pour zoomer avant/dézoomer"
 
-#: app/templates/admin/ai/documents.html:649
+#: app/templates/admin/ai/documents.html:657
 #: app/templates/admin/analytics/activity_endpoint_catalog.html:48
 #: app/templates/admin/analytics/page_path_analytics.html:75
 #: app/templates/admin/communication/registry.html:47
@@ -27992,7 +27992,7 @@ msgstr "{compte} indicateurs"
 msgid "{count} selected"
 msgstr "{count} sélectionné"
 
-#: app/services/notification/core.py:92
+#: app/services/notification/core.py:91
 #, python-brace-format
 msgid "{submitter_name} has submitted this assignment for period {period}."
 msgstr "{submitter_name} a soumis ce devoir pour la période {période}."
@@ -28014,7 +28014,7 @@ msgstr "— Pas de PDF généré automatiquement —"
 
 #: app/forms/form_builder/template_forms.py:42
 #: app/forms/form_builder/template_forms.py:62
-#: app/templates/admin/ai/documents.html:587
+#: app/templates/admin/ai/documents.html:595
 msgid "— None —"
 msgstr "— Aucun —"
 
@@ -28104,9 +28104,9 @@ msgstr "✓"
 #~ msgid "Cleared 1 translation field."
 #~ msgstr "J’ai validé 1 champ de traduction."
 
-# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1371
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1385
 #~ msgid "Default (2010–2024)"
-#~ msgstr "Par défaut (2010–2024)"
+#~ msgstr ""
 
 # [Removed] was: app/templates/admin/documents/documents.html:80
 #~ msgid "Documents are uploaded through form submissions."
@@ -28152,9 +28152,9 @@ msgstr "✓"
 #~ msgid "Sent for review: %(template)s"
 #~ msgstr "Envoyé pour critique : %(template)s"
 
-# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:109
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:110
 #~ msgid "Years (comma-separated)"
-#~ msgstr "Années (séparées par virgules)"
+#~ msgstr ""
 
 # [Removed] was: app/templates/core/dashboard.html:1326
 #~ msgid "at: %(datetime)s"
@@ -28163,3 +28163,43 @@ msgstr "✓"
 # [Removed] was: app/templates/admin/translations/manage_translations.html:708
 #~ msgid "translation fields."
 #~ msgstr "Champs de traduction."
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:111
+#~ msgid ""
+#~ "Choose which FDRS reporting years to fetch. All years in the default range "
+#~ "are selected initially."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:157
+#~ msgid ""
+#~ "Import FDRS submission documents (metadata and file download when IFRC URLs "
+#~ "are available). Uncheck to sync indicator data only."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1384
+#~ msgid "No years selected"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:110
+#~ msgid "Reporting years"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1787
+#~ msgid "Select at least one reporting year."
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:129
+#~ msgid "Select years"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:163
+#~ msgid "Sync FDRS documents"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1535
+#~ msgid "Sync documents"
+#~ msgstr ""
+
+# [Removed] was: app/templates/admin/templates/data_sync_imputation.html:1391
+#~ msgid "years"
+#~ msgstr ""

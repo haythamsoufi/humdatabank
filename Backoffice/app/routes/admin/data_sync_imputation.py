@@ -1271,7 +1271,7 @@ def run_data_sync(template_id: int):
     """
     Trigger data sync for a template (import_fdrs_form_data.py pipeline).
     Expects JSON: dry_run (bool), batch_size (int), fdrs_years (str, comma-separated), test (bool),
-    imputed_use_cache (bool), async (bool), and optional fdrs_reported_import_states (list of IFRC State ints).
+    imputed_use_cache (bool), sync_documents (bool), async (bool), and optional fdrs_reported_import_states (list of IFRC State ints).
     If fdrs_reported_import_states is omitted, the importer uses FDRS_REPORTED_IMPORT_STATES env or default all except Not filled (0).
     """
     try:
@@ -1296,6 +1296,7 @@ def run_data_sync(template_id: int):
         test_mode = bool(data.get("test", False))
         async_mode = bool(data.get("async", False))
         imputed_use_cache = bool(data.get("imputed_use_cache", True))
+        sync_documents = bool(data.get("sync_documents", True))
         try:
             fdrs_reported_import_states = _parse_reported_import_states(data)
         except ValueError as e:
@@ -1435,11 +1436,12 @@ def run_data_sync(template_id: int):
                         worker_pid=os.getpid(),
                     )
                     app.logger.info(
-                        "Data sync %s: starting (template_id=%s, dry_run=%s, test=%s)",
+                        "Data sync %s: starting (template_id=%s, dry_run=%s, test=%s, sync_documents=%s)",
                         job_id,
                         template_id,
                         dry_run,
                         test_mode,
+                        sync_documents,
                     )
 
                     try:
@@ -1470,6 +1472,7 @@ def run_data_sync(template_id: int):
                             progress_cb=_progress_cb,
                             cancel_check=_cancel_check,
                             sync_user_id=sync_user_id,
+                            sync_documents=sync_documents,
                         )
                         update_import_job(
                             job_id,
@@ -1548,6 +1551,7 @@ def run_data_sync(template_id: int):
             batch_size=batch_size,
             template_id=template_id,
             sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
+            sync_documents=sync_documents,
         )
 
         if dry_run and preview_path and os.path.isfile(preview_path):

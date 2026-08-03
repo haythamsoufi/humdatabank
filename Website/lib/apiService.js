@@ -43,7 +43,7 @@ function getBearerAuthHeader() {
  * Single entry point for all Backoffice /api/v1/* URLs.
  * In the browser returns same-origin proxy URL (avoids CORS); on server returns direct Backoffice URL.
  * All Backoffice endpoints (periods, indicator-bank, form-items, data/tables, etc.) should use this.
- * @param {string} path - Path after /api/v1/ (e.g. 'periods', 'indicator-bank', 'data/tables', 'form-items').
+ * @param {string} path - Path after /api/v1/ (e.g. 'periods', 'indicator-bank', 'data', 'form-items').
  * @param {Object} [params] - Query params as object (e.g. { template_id: 21, per_page: 1000 }).
  * @returns {string} URL to fetch (proxy in browser, direct on server).
  */
@@ -320,7 +320,7 @@ export async function testApiConnectivity() {
   try {
     // Test 1: Basic connectivity to the API base
     console.log('Testing basic connectivity to:', API_BASE_URL);
-    // Use /data/tables endpoint for connectivity test
+    // Use /data endpoint for connectivity test
     const testUrl = buildDataTablesApiUrl({
       templateId: FDRS_TEMPLATE_ID,
       perPage: 1,
@@ -1194,12 +1194,12 @@ export async function getDataWithRelated(filters = {}) {
     }
   }
 
-  // Fallback to direct API call using /data/tables endpoint
+  // Fallback to direct API call using /api/v1/data (via same-origin proxy in browser)
   return await getDataWithRelatedFromAPI(filters);
 }
 
 /**
- * Internal function that fetches data from API using /data/tables endpoint
+ * Internal function that fetches data from GET /api/v1/data
  * Returns full response with data, form_items, and countries tables
  * @private
  */
@@ -1222,8 +1222,9 @@ async function getDataWithRelatedFromAPI(filters = {}) {
 
   // In browser, use same-origin proxy to avoid CORS (dataviz, disaggregation, etc.)
   const isClient = typeof window !== 'undefined';
+  const queryString = new URL(backofficeUrl).searchParams.toString();
   const url = isClient && typeof window !== 'undefined' && window.location
-    ? `${window.location.origin}/api/data-tables?${new URL(backofficeUrl).searchParams.toString()}`
+    ? `${window.location.origin}/api/backoffice/data?${queryString}`
     : backofficeUrl;
 
   try {

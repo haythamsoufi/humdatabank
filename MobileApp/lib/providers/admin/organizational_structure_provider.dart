@@ -61,30 +61,30 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
         }
       }
 
-      // Use HTML route
+      // Mobile org structure JSON API (/api/mobile/v1/admin/org/structure)
       final response = await _api.get(
         AppConfig.mobileOrgStructureEndpoint,
         queryParams: queryParams.isNotEmpty ? queryParams : null,
       );
 
       if (response.statusCode == 200) {
-        // Try to parse as JSON first
         try {
           final jsonData = decodeJsonObject(response.body);
           if (mobileResponseIsSuccess(jsonData)) {
             final rawData = jsonData['data'] is Map<String, dynamic>
                 ? jsonData['data'] as Map<String, dynamic>
                 : jsonData;
-            final activeTab = rawData['active_tab'] as String? ?? jsonData['active_tab'] as String? ?? levelFilter ?? 'countries';
-            _organizations = _parseOrganizationsFromJson(rawData, activeTab);
+            // Server always returns all entity lists; pick the slice from the UI filter.
+            final effectiveTab = _effectiveTabFromFilter(levelFilter);
+            _organizations = _parseOrganizationsFromJson(rawData, effectiveTab);
           } else {
-            // Fallback to HTML parsing
-            _organizations = _parseOrganizationsFromHtml(response.body, levelFilter);
+            _organizations = [];
+            throw Exception('Failed to load organizations: invalid API response');
           }
         } catch (e) {
-          // If JSON parsing fails, try HTML parsing as fallback
-          DebugLogger.logWarn('ORGS', 'JSON parse failed, trying HTML: $e');
-          _organizations = _parseOrganizationsFromHtml(response.body, levelFilter);
+          DebugLogger.logErrorWithTag('ORGS', 'JSON parse failed: $e');
+          _organizations = [];
+          rethrow;
         }
 
         DebugLogger.logInfo('ORGS',
@@ -116,6 +116,23 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
       rethrow;
     }
     }); // end runAsyncOperation
+  }
+
+  /// Maps UI entity filter to the JSON slice returned by the mobile org API.
+  String _effectiveTabFromFilter(String? levelFilter) {
+    if (levelFilter == null || levelFilter.isEmpty || levelFilter == 'countries') {
+      return 'countries';
+    }
+    if (levelFilter == 'nss') return 'nss';
+    if (levelFilter == 'ns_structure') return 'ns-structure';
+    if (levelFilter == 'secretariat' ||
+        levelFilter == 'divisions' ||
+        levelFilter == 'departments' ||
+        levelFilter == 'regions' ||
+        levelFilter == 'clusters') {
+      return 'secretariat';
+    }
+    return 'countries';
   }
 
   List<Map<String, dynamic>> _parseOrganizationsFromJson(
@@ -150,30 +167,46 @@ class OrganizationalStructureProvider with ChangeNotifier, AsyncOperationMixin {
         }
       }
     } else if (activeTab == 'ns-structure') {
-      // Parse branches
-      if (jsonData['branches'] != null) {
-        final branches = jsonData['branches'] as List<dynamic>;
-        for (final branch in branches) {
-          organizations.add({
-            'id': branch['id'],
-            'name': branch['name'] ?? '',
-            'level': 'Branch',
-            'country': branch['country_name'] ?? '',
-            'country_id': branch['country_id'],
-            'is_active': branch['is_active'] ?? true,
-          });
+      final branches = jsonData['branches'] is List<dynamic>
+          ? jsonData['branches'] as List<dynamic>
+          : const <dynamic>[];
+      final branchNames = <int, String>{};
+      final branchCountries = <int, String>{};
+      for (final branch in branches) {
+        if (branch is! Map<String, dynamic>) continue;
+        final id = branch['id'];
+        if (id is int) {
+          branchNames[id] = branch['name']?.toString() ?? '';
+          branchCountries[id] = branch['country_name']?.toString() ?? '';
         }
+      }
+
+      // Parse branches
+      for (final branch in branches) {
+        if (branch is! Map<String, dynamic>) continue;
+        organizations.add({
+          'id': branch['id'],
+          'name': branch['name'] ?? '',
+          'level': 'Branch',
+          'country': branch['country_name'] ?? '',
+          'country_id': branch['country_id'],
+          'is_active': branch['is_active'] ?? true,
+        });
       }
       // Parse subbranches
       if (jsonData['subbranches'] != null) {
         final subbranches = jsonData['subbranches'] as List<dynamic>;
         for (final subbranch in subbranches) {
+          if (subbranch is! Map<String, dynamic>) continue;
+          final branchId = subbranch['branch_id'];
           organizations.add({
             'id': subbranch['id'],
             'name': subbranch['name'] ?? '',
             'level': 'Sub-branch',
-            'country': subbranch['branch_name'] ?? '',
-            'branch_id': subbranch['branch_id'],
+            'country': subbranch['branch_name'] ??
+                (branchId is int ? branchCountries[branchId] : null) ??
+                '',
+            'branch_id': branchId,
             'is_active': subbranch['is_active'] ?? true,
           });
         }

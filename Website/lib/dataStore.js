@@ -718,7 +718,7 @@ export async function syncDataFromBackend() {
 
   try {
     // 1. Fetch comprehensive dataset with disaggregation data
-    const url = `${API_BASE_URL}/api/v1/data/tables?api_key=${API_KEY}&related=all&per_page=100000&disagg=true`;
+    const url = `${API_BASE_URL}/api/v1/data?api_key=${API_KEY}&related=all&per_page=100000&disagg=true`;
     console.log(`📥 Fetching data from: ${url}`);
 
     const response = await fetch(url);

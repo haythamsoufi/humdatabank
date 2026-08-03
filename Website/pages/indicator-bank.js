@@ -484,11 +484,8 @@ export default function IndicatorBankPage() {
         additional_notes: proposeForm.additional_notes
       };
 
-      // Submit to backend API
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:5000';
-      const API_KEY = process.env.NEXT_PUBLIC_API_KEY || '';
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/indicator-suggestions?api_key=${API_KEY}`, {
+      // Submit via same-origin proxy (avoids CORS; server adds API key)
+      const response = await fetch('/api/indicator-suggestions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

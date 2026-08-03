@@ -393,9 +393,9 @@ export default function ExploreDataPage() {
         per_page: String(perPage),
         page: String(page)
       });
-      const response = await fetch(`/api/backoffice/data/tables?${params.toString()}`);
+      const response = await fetch(`/api/backoffice/data?${params.toString()}`);
       if (!response.ok) {
-        throw new Error(`Failed to load data/tables page ${page}: ${response.status}`);
+        throw new Error(`Failed to load data page ${page}: ${response.status}`);
       }
       return await response.json();
     };

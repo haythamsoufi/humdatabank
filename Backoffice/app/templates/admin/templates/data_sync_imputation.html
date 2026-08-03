@@ -1312,6 +1312,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let dataSyncCancelUrlTemplate = TEMPLATE_API_URLS.dataSyncCancel;
     let dataSyncActiveJobId = null;
     let dataSyncPollTimer = null;
+    let dataSyncPollDelayMs = 2000;
+    const DATA_SYNC_POLL_INITIAL_MS = 2000;
+    const DATA_SYNC_POLL_MAX_MS = 5000;
+    const DATA_SYNC_POLL_BACKOFF_FACTOR = 1.5;
     let dataSyncUIMode = 'settings';
     let dataSyncStopRequested = false;
 
@@ -1333,6 +1337,15 @@ document.addEventListener('DOMContentLoaded', function() {
             dataSyncPollTimer = null;
         }
         dataSyncActiveJobId = null;
+        dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+    }
+
+    function scheduleDataSyncPoll() {
+        dataSyncPollTimer = setTimeout(pollDataSyncStatus, dataSyncPollDelayMs);
+        dataSyncPollDelayMs = Math.min(
+            Math.round(dataSyncPollDelayMs * DATA_SYNC_POLL_BACKOFF_FACTOR),
+            DATA_SYNC_POLL_MAX_MS
+        );
     }
 
     function collectDataSyncParams() {
@@ -1531,8 +1544,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     setDataSyncStopping();
                 }
 
-                // Continue polling
-                dataSyncPollTimer = setTimeout(pollDataSyncStatus, 1000);
+                // Continue polling (2s initially, backs off to 5s to limit access-log noise)
+                scheduleDataSyncPoll();
             })
             .catch(err => {
                 stopDataSyncPolling();
@@ -1676,6 +1689,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(data.error || {{ _("Sync failed")|tojson|safe }});
                 }
                 dataSyncActiveJobId = data.job_id;
+                dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
                 pollDataSyncStatus();
             })
             .catch(function(err) {

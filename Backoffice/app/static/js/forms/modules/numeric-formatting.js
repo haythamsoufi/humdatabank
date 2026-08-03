@@ -41,11 +41,24 @@ const IS_COARSE = (function() {
 })();
 
 /**
- * Parse a numeric string using explicit decimal precision.
- * Standard rules: "." is always the decimal separator; "," is thousands (removed).
- * When both appear, the rightmost separator is the decimal point.
+ * True when a lone separator likely groups thousands (e.g. "232.000", "1.234") rather than a decimal fraction.
  */
-function __unformatWithMaxDecimals(str, _maxDecimals) {
+function __singleSeparatorLooksLikeGrouping(str, sepChar) {
+    const idx = str.indexOf(sepChar);
+    if (idx === -1) return false;
+    const digitsAfter = str.length - idx - 1;
+    const digitsBefore = idx;
+    return digitsAfter === 3 && digitsBefore >= 1 && digitsBefore <= 3;
+}
+
+/**
+ * Parse a numeric string for matrix columns with a known decimal precision.
+ * Whole-number columns (maxDecimals === 0) respect the browser locale for grouping
+ * because cells are displayed with Intl.NumberFormat(undefined, …).
+ * Decimal columns keep US-style rules: "." decimal, "," thousands; when both appear,
+ * the rightmost separator is the decimal point.
+ */
+function __unformatWithMaxDecimals(str, maxDecimals) {
     const hasComma = str.includes(',');
     const hasDot = str.includes('.');
     const removeAll = (s, ch) => s.split(ch).join('');
@@ -65,6 +78,31 @@ function __unformatWithMaxDecimals(str, _maxDecimals) {
     const sep = hasComma ? ',' : '.';
     const sepCount = (str.match(new RegExp(__escapeForRegex(sep), 'g')) || []).length;
     if (sepCount > 1) return removeAll(str, sep);
+
+    if (maxDecimals === 0) {
+        if (hasComma) {
+            const looksLikeGrouping = __singleSeparatorLooksLikeGrouping(str, ',');
+            if (__decimalSep === ',' && !looksLikeGrouping) {
+                return str.replace(/,/g, '.');
+            }
+            return removeAll(str, ',');
+        }
+
+        const idx = str.indexOf('.');
+        const digitsAfter = str.length - idx - 1;
+        const fractionPart = str.slice(idx + 1);
+        const looksLikeGrouping = __singleSeparatorLooksLikeGrouping(str, '.');
+        const trailingZeroGroup = digitsAfter === 3 && /^0+$/.test(fractionPart);
+
+        if (__decimalSep === ',' && __groupSep === '.') {
+            if (looksLikeGrouping || trailingZeroGroup) {
+                return removeAll(str, '.');
+            }
+            return str;
+        }
+
+        return str;
+    }
 
     if (hasComma) {
         return removeAll(str, ',');
@@ -303,7 +341,7 @@ function setupNumericFormatting() {
     document.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', () => {
             form.querySelectorAll('input[data-numeric="true"]').forEach(el => {
-                el.value = unformat(el.value);
+                el.value = unformat(el.value, __readMaxDecimals(el));
             });
         });
     });

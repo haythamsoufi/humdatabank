@@ -31,8 +31,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          # Scan the checked-out tree only (avoids failing on historical commits that predate secret hygiene).
-          fetch-depth: 1
+          # Full history so gitleaks can diff PR commits (shallow fetch breaks multi-commit PR ranges).
+          fetch-depth: 0
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2

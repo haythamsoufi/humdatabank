@@ -566,3 +566,74 @@
     outline: 2px solid rgba(255, 255, 255, 0.6);
     outline-offset: 2px;
 }
+
+/* Mobile layout for AI Knowledge Base page */
+.ai-docs-page {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 639px) {
+    .ai-docs-filters .ai-docs-filter-control {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .ai-docs-filters .ai-docs-filter-search {
+        min-width: 0;
+    }
+
+    #documentsBulkActions .btn {
+        flex: 1 1 calc(50% - 0.25rem);
+        min-width: 0;
+        justify-content: center;
+    }
+
+    #documentsBulkActions .btn span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    #aiAnswerSection .chat-bubble {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #uploadImportModal > .modal-shell-content {
+        max-height: calc(100vh - 1rem);
+        width: calc(100vw - 1rem);
+        max-width: calc(100vw - 1rem);
+        margin-left: auto;
+        margin-right: auto;
+        padding: 1rem;
+    }
+
+    #uploadImportModal .tab-button {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    #uploadImportModal .tab-button i {
+        margin-right: 0.25rem;
+    }
+
+    #importContent .flex.gap-3,
+    #ifrcApiContent .flex.gap-3 {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #importContent .flex.gap-3 > *,
+    #ifrcApiContent .flex.gap-3 > * {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    #documentsGrid-container,
+    #documentsGrid.ag-theme-alpine {
+        min-height: 420px;
+    }
+}

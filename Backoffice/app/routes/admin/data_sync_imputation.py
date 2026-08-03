@@ -314,6 +314,15 @@ def _fdrs_imports_dir() -> str:
     return os.path.normpath(os.path.join(current_app.root_path, "..", "scripts", "imports"))
 
 
+def _fdrs_default_years_bounds() -> tuple[int, int]:
+    imports_dir = _fdrs_imports_dir()
+    if imports_dir not in sys.path:
+        sys.path.insert(0, imports_dir)
+    from fdrs_data_fetcher import DEFAULT_FDRS_YEARS_END, DEFAULT_FDRS_YEARS_START
+
+    return DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END
+
+
 def _template_has_data_sync(template_id: int) -> bool:
     imports_dir = _fdrs_imports_dir()
     sync_script_available = os.path.isfile(os.path.join(imports_dir, "import_fdrs_form_data.py"))
@@ -331,6 +340,7 @@ def render_data_sync_imputation_page(template_id: int):
     sections_with_items = _sections_with_items_for_template(template)
     has_data_sync = _template_has_data_sync(template_id)
     accessible_templates = _accessible_templates_for_user(current_user)
+    fdrs_years_start, fdrs_years_end = _fdrs_default_years_bounds()
 
     return render_template(
         "admin/templates/data_sync_imputation.html",
@@ -340,6 +350,8 @@ def render_data_sync_imputation_page(template_id: int):
         has_data_sync=has_data_sync,
         has_upr_excel=template_id in _UPR_EXCEL_TEMPLATE_IDS,
         accessible_templates=accessible_templates,
+        fdrs_years_start=fdrs_years_start,
+        fdrs_years_end=fdrs_years_end,
     )
 
 

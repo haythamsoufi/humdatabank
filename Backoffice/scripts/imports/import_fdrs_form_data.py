@@ -2838,6 +2838,15 @@ def run_import(
             except Exception as e:
                 stats["documents_errors"] = stats.get("documents_errors", 0) + 1
                 logger.error("FDRS documents sync failed: %s", e, exc_info=True)
+        elif fdrs_from_data_api and not sync_documents:
+            _progress(
+                stage="documents_skipped",
+                message="FDRS documents skipped (indicator data only).",
+                current=0,
+                total=0,
+                percent=_PROGRESS_DOCUMENTS_END,
+            )
+            logger.info("FDRS documents skipped (sync_documents=False)")
 
         if fdrs_from_data_api and sync_assignment_status and assignment_rows:
             _check_cancel()
@@ -2980,6 +2989,11 @@ def main() -> int:
         "--no-sync-assignment-status",
         action="store_true",
         help="Skip syncing FDRS section workflow KPIs to assignment_entity_status (data-api mode only).",
+    )
+    parser.add_argument(
+        "--no-sync-documents",
+        action="store_true",
+        help="Skip syncing FDRS submission documents (data-api mode only; indicator data still imports).",
     )
     parser.add_argument("--batch-size", type=int, default=1000, help="Commit every N rows (default: 1000)")
     parser.add_argument(
@@ -3165,6 +3179,7 @@ def main() -> int:
             batch_size=args.batch_size,
             template_id=template_id,
             sync_assignment_status=not getattr(args, "no_sync_assignment_status", False),
+            sync_documents=not getattr(args, "no_sync_documents", False),
         )
     except (ValueError, RuntimeError) as e:
         logger.error("Error: %s", e)

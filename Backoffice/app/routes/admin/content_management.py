@@ -229,6 +229,8 @@ def _language_display_name(language_code: str | None) -> str:
     from config import Config
 
     lang = (language_code or "").split("_")[0].split("-")[0]
+    if lang == "zz":
+        return "Unknown"
     return (
         Config.LANGUAGE_DISPLAY_NAMES.get(lang)
         or Config.ALL_LANGUAGES_DISPLAY_NAMES.get(lang)
@@ -323,7 +325,7 @@ def _serialize_document_grid_row(
         "language": doc.language or "",
         "language_display": _language_display_name(doc.language),
         "period": period_display,
-        "is_public": doc.public_submission_id is not None,
+        "is_public": bool(doc.is_public),
         "uploaded_by_user_id": doc.uploaded_by_user_id,
         "uploaded_by": uploaded_by_name or "",
         "uploaded_by_email": uploaded_by_email,
@@ -340,7 +342,11 @@ def _serialize_document_grid_row(
             if can_manage_documents
             else ""
         ),
-        "decline_url": "",
+        "decline_url": (
+            url_for("content_management.decline_document", doc_id=doc.id)
+            if can_manage_documents
+            else ""
+        ),
         "has_thumbnail": bool(doc.thumbnail_relative_path),
         "thumbnail_filename": doc.thumbnail_filename or "",
     }

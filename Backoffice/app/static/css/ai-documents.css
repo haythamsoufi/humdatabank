@@ -105,7 +105,17 @@
     min-height: min(280px, 38vh);
     max-height: min(52vh, 560px);
 }
-/* IFRC modal: column flex so the grid gets a real height (height:100% was collapsing to ~pagination bar). */
+/* Modal import/IFRC grids: flex column chain so AgGridHelper useParentContainerHeight
+   sizes to the shell and the pagination bar stays inside the visible area. */
+#uploadImportModal #importDocumentsGridShell .ag-grid-body-wrap,
+#uploadImportModal #ifrcDocumentsGridShell .ag-grid-body-wrap {
+    flex: 1 1 0%;
+    min-height: 0 !important;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#uploadImportModal #importDocumentsGridShell #importDocumentsGrid-container,
 #uploadImportModal #ifrcDocumentsGridShell #ifrcDocumentsGrid-container {
     display: flex;
     flex-direction: column;
@@ -115,6 +125,7 @@
     overflow: hidden;
 }
 /* Do NOT use height:auto !important here — it overrides AgGridHelper inline height and traps autoHeight row sizing (body stays ~0px, only pagination ~44px shows). */
+#uploadImportModal #importDocumentsGridShell #importDocumentsGrid.ag-theme-alpine,
 #uploadImportModal #ifrcDocumentsGridShell #ifrcDocumentsGrid.ag-theme-alpine {
     flex: 0 1 auto;
     width: 100%;

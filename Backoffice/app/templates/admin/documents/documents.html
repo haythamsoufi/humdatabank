@@ -31,8 +31,8 @@
 {% endblock %}
 
 {% block content %}
-{# Admin manage_documents loads rows via JSON (documents=[]); still render the grid. #}
-{% set documents_grid_enabled = documents or (documents_load_async|default(false)) %}
+{# Admin manage_documents loads rows via JSON (documents=[]); focal always shows the grid. #}
+{% set documents_grid_enabled = (documents_load_async|default(false)) or (user_entities is defined) or documents %}
 {# Precompute assigned country IDs for per-document UI gating #}
 {% set _user_countries = (current_user.countries.all() if current_user.is_authenticated and hasattr(current_user, 'countries') and hasattr(current_user.countries, 'all') else (current_user.countries if current_user.is_authenticated and hasattr(current_user, 'countries') else [])) %}
 {% set current_user_country_ids = _user_countries | map(attribute='id') | list %}
@@ -71,15 +71,19 @@
             <div id="{{ DOCUMENTS_GRID_COLVIS_PH }}" class="flex-shrink-0 self-start sm:self-center"></div>
             {% endif %}
         </div>
+        {% elif documents_grid_enabled %}
+        <div class="flex justify-end mb-4">
+            <div id="{{ DOCUMENTS_GRID_COLVIS_PH }}" class="flex-shrink-0"></div>
+        </div>
         {% endif %}
         {% if documents_grid_enabled %}
             {% if user_entities is defined and user_entities %}
             {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), grid_height='600px', include_card=false, show_placeholder=false, placeholder_id=DOCUMENTS_GRID_COLVIS_PH) }}
             {% else %}
-            {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), grid_height='600px', include_card=false) }}
+            {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), grid_height='600px', include_card=false, show_placeholder=false, placeholder_id=DOCUMENTS_GRID_COLVIS_PH) }}
             {% endif %}
         {% else %}
-            {{ empty_state(icon="fas fa-file-alt", title=_('No Documents Found'), message=_('Documents are uploaded through form submissions.')) }}
+            {{ empty_state(icon="fas fa-file-alt", title=_('No Documents Found'), message=_('No documents have been uploaded for this entity yet.')) }}
         {% endif %}
     </div>
 </div>
@@ -592,58 +596,44 @@
             can_delete: {{ can_delete_doc|default(false)|tojson|safe }},
             delete_url: "{{ (url_for('content_management.delete_document', doc_id=doc.id, next=next_url) if next_url is defined and next_url else url_for('content_management.delete_document', doc_id=doc.id)) if can_delete_doc else '' }}",
             approve_url: "{{ (url_for('content_management.approve_document', doc_id=doc.id) if can_manage_documents else '') }}",
-            decline_url: "{{ '' }}",
+            decline_url: "{{ (url_for('content_management.decline_document', doc_id=doc.id) if can_manage_documents else '') }}",
             has_thumbnail: {{ 'true' if doc.thumbnail_relative_path else 'false' }},
-            thumbnail_filename: {{ (doc.thumbnail_filename or '')|tojson|safe }},
-            _debug: {
-                doc_id: {{ doc.id }},
-                uploaded_by_user_id: {{ (doc.uploaded_by_user_id if doc.uploaded_by_user_id else none)|tojson|safe }},
-                current_user_id: {{ (current_user.id if current_user.is_authenticated else none)|tojson|safe }},
-                is_owner: {{ is_owner|tojson|safe }},
-                entity_access: {{ has_entity_access|tojson|safe }},
-                doc_review_status: {{ doc_review_status|tojson|safe }},
-                is_approved_doc: {{ is_approved_doc|tojson|safe }},
-                can_manage_documents: {{ can_manage_documents|tojson|safe }},
-                can_upload_documents: {{ can_upload_documents|tojson|safe }},
-                can_edit_computed: {{ can_edit_doc|tojson|safe }},
-                can_delete_computed: {{ can_delete_doc|tojson|safe }},
-                doc_row_status_field: {{ (status or '')|tojson|safe }},
-                doc_model_status: {{ (doc.status or '')|tojson|safe }}
-            }
+            thumbnail_filename: {{ (doc.thumbnail_filename or '')|tojson|safe }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
     ];
     {% endif %}
 
-    (function logDocumentsGridActionsDebug() {
-        if (documentsLoadAsync) {
+    function patchDocumentRow(docId, patch) {
+        if (gridHelper && gridHelper.config && Array.isArray(gridHelper.config.rowData)) {
+            var row = gridHelper.config.rowData.find(function(r) { return r.id === docId; });
+            if (row) {
+                Object.assign(row, patch);
+            }
+        }
+        if (!gridApi) {
             return;
         }
-        var summary = {
-            rowCount: documentsData.length,
-            currentUserId: {{ (current_user.id if current_user.is_authenticated else none)|tojson|safe }},
-            can_upload_documents: canUploadDocuments,
-            can_manage_documents: isAdminOrSystemManager
-        };
-        window.__documentsActionsDebug = [];
-        documentsData.forEach(function(row) {
-            if (row._debug) {
-                window.__documentsActionsDebug.push(row._debug);
+        gridApi.forEachNode(function(node) {
+            if (node.data && node.data.id === docId) {
+                Object.assign(node.data, patch);
+                gridApi.refreshCells({ rowNodes: [node], force: true });
             }
         });
-        try {
-            if (window.__clientLog) {
-                window.__clientLog('[documentsGrid] actions summary', summary);
-                window.__documentsActionsDebug.forEach(function(d) {
-                    window.__clientLog('[documentsGrid] doc ' + d.doc_id, d);
-                });
-            }
-        } catch (e) {
-            if (typeof console !== 'undefined' && console.error) {
-                console.error('[documentsGrid] logDocumentsGridActionsDebug failed', e);
-            }
+    }
+
+    function removeDocumentRow(docId) {
+        var currentRows = (gridHelper && gridHelper.config && gridHelper.config.rowData) ? gridHelper.config.rowData : documentsData;
+        var nextRows = currentRows.filter(function(r) { return r.id !== docId; });
+        if (gridHelper && typeof gridHelper.setRowData === 'function') {
+            gridHelper.setRowData(nextRows);
+        } else if (gridApi && typeof gridApi.setGridOption === 'function') {
+            gridApi.setGridOption('rowData', nextRows);
         }
-    })();
+        if (gridHelper && typeof gridHelper.setResultCountTotal === 'function') {
+            gridHelper.setResultCountTotal(nextRows.length);
+        }
+    }
 
     // Column definitions for ag-grid
     const columnDefs = [
@@ -755,10 +745,12 @@
                 } else {
                     if (isAdminOrSystemManager) {
                         const docId = params.data.id;
+                        const approveUrl = params.data.approve_url || '';
+                        const declineUrl = params.data.decline_url || '';
                         return '<div class="flex items-center justify-center space-x-1">' +
-                            '<button class="btn btn-success btn-sm approve-document" data-doc-id="' + docId + '" title="' + {{ _("Approve Document")|tojson|safe }} + '">' +
+                            '<button class="btn btn-success btn-sm approve-document" data-doc-id="' + docId + '" data-approve-url="' + String(approveUrl).replace(/"/g, '&quot;') + '" title="' + {{ _("Approve Document")|tojson|safe }} + '">' +
                             '<i class="fas fa-check mr-1"></i>' + {{ _("Approve")|tojson|safe }} + '</button>' +
-                            '<button class="btn btn-danger btn-sm decline-document" data-doc-id="' + docId + '" title="' + {{ _("Decline Document")|tojson|safe }} + '">' +
+                            '<button class="btn btn-danger btn-sm decline-document" data-doc-id="' + docId + '" data-decline-url="' + String(declineUrl).replace(/"/g, '&quot;') + '" title="' + {{ _("Decline Document")|tojson|safe }} + '">' +
                             '<i class="fas fa-times mr-1"></i>' + {{ _("Decline")|tojson|safe }} + '</button>' +
                             '</div>';
                     } else {
@@ -779,14 +771,6 @@
             filter: false,
             cellRenderer: function(params) {
                 if (!canUploadDocuments) {
-                    if (!window.__documentsGridLoggedNoUpload) {
-                        window.__documentsGridLoggedNoUpload = true;
-                        try {
-                            if (window.__clientLog) {
-                                window.__clientLog('[documentsGrid] Actions column shows "-" because canUploadDocuments is false');
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
                     return '-';
                 }
                 const doc = params.data;
@@ -810,6 +794,7 @@
                 }
                 if (doc.can_delete && doc.delete_url) {
                     html += '<a href="#" class="text-gray-600 hover:text-red-600 transition-colors duration-200 delete-document" ' +
+                        'data-doc-id="' + doc.id + '" ' +
                         'data-delete-url="' + String(doc.delete_url || '').replace(/"/g, '&quot;') + '" ' +
                         'title="' + {{ _("Delete")|tojson|safe }} + '"><i class="fas fa-trash"></i></a>';
                 }
@@ -820,7 +805,7 @@
     ];
 
     // Initialize grid using helper
-    function loadDocumentsAsync(api) {
+    function loadDocumentsAsync(api, helper) {
         if (!documentsLoadAsync || !documentsJsonUrl) {
             return Promise.resolve();
         }
@@ -831,6 +816,7 @@
         var perPage = 200;
         var page = 1;
         var allRows = [];
+        var serverTotal = null;
 
         function fetchPage() {
             var url = documentsJsonUrl + (documentsJsonUrl.indexOf('?') >= 0 ? '&' : '?')
@@ -850,10 +836,19 @@
             }).then(function (payload) {
                 var rows = (payload && payload.documents) ? payload.documents : [];
                 allRows = allRows.concat(rows);
-                var total = payload && typeof payload.total === 'number' ? payload.total : allRows.length;
+                if (payload && typeof payload.total === 'number') {
+                    serverTotal = payload.total;
+                }
+                var total = serverTotal != null ? serverTotal : allRows.length;
                 if (allRows.length < total && rows.length === perPage) {
                     page += 1;
                     return fetchPage();
+                }
+                if (helper && helper.config) {
+                    helper.config.rowData = allRows;
+                }
+                if (helper && typeof helper.setResultCountTotal === 'function') {
+                    helper.setResultCountTotal(total);
                 }
                 if (api && typeof api.setGridOption === 'function') {
                     api.setGridOption('rowData', allRows);
@@ -880,9 +875,7 @@
 
     function initializeGrid() {
         var result = AgGridHelper.create('documentsGrid', 'documents', columnDefs, documentsData, {
-            {% if user_entities is defined and user_entities %}
             columnVisibility: { buttonPlaceholderId: '{{ DOCUMENTS_GRID_COLVIS_PH }}' },
-            {% endif %}
             onReady: function(api, helper) {
                 try {
                     if (api && typeof AgGridHelper.pinActionsColumn === 'function') {
@@ -896,7 +889,7 @@
                 } catch (e) {
                     window.__clientWarn && window.__clientWarn('Could not apply column order:', e);
                 }
-                loadDocumentsAsync(api);
+                loadDocumentsAsync(api, helper);
             }
         });
         gridHelper = result.helper;
@@ -953,6 +946,7 @@
     $(document).on('click', '.delete-document', function(e) {
         e.preventDefault();
         const deleteUrl = $(this).data('delete-url');
+        const docId = parseInt($(this).data('doc-id'), 10);
 
         // Update the confirm button click handler
         $('#confirmDeleteButton').off('click').on('click', function(e) {
@@ -976,7 +970,11 @@
                     'csrf_token': window.csrfToken
                 },
                 success: function(response) {
-                    location.reload();
+                    $('#deleteConfirmationModal').addClass('hidden');
+                    if (!isNaN(docId)) {
+                        removeDocumentRow(docId);
+                    }
+                    showToast({{ _("Document deleted successfully.")|tojson|safe }}, 'success');
                 },
                 error: function(xhr, status, error) {
                     showToast({{ _("Error deleting document:")|tojson|safe }} + ' ' + (error || ''), 'error', 7000);
@@ -998,13 +996,19 @@
     $(document).on('click', '.approve-document', function(e) {
         e.preventDefault();
         const docId = $(this).data('doc-id');
+        const approveUrl = $(this).data('approve-url');
         const button = $(this);
+
+        if (!approveUrl) {
+            showToast({{ _("Unable to approve this document.")|tojson|safe }}, 'error');
+            return;
+        }
 
         // Disable button to prevent double-clicks
         button.prop('disabled', true);
 
         $.ajax({
-            url: `/admin/documents/approve/${docId}`,
+            url: approveUrl,
             type: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -1014,8 +1018,8 @@
             },
             success: function(response) {
                 if (response.success) {
-                    // Reload the page to reflect the status change
-                    location.reload();
+                    patchDocumentRow(docId, { status: 'approved', can_edit: false, can_delete: false, delete_url: '' });
+                    showToast(response.message || {{ _("Document approved.")|tojson|safe }}, 'success');
                 } else {
                     showToast({{ _("Error approving document:")|tojson|safe }} + ' ' + (response.message || {{ _("Unknown error")|tojson|safe }}), 'error', 7000);
                     button.prop('disabled', false);
@@ -1032,13 +1036,19 @@
     $(document).on('click', '.decline-document', function(e) {
         e.preventDefault();
         const docId = $(this).data('doc-id');
+        const declineUrl = $(this).data('decline-url');
         const button = $(this);
+
+        if (!declineUrl) {
+            showToast({{ _("Unable to decline this document.")|tojson|safe }}, 'error');
+            return;
+        }
 
         // Disable button to prevent double-clicks
         button.prop('disabled', true);
 
         $.ajax({
-            url: `/admin/documents/decline/${docId}`,
+            url: declineUrl,
             type: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -1048,8 +1058,8 @@
             },
             success: function(response) {
                 if (response.success) {
-                    // Reload the page to reflect the status change
-                    location.reload();
+                    patchDocumentRow(docId, { status: 'rejected', can_edit: false, can_delete: false, delete_url: '' });
+                    showToast(response.message || {{ _("Document declined.")|tojson|safe }}, 'success');
                 } else {
                     showToast({{ _("Error declining document:")|tojson|safe }} + ' ' + (response.message || {{ _("Unknown error")|tojson|safe }}), 'error', 7000);
                     button.prop('disabled', false);

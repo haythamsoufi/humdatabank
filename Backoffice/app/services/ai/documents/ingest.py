@@ -1,8 +1,11 @@
 """Background AI/RAG ingest for SubmittedDocument (library and assignment uploads)."""
 
+import hashlib
 import logging
 import os
-from typing import Any, Dict, Optional
+import sys
+import tempfile
+from typing import Any, Dict, Optional, Tuple
 
 from flask import current_app
 
@@ -44,6 +47,269 @@ def sync_ai_document_is_public_from_submitted(submitted) -> None:
     )
 
 
+def _fdrs_imports_dir() -> str:
+    return os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "scripts", "imports")
+
+
+def _download_fdrs_document_to_temp(url: str, filename_hint: str) -> Tuple[str, str, int, str, str]:
+    """Download a public FDRS document URL to a temp file for AI processing."""
+    imports_dir = os.path.abspath(_fdrs_imports_dir())
+    if imports_dir not in sys.path:
+        sys.path.insert(0, imports_dir)
+
+    from fdrs_documents_sync import fetch_fdrs_document_bytes
+
+    data, status = fetch_fdrs_document_bytes(url)
+    if status not in (200, 206) or not data:
+        raise FileNotFoundError(
+            f"Could not download FDRS document (HTTP {status}). "
+            "The file may be private, unavailable, or blocked by IFRC."
+        )
+
+    filename = (filename_hint or "document").strip() or "document"
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".md", ".html"}:
+        ext = ".pdf"
+        if not filename.lower().endswith(".pdf"):
+            filename = f"{filename}{ext}"
+
+    fd, temp_path = tempfile.mkstemp(suffix=ext)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
+        raise
+
+    file_size = len(data)
+    content_hash = hashlib.sha256(data).hexdigest()
+    file_type = ext.lstrip(".") or "pdf"
+    return temp_path, filename, file_size, content_hash, file_type
+
+
+def _download_submitted_document_from_source_url(submitted_doc) -> Tuple[str, str, int, str, str]:
+    """
+    Download bytes for a submitted document that only has ``source_url`` (FDRS / IFRC API).
+
+    Returns (temp_path, filename, file_size, content_hash, file_type).
+    """
+    from app.routes.ai_documents.helpers import _download_ifrc_document
+
+    source_url = (getattr(submitted_doc, "source_url", None) or "").strip()
+    if not source_url:
+        raise FileNotFoundError("Document has no source URL")
+
+    filename_hint = submitted_doc.filename or "document"
+    prefer_fdrs = bool(getattr(submitted_doc, "fdrs_import_key", None)) or bool(
+        getattr(submitted_doc, "file_pending", False)
+    )
+
+    if prefer_fdrs:
+        try:
+            return _download_fdrs_document_to_temp(source_url, filename_hint)
+        except Exception as fdrs_err:
+            logger.warning(
+                "FDRS download failed for submitted_document %s, trying IFRC fetch: %s",
+                getattr(submitted_doc, "id", None),
+                fdrs_err,
+            )
+
+    try:
+        return _download_ifrc_document(source_url)
+    except Exception as ifrc_err:
+        logger.warning(
+            "IFRC download failed for submitted_document %s, trying FDRS fetch: %s",
+            getattr(submitted_doc, "id", None),
+            ifrc_err,
+        )
+        return _download_fdrs_document_to_temp(source_url, filename_hint)
+
+
+def _resolve_submitted_document_for_ai_processing(submitted_doc) -> Dict[str, Any]:
+    """
+    Resolve a local temp or stored path for AI ingest.
+
+    Supports local storage and reference-only rows (``source_url`` / ``file_pending`` FDRS docs).
+    """
+    from app.services.platform import storage_service as _ai_storage
+
+    storage_path = (submitted_doc.storage_path or "").strip()
+    source_url = (getattr(submitted_doc, "source_url", None) or "").strip()
+    file_pending = bool(getattr(submitted_doc, "file_pending", False))
+
+    if storage_path and not file_pending:
+        try:
+            file_path, cleanup_temp = _ai_storage.local_path_for_submitted_document_processing(
+                storage_path
+            )
+            if file_path:
+                return {
+                    "ok": True,
+                    "file_path": file_path,
+                    "cleanup_temp": cleanup_temp,
+                    "filename": submitted_doc.filename or "document",
+                    "from_url": False,
+                }
+        except Exception as e:
+            logger.error(
+                "Error resolving local file for submitted document %s: %s",
+                getattr(submitted_doc, "id", None),
+                e,
+                exc_info=True,
+            )
+
+    if storage_path and not source_url:
+        return {
+            "ok": False,
+            "code": "file_not_found",
+            "message": "File not found on server",
+        }
+
+    if source_url:
+        try:
+            temp_path, filename, file_size, content_hash, file_type = _download_submitted_document_from_source_url(
+                submitted_doc
+            )
+            return {
+                "ok": True,
+                "file_path": temp_path,
+                "cleanup_temp": True,
+                "filename": filename,
+                "file_size": file_size,
+                "content_hash": content_hash,
+                "file_type": file_type,
+                "from_url": True,
+                "source_url": source_url,
+            }
+        except Exception as e:
+            logger.error(
+                "Failed to download submitted document %s from source_url: %s",
+                getattr(submitted_doc, "id", None),
+                e,
+                exc_info=True,
+            )
+            return {
+                "ok": False,
+                "code": "download_failed",
+                "message": str(e) or "Failed to download document from source URL",
+            }
+
+    if not storage_path:
+        return {
+            "ok": False,
+            "code": "missing_storage_path",
+            "message": "Document has no storage path or source URL",
+        }
+
+    return {"ok": False, "code": "file_not_found", "message": "File not found"}
+
+
+def resolve_ai_document_source_for_processing(ai_doc) -> Dict[str, Any]:
+    """
+    Resolve a local or temp file for AI reprocess, metadata enrichment, or country detection.
+
+    Uses ``AIDocument.source_url`` when set; otherwise resolves via linked
+    ``SubmittedDocument`` (FDRS / IFRC URL or storage) or standalone AI upload storage.
+    """
+    from app.models import SubmittedDocument
+    from app.routes.ai_documents.helpers import _ai_doc_source_ready, _download_ifrc_document
+    from app.services.platform import storage_service as _ai_storage
+
+    source_url = (getattr(ai_doc, "source_url", None) or "").strip()
+    submitted_doc = None
+    submitted_doc_id = getattr(ai_doc, "submitted_document_id", None)
+    if submitted_doc_id:
+        try:
+            submitted_doc = SubmittedDocument.query.get(int(submitted_doc_id))
+        except (TypeError, ValueError):
+            submitted_doc = None
+
+    if source_url:
+        if submitted_doc and (
+            getattr(submitted_doc, "fdrs_import_key", None)
+            or getattr(submitted_doc, "file_pending", False)
+        ):
+            return _resolve_submitted_document_for_ai_processing(submitted_doc)
+        try:
+            temp_path, filename, file_size, content_hash, file_type = _download_ifrc_document(source_url)
+            return {
+                "ok": True,
+                "file_path": temp_path,
+                "cleanup_temp": True,
+                "filename": filename,
+                "file_size": file_size,
+                "content_hash": content_hash,
+                "file_type": file_type,
+                "from_url": True,
+                "source_url": source_url,
+            }
+        except Exception as e:
+            logger.error(
+                "Failed to download AI document %s from source_url: %s",
+                getattr(ai_doc, "id", None),
+                e,
+                exc_info=True,
+            )
+            return {
+                "ok": False,
+                "code": "download_failed",
+                "message": str(e) or "Failed to download document from source URL",
+            }
+
+    if submitted_doc:
+        resolved = _resolve_submitted_document_for_ai_processing(submitted_doc)
+        if resolved.get("ok") and resolved.get("from_url") and resolved.get("source_url"):
+            resolved["backfill_source_url"] = resolved["source_url"]
+        return resolved
+
+    storage_path = (getattr(ai_doc, "storage_path", None) or "").strip()
+    if storage_path and _ai_doc_source_ready(ai_doc):
+        cleanup_temp = False
+        if submitted_doc_id:
+            file_path, cleanup_temp = _ai_storage.local_path_for_submitted_document_processing(storage_path)
+        elif os.path.isabs(storage_path):
+            file_path = storage_path
+        else:
+            file_path = _ai_storage.get_absolute_path(_ai_storage.AI_DOCUMENTS, storage_path)
+        if file_path:
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "cleanup_temp": cleanup_temp,
+                "filename": getattr(ai_doc, "filename", None) or "document",
+                "from_url": False,
+            }
+
+    return {
+        "ok": False,
+        "code": "file_not_found",
+        "message": (
+            "Source file not found. Reprocess requires a local file, source URL, "
+            "or a linked system document with downloadable content."
+        ),
+    }
+
+
+def apply_resolved_source_metadata_to_ai_doc(ai_doc, resolved: Dict[str, Any]) -> None:
+    """Persist filename/hash/size/source_url from a resolved download onto ``AIDocument``."""
+    if not ai_doc or not resolved.get("ok"):
+        return
+    if resolved.get("filename"):
+        ai_doc.filename = resolved["filename"]
+    if resolved.get("file_size") is not None:
+        ai_doc.file_size_bytes = resolved["file_size"]
+    if resolved.get("content_hash"):
+        ai_doc.content_hash = resolved["content_hash"]
+    if resolved.get("file_type"):
+        ai_doc.file_type = resolved["file_type"]
+    source_url = (resolved.get("backfill_source_url") or resolved.get("source_url") or "").strip()
+    if source_url and not (getattr(ai_doc, "source_url", None) or "").strip():
+        ai_doc.source_url = source_url
+
+
 def enqueue_submitted_document_ai_processing(
     submitted_doc_id: int,
     *,
@@ -67,40 +333,40 @@ def enqueue_submitted_document_ai_processing(
             "message": "Submitted document not found",
         }
 
-    storage_path = (submitted_doc.storage_path or "").strip()
-    if not storage_path:
-        return {"ok": False, "code": "missing_storage_path", "message": "Document has no storage path"}
+    resolved = _resolve_submitted_document_for_ai_processing(submitted_doc)
+    if not resolved.get("ok"):
+        return {
+            "ok": False,
+            "code": resolved.get("code") or "file_not_found",
+            "message": resolved.get("message") or "File not found",
+        }
 
-    file_path = None
-    cleanup_temp = False
-    try:
-        file_path, cleanup_temp = _ai_storage.local_path_for_submitted_document_processing(
-            storage_path
-        )
-    except Exception as e:
-        logger.error("Error resolving file path for document %s: %s", submitted_doc_id, e, exc_info=True)
-
-    if not file_path:
-        logger.error(
-            "File not found for submitted document: id=%s filename=%s storage_path=%s resolved_path=%s",
-            submitted_doc_id,
-            submitted_doc.filename,
-            storage_path,
-            file_path,
-        )
-        return {"ok": False, "code": "file_not_found", "message": "File not found"}
+    file_path = resolved["file_path"]
+    cleanup_temp = bool(resolved.get("cleanup_temp"))
+    filename = resolved.get("filename") or submitted_doc.filename or "document"
+    from_url = bool(resolved.get("from_url"))
+    source_url = (resolved.get("source_url") or "").strip() if from_url else ""
 
     existing_ai_doc = AIDocument.query.filter_by(submitted_document_id=submitted_doc_id).first()
     if existing_ai_doc:
         existing_ai_doc.processing_status = "pending"
         existing_ai_doc.processing_error = None
         existing_ai_doc.is_public = bool(submitted_doc.is_public)
+        if from_url:
+            existing_ai_doc.source_url = source_url or existing_ai_doc.source_url
+            existing_ai_doc.filename = filename
+            if resolved.get("file_size") is not None:
+                existing_ai_doc.file_size_bytes = resolved["file_size"]
+            if resolved.get("content_hash"):
+                existing_ai_doc.content_hash = resolved["content_hash"]
+            if resolved.get("file_type"):
+                existing_ai_doc.file_type = resolved["file_type"]
         db.session.commit()
         _run_import_process_in_thread(
             current_app._get_current_object(),
             existing_ai_doc.id,
             file_path,
-            submitted_doc.filename,
+            filename,
             cleanup_temp=cleanup_temp,
             clear_storage_path=False,
         )
@@ -112,18 +378,30 @@ def enqueue_submitted_document_ai_processing(
         }
 
     processor = AIDocumentProcessor()
-    if not processor.is_supported_file(submitted_doc.filename):
+    if not processor.is_supported_file(filename):
+        if cleanup_temp and file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
         return {
             "ok": False,
             "code": "unsupported_file_type",
             "message": f'Unsupported file type. Supported: {", ".join(processor.SUPPORTED_TYPES.keys())}',
         }
 
-    storage_path_for_ai = _ai_storage.ai_aidoc_storage_path_for_submitted(submitted_doc.storage_path or "")
-
-    content_hash = processor.calculate_content_hash(file_path)
-    file_type = processor.get_file_type(submitted_doc.filename)
-    file_size = os.path.getsize(file_path)
+    if from_url:
+        content_hash = resolved.get("content_hash") or processor.calculate_content_hash(file_path)
+        file_type = resolved.get("file_type") or processor.get_file_type(filename)
+        file_size = resolved.get("file_size") or os.path.getsize(file_path)
+        storage_path_for_ai = None
+    else:
+        storage_path_for_ai = _ai_storage.ai_aidoc_storage_path_for_submitted(
+            submitted_doc.storage_path or ""
+        )
+        content_hash = processor.calculate_content_hash(file_path)
+        file_type = processor.get_file_type(filename)
+        file_size = os.path.getsize(file_path)
 
     derived_country = None
     try:
@@ -147,11 +425,12 @@ def enqueue_submitted_document_ai_processing(
 
     ai_doc = AIDocument(
         submitted_document_id=submitted_doc_id,
-        title=submitted_doc.filename,
-        filename=submitted_doc.filename,
+        title=filename,
+        filename=filename,
         file_type=file_type,
         file_size_bytes=file_size,
         storage_path=storage_path_for_ai,
+        source_url=source_url or None,
         content_hash=content_hash,
         processing_status="pending",
         user_id=uid,
@@ -166,15 +445,16 @@ def enqueue_submitted_document_ai_processing(
         current_app._get_current_object(),
         ai_doc.id,
         file_path,
-        submitted_doc.filename,
+        filename,
         cleanup_temp=cleanup_temp,
         clear_storage_path=False,
     )
     logger.info(
-        "Started AI processing for submitted document %s -> AI doc %s (user_id=%s)",
+        "Started AI processing for submitted document %s -> AI doc %s (user_id=%s, from_url=%s)",
         submitted_doc_id,
         ai_doc.id,
         uid,
+        from_url,
     )
     return {"ok": True, "code": "processing", "message": "Processing started", "ai_document_id": ai_doc.id}
 

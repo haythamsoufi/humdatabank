@@ -16,7 +16,7 @@ from flask import Blueprint, render_template, request, current_app, send_file, a
 from flask_login import current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, desc, and_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.extensions import db, limiter
 from app.routes.admin.shared import admin_permission_required
@@ -51,6 +51,28 @@ def _clear_reprocess_job_cancel_event(job_id: str) -> None:
         _REPROCESS_JOB_CANCEL_EVENTS.pop(job_id, None)
 
 
+def _resolve_ai_doc_file_for_processing(doc):
+    """
+    Return (file_path, temp_path, filename, from_url) for an AIDocument.
+
+    *temp_path* is set when the caller must delete a downloaded temp file afterward.
+    """
+    from app.services.ai.documents.ingest import (
+        apply_resolved_source_metadata_to_ai_doc,
+        resolve_ai_document_source_for_processing,
+    )
+
+    resolved = resolve_ai_document_source_for_processing(doc)
+    if not resolved.get("ok"):
+        raise FileNotFoundError(resolved.get("message") or "Source file not found")
+    apply_resolved_source_metadata_to_ai_doc(doc, resolved)
+    db.session.commit()
+    file_path = resolved["file_path"]
+    temp_path = file_path if resolved.get("cleanup_temp") else None
+    filename = resolved.get("filename") or doc.filename or "document"
+    return file_path, temp_path, filename, bool(resolved.get("from_url"))
+
+
 def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
     """Process one bulk reprocess job item (download if needed, clear chunks, re-chunk + re-embed)."""
     with app.app_context():
@@ -61,7 +83,6 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
             AIJobItem,
         )
         from app.routes.ai_documents.upload import _process_document_sync
-        from app.routes.ai_documents.helpers import _download_ifrc_document
 
         cancel_ev = _get_reprocess_job_cancel_event(job_id)
         item = AIJobItem.query.get(int(item_id))
@@ -85,9 +106,10 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
         temp_path = None
         file_path = None
         filename = doc.filename or "document"
+        from_url = False
 
         try:
-            item.status = "downloading" if doc.source_url else "processing"
+            item.status = "processing"
             item.error = None
             db.session.commit()
 
@@ -96,20 +118,7 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
             doc.processing_error = None
             db.session.commit()
 
-            if doc.source_url:
-                temp_path, filename, file_size, content_hash, file_type = _download_ifrc_document(doc.source_url)
-                file_path = temp_path
-                doc.file_size_bytes = file_size
-                doc.content_hash = content_hash
-                doc.file_type = file_type
-                doc.filename = filename
-                db.session.commit()
-            else:
-                if not doc.storage_path or not os.path.exists(doc.storage_path):
-                    raise FileNotFoundError(
-                        "Source file not found. This document has no source URL; reprocess requires a local file or a document imported from IFRC API."
-                    )
-                file_path = doc.storage_path
+            file_path, temp_path, filename, from_url = _resolve_ai_doc_file_for_processing(doc)
 
             if cancel_ev.is_set():
                 item = AIJobItem.query.get(int(item_id))
@@ -178,9 +187,9 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
                     os.remove(temp_path)
                 except OSError:
                     pass
-            # Clear storage_path for source_url docs (keep reference-only behavior)
+            # Clear storage_path for URL-backed docs (keep reference-only behavior)
             try:
-                if doc and getattr(doc, "source_url", None):
+                if doc and from_url:
                     doc = AIDocument.query.get(int(doc.id))
                     if doc:
                         doc.storage_path = None
@@ -576,10 +585,8 @@ def delete_document(document_id):
 def reprocess_document(document_id):
     """Reprocess a document (re-chunk and re-embed). Uses source_url for IFRC API docs when no local file."""
     try:
-        import requests
         from app.models import AIDocument, AIDocumentChunk, AIEmbedding
         from app.routes.ai_documents.upload import _process_document_sync
-        from app.routes.ai_documents.helpers import _download_ifrc_document
 
         doc = AIDocument.query.get_or_404(document_id)
         doc.processing_status = 'pending'
@@ -591,25 +598,9 @@ def reprocess_document(document_id):
         admin_email = current_user.email
 
         temp_path = None
-        file_path = None
-        filename = doc.filename or 'document'
+        from_url = False
 
-        if doc.source_url:
-            # Document has source URL (e.g. IFRC API): re-fetch, temp save, process, delete temp
-            try:
-                temp_path, filename, file_size, content_hash, file_type = _download_ifrc_document(doc.source_url)
-                file_path = temp_path
-                doc.file_size_bytes = file_size
-                doc.content_hash = content_hash
-                doc.file_type = file_type
-                doc.filename = filename
-            except requests.exceptions.RequestException as e:
-                return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
-        else:
-            # Local file only: require stored path and file to exist
-            if not doc.storage_path or not os.path.exists(doc.storage_path):
-                return json_not_found('Source file not found. This document has no source URL; reprocess requires a local file or a document imported from IFRC API.')
-            file_path = doc.storage_path
+        file_path, temp_path, filename, from_url = _resolve_ai_doc_file_for_processing(doc)
 
         # Clear old chunks and embeddings before reprocessing
         AIDocumentChunk.query.filter_by(document_id=document_id).delete()
@@ -617,8 +608,6 @@ def reprocess_document(document_id):
         doc.total_chunks = 0
         doc.total_embeddings = 0
         db.session.commit()
-
-        has_source_url = bool(doc.source_url)
 
         try:
             _process_document_sync(document_id, file_path, filename)
@@ -628,7 +617,7 @@ def reprocess_document(document_id):
                     os.remove(temp_path)
                 except OSError as e:
                     logger.warning(f"Could not remove temp file {temp_path}: {e}")
-            if has_source_url:
+            if from_url:
                 fresh_doc = db.session.get(AIDocument, document_id)
                 if fresh_doc:
                     fresh_doc.storage_path = None
@@ -637,6 +626,8 @@ def reprocess_document(document_id):
         logger.info(f"Admin {admin_email} reprocessed AI document {document_id}")
         return json_ok(message='Document reprocessed successfully')
 
+    except FileNotFoundError as e:
+        return json_not_found(str(e))
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -647,28 +638,14 @@ def reprocess_document(document_id):
 def redetect_country_document(document_id):
     """Re-run country detection for a document (extract first page/content, then detect country). No re-chunk or re-embed."""
     try:
-        import requests
         from app.models import AIDocument, Country
         from app.routes.ai_documents.upload import _apply_country_detection_to_doc
-        from app.routes.ai_documents.helpers import _download_ifrc_document
         from app.services.ai.documents.processor import AIDocumentProcessor
 
         doc = AIDocument.query.get_or_404(document_id)
 
         temp_path = None
-        file_path = None
-        filename = doc.filename or 'document'
-
-        if doc.source_url:
-            try:
-                temp_path, filename, file_size, content_hash, file_type = _download_ifrc_document(doc.source_url)
-                file_path = temp_path
-            except requests.exceptions.RequestException as e:
-                return handle_json_view_exception(e, 'Failed to download document', status_code=500)
-        else:
-            if not doc.storage_path or not os.path.exists(doc.storage_path):
-                return json_not_found('Source file not found. Redetect country requires a local file or a document imported from IFRC API.')
-            file_path = doc.storage_path
+        file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
 
         try:
             processor = AIDocumentProcessor()
@@ -700,6 +677,8 @@ def redetect_country_document(document_id):
                 except OSError as e:
                     logger.warning("Could not remove temp file %s: %s", temp_path, e)
 
+    except FileNotFoundError as e:
+        return json_not_found(str(e))
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -714,28 +693,15 @@ def reprocess_document_metadata(document_id):
     text/PDF metadata, then applies enrich_document_metadata().
     """
     try:
-        import requests as _requests
         from app.models import AIDocument
-        from app.routes.ai_documents.helpers import _download_ifrc_document
         from app.services.ai.documents.processor import AIDocumentProcessor
         from app.services.ai.documents.metadata import enrich_document_metadata
 
         doc = AIDocument.query.get_or_404(document_id)
 
         temp_path = None
-        file_path = None
-        filename = doc.filename or 'document'
-
-        if doc.source_url:
-            try:
-                temp_path, filename, _size, _hash, _ftype = _download_ifrc_document(doc.source_url)
-                file_path = temp_path
-            except _requests.exceptions.RequestException as e:
-                return handle_json_view_exception(e, 'Failed to download document', status_code=500)
-        else:
-            if not doc.storage_path or not os.path.exists(doc.storage_path):
-                return json_not_found('Source file not found. Reprocess metadata requires a local file or a document imported from IFRC API.')
-            file_path = doc.storage_path
+        file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
+        effective_source_url = (getattr(doc, "source_url", None) or "").strip() or None
 
         try:
             processor = AIDocumentProcessor()
@@ -754,7 +720,7 @@ def reprocess_document_metadata(document_id):
                 pdf_metadata=extracted.get('metadata'),
                 has_tables=len(tables) > 0,
                 table_extraction_success=len(tables) > 0,
-                source_url=getattr(doc, 'source_url', None),
+                source_url=effective_source_url,
             )
             doc.document_date = enriched_meta.get('document_date')
             doc.document_language = enriched_meta.get('document_language')
@@ -777,6 +743,8 @@ def reprocess_document_metadata(document_id):
                 except OSError as e:
                     logger.warning("Could not remove temp file %s: %s", temp_path, e)
 
+    except FileNotFoundError as e:
+        return json_not_found(str(e))
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1000,7 +968,6 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
     """Run metadata enrichment for a single AIJobItem (metadata-only, no re-chunk/re-embed)."""
     with app.app_context():
         from app.models import AIDocument, AIJobItem
-        from app.routes.ai_documents.helpers import _download_ifrc_document
         from app.services.ai.documents.processor import AIDocumentProcessor
         from app.services.ai.documents.metadata import enrich_document_metadata
 
@@ -1023,22 +990,15 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
             return
 
         temp_path = None
-        file_path = None
         filename = doc.filename or "document"
 
         try:
-            item.status = "downloading" if doc.source_url else "processing"
+            item.status = "processing"
             item.error = None
             db.session.commit()
 
-            if doc.source_url:
-                import requests as _req
-                temp_path, filename, _size, _hash, _ftype = _download_ifrc_document(doc.source_url)
-                file_path = temp_path
-            else:
-                if not doc.storage_path or not os.path.exists(doc.storage_path):
-                    raise FileNotFoundError("Source file not found for metadata reprocess")
-                file_path = doc.storage_path
+            file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
+            effective_source_url = (getattr(doc, "source_url", None) or "").strip() or None
 
             if cancel_ev.is_set():
                 item = AIJobItem.query.get(int(item_id))
@@ -1068,7 +1028,7 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
                 pdf_metadata=extracted.get("metadata"),
                 has_tables=len(tables) > 0,
                 table_extraction_success=len(tables) > 0,
-                source_url=getattr(doc, "source_url", None),
+                source_url=effective_source_url,
             )
             doc = AIDocument.query.get(doc_id)
             doc.document_date = enriched_meta.get("document_date")
@@ -1656,9 +1616,16 @@ def process_submitted_document(submitted_doc_id):
                     code="submitted_document_not_found",
                 )
             if code == "missing_storage_path":
-                return json_error("Document has no storage path", 200, success=False, code="missing_storage_path")
+                return json_error(
+                    "Document has no storage path or source URL",
+                    200,
+                    success=False,
+                    code="missing_storage_path",
+                )
             if code == "file_not_found":
                 return json_error(msg, 200, success=False, code="file_not_found")
+            if code == "download_failed":
+                return json_error(msg, 200, success=False, code="download_failed")
             if code == "unsupported_file_type":
                 return json_bad_request(msg)
             return json_server_error(msg)
@@ -1704,22 +1671,113 @@ def check_submitted_document_ai_status(submitted_doc_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+def _language_display_name_for_import(language_code: str | None) -> str:
+    """Display label for a document language code (import grid)."""
+    from config import Config
+
+    lang = (language_code or "").split("_")[0].split("-")[0]
+    if lang == "zz":
+        return "Unknown"
+    return (
+        Config.LANGUAGE_DISPLAY_NAMES.get(lang)
+        or Config.ALL_LANGUAGES_DISPLAY_NAMES.get(lang)
+        or language_code
+        or ""
+    )
+
+
+def _serialize_system_document_for_ai_import(doc, ai_doc, *, file_size: int = 0) -> dict:
+    """Serialize a SubmittedDocument row for the AI import modal grid."""
+    source = "standalone"
+    assignment_name = ""
+    template_name = ""
+    assignment_period = ""
+
+    if doc.assignment_entity_status_id:
+        source = "assignment"
+        aes = doc.assignment_entity_status
+        assigned_form = aes.assigned_form if aes else None
+        if assigned_form:
+            assignment_name = assigned_form.display_name or ""
+            template_name = (assigned_form.template.name if assigned_form.template else "") or ""
+            assignment_period = assigned_form.period_name or ""
+    elif doc.public_submission_id:
+        source = "public"
+        public_submission = doc.public_submission
+        assigned_form = public_submission.assigned_form if public_submission else None
+        if assigned_form:
+            assignment_name = assigned_form.display_name or ""
+            template_name = (assigned_form.template.name if assigned_form.template else "") or ""
+            assignment_period = assigned_form.period_name or ""
+
+    country = doc.document_country
+    if country and getattr(country, "name", None):
+        country_name = country.name
+    elif doc.standalone_linked_display:
+        country_name = doc.standalone_linked_display
+    else:
+        country_name = ""
+
+    period_display = (doc.period or "").strip() or assignment_period or ""
+
+    uploaded_by = ""
+    if doc.uploaded_by_user:
+        uploaded_by = doc.uploaded_by_user.name or doc.uploaded_by_user.email or ""
+
+    status_raw = doc.status.value if hasattr(doc.status, "value") else doc.status
+
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "document_type": doc.document_label or doc.document_type or "",
+        "country_name": country_name,
+        "source": source,
+        "assignment_name": assignment_name,
+        "template_name": template_name,
+        "period": period_display,
+        "language": doc.language or "",
+        "language_display": _language_display_name_for_import(doc.language),
+        "uploaded_by": uploaded_by,
+        "status": str(status_raw or ""),
+        "is_public": bool(doc.is_public),
+        "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        "file_size": file_size,
+        "file_pending": bool(getattr(doc, "file_pending", False)),
+        "source_url": (getattr(doc, "source_url", None) or "").strip() or None,
+        "ai_processed": ai_doc is not None,
+        "ai_document_id": ai_doc.id if ai_doc else None,
+        "ai_status": ai_doc.processing_status if ai_doc else None,
+    }
+
+
 @bp.route("/documents/list-system-documents", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def list_system_documents():
     """List submitted documents from the system for import into AI."""
     try:
-        from app.models import SubmittedDocument, AIDocument
+        from app.models import SubmittedDocument, AIDocument, AssignmentEntityStatus, AssignedForm, PublicSubmission
         from sqlalchemy import or_
 
         # Get query parameters
         search_query = request.args.get('q', '').strip()
-        limit = min(int(request.args.get('limit', 100)), 500)
+        limit = min(int(request.args.get('limit', 5000)), 5000)
 
         # Build query
-        query = db.session.query(SubmittedDocument).outerjoin(
-            AIDocument,
-            AIDocument.submitted_document_id == SubmittedDocument.id
+        query = (
+            db.session.query(SubmittedDocument, AIDocument)
+            .outerjoin(AIDocument, AIDocument.submitted_document_id == SubmittedDocument.id)
+            .options(
+                selectinload(SubmittedDocument.assignment_entity_status)
+                .selectinload(AssignmentEntityStatus.assigned_form)
+                .selectinload(AssignedForm.template),
+                selectinload(SubmittedDocument.public_submission).options(
+                    selectinload(PublicSubmission.assigned_form).selectinload(AssignedForm.template),
+                    selectinload(PublicSubmission.country),
+                ),
+                selectinload(SubmittedDocument.form_item),
+                selectinload(SubmittedDocument.country),
+                selectinload(SubmittedDocument.uploaded_by_user),
+            )
         )
 
         # Apply search filter
@@ -1732,6 +1790,8 @@ def list_system_documents():
                 )
             )
 
+        total_matching = query.with_entities(SubmittedDocument.id).distinct().count()
+
         # Order by most recent, not processed first
         query = query.order_by(
             AIDocument.id.is_(None).desc(),  # Unprocessed first
@@ -1743,11 +1803,7 @@ def list_system_documents():
 
         # Format response
         result = []
-        for doc in documents:
-            # Get AI document if exists
-            ai_doc = AIDocument.query.filter_by(submitted_document_id=doc.id).first()
-
-            # Get file size if possible (use correct storage root)
+        for doc, ai_doc in documents:
             file_size = 0
             if doc.storage_path:
                 try:
@@ -1774,21 +1830,9 @@ def list_system_documents():
                 except Exception as e:
                     current_app.logger.debug("file_size get failed: %s", e)
 
-            result.append({
-                'id': doc.id,
-                'filename': doc.filename,
-                'document_type': doc.document_type,
-                'language': doc.language,
-                'period': doc.period,
-                'is_public': doc.is_public,
-                'uploaded_at': doc.uploaded_at.isoformat() if doc.uploaded_at else None,
-                'file_size': file_size,
-                'ai_processed': ai_doc is not None,
-                'ai_document_id': ai_doc.id if ai_doc else None,
-                'ai_status': ai_doc.processing_status if ai_doc else None
-            })
+            result.append(_serialize_system_document_for_ai_import(doc, ai_doc, file_size=file_size))
 
-        return json_ok(documents=result, total=len(result))
+        return json_ok(documents=result, total=total_matching, returned=len(result))
 
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

@@ -474,7 +474,7 @@ function renderTrackedProcessingBar() {
             const focusId = focus.id;
             const focusStage = focus.data.stage || cfg.t.preparing_0862f67f;
             const focusPct = clampPercent(typeof focus.data.progress === 'number' ? focus.data.progress : 0);
-            detail = `#${focusId} • cfg.t.stage_5f483ab8 ${focusStage} • ${focusPct}%`;
+            detail = `#${focusId} • ${cfg.t.stage_5f483ab8} ${focusStage} • ${focusPct}%`;
         } else {
             detail = cfg.t.working_9c8a77ee;
         }
@@ -1806,7 +1806,7 @@ function initializeUploadForm() {
                 reloadDocumentsGrid();
                 setTimeout(function() { hideProcessingBanner(); uploadForm.dataset.uploading = '0'; uploadBtn.disabled = false; }, 2000);
                 } else {
-                    uploadStatus.textContent = 'cfg.t.error_3d9f514d ' + ((t && t.error) || result.error || 'Unknown error');
+                    uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + ((t && t.error) || result.error || 'Unknown error');
                     hideProcessingBanner();
                     uploadForm.dataset.uploading = '0';
                     uploadBtn.disabled = false;
@@ -1823,14 +1823,14 @@ function initializeUploadForm() {
                 }, 1500);
             } else {
                 progressBar.style.width = '100%';
-                uploadStatus.textContent = 'cfg.t.error_3d9f514d ' + (result.error || 'Unknown error');
+                uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + (result.error || 'Unknown error');
                 uploadForm.dataset.uploading = '0';
                 uploadBtn.disabled = false;
             }
         } catch (error) {
             console.error('Upload error:', error);
             uploadProgress.classList.remove('hidden');
-            uploadStatus.textContent = 'cfg.t.upload_failed_0e76390e ' + error.message;
+            uploadStatus.textContent = cfg.t.upload_failed_0e76390e + ' ' + error.message;
             uploadForm.dataset.uploading = '0';
             uploadBtn.disabled = false;
         }
@@ -1944,6 +1944,12 @@ function initializeTabs() {
         if (!importTab.dataset.loaded) {
             loadSystemDocuments();
             importTab.dataset.loaded = 'true';
+        } else if (importDocumentsGridHelper && typeof importDocumentsGridHelper.setDynamicHeight === 'function') {
+            window.requestAnimationFrame(function() {
+                try {
+                    importDocumentsGridHelper.setDynamicHeight();
+                } catch (e) { /* ignore */ }
+            });
         }
     });
 
@@ -2144,14 +2150,35 @@ function mapSystemDocumentToRow(doc) {
         id: doc.id,
         filename: doc.filename || '',
         document_type: doc.document_type || '',
-        language: doc.language || '',
+        country_name: doc.country_name || '',
+        source: doc.source || '',
+        assignment_name: doc.assignment_name || '',
+        template_name: doc.template_name || '',
         period: doc.period || '',
+        language: doc.language || '',
+        language_display: doc.language_display || doc.language || '',
+        uploaded_by: doc.uploaded_by || '',
+        status: doc.status || '',
         file_size: typeof doc.file_size === 'number' ? doc.file_size : 0,
         uploaded_at: doc.uploaded_at || null,
         ai_processed: !!doc.ai_processed,
         ai_document_id: doc.ai_document_id != null ? doc.ai_document_id : null,
         ai_status: doc.ai_status || null
     };
+}
+
+function importGridTextCell(value) {
+    const v = (value == null ? '' : String(value)).trim();
+    if (!v) return '<span class="text-xs text-gray-400">\u2014</span>';
+    return '<span class="text-sm text-gray-700">' + escapeHtml(v) + '</span>';
+}
+
+function importGridSourceLabel(source) {
+    const key = String(source || '').trim().toLowerCase();
+    if (key === 'assignment') return cfg.t.source_assignment_5c1a8f3d;
+    if (key === 'public') return cfg.t.source_public_7b2e4c9a;
+    if (key === 'standalone') return cfg.t.source_standalone_3f8d1e6b;
+    return '';
 }
 
 function getImportSystemDocumentsGridOptions() {
@@ -2195,12 +2222,12 @@ const importSystemDocumentsColumnDefs = [
             const data = params.data || {};
             const icon = getFileTypeIcon(data.filename);
             const name = escapeHtml(data.filename || '');
-            const meta = escapeHtml(data.document_type || cfg.t.document_09453598) + ' \u2022 ' + formatFileSize(data.file_size || 0);
+            const meta = formatFileSize(data.file_size || 0);
             const wrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%';
             const aid = data.ai_document_id != null ? parseInt(data.ai_document_id, 10) : 0;
             const nameLine = (data.ai_processed && aid) ?
                 '<a href="/admin/ai/documents/' + aid + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
-                'target="_blank" rel="noopener noreferrer" title="cfg.t.view_or_download_9e34181d">' + name + '</a>' :
+                'target="_blank" rel="noopener noreferrer" title="' + escapeAttr(cfg.t.view_or_download_9e34181d) + '">' + name + '</a>' :
                 '<div class="text-sm font-medium text-gray-900" style="' + wrap + '" title="' + escapeAttr(data.filename || '') + '">' + name + '</div>';
             return '<div class="flex items-start gap-2 min-w-0" style="width:100%">' +
                 '<div class="flex-shrink-0 text-gray-500" style="padding-top:2px">' + icon + '</div>' +
@@ -2218,21 +2245,166 @@ const importSystemDocumentsColumnDefs = [
         }
     },
     {
-        field: 'language',
+        field: 'country_name',
+        headerName: cfg.t.entity_2a6f8c3e,
+        width: 160,
+        minWidth: 120,
+        maxWidth: 240,
+        filter: 'customSetFilter',
+        wrapText: true,
+        autoHeight: true,
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        },
+        cellStyle: {
+            'white-space': 'normal',
+            'line-height': '1.4',
+            'display': 'flex',
+            'align-items': 'flex-start',
+            'padding-top': '6px',
+            'padding-bottom': '6px'
+        }
+    },
+    {
+        field: 'assignment_name',
+        headerName: cfg.t.assignment_8b3f1a2c,
+        width: 200,
+        minWidth: 160,
+        maxWidth: 320,
+        filter: 'agTextColumnFilter',
+        wrapText: true,
+        autoHeight: true,
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        },
+        cellStyle: {
+            'white-space': 'normal',
+            'line-height': '1.4',
+            'display': 'flex',
+            'align-items': 'flex-start',
+            'padding-top': '6px',
+            'padding-bottom': '6px'
+        }
+    },
+    {
+        field: 'template_name',
+        headerName: cfg.t.template_1d7b5e8c,
+        width: 180,
+        minWidth: 140,
+        maxWidth: 280,
+        filter: 'customSetFilter',
+        wrapText: true,
+        autoHeight: true,
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        },
+        cellStyle: {
+            'white-space': 'normal',
+            'line-height': '1.4',
+            'display': 'flex',
+            'align-items': 'flex-start',
+            'padding-top': '6px',
+            'padding-bottom': '6px'
+        }
+    },
+    {
+        field: 'document_type',
+        headerName: cfg.t.document_type_4e7c9d1b,
+        width: 160,
+        minWidth: 120,
+        maxWidth: 240,
+        filter: 'customSetFilter',
+        wrapText: true,
+        autoHeight: true,
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        },
+        cellStyle: {
+            'white-space': 'normal',
+            'line-height': '1.4',
+            'display': 'flex',
+            'align-items': 'flex-start',
+            'padding-top': '6px',
+            'padding-bottom': '6px'
+        }
+    },
+    {
+        field: 'period',
+        headerName: cfg.t.period_9d4e2b7a,
+        width: 120,
+        minWidth: 90,
+        maxWidth: 160,
+        filter: 'agTextColumnFilter',
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        }
+    },
+    {
+        field: 'source',
+        headerName: cfg.t.source_type_6a4c9e2f,
+        width: 170,
+        minWidth: 140,
+        maxWidth: 220,
+        filter: 'customSetFilter',
+        filterValueGetter: function(params) {
+            return importGridSourceLabel(params.data && params.data.source);
+        },
+        cellRenderer: function(params) {
+            return importGridTextCell(importGridSourceLabel(params.data && params.data.source));
+        }
+    },
+    {
+        field: 'language_display',
         headerName: cfg.t.language_4994a8ff,
         width: 100,
         minWidth: 80,
         maxWidth: 140,
         filter: 'customSetFilter',
+        valueGetter: function(params) {
+            const d = params.data || {};
+            return (d.language_display || d.language || '').trim();
+        },
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        }
+    },
+    {
+        field: 'uploaded_by',
+        headerName: cfg.t.uploaded_by_8e3c7a2d,
+        width: 160,
+        minWidth: 120,
+        maxWidth: 220,
+        filter: 'agTextColumnFilter',
+        wrapText: true,
+        autoHeight: true,
+        cellRenderer: function(params) {
+            return importGridTextCell(params.value);
+        },
+        cellStyle: {
+            'white-space': 'normal',
+            'line-height': '1.4',
+            'display': 'flex',
+            'align-items': 'flex-start',
+            'padding-top': '6px',
+            'padding-bottom': '6px'
+        }
+    },
+    {
+        field: 'status',
+        headerName: cfg.t.status_ec53a8c4,
+        width: 120,
+        minWidth: 100,
+        maxWidth: 160,
+        filter: 'customSetFilter',
         cellRenderer: function(params) {
             const v = (params.value || '').trim();
             if (!v) return '<span class="text-xs text-gray-400">\u2014</span>';
-            return '<span class="text-sm text-gray-700">' + escapeHtml(v) + '</span>';
+            return '<span class="text-sm text-gray-700 capitalize">' + escapeHtml(v) + '</span>';
         }
     },
     {
         field: 'uploaded_at',
-        headerName: cfg.t.uploaded_fe8d588f,
+        headerName: cfg.t.upload_date_4f2a9c1e,
         width: 160,
         minWidth: 140,
         maxWidth: 200,
@@ -2257,9 +2429,9 @@ const importSystemDocumentsColumnDefs = [
             const processed = !!data.ai_processed;
             const badge = processed ?
                 '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">' +
-                '<i class="fas fa-check-circle mr-1"></i>cfg.t.processed_e6f641ae</span>' :
+                '<i class="fas fa-check-circle mr-1"></i>' + escapeHtml(cfg.t.processed_e6f641ae) + '</span>' :
                 '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">' +
-                '<i class="fas fa-clock mr-1"></i>cfg.t.not_processed_0fe381df</span>';
+                '<i class="fas fa-clock mr-1"></i>' + escapeHtml(cfg.t.not_processed_0fe381df) + '</span>';
             return '<div class="flex items-center flex-wrap gap-1">' + badge + '</div>';
         },
         cellStyle: { 'white-space': 'nowrap' }
@@ -2321,15 +2493,17 @@ function ensureImportDocumentsGrid(rowData) {
                 rowData: rowData || [],
                 options: getImportSystemDocumentsGridOptions(),
                 columnVisibilityOptions: {
-                    showPanelButton: false,
+                    showPanelButton: true,
+                    buttonPlaceholderId: 'importDocumentsGrid-colvis-placeholder',
                     enableExport: false,
                     enableReset: true
                 },
                 heightOptions: {
-                    minHeight: 420,
-                    maxHeight: 640,
-                    absoluteMinHeight: 400,
-                    viewportOffset: 100
+                    useParentContainerHeight: true,
+                    minHeight: 280,
+                    maxHeight: 520,
+                    absoluteMinHeight: 240,
+                    viewportOffset: 140
                 }
             });
             importDocumentsGridApi = importDocumentsGridHelper.initialize();
@@ -2364,6 +2538,23 @@ function ensureImportDocumentsGrid(rowData) {
     if (containerEl) containerEl.style.display = 'block';
     if (emptyEl) emptyEl.style.display = 'none';
     updateImportActionsVisibility((rowData || []).length);
+    if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(function() {
+            window.requestAnimationFrame(function() {
+                if (importDocumentsGridHelper && typeof importDocumentsGridHelper.setDynamicHeight === 'function') {
+                    try {
+                        importDocumentsGridHelper.setDynamicHeight();
+                    } catch (e) { /* ignore */ }
+                }
+                var api = importDocumentsGridApi;
+                if (api && typeof api.doLayout === 'function') {
+                    try {
+                        api.doLayout();
+                    } catch (e) { /* ignore */ }
+                }
+            });
+        });
+    }
 }
 
 function updateImportActionsVisibility(rowCount) {
@@ -2397,7 +2588,7 @@ async function loadSystemDocuments() {
 
     try {
         const searchQuery = searchInput ? searchInput.value : '';
-        const response = await ((window.getFetch && window.getFetch()) || fetch)('/admin/ai/documents/list-system-documents?q=' + encodeURIComponent(searchQuery), {
+        const response = await ((window.getFetch && window.getFetch()) || fetch)('/admin/ai/documents/list-system-documents?q=' + encodeURIComponent(searchQuery) + '&limit=5000', {
             credentials: 'same-origin',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -2659,7 +2850,7 @@ async function loadIfrcCountries(appealsTypeIds) {
             return nameA.localeCompare(nameB);
         });
 
-        countrySelect.innerHTML = '<option value="">cfg.t.all_countries_74202da6</option>';
+        countrySelect.innerHTML = '<option value="">' + escapeHtml(cfg.t.all_countries_74202da6) + '</option>';
         countries.forEach(country => {
             const countryName = country.name || country.localized_name;
             if (countryName) {
@@ -2680,7 +2871,7 @@ async function loadIfrcCountries(appealsTypeIds) {
     } catch (error) {
         console.error('Error loading countries:', error);
         if (countrySelect) {
-            countrySelect.innerHTML = '<option value="">cfg.t.error_loading_countries_b47e1f6f</option>';
+            countrySelect.innerHTML = '<option value="">' + escapeHtml(cfg.t.error_loading_countries_b47e1f6f) + '</option>';
         }
     }
 }
@@ -2754,7 +2945,7 @@ const ifrcDocumentsColumnDefs = [
             const canLink = !!(safeHref && safeHref !== '#');
             const titleLine = canLink ?
                 '<a href="' + escapeAttr(safeHref) + '" class="ifrc-doc-title-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
-                'target="_blank" rel="noopener noreferrer" title="cfg.t.open_document_18c0765a">' + title + '</a>' :
+                'target="_blank" rel="noopener noreferrer" title="' + escapeAttr(cfg.t.open_document_18c0765a) + '">' + title + '</a>' :
                 '<div class="text-sm font-medium text-gray-900" style="' + wrap + '" title="' + escapeAttr(d.title || '') + '">' + title + '</div>';
             return '<div class="flex items-start gap-2 min-w-0" style="width:100%">' +
                 '<div class="flex-shrink-0 text-red-500" style="padding-top:2px"><i class="fas fa-file-pdf text-xl"></i></div>' +
@@ -3301,8 +3492,8 @@ function startBulkMetaReprocessJobPolling(jobId) {
                     ? cfg.t.metadata_reprocess_cancelled_3e89b850
                     : cfg.t.metadata_reprocess_complete_87ff8292;
                 const detailText = (Number(counts.failed) || 0) > 0
-                    ? done + '/cfg.t.total_fbb44b44 (' + (Number(counts.failed) || 0) + ' cfg.t.failed_26934eb3)'
-                    : done + '/cfg.t.total_fbb44b44';
+                    ? done + '/' + cfg.t.total_fbb44b44 + ' (' + (Number(counts.failed) || 0) + ' ' + cfg.t.failed_26934eb3 + ')'
+                    : done + '/' + cfg.t.total_fbb44b44;
                 showProcessingBanner(titleText, detailText.replace(cfg.t.total_fbb44b44, String(total)), 100);
                 setTimeout(function() { hideProcessingBanner(); }, 2500);
                 // Reload grid so updated metadata columns are visible
@@ -3364,13 +3555,13 @@ async function importIfrcDocuments() {
 
     importBtn.disabled = true;
     const originalText = importBtn.innerHTML;
-    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>cfg.t.importing_fa072aec';
+    importBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + escapeHtml(cfg.t.importing_fa072aec);
 
     const total = items.length;
     window.aiDocsImportProgress = { total: total, done: 0 };
     showProcessingBanner(
         cfg.t.importing_documents_8a49fe5a,
-        total > 1 ? `0/${total} cfg.t.starting_8c6ce9f8` : 'cfg.t.starting_import_b06c80dc...',
+        total > 1 ? `0/${total} ${cfg.t.starting_8c6ce9f8}` : cfg.t.starting_import_b06c80dc + '...',
         0
     );
     if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
@@ -3412,9 +3603,9 @@ async function importIfrcDocuments() {
     } catch (e) {
         hideProcessingBanner();
         if (window.showAlert) {
-            window.showAlert('cfg.t.failed_to_start_import_d9e1bb79: ' + (e && e.message ? e.message : String(e)), 'error');
+            window.showAlert(cfg.t.failed_to_start_import_d9e1bb79 + ': ' + (e && e.message ? e.message : String(e)), 'error');
         } else {
-            if (window.showAlert) window.showAlert('cfg.t.failed_to_start_import_d9e1bb79: ' + (e && e.message ? e.message : String(e)), 'error');
+            if (window.showAlert) window.showAlert(cfg.t.failed_to_start_import_d9e1bb79 + ': ' + (e && e.message ? e.message : String(e)), 'error');
             else console.error('Failed to start import:', e);
         }
     } finally {
@@ -3457,7 +3648,7 @@ async function processSelectedDocuments() {
         const processBtn = document.getElementById('processSelectedBtn');
         if (processBtn) {
             processBtn.disabled = true;
-            processBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>cfg.t.processing_21d104a5';
+            processBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + escapeHtml(cfg.t.processing_21d104a5);
         }
 
         if (typeof closeUploadModal === 'function') {
@@ -3563,15 +3754,15 @@ async function processSelectedDocuments() {
             if (fatalError) {
                 const errorMsg = fatalError.message || 'Unknown error occurred';
                 if (window.showAlert) {
-                    window.showAlert('cfg.t.error_processing_documents_7f24aef8 ' + errorMsg, 'error');
+                    window.showAlert(cfg.t.error_processing_documents_7f24aef8 + ' ' + errorMsg, 'error');
                 } else {
-                    if (window.showAlert) window.showAlert('cfg.t.error_processing_documents_7f24aef8 ' + errorMsg, 'error');
+                    if (window.showAlert) window.showAlert(cfg.t.error_processing_documents_7f24aef8 + ' ' + errorMsg, 'error');
                     else console.error('Error:', errorMsg);
                 }
                 // Don't reload on fatal error - let user see the error
                 if (processBtn) {
                     processBtn.disabled = false;
-                    processBtn.innerHTML = '<i class="fas fa-robot mr-2"></i>cfg.t.process_selected_0401d5a2';
+                    processBtn.innerHTML = '<i class="fas fa-robot mr-2"></i>' + escapeHtml(cfg.t.process_selected_0401d5a2);
                 }
             } else {
                 // Show results
@@ -3584,9 +3775,9 @@ async function processSelectedDocuments() {
                 if (failCount > 0) {
                     message += cfg.t.failed_count_bc24793b.replace('{count}', failCount);
                     if (errors.length > 0) {
-                        message += '\n\ncfg.t.errors_c48c42c9\n' + errors.slice(0, 5).join('\n');
+                        message += '\n\n' + cfg.t.errors_c48c42c9 + '\n' + errors.slice(0, 5).join('\n');
                         if (errors.length > 5) {
-                            message += '\n...cfg.t.and_count_more_6a5f73fb'.replace('{count}', errors.length - 5);
+                            message += '\n...' + cfg.t.and_count_more_6a5f73fb.replace('{count}', errors.length - 5);
                         }
                     }
                 }
@@ -4282,7 +4473,7 @@ function renderAnswerSources(sources) {
     }
 
     if (!sources || sources.length === 0) {
-        sourcesContainer.innerHTML = '<div class="text-sm text-gray-500 italic flex items-center gap-2"><i class="fas fa-info-circle"></i>cfg.t.no_sources_found_1203fa96</div>';
+        sourcesContainer.innerHTML = '<div class="text-sm text-gray-500 italic flex items-center gap-2"><i class="fas fa-info-circle"></i>' + escapeHtml(cfg.t.no_sources_found_1203fa96) + '</div>';
         return;
     }
 
@@ -4290,7 +4481,7 @@ function renderAnswerSources(sources) {
         const filename = escapeHtml(s.filename || s.title || cfg.t.document_09453598);
         const pageInfo = s.page_label
             ? escapeHtml(s.page_label)
-            : (s.page_number ? `cfg.t.page_193cfc9b ${s.page_number}` : 'cfg.t.page_193cfc9b N/A');
+            : (s.page_number ? `${cfg.t.page_193cfc9b} ${s.page_number}` : `${cfg.t.page_193cfc9b} ${cfg.t.n_a_382b0f51}`);
         const score = typeof s.score === 'number' ? s.score.toFixed(3) : '';
         const fileIcon = getFileTypeIcon(s.filename || s.title || '');
         return `
@@ -4320,7 +4511,7 @@ if (aiSearchForm) {
                 if (statusSpan) {
                     statusSpan.textContent = cfg.t.please_enter_a_query_4ad9a6c1;
                 } else {
-                    aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-600"></i><span>cfg.t.please_enter_a_query_4ad9a6c1</span>';
+                    aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-600"></i><span>' + escapeHtml(cfg.t.please_enter_a_query_4ad9a6c1) + '</span>';
                 }
                 aiSearchStatus.classList.remove('hidden');
                 aiSearchStatus.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700');
@@ -4368,7 +4559,7 @@ if (aiSearchForm) {
             answerSection.classList.remove('hidden');
         }
         if (aiAnswerOutput) {
-            aiAnswerOutput.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><span>cfg.t.typing_066182d6</span><span class="ai-typing-indicator" aria-hidden="true"><span></span><span></span><span></span></span></div>';
+            aiAnswerOutput.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><span>' + escapeHtml(cfg.t.typing_066182d6) + '</span><span class="ai-typing-indicator" aria-hidden="true"><span></span><span></span><span></span></span></div>';
         }
         setAnswerStatus({ transport: null, model: null, issues: [] });
 
@@ -4409,7 +4600,7 @@ if (aiSearchForm) {
             const sourceCount = wsResult.sources?.length || 0;
             if (sourcesCountEl) {
                 if (sourceCount > 0) {
-                    sourcesCountEl.textContent = 'cfg.t.found_5d695cc2 ' + sourceCount + ' cfg.t.source_s_b7dcde0d';
+                    sourcesCountEl.textContent = cfg.t.found_5d695cc2 + ' ' + sourceCount + ' ' + cfg.t.source_s_b7dcde0d;
                     sourcesCountEl.classList.remove('hidden');
                 } else {
                     sourcesCountEl.textContent = '';
@@ -4464,7 +4655,7 @@ if (aiSearchForm) {
                     const sourceCount = Array.isArray(result.sources) ? result.sources.length : 0;
                     if (sourcesCountEl) {
                         if (sourceCount > 0) {
-                            sourcesCountEl.textContent = 'cfg.t.found_5d695cc2 ' + sourceCount + ' cfg.t.source_s_b7dcde0d';
+                            sourcesCountEl.textContent = cfg.t.found_5d695cc2 + ' ' + sourceCount + ' ' + cfg.t.source_s_b7dcde0d;
                             sourcesCountEl.classList.remove('hidden');
                         } else {
                             sourcesCountEl.textContent = '';
@@ -4482,9 +4673,9 @@ if (aiSearchForm) {
                     // XSS fix: escape error message before inserting
                     const safeErrorMsg = escapeHtml(errorMsg);
                     if (statusSpan) {
-                        statusSpan.textContent = 'cfg.t.error_3d9f514d ' + errorMsg;
+                        statusSpan.textContent = cfg.t.error_3d9f514d + ' ' + errorMsg;
                     } else {
-                        aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-red-600"></i><span>cfg.t.error_3d9f514d ' + safeErrorMsg + '</span>';
+                        aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-red-600"></i><span>' + escapeHtml(cfg.t.error_3d9f514d) + ' ' + safeErrorMsg + '</span>';
                     }
                     aiSearchStatus.classList.remove('hidden');
                     aiSearchStatus.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700');
@@ -4500,9 +4691,9 @@ if (aiSearchForm) {
                     // XSS fix: escape error message before inserting
                     const safeErrorMsg = escapeHtml(errorMsg);
                     if (statusSpan) {
-                        statusSpan.textContent = 'cfg.t.error_3d9f514d ' + errorMsg;
+                        statusSpan.textContent = cfg.t.error_3d9f514d + ' ' + errorMsg;
                     } else {
-                        aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-red-600"></i><span>cfg.t.error_3d9f514d ' + safeErrorMsg + '</span>';
+                        aiSearchStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-red-600"></i><span>' + escapeHtml(cfg.t.error_3d9f514d) + ' ' + safeErrorMsg + '</span>';
                     }
                     aiSearchStatus.classList.remove('hidden');
                     aiSearchStatus.classList.remove('bg-blue-50', 'border-blue-200', 'text-blue-700');
@@ -4547,7 +4738,7 @@ if (document.readyState === 'loading') {
 
 async function deleteDocument(id, title) {
     const safeTitle = String(title || '').replace(/\s+/g, ' ').trim();
-    const confirmMsg = 'cfg.t.delete_document_137e0e00 "' + safeTitle + '"?';
+    const confirmMsg = cfg.t.delete_document_137e0e00 + ' "' + safeTitle + '"?';
     const proceedWithDelete = async () => {
         try {
             const response = await csrfFetch(`/admin/ai/documents/${id}/delete`, {
@@ -4567,17 +4758,17 @@ async function deleteDocument(id, title) {
                 setTimeout(() => window.location.reload(), 800);
             } else {
                 if (window.showAlert) {
-                    window.showAlert('cfg.t.error_3d9f514d ' + result.error, 'error');
+                    window.showAlert(cfg.t.error_3d9f514d + ' ' + result.error, 'error');
                 } else {
-                    if (window.showAlert) window.showAlert('cfg.t.error_3d9f514d ' + result.error, 'error');
+                    if (window.showAlert) window.showAlert(cfg.t.error_3d9f514d + ' ' + result.error, 'error');
                     else console.error(result.error);
                 }
             }
         } catch (error) {
             if (window.showAlert) {
-                window.showAlert('cfg.t.error_3d9f514d ' + error.message, 'error');
+                window.showAlert(cfg.t.error_3d9f514d + ' ' + error.message, 'error');
             } else {
-                if (window.showAlert) window.showAlert('cfg.t.error_3d9f514d ' + error.message, 'error');
+                if (window.showAlert) window.showAlert(cfg.t.error_3d9f514d + ' ' + error.message, 'error');
                 else console.error(error.message);
             }
         }
@@ -4635,9 +4826,9 @@ async function reprocessDocument(id) {
                 updateTrackedProcessingDoc(id, { status: 'failed', stage: 'Failed', progress: 100, error: result.error || '' });
                 stopProcessingPoll(id);
                 if (window.showAlert) {
-                    window.showAlert('cfg.t.error_3d9f514d ' + result.error, 'error');
+                    window.showAlert(cfg.t.error_3d9f514d + ' ' + result.error, 'error');
                 } else {
-                    if (window.showAlert) window.showAlert('cfg.t.error_3d9f514d ' + result.error, 'error');
+                    if (window.showAlert) window.showAlert(cfg.t.error_3d9f514d + ' ' + result.error, 'error');
                     else console.error(result.error);
                 }
             }
@@ -4646,9 +4837,9 @@ async function reprocessDocument(id) {
             updateTrackedProcessingDoc(id, { status: 'failed', stage: 'Failed', progress: 100, error: error.message || '' });
             stopProcessingPoll(id);
             if (window.showAlert) {
-                window.showAlert('cfg.t.error_3d9f514d ' + error.message, 'error');
+                window.showAlert(cfg.t.error_3d9f514d + ' ' + error.message, 'error');
             } else {
-                if (window.showAlert) window.showAlert('cfg.t.error_3d9f514d ' + error.message, 'error');
+                if (window.showAlert) window.showAlert(cfg.t.error_3d9f514d + ' ' + error.message, 'error');
                 else console.error(error.message);
             }
         }

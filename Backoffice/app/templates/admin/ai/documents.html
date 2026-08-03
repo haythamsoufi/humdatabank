@@ -310,6 +310,7 @@
                             <button type="button" id="importRefreshBtn" class="btn btn-secondary btn-sm">
                                 <i class="fas fa-sync-alt mr-2"></i> {{ _('Refresh') }}
                             </button>
+                            <div id="importDocumentsGrid-colvis-placeholder" class="flex-shrink-0"></div>
                         </div>
                     </div>
                     <div id="importLoading" class="hidden text-center py-8 flex-shrink-0">
@@ -320,7 +321,7 @@
                     </div>
                     <div id="importDocumentsFetchError" class="hidden flex-shrink-0 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div>
                     <div id="importDocumentsGridShell" class="relative flex flex-col flex-1 min-h-0 overflow-hidden">
-                        {{ ag_grid_container('importDocumentsGrid', show_placeholder=false, include_card=false, grid_height='480px') }}
+                        {{ ag_grid_container('importDocumentsGrid', show_placeholder=false, include_card=false) }}
                     </div>
                     <div id="importActions" class="hidden mt-4 pt-4 border-t border-gray-200 flex justify-end flex-shrink-0">
                         <button type="button" class="btn btn-primary" id="processSelectedBtn" disabled>
@@ -652,6 +653,17 @@ window.aiDocumentsConfig.t = {
   upload_complete_635c737d: {{ _('Upload complete!')|tojson }},
   upload_complete_f79598ab: {{ _('Upload complete')|tojson }},
   upload_failed_0e76390e: {{ _('Upload failed:')|tojson }},
+  assignment_8b3f1a2c: {{ _('Assignment')|tojson }},
+  document_type_4e7c9d1b: {{ _('Document Type')|tojson }},
+  entity_2a6f8c3e: {{ _('Entity')|tojson }},
+  period_9d4e2b7a: {{ _('Period')|tojson }},
+  source_assignment_5c1a8f3d: {{ _('Assignment submission')|tojson }},
+  source_public_7b2e4c9a: {{ _('Public submission')|tojson }},
+  source_standalone_3f8d1e6b: {{ _('Document library')|tojson }},
+  source_type_6a4c9e2f: {{ _('Source')|tojson }},
+  template_1d7b5e8c: {{ _('Template')|tojson }},
+  upload_date_4f2a9c1e: {{ _('Upload Date')|tojson }},
+  uploaded_by_8e3c7a2d: {{ _('Uploaded By')|tojson }},
   uploaded_fe8d588f: {{ _('Uploaded')|tojson }},
   uploading_f2870421: {{ _('Uploading...')|tojson }},
   view_or_download_9e34181d: {{ _('View or download')|tojson }},

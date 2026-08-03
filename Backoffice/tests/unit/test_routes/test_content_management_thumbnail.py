@@ -1,5 +1,4 @@
-"""Unit tests for PDF thumbnail generation in content_management."""
-import io
+"""Unit tests for PDF thumbnail generation via ThumbnailService."""
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,7 +8,7 @@ pytestmark = [pytest.mark.unit]
 
 class TestGeneratePdfThumbnailToStorage:
     def test_uses_context_manager_for_pdf_document(self, app):
-        from app.routes.admin.content_management import _generate_pdf_thumbnail_to_storage
+        from app.services.content.thumbnail_service import ThumbnailService
 
         mock_page = MagicMock()
         mock_pix = MagicMock()
@@ -31,13 +30,13 @@ class TestGeneratePdfThumbnailToStorage:
 
         with app.app_context(), \
              patch(
-                 "app.routes.admin.content_management._check_pdf_processing_capability",
+                 "app.services.content.thumbnail_service.ThumbnailService.check_pdf_processing_capability",
                  return_value=True,
              ), \
              patch.dict("sys.modules", {"fitz": mock_fitz}), \
              patch("PIL.Image", mock_pil), \
-             patch("app.routes.admin.content_management.storage.upload", return_value="thumb/path.png"):
-            result = _generate_pdf_thumbnail_to_storage(
+             patch("app.services.platform.storage_service.upload", return_value="thumb/path.png"):
+            result = ThumbnailService.generate_pdf_thumbnail_to_storage(
                 "/tmp/test.pdf", "folder123", language_code="en",
             )
 

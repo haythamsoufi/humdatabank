@@ -1,5 +1,5 @@
 {% extends "core/layout.html" %}
-{% from "components/_page_header.html" import page_header %}
+{% from "admin/_validation_admin_shell.html" import validation_admin_shell, validation_admin_styles with context %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container, ag_grid_page_config %}
 {% from "macros/excel_io_modal.html" import excel_io_modal %}
@@ -9,45 +9,18 @@
 
 {% block head %}
     {{ super() }}
-    <link rel="stylesheet" href="{{ static_url('css/validation-dashboard.css') }}">
+    {{ validation_admin_styles() }}
 {% endblock %}
 
 {% block content %}
 
-{% set vq_header_actions = namespace(items=[]) %}
-{% if is_system_manager or has_permission('admin.validation.dashboard') %}
-    {% set __ = vq_header_actions.items.append({
-        'type': 'link',
-        'text': _('Validation Dashboard'),
-        'icon': 'fas fa-chart-line',
-        'url': url_for('admin.validation_dashboard'),
-        'classes': 'professional-action-btn professional-action-btn-blue'
-    }) %}
-{% endif %}
-{% if is_system_manager or has_permission('admin.validation.rules') %}
-    {% set __ = vq_header_actions.items.append({
-        'type': 'link',
-        'text': _('Rules Registry'),
-        'icon': 'fas fa-shield-alt',
-        'url': url_for('admin.validation_rules_admin'),
-        'classes': 'professional-action-btn'
-    }) %}
-{% endif %}
-
-{{ page_header(
-    title=_('Validation Questions'),
-    subtitle=_('Manage validation questions and review country-level status summaries.'),
-    icon='fas fa-clipboard-question',
-    breadcrumbs=[
-        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Explore Data'), 'url': url_for('data_exploration.explore_data')},
-        {'name': _('Validation Questions')}
-    ],
-    actions=vq_header_actions.items
-) }}
-
-<div id="vq-feedback" class="hidden mb-4 rounded-md px-4 py-3 text-sm border" role="status" aria-live="polite"></div>
-
+{% call validation_admin_shell(
+    'questions',
+    _('Validation Questions'),
+    _('Manage validation questions and review country-level status summaries.'),
+    'fas fa-clipboard-question',
+    'vq-feedback'
+) %}
 <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 mb-6">
     {% call scroll_tab_bar(inner_id='vq-tabs', aria_label=_('Validation questions views')) %}
         <button type="button" role="tab" data-tab="all-questions" id="vq-tab-all"
@@ -315,6 +288,8 @@
     }
 } %}
 {{ ag_grid_page_config('validationQuestionsGridConfig', 'VQ_GRID_TRANSLATIONS', vq_grid_bootstrap) }}
+
+{% endcall %}
 
 {% endblock %}
 

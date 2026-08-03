@@ -1,0 +1,662 @@
+        <div id="current-assignments-section" class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-black-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                {%- if selected_entity_type and selected_entity_type != 'country' or selected_country -%}
+                    {{ entity_scope_phrase(_('Assignments for'), _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
+                {%- endif %}
+            </h2>
+                    {# Loop through the current assignments list #}
+        {% if current_assignments %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for item in current_assignments %}
+                            {# Determine if overdue (only for assigned forms still awaiting submission) #}
+                            {% set is_overdue = item.type == 'assigned' and item.date_info and item.date_info.date() < current_date
+                                and item.status not in ['submitted', 'approved', 'requires_revision', 'sent_for_review', 'cancelled'] %}
+
+                            {# Apply conditional styling based on type #}
+                            <div class="dashboard-assignment-card p-4 rounded-lg shadow-md flex flex-col justify-between relative transition-all duration-200 ease-out hover:shadow-xl {% if not is_overdue %}hover:-translate-y-0.5{% endif %} motion-reduce:transition-none motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-md {% if is_overdue %}dashboard-assignment-card--overdue{% endif %} {# Added relative for delete button positioning #}
+                                        {% if item.is_public %}
+                                            bg-purple-50 border-2 border-purple-500 ring-2 ring-purple-300 hover:border-purple-600 hover:ring-purple-400/80 {# Different color for public submissions #}
+                                        {% elif is_overdue %}
+                                            bg-gray-50 border-2 border-red-500 ring-2 ring-red-300 hover:border-red-600 hover:ring-red-400/80
+                                        {% else %}
+                                            bg-gray-50 border border-gray-300 hover:border-gray-400 hover:bg-white
+                                        {% endif %}">
+
+                                {# NEW: Delete button for self-reported assignments #}
+                                {% if item.type == 'assigned' and item.item_object.assigned_form.period_name == 'Self-Reported' %}
+                                    <form action="{{ url_for('forms.delete_self_report_assignment', aes_id=item.item_object.id) }}" method="POST" class="absolute top-2 right-2 delete-self-report-form">
+                                        {{ delete_form.csrf_token }} {# Include CSRF token #}
+                                        <button type="submit" class="btn btn-icon btn-sm btn-ghost-danger" title="{{ _('Delete Self-Reported Assignment')|forceescape }}" data-loading-text=""
+                                                data-confirm-title="{{ _('Delete Self-Report?')|forceescape }}"
+                                                data-confirm-label="{{ _('Delete')|forceescape }}"
+                                                data-confirm-message="{{ _('Are you sure you want to delete this self-reported assignment?')|forceescape }}"
+                                                data-confirm-danger="true">
+                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        </button>
+                                    </form>
+                                {% endif %}
+
+                                <div>
+                                    <p class="text-lg font-semibold text-gray-800 mb-2 pr-6"> {# Added right padding to avoid text overlapping delete button #}
+                                        {# Use appropriate icon based on type #}
+                                        {% if item.is_public %}
+                                            <i class="fas fa-link h-5 w-5 inline-block mr-1 text-black-700 align-text-bottom"></i>
+                                        {% else %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1 text-gray-600 align-text-bottom" viewBox="0 0 24 24" fill="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                            </svg>
+                                        {% endif %}
+                                        {# Wrap the title in an anchor tag to make it clickable #}
+                                        {% if item.type == 'assigned' %}
+                                            <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=item.item_object.id) }}" class="hover:underline text-black-700"> {# Added styling for link appearance #}
+                                                {% if item.item_object.assigned_form.custom_name %}
+                                                    {{ item.item_object.assigned_form.display_name }}
+                                                {% else %}
+                                                    {{ get_localized_template_name(item.item_object.assigned_form.template) if item.item_object.assigned_form.template else _('Template Missing') }}
+                                                    {% if item.item_object.assigned_form.period_name != 'Self-Reported' %}
+                                                        - {{ item.item_object.assigned_form.period_name }}
+                                                    {% endif %}
+                                                {% endif %}
+                                            </a>
+                                        {% else %} {# item.type == 'public' #}
+                                            <a href="{{ item.view_data_link }}" class="hover:underline text-black-700"> {# Added styling for link appearance #}
+                                                 {{ item.name }} {# Use item.name which is already formatted for public links #}
+                                            </a>
+                                        {% endif %}
+                                    </p>
+
+                                    {# Display additional info based on type #}
+                                    {% if item.type == 'assigned' %}
+                                        {# Primary status line with inline attribution (flex keeps badge + date on one row when possible) #}
+                                        <div class="text-sm text-gray-600 mb-1 flex flex-wrap items-center gap-x-1 gap-y-0.5">
+                                            <span class="whitespace-nowrap">{{ _('Status') }}:</span>
+                                            {{ assignment_status_pipeline_badge(
+                                                item.status,
+                                                item.item_object.is_round_closed_for_entity(),
+                                                _ui_language,
+                                                item.item_object
+                                            ) }}
+                                            {# Inline: "by: <user> at: <time>" for the current status actor #}
+                                            {% if item.status == 'approved' and item.approved_by_user is defined and item.approved_by_user %}
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.approved_by_user.name or _('Unknown') }}</span></span>
+                                            {% elif item.status == 'submitted' and item.submitted_by_user is defined and item.submitted_by_user %}
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.submitted_by_user.name or _('Unknown') }}</span></span>
+                                            {% elif item.status == 'sent_for_review' and item.sent_for_review_by_user is defined and item.sent_for_review_by_user %}
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('by') }}: <span class="font-medium text-gray-700">{{ item.sent_for_review_by_user.name or _('Unknown') }}</span></span>
+                                            {% endif %}
+                                            {% if item.status_timestamp %}
+                                                <span class="text-xs text-gray-500 whitespace-nowrap">{{ _('at') }}: {{ item.status_timestamp|format_datetime_localized('short', 'short') }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {# Secondary line: show "Submitted by" when status is Approved (so both actors are visible) #}
+                                        {% if item.status == 'approved' and item.submitted_by_user is defined and item.submitted_by_user %}
+                                            <p class="text-xs text-gray-500 mb-1 ml-1">
+                                                {{ _('Submitted by') }}: <span class="font-medium text-gray-600">{{ item.submitted_by_user.name or _('Unknown') }}</span>
+                                                {% if item.submitted_at %}
+                                                    <span class="ml-1">{{ _('at') }}: {{ item.submitted_at|format_datetime_localized('short', 'short') }}</span>
+                                                {% endif %}
+                                            </p>
+                                        {% endif %}
+                                        {% if item.date_info %}
+                                            <p class="text-sm {% if is_overdue %}text-red-600 font-semibold dashboard-assignment-due--overdue-glow{% else %}text-gray-600{% endif %} mb-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 align-middle {% if is_overdue %}text-red-500{% else %}text-gray-500{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                {{ _('Due Date') }}: <span class="font-medium">{{ item.date_info|format_date_localized('medium') }}</span>
+                                                {% if is_overdue %}
+                                                    {{ status_label(_('Overdue'), 'danger', 'ml-1') }}
+                                                {% endif %}
+                                            </p>
+                                        {% endif %}
+                                    {% else %} {# item.type == 'public' #}
+                                         {% if item.period %}
+                                            <p class="text-sm text-gray-600 mb-1">{{ _('Period') }}: {{ item.period }}</p>
+                                        {% endif %}
+                                        {% if item.date_info %}
+                                            <p class="text-sm text-gray-600 mb-1">{{ _('Latest Submission') }}: {{ item.date_info|format_datetime_localized('short', 'short') }}</p>
+                                        {% endif %}
+                                        {# Add text for public submissions #}
+                                        <p class="text-sm text-purple-700 font-semibold mb-1">
+                                            <i class="fas fa-list-alt mr-1"></i> {{ _('Submitted through public link') }} ({{ item.submission_count }} {{ _('submission') }}{{ 's' if item.submission_count != 1 }})
+                                        </p>
+                                    {% endif %}
+
+                                    {# Display Completion Rate (common to both) — tiers match MobileApp AssignmentCard._getCompletionColor #}
+                                    {% set cr = item.completion_rate|default(0)|float %}
+                                    <p class="text-sm text-gray-600 relative inline-flex items-center group">
+                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 align-middle {% if cr >= 80 %}text-green-600{% elif cr >= 50 %}text-amber-500{% elif cr >= 25 %}text-amber-500{% else %}text-red-500{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        {{ _('Completion') }}:&nbsp;<span class="font-medium {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">{{ "{:.1f}%".format(item.completion_rate) }}</span>
+                                    </p>
+
+                                    {# NEW: Display public submission information for assignments with public submissions #}
+                                    {% if item.type == 'assigned' and item.public_submission_count %}
+                                        <p class="text-sm text-purple-700 font-semibold mb-1">
+                                            <i class="fas fa-link mr-1"></i>
+                                            {% if item.public_submission_count == 1 %}
+                                                {{ _('Received 1 submission using the public link') }}
+                                            {% else %}
+                                                {{ _('Received %(count)d submissions using the public link', count=item.public_submission_count) }}
+                                            {% endif %}
+                                            {% if item.latest_public_submission %}
+                                                <span class="text-xs text-gray-500 ml-2">
+                                                    {% if item.public_submission_count == 1 %}
+                                                        ({{ _('at:') }} {{ item.latest_public_submission.submitted_at|format_datetime_localized('short', 'short') }})
+                                                    {% else %}
+                                                        ({{ _('Latest:') }} {{ item.latest_public_submission.submitted_at|format_datetime_localized('short', 'short') }})
+                                                    {% endif %}
+                                                </span>
+                                            {% endif %}
+                                        </p>
+                                    {% endif %}
+
+                                </div>
+                                {# Bottom corner elements - RTL aware positioning #}
+                                {% set current_lang = _ui_language %}
+                                <!-- Debug: Current language is {{ current_lang }} -->
+                                <div class="absolute bottom-2 flex items-center space-x-2 {% if current_lang == 'ar' %}left-2{% else %}right-2{% endif %}">
+                                    {# "Self-Reported" label #}
+                                    {% if item.type == 'assigned' and item.item_object.assigned_form.period_name == 'Self-Reported' %}
+                                        {{ status_label(_('Self-Reported'), 'success') }}
+                                    {% endif %}
+
+                                    {# Last modified user profile icon #}
+                                    {% if item.last_modified_user %}
+                                        <div class="relative profile-icon-tooltip-container">
+                                            {# Show last modifier + other contributors stacked behind #}
+                                            {% set contributors = item.contributors if item.contributors is defined else [] %}
+                                            {% if not contributors %}
+                                                {% set contributors = [item.last_modified_user] %}
+                                            {% endif %}
+
+                                            <div class="contributor-avatar-stack flex items-center">
+                                                {# Render oldest/least-recent first so last modifier ends up on top #}
+                                                {% for u in contributors|reverse %}
+                                                    <div class="contributor-avatar" style="z-index: {{ loop.index }};">
+                                                        {{ profile_icon(u, 'md', false, false, false, 'shadow-sm avatar-circle') }}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                            <div class="profile-icon-tooltip absolute bottom-full mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50 shadow-lg border border-gray-700 min-w-[200px] max-w-xs {% if current_lang == 'ar' %}left-0{% else %}right-0{% endif %}">
+                                                {% if contributors|length <= 1 %}
+                                                    <div class="font-semibold text-gray-200 mb-1">{{ _('Last modified by') }}:</div>
+                                                    <div class="font-medium text-white mb-1 break-words">{{ item.last_modified_user.name or _('Unknown') }}</div>
+                                                    <div class="text-gray-300 text-xs break-all">
+                                                        <a href="mailto:{{ item.last_modified_user.email }}" class="hover:text-white transition-colors duration-150">{{ item.last_modified_user.email }}</a>
+                                                    </div>
+                                                {% else %}
+                                                    <div class="font-semibold text-gray-200 mb-2">{{ _('Contributors') }}:</div>
+                                                    <div class="space-y-2">
+                                                        {% for u in contributors %}
+                                                            <div class="flex items-start gap-3">
+                                                                <div class="min-w-0">
+                                                                    {% if item.last_modified_user and u.id == item.last_modified_user.id %}
+                                                                        <div class="text-[10px] text-gray-300 mb-0.5">
+                                                                            {{ _('Last modified') }}
+                                                                        </div>
+                                                                    {% endif %}
+                                                                    <div class="font-medium text-white break-words">
+                                                                        {{ u.name or _('Unknown') }}
+                                                                    </div>
+                                                                    <div class="text-gray-300 text-xs break-all">
+                                                                        <a href="mailto:{{ u.email }}" class="hover:text-white transition-colors duration-150">{{ u.email }}</a>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                                <div class="absolute top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800 {% if current_lang == 'ar' %}left-3{% else %}right-3{% endif %}"></div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div class="dashboard-card-actions mt-4 flex items-center gap-2 min-w-0 w-full" data-dashboard-card-actions>
+                                    <div class="dashboard-card-actions-primary flex shrink-0 items-center gap-2">
+                                    {# Conditional buttons based on type #}
+                                    {% if item.type == 'assigned' %}
+                                        {% set aes = item.item_object %}
+                                        {# Conditional display of "Enter Data" button for Focal Points #}
+                                        {% set aes_can_enter = (
+                                            aes.status not in ['submitted', 'approved', 'cancelled']
+                                            and (
+                                                aes.status != 'sent_for_review'
+                                                or is_delegation_user
+                                            )
+                                        ) %}
+                                        {% if current_user_has_role('assignment_editor_submitter') and aes.is_round_closed_for_entity() %}
+                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-secondary btn-sm">
+                                            <i class="fas fa-eye mr-1 -ml-0.5"></i>
+                                            {{ _('View') }}
+                                        </a>
+                                        {% elif current_user_has_role('assignment_editor_submitter') and aes_can_enter %}
+                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                            <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                                            </svg>
+                                            {{ _('Enter Data') }}
+                                        </a>
+                                        {% elif (current_user_has_role('system_manager') or is_admin_user) %}
+                                        {# Admins and System Managers see "Enter Data" for assigned forms #}
+                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                            <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                                            </svg>
+                                            {{ _('Enter Data') }}
+                                        </a>
+                                        {% endif %}
+                                    {% endif %}
+                                    </div>
+                                    <div class="dashboard-card-actions-bar flex flex-1 min-w-0 items-center gap-2">
+                                    <div class="dashboard-card-actions-inline flex flex-nowrap items-center gap-2 min-w-0 overflow-hidden">
+                                    {% if item.type == 'assigned' %}
+                                        {% set aes = item.item_object %}
+
+                                        {# "Approve" button visible with RBAC permission check when status is Submitted #}
+                                        {% if aes.status == 'submitted' and can_approve_assignment(aes) %}
+                                        {# Changed from <a> to <form> and <button> #}
+                                        <form action="{{ url_for('main.approve_assignment', aes_id=aes.id) }}" method="POST" class="inline-block approve-assignment-form">
+                                            {{ approve_form.csrf_token }} {# Include CSRF token #}
+                                            <button type="submit" class="btn btn-success btn-sm" data-loading-text="{{ _('Approving…') }}"
+                                                    data-confirm-title="{{ _('Approve Assignment?')|forceescape }}"
+                                                    data-confirm-label="{{ _('Approve')|forceescape }}"
+                                                    data-confirm-message="{{ _('Are you sure you want to approve this assignment?')|forceescape }}">
+                                                 <i class="fas fa-check-circle mr-1 -ml-0.5"></i> {{ _('Approve') }}
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {# "Reopen" button: entity-level reopen takes priority.
+                                           can_reopen_assignment covers submitted/approved/etc. AND
+                                           pending/in_progress when the global round is closed but this
+                                           entity has not yet been individually reopened. #}
+                                        {% if can_reopen_assignment(aes) %}
+                                        <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                            {{ reopen_form.csrf_token }}
+                                            <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}"
+                                                    data-confirm-title="{{ _('Reopen Assignment?')|forceescape }}"
+                                                    data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                                    data-confirm-message="{{ _('Are you sure you want to reopen this assignment?')|forceescape }}">
+                                                <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
+                                            </button>
+                                        </form>
+                                        {% elif item.item_object.assigned_form.is_effectively_closed and not aes.reopened_after_close and can_reopen_closed_assignment(aes.assigned_form) %}
+                                        {# Fallback: reopen the entire round (admin only, only when entity reopen is not applicable) #}
+                                        <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                            {{ reopen_form.csrf_token }}
+                                            <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}"
+                                                    data-confirm-title="{{ _('Reopen Assignment?')|forceescape }}"
+                                                    data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                                    data-confirm-message="{{ _('Are you sure you want to reopen this assignment?')|forceescape }}">
+                                                <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {% if aes.status == 'sent_for_review' and can_return_for_revision(aes) %}
+                                        <form action="{{ url_for('main.return_assignment_for_revision', aes_id=aes.id) }}" method="POST" class="inline-block return-for-revision-form">
+                                            {{ reopen_form.csrf_token }}
+                                            <button type="submit" class="btn btn-warning btn-sm"
+                                                    data-confirm-title="{{ _('Request changes?')|forceescape }}"
+                                                    data-confirm-label="{{ _('Request changes')|forceescape }}"
+                                                    data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}"
+                                                    data-loading-text="{{ _('Returning…') }}">
+                                                <i class="fas fa-reply mr-1 -ml-0.5"></i> {{ _('Request changes') }}
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {# NEW: Public submission buttons based on user role and submission count #}
+                                        {% if item.public_submission_count %}
+                                            {% if current_user_has_role('system_manager') or is_admin_user %}
+                                                {# Admin sees the management view #}
+                                                <a href="{{ url_for('assignment_management.view_public_submissions', assignment_id=aes.assigned_form_id) }}" class="btn btn-purple btn-sm">
+                                                    <i class="fas fa-eye mr-1 -ml-0.5"></i> {{ _('View Public Submissions') }}
+                                                </a>
+                                            {% else %}
+                                                {# Focal points see direct submission access #}
+                                                {% if item.public_submission_count == 1 %}
+                                                    {# Single submission - direct link #}
+                                                    {% set submission = item.public_submissions[0] %}
+                                                    <a href="{{ url_for('forms.view_public_submission', submission_id=submission.id) }}" class="btn btn-purple btn-sm">
+                                                        <i class="fas fa-eye mr-1 -ml-0.5"></i> {{ _('View Submission') }}
+                                                    </a>
+                                                {% else %}
+                                                    {# Multiple submissions - dropdown #}
+                                                    <div class="relative inline-block text-left">
+                                                        <div>
+                                                            <button type="button" class="btn btn-purple btn-sm" id="submission-dropdown-{{ aes.id }}" aria-haspopup="true" aria-expanded="false">
+                                                                <i class="fas fa-eye mr-1 -ml-0.5"></i> {{ _('View Submission') }}
+                                                                <i class="fas fa-chevron-down ml-1 -mr-1"></i>
+                                                            </button>
+                                                        </div>
+                                                        <div class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-50" id="submission-dropdown-menu-{{ aes.id }}" role="menu" aria-orientation="vertical" aria-labelledby="submission-dropdown-{{ aes.id }}">
+                                                            <div class="py-1" role="none">
+                                                                {% for submission in item.public_submissions %}
+                                                                    <a href="{{ url_for('forms.view_public_submission', submission_id=submission.id) }}" class="flex items-center justify-between px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900" role="menuitem">
+                                                                        <span>{{ submission.submitted_at|format_datetime_localized('short', 'short') }}</span>
+                                                                        {{ status_label_for_public_submission(submission.status) }}
+                                                                    </a>
+                                                                {% endfor %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %} {# item.type == 'public' #}
+                                        {% set pa = item.item_object %}
+                                        {# Link to view the actual public submission data #}
+                                        <a href="{{ item.view_data_link }}" class="btn btn-purple btn-sm">
+                                            <i class="fas fa-eye mr-1 -ml-0.5"></i> {{ _('View Submissions') }}
+                                        </a>
+                                        {# Link to the public form itself #}
+                                        {% set public_url = url_for('forms.fill_public_form', public_token=pa.unique_token, _external=True) %}
+                                        <a href="{{ public_url }}" target="_blank" class="btn btn-dark btn-sm">
+                                            <i class="fas fa-external-link-alt mr-1 -ml-0.5"></i> {{ _('Open Form') }}
+                                        </a>
+                                    {% endif %}
+                                    </div>
+                                    <div class="dashboard-card-actions-overflow relative shrink-0 hidden">
+                                        <button type="button"
+                                                class="btn btn-secondary btn-sm dashboard-card-actions-overflow-btn"
+                                                aria-haspopup="true"
+                                                aria-expanded="false"
+                                                title="{{ _('More actions')|forceescape }}"
+                                                aria-label="{{ _('More actions')|forceescape }}">
+                                            <i class="fas fa-ellipsis-v" aria-hidden="true"></i>
+                                        </button>
+                                        <div class="dashboard-card-actions-overflow-menu origin-top-right absolute right-0 top-full mt-1 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 hidden p-1 flex flex-col items-stretch gap-1"
+                                             role="menu"></div>
+                                    </div>
+                                    </div>
+                                </div>
+                            </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                 <div class="text-center py-8">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p class="mt-2 text-sm font-medium text-gray-600">
+                                {{ entity_scope_phrase_with_suffix(_('All clear! No active assignments for'), _('at this time.'), _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">{{ _('New assignments will appear here when available.') }}</p>
+                        </div>
+            {% endif %}
+        </div>
+
+        {# Past Assignments Section: Requires Revision; Approved older than 1 month; Pending/In Progress older than 1 year #}
+        {% if past_assignments %}
+            <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
+                <div
+                    class="flex justify-between items-center cursor-pointer group rounded-md px-2 py-1 -mx-2 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2"
+                    id="approved-assignments-header"
+                    role="button"
+                    tabindex="0"
+                    aria-controls="approved-assignments-content"
+                    aria-expanded="false">
+                     <h2 class="text-xl font-semibold text-gray-700 flex items-center">
+                        {# Updated Icon and Color #}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        {{ entity_scope_phrase(_('Past Assignments for'), _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
+                        <span id="approved-assignments-hint" class="ml-2 text-sm font-normal text-gray-500 hidden md:inline">
+                            {{ _('Click to expand') }}
+                        </span>
+                    </h2>
+                    <button
+                        type="button"
+                        id="toggle-approved-assignments"
+                        class="btn btn-ghost btn-sm text-gray-700"
+                        aria-controls="approved-assignments-content"
+                        aria-expanded="false"
+                        title="{{ _('Show past assignments')|forceescape }}">
+                        <span id="approved-assignments-toggle-text" class="hidden sm:inline text-sm font-medium mr-2">
+                            {{ _('Show') }}
+                        </span>
+                        <i id="approved-assignments-chevron" class="fas fa-chevron-down transition-transform transform rotate-0" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                {# Define approved_assignments here so it's available for slicers #}
+                {# Use past_assignments directly from the backend #}
+                {% set approved_assignments = past_assignments %} {# Keep the old variable name for compatibility with existing code #}
+
+                {# Content of the Past Assignments section (hidden by default) #}
+                <div id="approved-assignments-content" class="mt-4 hidden">
+
+                    {# NEW: Slicers for Period, Template, and Status - With max-width constraints #}
+                    <div class="flex flex-col md:flex-row gap-4 mb-4">
+                        {# Period Slicer #}
+                        <div class="w-full md:w-auto md:max-w-md"> {# Further increased max-width to ensure no overlap #}
+                            <label for="period-slicer" class="block text-sm font-medium text-gray-700"></label>{# Filter by Period: #}
+                            <select id="period-slicer" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">{{ _('All Years') }}</option>
+                                {# Populate with unique periods from approved_assignments #}
+                                {% for period in past_assignment_periods %}
+                                    <option value="{{ period }}">{{ period }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {# Template Slicer #}
+                         <div class="w-full md:w-auto md:max-w-md"> {# Further increased max-width to ensure no overlap #}
+                            <label for="template-slicer" class="block text-sm font-medium text-gray-700"></label>{# Filter by Template: #}
+                            <select id="template-slicer" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">{{ _('All Templates') }}</option>
+                                 {# Populate with unique template names from approved_assignments #}
+                                {% set template_objects = approved_assignments | map(attribute='item_object.assigned_form.template') | selectattr('name') | unique | list %}
+                                {% for template_obj in template_objects %}
+                                    <option value="{{ template_obj.name }}">{{ get_localized_template_name(template_obj) }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        {# Status Slicer #}
+                        <div class="w-full md:w-auto md:max-w-md"> {# Further increased max-width to ensure no overlap #}
+                            <label for="status-slicer" class="block text-sm font-medium text-gray-700"></label>{# Filter by Status: #}
+                            <select id="status-slicer" class="mt-1 block w-full py-2 pl-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                <option value="">{{ _('All Statuses') }}</option>
+                                {# Populate with unique statuses from approved_assignments #}
+                                {% set statuses = approved_assignments | map(attribute='status') | unique | list %}
+                                {% for status in statuses %}
+                                    <option value="{{ status }}">{{ localize_status(status) }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+
+                    {% if approved_assignments %}
+                        {# Table for Past Assignments #}
+                        <div class="past-assignments-table-wrap">
+                            <table class="min-w-full divide-y divide-gray-200" id="approved-assignments-list">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            {{ _('Form') }}
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            {{ _('Period') }}
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            {{ _('Status') }}
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            {{ _('Status Updated') }}
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            {{ _('Completion') }}
+                                        </th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            {{ _('Actions') }}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for item in approved_assignments %}
+                                        <tr class="approved-assignment-item hover:bg-gray-50
+                                            {% if item.status == 'approved' %}
+                                                bg-green-50
+                                            {% elif item.status == 'requires_revision' %}
+                                                bg-orange-50
+                                            {% elif item.status == 'cancelled' %}
+                                                bg-gray-100
+                                            {% endif %}"
+                                            {% if item.type == 'assigned' %}
+                                            data-period="{{ item.item_object.assigned_form.period_name }}"
+                                            data-template="{{ item.item_object.assigned_form.template.name if item.item_object.assigned_form.template else '' }}"
+                                            data-status="{{ item.status }}"
+                                            {% else %}
+                                            data-period="{{ item.period if item.period else '' }}"
+                                            data-template="{{ item.name }}"
+                                            data-status="{{ item.status }}"
+                                            {% endif %}>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <div class="flex-shrink-0 h-4 w-4">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 {% if item.status == 'approved' %}text-green-700{% elif item.status == 'requires_revision' %}text-orange-700{% elif item.status == 'cancelled' %}text-gray-500{% else %}text-gray-600{% endif %}" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                                        </svg>
+                                                    </div>
+                                                    <div class="ml-4">
+                                                        <div class="text-sm font-medium text-gray-900">
+                                                            {% if item.type == 'assigned' %}
+                                                                <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=item.item_object.id) }}" class="hover:underline text-black-700">
+                                                                    {% if item.item_object.assigned_form.custom_name %}
+                                                                        {{ item.item_object.assigned_form.display_name }}
+                                                                    {% else %}
+                                                                        {{ get_localized_template_name(item.item_object.assigned_form.template) if item.item_object.assigned_form.template else _('Template Missing') }}
+                                                                    {% endif %}
+                                                                </a>
+                                                            {% else %}
+                                                                <a href="{{ item.view_data_link }}" class="hover:underline text-black-700">
+                                                                    {{ item.name }}
+                                                                </a>
+                                                            {% endif %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {% if item.type == 'assigned' %}
+                                                    {{ item.item_object.assigned_form.period_name if item.item_object.assigned_form.period_name != 'Self-Reported' else _('Self-Reported') }}
+                                                {% else %}
+                                                    {{ item.period if item.period else _('N/A') }}
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                {% if item.type == 'assigned' %}
+                                                    {{ assignment_status_pipeline_badge(
+                                                        item.status,
+                                                        item.item_object.is_round_closed_for_entity(),
+                                                        _ui_language,
+                                                        item.item_object
+                                                    ) }}
+                                                {% else %}
+                                                    {{ status_label(localize_status(item.status), 'neutral') }}
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {% if item.status_timestamp %}
+                                                    {{ item.status_timestamp|format_datetime_localized('short', 'short') }}
+                                                {% else %}
+                                                    {{ _('N/A') }}
+                                                {% endif %}
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                {% set cr = item.completion_rate|default(0)|float %}
+                                                <span class="font-medium {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">{{ "{:.1f}%".format(cr) }}</span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                {% if item.type == 'assigned' %}
+                                                    {% set aes = item.item_object %}
+                                                    {# Entity reopen takes priority; global round reopen only as fallback #}
+                                                    {% if can_reopen_assignment(aes) %}
+                                                    <form action="{{ url_for('main.reopen_assignment', aes_id=aes.id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                                        {{ reopen_form.csrf_token }}
+                                                        <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}"
+                                                                data-confirm-title="{{ _('Reopen Assignment?')|forceescape }}"
+                                                                data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                                                data-confirm-message="{{ _('Are you sure you want to reopen this assignment?')|forceescape }}">
+                                                            <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
+                                                        </button>
+                                                    </form>
+                                                    {% elif item.item_object.assigned_form.is_effectively_closed and not aes.reopened_after_close and can_reopen_closed_assignment(aes.assigned_form) %}
+                                                    <form action="{{ url_for('assignment_management.reopen_closed_assignment', assignment_id=aes.assigned_form_id) }}" method="POST" class="inline-block reopen-assignment-form">
+                                                        {{ reopen_form.csrf_token }}
+                                                        <button type="submit" class="btn btn-warning btn-sm" data-loading-text="{{ _('Reopening…') }}"
+                                                                data-confirm-title="{{ _('Reopen Assignment?')|forceescape }}"
+                                                                data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                                                data-confirm-message="{{ _('Are you sure you want to reopen this assignment?')|forceescape }}">
+                                                            <i class="fas fa-undo mr-1 -ml-0.5"></i> {{ _('Reopen') }}
+                                                        </button>
+                                                    </form>
+                                                    {% else %}
+                                                    <span class="text-gray-400">{{ _('No actions available') }}</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="text-gray-400">{{ _('No actions available') }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {# Pagination Controls #}
+                        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                            <div class="flex-1 flex justify-between sm:hidden">
+                                <button id="prev-page-mobile" class="btn btn-secondary btn-sm relative disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {{ _('Previous') }}
+                                </button>
+                                <button id="next-page-mobile" class="btn btn-secondary btn-sm relative ml-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {{ _('Next') }}
+                                </button>
+                            </div>
+                            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-700">
+                                        {{ _('Showing') }} <span id="start-record" class="font-medium">1</span> {{ _('to') }} <span id="end-record" class="font-medium">10</span> {{ _('of') }} <span id="total-records" class="font-medium">{{ approved_assignments|length }}</span> {{ _('results') }}
+                                    </p>
+                                </div>
+                                <div>
+                                    <nav class="btn-group relative z-0 inline-flex shadow-sm" aria-label="Pagination">
+                                        <button id="prev-page" class="btn btn-secondary btn-sm relative px-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <span class="sr-only">{{ _('Previous') }}</span>
+                                            <i class="fas fa-chevron-left"></i>
+                                        </button>
+                                        <div id="page-numbers" class="flex">
+                                            <!-- Page numbers will be generated by JavaScript -->
+                                        </div>
+                                        <button id="next-page" class="btn btn-secondary btn-sm relative px-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <span class="sr-only">{{ _('Next') }}</span>
+                                            <i class="fas fa-chevron-right"></i>
+                                        </button>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                               <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                             </svg>
+                            <p class="mt-2 text-sm font-medium text-gray-600">
+                                {{ entity_scope_phrase_with_suffix(_('No past assignments for'), _('yet.'), _ui_language, selected_entity_type, selected_entity_display_name, selected_country) }}
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}

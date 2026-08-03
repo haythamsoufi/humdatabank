@@ -132,6 +132,8 @@
 {% block extra_js %}
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_page_config %}
 {{ ag_grid_js() }}
+<script src="{{ static_url('js/lib/html-escape.js') }}"></script>
+<script src="{{ static_url('js/admin/analytics-grid-common.js') }}"></script>
 <script src="{{ static_url('js/admin/session-logs-grid.js') }}"></script>
 {% set session_logs_grid_bootstrap = {
     'apiUrl': url_for('admin_analytics_api.session_logs_list_api'),

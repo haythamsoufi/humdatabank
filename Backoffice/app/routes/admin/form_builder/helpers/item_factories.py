@@ -7,6 +7,7 @@ from app.models import FormItem, FormSection, QuestionType, LookupList, Indicato
 from app.utils.transactions import request_transaction_rollback
 from config.config import Config
 from .item_updaters import is_conditions_meaningful, sanitize_blank_body_html
+from .field_parsing import make_field_reader
 import json
 
 
@@ -38,11 +39,7 @@ def _create_indicator_form_item(template, section, form_data, default_order):
     # Use the provided default order
     order = default_order
 
-    # Helper function to get field value with or without prefix
-    def get_field_value(field_name, prefix='add_ind_modal-'):
-        # Try with prefix first, then without
-        prefixed_name = f"{prefix}{field_name}"
-        return form_data.get(prefixed_name) or form_data.get(field_name)
+    get_field_value = make_field_reader(form_data, 'add_ind_modal-')
 
     # Get indicator bank
     indicator_bank_id_raw = get_field_value('indicator_bank_id')
@@ -209,11 +206,7 @@ def _create_question_form_item(template, section, form_data, default_order):
     # Use the provided default order
     order = default_order
 
-    # Helper function to get field value with or without prefix
-    def get_field_value(field_name, prefix='add_q_modal-'):
-        # Try with prefix first, then without
-        prefixed_name = f"{prefix}{field_name}"
-        return form_data.get(prefixed_name) or form_data.get(field_name)
+    get_field_value = make_field_reader(form_data, 'add_q_modal-')
 
     # Get question type
     question_type_str = get_field_value('question_type')
@@ -437,11 +430,7 @@ def _create_document_field_form_item(template, section, form_data, default_order
     # Use the provided default order
     order = default_order
 
-    # Helper function to get field value with or without prefix
-    def get_field_value(field_name, prefix='doc_field-'):
-        # Try with prefix first, then without
-        prefixed_name = f"{prefix}{field_name}"
-        return form_data.get(prefixed_name) or form_data.get(field_name)
+    get_field_value = make_field_reader(form_data, 'doc_field-')
 
     # Use section_id from form if provided, otherwise use the section parameter
     form_section_id = get_field_value('section_id')
@@ -536,16 +525,7 @@ def _create_matrix_form_item(template, section, form_data, default_order):
     # Use the provided default order
     order = default_order
 
-    # Helper function to get field value with or without prefix
-    def get_field_value(field_name, prefix=''):
-        # For matrix creation, we don't use prefix since the form submits field names directly
-        # Try with prefix first (for backward compatibility), then without
-        if prefix:
-            prefixed_name = f"{prefix}{field_name}"
-            value = form_data.get(prefixed_name)
-            if value:
-                return value
-        return form_data.get(field_name)
+    get_field_value = make_field_reader(form_data)
 
     # Use section_id from form if provided, otherwise use the section parameter
     form_section_id = get_field_value('section_id')
@@ -631,13 +611,7 @@ def _create_image_form_item(template, section, form_data, default_order):
     """Create a new image display form item."""
     order = default_order
 
-    def get_field_value(field_name, prefix=''):
-        if prefix:
-            prefixed_name = f"{prefix}{field_name}"
-            value = form_data.get(prefixed_name)
-            if value:
-                return value
-        return form_data.get(field_name)
+    get_field_value = make_field_reader(form_data)
 
     form_section_id = get_field_value('section_id')
     target_section_id = int(form_section_id) if form_section_id else section.id

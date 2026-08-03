@@ -1,5 +1,9 @@
 """Admin UI for validation rule registry, thresholds, and check types."""
 
+from __future__ import annotations
+
+from typing import Callable
+
 from flask import render_template, request
 from flask_login import login_required
 
@@ -22,7 +26,29 @@ from app.services.validation.registry_service import (
 )
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
+from app.utils.error_handling import handle_json_view_exception
 from app.utils.request_validation import enforce_csrf_json
+
+
+def _handle_registry_mutation(operation: Callable[[], dict], *, log_label: str):
+    """Shared JSON error handling for threshold/check-type upsert endpoints."""
+    try:
+        return json_ok(row=operation())
+    except (KeyError, TypeError, ValueError) as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        db.session.rollback()
+        return handle_json_view_exception(exc, str(exc), log_message=f"{log_label}: {exc}")
+
+
+def _handle_registry_delete(operation: Callable[[], None], *, log_label: str):
+    """Shared JSON error handling for threshold/check-type delete endpoints."""
+    try:
+        operation()
+        return json_ok(deleted=True)
+    except Exception as exc:
+        db.session.rollback()
+        return handle_json_view_exception(exc, str(exc), log_message=f"{log_label}: {exc}")
 
 
 @bp.route("/validation-rules", methods=["GET"])
@@ -65,20 +91,16 @@ def validation_rules_thresholds_upsert_api():
     if csrf_error:
         return csrf_error
     data = get_json_safe() or {}
-    try:
-        row = upsert_threshold(
+    return _handle_registry_mutation(
+        lambda: upsert_threshold(
             row_id=data.get("id"),
             country_id=int(data["country_id"]),
             kpi_code=data.get("kpi_code", ""),
             threshold_fraction=float(data["threshold_fraction"]),
             template_id=data.get("template_id"),
-        )
-        return json_ok(row=row)
-    except (KeyError, TypeError, ValueError) as exc:
-        return json_bad_request(str(exc))
-    except Exception as exc:
-        db.session.rollback()
-        return json_server_error(str(exc))
+        ),
+        log_label="validation_rules_thresholds_upsert",
+    )
 
 
 @bp.route("/validation-rules/api/thresholds/<int:row_id>", methods=["DELETE"])
@@ -88,12 +110,10 @@ def validation_rules_thresholds_delete_api(row_id: int):
     csrf_error = enforce_csrf_json()
     if csrf_error:
         return csrf_error
-    try:
-        delete_threshold(row_id)
-        return json_ok(deleted=True)
-    except Exception as exc:
-        db.session.rollback()
-        return json_server_error(str(exc))
+    return _handle_registry_delete(
+        lambda: delete_threshold(row_id),
+        log_label="validation_rules_thresholds_delete",
+    )
 
 
 @bp.route("/validation-rules/api/check-types", methods=["GET"])
@@ -112,19 +132,15 @@ def validation_rules_check_types_upsert_api():
     if csrf_error:
         return csrf_error
     data = get_json_safe() or {}
-    try:
-        row = upsert_check_type(
+    return _handle_registry_mutation(
+        lambda: upsert_check_type(
             row_id=data.get("id"),
             kpi_code=data.get("kpi_code", ""),
             check_type=data.get("check_type", ""),
             template_id=data.get("template_id"),
-        )
-        return json_ok(row=row)
-    except (KeyError, TypeError, ValueError) as exc:
-        return json_bad_request(str(exc))
-    except Exception as exc:
-        db.session.rollback()
-        return json_server_error(str(exc))
+        ),
+        log_label="validation_rules_check_types_upsert",
+    )
 
 
 @bp.route("/validation-rules/api/check-types/<int:row_id>", methods=["DELETE"])
@@ -134,12 +150,10 @@ def validation_rules_check_types_delete_api(row_id: int):
     csrf_error = enforce_csrf_json()
     if csrf_error:
         return csrf_error
-    try:
-        delete_check_type(row_id)
-        return json_ok(deleted=True)
-    except Exception as exc:
-        db.session.rollback()
-        return json_server_error(str(exc))
+    return _handle_registry_delete(
+        lambda: delete_check_type(row_id),
+        log_label="validation_rules_check_types_delete",
+    )
 
 
 @bp.route("/validation-rules/api/question-templates", methods=["GET"])

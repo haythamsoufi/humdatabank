@@ -110,6 +110,11 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.data_explore.data_table", "Data Explorer: Data Table", "Access the Data Table tab in Data Explorer"),
         ("admin.data_explore.analysis", "Data Explorer: Analysis", "Access the Analysis tab in Data Explorer"),
         ("admin.data_explore.compliance", "Data Explorer: Compliance", "Access the Compliance tab in Data Explorer"),
+        ("admin.data_explore.reports", "Data Explorer: Reports", "Access published reports in Data Explorer"),
+        # Reports builder
+        ("admin.reports.view", "Reports: View", "View reports within assigned scope"),
+        ("admin.reports.edit", "Reports: Edit", "Create and edit own reports"),
+        ("admin.reports.manage", "Reports: Manage all", "View and edit all reports (system managers)"),
         # Validation admin
         ("admin.validation.dashboard", "Validation: Dashboard", "Access the Validation Dashboard (tracker, checks, dispatch)"),
         ("admin.validation.questions", "Validation: Questions", "Manage validation questions (list, edit, import/export)"),
@@ -325,6 +330,24 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "name": "Admin: Data Explorer (Compliance)",
             "description": "Access the Compliance tab in Data Explorer.",
             "permission_codes": ["admin.data_explore.compliance"],
+        },
+        {
+            "code": "admin_data_explorer_reports",
+            "name": "Admin: Data Explorer (Reports)",
+            "description": "Access published reports in Data Explorer.",
+            "permission_codes": ["admin.data_explore.reports"],
+        },
+        {
+            "code": "admin_reports_viewer",
+            "name": "Admin: Reports (View)",
+            "description": "View published reports within scope.",
+            "permission_codes": ["admin.reports.view"],
+        },
+        {
+            "code": "admin_reports_editor",
+            "name": "Admin: Reports (Edit)",
+            "description": "Create and edit reports within scope.",
+            "permission_codes": ["admin.reports.view", "admin.reports.edit"],
         },
         {
             "code": "admin_validation_dashboard",

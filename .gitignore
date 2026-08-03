@@ -182,3 +182,7 @@ Backoffice/plugins/emergency_operations/data/appeals_cache.tmp
 
 # Azure load test run artifacts (downloaded engine logs, run details, prod webapp dumps)
 Backoffice/azure/loadtest/logs/
+
+# Plugin-generated HTML reports (regenerated locally)
+Backoffice/plugins/pb_progress/visuals/report/output/*.html
+Backoffice/instance/uploads/pb_progress/**/output/*.html

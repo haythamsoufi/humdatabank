@@ -8,41 +8,20 @@ try:
 except ImportError:  # pragma: no cover - handled at runtime
     requests = None
 from app.plugins.template_utils import render_plugin_template
-from app.plugins.plugin_utils import BasePluginRoutes, plugin_route_wrapper, plugin_admin_route_wrapper, measure_performance, clear_plugin_cache
+from app.plugins.plugin_utils import (
+    BasePluginRoutes,
+    load_plugin_config,
+    plugin_route_wrapper,
+    plugin_admin_route_wrapper,
+    measure_performance,
+    clear_plugin_cache,
+)
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_error, json_not_found, json_ok, json_server_error
 
-# Handle plugin config import with fallback
-try:
-    from .config import plugin_config
-except ImportError:
-    # Fallback for when running in isolated import context
-    import importlib.util
-    from pathlib import Path
+from pathlib import Path
 
-    try:
-        config_file = Path(__file__).parent / "config.py"
-        if config_file.exists():
-            spec = importlib.util.spec_from_file_location("interactive_map_config", config_file)
-            if spec and spec.loader:
-                config_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(config_module)
-                if hasattr(config_module, 'plugin_config'):
-                    plugin_config = config_module.plugin_config
-                else:
-                    raise ImportError("plugin_config not found in config module")
-            else:
-                raise ImportError("Could not create spec for config module")
-        else:
-            raise ImportError(f"Config file not found: {config_file}")
-    except Exception as e:
-        # Final fallback - create a minimal config
-        # Note: current_app might not be available at import time, so use logging module directly
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"Interactive Map Plugin: Could not load config, using fallback: {e}")
-        from app.plugins.db_config import DbPluginConfig
-        plugin_config = DbPluginConfig("interactive_map", {})
+plugin_config = load_plugin_config(Path(__file__).parent, "interactive_map")
 
 
 def create_blueprint():

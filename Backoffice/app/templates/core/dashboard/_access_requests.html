@@ -1,0 +1,286 @@
+            {# Ghost dashboard preview (dimmed behind the request panel) #}
+            <div class="dashboard-no-access-skeleton space-y-6" aria-hidden="true">
+                <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                    <div class="dashboard-skeleton-bar h-6 w-64 max-w-full mb-4"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {% for _ in range(3) %}
+                        <div class="p-4 rounded-lg border border-gray-300 bg-gray-100/80">
+                            <div class="dashboard-skeleton-bar h-5 w-3/4 max-w-full mb-3"></div>
+                            <div class="dashboard-skeleton-bar h-3 w-1/2 max-w-full mb-2"></div>
+                            <div class="dashboard-skeleton-bar h-3 w-2/3 max-w-full mb-2"></div>
+                            <div class="dashboard-skeleton-bar h-3 w-1/3 max-w-full"></div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="flex flex-col lg:flex-row gap-6">
+                    <div class="lg:w-2/3">
+                        <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                            <div class="dashboard-skeleton-bar h-6 w-72 max-w-full mb-4"></div>
+                            <div class="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-100/80 via-white to-white p-5">
+                                <div class="flex flex-col sm:flex-row gap-4 mb-5 pb-5 border-b border-gray-200">
+                                    <div class="dashboard-skeleton-bar dashboard-skeleton-bar--violet w-24 h-24 rounded-full shrink-0"></div>
+                                    <div class="flex-1 space-y-2 pt-1">
+                                        <div class="dashboard-skeleton-bar h-3 w-32 max-w-full"></div>
+                                        <div class="dashboard-skeleton-bar h-5 w-48 max-w-full"></div>
+                                        <div class="dashboard-skeleton-bar h-4 w-36 max-w-full"></div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {% for _ in range(6) %}
+                                    <div class="dashboard-skeleton-bar h-20 rounded-lg"></div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:w-1/3 flex flex-col gap-6">
+                        <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                            <div class="dashboard-skeleton-bar h-6 w-40 max-w-full mb-4"></div>
+                            {% for _ in range(4) %}
+                            <div class="flex gap-3 mb-4 last:mb-0">
+                                <div class="dashboard-skeleton-bar w-8 h-8 rounded-full shrink-0"></div>
+                                <div class="flex-1 space-y-2">
+                                    <div class="dashboard-skeleton-bar h-3 w-full"></div>
+                                    <div class="dashboard-skeleton-bar h-3 w-2/3 max-w-full"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="dashboard-no-access-skeleton-block bg-white p-6 rounded-lg shadow-md border border-gray-300">
+                            <div class="dashboard-skeleton-bar h-6 w-36 max-w-full mb-4"></div>
+                            {% for _ in range(2) %}
+                            <div class="flex gap-3 mb-3 last:mb-0 py-1">
+                                <div class="dashboard-skeleton-bar w-10 h-10 rounded-full shrink-0"></div>
+                                <div class="flex-1 space-y-2">
+                                    <div class="dashboard-skeleton-bar h-4 w-3/4 max-w-full"></div>
+                                    <div class="dashboard-skeleton-bar h-3 w-1/2 max-w-full"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-no-access-backdrop" aria-hidden="true"></div>
+
+            <div class="dashboard-no-access-panel">
+                {% set no_access_flow_step = 2 if pending_access_requests else 1 %}
+                {% set can_use_assignment_dashboard = can_view_assignment_dashboard|default(true) %}
+                <div class="dashboard-no-access-panel-stage">
+                    <p class="dashboard-no-access-step-here" hidden>
+                        <span class="dashboard-no-access-step-here__text">{{ _("You're here") }}</span>
+                        <svg class="dashboard-no-access-step-here__arrow" viewBox="0 0 44 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <defs>
+                                <marker id="no-access-here-arrowhead" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                                    <path d="M0 1.75 L9 5 L0 8.25 Z" fill="currentColor"/>
+                                </marker>
+                            </defs>
+                            <path d="M36 4 C24 8 17 17 11 28" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none" marker-end="url(#no-access-here-arrowhead)"/>
+                        </svg>
+                    </p>
+                <div class="dashboard-no-access-card dashboard-no-access-card--floating">
+                    <div class="dashboard-no-access-card-header">
+                        <div class="dashboard-no-access-card-icon">
+                            <i class="fas fa-globe-americas" aria-hidden="true"></i>
+                        </div>
+                        <h2 class="dashboard-no-access-card-title">
+                            {% if not can_use_assignment_dashboard %}
+                                {{ _('You do not have assignment dashboard access.') }}
+                            {% elif pending_access_requests %}
+                                {{ _('Your account is not linked to a country yet. You have pending request(s) under review.') }}
+                            {% else %}
+                                {{ _('Your account is not linked to a country yet. Submit a request to unlock your dashboard.') }}
+                            {% endif %}
+                        </h2>
+                    </div>
+
+                    <div class="dashboard-no-access-card-body">
+                        {% if not can_use_assignment_dashboard %}
+                            <div class="dashboard-no-access-pending">
+                                <p class="dashboard-no-access-pending__title">
+                                    <i class="fas fa-lock mr-1.5" aria-hidden="true"></i>
+                                    {{ _('Assignment dashboard access requires one of the Assignment roles.') }}
+                                </p>
+                                <p class="dashboard-no-access-pending__text">
+                                    {{ _('Ask a System Manager to grant Assignment Viewer, Assignment Editor & Submitter, or Assignment Approver if this user should work with assignments.') }}
+                                </p>
+                            </div>
+                        {% else %}
+                        {% if pending_access_requests %}
+                            <div class="dashboard-no-access-pending">
+                                <p class="dashboard-no-access-pending__title">
+                                    <i class="fas fa-clock mr-1.5" aria-hidden="true"></i>
+                                    {{ _('You have %(count)d pending access request(s). An admin will review them shortly.', count=pending_access_requests|length) }}
+                                </p>
+                                <p class="dashboard-no-access-pending__text">
+                                    {% if can_request_multiple_countries %}
+                                        {{ _('Need access to more countries? You can select multiple countries in a single request below.') }}
+                                    {% else %}
+                                        {{ _('You can only request access to one country in total. You have already submitted a request.') }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        {% endif %}
+
+                        <div class="dashboard-no-access-steps">
+                            <p class="dashboard-no-access-steps__label">{{ _('How it works') }}</p>
+                            <ol class="dashboard-no-access-steps__list dashboard-no-access-steps__list--at-step-{{ no_access_flow_step }}">
+                                <li class="dashboard-no-access-step{% if no_access_flow_step == 1 %} dashboard-no-access-step--current{% elif no_access_flow_step > 1 %} dashboard-no-access-step--completed{% endif %}"{% if no_access_flow_step == 1 %} aria-current="step"{% endif %}>
+                                    <span class="dashboard-no-access-step-num" aria-hidden="true">
+                                        {% if no_access_flow_step > 1 %}<i class="fas fa-check"></i>{% else %}1{% endif %}
+                                    </span>
+                                    <div class="dashboard-no-access-step-content">
+                                        <span class="dashboard-no-access-step-title">{{ _('Submit your request') }}</span>
+                                        <span class="dashboard-no-access-step-desc">{{ _('Choose the countries whose data you will be responsible for managing.') }}</span>
+                                    </div>
+                                </li>
+                                <li class="dashboard-no-access-step{% if no_access_flow_step == 2 %} dashboard-no-access-step--current{% elif no_access_flow_step > 2 %} dashboard-no-access-step--completed{% endif %}"{% if no_access_flow_step == 2 %} aria-current="step"{% endif %}>
+                                    <span class="dashboard-no-access-step-num" aria-hidden="true">
+                                        {% if no_access_flow_step > 2 %}<i class="fas fa-check"></i>{% else %}2{% endif %}
+                                    </span>
+                                    <div class="dashboard-no-access-step-content">
+                                        <span class="dashboard-no-access-step-title">{{ _('Admin review') }}</span>
+                                        <span class="dashboard-no-access-step-desc">{{ _('An administrator will review your request.') }}</span>
+                                    </div>
+                                </li>
+                                <li class="dashboard-no-access-step{% if no_access_flow_step == 3 %} dashboard-no-access-step--current{% endif %}">
+                                    <span class="dashboard-no-access-step-num" aria-hidden="true">3</span>
+                                    <div class="dashboard-no-access-step-content">
+                                        <span class="dashboard-no-access-step-title">{{ _('Access granted') }}</span>
+                                        <span class="dashboard-no-access-step-desc">{{ _('You’ll get access once your request is approved.') }}</span>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div class="dashboard-no-access-request-block">
+
+                        {% if all_access_requests %}
+                            <div class="dashboard-no-access-requests">
+                                <h3 class="dashboard-no-access-requests__title">{{ _('Your Access Requests') }}</h3>
+                                <div class="dashboard-no-access-requests__list">
+                                    {% for request in all_access_requests %}
+                                        {% set is_revoked = False %}
+                                        {% if request.status == 'approved' %}
+                                            {% set is_revoked = request._access_revoked|default(False) %}
+                                        {% endif %}
+                                        <div class="dashboard-no-access-request-item">
+                                            <div class="flex items-center justify-between flex-wrap gap-2 mb-1.5">
+                                                <h4 class="text-sm font-semibold text-gray-900">
+                                                    {% if request.country %}
+                                                        {{ get_localized_country_name(request.country) }}
+                                                    {% else %}
+                                                        {{ _('Unknown Country') }} (ID: {{ request.country_id }})
+                                                    {% endif %}
+                                                </h4>
+                                                <div class="flex items-center gap-2 flex-wrap">
+                                                    {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
+                                                    <span class="text-xs text-gray-500">
+                                                        {{ request.created_at|datetime_local('datetime') }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            {% if request.request_message %}
+                                                <p class="text-sm text-gray-600 mt-2 pt-2 border-t border-gray-200">{{ request.request_message }}</p>
+                                            {% endif %}
+                                            {% if request.admin_notes %}
+                                                <p class="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-200"><strong>{{ _('Admin Notes') }}:</strong> {{ request.admin_notes }}</p>
+                                            {% endif %}
+                                            {% if is_revoked %}
+                                                <p class="text-xs text-orange-700 mt-2 pt-2 border-t border-orange-200">{{ _('This request was approved, but your access to this country has since been removed by an administrator.') }}</p>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        {% set non_org_can_still_request = can_request_multiple_countries or not (non_org_has_counting_request|default(false)) %}
+                        {% if non_org_can_still_request %}
+                        <form method="POST" action="{{ url_for('main.request_country_access') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="request_access_csrf_token">
+
+                            <div class="dashboard-no-access-form-grid">
+                                <section class="dashboard-no-access-form-section">
+                                    <div class="dashboard-no-access-form-section-header">
+                                        <span class="dashboard-no-access-form-section-icon dashboard-no-access-form-section-icon--country">
+                                            <i class="fas fa-globe-americas" aria-hidden="true"></i>
+                                        </span>
+                                        <h3 class="dashboard-no-access-form-section-title">
+                                            {% if can_request_multiple_countries %}{{ _('Countries whose data you will manage') }}{% else %}{{ _('Country whose data you will manage') }}{% endif %}
+                                            <span class="required-mark">*</span>
+                                        </h3>
+                                    </div>
+                                    <p class="dashboard-no-access-form-section-hint">
+                                        {% if can_request_multiple_countries %}
+                                            {{ _('Only request access for countries whose databank data you are responsible for managing.') }}
+                                        {% else %}
+                                            {{ _('Request access for the country whose databank data you are responsible for managing. An admin will review your request.') }}
+                                        {% endif %}
+                                    </p>
+                                    <div class="select2-country-wrap">
+                                        {{ request_access_form.requested_country_id(id="request_access_requested_country", class="block w-full select2-country") }}
+                                    </div>
+                                    {% for error in request_access_form.requested_country_id.errors %}
+                                        <p class="text-red-600 text-sm">{{ error }}</p>
+                                    {% endfor %}
+                                    <p class="dashboard-no-access-form-section-note">
+                                        {% if can_request_multiple_countries %}
+                                            {{ _('You can select multiple countries and submit all requests at once.') }}
+                                        {% else %}
+                                            {{ _('You can only request one country in total.') }}
+                                        {% endif %}
+                                    </p>
+                                </section>
+
+                                <section class="dashboard-no-access-form-section">
+                                    <div class="dashboard-no-access-form-section-header">
+                                        <span class="dashboard-no-access-form-section-icon dashboard-no-access-form-section-icon--message">
+                                            <i class="fas fa-comment-dots" aria-hidden="true"></i>
+                                        </span>
+                                        <h3 class="dashboard-no-access-form-section-title">
+                                            {{ _('Message to admins') }}
+                                            <span class="text-gray-400 font-normal">({{ _('optional') }})</span>
+                                        </h3>
+                                    </div>
+                                    <p class="dashboard-no-access-form-section-hint">{{ _('Briefly describe your role and why you need access.') }}</p>
+                                    <div class="dashboard-no-access-message-wrap">
+                                        {{ request_access_form.request_message(id="request_access_request_message", class="dashboard-no-access-message", placeholder=_('Example: I am the Focal Point for reporting and need access to submit annual data.'), rows="5", maxlength="1000") }}
+                                        <span class="dashboard-no-access-message-count" id="request_access_message_count">0 / 1000</span>
+                                    </div>
+                                    {% for error in request_access_form.request_message.errors %}
+                                        <p class="mt-2 text-red-600 text-sm">{{ error }}</p>
+                                    {% endfor %}
+                                </section>
+                            </div>
+
+                            <div class="dashboard-no-access-form-footer">
+                                <div class="dashboard-no-access-submit-wrap">
+                                    <div class="dashboard-no-access-submit-row">
+                                        <p class="dashboard-no-access-notify">
+                                            <i class="far fa-envelope dashboard-no-access-notify__icon" aria-hidden="true"></i>
+                                            <span>{{ _('You will be notified about the status of your request.') }}</span>
+                                        </p>
+                                        <button type="submit" class="dashboard-no-access-submit">
+                                            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                                            {{ _('Request Access') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                        {% else %}
+                        <div class="dashboard-no-access-limit-notice">
+                            <i class="fas fa-info-circle mr-2" aria-hidden="true"></i>
+                            {{ _('You can only request access to one country in total. You have already submitted a request.') }}
+                        </div>
+                        {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                </div>
+            </div>

@@ -26,20 +26,20 @@ class TestNotifyStandaloneDocumentUploadedLogging:
 
             mock_create = MagicMock(return_value=[])
             with patch(
-                "app.services.notification.core.collect_entity_admin_audience_recipient_ids",
+                "app.services.notification.notifiers.documents.collect_entity_admin_audience_recipient_ids",
                 return_value=[valid_user.id, stale_user_id],
             ), patch(
-                "app.services.notification.core.create_notification",
+                "app.services.notification.notifiers.documents.create_notification",
                 mock_create,
             ), patch(
-                "app.services.notification.core.log_entity_activity",
+                "app.services.notification.notifiers.documents.log_entity_activity",
             ), patch(
-                "app.services.notification.core.current_user",
+                "app.services.notification.notifiers.documents.current_user",
                 MagicMock(is_authenticated=True, id=5, email="uploader@example.com"),
             ), patch(
-                "app.services.notification.core.Country"
+                "app.services.notification.notifiers.documents.Country"
             ) as MockCountry, patch(
-                "app.services.notification.core.User"
+                "app.services.notification.notifiers.documents.User"
             ) as MockUser:
                 MockCountry.query.get.return_value = MagicMock(name="Test Country")
                 MockUser.query.filter.return_value.all.return_value = [valid_user]

@@ -8,6 +8,7 @@ from flask import current_app
 from flask.cli import with_appcontext
 
 from app.extensions import db
+from app.utils.datetime_helpers import utcnow
 from app.utils.transactions import atomic
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def cleanup_sessions_now():
         """Immediately clean up all inactive sessions with detailed output."""
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         from app.models import UserSessionLog
         from app.services.platform.user_analytics_service import cleanup_inactive_sessions
@@ -47,8 +48,8 @@ def register_dev_tools_commands(app):
             click.echo(f"  Total sessions: {total_sessions}")
             click.echo(f"  Active sessions: {active_sessions}")
 
-            inactivity_cutoff = datetime.utcnow() - timedelta(hours=2)
-            max_duration_cutoff = datetime.utcnow() - timedelta(hours=8)
+            inactivity_cutoff = utcnow() - timedelta(hours=2)
+            max_duration_cutoff = utcnow() - timedelta(hours=8)
 
             inactive_sessions = UserSessionLog.query.filter(
                 UserSessionLog.is_active == True,
@@ -67,7 +68,7 @@ def register_dev_tools_commands(app):
                 for session_log in sessions_to_close:
                     user_email = session_log.user.email if session_log.user else "Unknown"
                     hours_since_activity = (
-                        datetime.utcnow() - session_log.last_activity
+                        utcnow() - session_log.last_activity
                     ).total_seconds() / 3600
                     click.echo(
                         f"  - User: {user_email}, Last activity: {hours_since_activity:.1f} hours ago"
@@ -163,7 +164,7 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def force_cleanup_old_sessions():
         """Force cleanup of all sessions older than 1 hour, regardless of activity."""
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         from app.models import UserSessionLog
         from app.services.platform.user_analytics_service import cleanup_inactive_sessions
@@ -185,10 +186,10 @@ def register_dev_tools_commands(app):
             for session_log in active_session_details:
                 user_email = session_log.user.email if session_log.user else "Unknown"
                 hours_since_start = (
-                    datetime.utcnow() - session_log.session_start
+                    utcnow() - session_log.session_start
                 ).total_seconds() / 3600
                 hours_since_activity = (
-                    datetime.utcnow() - session_log.last_activity
+                    utcnow() - session_log.last_activity
                 ).total_seconds() / 3600
                 click.echo(f"  - User: {user_email}")
                 click.echo(f"    Session start: {session_log.session_start}")
@@ -216,8 +217,6 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def show_all_sessions():
         """Show all sessions (active and inactive) with detailed information."""
-        from datetime import datetime
-
         from app.models import UserSessionLog
 
         try:
@@ -235,10 +234,10 @@ def register_dev_tools_commands(app):
             for session_log in all_sessions:
                 user_email = session_log.user.email if session_log.user else "Unknown"
                 hours_since_start = (
-                    datetime.utcnow() - session_log.session_start
+                    utcnow() - session_log.session_start
                 ).total_seconds() / 3600
                 hours_since_activity = (
-                    datetime.utcnow() - session_log.last_activity
+                    utcnow() - session_log.last_activity
                 ).total_seconds() / 3600
 
                 status = "ACTIVE" if session_log.is_active else "INACTIVE"
@@ -451,8 +450,6 @@ def register_dev_tools_commands(app):
     @with_appcontext
     def force_cleanup_all_active():
         """Force cleanup of ALL active sessions immediately."""
-        from datetime import datetime
-
         from app.models import UserSessionLog
 
         try:
@@ -465,7 +462,7 @@ def register_dev_tools_commands(app):
                 for session_log in active_sessions:
                     user_email = session_log.user.email if session_log.user else "Unknown"
 
-                    session_log.session_end = datetime.utcnow()
+                    session_log.session_end = utcnow()
                     session_log.is_active = False
                     session_log.ended_by = "force_cleanup"
 

@@ -43,6 +43,15 @@ export function initFormEvents() {
     if (!button) {
       return { message: null, title: _t('Submit Form?'), confirmText: _t('Submit'), action: 'submit' };
     }
+    if (window.getConfirmDialogOptions) {
+      const opts = window.getConfirmDialogOptions(button, form);
+      return {
+        message: opts.message,
+        title: opts.title,
+        confirmText: opts.confirmText,
+        action: button.value || 'submit',
+      };
+    }
     return {
       message: button.getAttribute('data-confirm-message'),
       title: button.getAttribute('data-confirm-title') || _t('Submit Form?'),
@@ -206,7 +215,9 @@ export function initFormEvents() {
 
   // Handle submit button confirmation dialogs
   // Use custom styled dialog instead of native alert
-  const confirmSubmitButtons = form.querySelectorAll('button[type="submit"][data-confirm-message]');
+  const confirmSubmitButtons = form.querySelectorAll(
+    'button[type="submit"][data-confirm-message]:not(.return-for-revision-trigger)'
+  );
   confirmSubmitButtons.forEach(button => {
     // Guard against double-initialization (which can cause stacked modals and double submits)
     if (button.dataset.confirmHandlerBound === 'true') return;

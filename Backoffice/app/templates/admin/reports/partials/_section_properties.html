@@ -1,0 +1,77 @@
+<div id="rb-section-props-empty" class="report-props-empty">
+    <i class="fas fa-layer-group" aria-hidden="true"></i>
+    <p>{{ _('Click a section or element in the report canvas to configure it here.') }}</p>
+</div>
+
+<div id="rb-section-props-form" class="hidden">
+    <section class="report-panel-section">
+        <h4 class="report-panel-heading"><i class="fas fa-layer-group" aria-hidden="true"></i>{{ _('Section') }}</h4>
+        <label class="report-field">
+            <span>{{ _('Section title') }}</span>
+            <input type="text" id="rb-section-title" class="form-control" placeholder="{{ _('Section heading in the report') }}">
+        </label>
+    </section>
+
+    <section class="report-panel-section">
+        <h4 class="report-panel-heading"><i class="fas fa-magic" aria-hidden="true"></i>{{ _('Content source') }}</h4>
+        <div class="report-mode-cards">
+            <label class="report-mode-card">
+                <input type="radio" name="rb-section-mode" value="manual">
+                <span class="report-mode-card-body">
+                    <strong>{{ _('Manual widgets') }}</strong>
+                    <span>{{ _('Add KPIs, charts, and tables one at a time.') }}</span>
+                </span>
+            </label>
+            <label class="report-mode-card">
+                <input type="radio" name="rb-section-mode" value="dynamic">
+                <span class="report-mode-card-body">
+                    <strong>{{ _('Indicator Bank rule') }}</strong>
+                    <span>{{ _('Auto-create one widget per matching indicator (recommended for PB-style reports).') }}</span>
+                </span>
+            </label>
+        </div>
+    </section>
+
+    <section id="rb-section-dynamic-fields" class="report-panel-section hidden">
+        <h4 class="report-panel-heading"><i class="fas fa-tags" aria-hidden="true"></i>{{ _('Which indicators?') }}</h4>
+        <label class="report-field">
+            <span>{{ _('Related programmes') }}</span>
+            <div id="rb-section-programmes-picker" class="rb-chip-picker" data-field="programmes"></div>
+            <span class="report-field-hint">{{ _('Click suggestions or type a programme code (e.g. PB27-28) and press Enter.') }}</span>
+        </label>
+        <label class="report-field">
+            <span>{{ _('Tags') }} <span class="report-field-optional">{{ _('optional') }}</span></span>
+            <div id="rb-section-tags-picker" class="rb-chip-picker" data-field="tags"></div>
+        </label>
+
+        <div id="rb-section-rule-summary" class="report-rule-summary hidden">
+            <i class="fas fa-check-circle" aria-hidden="true"></i>
+            <span id="rb-section-rule-summary-text"></span>
+        </div>
+
+        <label class="report-field">
+            <span>{{ _('Widget style for each indicator') }}</span>
+            <select id="rb-section-dynamic-widget-type" class="form-control">
+                <option value="indicator_dashboard">{{ _('Progress dashboard — line chart + year/NS table') }}</option>
+                <option value="line">{{ _('Line chart only') }}</option>
+                <option value="kpi">{{ _('Single number (KPI)') }}</option>
+                <option value="table">{{ _('Summary table') }}</option>
+            </select>
+        </label>
+
+        <label class="report-field">
+            <span class="inline-flex items-center gap-2">
+                <input type="checkbox" id="rb-section-dynamic-group-by">
+                {{ _('Split into SPEF sections (CC / SP / EF)') }}
+            </span>
+            <span class="report-field-hint">{{ _('Matches the PB Progress report layout — one section per Strategic Priority or Enabling Function.') }}</span>
+        </label>
+
+        <select id="rb-section-dynamic-kind" class="hidden" aria-hidden="true" tabindex="-1"></select>
+        <select id="rb-section-rule-programmes" class="hidden" multiple aria-hidden="true" tabindex="-1"></select>
+        <select id="rb-section-rule-tags" class="hidden" multiple aria-hidden="true" tabindex="-1"></select>
+        <input type="checkbox" id="rb-section-dynamic-enabled" class="hidden" aria-hidden="true" tabindex="-1">
+    </section>
+
+    {% include "admin/reports/partials/_section_tools.html" %}
+</div>

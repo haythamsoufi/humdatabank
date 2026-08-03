@@ -1300,7 +1300,10 @@ def api_assignment_entry_bootstrap(aes_id):
             return json_ok(completion_rate=0.0, auto_load={}, resolved_variables={})
 
         from app.services.assignments.completion_service import AssignmentCompletionService
-        from app.services.forms.variable_resolution_service import VariableResolutionService
+        from app.services.forms.variable_resolution_helpers import (
+            merge_batch_resolved_variables,
+            resolve_assignment_level_variables,
+        )
 
         completion_rate = AssignmentCompletionService.stored_rate_for(aes)
 
@@ -1318,20 +1321,10 @@ def api_assignment_entry_bootstrap(aes_id):
         # reverse-lookup columns) when no matrix on this template uses auto-load.
         auto_load_matrices = [item for item in matrices if _matrix_uses_auto_load(item)]
 
-        resolved_variables = {}
-        assignment_level_resolved = None
-        if template_version and variable_configs:
-            try:
-                # Computed once and shared: used for resolved_variables[''] below AND
-                # passed into every matrix's candidate collection so reverse-lookup
-                # ("entities_containing") columns don't each re-resolve it.
-                assignment_level_resolved = VariableResolutionService.resolve_variables(
-                    template_version, aes
-                )
-                resolved_variables[''] = assignment_level_resolved or {}
-                resolved_variables['assignment'] = assignment_level_resolved or {}
-            except Exception as e:
-                current_app.logger.debug('entry-bootstrap assignment resolve failed: %s', e)
+        resolved_variables, assignment_level_resolved = resolve_assignment_level_variables(
+            template_version,
+            aes,
+        )
 
         auto_load = {}
         pending_tick_filters = []  # [(form_item_id_str, candidates), ...]
@@ -1379,17 +1372,12 @@ def api_assignment_entry_bootstrap(aes_id):
         # ONE batch resolve covers both the reverse+tick auto-load filter and
         # resolved_variables for already-saved rows (previously: one batch call per
         # reverse-lookup matrix, plus a second, separate assignment-wide batch call).
-        batch = {}
-        if template_version and row_entity_ids:
-            try:
-                batch = VariableResolutionService.resolve_variables_batch(
-                    template_version, aes, list(row_entity_ids)
-                ) or {}
-            except Exception as e:
-                current_app.logger.debug('entry-bootstrap batch resolve failed: %s', e)
-
-        for rid, vals in batch.items():
-            resolved_variables[str(rid)] = vals
+        batch = merge_batch_resolved_variables(
+            template_version,
+            aes,
+            row_entity_ids,
+            resolved_variables,
+        )
 
         for item_id_str, candidates in pending_tick_filters:
             filtered = {}

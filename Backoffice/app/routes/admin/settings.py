@@ -132,8 +132,10 @@ def _build_ai_groups():
                     if pid not in seen:
                         ordered.append(pid)
                 provider_order = ordered
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.warning(
+                "Failed to parse AI provider priority from settings: %s", e
+            )
 
     _provider_fields_map = {
         'openai': [
@@ -1187,8 +1189,10 @@ def manage_settings():
                                 if _pid not in seen_p:
                                     valid_p.append(_pid)
                             existing_ai['AI_PROVIDER_PRIORITY'] = json.dumps(valid_p)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        current_app.logger.warning(
+                            "Failed to parse submitted AI provider priority: %s", e
+                        )
 
                 try:
                     ai_ok = set_ai_settings(existing_ai, user_id=user_id)

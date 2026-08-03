@@ -8,6 +8,8 @@ This module provides common functionality that plugins can use to reduce code du
 import logging
 import traceback
 import sys
+import importlib.util
+from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from functools import wraps
 from flask import current_app, request
@@ -19,6 +21,52 @@ from app.routes.admin.shared import permission_required
 import json
 
 PLUGIN_MANAGE_PERMISSION = 'admin.plugins.manage'
+
+
+def load_plugin_config(
+    module_dir,
+    plugin_id: str,
+    *,
+    config_filename: str = "config.py",
+    config_attr: str = "plugin_config",
+    log: Optional[logging.Logger] = None,
+):
+    """
+    Load a plugin config object from its config module directory.
+
+    Uses importlib file loading with a DbPluginConfig fallback when the module
+    cannot be loaded (same pattern as interactive_map and emergency_operations).
+    """
+    from app.plugins.db_config import DbPluginConfig
+
+    log = log or logging.getLogger(__name__)
+    module_dir = Path(module_dir)
+    config_file = module_dir / config_filename
+
+    try:
+        if not config_file.exists():
+            raise ImportError(f"Config file not found: {config_file}")
+
+        spec_name = f"{plugin_id}_config"
+        spec = importlib.util.spec_from_file_location(spec_name, config_file)
+        if not spec or not spec.loader:
+            raise ImportError("Could not create spec for config module")
+
+        config_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(config_module)
+
+        if not hasattr(config_module, config_attr):
+            raise ImportError(f"{config_attr} not found in config module")
+
+        return getattr(config_module, config_attr)
+    except Exception as exc:
+        log.warning(
+            "%s: Could not load config from %s, using DbPluginConfig fallback: %s",
+            plugin_id,
+            config_file,
+            exc,
+        )
+        return DbPluginConfig(plugin_id, {})
 
 
 class PluginError(Exception):

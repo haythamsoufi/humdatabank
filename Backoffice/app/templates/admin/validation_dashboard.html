@@ -1,5 +1,5 @@
 {% extends "core/layout.html" %}
-{% from "components/_page_header.html" import page_header %}
+{% from "admin/_validation_admin_shell.html" import validation_admin_shell, validation_admin_styles with context %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "components/ag_grid_includes.html" import ag_grid_js, ag_grid_container, ag_grid_page_config %}
 
@@ -7,46 +7,18 @@
 
 {% block head %}
     {{ super() }}
-    <link rel="stylesheet" href="{{ static_url('css/validation-dashboard.css') }}">
-    <link rel="stylesheet" href="{{ static_url('vendor/leaflet/leaflet.css') }}">
+    {{ validation_admin_styles(['vendor/leaflet/leaflet.css']) }}
 {% endblock %}
 
 {% block content %}
 
-{% set vd_header_actions = namespace(items=[]) %}
-{% if is_system_manager or has_permission('admin.validation.questions') %}
-    {% set __ = vd_header_actions.items.append({
-        'type': 'link',
-        'text': _('Manage Questions'),
-        'icon': 'fas fa-clipboard-question',
-        'url': url_for('admin.validation_questions_admin'),
-        'classes': 'professional-action-btn'
-    }) %}
-{% endif %}
-{% if is_system_manager or has_permission('admin.validation.rules') %}
-    {% set __ = vd_header_actions.items.append({
-        'type': 'link',
-        'text': _('Rules Registry'),
-        'icon': 'fas fa-shield-alt',
-        'url': url_for('admin.validation_rules_admin'),
-        'classes': 'professional-action-btn professional-action-btn-blue'
-    }) %}
-{% endif %}
-
-{{ page_header(
-    title=_('Validation Dashboard'),
-    subtitle=_('Track FDRS submission progress across countries, monitor validation flags, and generate questions for focal points.'),
-    icon='fas fa-chart-line',
-    breadcrumbs=[
-        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Explore Data'), 'url': url_for('data_exploration.explore_data')},
-        {'name': _('Validation Dashboard')}
-    ],
-    actions=vd_header_actions.items
-) }}
-
-<div id="vd-feedback" class="hidden mb-4 rounded-md px-4 py-3 text-sm border" role="status" aria-live="polite"></div>
-
+{% call validation_admin_shell(
+    'dashboard',
+    _('Validation Dashboard'),
+    _('Track FDRS submission progress across countries, monitor validation flags, and generate questions for focal points.'),
+    'fas fa-chart-line',
+    'vd-feedback'
+) %}
 <div class="bg-white rounded-lg shadow-sm border border-ifrc-gray-200 mb-6">
     {% if template_options %}
     {% set upr_ns = namespace(tab=none) %}
@@ -291,6 +263,8 @@
     }
 } %}
 {{ ag_grid_page_config('validationDashboardConfig', 'VD_GRID_TRANSLATIONS', vd_grid_bootstrap) }}
+
+{% endcall %}
 
 {% endblock %}
 

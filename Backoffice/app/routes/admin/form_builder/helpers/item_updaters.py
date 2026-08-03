@@ -6,6 +6,7 @@ from flask import flash, current_app
 from app import db
 from app.models import IndicatorBank, LookupList
 from config.config import Config
+from .field_parsing import get_field_value
 import json
 
 ENTRY_FORM_HINT_STYLES = frozenset({'normal', 'info', 'warning', 'tip', 'important'})
@@ -278,8 +279,9 @@ def _update_question_fields(question, form, request_form):
 
     # Helper to read possibly-prefixed fields
     field_prefix = f"{form.prefix}-" if getattr(form, 'prefix', None) else ''
+
     def _fp(name, default=None):
-        return request_form.get(f"{field_prefix}{name}", default)
+        return get_field_value(request_form, name, field_prefix, default)
 
     # Handle manual options vs calculated lists for choice types
     try:

@@ -184,7 +184,10 @@
                                 {% if assignment_status.status == 'submitted' and can_approve_assignment(assignment_status) %}
                                 <form action="{{ url_for('main.approve_assignment', aes_id=assignment_status.id) }}" method="POST" class="inline-block approve-assignment-form">
                                     {{ csrf_form.csrf_token }}
-                                    <button type="submit" class="professional-action-btn professional-action-btn-green" data-loading-text="{{ _('Validating…') }}">
+                                    <button type="submit" class="professional-action-btn professional-action-btn-green" data-loading-text="{{ _('Validating…') }}"
+                                            data-confirm-title="{{ _('Validate Assignment?')|forceescape }}"
+                                            data-confirm-label="{{ _('Validate')|forceescape }}"
+                                            data-confirm-message="{{ _('Are you sure you want to validate this assignment?')|forceescape }}">
                                         <i class="fas fa-check-double"></i>
                                         <span>{{ _('Validate') }}</span>
                                     </button>
@@ -193,7 +196,10 @@
                                 {% if can_reopen_assignment(assignment_status) %}
                                 <form action="{{ url_for('main.reopen_assignment', aes_id=assignment_status.id) }}" method="POST" class="inline-block reopen-assignment-form">
                                     {{ csrf_form.csrf_token }}
-                                    <button type="submit" class="professional-action-btn professional-action-btn-orange" data-loading-text="{{ _('Reopening…') }}">
+                                    <button type="submit" class="professional-action-btn professional-action-btn-orange" data-loading-text="{{ _('Reopening…') }}"
+                                            data-confirm-title="{{ _('Reopen Assignment?')|forceescape }}"
+                                            data-confirm-label="{{ _('Reopen')|forceescape }}"
+                                            data-confirm-message="{{ _('Are you sure you want to reopen this assignment?')|forceescape }}">
                                         <i class="fas fa-undo"></i>
                                         <span>{{ _('Reopen') }}</span>
                                     </button>
@@ -581,15 +587,17 @@
                             </button>
                             {% endif %}
                             {% if can_return_for_revision %}
-                            <form action="{{ url_for('main.return_assignment_for_revision', aes_id=assignment_status.id) }}" method="POST" class="flex-1 return-for-revision-form min-w-[10rem]">
-                                {{ csrf_form.csrf_token }}
-                                <button type="submit" class="btn btn-warning w-full"
-                                        data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}"
-                                        data-loading-text="{{ _('Returning…') }}">
-                                    <i class="fas fa-reply w-4 h-4 mr-2"></i>
-                                    {{ _('Request changes') }}
-                                </button>
-                            </form>
+                            {# Standalone POST form is outside #focalDataEntryForm; button triggers it via JS. #}
+                            <button type="button"
+                                    class="btn btn-warning w-full flex-1 min-w-[10rem] return-for-revision-trigger"
+                                    data-form-id="return-for-revision-form-{{ assignment_status.id }}"
+                                    data-confirm-title="{{ _('Request changes?')|forceescape }}"
+                                    data-confirm-label="{{ _('Request changes')|forceescape }}"
+                                    data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}"
+                                    data-loading-text="{{ _('Returning…') }}">
+                                <i class="fas fa-reply w-4 h-4 mr-2"></i>
+                                {{ _('Request changes') }}
+                            </button>
                             {% endif %}
                             {% if not is_public_submission %}
                             <button type="button" id="auth-save-draft-btn"
@@ -2596,6 +2604,18 @@
             <div id="mobile-nav-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden xl:hidden"></div>
 
         </div> {# End entry-form-ui #}
+        {% if can_return_for_revision and assignment_status %}
+        {# Standalone form — must not live inside #focalDataEntryForm (HTML forbids nested forms). #}
+        <form id="return-for-revision-form-{{ assignment_status.id }}"
+              action="{{ url_for('main.return_assignment_for_revision', aes_id=assignment_status.id) }}"
+              method="POST"
+              class="hidden return-for-revision-form"
+              data-confirm-title="{{ _('Request changes?')|forceescape }}"
+              data-confirm-label="{{ _('Request changes')|forceescape }}"
+              data-confirm-message="{{ _('Return this assignment to the National Society for changes?')|forceescape }}">
+            {{ csrf_form.csrf_token }}
+        </form>
+        {% endif %}
         </div> {# End of container #}
 
 
@@ -3959,45 +3979,6 @@
             });
         })();
         </script>
-
-        {# Confirmation handlers for admin validate/reopen forms on entry form #}
-        {% if not is_public_submission and is_admin_user %}
-        <script nonce="{{ csp_nonce() }}">
-        (function() {
-            'use strict';
-            document.addEventListener('submit', function(e) {
-                var form = e.target;
-                if (!form.classList.contains('approve-assignment-form') && !form.classList.contains('reopen-assignment-form')) return;
-                if (form.dataset.confirmed === 'true') { delete form.dataset.confirmed; return; }
-                e.preventDefault();
-                if (window.FormSubmitGuard && typeof window.FormSubmitGuard.reset === 'function') {
-                    window.FormSubmitGuard.reset(form);
-                }
-
-                var submitBtn = form.querySelector('[type="submit"]');
-                if (submitBtn && submitBtn.disabled) return;
-                if (submitBtn) submitBtn.disabled = true;
-
-                var isApprove = form.classList.contains('approve-assignment-form');
-                var msg = isApprove
-                    ? {{ _('Are you sure you want to validate this assignment?')|tojson|safe }}
-                    : {{ _('Are you sure you want to reopen this assignment?')|tojson|safe }};
-                var label = isApprove ? {{ _('Validate')|tojson|safe }} : {{ _('Reopen')|tojson|safe }};
-                var fn = window.showConfirmation || window.showDangerConfirmation;
-                if (fn) {
-                    fn(msg,
-                        function() { form.dataset.confirmed = 'true'; form.requestSubmit ? form.requestSubmit() : form.submit(); },
-                        function() { if (submitBtn) submitBtn.disabled = false; },
-                        label,
-                        {{ _('Cancel')|tojson|safe }}
-                    );
-                } else {
-                    if (submitBtn) submitBtn.disabled = false;
-                }
-            });
-        })();
-        </script>
-        {% endif %}
 
 {# Deferred chatbot loader: on entry-form pages the chatbot scripts are skipped during initial
    page load (skip_layout_chatbot=True) to save ~15 requests and ~580 KB. We inject them lazily

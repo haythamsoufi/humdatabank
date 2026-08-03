@@ -394,6 +394,7 @@ def api_get_notification_count():
 
 @bp.route("/api/stream/status", methods=["GET"])
 @login_required
+@json_error_handler('Notification stream status')
 def api_notification_stream_status():
     """
     Check if WebSocket is enabled on the server.
@@ -2051,45 +2052,41 @@ def api_admin_get_users_bulk():
 @bp.route("/api/admin/countries", methods=["GET"])
 @login_required
 @permission_required('admin.communication.manage')
+@json_error_handler('Admin countries list')
 def api_admin_get_countries():
     """Get list of countries for bulk selection (admin only)"""
-    try:
-        from app.models import Country
+    from app.models import Country
 
-        countries = Country.query.order_by(Country.name).all()
+    countries = Country.query.order_by(Country.name).all()
 
-        countries_data = []
-        for country in countries:
-            countries_data.append({
-                'id': country.id,
-                'name': country.name,
-                'code': country.iso3 or country.iso2 or ''
-            })
+    countries_data = []
+    for country in countries:
+        countries_data.append({
+            'id': country.id,
+            'name': country.name,
+            'code': country.iso3 or country.iso2 or ''
+        })
 
-        return json_ok(success=True, countries=countries_data)
-    except Exception as e:
-        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+    return json_ok(success=True, countries=countries_data)
 
 
 @bp.route("/api/admin/entity-types", methods=["GET"])
 @login_required
 @permission_required('admin.communication.manage')
+@json_error_handler('Admin entity types list')
 def api_admin_get_entity_types():
     """Get list of entity types for bulk selection (admin only)"""
-    try:
-        from app.models.enums import EntityType
-        from app.services.organization.entity_service import EntityService
+    from app.models.enums import EntityType
+    from app.services.organization.entity_service import EntityService
 
-        entity_types = []
-        for entity_type in EntityType:
-            entity_types.append({
-                'value': entity_type.value,
-                'label': EntityService.get_entity_type_label(entity_type.value)
-            })
+    entity_types = []
+    for entity_type in EntityType:
+        entity_types.append({
+            'value': entity_type.value,
+            'label': EntityService.get_entity_type_label(entity_type.value)
+        })
 
-        return json_ok(success=True, entity_types=entity_types)
-    except Exception as e:
-        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+    return json_ok(success=True, entity_types=entity_types)
 
 
 @bp.route("/api/admin/assignments", methods=["GET"])

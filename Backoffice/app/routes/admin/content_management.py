@@ -46,6 +46,7 @@ from app.services.ai.documents.ingest import (
     maybe_enqueue_submitted_document_ai_processing_after_approval,
     sync_ai_document_is_public_from_submitted,
 )
+from app.services.content.thumbnail_service import ThumbnailService
 
 # Allowed file extensions for uploads
 ALLOWED_DOCUMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt']
@@ -1131,8 +1132,7 @@ def generate_resource_thumbnail(resource_id, language_code):
                     os.remove(file_path)
 
             if thumbnail_path:
-                translation.thumbnail_relative_path = thumbnail_path
-                translation.thumbnail_filename = os.path.basename(thumbnail_path)
+                ThumbnailService.apply_generated_thumbnail(translation, thumbnail_path)
                 db.session.flush()
                 if is_json_request():
                     return json_ok(
@@ -1155,11 +1155,14 @@ def generate_resource_thumbnail(resource_id, language_code):
             flash("Thumbnail generation is only supported for PDF files.", "warning")
 
     except Exception as e:
-        current_app.logger.error("Error generating thumbnail: %s", e, exc_info=True)
-        request_transaction_rollback()
         if is_json_request():
-            return json_server_error(GENERIC_ERROR_MESSAGE)
-        flash("Error generating thumbnail.", "danger")
+            return handle_json_view_exception(
+                e,
+                GENERIC_ERROR_MESSAGE,
+                log_message=f"Error generating thumbnail: {e}",
+            )
+        handle_view_exception(e, "Error generating thumbnail.", redirect_endpoint="content_management.edit_resource", redirect_kwargs={"resource_id": resource_id})
+        return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
     if not is_json_request():
         return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
@@ -1181,8 +1184,7 @@ def delete_resource_thumbnail(resource_id, language_code):
             return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
         storage.delete(storage.RESOURCES, translation.thumbnail_relative_path)
-        translation.thumbnail_relative_path = None
-        translation.thumbnail_filename = None
+        ThumbnailService.clear_model_thumbnail_fields(translation)
         db.session.flush()
         tr_lang = translation.language_code
 
@@ -1192,12 +1194,19 @@ def delete_resource_thumbnail(resource_id, language_code):
         return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
     except Exception as e:
-        current_app.logger.error("Error deleting thumbnail: %s", e, exc_info=True)
-        request_transaction_rollback()
         if is_json_request():
-            return json_server_error(GENERIC_ERROR_MESSAGE)
-            flash("Error deleting thumbnail.", "danger")
-            return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
+            return handle_json_view_exception(
+                e,
+                GENERIC_ERROR_MESSAGE,
+                log_message=f"Error deleting thumbnail: {e}",
+            )
+        handle_view_exception(
+            e,
+            "Error deleting thumbnail.",
+            redirect_endpoint="content_management.edit_resource",
+            redirect_kwargs={"resource_id": resource_id},
+        )
+        return redirect(url_for("content_management.edit_resource", resource_id=resource_id))
 
 # === Document Management Routes ===
 @bp.route("/documents", methods=["GET"])
@@ -1912,8 +1921,7 @@ def generate_document_thumbnail(doc_id, language_code=None):
                 os.remove(file_path)
 
         if thumbnail_path:
-            document.thumbnail_relative_path = thumbnail_path
-            document.thumbnail_filename = os.path.basename(thumbnail_path)
+            ThumbnailService.apply_generated_thumbnail(document, thumbnail_path)
             db.session.flush()
 
             current_app.logger.info(f"Thumbnail generated successfully: {thumbnail_path}")
@@ -1935,14 +1943,14 @@ def generate_document_thumbnail(doc_id, language_code=None):
                 return redirect(url_for("content_management.manage_documents"))
 
     except Exception as e:
-        current_app.logger.error(f"Error generating document thumbnail: {e}", exc_info=True)
-        request_transaction_rollback()
-
         if is_json_request():
-            return json_server_error(GENERIC_ERROR_MESSAGE)
-        else:
-            flash("Error generating thumbnail.", "danger")
-            return redirect(url_for("content_management.manage_documents"))
+            return handle_json_view_exception(
+                e,
+                GENERIC_ERROR_MESSAGE,
+                log_message=f"Error generating document thumbnail: {e}",
+            )
+        handle_view_exception(e, "Error generating thumbnail.", redirect_endpoint="content_management.manage_documents")
+        return redirect(url_for("content_management.manage_documents"))
 
 @bp.route("/documents/<int:doc_id>/delete-thumbnail/<language_code>", methods=["POST"])
 @bp.route("/documents/<int:doc_id>/delete-thumbnail", methods=["POST"])
@@ -1966,15 +1974,9 @@ def delete_document_thumbnail(doc_id, language_code=None):
         current_app.logger.info(f"Deleting thumbnail: {document.thumbnail_relative_path}")
 
         thumb_cat = storage.submitted_document_rel_storage_category(document.thumbnail_relative_path)
-        deleted = storage.delete(thumb_cat, document.thumbnail_relative_path)
-        if deleted:
-            current_app.logger.info(f"Deleted thumbnail: {document.thumbnail_relative_path}")
-        else:
-            current_app.logger.warning(f"Thumbnail not found: {document.thumbnail_relative_path}")
+        ThumbnailService.delete_stored_thumbnail(thumb_cat, document.thumbnail_relative_path)
 
-        # Clear thumbnail fields in database
-        document.thumbnail_relative_path = None
-        document.thumbnail_filename = None
+        ThumbnailService.clear_model_thumbnail_fields(document)
         db.session.flush()
 
         current_app.logger.info(f"Thumbnail deleted successfully for document {doc_id}")
@@ -1986,14 +1988,14 @@ def delete_document_thumbnail(doc_id, language_code=None):
             return redirect(url_for("content_management.manage_documents"))
 
     except Exception as e:
-        current_app.logger.error(f"Error deleting document thumbnail: {e}", exc_info=True)
-        request_transaction_rollback()
-
         if is_json_request():
-            return json_server_error(GENERIC_ERROR_MESSAGE)
-        else:
-            flash("Error deleting thumbnail.", "danger")
-            return redirect(url_for("content_management.manage_documents"))
+            return handle_json_view_exception(
+                e,
+                GENERIC_ERROR_MESSAGE,
+                log_message=f"Error deleting document thumbnail: {e}",
+            )
+        handle_view_exception(e, "Error deleting thumbnail.", redirect_endpoint="content_management.manage_documents")
+        return redirect(url_for("content_management.manage_documents"))
 
 @bp.route("/documents/<int:doc_id>/thumbnail", methods=["GET"])
 @permission_required('admin.documents.manage')
@@ -2047,13 +2049,17 @@ def approve_document(doc_id):
             return json_ok(message=f"Document '{document.filename}' approved successfully.")
 
     except Exception as e:
-        request_transaction_rollback()
-        current_app.logger.error(f"Error approving document {doc_id}: {e}", exc_info=True)
-        flash("Error approving document.", "danger")
         if is_json_request():
-            return json_server_error(GENERIC_ERROR_MESSAGE)
+            return handle_json_view_exception(
+                e,
+                GENERIC_ERROR_MESSAGE,
+                log_message=f"Error approving document {doc_id}: {e}",
+            )
+        handle_view_exception(e, "Error approving document.", redirect_endpoint="content_management.manage_documents")
+        return redirect(url_for("content_management.manage_documents"))
 
     return redirect(url_for("content_management.manage_documents"))
+
 
 @bp.route("/documents/decline/<int:doc_id>", methods=["POST"])
 @permission_required('admin.documents.manage')
@@ -2069,11 +2075,14 @@ def decline_document(doc_id):
             return json_ok(message=f"Document '{document.filename}' declined successfully.")
 
     except Exception as e:
-        request_transaction_rollback()
-        current_app.logger.error(f"Error declining document {doc_id}: {e}", exc_info=True)
-        flash("Error declining document.", "danger")
         if is_json_request():
-            return json_server_error(GENERIC_ERROR_MESSAGE)
+            return handle_json_view_exception(
+                e,
+                GENERIC_ERROR_MESSAGE,
+                log_message=f"Error declining document {doc_id}: {e}",
+            )
+        handle_view_exception(e, "Error declining document.", redirect_endpoint="content_management.manage_documents")
+        return redirect(url_for("content_management.manage_documents"))
 
     return redirect(url_for("content_management.manage_documents"))
 
@@ -2217,39 +2226,15 @@ def _delete_file_and_folder(base_path, relative_file_path, category):
         current_app.logger.error(f"Error deleting file: {e}", exc_info=True)
 
 def _generate_pdf_thumbnail_to_storage(pdf_full_path, unique_folder_name, language_code=None, category=None):
-    """Generate a PDF thumbnail and save it via the storage service.
+    """Generate a PDF thumbnail and save it via the storage service."""
+    return ThumbnailService.generate_pdf_thumbnail_to_storage(
+        pdf_full_path, unique_folder_name, language_code=language_code, category=category,
+    )
 
-    Returns the relative path stored by the storage service, or ``None`` on failure.
-    """
-    try:
-        if not _check_pdf_processing_capability():
-            return None
 
-        import fitz
-        from PIL import Image
-        with fitz.open(pdf_full_path) as pdf_document:
-            page = pdf_document[0]
-
-            mat = fitz.Matrix(1.5, 1.5)
-            pix = page.get_pixmap(matrix=mat)
-            img_data = pix.tobytes("png")
-
-            img = Image.open(io.BytesIO(img_data))
-            img.thumbnail((300, 400), Image.Resampling.LANCZOS)
-
-            thumbnail_filename = f"thumbnail_{language_code}.png" if language_code else "thumbnail.png"
-            rel_path = f"{unique_folder_name}/thumbnails/{thumbnail_filename}"
-
-            buf = io.BytesIO()
-            img.save(buf, "PNG")
-            png_bytes = buf.getvalue()
-
-        cat = category or storage.ADMIN_DOCUMENTS
-        return storage.upload(cat, rel_path, png_bytes)
-
-    except Exception as e:
-        current_app.logger.error(f"Error generating PDF thumbnail: {e}", exc_info=True)
-        return None
+def _check_pdf_processing_capability():
+    """Check if PDF processing libraries are available."""
+    return ThumbnailService.check_pdf_processing_capability()
 
 
 def _auto_generate_resource_pdf_thumbnail_if_needed(translation, unique_folder_name):
@@ -2272,20 +2257,9 @@ def _auto_generate_resource_pdf_thumbnail_if_needed(translation, unique_folder_n
             category=storage.RESOURCES,
         )
         if thumbnail_path:
-            translation.thumbnail_relative_path = thumbnail_path
-            translation.thumbnail_filename = os.path.basename(thumbnail_path)
+            ThumbnailService.apply_generated_thumbnail(translation, thumbnail_path)
     finally:
         if _cleanup_temp:
             with suppress(OSError):
                 os.remove(file_path)
 
-
-def _check_pdf_processing_capability():
-    """Check if PDF processing libraries are available"""
-    try:
-        import fitz
-        from PIL import Image
-        return True
-    except ImportError:
-        current_app.logger.warning("PDF processing libraries not available")
-        return False

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{ report.title }}</title></head>
+<body>
+<h1>{{ report.title }}</h1>
+{% if report.description %}<p>{{ report.description }}</p>{% endif %}
+{% for wid, payload in widgets.items() %}
+<section class="widget">
+    <h2>{{ payload.title or wid }}</h2>
+    {% if payload.error %}
+    <p style="color:#b91c1c;">{{ payload.error }}</p>
+    {% elif payload.type == 'kpi' %}
+    <p><strong>{{ payload.value }}</strong>{% if payload.metric %} — {{ payload.metric }}{% endif %}</p>
+    {% elif payload.type == 'text' %}
+    <div>{{ payload.content|safe }}</div>
+    {% elif payload.type == 'table' %}
+    <table>
+        <thead><tr>{% for col in payload.columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for row in payload.rows %}
+        <tr>{% for col in payload.columns %}<td>{{ row[col] if row is mapping else '' }}</td>{% endfor %}</tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% elif chart_images.get(wid) %}
+    <img src="{{ chart_images[wid] }}" alt="{{ payload.title or wid }}">
+    {% elif payload.chart_payload %}
+    <p>{{ payload.chart_payload.type }} chart (use interactive export for images)</p>
+    {% endif %}
+</section>
+{% endfor %}
+</body>
+</html>

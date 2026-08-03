@@ -1,8 +1,13 @@
 from app.utils.file_paths import save_sector_logo
 from app.services.platform import storage_service as storage
-from flask import current_app
+from flask import current_app, flash
 from datetime import datetime
 from sqlalchemy import inspect
+from sqlalchemy.orm.attributes import flag_modified
+from app import db
+from app.utils.transactions import request_transaction_rollback
+from app.utils.api_responses import json_bad_request, json_ok, require_json_data
+from config import Config
 import os
 
 
@@ -37,6 +42,65 @@ def _delete_logo_file(filename):
         storage.delete(storage.SYSTEM, f"sectors/{filename}")
     except Exception as e:
         current_app.logger.exception("Error deleting logo file: %s", e)
+
+
+# === Hierarchy CRUD Helpers (sectors, subsectors, NS entities) ===
+
+def get_translatable_languages():
+    """Return configured translatable language codes."""
+    return (
+        current_app.config.get("TRANSLATABLE_LANGUAGES", None)
+        or getattr(Config, "TRANSLATABLE_LANGUAGES", [])
+        or []
+    )
+
+
+def apply_name_translations_from_form(entity, form):
+    """Apply name_<lang> form fields to an entity supporting set_name_translation."""
+    for lang in get_translatable_languages():
+        field = getattr(form, f"name_{lang}", None)
+        if field is not None:
+            entity.set_name_translation(lang, field.data or "")
+
+
+def flash_form_errors(form):
+    """Flash validation errors from a WTForms form."""
+    for field, errors in form.errors.items():
+        for error in errors:
+            flash(f"Error in {field}: {error}", "danger")
+
+
+def update_entity_name_translations_json(entity, data, *, success_message):
+    """Update name_* translation fields from a JSON payload."""
+    err = require_json_data(data)
+    if err:
+        return err
+    updated_fields = []
+    for field_name, value in data.items():
+        if not isinstance(field_name, str):
+            continue
+        if not field_name.startswith("name_") or field_name == "name":
+            continue
+        entity.set_name_translation(field_name[5:], value if value is not None else "")
+        updated_fields.append(field_name)
+    if not updated_fields:
+        return json_bad_request("No valid name translation fields to update")
+    flag_modified(entity, "name_translations")
+    db.session.add(entity)
+    db.session.flush()
+    return json_ok(message=success_message, updated_fields=updated_fields)
+
+
+def handle_hierarchy_db_error(
+    exc,
+    *,
+    log_message,
+    flash_message="An error occurred. Please try again.",
+):
+    """Rollback, flash, and log a hierarchy CRUD failure."""
+    request_transaction_rollback()
+    flash(flash_message, "danger")
+    current_app.logger.error(log_message, exc_info=True)
 
 
 # === Indicator Change Tracking ===

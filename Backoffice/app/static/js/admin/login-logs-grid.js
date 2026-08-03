@@ -4,28 +4,22 @@
 (function() {
     'use strict';
 
-    function esc(s) {
-        if (s === null || s === undefined) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+    var esc = window.esc || function(s) {
+        return (typeof AnalyticsGridCommon !== 'undefined' && AnalyticsGridCommon.esc)
+            ? AnalyticsGridCommon.esc(s)
+            : (s == null ? '' : String(s));
+    };
+
+    function mapRow(item) {
+        return (typeof AnalyticsGridCommon !== 'undefined' && AnalyticsGridCommon.mapAnalyticsUserRow)
+            ? AnalyticsGridCommon.mapAnalyticsUserRow(item)
+            : item;
     }
 
     function truncate(str, maxLen) {
         var s = str == null ? '' : String(str);
         if (s.length <= maxLen) return s;
         return s.slice(0, Math.max(0, maxLen - 1)) + '…';
-    }
-
-    function mapRow(item) {
-        var u = item.user;
-        return Object.assign({}, item, {
-            user_id: u ? u.id : null,
-            user_name: u ? (u.name || u.email || '') : '',
-            user_email: u ? (u.email || '') : ''
-        });
     }
 
     function buildColumnDefs(t) {

@@ -91,14 +91,15 @@
 {% endif %}
 
 {# Form & Data Management Category - Only show if user has any form/data management permissions #}
-{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') %}
+{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') or has_permission('admin.data_explore.reports') or has_permission('admin.reports.view') or has_permission('admin.reports.edit') %}
+{% set can_access_reports_builder = is_system_manager or has_permission('admin.reports.view') or has_permission('admin.reports.edit') %}
 {% for ext_tab in data_explorer_extension_tabs|default([]) %}
 {% set can_access_data_explorer = can_access_data_explorer or has_permission(ext_tab.permission) %}
 {% endfor %}
 {% set can_access_validation_dashboard = is_system_manager or has_permission('admin.validation.dashboard') %}
 {% set can_access_validation_questions = is_system_manager or has_permission('admin.validation.questions') %}
 {% set can_access_validation = can_access_validation_dashboard or can_access_validation_questions %}
-{% if is_system_manager or has_permission('admin.templates.view') or has_permission('admin.assignments.view') or has_permission('admin.assignments.public_submissions.manage') or can_access_data_explorer or can_access_validation %}
+{% if is_system_manager or has_permission('admin.templates.view') or has_permission('admin.assignments.view') or has_permission('admin.assignments.public_submissions.manage') or can_access_data_explorer or can_access_reports_builder or can_access_validation %}
 <div class="space-y-2 mt-4" data-category="form-data-management">
      <div class="collapsable-category-title">
          <h3 class="sidebar-section-title">{{ _('Form & Data Management') }}</h3>
@@ -121,6 +122,12 @@
         <a href="{{ url_for('data_exploration.explore_data') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Explore Data')|forceescape }}">
             {{ svg_icon('explore-data', 'sidebar-icon w-6 h-6 mr-3') }}
             <span class="sidebar-text">{{ _('Explore Data') }}</span>
+        </a>
+        {% endif %}
+        {% if can_access_reports_builder %}
+        <a href="{{ url_for('reports.reports_list') }}" class="sidebar-item-container block py-2 px-2.5 rounded transition duration-200 hover:bg-gray-700 hover:text-white" title="{{ _('Reports')|forceescape }}">
+            <i class="fas fa-chart-bar sidebar-icon w-6 h-6 mr-3 text-center"></i>
+            <span class="sidebar-text">{{ _('Reports') }}</span>
         </a>
         {% endif %}
         {% if can_access_validation_dashboard %}

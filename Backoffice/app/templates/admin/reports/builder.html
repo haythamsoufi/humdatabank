@@ -1,0 +1,93 @@
+{% extends "core/layout.html" %}
+
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ report.title if report else _('New report') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ static_url('css/reports/report-builder.css') }}">
+    <script src="{{ static_url('libs/apexcharts.min.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+{{ page_header(
+    title=_('Report builder'),
+    subtitle=_('Build interactive reports from form data and Indicator Bank rules.'),
+    icon='fas fa-chart-bar',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Reports'), 'url': url_for('reports.reports_list')},
+        {'name': report.title if report else _('New'), 'url': None}
+    ]
+) }}
+
+<div id="report-builder-app">
+    <header class="report-builder-toolbar">
+        <div class="report-builder-toolbar-primary">
+            <label class="report-toolbar-title-field">
+                <span class="sr-only">{{ _('Report title') }}</span>
+                <input type="text" id="rb-title" class="report-toolbar-title" value="{{ report.title if report else '' }}" placeholder="{{ _('Untitled report') }}">
+            </label>
+            <span id="rb-save-status" class="report-builder-save-status" aria-live="polite"></span>
+        </div>
+        <div class="report-builder-toolbar-actions">
+            <button type="button" id="rb-refresh-data-toolbar" class="btn btn-secondary">
+                <i class="fas fa-sync" aria-hidden="true"></i>{{ _('Refresh data') }}
+            </button>
+            <button type="button" id="rb-save" class="btn btn-primary">{{ _('Save') }}</button>
+            <button type="button" id="rb-publish" class="btn btn-secondary">{{ _('Publish') }}</button>
+            {% if report %}
+            <a href="{{ url_for('reports.reports_view', report_id=report.id) }}" class="btn btn-secondary">{{ _('Open viewer') }}</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="report-builder-layout">
+        <div class="report-builder-workspace report-builder-editor-workspace">
+            <div class="report-editor-toolbar">
+                <p id="rb-editor-hint" class="report-editor-hint">{{ _('Live preview of your report. Click elements to configure them, or use + slots to add widgets.') }}</p>
+                <div class="report-editor-toolbar-actions">
+                    <button type="button" id="rb-refresh-data" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-sync" aria-hidden="true"></i>{{ _('Refresh preview data') }}
+                    </button>
+                    <button type="button" id="rb-add-section" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-plus" aria-hidden="true"></i>{{ _('Add section') }}
+                    </button>
+                </div>
+            </div>
+            <div id="rb-editor-canvas" class="report-editor-canvas report-runtime" aria-label="{{ _('Report editor') }}"></div>
+        </div>
+
+        <aside class="report-builder-inspector">
+            <nav class="report-inspector-tabs" aria-label="{{ _('Configuration panels') }}">
+                <button type="button" class="report-inspector-tab is-active" data-inspector-tab="setup">{{ _('Setup') }}</button>
+                <button type="button" class="report-inspector-tab" data-inspector-tab="section">{{ _('Section') }}</button>
+                <button type="button" class="report-inspector-tab" data-inspector-tab="widget">{{ _('Widget') }}</button>
+            </nav>
+            <div class="report-inspector-body">
+                <div id="rb-inspector-setup" class="report-inspector-panel is-active">
+                    {% include "admin/reports/partials/_filter_panel.html" %}
+                </div>
+                <div id="rb-inspector-section" class="report-inspector-panel">
+                    {% include "admin/reports/partials/_section_properties.html" %}
+                </div>
+                <div id="rb-inspector-widget" class="report-inspector-panel">
+                    {% include "admin/reports/partials/_widget_properties.html" %}
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script type="application/json" id="report-builder-bootstrap">
+{{ {
+    'reportId': report.id if report else none,
+    'definition': definition,
+    'csrfToken': csrf_token(),
+    'apiBase': url_for('reports.api_create_report').rsplit('/api', 1)[0] + '/api',
+    'viewUrl': url_for('reports.reports_view', report_id=report.id) if report else none
+}|tojson }}
+</script>
+<script type="module" src="{{ static_url('js/reports/builder/main.js') }}"></script>
+{% endblock %}

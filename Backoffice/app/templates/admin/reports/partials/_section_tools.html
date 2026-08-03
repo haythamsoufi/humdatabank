@@ -1,0 +1,31 @@
+<section class="report-panel-section" id="rb-section-manual-tools">
+    <h4 class="report-panel-heading"><i class="fas fa-plus-circle" aria-hidden="true"></i>{{ _('Add widgets') }}</h4>
+    <p class="report-panel-intro">{{ _('Click a type to add it to the selected section, then configure it in the Widget tab.') }}</p>
+    {% include "admin/reports/partials/_widget_palette.html" %}
+</section>
+
+<section class="report-panel-section">
+    <h4 class="report-panel-heading"><i class="fas fa-sticky-note" aria-hidden="true"></i>{{ _('Section footnote') }}</h4>
+    <label class="report-field">
+        <span>{{ _('Footnote text') }} <span class="report-field-optional">{{ _('optional') }}</span></span>
+        <textarea id="rb-section-footnote" class="form-control" rows="3" placeholder="{{ _('Shown once at the bottom of this section in the report (e.g. data source notes).') }}"></textarea>
+    </label>
+</section>
+
+<section id="rb-section-dynamic-footnotes" class="report-panel-section hidden">
+    <h4 class="report-panel-heading"><i class="fas fa-list-ul" aria-hidden="true"></i>{{ _('Indicator footnotes') }}</h4>
+    <p class="report-panel-intro">{{ _('Optional notes below individual auto-generated indicator widgets.') }}</p>
+    <label class="report-field">
+        <span class="inline-flex items-center gap-2">
+            <input type="checkbox" id="rb-section-include-bank-guidance">
+            {{ _('Use Indicator Bank disaggregation guidance when no custom note is set') }}
+        </span>
+    </label>
+    <div id="rb-indicator-footnotes-list" class="report-indicator-footnotes-list">
+        <p class="report-field-hint">{{ _('Configure programmes/tags above, then footnote fields will appear for each matched indicator.') }}</p>
+    </div>
+</section>
+
+<div class="report-inspector-footer">
+    <button type="button" id="rb-delete-section" class="btn btn-sm btn-danger w-full">{{ _('Delete section') }}</button>
+</div>

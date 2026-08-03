@@ -31,8 +31,9 @@ describe('matrix numeric input sanitization', () => {
         await import('../../../app/static/js/forms/modules/numeric-formatting.js');
     });
 
-    it('whole-number matrix cells allow digits only', () => {
-        expect(window.__sanitizeMatrixNumericInputValue('12-3,4.5a', 0)).toBe('12345');
+    it('whole-number matrix cells preserve a decimal point for validation', () => {
+        expect(window.__sanitizeMatrixNumericInputValue('12-3,4.5a', 0)).toBe('1234.5');
+        expect(window.__sanitizeMatrixNumericInputValue('1234.56', 0)).toBe('1234.56');
     });
 
     it('decimal matrix cells allow digits and one decimal point', () => {

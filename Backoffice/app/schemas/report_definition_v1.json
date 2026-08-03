@@ -1,0 +1,212 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "report_definition_v1",
+  "type": "object",
+  "required": ["schema_version", "filters", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "template_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "period_names": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "country_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "assignment_statuses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "requires_revision",
+              "sent_for_review",
+              "submitted",
+              "approved",
+              "cancelled"
+            ]
+          }
+        },
+        "include_public_submissions": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/section" }
+    }
+  },
+  "definitions": {
+    "section": {
+      "type": "object",
+      "required": ["id", "title", "order", "widgets"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "order": { "type": "integer", "minimum": 0 },
+        "footnote": { "type": "string" },
+        "widgets": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/widget" }
+        },
+        "dynamic_indicators": { "$ref": "#/definitions/dynamic_indicators" }
+      }
+    },
+    "widget": {
+      "type": "object",
+      "required": ["id", "type", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": ["table", "kpi", "line", "bar", "pie", "text", "indicator_dashboard"]
+        },
+        "title": { "type": "string" },
+        "data_source": { "$ref": "#/definitions/data_source" },
+        "chart_options": {
+          "type": "object"
+        },
+        "content": {
+          "type": "string",
+          "description": "Markdown/HTML for text widgets"
+        },
+        "footnote": {
+          "type": "string",
+          "description": "Optional footnote shown below the widget"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "text" } } },
+          "then": {}
+        },
+        {
+          "if": {
+            "properties": {
+              "type": { "enum": ["table", "kpi", "line", "bar", "pie"] }
+            }
+          },
+          "then": { "required": ["data_source"] }
+        }
+      ]
+    },
+    "data_source": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "indicator_values",
+            "indicator_aggregate",
+            "indicator_timeseries",
+            "indicator_by_country",
+            "indicator_by_dimension",
+            "assignment_status_counts",
+            "assignment_list",
+            "categorical_counts",
+            "raw_data",
+            "indicator_set_aggregate",
+            "indicator_dashboard"
+          ]
+        },
+        "indicator_bank_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "indicator_bank_id": { "type": ["integer", "null"] },
+        "metric": {
+          "type": "string",
+          "enum": ["sum", "count", "avg", "implementing_count", "reported_count"]
+        },
+        "group_by": { "type": "string" },
+        "disaggregation_mode": {
+          "type": "string",
+          "enum": ["none", "sex", "age", "sex_age"]
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "layout": {
+          "type": "string",
+          "enum": ["flat", "star"]
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 5000 },
+        "indicator_selection": { "$ref": "#/definitions/indicator_selection" }
+      }
+    },
+    "indicator_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "related_programs_any": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Match indicators whose Related Programmes includes any of these values (e.g. PB27-28)."
+        },
+        "tags_any": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "spef_codes_any": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "emergency": { "type": ["boolean", "null"] },
+        "search_text": { "type": "string" }
+      }
+    },
+    "indicator_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["manual", "rule"]
+        },
+        "rule": { "$ref": "#/definitions/indicator_rule" }
+      }
+    },
+    "dynamic_indicators": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "rule": { "$ref": "#/definitions/indicator_rule" },
+        "widget_type": {
+          "type": "string",
+          "enum": ["kpi", "table", "line", "indicator_dashboard"]
+        },
+        "data_source_kind": { "type": "string" },
+        "metric": { "type": "string" },
+        "group_by": {
+          "type": "string",
+          "enum": ["spef_section"]
+        },
+        "include_bank_guidance_footnotes": { "type": "boolean" },
+        "indicator_footnotes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  }
+}

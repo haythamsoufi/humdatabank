@@ -184,12 +184,9 @@ function __isMatrixNumericInput(input) {
         input.matches && (input.matches('input[type="number"]') || input.dataset.numeric === 'true'));
 }
 
-/** Matrix cells accept typed digits only; decimal columns also allow one "." (commas added on blur). */
-function __sanitizeMatrixNumericInputValue(value, maxDecimals) {
+/** Matrix cells accept typed digits; allow one "." so pasted decimals stay visible and whole-number validation can flag them. */
+function __sanitizeMatrixNumericInputValue(value, _maxDecimals) {
     let str = String(value ?? '');
-    if (typeof maxDecimals === 'number' && maxDecimals === 0) {
-        return str.replace(/[^0-9]/g, '');
-    }
     str = str.replace(/[^0-9.]/g, '');
     const dotIndex = str.indexOf('.');
     if (dotIndex !== -1) {

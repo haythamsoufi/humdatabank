@@ -1,0 +1,65 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ _('Reports') }} — {{ _('Admin') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ static_url('css/reports/report-builder.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set header_actions = namespace(items=[]) %}
+{% if can_edit %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('New report'),
+        'icon': 'fas fa-plus',
+        'url': url_for('reports.reports_new'),
+        'classes': 'professional-action-btn professional-action-btn-blue'
+    }) %}
+{% endif %}
+
+{{ page_header(
+    title=_('Reports'),
+    subtitle=_('Build and view metadata-driven reports from indicator bank, templates, and assignments.'),
+    icon='fas fa-chart-bar',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Reports'), 'url': None}
+    ],
+    actions=header_actions.items
+) }}
+
+<div class="report-list-page">
+    {% if reports %}
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {% for report in reports %}
+        <article class="report-card">
+            <h3 class="report-card-title">{{ report.title }}</h3>
+            {% if report.description %}
+            <p class="report-card-desc">{{ report.description }}</p>
+            {% endif %}
+            <div class="report-card-meta">
+                <span class="report-status report-status-{{ report.status }}">{{ report.status }}</span>
+                <span>{{ report.updated_at.strftime('%Y-%m-%d') if report.updated_at else '' }}</span>
+            </div>
+            <div class="report-card-actions">
+                <a href="{{ url_for('reports.reports_view', report_id=report.id) }}" class="btn btn-sm btn-primary">{{ _('View') }}</a>
+                {% if can_edit and (is_system_manager or report.owner_user_id == current_user.id or has_permission('admin.reports.manage')) %}
+                <a href="{{ url_for('reports.reports_edit', report_id=report.id) }}" class="btn btn-sm btn-secondary">{{ _('Edit') }}</a>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="report-empty-state">
+        <p>{{ _('No reports yet.') }}</p>
+        {% if can_edit %}
+        <a href="{{ url_for('reports.reports_new') }}" class="btn btn-primary">{{ _('Create your first report') }}</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

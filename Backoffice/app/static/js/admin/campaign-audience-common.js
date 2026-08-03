@@ -194,6 +194,94 @@
         }
     }
 
+    function updateCountryCount() {
+        const countrySelect = document.getElementById('bulk-select-country');
+        const countEl = document.getElementById('bulk-country-count');
+        if (!countrySelect || !countEl) return;
+        let selected = 0;
+        if (global.jQuery && global.jQuery.fn.select2 && global.jQuery(countrySelect).hasClass('select2-hidden-accessible')) {
+            const val = global.jQuery(countrySelect).val();
+            selected = val ? (Array.isArray(val) ? val.length : 1) : 0;
+        } else {
+            selected = countrySelect.selectedOptions.length;
+        }
+        if (selected > 0) {
+            countEl.textContent = `${selected} countr${selected === 1 ? 'y' : 'ies'} selected`;
+            countEl.className = 'text-xs text-blue-600 font-medium mt-1';
+        } else {
+            countEl.textContent = 'No countries selected';
+            countEl.className = 'text-xs text-gray-500 mt-1';
+        }
+    }
+
+    function checkAssignmentStatusForTemplateGroup() {
+        const templateGroup = document.getElementById('bulk-select-template-group');
+        const checkedStatuses = Array.from(document.querySelectorAll('.bulk-assignment-status-checkbox:checked'));
+        if (!templateGroup) return;
+        if (checkedStatuses.length > 0) {
+            templateGroup.classList.remove('hidden');
+            return;
+        }
+        templateGroup.classList.add('hidden');
+        const templateSelect = document.getElementById('bulk-select-template');
+        if (!templateSelect) return;
+        if (global.jQuery && global.jQuery.fn.select2 && global.jQuery(templateSelect).hasClass('select2-hidden-accessible')) {
+            global.jQuery(templateSelect).val(null).trigger('change');
+        } else {
+            templateSelect.value = '';
+        }
+    }
+
+    function loadAssignmentsDropdown(options) {
+        const assignmentFormSelect = document.getElementById('bulk-select-assignment-form');
+        const allAssignments = options && options.allAssignments;
+        const onCountChange = options && options.onCountChange;
+        const onFiltersChanged = options && options.onFiltersChanged;
+        if (!assignmentFormSelect || !allAssignments) return;
+
+        const selectedTemplateIds = getSelectedTemplateFilterIds();
+        const currentSelected = getMultiSelectIntValues(assignmentFormSelect);
+        assignmentFormSelect.replaceChildren();
+        const assignmentsToShow = filterAssignmentsByTemplateIds(allAssignments, selectedTemplateIds);
+
+        assignmentsToShow.forEach((assignment) => {
+            const option = document.createElement('option');
+            option.value = assignment.id;
+            option.textContent = assignment.name;
+            option.dataset.templateId = assignment.template_id;
+            option.dataset.periodName = assignment.period_name;
+            assignmentFormSelect.appendChild(option);
+        });
+
+        if (global.jQuery && global.jQuery.fn.select2 && global.jQuery(assignmentFormSelect).hasClass('select2-hidden-accessible')) {
+            global.jQuery(assignmentFormSelect).select2('destroy');
+            const modal = document.getElementById('bulk-selection-modal');
+            global.jQuery(assignmentFormSelect).select2({
+                placeholder: 'Search and select assignments...',
+                allowClear: true,
+                width: '100%',
+                closeOnSelect: false,
+                theme: 'default',
+                dropdownParent: modal ? global.jQuery(modal) : global.jQuery('body'),
+            });
+            const availableIds = currentSelected.filter((id) => assignmentsToShow.some((a) => a.id === id));
+            if (availableIds.length > 0) {
+                global.jQuery(assignmentFormSelect).val(availableIds).trigger('change');
+            }
+            global.jQuery(assignmentFormSelect).on('select2:select select2:unselect', () => {
+                if (typeof onCountChange === 'function') onCountChange();
+                if (typeof onFiltersChanged === 'function') onFiltersChanged();
+            });
+            if (typeof onCountChange === 'function') onCountChange();
+        } else {
+            currentSelected.forEach((id) => {
+                const option = assignmentFormSelect.querySelector(`option[value="${id}"]`);
+                if (option) option.selected = true;
+            });
+            if (typeof onCountChange === 'function') onCountChange();
+        }
+    }
+
     global.CampaignAudienceCommon = {
         esc,
         escapeHtml: esc,
@@ -210,5 +298,8 @@
         formatEntityType,
         safeDomId,
         updateMultiSelectCountDisplay,
+        updateCountryCount,
+        checkAssignmentStatusForTemplateGroup,
+        loadAssignmentsDropdown,
     };
 }(typeof window !== 'undefined' ? window : this));

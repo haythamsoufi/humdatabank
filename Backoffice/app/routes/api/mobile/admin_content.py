@@ -1,6 +1,10 @@
 # Backoffice/app/routes/api/mobile/admin_content.py
 """Admin content management routes: templates, assignments, documents, resources,
-indicator bank, translations."""
+indicator bank, translations.
+
+Thumbnail generate/delete for mobile should delegate to
+``app.services.content.thumbnail_service.ThumbnailService`` (same as web admin).
+"""
 
 from flask import request, current_app
 from flask_login import current_user
@@ -13,7 +17,6 @@ from app.utils.mobile_responses import (
     mobile_ok, mobile_bad_request, mobile_not_found, mobile_forbidden,
     mobile_server_error, mobile_paginated, mobile_error,
 )
-from app.utils.sql_utils import safe_ilike_pattern
 from app.extensions import resolve_translations_directory
 from app.routes.api.mobile import mobile_bp
 

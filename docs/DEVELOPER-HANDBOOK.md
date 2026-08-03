@@ -469,6 +469,27 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 
 **Config override:** `PB_VISUALS_TOOL_DIR` in Flask config overrides the default `plugins/pb_progress/visuals/` path for the P&B build pipeline.
 
+### Native Report Builder (core platform)
+
+Admins compose metadata-driven reports from Indicator Bank, templates, and assignment data. Unlike the P&B plugin, reports are user-defined and stored in the `report_definition` table.
+
+| Piece | Location |
+|-------|----------|
+| Models | [`Backoffice/app/models/reports.py`](Backoffice/app/models/reports.py) |
+| Definition schema (v1) | [`Backoffice/app/schemas/report_definition_v1.json`](Backoffice/app/schemas/report_definition_v1.json) |
+| CRUD + scoping | [`Backoffice/app/services/reports/definition_service.py`](Backoffice/app/services/reports/definition_service.py) |
+| Widget execution | [`Backoffice/app/services/reports/data_service.py`](Backoffice/app/services/reports/data_service.py) |
+| Shared aggregation | [`Backoffice/app/services/data_retrieval/aggregation.py`](Backoffice/app/services/data_retrieval/aggregation.py) |
+| Admin UI | `/admin/reports` — list, builder (`/edit`), viewer |
+| JS renderers | [`Backoffice/app/static/js/reports/`](Backoffice/app/static/js/reports/) |
+| Permissions | `admin.reports.view`, `admin.reports.edit`, `admin.reports.manage`; Data Explorer tab `admin.data_explore.reports` |
+
+**Adding a widget type:** extend the JSON schema, add a `data_source.kind` handler in `ReportDataService.execute_widget`, and register the type in the builder palette (`builder/main.js`) plus `widget-renderer.js`.
+
+**Relationship to `/api/v1/data`:** reports use the same underlying FormData/assignment joins via `aggregation.py` and `query_form_data` filters; the public data API remains the integration surface for external BI tools.
+
+**Relationship to pb_progress:** P&B remains a specialized offline publish pipeline; it may later consume `aggregation.py` for system dataset generation, but is unchanged by the report builder v1.
+
 ## Migration and Data Management
 
 ### Database Migrations

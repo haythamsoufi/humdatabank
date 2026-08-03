@@ -3064,67 +3064,14 @@ class AdminNotifications {
     }
 
     loadAssignmentsDropdown() {
-        const assignmentFormSelect = document.getElementById('bulk-select-assignment-form');
-        if (!assignmentFormSelect || !this.allAssignments) return;
-
-        const cac = window.CampaignAudienceCommon;
-        const selectedTemplateIds = cac.getSelectedTemplateFilterIds();
-        const currentSelected = cac.getMultiSelectIntValues(assignmentFormSelect);
-
-        // Clear existing options
-        assignmentFormSelect.replaceChildren();
-
-        const assignmentsToShow = cac.filterAssignmentsByTemplateIds(this.allAssignments, selectedTemplateIds);
-
-        // Populate dropdown with filtered assignments
-        assignmentsToShow.forEach(assignment => {
-            const option = document.createElement('option');
-            option.value = assignment.id;
-            option.textContent = assignment.name;
-            option.dataset.templateId = assignment.template_id;
-            option.dataset.periodName = assignment.period_name;
-            assignmentFormSelect.appendChild(option);
-        });
-
-        // Restore Select2 if it was initialized
-        if (window.jQuery && window.jQuery.fn.select2 && $(assignmentFormSelect).hasClass('select2-hidden-accessible')) {
-            // Destroy and reinitialize Select2 to update options
-            $(assignmentFormSelect).select2('destroy');
-            const modal = document.getElementById('bulk-selection-modal');
-            $(assignmentFormSelect).select2({
-                placeholder: 'Search and select assignments...',
-                allowClear: true,
-                width: '100%',
-                closeOnSelect: false,
-                theme: 'default',
-                dropdownParent: modal ? $(modal) : $('body')
-            });
-
-            // Restore selected values that are still available
-            const availableIds = currentSelected.filter(id =>
-                assignmentsToShow.some(a => a.id === id)
-            );
-            if (availableIds.length > 0) {
-                $(assignmentFormSelect).val(availableIds).trigger('change');
-            }
-
-            // Reattach event listener
-            $(assignmentFormSelect).on('select2:select select2:unselect', () => {
-                this.updateAssignmentFormCount();
+        window.CampaignAudienceCommon.loadAssignmentsDropdown({
+            allAssignments: this.allAssignments,
+            onCountChange: () => this.updateAssignmentFormCount(),
+            onFiltersChanged: () => {
                 this.previewPage = 1;
                 this.loadPreviewUsers();
-            });
-
-            // Update count
-            this.updateAssignmentFormCount();
-        } else {
-            // For native select, restore selected values
-            currentSelected.forEach(id => {
-                const option = assignmentFormSelect.querySelector(`option[value="${id}"]`);
-                if (option) option.selected = true;
-            });
-            this.updateAssignmentFormCount();
-        }
+            },
+        });
     }
 
     filterAssignmentsByTemplates() {
@@ -3132,46 +3079,11 @@ class AdminNotifications {
     }
 
     checkAssignmentStatusForTemplateGroup() {
-        const templateGroup = document.getElementById('bulk-select-template-group');
-        const checkedStatuses = Array.from(document.querySelectorAll('.bulk-assignment-status-checkbox:checked'));
-
-        if (templateGroup) {
-            if (checkedStatuses.length > 0) {
-                templateGroup.classList.remove('hidden');
-            } else {
-                templateGroup.classList.add('hidden');
-                // Clear template selection when no status is selected
-                const templateSelect = document.getElementById('bulk-select-template');
-                if (templateSelect) {
-                    if (window.jQuery && window.jQuery.fn.select2 && $(templateSelect).hasClass('select2-hidden-accessible')) {
-                        $(templateSelect).val(null).trigger('change');
-                    } else {
-                        templateSelect.value = '';
-                    }
-                }
-            }
-        }
+        window.CampaignAudienceCommon.checkAssignmentStatusForTemplateGroup();
     }
 
     updateCountryCount() {
-        const countrySelect = document.getElementById('bulk-select-country');
-        const countEl = document.getElementById('bulk-country-count');
-        if (countrySelect && countEl) {
-            let selected = 0;
-            // Check if Select2 is initialized
-            if (window.jQuery && window.jQuery.fn.select2 && $(countrySelect).hasClass('select2-hidden-accessible')) {
-                selected = $(countrySelect).val() ? $(countrySelect).val().length : 0;
-            } else {
-                selected = countrySelect.selectedOptions.length;
-            }
-            if (selected > 0) {
-                countEl.textContent = `${selected} countr${selected === 1 ? 'y' : 'ies'} selected`;
-                countEl.className = 'text-xs text-blue-600 font-medium mt-1';
-            } else {
-                countEl.textContent = 'No countries selected';
-                countEl.className = 'text-xs text-gray-500 mt-1';
-            }
-        }
+        window.CampaignAudienceCommon.updateCountryCount();
     }
 
     async loadPreviewUsers() {

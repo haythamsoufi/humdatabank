@@ -1,0 +1,19 @@
+HTTP/1.1 302 FOUND
+Date: Mon, 03 Aug 2026 00:09:45 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 189
+Connection: keep-alive
+Server: gunicorn
+Cache-Control: no-cache, no-store, must-revalidate
+Location: /
+Set-Cookie: session=.eJwljUEKgzAQRa8yzDqItaKtp-i2FJGJmWioTSCjFRHv3khXHx6P93fs7EQysmDz2hHmNLhS9M4PqPAZlgjCIi548MyGDRBEtpFlVCABttNIhRlk0R_3N1cS8CEh-rLJ4DExCcMcN6CBnM-wPVqVns8KNpYmYYW9RNvN4c0eGzR1ocu7NdWt7ume60LrS1Ua4op7fa1tkXMy8hyPH7SRQWg.am_cSQ.2_8es1YeOn-E0y0afjSODpHZfH0; Secure; HttpOnly; Path=/; SameSite=Lax
+Vary: Accept-Encoding, Cookie
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 1; mode=block
+Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-p9RgsTkCniYEln-J' 'sha256-F2OZJCLKXjn5GkgDK82TQCGt3VAD7pAvv2GegMmBmmA=' 'sha256-C0POBvuIg2WsFkKXuy5NW4X27PXkxKrkaQL0AjxA/B8=' 'sha256-eRf/6o7h063u1aRHq9JazzrFoegwHCJN/dFqqZg7oF0=' 'sha256-4go2tWGJE+CNuqNpl48Yv+bO4uu+BQJh1MJF3yTjhl8=' 'sha256-Y/4W14eTM3Az3L4dOeJ6tK2FFZ+wZxp7ssM38MBKM2g=' 'sha256-dt/ya86/s8LgFk2v8XZkKpeGcfwvFHR3ivK+gBEVm64=' 'sha256-9plDW+xe6iwb+kc2Ab2H1JEg2Z7f2/5tGt6Ovl5ojFE=' 'sha256-ewJJ2tQuYLmjU/myxACs+VuEoGqmyJwcCEYdr+AuMac=' 'sha256-iNLi1rYoOeNI8CEXwy6NnxglbQ3BjdJZbgZHvuY89wA=' 'sha256-xG5vOuTJfko1kfw3c6cQOiOXhaZxr2Yhc5uF1ybVo+c=' 'sha256-ofVqu4ZzAuGbayuRZeenPtqaKeG7wyBnn5XRT9+Pyew=' https://ifrcdatabankstorage2.blob.core.windows.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.jsdelivr.net https://unpkg.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://ifrcdatabankstorage2.blob.core.windows.net https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://www.gstatic.com; img-src 'self' data: blob: https:; font-src 'self' data: https://ifrcdatabankstorage2.blob.core.windows.net https://cdnjs.cloudflare.com https://fonts.gstatic.com; connect-src 'self' https://ifrcdatabankstorage2.blob.core.windows.net https://unpkg.com https://www.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://nominatim.openstreetmap.org https://ipapi.co https://api.mapbox.com; frame-src 'self' https://app.powerbi.com https://app.powerbigov.us https://msit.powerbi.com https://public.tableau.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(self), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), fullscreen=(self), sync-xhr=()
+X-App-Origin: 1
+

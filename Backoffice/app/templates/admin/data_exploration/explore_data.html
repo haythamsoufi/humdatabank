@@ -5,95 +5,7 @@
 
 {% block head %}
     {{ super() }}
-    <style nonce="{{ csp_style_nonce() }}">
-        /* Grid container styling */
-        #dataExplorationGrid-container {
-            overflow-x: auto;
-            position: relative;
-        }
-
-        /* Loading spinner animation */
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Add vertical padding to ALL grid cells so text doesn't touch row borders */
-        /* Use very high specificity to override inline styles from cellStyle */
-        #dataExplorationGrid.ag-theme-alpine .ag-cell,
-        #dataExplorationGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height {
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
-            box-sizing: border-box !important;
-        }
-
-        /* Force padding even if inline styles try to override it */
-        /* This targets cells with inline style attributes */
-        #dataExplorationGrid.ag-theme-alpine .ag-cell[style] {
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
-        }
-
-        /* Ensure cell-wrapper maintains proper alignment and doesn't interfere */
-        #dataExplorationGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height .ag-cell-wrapper {
-            align-items: center !important;
-            min-height: calc(100% - 20px) !important;
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-        }
-
-        /* Text selection is enabled by default in ag-grid-common-styles.css */
-        /* Cell alignment and padding are handled by ag-grid-common-styles.css */
-        /* This template uses default middle alignment - no overrides needed */
-
-        /* Column visibility toolbar: ag-column-visibility-manager.css */
-        /* Additional template-specific overrides can be added here if needed */
-
-        /* Compliance grid styling */
-        #complianceGrid-container {
-            overflow-x: auto;
-            position: relative;
-        }
-
-        #complianceGrid.ag-theme-alpine .ag-cell,
-        #complianceGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height {
-            padding-top: 10px !important;
-            padding-bottom: 10px !important;
-            box-sizing: border-box !important;
-        }
-
-        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center,
-        #complianceGrid.ag-theme-alpine .ag-header-cell.compliance-header-center {
-            text-align: center !important;
-        }
-
-        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-wrapper,
-        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-value {
-            width: 100% !important;
-            justify-content: center !important;
-            text-align: center !important;
-        }
-
-        #complianceGrid.ag-theme-alpine .ag-header-cell.compliance-header-center .ag-header-cell-label {
-            justify-content: center !important;
-        }
-
-        /* Disaggregation sub-tab styling */
-        .disagg-subtab.active { border-bottom-color: #2563eb; color: #2563eb; }
-        .disagg-subtabs-divider {
-            width: 1px;
-            height: 1.5rem;
-            background-color: #d1d5db;
-            margin: 0 0.5rem;
-            flex-shrink: 0;
-        }
-        /* ApexCharts container styling */
-        .chart-container { min-height: 0; overflow: visible; }
-        .apexcharts-canvas { margin: 0 auto; }
-        .apexcharts-tooltip { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border-radius: 8px; }
-        .apexcharts-menu { border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
-        .apexcharts-menu-item:hover { background-color: #eff6ff; }
-    </style>
+    <link rel="stylesheet" href="{{ static_url('css/data-exploration-page.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -151,6 +63,14 @@
                     aria-selected="{{ 'true' if explore_first_tab == 'compliance' else 'false' }}"
                     class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'compliance') }}">
                 <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Compliance') }}
+            </button>
+            {% endif %}
+            {% if can_access_reports %}
+            <button type="button" role="tab" id="tab-reports"
+                    data-tab="reports"
+                    aria-selected="{{ 'true' if explore_first_tab == 'reports' else 'false' }}"
+                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'reports') }}">
+                <i class="fas fa-chart-bar mr-1.5"></i>{{ _('Reports') }}
             </button>
             {% endif %}
             {% for ext_tab in explorer_extension_tabs_render|default([]) %}
@@ -631,6 +551,12 @@
     {% endif %}
     <!-- End Tab panel: Compliance -->
 
+    {% if can_access_reports %}
+    <div id="panel-reports" class="explore-panel{% if explore_first_tab != 'reports' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-reports">
+        {% include "admin/reports/_explorer_tab_panel.html" %}
+    </div>
+    {% endif %}
+
     {% for ext_tab in explorer_extension_tabs_render|default([]) %}
     {{ extension_panels.get(ext_tab.tab_id, '')|safe }}
     {% endfor %}
@@ -656,6 +582,7 @@
     const CAN_ACCESS_DATA_TABLE = {{ can_access_data_table|tojson }};
     const CAN_ACCESS_ANALYSIS = {{ can_access_analysis|tojson }};
     const CAN_ACCESS_COMPLIANCE = {{ can_access_compliance|tojson }};
+    const CAN_ACCESS_REPORTS = {{ can_access_reports|default(false)|tojson }};
     const CAN_ACCESS_PB_PROGRESS = {{ can_access_pb_progress|default(false)|tojson }};
     const CAN_USE_AI_VALIDATION = {{ user_has_ai_beta_access(current_user)|tojson }};
     const FDRS_TEMPLATE_ID = {{ fdrs_template_id|tojson }};
@@ -845,11 +772,12 @@
     }
     window.applyExploreParamsToUrl = applyParamsToUrl;
 
-    // Get the currently active main tab id (data-table | disaggregation | compliance | pb-progress)
+    // Get the currently active main tab id (data-table | disaggregation | compliance | reports | pb-progress)
     function getActiveMainTabId() {
         if (domCache.tabDataTable && domCache.tabDataTable.getAttribute('aria-selected') === 'true') return 'data-table';
         if (domCache.tabDisaggregation && domCache.tabDisaggregation.getAttribute('aria-selected') === 'true') return 'disaggregation';
         if (domCache.tabCompliance && domCache.tabCompliance.getAttribute('aria-selected') === 'true') return 'compliance';
+        if (domCache.tabReports && domCache.tabReports.getAttribute('aria-selected') === 'true') return 'reports';
         if (domCache.tabPbProgress && domCache.tabPbProgress.getAttribute('aria-selected') === 'true') return 'pb-progress';
         return '';
     }
@@ -883,6 +811,7 @@
                 if (tabId === 'data-table' && domCache.tabDataTable && CAN_ACCESS_DATA_TABLE) switchMainTabFn(domCache.tabDataTable);
                 else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
                 else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
+                else if (tabId === 'reports' && domCache.tabReports && CAN_ACCESS_REPORTS) switchMainTabFn(domCache.tabReports);
                 else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
             }
             const activeTabId = tabId || getActiveMainTabId();
@@ -1122,10 +1051,12 @@
         domCache.tabDataTable = document.getElementById('tab-data-table');
         domCache.tabDisaggregation = document.getElementById('tab-disaggregation');
         domCache.tabCompliance = document.getElementById('tab-compliance');
+        domCache.tabReports = document.getElementById('tab-reports');
         domCache.tabPbProgress = document.getElementById('tab-pb-progress');
         domCache.panelDataTable = document.getElementById('panel-data-table');
         domCache.panelDisaggregation = document.getElementById('panel-disaggregation');
         domCache.panelCompliance = document.getElementById('panel-compliance');
+        domCache.panelReports = document.getElementById('panel-reports');
         domCache.panelPbProgress = document.getElementById('panel-pb-progress');
         domCache.exploreParametersSection = document.getElementById('explore-parameters-section');
         domCache.disaggTemplateFilterWrap = document.getElementById('disagg-template-filter-wrap');
@@ -3480,8 +3411,8 @@
             if (window.AdminUnderlineTabs) {
                 AdminUnderlineTabs.activateStripTab('#explore-data-tabs', tabId, { panelSelector: '.explore-panel' });
             } else {
-                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance, domCache.tabPbProgress];
-                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance, domCache.panelPbProgress];
+                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance, domCache.tabReports, domCache.tabPbProgress];
+                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance, domCache.panelReports, domCache.panelPbProgress];
                 tabs.forEach((tab, index) => {
                     if (!tab) return;
                     const isActive = tab === activeTab;
@@ -3560,6 +3491,12 @@
                         complianceGridHelper.refresh();
                     });
                 }
+            });
+        }
+        if (domCache.tabReports) {
+            domCache.tabReports.addEventListener('click', function() {
+                switchMainTab(domCache.tabReports);
+                applyParamsToUrl();
             });
         }
         if (domCache.tabPbProgress) {

@@ -1,0 +1,119 @@
+{# Request Access Modal - Available even when user has countries #}
+{% if user_countries or not user_countries %}
+<div id="request-access-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 hidden">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            {# Modal Header #}
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-user-plus mr-2 text-blue-600"></i>
+                    {{ _('Request Access to Additional Countries') }}
+                </h3>
+                <button type="button"
+                        id="close-request-access-modal"
+                        class="btn btn-close-icon"
+                        aria-label="{{ _('Close')|forceescape }}">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            {# Display list of access requests if any exist #}
+            {% if all_access_requests %}
+                <div class="mb-6 max-w-4xl">
+                    <h4 class="text-md font-semibold text-gray-800 mb-3 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        {{ _('Your Access Requests') }}
+                    </h4>
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                         {% for request in all_access_requests %}
+                             {% set is_revoked = False %}
+                             {% if request.status == 'approved' %}
+                                 {% set is_revoked = request._access_revoked|default(False) %}
+                             {% endif %}
+                            <div class="border border-gray-200 rounded-lg p-3 bg-white">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-900">
+                                        {% if request.country %}
+                                            {{ get_localized_country_name(request.country) }}
+                                        {% else %}
+                                            {{ _('Unknown Country') }} (ID: {{ request.country_id }})
+                                        {% endif %}
+                                    </span>
+                                    {{ status_label_for_access_request(request.status, is_revoked, request._auto_resolved|default(false)) }}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {# Request Access Form #}
+            <form method="POST" action="{{ url_for('main.request_country_access') }}" id="modal-request-access-form" class="max-w-4xl">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="modal_request_access_csrf_token">
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {# Left column: Country selection #}
+                    <div class="space-y-4">
+                        <div>
+                            <label for="modal_request_access_requested_country" class="block text-sm font-medium text-gray-700 mb-2">
+                                {% if can_request_multiple_countries %}{{ _('Countries whose data you will manage') }}{% else %}{{ _('Country whose data you will manage') }}{% endif %}
+                                <span class="text-red-500">*</span>
+                            </label>
+                            <div class="select2-country-wrap">
+                            {{ request_access_form.requested_country_id(id="modal_request_access_requested_country", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm select2-country-modal") }}
+                            </div>
+                            {% for error in request_access_form.requested_country_id.errors %}
+                                <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                            {% endfor %}
+                            <p class="mt-2 text-xs text-gray-500">
+                                {% if can_request_multiple_countries %}
+                                    {{ _('Only request access for countries whose databank data you are responsible for managing.') }}
+                                {% else %}
+                                    {{ _('Request access for the country whose databank data you are responsible for managing.') }}
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    {# Right column: Message field #}
+                    <div class="space-y-4">
+                        <div>
+                            <label for="modal_request_access_request_message" class="block text-sm font-medium text-gray-700 mb-2">
+                                {{ _('Message to admins') }}
+                                <span class="text-gray-400 font-normal">({{ _('optional') }})</span>
+                            </label>
+                            {{ request_access_form.request_message(id="modal_request_access_request_message", class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none", placeholder=_('Briefly describe your role and why you need access'), rows="6") }}
+                            {% for error in request_access_form.request_message.errors %}
+                                <p class="mt-1 text-red-600 text-sm">{{ error }}</p>
+                            {% endfor %}
+                            <p class="mt-2 text-xs text-gray-500">{{ _('Provide additional context to help admins process your request faster.') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {# Submit button #}
+                <div class="mt-6 pt-6 border-t border-gray-200 flex items-center justify-between">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane mr-2"></i>
+                        {{ _('Request Access') }}
+                    </button>
+                    <button type="button"
+                            id="cancel-request-access-modal"
+                            class="btn btn-secondary">
+                        {{ _('Cancel') }}
+                    </button>
+                </div>
+                <p class="mt-2 text-xs text-gray-500">
+                    {% if can_request_multiple_countries %}
+                        {{ _('You can select multiple countries and submit all requests at once.') }}
+                    {% else %}
+                        {{ _('You can request one country at a time.') }}
+                    {% endif %}
+                </p>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}

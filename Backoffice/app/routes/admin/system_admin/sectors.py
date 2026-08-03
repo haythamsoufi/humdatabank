@@ -1,19 +1,15 @@
-from collections import defaultdict
 from app.utils.transactions import request_transaction_rollback
 from flask import render_template, request, flash, redirect, url_for, current_app
 from flask_login import current_user
 from app import db
-from config import Config
 from sqlalchemy import or_
 from app.models import IndicatorBank, Sector, SubSector
 from app.forms.system import SectorForm, SubSectorForm
 from app.routes.admin.shared import permission_required, rbac_guard_audit_exempt
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import (
-    json_bad_request,
     json_ok,
     json_server_error,
-    require_json_data,
 )
 from app.utils.request_utils import is_json_request
 from sqlalchemy.orm.attributes import flag_modified
@@ -22,9 +18,13 @@ from app.services.platform import storage_service as storage
 from app.routes.admin.system_admin import bp
 from app.routes.admin.system_admin.helpers import (
     _save_logo_file, _delete_logo_file, _safe_logo_mimetype,
+    apply_name_translations_from_form,
+    flash_form_errors,
+    handle_hierarchy_db_error,
+    update_entity_name_translations_json,
 )
 
-from app.routes.admin.organization import (
+from app.forms.organization import (
     NSBranchForm,
     NSSubBranchForm,
     NSLocalUnitForm,
@@ -48,11 +48,7 @@ def new_sector():
                 name=form.name.data,
             )
 
-            languages = current_app.config.get("TRANSLATABLE_LANGUAGES", None) or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
-            for lang in languages:
-                field = getattr(form, f"name_{lang}", None)
-                if field is not None:
-                    new_sector.set_name_translation(lang, field.data or "")
+            apply_name_translations_from_form(new_sector, form)
 
             if form.logo_file.data:
                 logo_filename = _save_logo_file(
@@ -68,13 +64,9 @@ def new_sector():
             flash(f"Sector '{new_sector.name}' created successfully.", "success")
 
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error creating sector: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error creating sector: {e}")
     else:
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"Error in {field}: {error}", "danger")
+        flash_form_errors(form)
 
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
@@ -86,25 +78,8 @@ def edit_sector(sector_id):
     if is_json_request():
         try:
             data = get_json_safe()
-            err = require_json_data(data)
-            if err:
-                return err
-            updated_fields = []
-            for field_name, value in data.items():
-                if not isinstance(field_name, str):
-                    continue
-                if not field_name.startswith("name_") or field_name == "name":
-                    continue
-                sector.set_name_translation(field_name[5:], value if value is not None else "")
-                updated_fields.append(field_name)
-            if not updated_fields:
-                return json_bad_request("No valid name translation fields to update")
-            flag_modified(sector, "name_translations")
-            db.session.add(sector)
-            db.session.flush()
-            return json_ok(
-                message="Sector translations updated",
-                updated_fields=updated_fields,
+            return update_entity_name_translations_json(
+                sector, data, success_message="Sector translations updated"
             )
         except Exception as e:
             request_transaction_rollback()
@@ -119,11 +94,7 @@ def edit_sector(sector_id):
         try:
             sector.name = form.name.data
 
-            languages = current_app.config.get("TRANSLATABLE_LANGUAGES", None) or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
-            for lang in languages:
-                field = getattr(form, f"name_{lang}", None)
-                if field is not None:
-                    sector.set_name_translation(lang, field.data or "")
+            apply_name_translations_from_form(sector, form)
 
             if form.logo_file.data:
                 if sector.logo_filename:
@@ -140,13 +111,9 @@ def edit_sector(sector_id):
             flash(f"Sector '{sector.name}' updated successfully.", "success")
 
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error updating sector {sector_id}: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error updating sector {sector_id}: {e}")
     else:
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"Error in {field}: {error}", "danger")
+        flash_form_errors(form)
 
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
@@ -212,9 +179,7 @@ def delete_sector(sector_id):
         flash(f"Sector '{sector.name}' deleted successfully.", "success")
 
     except Exception as e:
-        request_transaction_rollback()
-        flash("An error occurred. Please try again.", "danger")
-        current_app.logger.error(f"Error deleting sector {sector_id}: {e}", exc_info=True)
+        handle_hierarchy_db_error(e, log_message=f"Error deleting sector {sector_id}: {e}")
 
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
@@ -230,11 +195,7 @@ def new_subsector():
                 sector_id=form.sector_id.data
             )
 
-            languages = current_app.config.get("TRANSLATABLE_LANGUAGES", None) or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
-            for lang in languages:
-                field = getattr(form, f"name_{lang}", None)
-                if field is not None:
-                    new_subsector.set_name_translation(lang, field.data or "")
+            apply_name_translations_from_form(new_subsector, form)
 
             db.session.add(new_subsector)
             db.session.flush()
@@ -242,13 +203,9 @@ def new_subsector():
             flash(f"Sub-sector '{new_subsector.name}' created successfully.", "success")
 
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error creating subsector: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error creating subsector: {e}")
     else:
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"Error in {field}: {error}", "danger")
+        flash_form_errors(form)
 
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
@@ -260,25 +217,8 @@ def edit_subsector(subsector_id):
     if is_json_request():
         try:
             data = get_json_safe()
-            err = require_json_data(data)
-            if err:
-                return err
-            updated_fields = []
-            for field_name, value in data.items():
-                if not isinstance(field_name, str):
-                    continue
-                if not field_name.startswith("name_") or field_name == "name":
-                    continue
-                subsector.set_name_translation(field_name[5:], value if value is not None else "")
-                updated_fields.append(field_name)
-            if not updated_fields:
-                return json_bad_request("No valid name translation fields to update")
-            flag_modified(subsector, "name_translations")
-            db.session.add(subsector)
-            db.session.flush()
-            return json_ok(
-                message="Sub-sector translations updated",
-                updated_fields=updated_fields,
+            return update_entity_name_translations_json(
+                subsector, data, success_message="Sub-sector translations updated"
             )
         except Exception as e:
             request_transaction_rollback()
@@ -292,24 +232,16 @@ def edit_subsector(subsector_id):
     if form.validate():
         try:
             subsector.name = form.name.data
-            languages = current_app.config.get("TRANSLATABLE_LANGUAGES", None) or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
-            for lang in languages:
-                field = getattr(form, f"name_{lang}", None)
-                if field is not None:
-                    subsector.set_name_translation(lang, field.data or "")
+            apply_name_translations_from_form(subsector, form)
             subsector.sector_id = form.sector_id.data
 
             db.session.flush()
             flash(f"Sub-sector '{subsector.name}' updated successfully.", "success")
 
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error updating subsector {subsector_id}: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error updating subsector {subsector_id}: {e}")
     else:
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"Error in {field}: {error}", "danger")
+        flash_form_errors(form)
 
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
@@ -366,9 +298,7 @@ def delete_subsector(subsector_id):
         flash(f"Sub-sector '{subsector.name}' deleted successfully.", "success")
 
     except Exception as e:
-        request_transaction_rollback()
-        flash("An error occurred. Please try again.", "danger")
-        current_app.logger.error(f"Error deleting subsector {subsector_id}: {e}", exc_info=True)
+        handle_hierarchy_db_error(e, log_message=f"Error deleting subsector {subsector_id}: {e}")
 
     return redirect(url_for("system_admin.manage_sectors_subsectors"))
 
@@ -431,9 +361,11 @@ def new_ns_branch():
             flash(f"Branch '{new_branch.name}' created successfully.", "success")
             return redirect(url_for("main.manage_ns_hierarchy"))
         except Exception as e:
-            request_transaction_rollback()
-            flash("Error creating branch.", "danger")
-            current_app.logger.error(f"Error creating NS branch: {e}", exc_info=True)
+            handle_hierarchy_db_error(
+                e,
+                log_message=f"Error creating NS branch: {e}",
+                flash_message="Error creating branch.",
+            )
 
     return render_template(
         "admin/organization/edit_entity.html",
@@ -488,9 +420,7 @@ def edit_ns_branch(branch_id):
             flash(f"Branch '{branch.name}' updated successfully.", "success")
             return redirect(url_for("main.manage_ns_hierarchy"))
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error updating NS branch {branch_id}: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error updating NS branch {branch_id}: {e}")
 
     return render_template(
         "admin/organization/edit_entity.html",
@@ -529,9 +459,11 @@ def delete_ns_branch(branch_id):
         flash(f"Branch '{branch.name}' deleted successfully.", "success")
 
     except Exception as e:
-        request_transaction_rollback()
-        flash("Error deleting branch.", "danger")
-        current_app.logger.error(f"Error deleting NS branch {branch_id}: {e}", exc_info=True)
+        handle_hierarchy_db_error(
+            e,
+            log_message=f"Error deleting NS branch {branch_id}: {e}",
+            flash_message="Error deleting branch.",
+        )
 
     return redirect(url_for("main.manage_ns_hierarchy"))
 
@@ -567,9 +499,7 @@ def new_ns_subbranch():
             flash(f"Sub-branch '{new_subbranch.name}' created successfully.", "success")
             return redirect(url_for("main.manage_ns_hierarchy"))
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error creating NS sub-branch: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error creating NS sub-branch: {e}")
 
     return render_template(
         "admin/organization/edit_entity.html",
@@ -611,9 +541,11 @@ def edit_ns_subbranch(subbranch_id):
             flash(f"Sub-branch '{subbranch.name}' updated successfully.", "success")
             return redirect(url_for("main.manage_ns_hierarchy"))
         except Exception as e:
-            request_transaction_rollback()
-            flash("Error updating sub-branch.", "danger")
-            current_app.logger.error(f"Error updating NS sub-branch {subbranch_id}: {e}", exc_info=True)
+            handle_hierarchy_db_error(
+                e,
+                log_message=f"Error updating NS sub-branch {subbranch_id}: {e}",
+                flash_message="Error updating sub-branch.",
+            )
 
     return render_template(
         "admin/organization/edit_entity.html",
@@ -644,9 +576,7 @@ def delete_ns_subbranch(subbranch_id):
         flash(f"Sub-branch '{subbranch.name}' deleted successfully.", "success")
 
     except Exception as e:
-        request_transaction_rollback()
-        flash("An error occurred. Please try again.", "danger")
-        current_app.logger.error(f"Error deleting NS sub-branch {subbranch_id}: {e}", exc_info=True)
+        handle_hierarchy_db_error(e, log_message=f"Error deleting NS sub-branch {subbranch_id}: {e}")
 
     return redirect(url_for("main.manage_ns_hierarchy"))
 
@@ -685,9 +615,11 @@ def new_ns_localunit():
             flash(f"Local unit '{new_localunit.name}' created successfully.", "success")
             return redirect(url_for("main.manage_ns_hierarchy"))
         except Exception as e:
-            request_transaction_rollback()
-            flash("Error creating local unit.", "danger")
-            current_app.logger.error(f"Error creating NS local unit: {e}", exc_info=True)
+            handle_hierarchy_db_error(
+                e,
+                log_message=f"Error creating NS local unit: {e}",
+                flash_message="Error creating local unit.",
+            )
 
     return render_template(
         "admin/organization/edit_entity.html",
@@ -732,9 +664,7 @@ def edit_ns_localunit(localunit_id):
             flash(f"Local unit '{localunit.name}' updated successfully.", "success")
             return redirect(url_for("main.manage_ns_hierarchy"))
         except Exception as e:
-            request_transaction_rollback()
-            flash("An error occurred. Please try again.", "danger")
-            current_app.logger.error(f"Error updating NS local unit {localunit_id}: {e}", exc_info=True)
+            handle_hierarchy_db_error(e, log_message=f"Error updating NS local unit {localunit_id}: {e}")
 
     return render_template(
         "admin/organization/edit_entity.html",
@@ -761,8 +691,10 @@ def delete_ns_localunit(localunit_id):
         flash(f"Local unit '{localunit.name}' deleted successfully.", "success")
 
     except Exception as e:
-        request_transaction_rollback()
-        flash("Error deleting local unit.", "danger")
-        current_app.logger.error(f"Error deleting NS local unit {localunit_id}: {e}", exc_info=True)
+        handle_hierarchy_db_error(
+            e,
+            log_message=f"Error deleting NS local unit {localunit_id}: {e}",
+            flash_message="Error deleting local unit.",
+        )
 
     return redirect(url_for("main.manage_ns_hierarchy"))

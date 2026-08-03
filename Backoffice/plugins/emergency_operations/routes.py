@@ -5,30 +5,23 @@ import requests
 import logging
 import json
 from app.plugins.template_utils import render_plugin_template
-from app.plugins.plugin_utils import BasePluginRoutes, plugin_route_wrapper, plugin_admin_route_wrapper, measure_performance, cache_plugin_result, clear_plugin_cache
+from app.plugins.plugin_utils import (
+    BasePluginRoutes,
+    load_plugin_config,
+    plugin_route_wrapper,
+    plugin_admin_route_wrapper,
+    measure_performance,
+    cache_plugin_result,
+    clear_plugin_cache,
+)
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
 
-# Handle plugin config import with fallback
-try:
-    from .config import plugin_config
-    from .data_store import get_data_store, trigger_background_refresh
-except ImportError:
-    # Fallback for when running in isolated import context
-    import importlib.util
-    from pathlib import Path
+from pathlib import Path
 
-    config_file = Path(__file__).parent / "config.py"
-    if config_file.exists():
-        spec = importlib.util.spec_from_file_location("emergency_operations_config", config_file)
-        config_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(config_module)
-        plugin_config = config_module.plugin_config
-    else:
-        # Final fallback - create a minimal config
-        from app.plugins.db_config import DbPluginConfig
-        plugin_config = DbPluginConfig("emergency_operations", {})
-        from .data_store import get_data_store, trigger_background_refresh
+from .data_store import get_data_store, trigger_background_refresh
+
+plugin_config = load_plugin_config(Path(__file__).parent, "emergency_operations")
 
 
 GO_APPEALS_URL = plugin_config.get_all_config().get('api', {}).get('base_url', "https://goadmin.ifrc.org/api/v2/appeal/")

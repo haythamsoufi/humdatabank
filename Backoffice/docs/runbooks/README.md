@@ -95,6 +95,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 
 | Runbook | When to use |
 |---------|-------------|
+| [Focal point browser smoke test](forms-data/focal-point-browser-smoke-test.md) | Repeatable E2E check: matrix edit, save, submit, delegation review, console/network monitoring |
 | [Submissions & Excel](forms-data/submissions-and-excel-notes.md) | AES naming reference, VERBOSE_FORM_DEBUG, Excel import/export triage |
 
 ---

@@ -824,3 +824,16 @@ class TestCreateNotification:
 
         # Still creates but URL should be stripped/None
         assert result is not None
+
+
+class TestNotifierReexports:
+    """Typed notify_* helpers remain importable from notification.core."""
+
+    def test_core_reexports_match_notifier_modules(self):
+        from app.services.notification import core as core_mod
+        from app.services.notification.notifiers import assignment, documents, digest
+
+        assert core_mod.notify_assignment_created is assignment.notify_assignment_created
+        assert core_mod.notify_document_uploaded is documents.notify_document_uploaded
+        assert core_mod.notify_user_added_to_country is digest.notify_user_added_to_country
+        assert core_mod.notify_standalone_document_uploaded is documents.notify_standalone_document_uploaded

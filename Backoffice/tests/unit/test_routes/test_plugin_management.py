@@ -249,14 +249,14 @@ class TestRenderPluginFieldEntry:
 class TestInteractiveMapPluginSecurity:
     def test_field_config_does_not_expose_raw_api_keys(self, client, app):
         mock_user = MagicMock(is_authenticated=True)
+        mock_config = MagicMock()
+        mock_config.get_all_config.return_value = {
+            "global_settings": {"default_map_provider": "mapbox"},
+            "api_keys": {"mapbox": "pk.secret-token-should-not-leak"},
+        }
+
         with patch("flask_login.utils._get_user", return_value=mock_user), \
-             patch(
-                 "plugins.interactive_map.routes.plugin_config.get_all_config",
-                 return_value={
-                     "global_settings": {"default_map_provider": "mapbox"},
-                     "api_keys": {"mapbox": "pk.secret-token-should-not-leak"},
-                 },
-             ):
+             patch("plugins.interactive_map.routes.plugin_config", mock_config):
             with client.session_transaction() as sess:
                 sess["_user_id"] = "1"
                 sess["_fresh"] = True

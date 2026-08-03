@@ -1230,58 +1230,64 @@ def bulk_enable_public_reporting(assignment_id):
 @permission_required('admin.assignments.public_submissions.manage')
 def bulk_update_public_availability(assignment_id):
     """Enable or disable public reporting for selected entity statuses."""
-    assignment = AssignedForm.query.get_or_404(assignment_id)
-    if not assignment.has_public_url():
-        return json_bad_request("Assignment does not have a public URL.")
+    try:
+        assignment = AssignedForm.query.get_or_404(assignment_id)
+        if not assignment.has_public_url():
+            return json_bad_request("Assignment does not have a public URL.")
 
-    data = get_json_safe()
-    status_ids = data.get('status_ids') or []
-    enable = data.get('enable', True)
+        data = get_json_safe()
+        status_ids = data.get('status_ids') or []
+        enable = data.get('enable', True)
 
-    if not status_ids or not isinstance(status_ids, list):
-        return json_bad_request("status_ids array required")
+        if not status_ids or not isinstance(status_ids, list):
+            return json_bad_request("status_ids array required")
 
-    updated = 0
-    for aes in AssignmentEntityStatus.query.filter(
-        AssignmentEntityStatus.id.in_(status_ids),
-        AssignmentEntityStatus.assigned_form_id == assignment_id
-    ):
-        if aes.is_public_available != enable:
-            aes.is_public_available = enable
-            updated += 1
+        updated = 0
+        for aes in AssignmentEntityStatus.query.filter(
+            AssignmentEntityStatus.id.in_(status_ids),
+            AssignmentEntityStatus.assigned_form_id == assignment_id
+        ):
+            if aes.is_public_available != enable:
+                aes.is_public_available = enable
+                updated += 1
 
-    db.session.flush()
-    action = "enabled" if enable else "disabled"
-    return json_ok(updated=updated, message=f"Public reporting {action} for {updated} entit{'y' if updated == 1 else 'ies'}.")
+        db.session.flush()
+        action = "enabled" if enable else "disabled"
+        return json_ok(updated=updated, message=f"Public reporting {action} for {updated} entit{'y' if updated == 1 else 'ies'}.")
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
 @bp.route("/assignments/<int:assignment_id>/entities/bulk-update-due-date", methods=["POST"])
 @permission_required('admin.assignments.entities.manage')
 def bulk_update_due_date_selected(assignment_id):
     """Update the due_date of selected entity assignments."""
-    AssignedForm.query.get_or_404(assignment_id)
-    data = get_json_safe()
-    status_ids = data.get('status_ids') or []
-    due_date_str = data.get('due_date')
-
-    if not status_ids or not isinstance(status_ids, list):
-        return json_bad_request('status_ids array required')
-    if not due_date_str:
-        return json_bad_request('due_date required')
-
     try:
-        due_date_obj = datetime.strptime(due_date_str, '%Y-%m-%d').date()
-    except (ValueError, TypeError):
-        return json_bad_request('Invalid date format')
+        AssignedForm.query.get_or_404(assignment_id)
+        data = get_json_safe()
+        status_ids = data.get('status_ids') or []
+        due_date_str = data.get('due_date')
 
-    safe_ids = [int(sid) for sid in status_ids]
-    updated = AssignmentEntityStatus.query.filter(
-        AssignmentEntityStatus.id.in_(safe_ids),
-        AssignmentEntityStatus.assigned_form_id == assignment_id,
-    ).update({"due_date": due_date_obj}, synchronize_session="fetch")
+        if not status_ids or not isinstance(status_ids, list):
+            return json_bad_request('status_ids array required')
+        if not due_date_str:
+            return json_bad_request('due_date required')
 
-    db.session.flush()
-    return json_ok(updated=updated)
+        try:
+            due_date_obj = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            return json_bad_request('Invalid date format')
+
+        safe_ids = [int(sid) for sid in status_ids]
+        updated = AssignmentEntityStatus.query.filter(
+            AssignmentEntityStatus.id.in_(safe_ids),
+            AssignmentEntityStatus.assigned_form_id == assignment_id,
+        ).update({"due_date": due_date_obj}, synchronize_session="fetch")
+
+        db.session.flush()
+        return json_ok(updated=updated)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
 @bp.route("/public-submissions/<int:submission_id>/update-status", methods=["POST"])

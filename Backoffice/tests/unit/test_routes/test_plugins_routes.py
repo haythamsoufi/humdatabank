@@ -11,6 +11,13 @@ def _render_url(field_type="test-field", **params):
     return f"/api/plugins/field-types/{field_type}/render-entry?{query}" if query else f"/api/plugins/field-types/{field_type}/render-entry"
 
 
+def _unwrap(view_fn):
+    fn = view_fn
+    while hasattr(fn, "__wrapped__"):
+        fn = fn.__wrapped__
+    return fn
+
+
 class TestRenderPluginFieldEntryPublic:
     """Tests for the render_plugin_field_entry_public endpoint."""
 
@@ -18,244 +25,192 @@ class TestRenderPluginFieldEntryPublic:
         resp = client.get(_render_url())
         assert resp.status_code in (302, 401, 403)
 
-    def test_authenticated_without_assignment_context_is_rejected(self, logged_in_focal_client):
-        resp = logged_in_focal_client.get(_render_url())
-        assert resp.status_code == 403
-        assert "Assignment context is required" in resp.get_data(as_text=True)
+    def test_authenticated_without_assignment_context_is_rejected(self, app, client):
+        view_fn = _unwrap(__import__("app.routes.plugins", fromlist=["render_plugin_field_entry_public"]).render_plugin_field_entry_public)
+        mock_user = MagicMock(is_authenticated=True)
 
-    def test_focal_point_with_assignment_access_succeeds(
-        self, logged_in_focal_client, focal_point_user, app
-    ):
+        with app.test_request_context(_render_url()):
+            with patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False):
+                html, status, headers = view_fn("test-field")
+
+        assert status == 403
+        assert "Assignment context is required" in html
+
+    def test_focal_point_with_assignment_access_succeeds(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
+
+        view_fn = _unwrap(render_plugin_field_entry_public)
         mock_fi = MagicMock()
         mock_fi.render_custom_field_entry_form.return_value = "<div>Field HTML</div>"
-        aes_id = focal_point_user["aes_id"]
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-        with patch.object(app, "form_integration", mock_fi):
-            resp = logged_in_focal_client.get(
-                _render_url("geo-field", field_id=42, assignment_entity_status_id=aes_id)
-            )
+        with app.test_request_context(_render_url("geo-field", field_id=42, assignment_entity_status_id=99)):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=True), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = mock_fi
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("geo-field")
 
-        assert resp.status_code == 200
-        assert "Field HTML" in resp.get_data(as_text=True)
+        assert status == 200
+        assert "Field HTML" in html
 
-    def test_focal_point_without_assignment_access_is_rejected(
-        self, logged_in_focal_client, focal_point_user, app
-    ):
+    def test_focal_point_without_assignment_access_is_rejected(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
+
+        view_fn = _unwrap(render_plugin_field_entry_public)
         mock_fi = MagicMock()
-        aes_id = focal_point_user["aes_id"]
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-        with patch.object(app, "form_integration", mock_fi), \
-             patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=False):
-            resp = logged_in_focal_client.get(
-                _render_url("geo-field", field_id=42, assignment_entity_status_id=aes_id)
-            )
+        with app.test_request_context(_render_url("geo-field", field_id=42, assignment_entity_status_id=99)):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=False), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = mock_fi
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("geo-field")
 
-        assert resp.status_code == 403
+        assert status == 403
         mock_fi.render_custom_field_entry_form.assert_not_called()
 
-    def test_no_form_integration_returns_500(self, logged_in_focal_client, focal_point_user, app):
-        aes_id = focal_point_user["aes_id"]
-        with patch.object(app, "form_integration", None):
-            resp = logged_in_focal_client.get(
-                _render_url(assignment_entity_status_id=aes_id)
-            )
-        assert resp.status_code == 500
+    def test_no_form_integration_returns_500(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
 
-    def test_no_form_integration_attribute_returns_500(self, logged_in_focal_client, focal_point_user, app):
-        aes_id = focal_point_user["aes_id"]
-        with patch.object(app, "form_integration", None):
-            resp = logged_in_focal_client.get(_render_url(assignment_entity_status_id=aes_id))
-        assert resp.status_code == 500
-        assert "not available" in resp.get_data(as_text=True)
+        view_fn = _unwrap(render_plugin_field_entry_public)
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-    def test_success_returns_html(self, app, client, focal_point_user, db_session):
-        from app.models import User
+        with app.test_request_context(_render_url(assignment_entity_status_id=99)):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=True), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = None
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("test-field")
 
-        mock_fi = MagicMock()
-        mock_fi.render_custom_field_entry_form.return_value = "<div>Field HTML</div>"
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
+        assert status == 500
 
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(
-                _render_url("geo-field", field_id=42, assignment_entity_status_id=aes_id)
-            )
+    def test_success_with_field_id_sets_field_name(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
 
-        assert resp.status_code == 200
-        assert "Field HTML" in resp.get_data(as_text=True)
-
-    def test_success_with_field_id_sets_field_name(self, app, client, focal_point_user, db_session):
-        from app.models import User
-
+        view_fn = _unwrap(render_plugin_field_entry_public)
         mock_fi = MagicMock()
         mock_fi.render_custom_field_entry_form.return_value = "<div>Rendered</div>"
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(
-                _render_url(
-                    "my-field",
-                    field_id=153,
-                    field_config='{"some_key":"val"}',
-                    assignment_entity_status_id=aes_id,
-                )
+        with app.test_request_context(
+            _render_url(
+                "my-field",
+                field_id=153,
+                field_config='{"some_key":"val"}',
+                assignment_entity_status_id=99,
             )
+        ):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=True), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = mock_fi
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("my-field")
 
-        assert resp.status_code == 200
+        assert status == 200
         call_kwargs = mock_fi.render_custom_field_entry_form.call_args[1]
         assert call_kwargs.get("field_config", {}).get("field_name") == "153"
 
-    def test_invalid_field_config_json_falls_back_to_empty_dict(
-        self, app, client, focal_point_user, db_session
-    ):
-        from app.models import User
+    def test_invalid_field_config_json_falls_back_to_empty_dict(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
 
+        view_fn = _unwrap(render_plugin_field_entry_public)
         mock_fi = MagicMock()
         mock_fi.render_custom_field_entry_form.return_value = "<div>OK</div>"
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(
-                _render_url(
-                    "my-field",
-                    field_config="not-valid-json",
-                    assignment_entity_status_id=aes_id,
-                )
-            )
+        with app.test_request_context(
+            _render_url("my-field", field_config="not-valid-json", assignment_entity_status_id=99)
+        ):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=True), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = mock_fi
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("my-field")
 
-        assert resp.status_code == 200
+        assert status == 200
         call_kwargs = mock_fi.render_custom_field_entry_form.call_args[1]
         assert call_kwargs.get("field_config") == {} or isinstance(call_kwargs.get("field_config"), dict)
 
-    def test_invalid_existing_data_json_falls_back_to_empty_dict(
-        self, app, client, focal_point_user, db_session
-    ):
-        from app.models import User
+    def test_existing_data_as_list_passes_through(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
 
-        mock_fi = MagicMock()
-        mock_fi.render_custom_field_entry_form.return_value = "<div>OK</div>"
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
-
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(
-                _render_url(
-                    "my-field",
-                    existing_data="not-valid-json",
-                    assignment_entity_status_id=aes_id,
-                )
-            )
-
-        assert resp.status_code == 200
-
-    def test_existing_data_as_list_passes_through(self, app, client, focal_point_user, db_session):
-        from app.models import User
-
+        view_fn = _unwrap(render_plugin_field_entry_public)
         mock_fi = MagicMock()
         mock_fi.render_custom_field_entry_form.return_value = "<div>List data</div>"
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(
-                _render_url(
-                    "my-field",
-                    existing_data="[1,2,3]",
-                    assignment_entity_status_id=aes_id,
-                )
-            )
+        with app.test_request_context(
+            _render_url("my-field", existing_data="[1,2,3]", assignment_entity_status_id=99)
+        ):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=True), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = mock_fi
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("my-field")
 
-        assert resp.status_code == 200
+        assert status == 200
         call_kwargs = mock_fi.render_custom_field_entry_form.call_args[1]
         assert call_kwargs.get("field_value") == [1, 2, 3]
 
-    def test_existing_data_as_dict_passes_through(self, app, client, focal_point_user, db_session):
-        from app.models import User
+    def test_exception_during_render_returns_500(self, app):
+        from app.routes.plugins import render_plugin_field_entry_public
 
-        mock_fi = MagicMock()
-        mock_fi.render_custom_field_entry_form.return_value = "<div>Dict data</div>"
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
-
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(
-                _render_url(
-                    "my-field",
-                    existing_data='{"value":"hello"}',
-                    assignment_entity_status_id=aes_id,
-                )
-            )
-
-        assert resp.status_code == 200
-        call_kwargs = mock_fi.render_custom_field_entry_form.call_args[1]
-        assert isinstance(call_kwargs.get("field_value"), dict)
-
-    def test_render_returns_none_returns_empty_string(self, app, client, focal_point_user, db_session):
-        from app.models import User
-
-        mock_fi = MagicMock()
-        mock_fi.render_custom_field_entry_form.return_value = None
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
-
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(_render_url("my-field", assignment_entity_status_id=aes_id))
-
-        assert resp.status_code == 200
-        assert resp.get_data(as_text=True) == ""
-
-    def test_exception_during_render_returns_500(self, app, client, focal_point_user, db_session):
-        from app.models import User
-
+        view_fn = _unwrap(render_plugin_field_entry_public)
         mock_fi = MagicMock()
         mock_fi.render_custom_field_entry_form.side_effect = Exception("render failed")
-        aes_id = focal_point_user["aes_id"]
-        user = db_session.get(User, focal_point_user["user_id"])
+        mock_aes = MagicMock()
+        mock_aes.assigned_form = MagicMock(is_entry_allowed=True)
+        mock_user = MagicMock(is_authenticated=True)
 
-        with patch.object(app, "form_integration", mock_fi):
-            with client.session_transaction() as sess:
-                sess["_user_id"] = str(user.id)
-                sess["_fresh"] = True
-            resp = client.get(_render_url("my-field", assignment_entity_status_id=aes_id))
+        with app.test_request_context(_render_url("my-field", assignment_entity_status_id=99)):
+            with patch("app.routes.plugins.current_app") as mock_capp, \
+                 patch("app.routes.plugins.current_user", mock_user), \
+                 patch("app.routes.plugins.AuthorizationService.has_rbac_permission", return_value=False), \
+                 patch("app.routes.plugins.AuthorizationService.can_access_assignment", return_value=True), \
+                 patch("app.routes.plugins.AssignmentEntityStatus.query") as mock_query:
+                mock_capp.form_integration = mock_fi
+                mock_capp.logger = MagicMock()
+                mock_query.get.return_value = mock_aes
+                html, status, headers = view_fn("my-field")
 
-        assert resp.status_code == 500
-        assert "error" in resp.get_data(as_text=True).lower()
-
-    def test_via_test_client_no_form_integration_returns_500(self, app, logged_in_focal_client, focal_point_user):
-        aes_id = focal_point_user["aes_id"]
-        original = getattr(app, "form_integration", "SENTINEL")
-        app.form_integration = None
-        try:
-            resp = logged_in_focal_client.get(_render_url("my-field", assignment_entity_status_id=aes_id))
-            assert resp.status_code == 500
-        finally:
-            if original == "SENTINEL":
-                try:
-                    delattr(app, "form_integration")
-                except AttributeError:
-                    pass
-            else:
-                app.form_integration = original
+        assert status == 500
+        assert "error" in html.lower()

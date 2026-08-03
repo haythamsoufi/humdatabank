@@ -123,6 +123,11 @@ from .plugin_data import (
     PluginData,
 )
 
+from .reports import (
+    ReportDefinition,
+    ReportRun,
+)
+
 from .rbac import (
     RbacPermission,
     RbacRole,
@@ -304,6 +309,10 @@ __all__ = [
 
     # Plugin data
     'PluginData',
+
+    # Report builder
+    'ReportDefinition',
+    'ReportRun',
 
     # AI Embeddings models
     'AIDocument',

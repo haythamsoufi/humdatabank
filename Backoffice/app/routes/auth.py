@@ -26,6 +26,7 @@ from app.services.platform.user_analytics_service import (
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
 from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit, rate_limit
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error, json_forbidden
+from app.utils.error_handling import handle_json_view_exception
 from app.utils.password_validator import validate_password_strength
 from app.models import PasswordResetToken
 import uuid
@@ -1659,9 +1660,11 @@ def complete_profile():
         )
         return json_ok(message=_('Profile updated successfully.'))
     except Exception as e:
-        request_transaction_rollback()
-        current_app.logger.error("complete_profile: failed to save: %s", e, exc_info=True)
-        return json_server_error(_('Failed to save profile. Please try again.'))
+        return handle_json_view_exception(
+            e,
+            _('Failed to save profile. Please try again.'),
+            log_message=f"complete_profile: failed to save: {e}",
+        )
 
 
 @bp.route("/debug/profile-picture", methods=["GET"])
@@ -1720,10 +1723,12 @@ def kickout_own_device(device_id):
         return json_ok(message='Device session ended successfully')
 
     except Exception as e:
-        request_transaction_rollback()
-        current_app.logger.error(f"Error kicking out device {device_id} for user {current_user.id}: {e}", exc_info=True)
         from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
-        return json_server_error(GENERIC_ERROR_MESSAGE)
+        return handle_json_view_exception(
+            e,
+            GENERIC_ERROR_MESSAGE,
+            log_message=f"Error kicking out device {device_id} for user {current_user.id}: {e}",
+        )
 
 
 @bp.route("/account-settings/devices/<int:device_id>/remove", methods=["DELETE"])
@@ -1747,6 +1752,8 @@ def remove_own_device(device_id):
         return json_ok(message='Device removed successfully')
 
     except Exception as e:
-        request_transaction_rollback()
-        current_app.logger.error(f"Error removing device {device_id} for user {current_user.id}: {e}", exc_info=True)
-        return json_server_error('An internal error occurred.')
+        return handle_json_view_exception(
+            e,
+            'An internal error occurred.',
+            log_message=f"Error removing device {device_id} for user {current_user.id}: {e}",
+        )

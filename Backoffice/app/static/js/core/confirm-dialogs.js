@@ -13,7 +13,7 @@
 //   showSubmitConfirmation(msg, onConfirm, onCancel?, confirmText?, cancelText?, title?)
 //   showDangerConfirmation(msg, onConfirm, onCancel?, confirmText?, cancelText?, title?)
 //   showDeleteDataConfirmation(msg, dataCount, onDeleteData, onKeepData, onCancel?, itemType?, translations?)
-//   getConfirmMessage(formOrElement) - returns first of data-confirm, data-confirm-message, data-confirm-msg, data-confirm-text
+//   getConfirmDialogOptions(submitter, formOrElement) - title, label, message from data-confirm-* attrs
 //   hasConfirm(formOrElement) - returns true if any confirm attribute is set
 
 /**
@@ -33,6 +33,39 @@ function getConfirmMessage(el) {
  */
 function hasConfirm(el) {
   return !!getConfirmMessage(el);
+}
+
+/**
+ * Resolve title, label, and message for styled confirm dialogs.
+ * Prefers submitter attributes, then form/element fallbacks.
+ * @param {HTMLElement|null} submitter
+ * @param {HTMLElement|null} formOrElement
+ * @returns {{ message: string|null, title: string, confirmText: string, cancelText: string }}
+ */
+function getConfirmDialogOptions(submitter, formOrElement) {
+  const pick = (attr) => {
+    if (submitter && submitter.getAttribute && submitter.getAttribute(attr)) {
+      return submitter.getAttribute(attr);
+    }
+    if (formOrElement && formOrElement.getAttribute && formOrElement.getAttribute(attr)) {
+      return formOrElement.getAttribute(attr);
+    }
+    return null;
+  };
+  const message =
+    (submitter && getConfirmMessage(submitter)) ||
+    (formOrElement && getConfirmMessage(formOrElement)) ||
+    null;
+  const isDanger =
+    (submitter && submitter.getAttribute && submitter.getAttribute('data-confirm-danger') === 'true') ||
+    (formOrElement && formOrElement.getAttribute && formOrElement.getAttribute('data-confirm-danger') === 'true');
+  return {
+    message,
+    title: pick('data-confirm-title') || _t('Confirm Action'),
+    confirmText: pick('data-confirm-label') || _t('Confirm'),
+    cancelText: _t('Cancel'),
+    isDanger,
+  };
 }
 
 // Bridge to the server-injected catalog (layout.html).  Falls back to the
@@ -535,6 +568,7 @@ window.showDangerConfirmation = showDangerConfirmation;
 window.showDeleteDataConfirmation = showDeleteDataConfirmation;
 window.showAlert = showAlert;
 window.getConfirmMessage = getConfirmMessage;
+window.getConfirmDialogOptions = getConfirmDialogOptions;
 window.hasConfirm = hasConfirm;
 
 })();

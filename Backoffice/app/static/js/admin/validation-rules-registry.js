@@ -19,14 +19,14 @@
 
     function el(id) { return document.getElementById(id); }
 
-    function esc(s) {
+    var esc = window.esc || function(s) {
         if (s == null) return '';
         return String(s)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
-    }
+    };
 
     function showFeedback(message, type) {
         if (!feedbackEl) return;

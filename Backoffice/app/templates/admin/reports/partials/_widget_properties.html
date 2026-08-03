@@ -1,0 +1,80 @@
+<div id="rb-widget-props-empty" class="report-props-empty">
+    <i class="fas fa-chart-pie" aria-hidden="true"></i>
+    <p>{{ _('Click a widget slot in the canvas to edit its title, data source, and footnote.') }}</p>
+</div>
+
+<div id="rb-widget-props-form" class="hidden">
+    <section class="report-panel-section">
+        <h4 class="report-panel-heading"><i class="fas fa-sliders-h" aria-hidden="true"></i>{{ _('Widget') }}</h4>
+        <label class="report-field">
+            <span>{{ _('Title') }}</span>
+            <input type="text" id="rb-widget-title" class="form-control">
+        </label>
+        <label class="report-field">
+            <span>{{ _('Visualization') }}</span>
+            <select id="rb-widget-kind" class="form-control"></select>
+        </label>
+    </section>
+
+    <section class="report-panel-section rb-indicator-field hidden">
+        <h4 class="report-panel-heading"><i class="fas fa-database" aria-hidden="true"></i>{{ _('Indicator data') }}</h4>
+        <label class="report-field">
+            <span>{{ _('How to pick indicators') }}</span>
+            <select id="rb-indicator-mode" class="form-control">
+                <option value="manual">{{ _('One indicator from the form template') }}</option>
+                <option value="rule">{{ _('Match by programme/tag rule') }}</option>
+            </select>
+        </label>
+        <div id="rb-indicator-manual-panel" class="mt-2">
+            <label class="report-field">
+                <span>{{ _('Search indicators') }}</span>
+                <input type="search" id="rb-indicator-search" class="form-control" placeholder="{{ _('Search by name…') }}" autocomplete="off">
+            </label>
+            <select id="rb-indicator-id" class="form-control rb-indicator-list" size="8"></select>
+            <span id="rb-indicator-hint" class="report-field-hint">{{ _('Choose a form template under Setup first.') }}</span>
+            <button type="button" id="rb-indicator-clear" class="btn btn-sm btn-secondary hidden mt-2">{{ _('Clear selection') }}</button>
+        </div>
+        <div id="rb-indicator-rule-panel" class="hidden mt-2">
+            <label class="report-field">
+                <span>{{ _('Related programmes') }}</span>
+                <div id="rb-widget-programmes-picker" class="rb-chip-picker" data-field="programmes"></div>
+            </label>
+            <label class="report-field">
+                <span>{{ _('Tags') }}</span>
+                <div id="rb-widget-tags-picker" class="rb-chip-picker" data-field="tags"></div>
+            </label>
+            <div id="rb-widget-rule-preview-result" class="report-rule-summary hidden"></div>
+            <select id="rb-widget-rule-programmes" class="hidden" multiple aria-hidden="true" tabindex="-1"></select>
+            <select id="rb-widget-rule-tags" class="hidden" multiple aria-hidden="true" tabindex="-1"></select>
+        </div>
+        <label class="report-field rb-metric-field">
+            <span>{{ _('Metric') }}</span>
+            <select id="rb-widget-metric" class="form-control">
+                <option value="sum">{{ _('Sum of values') }}</option>
+                <option value="count">{{ _('Count of entries') }}</option>
+                <option value="implementing_count">{{ _('Implementing NS count') }}</option>
+                <option value="reported_count">{{ _('Reporting NS count') }}</option>
+            </select>
+        </label>
+    </section>
+
+    <section class="report-panel-section rb-text-field hidden">
+        <label class="report-field">
+            <span>{{ _('Text content') }}</span>
+            <textarea id="rb-widget-content" class="form-control" rows="5"></textarea>
+        </label>
+    </section>
+
+    <section class="report-panel-section">
+        <h4 class="report-panel-heading"><i class="fas fa-sticky-note" aria-hidden="true"></i>{{ _('Widget footnote') }}</h4>
+        <label class="report-field">
+            <span>{{ _('Footnote text') }} <span class="report-field-optional">{{ _('optional') }}</span></span>
+            <textarea id="rb-widget-footnote" class="form-control" rows="3" placeholder="{{ _('Shown below this widget in the report.') }}"></textarea>
+        </label>
+    </section>
+
+    <div class="report-inspector-footer">
+        <button type="button" id="rb-preview-widget" class="btn btn-sm btn-primary w-full">{{ _('Preview this widget') }}</button>
+        <button type="button" id="rb-delete-widget" class="btn btn-sm btn-danger w-full">{{ _('Delete widget') }}</button>
+    </div>
+</div>

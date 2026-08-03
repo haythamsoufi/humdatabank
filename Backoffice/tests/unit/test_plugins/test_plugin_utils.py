@@ -23,6 +23,46 @@ def _make_flask_app():
 
 
 # ---------------------------------------------------------------------------
+# load_plugin_config
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestLoadPluginConfig:
+    def test_loads_config_from_module_file(self, tmp_path):
+        from app.plugins.plugin_utils import load_plugin_config
+
+        config_py = tmp_path / "config.py"
+        config_py.write_text(
+            "class DummyConfig:\n"
+            "    def get_all_config(self):\n"
+            "        return {'loaded': True}\n"
+            "plugin_config = DummyConfig()\n",
+            encoding="utf-8",
+        )
+
+        cfg = load_plugin_config(tmp_path, "test_plugin")
+        assert cfg.get_all_config() == {"loaded": True}
+
+    def test_falls_back_to_db_plugin_config(self, tmp_path):
+        from app.plugins.plugin_utils import load_plugin_config
+        from app.plugins.db_config import DbPluginConfig
+
+        cfg = load_plugin_config(tmp_path, "missing_plugin")
+        assert isinstance(cfg, DbPluginConfig)
+        assert cfg.plugin_id == "missing_plugin"
+
+    def test_falls_back_when_config_attr_missing(self, tmp_path):
+        from app.plugins.plugin_utils import load_plugin_config
+        from app.plugins.db_config import DbPluginConfig
+
+        config_py = tmp_path / "config.py"
+        config_py.write_text("OTHER = 1\n", encoding="utf-8")
+
+        cfg = load_plugin_config(tmp_path, "bad_plugin")
+        assert isinstance(cfg, DbPluginConfig)
+
+
+# ---------------------------------------------------------------------------
 # PluginError and subclasses
 # ---------------------------------------------------------------------------
 

@@ -1,0 +1,63 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ report.title }} — {{ _('Reports') }}{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ static_url('css/reports/report-builder.css') }}">
+    <script src="{{ static_url('libs/apexcharts.min.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+{% set header_actions = namespace(items=[]) %}
+{% if can_edit %}
+    {% set __ = header_actions.items.append({
+        'type': 'link',
+        'text': _('Edit'),
+        'icon': 'fas fa-pen',
+        'url': url_for('reports.reports_edit', report_id=report.id),
+        'classes': 'professional-action-btn'
+    }) %}
+{% endif %}
+{% set __ = header_actions.items.append({
+    'type': 'button',
+    'text': _('Export Excel'),
+    'icon': 'fas fa-file-excel',
+    'classes': 'professional-action-btn',
+    'attributes': {'id': 'report-export-excel'}
+}) %}
+{% set __ = header_actions.items.append({
+    'type': 'button',
+    'text': _('Export PDF'),
+    'icon': 'fas fa-file-pdf',
+    'classes': 'professional-action-btn',
+    'attributes': {'id': 'report-export-pdf'}
+}) %}
+
+{{ page_header(
+    title=report.title,
+    subtitle=report.description or '',
+    icon='fas fa-chart-bar',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Reports'), 'url': url_for('reports.reports_list')},
+        {'name': report.title, 'url': None}
+    ],
+    actions=header_actions.items
+) }}
+
+<div id="report-runtime-app" class="report-runtime">
+    <div id="report-runtime-sections"></div>
+</div>
+
+<script type="application/json" id="report-runtime-bootstrap">
+{{ {
+    'reportId': report.id,
+    'definition': report.definition_json,
+    'csrfToken': csrf_token(),
+    'apiBase': url_for('reports.api_get_report', report_id=report.id).rsplit('/api/', 1)[0] + '/api/' + report.id|string
+}|tojson }}
+</script>
+<script type="module" src="{{ static_url('js/reports/report-runtime.js') }}"></script>
+{% endblock %}

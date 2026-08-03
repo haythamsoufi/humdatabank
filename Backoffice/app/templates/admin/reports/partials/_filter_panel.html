@@ -1,0 +1,29 @@
+<section class="report-panel-section">
+    <h4 class="report-panel-heading"><i class="fas fa-file-lines" aria-hidden="true"></i>{{ _('About this report') }}</h4>
+    <label class="report-field">
+        <span>{{ _('Description') }}</span>
+        <textarea id="rb-description" class="form-control" rows="3" placeholder="{{ _('Optional — shown on the report list and viewer') }}">{{ report.description if report and report.description else '' }}</textarea>
+    </label>
+</section>
+
+<section class="report-panel-section">
+    <h4 class="report-panel-heading"><i class="fas fa-filter" aria-hidden="true"></i>{{ _('Data scope') }}</h4>
+    <p class="report-panel-intro">{{ _('These filters apply to every widget when the report runs.') }}</p>
+    <label class="report-field">
+        <span>{{ _('Form template') }}</span>
+        <select id="rb-template" class="form-control"><option value="">{{ _('Select template') }}</option></select>
+    </label>
+    <label class="report-field">
+        <span>{{ _('Reporting periods') }}</span>
+        <select id="rb-period" class="form-control report-builder-select-multiple" multiple></select>
+        <span class="report-field-hint">{{ _('Leave empty to include all available years. Hold Ctrl/Cmd to pick specific periods.') }}</span>
+    </label>
+    <label class="report-field">
+        <span>{{ _('Assignment status') }}</span>
+        <select id="rb-statuses" class="form-control report-builder-select-multiple" multiple>
+            <option value="submitted" selected>{{ _('Submitted') }}</option>
+            <option value="approved" selected>{{ _('Approved') }}</option>
+            <option value="in_progress">{{ _('In progress') }}</option>
+        </select>
+    </label>
+</section>

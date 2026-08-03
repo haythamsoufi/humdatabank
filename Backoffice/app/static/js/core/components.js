@@ -82,6 +82,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Entry form sidebar: return-for-revision uses a standalone form (no nested <form> in #focalDataEntryForm).
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.return-for-revision-trigger');
+        if (!btn) return;
+
+        const formId = btn.getAttribute('data-form-id');
+        const form = formId ? document.getElementById(formId) : null;
+        if (!form) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const opts = (window.getConfirmDialogOptions && window.getConfirmDialogOptions(btn, form)) || {
+            message: window.getConfirmMessage && (window.getConfirmMessage(btn) || window.getConfirmMessage(form)),
+            title: _t('Request changes?'),
+            confirmText: _t('Request changes'),
+            cancelText: _t('Cancel'),
+        };
+
+        const submitReturnForm = () => {
+            form.dataset.confirmed = 'true';
+            if (form.requestSubmit) {
+                form.requestSubmit();
+            } else {
+                form.submit();
+            }
+        };
+
+        if (opts.message && window.showConfirmation) {
+            window.showConfirmation(
+                opts.message,
+                submitReturnForm,
+                () => { /* cancelled */ },
+                opts.confirmText,
+                opts.cancelText,
+                opts.title
+            );
+            return;
+        }
+        submitReturnForm();
+    }, true);
+
     // --- Global confirm-on-submit (replaces inline onclick patterns) ---
     // Supports forms using any of: data-confirm, data-confirm-message, data-confirm-msg, data-confirm-text
     // Use data-confirm-danger="true" for destructive actions (uses showDangerConfirmation)
@@ -103,73 +145,72 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const msg = (window.getConfirmMessage && window.getConfirmMessage(form)) || null;
+        const submitter = e.submitter;
+        const opts = (window.getConfirmDialogOptions && window.getConfirmDialogOptions(submitter, form)) || {
+            message: null,
+            title: _t('Confirm Action'),
+            confirmText: _t('Confirm'),
+            cancelText: _t('Cancel'),
+            isDanger: false,
+        };
+        const msg = opts.message;
         if (!msg) return;
 
         // Avoid double prompts if something triggers submit twice
         if (form.dataset.confirmed === 'true') return;
 
-        // Check if this is a submit action (for form submission confirmations)
-        const submitter = e.submitter;
+        if (window.FormSubmitGuard && typeof window.FormSubmitGuard.reset === 'function') {
+            window.FormSubmitGuard.reset(form);
+        }
+
+        const submitBtn = submitter || form.querySelector('[type="submit"]');
+        const restoreSubmitBtn = () => {
+            if (submitBtn) submitBtn.disabled = false;
+        };
+        if (submitBtn && submitBtn.disabled) return;
+        if (submitBtn) submitBtn.disabled = true;
+
+        const confirmAndSubmit = (showDialog) => {
+            e.preventDefault();
+            e.stopPropagation();
+            showDialog(
+                msg,
+                () => {
+                    form.dataset.confirmed = 'true';
+                    if (form.requestSubmit && submitter) {
+                        form.requestSubmit(submitter);
+                    } else if (form.requestSubmit) {
+                        form.requestSubmit();
+                    } else {
+                        form.submit();
+                    }
+                },
+                restoreSubmitBtn,
+                opts.confirmText,
+                opts.cancelText,
+                opts.title
+            );
+        };
+
+        // Check if this is a submit action (for form entry submission confirmations)
         const isSubmitAction = submitter && submitter.name === 'action' && submitter.value === 'submit';
-        const isDanger = form.hasAttribute('data-confirm-danger') && (form.getAttribute('data-confirm-danger') === 'true' || form.getAttribute('data-confirm-danger') === '');
+        const isDanger = opts.isDanger;
 
         // Use custom dialogs if available
         if (isSubmitAction && window.showSubmitConfirmation) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.showSubmitConfirmation(
-                msg,
-                () => {
-                    form.dataset.confirmed = 'true';
-                    if (form.requestSubmit && submitter) {
-                        form.requestSubmit(submitter);
-                    } else {
-                        form.submit();
-                    }
-                },
-                () => { /* User cancelled */ }
-            );
+            confirmAndSubmit(window.showSubmitConfirmation);
             return;
         }
         if (isDanger && window.showDangerConfirmation) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.showDangerConfirmation(
-                msg,
-                () => {
-                    form.dataset.confirmed = 'true';
-                    if (form.requestSubmit && submitter) {
-                        form.requestSubmit(submitter);
-                    } else {
-                        form.submit();
-                    }
-                },
-                () => { /* User cancelled */ },
-                _t('Delete'),
-                _t('Cancel'),
-                _t('Confirm Delete')
-            );
+            confirmAndSubmit(window.showDangerConfirmation);
             return;
         }
         if (window.showConfirmation) {
-            e.preventDefault();
-            e.stopPropagation();
-            window.showConfirmation(
-                msg,
-                () => {
-                    form.dataset.confirmed = 'true';
-                    if (form.requestSubmit && submitter) {
-                        form.requestSubmit(submitter);
-                    } else {
-                        form.submit();
-                    }
-                },
-                () => { /* User cancelled */ }
-            );
+            confirmAndSubmit(window.showConfirmation);
             return;
         }
 
+        restoreSubmitBtn();
         // No native confirm fallback: confirm-dialogs.js should provide styled dialogs globally.
         e.preventDefault();
         e.stopPropagation();

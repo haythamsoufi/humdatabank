@@ -1,0 +1,88 @@
+        /* Grid container styling */
+        #dataExplorationGrid-container {
+            overflow-x: auto;
+            position: relative;
+        }
+
+        /* Loading spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Add vertical padding to ALL grid cells so text doesn't touch row borders */
+        /* Use very high specificity to override inline styles from cellStyle */
+        #dataExplorationGrid.ag-theme-alpine .ag-cell,
+        #dataExplorationGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Force padding even if inline styles try to override it */
+        /* This targets cells with inline style attributes */
+        #dataExplorationGrid.ag-theme-alpine .ag-cell[style] {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+        }
+
+        /* Ensure cell-wrapper maintains proper alignment and doesn't interfere */
+        #dataExplorationGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height .ag-cell-wrapper {
+            align-items: center !important;
+            min-height: calc(100% - 20px) !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        /* Text selection is enabled by default in ag-grid-common-styles.css */
+        /* Cell alignment and padding are handled by ag-grid-common-styles.css */
+        /* This template uses default middle alignment - no overrides needed */
+
+        /* Column visibility toolbar: ag-column-visibility-manager.css */
+        /* Additional template-specific overrides can be added here if needed */
+
+        /* Compliance grid styling */
+        #complianceGrid-container {
+            overflow-x: auto;
+            position: relative;
+        }
+
+        #complianceGrid.ag-theme-alpine .ag-cell,
+        #complianceGrid.ag-theme-alpine .ag-cell.ag-cell-auto-height {
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+            box-sizing: border-box !important;
+        }
+
+        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center,
+        #complianceGrid.ag-theme-alpine .ag-header-cell.compliance-header-center {
+            text-align: center !important;
+        }
+
+        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-wrapper,
+        #complianceGrid.ag-theme-alpine .ag-cell.compliance-cell-center .ag-cell-value {
+            width: 100% !important;
+            justify-content: center !important;
+            text-align: center !important;
+        }
+
+        #complianceGrid.ag-theme-alpine .ag-header-cell.compliance-header-center .ag-header-cell-label {
+            justify-content: center !important;
+        }
+
+        /* Disaggregation sub-tab styling */
+        .disagg-subtab.active { border-bottom-color: #2563eb; color: #2563eb; }
+        .disagg-subtabs-divider {
+            width: 1px;
+            height: 1.5rem;
+            background-color: #d1d5db;
+            margin: 0 0.5rem;
+            flex-shrink: 0;
+        }
+        /* ApexCharts container styling */
+        .chart-container { min-height: 0; overflow: visible; }
+        .apexcharts-canvas { margin: 0 auto; }
+        .apexcharts-tooltip { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); border-radius: 8px; }
+        .apexcharts-menu { border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .apexcharts-menu-item:hover { background-color: #eff6ff; }
+    

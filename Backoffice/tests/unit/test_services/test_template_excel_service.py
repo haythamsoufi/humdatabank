@@ -478,7 +478,7 @@ class TestHelperMethods:
 
     def test_get_type_options_from_database_exception_returns_defaults(self, app):
         with app.app_context():
-            with patch("app.services.templates.excel_service.db") as mock_db:
+            with patch("app.services.templates.excel_export.db") as mock_db:
                 mock_db.session.query.side_effect = Exception("DB error")
                 opts = TemplateExcelService._get_type_options_from_database()
                 assert 'Number' in opts
@@ -2124,6 +2124,36 @@ class TestTemplateSheetRowLayout:
             result = TemplateExcelService.validate_import_file(buf)
         assert result['valid'] is True
         assert result['preview']['name'] == 'Valid Row Layout'
+
+
+# ---------------------------------------------------------------------------
+# Split-module layout (god-file refactor)
+# ---------------------------------------------------------------------------
+
+class TestModuleSplit:
+    """Ensure TemplateExcelService public API survives the module split."""
+
+    def test_orchestrator_inherits_export_and_import_mixins(self):
+        from app.services.templates.excel_base import TemplateExcelBase
+        from app.services.templates.excel_export import TemplateExcelExportMixin
+        from app.services.templates.excel_import import TemplateExcelImportMixin
+        from app.services.templates.matrix_import import TemplateExcelMatrixMixin
+
+        assert issubclass(TemplateExcelService, TemplateExcelImportMixin)
+        assert issubclass(TemplateExcelService, TemplateExcelExportMixin)
+        assert issubclass(TemplateExcelImportMixin, TemplateExcelMatrixMixin)
+        assert issubclass(TemplateExcelMatrixMixin, TemplateExcelBase)
+        assert issubclass(TemplateExcelExportMixin, TemplateExcelBase)
+
+    def test_public_methods_resolved_on_orchestrator(self):
+        assert getattr(TemplateExcelService.export_template, '__func__', TemplateExcelService.export_template)
+        assert TemplateExcelService.import_template
+        assert TemplateExcelService.matrix_import_entry_log
+        assert TemplateExcelService.validate_import_file
+
+    def test_constants_available_on_orchestrator(self):
+        assert TemplateExcelService.EXCEL_EXPORT_VERSION == 'V2'
+        assert 'matrix' not in TemplateExcelService.REQUIRED_COLUMNS  # sanity: unrelated key absent
 
 
 # ---------------------------------------------------------------------------

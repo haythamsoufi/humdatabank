@@ -1,5 +1,5 @@
 """
-Comprehensive tests for app/routes/admin/organization.py
+Comprehensive tests for app/routes/admin/organization/ package.
 Targeting 100% code coverage of organization management routes.
 """
 import io
@@ -22,7 +22,7 @@ def _json_headers():
 
 def _mock_render(return_value="<html>ok</html>"):
     return patch(
-        "app.routes.admin.organization.render_template",
+        "flask.render_template",
         return_value=return_value,
     )
 
@@ -252,7 +252,7 @@ class TestDeleteCountry:
 
     def test_delete_with_exception_redirects(self, logged_in_client, db_session, app):
         country = create_test_country(db_session, name="Error Delete Country", iso3="ERC", iso2="ER")
-        with patch("app.routes.admin.organization.db.session.delete", side_effect=Exception("db error")):
+        with patch("app.routes.admin.organization.countries.db.session.delete", side_effect=Exception("db error")):
             resp = logged_in_client.post(
                 f"/admin/organization/countries/{country.id}/delete",
                 follow_redirects=False,
@@ -272,7 +272,7 @@ class TestExportCountries:
         assert "spreadsheet" in resp.content_type or "xlsx" in resp.content_type
 
     def test_export_on_exception_redirects(self, logged_in_client, db_session):
-        with patch("app.routes.admin.organization.pd.DataFrame", side_effect=Exception("err")):
+        with patch("app.routes.admin.organization.import_export.pd.DataFrame", side_effect=Exception("err")):
             resp = logged_in_client.get(
                 "/admin/organization/countries/export",
                 follow_redirects=False,
@@ -291,7 +291,7 @@ class TestCountriesTemplate:
         assert "spreadsheet" in resp.content_type or "xlsx" in resp.content_type
 
     def test_template_on_exception_redirects(self, logged_in_client, db_session):
-        with patch("app.routes.admin.organization.pd.DataFrame", side_effect=Exception("err")):
+        with patch("app.routes.admin.organization.import_export.pd.DataFrame", side_effect=Exception("err")):
             resp = logged_in_client.get(
                 "/admin/organization/countries/template",
                 follow_redirects=False,
@@ -1266,23 +1266,23 @@ class TestOrganizationAPIEndpoints:
 
     def test_regional_office_translation_fields_includes_short_name(self):
         from types import SimpleNamespace
-        from app.routes.admin.organization import _regional_office_translation_fields
+        from app.routes.admin.organization import regional_office_translation_fields
 
         same = SimpleNamespace(name="Africa", short_name="Africa")
-        assert _regional_office_translation_fields(same) == [
+        assert regional_office_translation_fields(same) == [
             ("name", "name_translations"),
             ("short_name", "short_name_translations"),
         ]
 
         different = SimpleNamespace(name="Europe and Central Asia", short_name="Europe & CA")
-        assert _regional_office_translation_fields(different) == [
+        assert regional_office_translation_fields(different) == [
             ("name", "name_translations"),
             ("short_name", "short_name_translations"),
         ]
 
     def test_resolve_field_translation_copies_matching_short_name(self):
         from types import SimpleNamespace
-        from app.routes.admin.organization import _resolve_field_translation
+        from app.routes.admin.organization import resolve_field_translation
 
         entity = SimpleNamespace(
             name="Africa",
@@ -1291,7 +1291,7 @@ class TestOrganizationAPIEndpoints:
         )
         mock_translator = MagicMock()
 
-        result = _resolve_field_translation(
+        result = resolve_field_translation(
             entity, "short_name", "Africa", "fr", mock_translator, "ifrc"
         )
 
@@ -1395,7 +1395,7 @@ class TestOrganizationAPIEndpoints:
 
 class TestNSSExportImport:
     def test_ns_export_on_exception_redirects(self, logged_in_client, db_session):
-        with patch("app.routes.admin.organization.pd.DataFrame", side_effect=Exception("err")):
+        with patch("app.routes.admin.organization.import_export.pd.DataFrame", side_effect=Exception("err")):
             resp = logged_in_client.get(
                 "/admin/organization/national-societies/export",
                 follow_redirects=False,
@@ -1403,7 +1403,7 @@ class TestNSSExportImport:
         assert resp.status_code in (302, 500)
 
     def test_ns_template_on_exception_redirects(self, logged_in_client, db_session):
-        with patch("app.routes.admin.organization.pd.DataFrame", side_effect=Exception("err")):
+        with patch("app.routes.admin.organization.import_export.pd.DataFrame", side_effect=Exception("err")):
             resp = logged_in_client.get(
                 "/admin/organization/national-societies/template",
                 follow_redirects=False,
@@ -1448,19 +1448,19 @@ class TestInternalHelpers:
     def test_get_translation_languages_no_app_context(self, app):
         """Test that _get_translation_languages works during import (no app context)."""
         with app.app_context():
-            from app.routes.admin.organization import _get_translation_languages
-            result = _get_translation_languages()
+            from app.routes.admin.organization import get_translation_languages
+            result = get_translation_languages()
             assert isinstance(result, list)
 
     def test_get_translation_codes(self, app):
         with app.app_context():
-            from app.routes.admin.organization import _get_translation_codes
-            result = _get_translation_codes()
+            from app.routes.admin.organization import get_translation_codes
+            result = get_translation_codes()
             assert isinstance(result, list)
 
     def test_count_missing_name_translations(self, app, db_session):
         with app.app_context():
-            from app.routes.admin.organization import _count_missing_name_translations
+            from app.routes.admin.organization import count_missing_name_translations
             countries = create_test_country(db_session, name="Translation Test", iso3="TTX", iso2="TX")
-            result = _count_missing_name_translations([countries])
+            result = count_missing_name_translations([countries])
             assert isinstance(result, dict)

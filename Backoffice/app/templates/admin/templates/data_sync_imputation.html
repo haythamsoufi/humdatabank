@@ -107,11 +107,61 @@
       <div id="data-sync-settings" class="space-y-4">
         <p class="text-sm text-gray-600">{{ _('Sync data from your configured external API endpoint into form data for this template.') }}</p>
         <div>
-          <label for="data-sync-years" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Years (comma-separated)') }}</label>
-          <input type="text"
-                 id="data-sync-years"
-                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                 placeholder="e.g. 2019,2020,2021 (empty = default 2010-2024)">
+          <span class="block text-sm font-medium text-gray-700 mb-1">{{ _('Reporting years') }}</span>
+          <p class="text-xs text-gray-500 mb-2">{{ _('Choose which FDRS reporting years to fetch. All years in the default range are selected initially.') }}</p>
+          <div class="relative" id="data-sync-years-wrap">
+            <button type="button"
+                    id="data-sync-years-toggle"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-controls="data-sync-years-dropdown"
+                    class="w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 text-left text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 flex items-center justify-between gap-2">
+              <span id="data-sync-years-label" class="truncate text-gray-900"></span>
+              <svg class="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <div id="data-sync-years-dropdown"
+                 class="hidden absolute z-20 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg p-3"
+                 role="listbox"
+                 aria-multiselectable="true">
+              <div class="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-gray-100">
+                <span class="text-xs font-medium text-gray-600">{{ _('Select years') }}</span>
+                <div class="flex items-center gap-2">
+                  <button type="button"
+                          id="data-sync-years-select-all"
+                          class="text-xs text-blue-600 hover:text-blue-800">{{ _('All') }}</button>
+                  <span class="text-gray-300" aria-hidden="true">|</span>
+                  <button type="button"
+                          id="data-sync-years-clear-all"
+                          class="text-xs text-blue-600 hover:text-blue-800">{{ _('None') }}</button>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 sm:grid-cols-4 gap-x-3 gap-y-2 max-h-48 overflow-y-auto">
+                {% for year in range(fdrs_years_start, fdrs_years_end + 1) %}
+                <label class="inline-flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+                  <input type="checkbox"
+                         name="data-sync-year"
+                         value="{{ year }}"
+                         class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                         checked>
+                  <span>{{ year }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="border border-gray-200 rounded-md p-3 bg-gray-50">
+          <span class="block text-sm font-medium text-gray-800 mb-1">{{ _('Documents') }}</span>
+          <p class="text-xs text-gray-600 mb-2">{{ _('Import FDRS submission documents (metadata and file download when IFRC URLs are available). Uncheck to sync indicator data only.') }}</p>
+          <label class="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
+            <input type="checkbox"
+                   id="data-sync-documents"
+                   class="h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                   checked>
+            <span>{{ _('Sync FDRS documents') }}</span>
+          </label>
         </div>
         <div>
           <label for="data-sync-batch-size" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Batch size') }}</label>
@@ -1307,6 +1357,90 @@ document.addEventListener('DOMContentLoaded', function() {
         400: {{ _("Validated")|tojson|safe }},
         500: {{ _("Published")|tojson|safe }}
     };
+    const FDRS_YEARS_START = {{ fdrs_years_start }};
+    const FDRS_YEARS_END = {{ fdrs_years_end }};
+
+    const dataSyncYearsWrap = document.getElementById('data-sync-years-wrap');
+    const dataSyncYearsToggle = document.getElementById('data-sync-years-toggle');
+    const dataSyncYearsDropdown = document.getElementById('data-sync-years-dropdown');
+    const dataSyncYearsLabel = document.getElementById('data-sync-years-label');
+    const dataSyncYearsSelectAll = document.getElementById('data-sync-years-select-all');
+    const dataSyncYearsClearAll = document.getElementById('data-sync-years-clear-all');
+
+    function getDataSyncYearCheckboxes() {
+        return Array.from(document.querySelectorAll('input[name="data-sync-year"]'));
+    }
+
+    function getSelectedDataSyncYears() {
+        return getDataSyncYearCheckboxes()
+            .filter(function (el) { return el.checked; })
+            .map(function (el) { return parseInt(el.value, 10); })
+            .filter(function (n) { return !isNaN(n); })
+            .sort(function (a, b) { return a - b; });
+    }
+
+    function formatDataSyncYearsDisplay(years) {
+        if (!years.length) {
+            return {{ _("No years selected")|tojson|safe }};
+        }
+        const allYears = [];
+        for (let y = FDRS_YEARS_START; y <= FDRS_YEARS_END; y += 1) {
+            allYears.push(y);
+        }
+        if (years.length === allYears.length) {
+            return FDRS_YEARS_START + '\u2013' + FDRS_YEARS_END + ' (' + years.length + ' ' + {{ _("years")|tojson|safe }} + ')';
+        }
+        if (years.length <= 4) {
+            return years.join(', ');
+        }
+        return years[0] + '\u2013' + years[years.length - 1] + ' (' + years.length + ' ' + {{ _("years")|tojson|safe }} + ')';
+    }
+
+    function updateDataSyncYearsLabel() {
+        if (!dataSyncYearsLabel) return;
+        dataSyncYearsLabel.textContent = formatDataSyncYearsDisplay(getSelectedDataSyncYears());
+    }
+
+    function setDataSyncYearsOpen(isOpen) {
+        if (!dataSyncYearsDropdown || !dataSyncYearsToggle) return;
+        dataSyncYearsDropdown.classList.toggle('hidden', !isOpen);
+        dataSyncYearsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
+    function setAllDataSyncYears(checked) {
+        getDataSyncYearCheckboxes().forEach(function (el) {
+            el.checked = checked;
+        });
+        updateDataSyncYearsLabel();
+    }
+
+    if (dataSyncYearsToggle && dataSyncYearsDropdown) {
+        updateDataSyncYearsLabel();
+        dataSyncYearsToggle.addEventListener('click', function (event) {
+            event.stopPropagation();
+            const isOpen = dataSyncYearsDropdown.classList.contains('hidden');
+            setDataSyncYearsOpen(isOpen);
+        });
+        dataSyncYearsDropdown.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+        document.addEventListener('click', function () {
+            setDataSyncYearsOpen(false);
+        });
+        getDataSyncYearCheckboxes().forEach(function (el) {
+            el.addEventListener('change', updateDataSyncYearsLabel);
+        });
+        if (dataSyncYearsSelectAll) {
+            dataSyncYearsSelectAll.addEventListener('click', function () {
+                setAllDataSyncYears(true);
+            });
+        }
+        if (dataSyncYearsClearAll) {
+            dataSyncYearsClearAll.addEventListener('click', function () {
+                setAllDataSyncYears(false);
+            });
+        }
+    }
 
     let dataSyncStatusUrlTemplate = TEMPLATE_API_URLS.dataSyncStatus;
     let dataSyncCancelUrlTemplate = TEMPLATE_API_URLS.dataSyncCancel;
@@ -1349,25 +1483,29 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function collectDataSyncParams() {
-        const years = (document.getElementById('data-sync-years') && document.getElementById('data-sync-years').value) || '';
+        const selectedYears = getSelectedDataSyncYears();
+        const years = selectedYears.join(',');
         const batchSizeRaw = (document.getElementById('data-sync-batch-size') && document.getElementById('data-sync-batch-size').value) || '';
         const batchSizeRawTrim = (batchSizeRaw || '').trim();
         const batchSize = batchSizeRawTrim ? parseInt(batchSizeRawTrim, 10) : null;
         const dryRun = !!(document.getElementById('data-sync-dry-run') && document.getElementById('data-sync-dry-run').checked);
         const test = !!(document.getElementById('data-sync-test') && document.getElementById('data-sync-test').checked);
         const imputedUseCache = !!(document.getElementById('data-sync-imputed-cache') && document.getElementById('data-sync-imputed-cache').checked);
+        const syncDocuments = !!(document.getElementById('data-sync-documents') && document.getElementById('data-sync-documents').checked);
         const statusBoxes = document.querySelectorAll('input[name="data-sync-status"]:checked');
         const reportedStates = Array.from(statusBoxes).map(function (el) {
             return parseInt(el.value, 10);
         }).filter(function (n) { return !isNaN(n); });
 
         return {
-            years: years.trim(),
+            years: years,
+            selectedYears: selectedYears,
             batchSizeRawTrim: batchSizeRawTrim,
             batchSize: batchSize,
             dryRun: dryRun,
             test: test,
             imputedUseCache: imputedUseCache,
+            syncDocuments: syncDocuments,
             reportedStates: reportedStates
         };
     }
@@ -1382,7 +1520,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderDataSyncConfigSummary(params) {
         if (!dataSyncConfigSummaryBody) return;
 
-        const yearsDisplay = params.years || {{ _("Default (2010–2024)")|tojson|safe }};
+        const yearsDisplay = formatDataSyncYearsDisplay(params.selectedYears || []);
         const batchDisplay = params.batchSize !== null && !isNaN(params.batchSize)
             ? String(params.batchSize)
             : {{ _("Default (1000)")|tojson|safe }};
@@ -1394,6 +1532,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { label: {{ _("Years")|tojson|safe }}, value: yearsDisplay },
             { label: {{ _("Batch size")|tojson|safe }}, value: batchDisplay },
             { label: {{ _("Data status")|tojson|safe }}, value: statusLabels || '-' },
+            { label: {{ _("Sync documents")|tojson|safe }}, value: dataSyncBoolIcon(params.syncDocuments), html: true, inline: true },
             { label: {{ _("Dry run")|tojson|safe }}, value: dataSyncBoolIcon(params.dryRun), html: true, inline: true },
             { label: {{ _("Test mode")|tojson|safe }}, value: dataSyncBoolIcon(params.test), html: true, inline: true },
             { label: {{ _("Cached imputed values")|tojson|safe }}, value: dataSyncBoolIcon(params.imputedUseCache), html: true, inline: true }
@@ -1643,6 +1782,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
+            if (!params.selectedYears.length) {
+                dataSyncResult.classList.remove('hidden');
+                dataSyncResultText.textContent = {{ _("Select at least one reporting year.")|tojson|safe }};
+                dataSyncResultText.className = 'text-sm text-red-700';
+                return;
+            }
+
             if (!params.reportedStates.length) {
                 dataSyncResult.classList.remove('hidden');
                 dataSyncResultText.textContent = {{ _("Select at least one data status to include.")|tojson|safe }};
@@ -1668,6 +1814,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 test: params.test,
                 async: true,
                 imputed_use_cache: params.imputedUseCache,
+                sync_documents: params.syncDocuments,
                 fdrs_reported_import_states: params.reportedStates
             };
             if (params.batchSize !== null) {

@@ -582,6 +582,8 @@ class AIVectorStore:
         query_embedding: List[float],
         top_k: int = 10,
         filters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        user_role: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Fast system document search using pre-computed embedding.
@@ -610,6 +612,10 @@ class AIVectorStore:
                 AIDocument.searchable == True,
                 AIDocument.processing_status == 'completed',
                 AIDocument.submitted_document_id.isnot(None),  # ONLY system documents
+            )
+
+            similarity_query = self._apply_document_permission_filters(
+                similarity_query, user_id, user_role
             )
 
             # Apply country filter if provided
@@ -723,6 +729,8 @@ class AIVectorStore:
             query_embedding=query_embedding,
             top_k=top_k,
             filters=filters,
+            user_id=user_id,
+            user_role=user_role,
         )
 
         # Merge system document results into vector results (they'll get priority boost in combine)
@@ -967,6 +975,10 @@ class AIVectorStore:
                 AIDocument.searchable == True,
                 AIDocument.processing_status == 'completed',
                 AIDocument.submitted_document_id.isnot(None),  # ONLY system documents
+            )
+
+            similarity_query = self._apply_document_permission_filters(
+                similarity_query, user_id, user_role
             )
 
             # Apply country filter if provided (multi-country aware)

@@ -38,6 +38,23 @@ class TestLandingPage:
         assert "current_year" in kwargs
 
 
+class TestCustomGptRedirect:
+    def test_gpt_redirects_to_chatgpt(self, client):
+        resp = client.get("/gpt")
+        assert resp.status_code == 302
+        assert resp.headers["Location"].startswith("https://chatgpt.com/g/")
+
+    def test_assistant_alias_redirects_to_chatgpt(self, client):
+        resp = client.get("/assistant")
+        assert resp.status_code == 302
+        assert "ifrc-network-databank" in resp.headers["Location"]
+
+    def test_gpt_redirect_404_when_url_invalid(self, app, client):
+        app.config["CUSTOM_GPT_URL"] = "https://evil.example.com/gpt"
+        resp = client.get("/gpt")
+        assert resp.status_code == 404
+
+
 class TestPrivacyPolicy:
     def test_privacy_returns_200_without_login(self, client):
         resp = client.get("/privacy")

@@ -1,0 +1,245 @@
+openapi: 3.1.0
+info:
+  title: IFRC Humanitarian Databank Public API
+  version: 1.1.0
+  description: Public read-only API for FDRS/UPR stats and public document chunks. Prefer /public/* routes. No auth. Privacy https://databank.ifrc.org/privacy
+
+servers:
+  - url: https://databank.ifrc.org/api/v1
+
+paths:
+  /public/global-trend:
+    get:
+      operationId: getGlobalTrend
+      summary: Global totals by reporting period
+      description: Deduped global totals by period. Prefer over paginating /data for worldwide trends. Filter data_status=available on raw rows only.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Metric name e.g. volunteers
+        - name: indicator_bank_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Indicator id e.g. 724
+        - name: period_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: e.g. Annual 2023
+        - name: max_pages
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 20
+      responses:
+        "200":
+          description: by_period with period_name, total, countries_reporting
+
+  /public/indicators/resolve:
+    get:
+      operationId: resolveIndicator
+      summary: Resolve metric name to indicator id
+      description: Maps e.g. volunteers to indicator bank id. Prefer over broad indicator-bank search.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Metric name or numeric id
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5
+            maximum: 20
+      responses:
+        "200":
+          description: best_match and alternatives with id and name
+
+  /public/documents/search:
+    get:
+      operationId: searchPublicDocuments
+      summary: Search public document chunks
+      description: Public AI Knowledge Base chunks only. Use for Unified Plans and reports. Synthesize answer from chunks[] and cite title and page.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: User question with country and year if relevant
+        - name: top_k
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 8
+            maximum: 12
+        - name: min_score
+          in: query
+          required: false
+          schema:
+            type: number
+            default: 0.25
+        - name: country_name
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: search_mode
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - hybrid
+              - vector
+            default: hybrid
+      responses:
+        "200":
+          description: chunks with content, document_title, page_number, score
+
+  /indicator-bank:
+    get:
+      operationId: getIndicatorBank
+      summary: Search indicator catalogue
+      description: Search FDRS/UPR indicator metadata. Use resolveIndicator first when possible. Always pass limit.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Keyword on name or definition
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 50
+          description: Max results cap
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sector
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sub_sector
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: emergency
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: archived
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+      responses:
+        "200":
+          description: indicators list with id, name, unit, fdrs_kpi_code
+
+  /indicator-bank/{indicator_id}:
+    get:
+      operationId: getIndicatorById
+      summary: Get one indicator
+      description: Full metadata for a single indicator bank id.
+      parameters:
+        - name: indicator_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Indicator definition, unit, sector
+        "404":
+          description: Not found
+
+  /data:
+    get:
+      operationId: getPublicData
+      summary: Paginated public values
+      description: Scoped public form data. Needs indicator_bank_id or country or period filter. Slim data[] only. Use getGlobalTrend for global totals. Keep include_dimensions false.
+      parameters:
+        - name: indicator_bank_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: template_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: 21 for FDRS submissions
+        - name: country_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: country_iso3
+          in: query
+          required: false
+          schema:
+            type: string
+          description: ISO3 e.g. KEN
+        - name: country_iso2
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: period_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: e.g. Annual 2023
+        - name: page
+          in: query
+          required: true
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          required: true
+          schema:
+            type: integer
+            default: 500
+            maximum: 5000
+        - name: include_dimensions
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+            default: "false"
+          description: Must stay false for GPT
+      responses:
+        "200":
+          description: Paginated data rows with num_value and data_status

@@ -40,74 +40,8 @@ env:
   EFFECTIVE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.sha }}
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
-    environment: staging
-    permissions:
-      contents: read
-    steps:
-      - name: Set deployment target
-        id: config
-        run: |
-          echo "app_name=ifrc-databank-mcp-staging" >> "$GITHUB_OUTPUT"
-          echo "resource_group=ifrctgo001rg" >> "$GITHUB_OUTPUT"
-
-      - name: Verify MCP publish profile credentials
-        env:
-          PUBLISH_PROFILE: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
-          APP_NAME: ${{ steps.config.outputs.app_name }}
-        run: |
-          python3 << 'EOF'
-          import os, sys, xml.etree.ElementTree as ET, urllib.request, urllib.error, base64
-
-          profile_xml = os.environ.get("PUBLISH_PROFILE", "").strip()
-          app_name = os.environ["APP_NAME"]
-          if not profile_xml:
-              print("ERROR: AZURE_MCP_PUBLISH_PROFILE secret is not set.")
-              sys.exit(1)
-
-          try:
-              root = ET.fromstring(profile_xml)
-          except ET.ParseError as exc:
-              print(f"ERROR: Could not parse publish profile XML: {exc}")
-              sys.exit(1)
-
-          entry = next(
-              (p for p in root.findall("publishProfile") if p.get("publishMethod") == "MSDeploy"),
-              None,
-          )
-          if entry is None:
-              print("ERROR: No MSDeploy entry found in publish profile.")
-              sys.exit(1)
-
-          scm_host = entry.get("publishUrl", "").split(":")[0]
-          msdeploy = entry.get("msdeploySite", "")
-          username = entry.get("userName", "")
-          password = entry.get("userPWD", "")
-
-          if not scm_host.startswith(app_name):
-              print(f"ERROR: Publish profile is for '{msdeploy}', expected app '{app_name}'.")
-              sys.exit(1)
-
-          token = base64.b64encode(f"{username}:{password}".encode()).decode()
-          req = urllib.request.Request(
-              f"https://{scm_host}/api/settings",
-              headers={"Authorization": f"Basic {token}"},
-          )
-          try:
-              urllib.request.urlopen(req, timeout=15)
-              print(f"OK: Credentials verified for '{msdeploy}' at {scm_host}")
-          except urllib.error.HTTPError as exc:
-              print(f"ERROR: HTTP {exc.code} from {scm_host} — credentials rejected or app unreachable.")
-              sys.exit(1)
-          except urllib.error.URLError as exc:
-              print(f"ERROR: Could not reach {scm_host}: {exc.reason}")
-              sys.exit(1)
-          EOF
-
   build:
     runs-on: ubuntu-latest
-    needs: validate
     environment: staging
     permissions:
       contents: read

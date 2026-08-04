@@ -236,4 +236,49 @@ describe('initAuthDrafts restore flow', () => {
       expect(input.disabled).toBe(false);
     });
   });
+
+  it('skips restore for NS focals when send-for-review workflow is enabled', async () => {
+    window.showConfirmation = vi.fn();
+    setupEntryFormDom({
+      assignmentStatus: 'in_progress',
+      reviewEnabled: true,
+      isDelegationUser: false,
+    });
+    const mod = await prepareAuthDraftsTestEnv();
+    await initAuthDraftsForTest(mod, {
+      preSaveDraft: { data: { indicator_1: 'draft-value' }, diffBased: true },
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelector('[name="indicator_1"]').value).toBe('server-value');
+    expect(window.showConfirmation).not.toHaveBeenCalled();
+    expect(await mod.loadDraft('auth:42:100')).not.toBeNull();
+  });
+
+  it('restores for ORG delegation users while assignment is sent_for_review', async () => {
+    window.showConfirmation = (_msg, onConfirm) => onConfirm();
+    setupEntryFormDom({
+      assignmentStatus: 'sent_for_review',
+      reviewEnabled: true,
+      isDelegationUser: true,
+    });
+    const mod = await prepareAuthDraftsTestEnv();
+    await initAuthDraftsForTest(mod, {
+      preSaveDraft: { data: { indicator_1: 'draft-value' }, diffBased: true },
+    });
+    await vi.waitFor(() => {
+      expect(document.querySelector('[name="indicator_1"]').value).toBe('draft-value');
+    });
+  });
+
+  it('skips restore when assignment is already submitted', async () => {
+    window.showConfirmation = vi.fn();
+    setupEntryFormDom({ assignmentStatus: 'submitted' });
+    const mod = await prepareAuthDraftsTestEnv();
+    await initAuthDraftsForTest(mod, {
+      preSaveDraft: { data: { indicator_1: 'draft-value' }, diffBased: true },
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelector('[name="indicator_1"]').value).toBe('server-value');
+    expect(window.showConfirmation).not.toHaveBeenCalled();
+  });
 });

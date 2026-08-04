@@ -1369,6 +1369,197 @@ a.btn.entry-form-doc-library-btn {
   text-align: left;
 }
 
+/* Entry form document cards — uploaded / repository file rows */
+.entry-form-doc-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.entry-form-doc-card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
+.entry-form-doc-card--submitted {
+  border-left: 3px solid #059669;
+}
+
+.entry-form-doc-card--repository {
+  border-left: 3px solid #2563eb;
+}
+
+.entry-form-doc-card--pending-delete {
+  background: #fef2f2;
+  border-color: #fecaca;
+  border-left-color: #ef4444;
+  opacity: 0.88;
+}
+
+.entry-form-doc-card__main {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.entry-form-doc-card__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.375rem;
+  font-size: 0.95rem;
+}
+
+.entry-form-doc-card--submitted .entry-form-doc-card__icon {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.entry-form-doc-card--repository .entry-form-doc-card__icon {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.entry-form-doc-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-form-doc-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.entry-form-doc-card__filename {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.35;
+  word-break: break-word;
+  min-width: 0;
+  flex: 1;
+  text-decoration: none;
+}
+
+.entry-form-doc-card__filename:hover {
+  color: #059669;
+  text-decoration: underline;
+}
+
+.entry-form-doc-card--repository .entry-form-doc-card__filename:hover {
+  color: #2563eb;
+}
+
+.entry-form-doc-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.entry-form-doc-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.entry-form-doc-card__upload-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.25;
+}
+
+.entry-form-doc-card__upload-info i {
+  font-size: 0.65rem;
+  opacity: 0.75;
+}
+
+.entry-form-doc-card--pending-delete .entry-form-doc-card__upload-info {
+  color: #dc2626;
+}
+
+.entry-form-doc-card__source-note {
+  display: block;
+  width: 100%;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #1d4ed8;
+  margin-top: 0.25rem;
+}
+
+.entry-form-doc-card__delete-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: #dc2626;
+}
+
+.entry-form-doc-card__footer {
+  margin-top: 0.5rem;
+}
+
+/* Entry form document cards — language pill tag */
+.entry-form-doc-language-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  border-radius: 9999px;
+  vertical-align: middle;
+}
+
+.entry-form-doc-language-tag i {
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+
+.entry-form-doc-language-tag--submitted {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+}
+
+.entry-form-doc-language-tag--repository {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.entry-form-doc-language-tag--pending {
+  background-color: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
+/* Queued document feedback — align with card styling */
+.document-pending-feedback.entry-form-doc-card--pending {
+  border-left: 3px solid #6366f1;
+  background: #fafafa;
+}
+
 .modal-document-language-select {
   appearance: none;
   -webkit-appearance: none;

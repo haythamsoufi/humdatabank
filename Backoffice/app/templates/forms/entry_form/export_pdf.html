@@ -7,8 +7,8 @@
 <head>
     <meta charset="utf-8">
     {% set _assignment_name = assignment_display_name or (assignment.template.name if assignment and assignment.template else _('Assignment')) %}
-    {% set _country_name = country_display_name or (country.name if country else '') %}
-    <title>{{ _assignment_name }} - {{ _country_name }}</title>
+    {% set _entity_name = entity_display_name or country_display_name or '' %}
+    <title>{{ _entity_name }} - {{ _assignment_name }}</title>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     {% if _lang == 'ar' %}
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
@@ -18,7 +18,7 @@
     <header>
         <h1>{{ _assignment_name }}</h1>
         <div class="meta">
-            <div><strong>{{ _('Country:') }}</strong> {{ _country_name if _country_name else '-' }}</div>
+            <div><strong>{{ _('Entity:') }}</strong> {{ _entity_name if _entity_name else '-' }}</div>
             <div><strong>{{ _('Period:') }}</strong> {{ assignment.period_name if assignment else '-' }}</div>
             <div><strong>{{ _('Status:') }}</strong> {{ localize_status(aes.status) if aes else '-' }}</div>
             <div><strong>{{ _('Generated:') }}</strong> {{ generated_at|datetime_local('datetime') if generated_at else '' }}</div>
@@ -40,15 +40,40 @@
             {% for field in section.fields_ordered %}
                 {% set item_key = 'form_item_' ~ field.id %}
                 {% set value = existing_data.get(item_key) %}
+                {% set field_is_prefilled = existing_data.get(item_key ~ '_is_prefilled', false) %}
+                {% set field_is_imputed = existing_data.get(item_key ~ '_is_imputed', false) %}
+                {% set field_is_carry_forward = existing_data.get(item_key ~ '_is_carry_forward', false) %}
+                {% set field_carry_forward_ref = existing_data.get(item_key ~ '_carry_forward_ref') %}
                 {% if field.kind == 'note' %}
-                    {% set _raw = value.get('values', {}).get('value') if (value is mapping) else (value if value is not none else '') %}
-                    {% set note_text = (_raw|string|trim) if (_raw is not none and _raw|string|trim != '') else (field.display_label|trim if field.display_label else '') %}
-                    {% if note_text %}
-                        <div class="form-note">{{ note_text }}</div>
+                    {% set note_label = field.note_label if field.note_label is defined else (field.display_label or '') %}
+                    {% set note_body = field.note_body if field.note_body is defined else '' %}
+                    {% if (note_label and note_label|trim) or (note_body and note_body|trim) %}
+                        <div class="form-note">
+                            {% if note_label and note_label|trim %}
+                                <div class="form-note-heading">{{ note_label }}</div>
+                            {% endif %}
+                            {% if note_body and note_body|trim %}
+                                <div class="form-note-body">{{ note_body | safe }}</div>
+                            {% endif %}
+                        </div>
                     {% endif %}
                 {% else %}
+                {% set flagged_unavailable = value is mapping and value.get('data_not_available') %}
+                {% set flagged_na = value is mapping and value.get('not_applicable') %}
+                {% set _wide_matrix = false %}
+                {% set _matrix_strategy = '' %}
+                {% if field.kind == 'matrix' %}
+                    {% set _layout_cols = field.matrix_columns if field.matrix_columns is defined else [] %}
+                    {% set _layout_col_count = _layout_cols|length %}
+                    {% set _matrix_strategy = matrix_pdf_layout_strategy(_layout_col_count) %}
+                    {% if _matrix_strategy %}
+                        {% set _wide_matrix = true %}
+                    {% endif %}
+                {% endif %}
                 {% set is_empty = false %}
-                {% if value is none %}
+                {% if flagged_unavailable or flagged_na %}
+                    {% set is_empty = false %}
+                {% elif value is none %}
                     {% set is_empty = true %}
                 {% elif value is mapping %}
                     {% if field.kind == 'matrix' %}
@@ -103,13 +128,29 @@
                     {% set is_required = true if required_raw else false %}
                 {% endif %}
 
-                <div class="field-box {{ 'field-empty-required' if (is_empty and is_required) else ('field-empty-optional' if is_empty else 'field-filled') }}{{ ' field-box-matrix' if field.kind == 'matrix' else '' }}">
+                {% set _field_label = field.display_label if field.display_label is defined else (field.label if field.label is defined else '') %}
+                {% set _has_field_label = _field_label and _field_label|string|trim %}
+                {% if _has_field_label %}
+                <div class="field-box {{ 'field-empty-required' if (is_empty and is_required) else ('field-empty-optional' if is_empty else 'field-filled') }}{{ ' field-box-matrix' if field.kind == 'matrix' else '' }}{% if field_is_imputed %} field-box-imputed{% endif %}{% if _wide_matrix %} field-box-matrix-wide wide-matrix-{{ _matrix_strategy }}{% endif %}">
                     <div class="field-header">
-                        <span class="field-label">{{ field.display_label }}</span>
+                        <span class="field-label">{{ _field_label }}</span>
+                        {% if field_is_imputed and field.kind != 'matrix' %}
+                            <span class="field-flag field-flag-imputed">{{ _('Imputed') }}</span>
+                        {% elif (field_is_prefilled or field_is_carry_forward) and field.kind != 'matrix' %}
+                            <span class="field-flag field-flag-prefilled">{{ _('Prefilled') }}</span>
+                        {% endif %}
                     </div>
                     <div class="field-content">
+                {% else %}
+                <div class="field-unlabeled{% if field.kind == 'matrix' %} field-box-matrix{% endif %}{% if _wide_matrix %} field-box-matrix-wide wide-matrix-{{ _matrix_strategy }}{% endif %}">
+                    <div class="field-content field-content-unlabeled">
+                {% endif %}
+                        {% if flagged_unavailable %}
+                            <span class="not-reported-optional">{{ _('Data not available') }}</span>
+                        {% elif flagged_na %}
+                            <span class="not-reported-optional">{{ _('Not applicable') }}</span>
                         {# For matrices, always render the table structure (even when empty) #}
-                        {% if field.kind == 'matrix' %}
+                        {% elif field.kind == 'matrix' %}
                             {% if is_empty %}
                                 <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
                             {% endif %}
@@ -122,8 +163,14 @@
                             {% set matrix_rows = field.matrix_rows if field.matrix_rows is defined else [] %}
                             {% set matrix_columns = field.matrix_columns if field.matrix_columns is defined else [] %}
                             {% set matrix_data = value if value is mapping else {} %}
+                            {% set matrix_is_prefilled = field_is_prefilled %}
+                            {% set matrix_is_imputed = field_is_imputed %}
+                            {% set matrix_carry_forward_ref = field_carry_forward_ref %}
+                            {% set matrix_has_carry_forward_ref = matrix_carry_forward_ref is mapping and matrix_carry_forward_ref|length > 0 %}
+                            {% set matrix_highlight_prefilled_cells = (matrix_is_prefilled or matrix_has_carry_forward_ref) and not matrix_is_imputed %}
                             {% set row_labels = field.matrix_row_labels if field.matrix_row_labels is defined else {} %}
                             {% set matrix_config = field.matrix_config if field.matrix_config is defined else {} %}
+                            {% set matrix_column_groups = field.matrix_column_groups if field.matrix_column_groups is defined else matrix_config.get('column_groups', {}) %}
                             {% set show_row_totals = matrix_config.get('show_row_totals', true) %}
                             {% set show_column_totals = matrix_config.get('show_column_totals', true) %}
                             {# Sort rows A–Z by display label (case-insensitive), matching matrix-handler.js #}
@@ -171,14 +218,97 @@
                                     {% set _ = ns_ct.col_totals.append(ns.col_total) %}
                                     {% set ns_ct.grand_total = ns_ct.grand_total + ns.col_total %}
                                 {% endfor %}
-                                {% set _wide_matrix = (matrix_columns|length) > 10 %}
                                 {% if _wide_matrix %}
-                                <div class="wide-matrix wide-matrix-{{ wide_matrix_strategy|default('scale') }}">
+                                <div class="wide-matrix-compact">
                                 {% endif %}
-                                <table class="table">
+                                {% if matrix_is_imputed %}
+                                <div class="matrix-field-flag">
+                                    <span class="field-flag field-flag-imputed">{{ _('Imputed') }}</span>
+                                </div>
+                                {% endif %}
+                                {% if matrix_highlight_prefilled_cells %}
+                                <div class="matrix-legend">
+                                    <div class="matrix-legend-item">
+                                        <span class="matrix-legend-swatch" aria-hidden="true"></span>
+                                        <span>{{ _('Carried forward value') if (field_is_carry_forward or matrix_has_carry_forward_ref) else _('Prefilled value') }}</span>
+                                    </div>
+                                </div>
+                                {% endif %}
+                                <table class="table matrix-table">
+                                    {% if _matrix_strategy == 'portrait-compact' %}
+                                    <colgroup>
+                                        {% for col_name, width_mm in matrix_portrait_column_widths_mm(_layout_col_count, matrix_columns, show_row_totals=show_row_totals) %}
+                                        <col{% if col_name == '__row__' %} class="matrix-col-row-label"{% elif width_mm <= 7.5 %} class="matrix-col-tick"{% else %} class="matrix-col-data"{% endif %} style="width: {{ width_mm }}mm">
+                                        {% endfor %}
+                                    </colgroup>
+                                    {% endif %}
                                     <thead>
+                                        {% set _has_groups = namespace(value=false) %}
+                                        {% for _c in matrix_columns %}
+                                            {% if _c is mapping and _c.get('group') %}
+                                                {% set _has_groups.value = true %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if _has_groups.value %}
+                                            <tr>
+                                                <th rowspan="2" class="matrix-row-header"></th>
+                                                {% for column in matrix_columns %}
+                                                    {% set _col_group = column.get('group', '') if column is mapping else '' %}
+                                                    {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
+                                                    {% set _col_display = _col_key %}
+                                                    {% if column is mapping and column.name_translations %}
+                                                        {% set _cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
+                                                        {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
+                                                    {% endif %}
+                                                    {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
+                                                    {% if not _col_group %}
+                                                        <th rowspan="2" class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ _col_display }}</th>
+                                                    {% else %}
+                                                        {% set _prev_group = '' %}
+                                                        {% if loop.index0 > 0 %}
+                                                            {% set _prev_col = matrix_columns[loop.index0 - 1] %}
+                                                            {% set _prev_group = _prev_col.get('group', '') if _prev_col is mapping else '' %}
+                                                        {% endif %}
+                                                        {% if _col_group != _prev_group %}
+                                                            {% set _span = namespace(value=0, done=false) %}
+                                                            {% for _la in matrix_columns[loop.index0:] %}
+                                                                {% if not _span.done %}
+                                                                    {% set _la_group = _la.get('group', '') if _la is mapping else '' %}
+                                                                    {% if _la_group == _col_group %}
+                                                                        {% set _span.value = _span.value + 1 %}
+                                                                    {% else %}
+                                                                        {% set _span.done = true %}
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                            {% set _grp_translations = matrix_column_groups.get(_col_group, {}) if matrix_column_groups is mapping else {} %}
+                                                            {% set _grp_display = _grp_translations.get(translation_key) or _grp_translations.get('en') or _col_group %}
+                                                            <th colspan="{{ _span.value }}" class="matrix-group-header">{{ _grp_display }}</th>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                {% if show_row_totals %}
+                                                    <th rowspan="2" class="matrix-col-header">{{ _('Total') }}</th>
+                                                {% endif %}
+                                            </tr>
+                                            <tr>
+                                                {% for column in matrix_columns %}
+                                                    {% set _col_group = column.get('group', '') if column is mapping else '' %}
+                                                    {% if _col_group %}
+                                                        {% set _col_key = column.name if column is mapping and column.name else (column if column is string else '') %}
+                                                        {% set _col_display = _col_key %}
+                                                        {% if column is mapping and column.name_translations %}
+                                                            {% set _cand = column.name_translations.get(translation_key) or column.name_translations.get('en') %}
+                                                            {% if _cand and _cand|trim %}{% set _col_display = _cand %}{% endif %}
+                                                        {% endif %}
+                                                        {% set _hdr_col_type = column.get('type', 'number') if column is mapping else 'number' %}
+                                                        <th class="matrix-col-header{% if _hdr_col_type == 'tick' %} cell-tick{% endif %}">{{ _col_display }}</th>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </tr>
+                                        {% else %}
                                         <tr>
-                                            <th></th>
+                                            <th class="matrix-row-header"></th>
                                             {% for col in matrix_columns %}
                                                 {% if col is mapping %}
                                                     {% set col_name = col.get('name') if col.get('name') else col %}
@@ -187,16 +317,19 @@
                                                         {% set _cand = col.get('name_translations', {}).get(translation_key) or col.get('name_translations', {}).get('en') %}
                                                         {% if _cand and _cand|string|trim %}{% set col_display = _cand %}{% endif %}
                                                     {% endif %}
+                                                    {% set col_type = col.get('type', 'number') %}
                                                 {% else %}
                                                     {% set col_name = col %}
                                                     {% set col_display = col_name %}
+                                                    {% set col_type = 'number' %}
                                                 {% endif %}
-                                                <th>{{ col_display }}</th>
+                                                <th class="matrix-col-header{% if col_type == 'tick' %} cell-tick{% endif %}">{{ col_display }}</th>
                                             {% endfor %}
                                             {% if show_row_totals %}
-                                                <th>{{ _('Total') }}</th>
+                                                <th class="matrix-col-header">{{ _('Total') }}</th>
                                             {% endif %}
                                         </tr>
+                                        {% endif %}
                                     </thead>
                                     <tbody>
                                         {% if not matrix_rows %}
@@ -241,7 +374,7 @@
                                                 {% set ns_rt.row_total = ns_rt.row_total + add %}
                                             {% endfor %}
                                             <tr>
-                                                <td><strong>{{ row_display }}</strong></td>
+                                                <td class="matrix-row-label"><strong>{{ row_display }}</strong></td>
                                                 {% for col in matrix_columns %}
                                                     {% if col is mapping %}
                                                         {% set col_name = col.get('name') if col.get('name') else col %}
@@ -257,7 +390,17 @@
                                                     {% else %}
                                                         {% set display_cell = cell_value %}
                                                     {% endif %}
-                                                    <td{% if col_type == 'tick' %} class="cell-tick"{% endif %}>
+                                                    {% set is_variable_col = col is mapping and (col.get('is_variable') or col.get('type') == 'variable') %}
+                                                    {% set variable_readonly = col.get('variable_readonly', true) if col is mapping else true %}
+                                                    {% set cell_is_prefilled = matrix_cell_is_prefilled_highlight(
+                                                        cell_key,
+                                                        display_cell,
+                                                        is_prefilled=matrix_is_prefilled,
+                                                        is_imputed=matrix_is_imputed,
+                                                        carry_forward_ref=matrix_carry_forward_ref,
+                                                        is_variable_readonly=is_variable_col and variable_readonly
+                                                    ) %}
+                                                    <td class="matrix-col-data{% if col_type == 'tick' %} cell-tick{% endif %}{% if cell_is_prefilled %} cell-prefilled{% elif matrix_is_imputed %} cell-imputed{% endif %}">
                                                         {% if col_type == 'tick' %}
                                                             {% if display_cell in [1, '1', true, 'true', 'True'] %}✓{% else %}-{% endif %}
                                                         {% else %}
@@ -316,7 +459,7 @@
                                 {% set sex_cats = field.model.effective_sex_categories if (field.model is defined and field.model) else (config.DEFAULT_SEX_CATEGORIES or []) %}
                                 {% set age_grps = field.model.effective_age_groups if (field.model is defined and field.model) else (config.DEFAULT_AGE_GROUPS or []) %}
                                 {% if mode == 'total' and total_val is not none %}
-                                    <span class="field-value">{{ total_val | format_number }}</span>
+                                    <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ total_val | format_number }}</span>
                                 {% elif mode == 'sex' and sex_cats %}
                                     <p class="disaggregation-caption">{{ _('By Sex:') }}</p>
                                     <table class="table">
@@ -381,7 +524,7 @@
                                         </tbody>
                                     </table>
                                 {% elif total_val is not none %}
-                                    <span class="field-value">{{ total_val | format_number }}</span>
+                                    <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ total_val | format_number }}</span>
                                 {% elif direct_or_flat and direct_or_flat is mapping %}
                                     <table class="table">
                                         <thead>
@@ -403,10 +546,10 @@
                                     <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="field-value">{{ value | format_number }}</span>
+                                <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ value | format_number }}</span>
                             {% endif %}
                         {% elif field.kind == 'question' %}
-                            <span class="field-value">{{ value | format_number }}</span>
+                            <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ value | format_number }}</span>
                         {% elif field.kind == 'document' %}
                             <span class="field-value document-note">{{ _('See documents in the web interface') }}</span>
                         {% else %}

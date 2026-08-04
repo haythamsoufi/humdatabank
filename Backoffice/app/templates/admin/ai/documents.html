@@ -62,24 +62,42 @@
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">{{ stats.total_documents or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Total') }}</div>
+            {% if has_active_filters and stats_global %}
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.total_documents or 0) }}</p>
+            {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-green-600 mb-1 sm:mb-2">{{ stats.completed or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Completed') }}</div>
+            {% if has_active_filters and stats_global %}
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.completed or 0) }}</p>
+            {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-yellow-600 mb-1 sm:mb-2">{{ stats.pending or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Pending') }}</div>
+            {% if has_active_filters and stats_global %}
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.pending or 0) }}</p>
+            {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-red-600 mb-1 sm:mb-2">{{ stats.failed or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Failed') }}</div>
+            {% if has_active_filters and stats_global %}
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.failed or 0) }}</p>
+            {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center col-span-2 sm:col-span-1">
             <div class="text-2xl sm:text-3xl font-bold text-purple-600 mb-1 sm:mb-2">{{ stats.total_embeddings or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Embeddings') }}</div>
+            {% if has_active_filters %}
+            <p class="text-xs text-gray-500 mt-1">{{ _('Library-wide total') }}</p>
+            {% endif %}
         </div>
     </div>
+    {% if has_active_filters %}
+    <p class="text-xs text-gray-500 mt-2">{{ _('Status counts match the current filters.') }}</p>
+    {% endif %}
 </div>
 
 <!-- AI Query -->
@@ -322,6 +340,7 @@
                         </div>
                     </div>
                     <div id="importDocumentsFetchError" class="hidden flex-shrink-0 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div>
+                    <div id="importDocumentsTruncationHint" class="hidden flex-shrink-0 mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status"></div>
                     <div id="importDocumentsGridShell" class="relative flex flex-col flex-1 min-h-0 overflow-hidden">
                         {{ ag_grid_container('importDocumentsGrid', show_placeholder=false, include_card=false) }}
                     </div>
@@ -479,6 +498,15 @@
 
     <div class="p-3 sm:p-4 md:p-6 relative min-w-0 overflow-hidden">
         {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), show_placeholder=false, grid_height='600px', include_card=false, empty_message=_('No documents found. Upload a document to get started.')) }}
+        <div id="documentsGrid-pagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 pt-4">
+            <button type="button" id="documentsGrid-page-prev" class="btn btn-secondary btn-sm order-2 sm:order-1">
+                <i class="fas fa-chevron-left mr-1"></i>{{ _('Previous') }}
+            </button>
+            <span id="documentsGrid-page-label" class="text-sm text-gray-600 order-1 sm:order-2 text-center"></span>
+            <button type="button" id="documentsGrid-page-next" class="btn btn-secondary btn-sm order-3">
+                {{ _('Next') }}<i class="fas fa-chevron-right ml-1"></i>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -491,35 +519,14 @@
 {% from "components/ag_grid_includes.html" import ag_grid_js %}
 {{ ag_grid_js() }}
 <script src="{{ static_url('js/core/floating-progress-banner.js') }}"></script>
-<script type="application/json" id="ai-documents-rows">
-[
-    {% for doc in documents %}
-    {
-        "id": {{ doc.id }},
-        "title": {{ doc.title|tojson|safe }},
-        "filename": {{ doc.filename|tojson|safe }},
-        "country_name": {{ ((doc.country.name if doc.country else (doc.country_name or '')))|tojson|safe }},
-        "country_iso3": {{ ((doc.country.iso3 if doc.country else ''))|tojson|safe }},
-        "geographic_scope": {{ (doc.geographic_scope or '')|tojson|safe }},
-        "countries": [{% for c in doc.countries %}{"id": {{ c.id }}, "name": {{ c.name|tojson|safe }}, "iso3": {{ (c.iso3 or '')|tojson|safe }}}{% if not loop.last %},{% endif %}{% endfor %}],
-        "file_type": {{ doc.file_type|tojson|safe }},
-        "processing_status": {{ doc.processing_status|tojson|safe }},
-        "processing_error": {{ (doc.processing_error or '')|tojson|safe }},
-        "total_chunks": {{ doc.total_chunks or 0 }},
-        "created_at": {{ doc.created_at|datetime_iso|tojson|safe }},
-        "is_public": {{ doc.is_public|tojson|safe }},
-        "document_date": {{ (doc.document_date.isoformat() if doc.document_date else '')|tojson|safe }},
-        "document_language": {{ (doc.document_language or '')|tojson|safe }},
-        "document_category": {{ (doc.document_category or '')|tojson|safe }},
-        "source_organization": {{ (doc.source_organization or '')|tojson|safe }},
-        "quality_score": {{ (doc.quality_score if doc.quality_score is not none else none)|tojson|safe }}
-    }{% if not loop.last %},{% endif %}
-    {% endfor %}
-]
-</script>
+<script type="application/json" id="ai-documents-processing-ids">{{ (processing_doc_ids or [])|tojson }}</script>
 <script nonce="{{ csp_nonce() }}">
 window.aiDocumentsConfig = window.aiDocumentsConfig || {};
 window.aiDocumentsConfig.debug = {{ config.DEBUG | default(false) | tojson }};
+window.aiDocumentsConfig.perPage = 50;
+window.aiDocumentsConfig.urls = {
+  documentsList: {{ url_for('ai_documents.list_documents')|tojson }},
+};
 window.aiDocumentsConfig.t = {
   ai_import_eca697b5: {{ _('AI import')|tojson }},
   all_countries_74202da6: {{ _('All Countries')|tojson }},
@@ -598,7 +605,12 @@ window.aiDocumentsConfig.t = {
   not_public_20257be8: {{ _('Not public')|tojson }},
   open_document_18c0765a: {{ _('Open document')|tojson }},
   other_6311ae17: {{ _('Other')|tojson }},
+  page_of_total_4b2e8c1d: {{ _('Page {page} of {pages} ({total} total)')|tojson }},
   page_193cfc9b: {{ _('Page')|tojson }},
+  no_documents_rows_9a1c3e7f: {{ _('No documents')|tojson }},
+  load_documents_error_2d8f4b1a: {{ _('Could not load documents.')|tojson }},
+  previous_page_6e3a9c2b: {{ _('Previous')|tojson }},
+  next_page_7f4b0d3c: {{ _('Next')|tojson }},
   pending_2d13df6f: {{ _('Pending')|tojson }},
   plan_0b6cbdf7: {{ _('Plan')|tojson }},
   please_enter_a_query_4ad9a6c1: {{ _('Please enter a query.')|tojson }},
@@ -643,6 +655,7 @@ window.aiDocumentsConfig.t = {
   resolution_b5a4b64b: {{ _('Resolution')|tojson }},
   resuming_09136a9d: {{ _('Resuming...')|tojson }},
   selected_91b442d3: {{ _('Selected')|tojson }},
+  showing_count_of_total_8f3c1a2b: {{ _('Showing {returned} of {total} matching documents. Refine search to see more.')|tojson }},
   situation_report_eb2802e8: {{ _('Situation Report')|tojson }},
   some_documents_failed_2221bc0e: {{ _('Some documents failed')|tojson }},
   some_documents_failed_aaa3128a: {{ _('Some documents failed.')|tojson }},
@@ -678,8 +691,6 @@ window.aiDocumentsConfig.t = {
   work_plan_2a21b46b: {{ _('Work Plan')|tojson }},
   working_9c8a77ee: {{ _('Working...')|tojson }},
   year_537c66b2: {{ _('Year')|tojson }},
-};
-window.aiDocumentsConfig.urls = {
 };
 </script>
 <script src="{{ static_url('js/admin/ai-documents.js') }}"></script>

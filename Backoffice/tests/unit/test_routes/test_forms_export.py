@@ -98,6 +98,168 @@ def _country_patch():
 
 
 # ---------------------------------------------------------------------------
+# PDF export helpers
+# ---------------------------------------------------------------------------
+
+class TestAssignmentPdfHelpers:
+    def test_make_assignment_pdf_download_name(self):
+        from app.routes.forms.export import _make_assignment_pdf_download_name
+
+        assert _make_assignment_pdf_download_name("Syria", "Annual Report 2024") == "Syria - Annual Report 2024.pdf"
+        assert _make_assignment_pdf_download_name("", "Annual Report 2024") == "Annual Report 2024.pdf"
+        assert _make_assignment_pdf_download_name("Syria", "") == "Syria - Assignment.pdf"
+
+    def test_normalize_note_html_for_pdf_strips_empty_paragraphs(self):
+        from app.routes.forms.export import _normalize_note_html_for_pdf
+
+        html = (
+            '<p><strong>1. Work Advance:</strong> Ensure work advances.</p>'
+            '<p><br></p>'
+            '<p><strong>2. Transfers:</strong> Report transfers.</p>'
+            '<p>&nbsp;</p>'
+            '<p><strong>3. Total Funding:</strong> Include totals.</p>'
+        )
+        cleaned = _normalize_note_html_for_pdf(html)
+        assert '<p><br></p>' not in cleaned
+        assert '<p>&nbsp;</p>' not in cleaned
+        assert cleaned.count('<p>') == 3
+
+    def test_matrix_row_entity_ids_from_labels(self):
+        from app.routes.forms.export import _matrix_row_entity_ids
+
+        field = {
+            'matrix_rows': [],
+            'matrix_row_labels': {'101': 'Afghan Red Crescent', '102': 'Albanian Red Cross'},
+        }
+        assert _matrix_row_entity_ids(field) == [101, 102]
+
+    def test_merge_matrix_variable_values_fills_missing_cells(self):
+        from app.routes.forms.export import _merge_matrix_variable_values
+
+        field = {
+            'id': 1433,
+            'matrix_columns': [
+                {'name': 'Funding Requirement', 'is_variable': True, 'variable': 'funding_req'},
+                {'name': 'Total Funding', 'is_variable': False},
+            ],
+            'matrix_rows': ['101'],
+        }
+        matrix_data = {'101_Total Funding': 123}
+        template_version = MagicMock()
+        aes = MagicMock()
+
+        with patch('app.services.forms.variable_resolution_service.VariableResolutionService') as mock_vrs:
+            mock_vrs.resolve_variables_batch.return_value = {
+                101: {'funding_req': 488516},
+            }
+            merged = _merge_matrix_variable_values(field, matrix_data, template_version, aes)
+
+        assert merged['101_Total Funding'] == 123
+        assert merged['101_Funding Requirement'] == 488516
+
+    def test_convert_entry_data_to_export_format(self):
+        from app.routes.forms.export import _convert_entry_data_to_export_format
+
+        entry_data = {
+            'field_value[42]': {'mode': 'total', 'values': {'total': 10}},
+            'field_value[42]_is_prefilled': True,
+            'field_value[99]_carry_forward_ref': {'1_col': 5},
+            'field_value[99]_is_carry_forward': True,
+            'field_value[dynamic_7]': {'values': {'total': 3}},
+            'indicator_55_data_not_available': True,
+            'dynamic_7_not_applicable': True,
+        }
+        export_data = _convert_entry_data_to_export_format(entry_data)
+
+        assert export_data['form_item_42']['values']['total'] == 10
+        assert export_data['form_item_42_is_prefilled'] is True
+        assert export_data['form_item_99_carry_forward_ref'] == {'1_col': 5}
+        assert export_data['form_item_99_is_carry_forward'] is True
+        assert export_data['form_item_dynamic_7']['values']['total'] == 3
+        assert export_data['form_item_55']['data_not_available'] is True
+        assert export_data['form_item_dynamic_7']['not_applicable'] is True
+
+    def test_matrix_cell_is_prefilled_highlight(self):
+        from app.routes.forms.export import matrix_cell_is_prefilled_highlight
+
+        assert matrix_cell_is_prefilled_highlight(
+            '1_amount',
+            100,
+            is_prefilled=True,
+        ) is True
+        assert matrix_cell_is_prefilled_highlight(
+            '1_amount',
+            '',
+            is_prefilled=True,
+        ) is False
+        assert matrix_cell_is_prefilled_highlight(
+            '1_amount',
+            100,
+            is_prefilled=True,
+            is_imputed=True,
+        ) is False
+        assert matrix_cell_is_prefilled_highlight(
+            '1_amount',
+            100,
+            carry_forward_ref={'1_amount': 100},
+        ) is True
+        assert matrix_cell_is_prefilled_highlight(
+            '1_amount',
+            200,
+            carry_forward_ref={'1_amount': 100},
+        ) is False
+        assert matrix_cell_is_prefilled_highlight(
+            '1_funding',
+            100,
+            carry_forward_ref={'1_funding': 100},
+            is_variable_readonly=True,
+        ) is False
+
+    def test_matrix_pdf_layout_strategy(self):
+        from app.routes.forms.export import matrix_pdf_layout_strategy
+
+        assert matrix_pdf_layout_strategy(7) == ''
+        assert matrix_pdf_layout_strategy(8) == 'portrait-compact'
+        assert matrix_pdf_layout_strategy(10) == 'portrait-compact'
+        assert matrix_pdf_layout_strategy(13) == 'portrait-compact'
+        assert matrix_pdf_layout_strategy(14) == 'landscape'
+        assert matrix_pdf_layout_strategy(16) == 'landscape'
+        assert matrix_pdf_layout_strategy(17) == 'landscape-scale'
+
+    def test_matrix_portrait_column_widths_mm(self):
+        from app.routes.forms.export import matrix_portrait_column_widths_mm
+
+        columns = [
+            {'name': 'Amount', 'type': 'number'},
+            {'name': 'Done', 'type': 'tick'},
+            {'name': 'Funding Requirement', 'type': 'number'},
+        ]
+        widths = matrix_portrait_column_widths_mm(10, columns, show_row_totals=True)
+        assert widths[0] == ('__row__', 22)
+        assert widths[1][0] == 'Amount'
+        assert widths[2] == ('Done', 7.0)
+        assert sum(w for _, w in widths) <= 190
+
+    def test_merge_matrix_variable_values_preserves_saved_override(self):
+        from app.routes.forms.export import _merge_matrix_variable_values
+
+        field = {
+            'id': 1,
+            'matrix_columns': [
+                {'name': 'Funding Requirement', 'is_variable': True, 'variable': 'funding_req'},
+            ],
+            'matrix_rows': ['101'],
+        }
+        matrix_data = {'101_Funding Requirement': {'original': 100, 'modified': 200}}
+
+        with patch('app.services.forms.variable_resolution_service.VariableResolutionService') as mock_vrs:
+            mock_vrs.resolve_variables_batch.return_value = {101: {'funding_req': 488516}}
+            merged = _merge_matrix_variable_values(field, matrix_data, MagicMock(), MagicMock())
+
+        assert merged['101_Funding Requirement']['modified'] == 200
+
+
+# ---------------------------------------------------------------------------
 # _export_pdf_impl
 # ---------------------------------------------------------------------------
 
@@ -247,6 +409,8 @@ class TestExportPdfImpl:
                        return_value="Section"), \
                  patch("app.routes.forms.export.get_localized_page_name",
                        return_value="Page 1"), \
+                 patch("app.services.organization.entity_service.EntityService.get_localized_entity_name",
+                       return_value="Test Country"), \
                  patch("app.routes.forms.export.send_file",
                        return_value=mock_send_file_response) as mock_send, \
                  patch("app.routes.forms.export.url_for", return_value="/f"):
@@ -276,6 +440,7 @@ class TestExportPdfImpl:
         call_kwargs = mock_send.call_args[1]
         assert call_kwargs.get("mimetype") == "application/pdf"
         assert call_kwargs.get("as_attachment") is True
+        assert call_kwargs.get("download_name") == "Test Country - My Template.pdf"
 
     def test_pdf_with_hidden_sections_and_fields(self, app, mock_user):
         """hidden_sections and hidden_fields query params filter the output."""
@@ -525,6 +690,8 @@ class TestExportPdfImpl:
         form_item.question_type = MagicMock()
         form_item.question_type.value = "blank"
         form_item.label_translations = None
+        form_item.definition = "<p>Note body</p>"
+        form_item.definition_translations = None
 
         with app.test_request_context("/forms/assignment_status/1/export_pdf"):
             from flask_login import login_user
@@ -543,6 +710,8 @@ class TestExportPdfImpl:
                        return_value="<html></html>") as mock_render, \
                  patch("app.routes.forms.export.get_translation_key", return_value="en"), \
                  patch("app.routes.forms.export.get_localized_section_name", return_value="Section"), \
+                 patch("app.services.organization.entity_service.EntityService.get_localized_entity_name",
+                       return_value="Test Country"), \
                  patch("app.routes.forms.export.send_file",
                        return_value=_make_mock_response(200)):
 
@@ -554,6 +723,7 @@ class TestExportPdfImpl:
                 mock_did.query.filter_by.return_value.all.return_value = []
                 mock_did.query.filter_by.return_value.order_by.return_value.all.return_value = []
                 mock_vrs.resolve_variables.return_value = {}
+                mock_vrs.replace_variables_in_text.side_effect = lambda text, *args, **kwargs: text
 
                 mock_weasyprint = MagicMock()
                 mock_html_inst = MagicMock()
@@ -572,6 +742,8 @@ class TestExportPdfImpl:
                 for f in sec.get("fields_ordered", []):
                     if f.get("id") == 9:
                         assert f["kind"] == "note"
+                        assert f["note_label"] == "A Note"
+                        assert f["note_body"] == "<p>Note body</p>"
 
     def test_pdf_document_field_items(self, app, mock_user):
         """FormItem that is_document_field=True → kind='document'."""

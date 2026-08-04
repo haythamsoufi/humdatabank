@@ -6,11 +6,16 @@ var cfg = window.aiDocumentsConfig || {};
 let documentsGridHelper = null;
 let documentsGridApi = null;
 
-// Transform documents data for ag-grid
-const documentsData = (function() {
-  var el = document.getElementById('ai-documents-rows');
-  if (!el) return [];
-  try { return JSON.parse(el.textContent || '[]'); } catch (e) { return []; }
+// Resume polling for in-flight documents (lightweight id list from SSR).
+const processingDocIdsFromPage = (function() {
+    var el = document.getElementById('ai-documents-processing-ids');
+    if (!el) return [];
+    try {
+        var parsed = JSON.parse(el.textContent || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+        return [];
+    }
 })();
 
 // Helper function to get file icon HTML
@@ -750,88 +755,16 @@ async function refreshAiDocumentGridRowFromApi(docId) {
 }
 
 /**
- * Fetch documents from API and reload the documents grid (no full page reload).
- * Used after upload or external API import success.
- * Paginates through all pages so the grid is never truncated to the API's per-page limit.
+ * Read Knowledge Base URL filter params for API reloads (mirrors the GET filter form).
  */
-async function reloadDocumentsGrid() {
-    try {
-        const pageSize = 200;
-        let offset = 0;
-        let total = null;
-        let allDocuments = [];
-
-        while (true) {
-            const response = await ((window.getFetch && window.getFetch()) || fetch)(`/api/ai/documents/?limit=${pageSize}&offset=${offset}`);
-            const data = await response.json();
-            if (!data.success || !Array.isArray(data.documents)) {
-                window.__clientWarn && window.__clientWarn('reloadDocumentsGrid: invalid response', data);
-                return;
-            }
-
-            allDocuments = allDocuments.concat(data.documents);
-            total = Number.isFinite(data.total) ? data.total : total;
-
-            const received = data.documents.length;
-            if (received < pageSize) break;
-            offset += received;
-            if (Number.isFinite(total) && offset >= total) break;
-        }
-
-        const rows = allDocuments.map(mapDocToGridRow);
-        const loadingEl = document.getElementById('documentsGrid-loading');
-        const emptyEl = document.getElementById('documentsGrid-empty');
-        const containerEl = document.getElementById('documentsGrid-container');
-
-        if (documentsGridApi && documentsGridHelper) {
-            documentsGridHelper.setRowData(rows);
-            if (loadingEl) loadingEl.style.display = 'none';
-            if (containerEl) containerEl.style.display = rows.length ? 'block' : 'none';
-            if (emptyEl) emptyEl.style.display = rows.length ? 'none' : 'block';
-        } else if (rows.length > 0) {
-            initializeDocumentsGridWithData(rows);
-        }
-    } catch (e) {
-        console.error('reloadDocumentsGrid failed:', e);
-    }
-}
-
-/**
- * Initialize the documents grid with the given row data (used when grid was empty and we just imported docs).
- */
-function initializeDocumentsGridWithData(rowData) {
-    const loadingEl = document.getElementById('documentsGrid-loading');
-    const emptyEl = document.getElementById('documentsGrid-empty');
-    const containerEl = document.getElementById('documentsGrid-container');
-    try {
-        documentsGridHelper = new AgGridHelper({
-            containerId: 'documentsGrid',
-            templateId: 'ai-documents',
-            columnDefs: columnDefs,
-            rowData: rowData,
-            options: {
-                getRowHeight: function(params) { return null; },
-                defaultColDef: { resizable: true },
-                tooltipShowDelay: 200,
-                tooltipHideDelay: 12000,
-                components: {
-                    countryScopeTooltip: CountryScopeTooltip
-                }
-            },
-            columnVisibilityOptions: { enableExport: false, enableReset: true }
-        });
-        documentsGridApi = documentsGridHelper.initialize();
-        window.documentsGridApi = documentsGridApi;
-        window.documentsGridHelper = documentsGridHelper;
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (containerEl) containerEl.style.display = 'block';
-        if (emptyEl) emptyEl.style.display = 'none';
-    } catch (error) {
-        console.error('Error initializing grid with data:', error);
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (emptyEl) emptyEl.style.display = 'block';
-        if (containerEl) containerEl.style.display = 'none';
-    }
+function getDocumentsPageFilterParams() {
+    const sp = new URLSearchParams(window.location.search);
+    const out = new URLSearchParams();
+    ['status', 'file_type', 'category', 'language', 'q'].forEach(function(key) {
+        const v = (sp.get(key) || '').trim();
+        if (v) out.set(key, v);
+    });
+    return out;
 }
 
 // Custom tooltip for Country/Scope when scope is Regional or Cluster (full country list on hover)
@@ -1207,59 +1140,190 @@ const columnDefs = [
     }
 ];
 
-// Initialize grid
-function initializeDocumentsGrid() {
+const documentsGridPageState = {
+    currentPage: 1,
+    totalPages: 0,
+    totalRows: 0,
+    gridInitialized: false,
+    perPage: Number(cfg.perPage) > 0 ? Number(cfg.perPage) : 50,
+};
+
+function getDocumentsGridListUrl() {
+    return (cfg.urls && cfg.urls.documentsList) || '/api/ai/documents/';
+}
+
+function getDocumentsGridInitialPage() {
+    const sp = new URLSearchParams(window.location.search);
+    const p = parseInt(sp.get('page') || '1', 10);
+    return (isNaN(p) || p < 1) ? 1 : p;
+}
+
+function replaceDocumentsGridUrlPage(page) {
+    try {
+        const u = new URL(window.location.href);
+        if (page <= 1) {
+            u.searchParams.delete('page');
+        } else {
+            u.searchParams.set('page', String(page));
+        }
+        window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+    } catch (e) {
+        if (window.__clientWarn) window.__clientWarn('documents grid replaceState failed', e);
+    }
+}
+
+function updateDocumentsGridPaginationUi() {
+    const prev = document.getElementById('documentsGrid-page-prev');
+    const next = document.getElementById('documentsGrid-page-next');
+    const label = document.getElementById('documentsGrid-page-label');
+    const total = documentsGridPageState.totalRows != null ? documentsGridPageState.totalRows : 0;
+    const pages = documentsGridPageState.totalPages != null ? documentsGridPageState.totalPages : 0;
+    const page = documentsGridPageState.currentPage != null ? documentsGridPageState.currentPage : 1;
+
+    if (label) {
+        if (total === 0) {
+            label.textContent = cfg.t.no_documents_rows_9a1c3e7f || 'No documents';
+        } else {
+            label.textContent = (cfg.t.page_of_total_4b2e8c1d || 'Page {page} of {pages} ({total} total)')
+                .replace('{page}', String(page))
+                .replace('{pages}', String(Math.max(pages, 1)))
+                .replace('{total}', String(total));
+        }
+    }
+    if (prev) {
+        prev.disabled = page <= 1 || total === 0;
+        prev.classList.toggle('opacity-50', page <= 1 || total === 0);
+    }
+    if (next) {
+        next.disabled = total === 0 || pages <= 0 || page >= pages;
+        next.classList.toggle('opacity-50', total === 0 || pages <= 0 || page >= pages);
+    }
+}
+
+async function fetchDocumentsGridPage(page) {
+    const sp = getDocumentsPageFilterParams();
+    sp.set('page', String(page));
+    sp.set('per_page', String(documentsGridPageState.perPage));
+    let base = getDocumentsGridListUrl();
+    if (base.indexOf('?') !== -1) {
+        base = base.split('?')[0];
+    }
+    const response = await ((window.getFetch && window.getFetch()) || fetch)(base + '?' + sp.toString(), {
+        credentials: 'same-origin',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    });
+    const data = await response.json();
+    if (!data || data.success !== true || !Array.isArray(data.documents)) {
+        throw new Error((data && data.error) || cfg.t.load_documents_error_2d8f4b1a || 'Could not load documents.');
+    }
+    return data;
+}
+
+async function loadDocumentsGridPage(page) {
     const loadingEl = document.getElementById('documentsGrid-loading');
     const emptyEl = document.getElementById('documentsGrid-empty');
     const containerEl = document.getElementById('documentsGrid-container');
-
-    if (!documentsData || documentsData.length === 0) {
-        // Hide loading indicator and show empty message
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (emptyEl) emptyEl.style.display = 'block';
-        if (containerEl) containerEl.style.display = 'none';
-        return;
-    }
+    if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
-        documentsGridHelper = new AgGridHelper({
-            containerId: 'documentsGrid',
-            templateId: 'ai-documents',
-            columnDefs: columnDefs,
-            rowData: documentsData,
-            options: {
-                tooltipShowDelay: 200,
-                tooltipHideDelay: 12000,
-                components: {
-                    countryScopeTooltip: CountryScopeTooltip
-                }
-            },
-            columnVisibilityOptions: {
-                enableExport: false,
-                enableReset: true
+        const payload = await fetchDocumentsGridPage(page);
+        const rows = (payload.documents || []).map(mapDocToGridRow);
+        documentsGridPageState.currentPage = payload.page != null ? payload.page : page;
+        documentsGridPageState.totalPages = payload.pages != null ? payload.pages : 0;
+        documentsGridPageState.totalRows = payload.total != null ? payload.total : rows.length;
+        replaceDocumentsGridUrlPage(documentsGridPageState.currentPage);
+
+        if (documentsGridPageState.gridInitialized && documentsGridHelper) {
+            documentsGridHelper.setRowData(rows);
+            if (documentsGridApi && typeof documentsGridApi.setGridOption === 'function') {
+                documentsGridApi.setGridOption('rowData', rows);
             }
-        });
+            if (typeof documentsGridHelper.setResultCountTotal === 'function') {
+                documentsGridHelper.setResultCountTotal(documentsGridPageState.totalRows);
+            }
+        } else {
+            documentsGridPageState.gridInitialized = true;
+            documentsGridHelper = new AgGridHelper({
+                containerId: 'documentsGrid',
+                templateId: 'ai-documents',
+                columnDefs: columnDefs,
+                rowData: rows,
+                options: {
+                    pagination: false,
+                    suppressPaginationPanel: true,
+                    tooltipShowDelay: 200,
+                    tooltipHideDelay: 12000,
+                    components: {
+                        countryScopeTooltip: CountryScopeTooltip
+                    }
+                },
+                columnVisibilityOptions: {
+                    enableExport: false,
+                    enableReset: true
+                }
+            });
+            documentsGridApi = documentsGridHelper.initialize();
+            window.documentsGridApi = documentsGridApi;
+            window.documentsGridHelper = documentsGridHelper;
+            if (typeof documentsGridHelper.setResultCountTotal === 'function') {
+                documentsGridHelper.setResultCountTotal(documentsGridPageState.totalRows);
+            }
+        }
 
-        documentsGridApi = documentsGridHelper.initialize();
-
-        // Expose for other scripts
-        window.documentsGridApi = documentsGridApi;
-        window.documentsGridHelper = documentsGridHelper;
-
-        // Hide loading indicator and show grid
         if (loadingEl) loadingEl.style.display = 'none';
-        if (containerEl) containerEl.style.display = 'block';
-        if (emptyEl) emptyEl.style.display = 'none';
-    } catch (error) {
-        console.error('Error initializing grid:', error);
+        if (rows.length > 0) {
+            if (containerEl) containerEl.style.display = 'block';
+            if (emptyEl) emptyEl.style.display = 'none';
+        } else {
+            if (containerEl) containerEl.style.display = 'none';
+            if (emptyEl) emptyEl.style.display = 'block';
+        }
+        updateDocumentsGridPaginationUi();
+    } catch (err) {
+        console.error('loadDocumentsGridPage failed:', err);
         if (loadingEl) loadingEl.style.display = 'none';
+        if (containerEl) containerEl.style.display = 'none';
         if (emptyEl) {
-            // XSS fix: escape error message before inserting into innerHTML
-            const safeErrorMsg = escapeHtml(error.message || 'Unknown error');
-            emptyEl.innerHTML = '<i class="fas fa-exclamation-triangle text-5xl text-red-300 mb-4"></i><p class="text-red-600 font-medium mb-1">Error loading grid</p><p class="text-sm text-gray-500">' + safeErrorMsg + '</p>';
+            const safeErrorMsg = escapeHtml((err && err.message) || cfg.t.load_documents_error_2d8f4b1a || 'Could not load documents.');
+            emptyEl.innerHTML = '<i class="fas fa-exclamation-triangle text-5xl text-red-300 mb-4"></i><p class="text-red-600 font-medium mb-1">' +
+                escapeHtml(cfg.t.error_3d9f514d || 'Error:') + '</p><p class="text-sm text-gray-500">' + safeErrorMsg + '</p>';
             emptyEl.style.display = 'block';
         }
+        updateDocumentsGridPaginationUi();
     }
+}
+
+async function reloadDocumentsGrid() {
+    documentsGridPageState.currentPage = 1;
+    replaceDocumentsGridUrlPage(1);
+    return loadDocumentsGridPage(1);
+}
+
+// Initialize grid (server-side pagination; one page fetched at a time)
+function initializeDocumentsGrid() {
+    documentsGridPageState.currentPage = getDocumentsGridInitialPage();
+
+    const prevBtn = document.getElementById('documentsGrid-page-prev');
+    const nextBtn = document.getElementById('documentsGrid-page-next');
+    if (prevBtn) {
+        prevBtn.addEventListener('click', function() {
+            const n = documentsGridPageState.currentPage - 1;
+            if (n < 1) return;
+            loadDocumentsGridPage(n);
+        });
+    }
+    if (nextBtn) {
+        nextBtn.addEventListener('click', function() {
+            const n = documentsGridPageState.currentPage + 1;
+            if (documentsGridPageState.totalPages > 0 && n > documentsGridPageState.totalPages) return;
+            loadDocumentsGridPage(n);
+        });
+    }
+
+    loadDocumentsGridPage(documentsGridPageState.currentPage);
 }
 
 // Initialize when DOM is ready
@@ -1677,11 +1741,9 @@ if (document.readyState === 'loading') {
 }
 
 // Start polling for documents already processing
-const processingDocIds = documentsData
-    .filter(doc => doc.processing_status === 'processing' || doc.processing_status === 'pending')
-    .map(doc => doc.id);
-
-processingDocIds.forEach((docId) => startProcessingPoll(docId));
+processingDocIdsFromPage.forEach(function(docId) {
+    startProcessingPoll(docId);
+});
 
 // Upload form handling
 function initializeUploadForm() {
@@ -2159,7 +2221,9 @@ function mapSystemDocumentToRow(doc) {
         language_display: doc.language_display || doc.language || '',
         uploaded_by: doc.uploaded_by || '',
         status: doc.status || '',
-        file_size: typeof doc.file_size === 'number' ? doc.file_size : 0,
+        file_size: (typeof doc.file_size === 'number' && doc.file_size > 0) ? doc.file_size : null,
+        file_pending: !!doc.file_pending,
+        source_url: doc.source_url || null,
         uploaded_at: doc.uploaded_at || null,
         ai_processed: !!doc.ai_processed,
         ai_document_id: doc.ai_document_id != null ? doc.ai_document_id : null,
@@ -2209,6 +2273,14 @@ function getImportSystemDocumentsGridOptions() {
     };
 }
 
+function importFileSizeMeta(data, wrapStyle) {
+    const size = data && data.file_size;
+    if (typeof size !== 'number' || size <= 0) {
+        return '';
+    }
+    return '<div class="text-xs text-gray-500" style="' + (wrapStyle || '') + '">' + formatFileSize(size) + '</div>';
+}
+
 const importSystemDocumentsColumnDefs = [
     {
         field: 'filename',
@@ -2222,7 +2294,6 @@ const importSystemDocumentsColumnDefs = [
             const data = params.data || {};
             const icon = getFileTypeIcon(data.filename);
             const name = escapeHtml(data.filename || '');
-            const meta = formatFileSize(data.file_size || 0);
             const wrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%';
             const aid = data.ai_document_id != null ? parseInt(data.ai_document_id, 10) : 0;
             const nameLine = (data.ai_processed && aid) ?
@@ -2233,7 +2304,7 @@ const importSystemDocumentsColumnDefs = [
                 '<div class="flex-shrink-0 text-gray-500" style="padding-top:2px">' + icon + '</div>' +
                 '<div class="min-w-0 flex-1" style="' + wrap + '">' +
                 nameLine +
-                '<div class="text-xs text-gray-500" style="' + wrap + '">' + meta + '</div></div></div>';
+                importFileSizeMeta(data, wrap) + '</div></div>';
         },
         cellStyle: {
             'white-space': 'normal',
@@ -2605,6 +2676,25 @@ async function loadSystemDocuments() {
             const rows = sorted.map(mapSystemDocumentToRow).filter(Boolean);
             ensureImportDocumentsGrid(rows);
             syncImportSelectionFromGrid();
+
+            const totalMatching = Number(result.total);
+            const returned = Number.isFinite(Number(result.returned)) ? Number(result.returned) : rows.length;
+            if (importDocumentsGridHelper && typeof importDocumentsGridHelper.setResultCountTotal === 'function' && Number.isFinite(totalMatching)) {
+                importDocumentsGridHelper.setResultCountTotal(totalMatching);
+            }
+            const truncEl = document.getElementById('importDocumentsTruncationHint');
+            if (truncEl) {
+                if (Number.isFinite(totalMatching) && totalMatching > returned) {
+                    const msg = (cfg.t.showing_count_of_total_8f3c1a2b || 'Showing {returned} of {total} matching documents. Refine search to see more.')
+                        .replace('{returned}', String(returned))
+                        .replace('{total}', String(totalMatching));
+                    truncEl.textContent = msg;
+                    truncEl.classList.remove('hidden');
+                } else {
+                    truncEl.textContent = '';
+                    truncEl.classList.add('hidden');
+                }
+            }
         } else {
             var errorMsg = result.error || cfg.t.error_loading_documents_a708c41e;
             if (errEl) {
@@ -2613,6 +2703,11 @@ async function loadSystemDocuments() {
             }
             if (importDocumentsGridHelper) {
                 importDocumentsGridHelper.setRowData([]);
+            }
+            const truncEl = document.getElementById('importDocumentsTruncationHint');
+            if (truncEl) {
+                truncEl.textContent = '';
+                truncEl.classList.add('hidden');
             }
             if (importDocumentsGridApi && typeof importDocumentsGridApi.deselectAll === 'function') {
                 importDocumentsGridApi.deselectAll();
@@ -2628,6 +2723,11 @@ async function loadSystemDocuments() {
         }
         if (importDocumentsGridHelper) {
             importDocumentsGridHelper.setRowData([]);
+        }
+        const truncElCatch = document.getElementById('importDocumentsTruncationHint');
+        if (truncElCatch) {
+            truncElCatch.textContent = '';
+            truncElCatch.classList.add('hidden');
         }
         if (importDocumentsGridApi && typeof importDocumentsGridApi.deselectAll === 'function') {
             importDocumentsGridApi.deselectAll();
@@ -3790,10 +3890,9 @@ async function processSelectedDocuments() {
                 }
 
                 // Delay reload to allow user to read error messages
-                // If there are errors, wait longer; if all succeeded, reload quickly
                 const reloadDelay = failCount > 0 ? 5000 : 2000;
-                setTimeout(() => {
-                    window.location.reload();
+                setTimeout(function() {
+                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
                 }, reloadDelay);
             }
         })();
@@ -4754,8 +4853,10 @@ async function deleteDocument(id, title) {
                 // Stop polling if it was running (prevents 404 spam after delete)
                 stopProcessingPoll(id);
                 removeTrackedProcessingDoc(id);
-                showProcessingBanner(cfg.t.document_deleted_369422de, cfg.t.refreshing_document_list_fa9f8b74, 100);
-                setTimeout(() => window.location.reload(), 800);
+                removeDocumentFromGrid(id);
+                if (window.showAlert) {
+                    window.showAlert(cfg.t.document_deleted_369422de, 'success');
+                }
             } else {
                 if (window.showAlert) {
                     window.showAlert(cfg.t.error_3d9f514d + ' ' + result.error, 'error');

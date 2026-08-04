@@ -54,8 +54,12 @@ def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
     downloaded = doc_stats.get("downloaded", 0)
     pending = doc_stats.get("pending", 0)
     download_errors = doc_stats.get("download_errors", 0)
+    status_approved = doc_stats.get("status_approved", 0)
+    status_pending = doc_stats.get("status_pending", 0)
+    status_rejected = doc_stats.get("status_rejected", 0)
     return (
         f"FDRS documents complete: {inserted} inserted, {updated} updated; "
+        f"status approved={status_approved} pending={status_pending} rejected={status_rejected}; "
         f"files saved: {downloaded}, awaiting IFRC file download: {pending}, "
         f"download errors: {download_errors}"
     )
@@ -319,6 +323,9 @@ def build_document_import_plan(
         "skipped_duplicate": 0,
         "skipped_sync_year": 0,
         "planned": 0,
+        "status_approved": 0,
+        "status_pending": 0,
+        "status_rejected": 0,
     }
 
     # Best doc per (iso3, reporting_year, document_type)
@@ -374,6 +381,7 @@ def build_document_import_plan(
             approval_status,
             public_code=doc.get("Public"),
         )
+        doc_status = fdrs_document_status_from_approval(approval_status)
         plan.append(
             {
                 "fdrs_import_key": import_key,
@@ -390,10 +398,16 @@ def build_document_import_plan(
                 "year": year_str,
                 "fdrs_document_type": doc_type,
                 "approval_status": approval_status,
-                "status": fdrs_document_status_from_approval(approval_status),
+                "status": doc_status,
                 "modified_at": doc.get("ModifiedAt"),
             }
         )
+        if doc_status == "approved":
+            summary["status_approved"] += 1
+        elif doc_status == "rejected":
+            summary["status_rejected"] += 1
+        else:
+            summary["status_pending"] += 1
     summary["planned"] = len(plan)
     return plan, summary
 
@@ -456,6 +470,9 @@ def upsert_fdrs_document_metadata(
         "downloaded": 0,
         "pending": 0,
         "download_errors": 0,
+        "status_approved": 0,
+        "status_pending": 0,
+        "status_rejected": 0,
     }
     if not plan_rows:
         return stats
@@ -528,6 +545,12 @@ def upsert_fdrs_document_metadata(
                 row.get("status")
                 or fdrs_document_status_from_approval(row.get("approval_status"))
             )
+            if doc_status == DocumentStatusValue.approved:
+                stats["status_approved"] += 1
+            elif doc_status == DocumentStatusValue.rejected:
+                stats["status_rejected"] += 1
+            else:
+                stats["status_pending"] += 1
 
             storage_path = existing.storage_path if existing else None
             file_pending = True

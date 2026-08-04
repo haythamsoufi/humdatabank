@@ -133,6 +133,20 @@ export function initDocumentUpload() {
     return effective.length <= 8 ? effective.toUpperCase() : effective;
   }
 
+  /** Pill-style language tag matching server-rendered document cards. */
+  function createLanguageTagElement(label, variant) {
+    const tag = document.createElement('span');
+    const v = variant || 'submitted';
+    tag.className = `entry-form-doc-language-tag entry-form-doc-language-tag--${v}`;
+    tag.setAttribute('title', t.labelLanguage || 'Language');
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-language';
+    icon.setAttribute('aria-hidden', 'true');
+    tag.appendChild(icon);
+    tag.appendChild(document.createTextNode(label || ''));
+    return tag;
+  }
+
   let currentFieldId = null;
   let currentFieldLabel = null;
   let currentIsRequired = false;
@@ -1148,48 +1162,24 @@ export function initDocumentUpload() {
 
     docElement.setAttribute('data-pending-delete', 'true');
 
-    // Change visual appearance to show "will be deleted"
-    docElement.classList.remove('bg-green-100', 'border-green-400', 'text-green-700');
-    docElement.classList.add('bg-red-50', 'border-red-300', 'text-red-700', 'opacity-75');
+    docElement.classList.add('entry-form-doc-card--pending-delete');
 
-    // Ensure container uses flex-col layout
-    if (!docElement.classList.contains('flex-col')) {
-      docElement.classList.add('flex-col');
-      docElement.classList.remove('flex', 'items-center', 'justify-between');
-    }
+    const uploadInfo = docElement.querySelector('.entry-form-doc-card__upload-info');
 
-    // Uploaded-by line: inside the card (nested) or legacy next-sibling <p>
-    let uploadInfoP = docElement.querySelector('p.text-xs');
-    if (uploadInfoP) {
-      uploadInfoP.classList.remove('text-green-600', 'text-blue-700', 'text-gray-600');
-      uploadInfoP.classList.add('text-red-600');
-    } else {
-      uploadInfoP = docElement.nextElementSibling;
-      if (uploadInfoP && uploadInfoP.classList.contains('text-xs') && (uploadInfoP.classList.contains('text-gray-600') || uploadInfoP.classList.contains('text-green-600'))) {
-        uploadInfoP.classList.remove('text-gray-600', 'text-green-600', 'mb-3');
-        uploadInfoP.classList.add('text-red-600', 'mt-1', 'ml-8');
-        uploadInfoP.style.marginTop = '0.25rem';
-        uploadInfoP.style.marginLeft = '2rem';
-        uploadInfoP.style.marginBottom = '0';
-        docElement.appendChild(uploadInfoP);
-      }
-    }
-
-    // Add "Will be deleted on save" message inside the container
-    let deleteMessage = docElement.querySelector('.delete-message');
+    let deleteMessage = docElement.querySelector('.entry-form-doc-card__delete-notice');
     if (!deleteMessage) {
       deleteMessage = document.createElement('div');
-      deleteMessage.className = 'delete-message text-xs text-red-600 mt-1 ml-8 flex items-center gap-2';
-      deleteMessage.style.marginTop = '0.25rem';
-      deleteMessage.style.marginLeft = '2rem';
-      deleteMessage.style.marginBottom = '0';
+      deleteMessage.className = 'entry-form-doc-card__delete-notice';
       const icon = document.createElement('i');
       icon.className = 'fas fa-exclamation-triangle';
       deleteMessage.appendChild(icon);
       deleteMessage.appendChild(document.createTextNode(t.msgWillDeleteOnSave || 'Will be deleted when you save the form.'));
 
-      if (uploadInfoP && uploadInfoP.parentElement) {
-        uploadInfoP.parentElement.insertBefore(deleteMessage, uploadInfoP.nextSibling);
+      const metaRow = docElement.querySelector('.entry-form-doc-card__meta');
+      if (metaRow && metaRow.parentElement) {
+        metaRow.parentElement.insertBefore(deleteMessage, metaRow.nextSibling);
+      } else if (uploadInfo && uploadInfo.parentElement) {
+        uploadInfo.parentElement.appendChild(deleteMessage);
       } else {
         docElement.appendChild(deleteMessage);
       }
@@ -1256,23 +1246,11 @@ export function initDocumentUpload() {
 
     element.removeAttribute('data-pending-delete');
 
-    // Restore visual appearance
-    element.classList.remove('bg-red-50', 'border-red-300', 'text-red-700', 'opacity-75');
-    element.classList.add('bg-green-100', 'border-green-400', 'text-green-700');
+    element.classList.remove('entry-form-doc-card--pending-delete');
 
-    // Remove delete message (inside the element)
-    const deleteMessage = element.querySelector('.delete-message');
+    const deleteMessage = element.querySelector('.entry-form-doc-card__delete-notice, .delete-message');
     if (deleteMessage) {
       deleteMessage.remove();
-    }
-
-    const uploadInfoP = element.querySelector('p.text-xs');
-    if (uploadInfoP && uploadInfoP.classList.contains('text-red-600')) {
-      uploadInfoP.classList.remove('text-red-600', 'ml-8');
-      const isRepo = element.getAttribute('data-entry-form-document') === 'repository';
-      uploadInfoP.classList.add(isRepo ? 'text-blue-700' : 'text-green-600');
-      uploadInfoP.style.marginTop = '';
-      uploadInfoP.style.marginLeft = '';
     }
 
     // Show edit/delete buttons, hide cancel button
@@ -2019,7 +1997,7 @@ export function initDocumentUpload() {
 
     queuedDocuments[fieldId].forEach((doc) => {
       const feedbackDiv = document.createElement('div');
-      feedbackDiv.className = 'document-pending-feedback mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm';
+      feedbackDiv.className = 'document-pending-feedback entry-form-doc-card entry-form-doc-card--pending mb-2 text-sm';
       feedbackDiv.dataset.queueId = doc.queueId;
 
       // Build feedback div using DOM construction
@@ -2051,17 +2029,7 @@ export function initDocumentUpload() {
       const langLabel =
         doc.languageDisplayName ||
         getLanguageDisplayName(document.getElementById('modal-document-language'), doc.language || 'en');
-      if (doc.language && doc.language !== 'en') {
-        const langBadge = document.createElement('span');
-        langBadge.className = 'language-badge ml-2 px-2 py-0.5 bg-blue-100 rounded text-xs whitespace-normal inline-block';
-        langBadge.textContent = langLabel;
-        badgesDiv.appendChild(langBadge);
-      } else if (!doc.language || doc.language === 'en') {
-        const langBadge = document.createElement('span');
-        langBadge.className = 'language-badge ml-2 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs whitespace-normal inline-block';
-        langBadge.textContent = langLabel;
-        badgesDiv.appendChild(langBadge);
-      }
+      badgesDiv.appendChild(createLanguageTagElement(langLabel, 'pending'));
 
       if (doc.documentType) {
         const typeBadge = document.createElement('span');
@@ -2147,7 +2115,7 @@ export function initDocumentUpload() {
     let feedbackDiv = fieldContainer.querySelector('.document-pending-feedback');
     if (!feedbackDiv) {
       feedbackDiv = document.createElement('div');
-      feedbackDiv.className = 'document-pending-feedback mb-2 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm';
+      feedbackDiv.className = 'document-pending-feedback entry-form-doc-card entry-form-doc-card--pending mb-2 text-sm';
 
       const mainDiv = document.createElement('div');
       mainDiv.className = 'flex items-center gap-2';
@@ -2161,8 +2129,8 @@ export function initDocumentUpload() {
       strong.textContent = t.labelDocumentQueued;
       const filenameSpan = document.createElement('span');
       filenameSpan.className = 'filename';
-      const langBadge = document.createElement('span');
-      langBadge.className = 'language-badge ml-2 px-2 py-0.5 bg-blue-100 rounded text-xs';
+      const langBadge = createLanguageTagElement('', 'pending');
+      langBadge.classList.add('language-badge', 'ml-2');
 
       contentSpan.appendChild(strong);
       contentSpan.appendChild(filenameSpan);
@@ -2193,7 +2161,17 @@ export function initDocumentUpload() {
       const display =
         languageDisplayName ||
         getLanguageDisplayName(document.getElementById('modal-document-language'), languageCode || 'en');
-      languageBadge.textContent = display;
+      const icon = languageBadge.querySelector('i');
+      languageBadge.replaceChildren();
+      if (icon) {
+        languageBadge.appendChild(icon);
+      } else {
+        const newIcon = document.createElement('i');
+        newIcon.className = 'fas fa-language';
+        newIcon.setAttribute('aria-hidden', 'true');
+        languageBadge.appendChild(newIcon);
+      }
+      languageBadge.appendChild(document.createTextNode(display));
     }
   }
 
@@ -2358,41 +2336,43 @@ export function initDocumentUpload() {
   // Helper function to create uploaded document display element
   function createUploadedDocumentElement(doc, fieldId, fieldLabel, fieldConfig) {
     const docContainer = document.createElement('div');
-    docContainer.className = 'flex flex-col bg-green-100 border border-green-400 text-green-700 px-4 py-3 relative mb-2';
+    docContainer.className = 'entry-form-doc-card entry-form-doc-card--submitted mb-2';
     docContainer.setAttribute('data-entry-form-document', 'submitted');
 
-    const titleRow = document.createElement('div');
-    titleRow.className = 'flex items-start gap-3';
+    const main = document.createElement('div');
+    main.className = 'entry-form-doc-card__main';
 
+    const iconWrap = document.createElement('div');
+    iconWrap.className = 'entry-form-doc-card__icon';
+    iconWrap.setAttribute('aria-hidden', 'true');
     const icon = document.createElement('i');
-    icon.className = 'fas fa-file-alt w-5 h-5 shrink-0 mt-0.5 opacity-90';
-    icon.setAttribute('aria-hidden', 'true');
+    icon.className = 'fas fa-file-alt';
+    iconWrap.appendChild(icon);
 
-    const titleRight = document.createElement('div');
-    titleRight.className = 'min-w-0 flex-1 flex items-start justify-between gap-2';
+    const body = document.createElement('div');
+    body.className = 'entry-form-doc-card__body';
 
-    // Filename link (will be updated with real document ID after fetch)
+    const header = document.createElement('div');
+    header.className = 'entry-form-doc-card__header';
+
     const filenameLink = document.createElement('a');
-    filenameLink.className = 'font-semibold hover:underline text-sm block truncate min-w-0';
+    filenameLink.className = 'entry-form-doc-card__filename';
     filenameLink.textContent = doc.fileName;
     filenameLink.title = doc.fileName;
-    filenameLink.href = '#'; // Placeholder, will be updated
+    filenameLink.href = '#';
 
-    const languageSpan = document.createElement('span');
-    languageSpan.className = 'text-xs text-green-600 block';
-    languageSpan.textContent =
+    const languageLabel =
       doc.languageDisplayName ||
       getLanguageDisplayName(document.getElementById('modal-document-language'), doc.language || 'en');
+    const languageTag = createLanguageTagElement(languageLabel, 'submitted');
 
-    // Action buttons
     const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'flex items-center gap-2 shrink-0 pt-0.5';
+    actionsDiv.className = 'entry-form-doc-card__actions';
 
-    // Edit button (will be updated with real document ID after fetch)
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
-    editBtn.className = 'btn btn-primary btn-icon btn-sm edit-document-btn';
-    editBtn.dataset.docId = 'pending'; // Placeholder
+    editBtn.className = 'btn btn-ghost btn-icon btn-sm edit-document-btn';
+    editBtn.dataset.docId = 'pending';
     editBtn.dataset.fieldId = fieldId;
     editBtn.dataset.fieldLabel = fieldLabel;
     editBtn.dataset.filename = doc.fileName;
@@ -2410,11 +2390,10 @@ export function initDocumentUpload() {
     editIcon.setAttribute('aria-hidden', 'true');
     editBtn.appendChild(editIcon);
 
-    // Delete button (will be updated with real document ID after fetch)
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
-    deleteBtn.className = 'btn btn-danger btn-icon btn-sm delete-document-btn';
-    deleteBtn.dataset.docId = 'pending'; // Placeholder
+    deleteBtn.className = 'btn btn-ghost-danger btn-icon btn-sm delete-document-btn';
+    deleteBtn.dataset.docId = 'pending';
     deleteBtn.title = t.labelDeleteDocument || 'Delete Document';
     deleteBtn.setAttribute('aria-label', t.labelDeleteDocument || 'Delete Document');
     const deleteIcon = document.createElement('i');
@@ -2425,24 +2404,36 @@ export function initDocumentUpload() {
     actionsDiv.appendChild(editBtn);
     actionsDiv.appendChild(deleteBtn);
 
-    titleRight.appendChild(filenameLink);
-    titleRight.appendChild(actionsDiv);
+    header.appendChild(filenameLink);
+    header.appendChild(actionsDiv);
 
-    titleRow.appendChild(icon);
-    titleRow.appendChild(titleRight);
+    const meta = document.createElement('div');
+    meta.className = 'entry-form-doc-card__meta';
 
-    const details = document.createElement('div');
-    details.className = 'mt-2 space-y-1 w-full';
-    const infoP = document.createElement('p');
-    infoP.className = 'text-xs text-green-600';
+    const uploadInfo = document.createElement('span');
+    uploadInfo.className = 'entry-form-doc-card__upload-info';
+    const userIcon = document.createElement('i');
+    userIcon.className = 'fas fa-user';
+    userIcon.setAttribute('aria-hidden', 'true');
+    const calIcon = document.createElement('i');
+    calIcon.className = 'fas fa-calendar-alt';
+    calIcon.setAttribute('aria-hidden', 'true');
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
-    infoP.textContent = `(Uploaded just now on ${dateStr})`;
-    details.appendChild(languageSpan);
-    details.appendChild(infoP);
+    uploadInfo.appendChild(userIcon);
+    uploadInfo.appendChild(document.createTextNode('You'));
+    uploadInfo.appendChild(document.createTextNode(' · '));
+    uploadInfo.appendChild(calIcon);
+    uploadInfo.appendChild(document.createTextNode(` ${dateStr}`));
 
-    docContainer.appendChild(titleRow);
-    docContainer.appendChild(details);
+    meta.appendChild(languageTag);
+    meta.appendChild(uploadInfo);
+
+    body.appendChild(header);
+    body.appendChild(meta);
+    main.appendChild(iconWrap);
+    main.appendChild(body);
+    docContainer.appendChild(main);
 
     return { container: docContainer, editBtn: editBtn, deleteBtn: deleteBtn, filenameLink: filenameLink };
   }

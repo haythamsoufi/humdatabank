@@ -2821,10 +2821,14 @@ def run_import(
                 stats["documents_downloaded"] = ds.get("downloaded", 0)
                 stats["documents_pending"] = ds.get("pending", 0)
                 stats["documents_download_errors"] = ds.get("download_errors", 0)
+                stats["documents_status_approved"] = ds.get("status_approved", 0)
+                stats["documents_status_pending"] = ds.get("status_pending", 0)
+                stats["documents_status_rejected"] = ds.get("status_rejected", 0)
                 stats["documents_summary"] = doc_result.get("documents_summary")
                 logger.info(
                     "FDRS documents complete: inserted=%s updated=%s files_saved=%s "
-                    "awaiting_file_download=%s download_errors=%s row_errors=%s planned=%s",
+                    "awaiting_file_download=%s download_errors=%s row_errors=%s planned=%s "
+                    "status_approved=%s status_pending=%s status_rejected=%s",
                     stats["documents_inserted"],
                     stats["documents_updated"],
                     stats["documents_downloaded"],
@@ -2832,6 +2836,9 @@ def run_import(
                     stats["documents_download_errors"],
                     stats["documents_errors"],
                     (doc_result.get("documents_summary") or {}).get("planned"),
+                    stats["documents_status_approved"],
+                    stats["documents_status_pending"],
+                    stats["documents_status_rejected"],
                 )
             except FdrsSyncCancelled:
                 raise

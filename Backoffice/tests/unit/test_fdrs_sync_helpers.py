@@ -132,6 +132,76 @@ def test_build_document_import_plan_maps_under_validation_to_pending():
     assert plan[0]["status"] == "pending"
 
 
+def test_build_document_import_plan_imports_under_validation_private():
+    documents = [
+        {
+            "don_code": "DAF001",
+            "iso3": "AFG",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "Annual Report_Afghanistan_2024-2024_zz.pdf",
+            "url": "https://data-api.ifrc.org/documents/AF/report.pdf",
+            "LangCode": "zz",
+            "Public": 4,
+            "ApprovalStatus": "Under Validation (Private)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        }
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "AFG", "assignment_entity_status_id": 88},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 1
+    assert summary["skipped_approval"] == 0
+    assert summary["status_pending"] == 1
+    assert plan[0]["status"] == "pending"
+    assert plan[0]["is_public"] is False
+
+
+def test_build_document_import_plan_tracks_status_counts():
+    documents = [
+        {
+            "don_code": "DUS001",
+            "iso3": "USA",
+            "document_type": "Our Annual Report",
+            "document_typeId": 1,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "Annual Report_USA_2024_en.pdf",
+            "url": "https://example.org/a.pdf",
+            "LangCode": "en",
+            "Public": 1,
+            "ApprovalStatus": "Validated (Public)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        },
+        {
+            "don_code": "DGA001",
+            "iso3": "GAB",
+            "document_type": "Our Audited Financial Statements",
+            "document_typeId": 2,
+            "year": 2024,
+            "YearText": "2024",
+            "name": "audited Financial Statement_Gabon_2024.pdf",
+            "url": "https://example.org/b.pdf",
+            "LangCode": "fr",
+            "Public": 3,
+            "ApprovalStatus": "Rejected (Public)",
+            "ModifiedAt": "2025-01-01T00:00:00",
+        },
+    ]
+    assignment_rows = [
+        {"period_name": "2024", "iso3": "USA", "assignment_entity_status_id": 99},
+        {"period_name": "2024", "iso3": "GAB", "assignment_entity_status_id": 77},
+    ]
+    plan, summary = build_document_import_plan(documents, assignment_rows)
+    assert summary["planned"] == 2
+    assert summary["status_approved"] == 1
+    assert summary["status_rejected"] == 1
+    assert summary["status_pending"] == 0
+
+
 def test_build_document_import_plan_maps_rejected_status():
     documents = [
         {

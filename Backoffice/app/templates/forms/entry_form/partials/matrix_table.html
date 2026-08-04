@@ -45,7 +45,13 @@
      {% if matrix_is_carry_forward or matrix_has_carry_forward_ref %}data-carry-forward="true"{% endif %}
      {% if matrix_has_carry_forward_ref %}data-carry-forward-ref='{{ matrix_carry_forward_ref | tojson }}'{% endif %}
      {% if matrix_highlight_prefilled_cells %}data-prefilled-cell-title="{{ _matrix_prefilled_title }}"{% endif %}
-     {% if matrix_highlight_prefilled_cells %}data-prefilled-legend-text="{{ _('Prefilled value')|forceescape }}"{% endif %}
+     {% if matrix_highlight_prefilled_cells %}
+     {% if matrix_is_carry_forward or matrix_has_carry_forward_ref %}
+     data-prefilled-legend-text="{{ _('Carried forward value')|forceescape }}"
+     {% else %}
+     data-prefilled-legend-text="{{ _('Prefilled value')|forceescape }}"
+     {% endif %}
+     {% endif %}
      role="group"
      aria-labelledby="field-{{ field.id }}"
      aria-describedby="matrix-error-{{ field.id }}"

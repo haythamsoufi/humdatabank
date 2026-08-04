@@ -14,6 +14,7 @@ from contextlib import suppress
 import io
 import json
 import os
+import re
 
 from flask import current_app, flash, redirect, render_template, request, send_file, url_for
 from flask_babel import _
@@ -45,6 +46,425 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+
+
+def _first_localized_translation(translations_map, translation_key):
+    """Return the first non-empty translation for preferred language keys."""
+    if not isinstance(translations_map, dict):
+        return None
+    for key in (translation_key, 'en', 'EN'):
+        if not key:
+            continue
+        for candidate_key in (key, str(key).lower(), str(key).upper()):
+            value = translations_map.get(candidate_key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _normalize_note_html_for_pdf(html):
+    """Tighten note/blank HTML for PDF so spacing matches the entry form."""
+    if not html or not isinstance(html, str):
+        return html or ''
+    cleaned = re.sub(
+        r'<p>\s*(?:<br\s*/?>|&nbsp;|\u00a0|\s)*\s*</p>',
+        '',
+        html,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r'(\s*<br\s*/?>\s*){2,}', '<br>', cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
+def _resolve_note_body(form_item, translation_key, resolved_variables, variable_configs):
+    """Resolve localized note/blank body HTML (definition), with variable substitution."""
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+
+    body = _first_localized_translation(
+        getattr(form_item, 'definition_translations', None),
+        translation_key,
+    )
+    if not body:
+        raw_definition = getattr(form_item, 'definition', None)
+        body = raw_definition.strip() if isinstance(raw_definition, str) else ''
+    if body and resolved_variables:
+        with suppress(Exception):
+            body = VariableResolutionService.replace_variables_in_text(
+                body,
+                resolved_variables,
+                variable_configs,
+            )
+    return _normalize_note_html_for_pdf(body or '')
+
+
+def _wrap_export_value_with_flags(value, *, data_not_available=False, not_applicable=False):
+    """Attach availability flags to exported field values when set on FormData."""
+    if not data_not_available and not not_applicable:
+        return value
+    if isinstance(value, dict):
+        wrapped = dict(value)
+        wrapped['data_not_available'] = bool(data_not_available)
+        wrapped['not_applicable'] = bool(not_applicable)
+        return wrapped
+    return {
+        'value': value,
+        'data_not_available': bool(data_not_available),
+        'not_applicable': bool(not_applicable),
+    }
+
+
+_FIELD_VALUE_KEY_RE = re.compile(r'^field_value\[(\d+)\](.*)$')
+_DYNAMIC_VALUE_KEY_RE = re.compile(r'^field_value\[dynamic_(\d+)\](.*)$')
+_AVAILABILITY_KEY_RES = (
+    (re.compile(r'^matrix_(\d+)_data_not_available$'), 'data_not_available'),
+    (re.compile(r'^indicator_(\d+)_data_not_available$'), 'data_not_available'),
+    (re.compile(r'^question_(\d+)_data_not_available$'), 'data_not_available'),
+    (re.compile(r'^matrix_(\d+)_not_applicable$'), 'not_applicable'),
+    (re.compile(r'^indicator_(\d+)_not_applicable$'), 'not_applicable'),
+    (re.compile(r'^question_(\d+)_not_applicable$'), 'not_applicable'),
+    (re.compile(r'^dynamic_(\d+)_data_not_available$'), 'data_not_available'),
+    (re.compile(r'^dynamic_(\d+)_not_applicable$'), 'not_applicable'),
+)
+
+
+def _normalize_matrix_cell_value(value):
+    """Normalize a matrix cell value for prefilled/carry-forward comparison."""
+    if value is None or value == '':
+        return ''
+    if isinstance(value, dict):
+        if value.get('modified') not in (None, ''):
+            return _normalize_matrix_cell_value(value.get('modified'))
+        if value.get('original') not in (None, ''):
+            return _normalize_matrix_cell_value(value.get('original'))
+        return ''
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    text = str(value).strip()
+    if text == 'true':
+        return '1'
+    if text == 'false':
+        return '0'
+    return text
+
+
+def matrix_pdf_layout_strategy(col_count):
+    """Choose PDF layout for wide matrices: portrait squeeze vs landscape page.
+
+    Returns an empty string for normal (≤7 columns) matrices.
+    """
+    try:
+        count = int(col_count or 0)
+    except (TypeError, ValueError):
+        count = 0
+    if count <= 7:
+        return ''
+    if count <= 13:
+        return 'portrait-compact'
+    if count <= 16:
+        return 'landscape'
+    return 'landscape-scale'
+
+
+def matrix_portrait_column_widths_mm(
+    col_count,
+    columns,
+    *,
+    show_row_totals=True,
+    table_width_mm=190,
+):
+    """Return ``(name, width_mm)`` pairs for a portrait-compact matrix ``colgroup``."""
+    try:
+        count = int(col_count or 0)
+    except (TypeError, ValueError):
+        count = 0
+
+    row_label_mm = 26
+    if count >= 12:
+        row_label_mm = 20
+    elif count >= 10:
+        row_label_mm = 22
+
+    tick_mm = 7.0
+    min_number_mm = 8.5
+
+    specs = []
+    for col in columns or []:
+        if isinstance(col, dict):
+            col_type = (col.get('type') or 'number').strip().lower()
+            name = col.get('name') or ''
+        else:
+            col_type = 'number'
+            name = str(col)
+        specs.append({'name': name, 'is_tick': col_type == 'tick'})
+
+    if show_row_totals:
+        specs.append({'name': '__total__', 'is_tick': False})
+
+    tick_total_mm = tick_mm * sum(1 for spec in specs if spec['is_tick'])
+    number_count = sum(1 for spec in specs if not spec['is_tick'])
+    remaining_mm = max(table_width_mm - row_label_mm - tick_total_mm, min_number_mm * max(number_count, 1))
+    number_mm = remaining_mm / number_count if number_count else min_number_mm
+    number_mm = max(min_number_mm, number_mm)
+
+    widths = [('__row__', row_label_mm)]
+    for spec in specs:
+        if spec['is_tick']:
+            widths.append((spec['name'], tick_mm))
+        else:
+            widths.append((spec['name'], round(number_mm, 1)))
+    return widths
+
+
+def matrix_cell_is_prefilled_highlight(
+    cell_key,
+    display_cell,
+    *,
+    is_prefilled=False,
+    is_imputed=False,
+    carry_forward_ref=None,
+    is_variable_readonly=False,
+):
+    """Return True when a matrix cell should be highlighted as prefilled in PDF export."""
+    if is_imputed or is_variable_readonly:
+        return False
+    if not is_prefilled and not (isinstance(carry_forward_ref, dict) and carry_forward_ref):
+        return False
+
+    normalized = _normalize_matrix_cell_value(display_cell)
+    if not normalized:
+        return False
+
+    if isinstance(carry_forward_ref, dict) and carry_forward_ref:
+        if cell_key not in carry_forward_ref:
+            return False
+        return normalized == _normalize_matrix_cell_value(carry_forward_ref.get(cell_key))
+
+    return True
+
+
+def _apply_availability_flag(export_data, export_key, flag_name):
+    """Merge data-not-available / not-applicable flags into an export field payload."""
+    current = export_data.get(export_key)
+    if current is None:
+        export_data[export_key] = {flag_name: True}
+    elif isinstance(current, dict):
+        merged = dict(current)
+        merged[flag_name] = True
+        export_data[export_key] = merged
+    else:
+        export_data[export_key] = {
+            'value': current,
+            flag_name: True,
+        }
+
+
+def _convert_entry_data_to_export_format(entry_data):
+    """Map entry-form existing_data keys to PDF export template keys."""
+    export_data = {}
+
+    for key, value in (entry_data or {}).items():
+        dynamic_match = _DYNAMIC_VALUE_KEY_RE.match(key)
+        if dynamic_match:
+            export_data[f"form_item_dynamic_{dynamic_match.group(1)}{dynamic_match.group(2)}"] = value
+            continue
+
+        field_match = _FIELD_VALUE_KEY_RE.match(key)
+        if field_match:
+            export_data[f"form_item_{field_match.group(1)}{field_match.group(2)}"] = value
+            continue
+
+        matched = False
+        for pattern, flag_name in _AVAILABILITY_KEY_RES:
+            avail_match = pattern.match(key)
+            if not avail_match:
+                continue
+            item_id = avail_match.group(1)
+            export_key = (
+                f"form_item_dynamic_{item_id}"
+                if key.startswith('dynamic_')
+                else f"form_item_{item_id}"
+            )
+            _apply_availability_flag(export_data, export_key, flag_name)
+            matched = True
+            break
+        if matched:
+            continue
+
+    return export_data
+
+
+def _load_existing_data_for_pdf_export(assignment_entity_status, form_template):
+    """Load assignment data with prefilled/imputed/carry-forward metadata for PDF export."""
+    from app.routes.forms.helpers import _load_existing_data_for_assignment
+
+    entry_data = _load_existing_data_for_assignment(assignment_entity_status, form_template)
+
+    cf_items = []
+    for section_model in form_template.sections.order_by(FormSection.order).all():
+        for form_item in FormItem.query.filter_by(section_id=section_model.id, archived=False).all():
+            config = form_item.config if isinstance(form_item.config, dict) else {}
+            if config.get('carry_forward'):
+                cf_items.append(form_item)
+
+    if cf_items:
+        from app.services.forms.carry_forward_service import CarryForwardService
+
+        try:
+            cf_results = CarryForwardService.resolve_for_aes(assignment_entity_status, cf_items)
+            for item_id, result in cf_results.items():
+                field_key = f'field_value[{item_id}]'
+                if field_key in entry_data:
+                    continue
+                entry_data[field_key] = (
+                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
+                )
+                entry_data[f'{field_key}_is_prefilled'] = True
+                entry_data[f'{field_key}_is_carry_forward'] = True
+
+            cf_refs = CarryForwardService.resolve_references_for_aes(
+                assignment_entity_status, cf_items
+            )
+            for item_id, result in cf_refs.items():
+                ref_data = (
+                    result['disagg_data'] if result.get('is_matrix') else result.get('value')
+                )
+                if ref_data is None:
+                    continue
+                entry_data[f'field_value[{item_id}]_carry_forward_ref'] = ref_data
+                entry_data[f'field_value[{item_id}]_is_carry_forward'] = True
+        except Exception as e:
+            current_app.logger.warning(
+                "Carry-forward resolution failed for PDF export (AES %s): %s",
+                assignment_entity_status.id,
+                e,
+            )
+
+    return _convert_entry_data_to_export_format(entry_data)
+
+
+def _make_assignment_pdf_download_name(entity_name, assignment_name):
+    """Build `{entity} - {assignment}.pdf`, keeping names intact aside from unsafe path chars."""
+    entity = (entity_name or '').strip()
+    assignment = (assignment_name or '').strip() or 'Assignment'
+    base = f"{entity} - {assignment}" if entity else assignment
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]', '', base)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip().rstrip('.')
+    cleaned = cleaned[:200] or 'Assignment'
+    return f"{cleaned}.pdf"
+
+
+def _matrix_row_entity_ids(field_dict):
+    """Collect numeric row entity IDs from a matrix field export dict."""
+    row_ids = []
+    seen = set()
+    for r in field_dict.get('matrix_rows') or []:
+        rid = r.get('text') if isinstance(r, dict) else r
+        if rid is None:
+            continue
+        try:
+            rid_int = int(rid)
+        except (ValueError, TypeError):
+            continue
+        if rid_int not in seen:
+            seen.add(rid_int)
+            row_ids.append(rid_int)
+    if not row_ids:
+        for rid in (field_dict.get('matrix_row_labels') or {}).keys():
+            try:
+                rid_int = int(rid)
+            except (ValueError, TypeError):
+                continue
+            if rid_int not in seen:
+                seen.add(rid_int)
+                row_ids.append(rid_int)
+    return row_ids
+
+
+def _matrix_has_variable_columns(columns):
+    for col in columns or []:
+        if isinstance(col, dict) and (col.get('is_variable') or col.get('type') == 'variable'):
+            return True
+    return False
+
+
+def _merge_matrix_variable_values(field_dict, matrix_data, template_version, assignment_entity_status):
+    """Fill variable matrix cells from template variable resolution (not stored in disagg_data)."""
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+
+    columns = field_dict.get('matrix_columns') or []
+    if not _matrix_has_variable_columns(columns) or not template_version:
+        return matrix_data
+
+    row_ids = _matrix_row_entity_ids(field_dict)
+    if not row_ids:
+        return matrix_data
+
+    try:
+        batch = VariableResolutionService.resolve_variables_batch(
+            template_version,
+            assignment_entity_status,
+            row_ids,
+        ) or {}
+    except Exception as e:
+        current_app.logger.warning(
+            "Failed to resolve matrix variable columns for PDF export (field %s): %s",
+            field_dict.get('id'),
+            e,
+            exc_info=True,
+        )
+        return matrix_data
+
+    enriched = dict(matrix_data) if isinstance(matrix_data, dict) else {}
+    for row_id, var_map in batch.items():
+        if not isinstance(var_map, dict):
+            continue
+        row_key = str(row_id)
+        for col in columns:
+            if not isinstance(col, dict):
+                continue
+            if not (col.get('is_variable') or col.get('type') == 'variable'):
+                continue
+            col_name = col.get('name')
+            var_name = col.get('variable') or col.get('variable_name')
+            if not col_name or not var_name:
+                continue
+            cell_key = f"{row_key}_{col_name}"
+            existing = enriched.get(cell_key)
+            if existing is not None and existing != '':
+                if isinstance(existing, dict):
+                    if existing.get('modified') not in (None, ''):
+                        continue
+                    if existing.get('original') not in (None, ''):
+                        continue
+                else:
+                    continue
+            val = var_map.get(var_name)
+            if val is not None and val != '':
+                enriched[cell_key] = val
+    return enriched
+
+
+def _enrich_matrix_export_data(section_node, existing_data, template_version, assignment_entity_status):
+    """Walk section tree and merge resolved variable values into matrix export data."""
+    if not isinstance(section_node, dict):
+        return
+    for field_dict in section_node.get('fields_ordered') or []:
+        if not isinstance(field_dict, dict) or field_dict.get('kind') != 'matrix':
+            continue
+        item_key = f"form_item_{field_dict.get('id')}"
+        raw = existing_data.get(item_key)
+        if raw is None:
+            raw = {}
+        elif not isinstance(raw, dict):
+            raw = {'value': raw}
+        existing_data[item_key] = _merge_matrix_variable_values(
+            field_dict,
+            raw,
+            template_version,
+            assignment_entity_status,
+        )
+    for child in section_node.get('subsections') or []:
+        _enrich_matrix_export_data(child, existing_data, template_version, assignment_entity_status)
 
 
 def register_export_routes(bp):
@@ -129,6 +549,14 @@ def _export_pdf_impl(aes_id):
         with suppress(Exception):
             country_display_name = get_localized_country_name(country) if country else None
 
+        from app.services.organization.entity_service import EntityService
+        entity_display_name = None
+        with suppress(Exception):
+            entity_display_name = EntityService.get_localized_entity_name(
+                assignment_entity_status.entity_type,
+                assignment_entity_status.entity_id,
+            )
+
         sections_by_page = {}
         default_page_id = 0
 
@@ -210,7 +638,18 @@ def _export_pdf_impl(aes_id):
                             or (getattr(form_item, 'question_type', None) and getattr(form_item.question_type, 'value', None) == 'blank')
                         )
                         if is_blank_note:
-                            base.update({'kind': 'note', 'model': form_item})
+                            note_body = _resolve_note_body(
+                                form_item,
+                                translation_key,
+                                resolved_variables,
+                                variable_configs,
+                            )
+                            base.update({
+                                'kind': 'note',
+                                'model': form_item,
+                                'note_label': display_label or '',
+                                'note_body': note_body,
+                            })
                         else:
                             base.update({'kind': 'question', 'model': form_item})
                         temp_fields.append(base)
@@ -255,6 +694,31 @@ def _export_pdf_impl(aes_id):
                                 exc_info=True
                             )
                         matrix_columns = matrix_config.get('columns', []) if isinstance(matrix_config, dict) else []
+                        matrix_column_groups = (
+                            matrix_config.get('column_groups', {})
+                            if isinstance(matrix_config, dict) else {}
+                        )
+                        try:
+                            resolved_columns, resolved_groups = VariableResolutionService.resolve_matrix_display_headers(
+                                matrix_config,
+                                resolved_variables,
+                                variable_configs,
+                                replace_fn=lambda text: VariableResolutionService.replace_variables_in_text(
+                                    text,
+                                    resolved_variables,
+                                    variable_configs,
+                                ),
+                            )
+                            if resolved_columns:
+                                matrix_columns = resolved_columns
+                            if resolved_groups:
+                                matrix_column_groups = resolved_groups
+                        except Exception as e:
+                            current_app.logger.debug(
+                                "resolve_matrix_display_headers failed for form_item %s: %s",
+                                form_item.id,
+                                e,
+                            )
 
                         base.update({
                             'kind': 'matrix',
@@ -262,6 +726,7 @@ def _export_pdf_impl(aes_id):
                             'matrix_config': matrix_config,
                             'matrix_rows': matrix_rows,
                             'matrix_columns': matrix_columns,
+                            'matrix_column_groups': matrix_column_groups,
                         })
                         temp_fields.append(base)
                     elif form_item.is_document_field:
@@ -323,29 +788,10 @@ def _export_pdf_impl(aes_id):
                 sections_by_page[page_id] = []
             sections_by_page[page_id].append(node)
 
-        existing_entries = FormData.query.filter_by(
-            assignment_entity_status_id=assignment_entity_status.id
-        ).all()
-        existing_data_processed_for_export = {}
-        for entry in existing_entries:
-            if entry.form_item_id:
-                value = entry.disagg_data if entry.disagg_data is not None else entry.value
-                if isinstance(value, str):
-                    v = value.strip()
-                    if (v.startswith('{') and v.endswith('}')) or (v.startswith('[') and v.endswith(']')):
-                        with suppress(Exception):
-                            value = json.loads(v)
-                existing_data_processed_for_export[f"form_item_{entry.form_item_id}"] = value
-
-        dynamic_entries = DynamicIndicatorData.query.filter_by(
-            assignment_entity_status_id=assignment_entity_status.id
-        ).all()
-        for dyn in dynamic_entries:
-            key = f"form_item_dynamic_{dyn.id}"
-            if dyn.disagg_data is not None:
-                existing_data_processed_for_export[key] = dyn.disagg_data
-            else:
-                existing_data_processed_for_export[key] = {'values': {'total': dyn.value}}
+        existing_data_processed_for_export = _load_existing_data_for_pdf_export(
+            assignment_entity_status,
+            form_template_for_export,
+        )
 
         def _parse_hidden_ids_arg(arg_name):
             raw = (request.args.get(arg_name) or '').strip()
@@ -533,6 +979,16 @@ def _export_pdf_impl(aes_id):
             for sec in root_sections or []:
                 _walk_sections_for_export(sec)
 
+        if template_version:
+            for page_id, root_sections in (sections_by_page or {}).items():
+                for sec in root_sections or []:
+                    _enrich_matrix_export_data(
+                        sec,
+                        existing_data_processed_for_export,
+                        template_version,
+                        assignment_entity_status,
+                    )
+
         pages = list(form_template_for_export.pages) if form_template_for_export.is_paginated else [None]
 
         html_content = render_template(
@@ -541,6 +997,7 @@ def _export_pdf_impl(aes_id):
             assignment_display_name=assignment_display_name,
             country=country,
             country_display_name=country_display_name,
+            entity_display_name=entity_display_name,
             aes=assignment_entity_status,
             form_template=form_template_for_export,
             sections_by_page=sections_by_page,
@@ -548,7 +1005,9 @@ def _export_pdf_impl(aes_id):
             existing_data=existing_data_processed_for_export,
             generated_at=utcnow(),
             get_localized_page_name=get_localized_page_name,
-            wide_matrix_strategy='scale',
+            matrix_cell_is_prefilled_highlight=matrix_cell_is_prefilled_highlight,
+            matrix_pdf_layout_strategy=matrix_pdf_layout_strategy,
+            matrix_portrait_column_widths_mm=matrix_portrait_column_widths_mm,
         )
 
         try:
@@ -566,7 +1025,7 @@ def _export_pdf_impl(aes_id):
         pdf_css_string = '''
             @page {
                 size: A4;
-                margin: 20mm 15mm 20mm 15mm;
+                margin: 20mm 10mm 20mm 10mm;
                 @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
             }
             body {
@@ -589,6 +1048,77 @@ def _export_pdf_impl(aes_id):
                 border-left: 3px solid #cc0000;
             }
             .meta div { margin: 4px 0; }
+            .field-flag {
+                display: inline-block;
+                margin-left: 8px;
+                padding: 1px 6px;
+                border-radius: 3px;
+                font-size: 8pt;
+                font-weight: 600;
+                vertical-align: middle;
+            }
+            .field-flag-prefilled {
+                background: #fef9c3;
+                color: #854d0e;
+                border: 1px solid #fde047;
+            }
+            .field-flag-imputed {
+                background: #dbeafe;
+                color: #1e40af;
+                border: 1px solid #93c5fd;
+            }
+            .matrix-legend {
+                margin: 0 0 8px 0;
+                padding: 6px 8px;
+                background: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: 4px;
+                font-size: 9pt;
+                color: #374151;
+                page-break-inside: avoid;
+            }
+            .matrix-field-flag {
+                text-align: right;
+                margin: 0 0 6px 0;
+                page-break-inside: avoid;
+            }
+            .matrix-legend-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .matrix-legend-swatch {
+                width: 14px;
+                height: 14px;
+                border: 1px solid #fde047;
+                background: #fef9c3;
+                border-radius: 2px;
+                flex-shrink: 0;
+            }
+            .field-box-imputed {
+                background: #eff6ff;
+                border-color: #93c5fd;
+            }
+            .cell-prefilled {
+                background: #fef9c3 !important;
+            }
+            .cell-imputed {
+                background: #eff6ff !important;
+            }
+            .field-value-prefilled {
+                display: inline-block;
+                background: #fef9c3;
+                border: 1px solid #fde047;
+                border-radius: 3px;
+                padding: 2px 6px;
+            }
+            .field-value-imputed {
+                display: inline-block;
+                background: #eff6ff;
+                border: 1px solid #93c5fd;
+                border-radius: 3px;
+                padding: 2px 6px;
+            }
             .section {
                 margin-bottom: 16px;
             }
@@ -607,14 +1137,31 @@ def _export_pdf_impl(aes_id):
                 margin: 8px 0 0 0;
             }
             .form-note {
-                color: #374151;
-                font-size: 10pt;
                 margin: 8px 0;
                 padding: 8px 12px;
                 background: #f9fafb;
                 border-left: 3px solid #9ca3af;
                 border-radius: 0 4px 4px 0;
             }
+            .form-note-heading {
+                color: #111827;
+                font-size: 10pt;
+                font-weight: 600;
+                margin: 0 0 4px 0;
+                white-space: pre-wrap;
+            }
+            .form-note-body {
+                color: #374151;
+                font-size: 10pt;
+                line-height: 1.25;
+            }
+            .form-note-body p {
+                margin: 0;
+            }
+            .form-note-body ul, .form-note-body ol { margin: 4px 0 6px 1.2em; padding: 0; }
+            .form-note-body li { margin: 2px 0; }
+            .form-note-body a { color: #2563eb; text-decoration: underline; }
+            .form-note-body strong, .form-note-body b { font-weight: 600; }
 
             .field-box {
                 border: 1.5px solid #e5e7eb;
@@ -623,14 +1170,87 @@ def _export_pdf_impl(aes_id):
                 page-break-inside: avoid;
                 background: #ffffff;
             }
+            .field-unlabeled {
+                margin: 8px 0;
+                border: none;
+                background: transparent;
+                page-break-inside: auto;
+            }
+            .field-content-unlabeled {
+                padding: 0;
+                min-height: 0;
+            }
             .field-box-matrix {
                 page-break-inside: auto;
             }
-            .field-box-matrix .table thead {
+            /* Wide matrices (8–13 cols): squeeze into portrait via fixed layout + narrow columns */
+            .field-box-matrix-wide.wide-matrix-portrait-compact,
+            .field-unlabeled.field-box-matrix-wide.wide-matrix-portrait-compact {
+                page-break-inside: auto;
+            }
+            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table {
+                table-layout: fixed;
+                width: 100%;
+                font-size: 7pt;
+            }
+            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table th,
+            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table td {
+                padding: 2px 3px;
+                font-size: 7pt;
+                line-height: 1.25;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+                hyphens: auto;
+                vertical-align: top;
+            }
+            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table th:first-child,
+            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-table td:first-child {
+                min-width: 0;
+                max-width: none;
+            }
+            .wide-matrix-portrait-compact .wide-matrix-compact .matrix-group-header {
+                font-size: 6.5pt;
+                padding: 2px 2px;
+                text-align: center;
+            }
+            /* Wide matrices (14+ cols): landscape page */
+            .field-box-matrix-wide.wide-matrix-landscape,
+            .field-box-matrix-wide.wide-matrix-landscape-scale {
+                page: wide;
+                page-break-before: always;
+                page-break-inside: auto;
+            }
+            .field-box-matrix-wide.wide-matrix-landscape-scale {
+                overflow: hidden;
+            }
+            .field-box-matrix-wide.wide-matrix-landscape-scale .matrix-table {
+                transform: scale(0.82);
+                transform-origin: top left;
+            }
+            .field-box-matrix .matrix-table {
+                page-break-inside: auto;
+            }
+            .field-box-matrix .matrix-table thead {
                 display: table-header-group;
             }
-            .field-box-matrix .table tr {
+            .field-box-matrix .matrix-table thead tr {
                 page-break-inside: avoid;
+                page-break-after: avoid;
+            }
+            .field-box-matrix .matrix-table tbody tr {
+                page-break-inside: avoid;
+            }
+            .field-box-matrix .matrix-table td:first-child,
+            .field-box-matrix .matrix-table th:first-child {
+                min-width: 22mm;
+                max-width: 34mm;
+                vertical-align: top;
+            }
+            .matrix-group-header {
+                background: #eef2ff;
+                color: #3730a3;
+                font-weight: 600;
+                text-align: center;
             }
 
             .field-filled {
@@ -728,6 +1348,8 @@ def _export_pdf_impl(aes_id):
             }
             html[dir="rtl"] .meta { border-left: none; border-right: 3px solid #cc0000; }
             html[dir="rtl"] .form-note { border-left: none; border-right: 3px solid #9ca3af; border-radius: 4px 0 0 4px; }
+            html[dir="rtl"] .form-note-heading,
+            html[dir="rtl"] .form-note-body { text-align: right; }
             html[dir="rtl"] .subsection { margin-left: 0; margin-right: 12px; padding-left: 0; padding-right: 10px; border-left: none; border-right: 2px solid #e5e7eb; }
             html[dir="rtl"] table th, html[dir="rtl"] table td {
                 text-align: right;
@@ -764,6 +1386,26 @@ def _export_pdf_impl(aes_id):
             .table td.cell-tick {
                 text-align: center;
             }
+            /* Wide matrices (8+ columns): tighter cells */
+            .wide-matrix-compact table.table,
+            .wide-matrix-compact table.matrix-table {
+                font-size: 7.5pt;
+            }
+            .wide-matrix-compact table.table th,
+            .wide-matrix-compact table.table td,
+            .wide-matrix-compact table.matrix-table th,
+            .wide-matrix-compact table.matrix-table td {
+                padding: 3px 4px;
+                word-wrap: break-word;
+                overflow-wrap: anywhere;
+                hyphens: auto;
+            }
+            .wide-matrix-compact table.table th:first-child,
+            .wide-matrix-compact table.table td:first-child,
+            .wide-matrix-compact table.matrix-table th:first-child,
+            .wide-matrix-compact table.matrix-table td:first-child {
+                max-width: 28mm;
+            }
             .wide-matrix-scale {
                 width: 100%;
                 overflow: hidden;
@@ -772,13 +1414,45 @@ def _export_pdf_impl(aes_id):
                 transform: scale(0.72);
                 transform-origin: top left;
             }
+            /* Matrix alignment — explicit classes; keep after generic table/RTL rules */
+            html[dir="ltr"] .matrix-table thead th.matrix-row-header,
+            html[dir="ltr"] .matrix-table thead th.matrix-col-header {
+                text-align: left;
+                hyphens: none;
+            }
+            html[dir="ltr"] .matrix-table thead th.matrix-group-header {
+                text-align: center;
+            }
+            html[dir="ltr"] .matrix-table thead th.cell-tick,
+            html[dir="ltr"] .matrix-table tbody td.cell-tick {
+                text-align: center;
+            }
+            html[dir="ltr"] .matrix-table tbody td.matrix-col-data,
+            html[dir="ltr"] .matrix-table tbody td.matrix-column-total-cell,
+            html[dir="ltr"] .matrix-table tbody td.matrix-row-total-cell,
+            html[dir="ltr"] .matrix-table tbody td.matrix-grand-total-cell {
+                text-align: right;
+            }
+            html[dir="ltr"] .matrix-table tbody td.matrix-row-label {
+                text-align: left;
+            }
+            html[dir="rtl"] .matrix-table thead th.matrix-row-header,
+            html[dir="rtl"] .matrix-table thead th.matrix-col-header {
+                text-align: right;
+            }
+            html[dir="rtl"] .matrix-table thead th.matrix-group-header {
+                text-align: center;
+            }
+            html[dir="rtl"] .matrix-table tbody td.matrix-col-data,
+            html[dir="rtl"] .matrix-table tbody td.matrix-column-total-cell,
+            html[dir="rtl"] .matrix-table tbody td.matrix-row-total-cell,
+            html[dir="rtl"] .matrix-table tbody td.matrix-grand-total-cell {
+                text-align: left;
+            }
             @page wide {
                 size: A4 landscape;
-                margin: 20mm 15mm 20mm 15mm;
+                margin: 15mm 8mm 15mm 8mm;
                 @bottom-right { content: "Page " counter(page); font-size: 10pt; color: #6b7280; }
-            }
-            .wide-matrix-landscape {
-                page: wide;
             }
             .page-break { page-break-before: always; }
         '''
@@ -794,7 +1468,10 @@ def _export_pdf_impl(aes_id):
         )
 
         pdf_buffer.seek(0)
-        filename = f"assignment_{country.iso3 if country else 'country'}_{str(assignment.period_name).replace(' ', '_')}.pdf"
+        filename = _make_assignment_pdf_download_name(
+            entity_display_name or country_display_name,
+            assignment_display_name or (assignment.template.name if assignment and assignment.template else None),
+        )
         return send_file(
             pdf_buffer,
             download_name=filename,

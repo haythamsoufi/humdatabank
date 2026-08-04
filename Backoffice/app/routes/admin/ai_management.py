@@ -51,6 +51,23 @@ def _clear_reprocess_job_cancel_event(job_id: str) -> None:
         _REPROCESS_JOB_CANCEL_EVENTS.pop(job_id, None)
 
 
+def _job_item_ai_document_id(item) -> int | None:
+    """Resolve linked AIDocument id from a job item (entity or payload)."""
+    if item.entity_type == "ai_document" and item.entity_id:
+        try:
+            return int(item.entity_id)
+        except (TypeError, ValueError):
+            pass
+    payload = item.payload if isinstance(item.payload, dict) else {}
+    raw = payload.get("ai_document_id")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _resolve_ai_doc_file_for_processing(doc):
     """
     Return (file_path, temp_path, filename, from_url) for an AIDocument.
@@ -276,7 +293,8 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
     """Process one system-document bulk import job item synchronously."""
     with app.app_context():
         from app.models import AIJobItem
-        from app.services.ai.documents.ingest import process_submitted_document_ai_import_sync
+        from app.routes.ai_documents.upload import _process_document_sync
+        from app.services.ai.documents.ingest import _prepare_submitted_document_ai_import
 
         cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
         item = AIJobItem.query.get(int(item_id))
@@ -314,6 +332,31 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
         item.status = "processing"
         item.error = None
         db.session.commit()
+
+        prep = _prepare_submitted_document_ai_import(submitted_doc_id, user_id=job_user_id)
+        if not prep.get("ok"):
+            item.status = "failed"
+            item.error = prep.get("message") or prep.get("code") or "Processing failed"
+            db.session.commit()
+            return
+
+        ai_doc_id = int(prep["ai_document_id"])
+        file_path = prep["file_path"]
+        filename = prep["filename"]
+        cleanup_temp = bool(prep.get("cleanup_temp"))
+
+        item.entity_type = "ai_document"
+        item.entity_id = ai_doc_id
+        try:
+            base_payload = item.payload if isinstance(item.payload, dict) else {}
+            new_payload = dict(base_payload)
+            new_payload["ai_document_id"] = ai_doc_id
+            item.payload = new_payload
+        except Exception as e:
+            current_app.logger.debug("System import item payload update failed: %s", e)
+        item.status = "processing"
+        item.error = None
+        db.session.commit()
         db.session.remove()
 
         try:
@@ -325,36 +368,24 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
                     db.session.commit()
                 return
 
-            result = process_submitted_document_ai_import_sync(
-                submitted_doc_id,
-                user_id=job_user_id,
-            )
+            _process_document_sync(ai_doc_id, file_path, filename)
 
+            from app.models import AIDocument
+
+            doc = AIDocument.query.get(ai_doc_id)
             item = AIJobItem.query.get(int(item_id))
             if not item:
                 return
 
-            ai_doc_id = result.get("ai_document_id")
-            if ai_doc_id:
-                item.entity_type = "ai_document"
-                item.entity_id = int(ai_doc_id)
-                try:
-                    base_payload = item.payload if isinstance(item.payload, dict) else {}
-                    new_payload = dict(base_payload)
-                    new_payload["ai_document_id"] = int(ai_doc_id)
-                    item.payload = new_payload
-                except Exception as e:
-                    current_app.logger.debug("System import item payload update failed: %s", e)
-
             if cancel_ev.is_set():
                 item.status = "cancelled"
                 item.error = None
-            elif result.get("ok"):
+            elif doc and doc.processing_status == "completed":
                 item.status = "completed"
                 item.error = None
             else:
                 item.status = "failed"
-                item.error = result.get("message") or result.get("code") or "Processing failed"
+                item.error = (doc.processing_error if doc else None) or "Processing failed"
             db.session.commit()
         except Exception as e:
             logger.error(
@@ -365,6 +396,12 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
                 exc_info=True,
             )
             try:
+                from app.models import AIDocument
+
+                doc = AIDocument.query.get(ai_doc_id)
+                if doc:
+                    doc.processing_status = "failed"
+                    doc.processing_error = "Processing failed."
                 item = AIJobItem.query.get(int(item_id))
                 if item:
                     item.status = "failed"
@@ -373,6 +410,12 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
             except Exception as update_e:
                 current_app.logger.debug("System import item failure update failed: %s", update_e)
                 db.session.rollback()
+        finally:
+            if cleanup_temp and file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
 
 
 def _run_system_bulk_import_job(app, job_id: str) -> None:
@@ -1602,7 +1645,11 @@ def import_system_bulk_status(job_id: str):
         cancelled = sum(1 for it in items if it.status == "cancelled")
         processing = sum(1 for it in items if it.status in ("downloading", "processing", "queued"))
 
-        doc_ids = [int(it.entity_id) for it in items if (it.entity_type == "ai_document" and it.entity_id)]
+        doc_ids = []
+        for it in items:
+            aid = _job_item_ai_document_id(it)
+            if aid is not None:
+                doc_ids.append(aid)
         docs_by_id: dict[int, dict] = {}
         if doc_ids:
             docs = AIDocument.query.filter(AIDocument.id.in_(doc_ids)).all()
@@ -1642,14 +1689,12 @@ def import_system_bulk_status(job_id: str):
                         if isinstance(it.payload, dict)
                         else None
                     ),
-                    "ai_document_id": (
-                        int(it.entity_id) if (it.entity_type == "ai_document" and it.entity_id) else None
-                    ),
+                    "ai_document_id": _job_item_ai_document_id(it),
                     "import_status": it.status,
                     "import_error": it.error,
                     "document": (
-                        docs_by_id.get(int(it.entity_id))
-                        if (it.entity_type == "ai_document" and it.entity_id)
+                        docs_by_id.get(int(_job_item_ai_document_id(it)))
+                        if _job_item_ai_document_id(it) is not None
                         else None
                     ),
                 }

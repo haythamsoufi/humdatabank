@@ -1,6 +1,17 @@
 (function() {
 'use strict';
 var cfg = window.aiDocumentsConfig || {};
+
+function importSystemBulkUrl(suffix, jobId) {
+    const urls = (cfg.urls || {});
+    const tpl = suffix === 'status'
+        ? urls.importSystemBulkStatus
+        : (suffix === 'cancel' ? urls.importSystemBulkCancel : urls.importSystemBulk);
+    if (tpl && jobId) {
+        return String(tpl).replace('__JOB__', encodeURIComponent(String(jobId)));
+    }
+    return tpl || ('/admin/ai/documents/import-system-bulk' + (suffix && jobId ? '/' + encodeURIComponent(String(jobId)) + '/' + suffix : ''));
+}
 // Included by admin/ai/documents.html. Single source of truth for the documents grid and all AI documents page JS.
 // AG Grid helper instance
 let documentsGridHelper = null;
@@ -302,7 +313,7 @@ if (processingCancelBtn) {
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
                 } else if (systemImportJobId) {
-                    await csrfFetch(`/admin/ai/documents/import-system-bulk/${encodeURIComponent(systemImportJobId)}/cancel`, {
+                    await csrfFetch(importSystemBulkUrl('cancel', systemImportJobId), {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
@@ -456,7 +467,9 @@ function renderTrackedProcessingBar() {
             } else {
                 detail = total > 1 ? `0/${total} ` + cfg.t.starting_8c6ce9f8 : cfg.t.starting_import_b06c80dc + '...';
             }
-            const overallPct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+            const inFlight = activeDownloads;
+            const effectiveDone = doneCount + (inFlight > 0 ? Math.min(inFlight, Math.max(0, total - doneCount)) * 0.5 : 0);
+            const overallPct = total > 0 ? clampPercent((effectiveDone / total) * 100) : 0;
             showProcessingBanner(cfg.t.importing_documents_8a49fe5a, detail, overallPct);
             if (processingBannerUI && processingBannerUI.setCancelVisible) {
                 processingBannerUI.setCancelVisible(true);
@@ -528,7 +541,10 @@ function renderTrackedProcessingBar() {
     }
 
     // Choose which percentage to display
-    const percentToShow = (total <= 1) ? clampPercent((focus && focus.data && typeof focus.data.progress === 'number') ? focus.data.progress : 0) : percentOverall;
+    const useImportAverage = !!(window.aiDocsImportProgress && window.aiDocsImportProgress.total > 0 && total > 1);
+    const percentToShow = (total <= 1)
+        ? clampPercent((focus && focus.data && typeof focus.data.progress === 'number') ? focus.data.progress : 0)
+        : (useImportAverage ? percentAverage : percentOverall);
     showProcessingBanner(title, detail, percentToShow);
 
     const summaryKey = [entries.length, done, failed, title, detail, percentToShow].join('|');
@@ -1965,6 +1981,41 @@ function syncUploadImportModalIfrcCompactLayout() {
             ifrcContent.classList.remove('ifrc-api-tab--expanded');
         }
     }
+    syncUploadImportModalFooter();
+}
+
+let importTabHasRows = false;
+let ifrcTabHasRows = false;
+
+function formatImportFooterSummary(count) {
+    const n = Number(count) || 0;
+    if (n <= 0) {
+        return cfg.t.import_footer_none_selected_a4c8e2b1 || 'Select documents in the grid';
+    }
+    const tpl = cfg.t.import_footer_selected_count_b7d3f9a2 || '{count} selected';
+    return tpl.replace('{count}', String(n));
+}
+
+function syncUploadImportModalFooter() {
+    const footer = document.getElementById('uploadImportModalFooter');
+    const importFooter = document.getElementById('importTabFooter');
+    const ifrcFooter = document.getElementById('ifrcTabFooter');
+    const importContent = document.getElementById('importContent');
+    const ifrcContent = document.getElementById('ifrcApiContent');
+    const importVisible = !!(importContent && !importContent.classList.contains('hidden'));
+    const ifrcVisible = !!(ifrcContent && !ifrcContent.classList.contains('hidden'));
+    const showImportFooter = importVisible && importTabHasRows;
+    const showIfrcFooter = ifrcVisible && ifrcTabHasRows;
+
+    if (footer) {
+        footer.classList.toggle('hidden', !showImportFooter && !showIfrcFooter);
+    }
+    if (importFooter) {
+        importFooter.classList.toggle('hidden', !showImportFooter);
+    }
+    if (ifrcFooter) {
+        ifrcFooter.classList.toggle('hidden', !showIfrcFooter);
+    }
 }
 
 // Tab switching functionality
@@ -2215,6 +2266,15 @@ function initializeUploadModal() {
 
     if (closeBtn) {
         closeBtn.addEventListener('click', closeModal);
+    }
+
+    const importTabCancelBtn = document.getElementById('importTabCancelBtn');
+    const ifrcTabCancelBtn = document.getElementById('ifrcTabCancelBtn');
+    if (importTabCancelBtn) {
+        importTabCancelBtn.addEventListener('click', closeModal);
+    }
+    if (ifrcTabCancelBtn) {
+        ifrcTabCancelBtn.addEventListener('click', closeModal);
     }
 
     // Backdrop click (modal_shell: outer div is the overlay)
@@ -2742,12 +2802,22 @@ function ensureImportDocumentsGrid(rowData) {
 }
 
 function updateImportActionsVisibility(rowCount) {
-    const actionsDiv = document.getElementById('importActions');
-    if (!actionsDiv) return;
-    if (rowCount > 0) {
-        actionsDiv.classList.remove('hidden');
-    } else {
-        actionsDiv.classList.add('hidden');
+    importTabHasRows = (Number(rowCount) || 0) > 0;
+    syncUploadImportModalFooter();
+    if (importTabHasRows) {
+        updateImportSelectedSummary();
+    }
+}
+
+function updateImportSelectedSummary() {
+    const summaryEl = document.getElementById('importSelectedSummary');
+    const processBtn = document.getElementById('processSelectedBtn');
+    const count = selectedDocuments.size;
+    if (processBtn) {
+        processBtn.disabled = count === 0;
+    }
+    if (summaryEl) {
+        summaryEl.textContent = formatImportFooterSummary(count);
     }
 }
 
@@ -2853,10 +2923,7 @@ async function loadSystemDocuments() {
 }
 
 function updateSelectedCount() {
-    const processBtn = document.getElementById('processSelectedBtn');
-    if (processBtn) {
-        processBtn.disabled = selectedDocuments.size === 0;
-    }
+    updateImportSelectedSummary();
 }
 
 // External API documents import functionality
@@ -3260,12 +3327,22 @@ function attachIfrcDocumentsGridLinkGuard() {
 }
 
 function updateIfrcActionsVisibility(rowCount) {
-    const actionsDiv = document.getElementById('ifrcActions');
-    if (!actionsDiv) return;
-    if (rowCount > 0) {
-        actionsDiv.classList.remove('hidden');
-    } else {
-        actionsDiv.classList.add('hidden');
+    ifrcTabHasRows = (Number(rowCount) || 0) > 0;
+    syncUploadImportModalFooter();
+    if (ifrcTabHasRows) {
+        updateIfrcSelectedSummary();
+    }
+}
+
+function updateIfrcSelectedSummary() {
+    const summaryEl = document.getElementById('ifrcSelectedSummary');
+    const importBtn = document.getElementById('ifrcImportSelectedBtn');
+    const count = selectedIfrcDocuments.size;
+    if (importBtn) {
+        importBtn.disabled = count === 0;
+    }
+    if (summaryEl) {
+        summaryEl.textContent = formatImportFooterSummary(count);
     }
 }
 
@@ -3442,10 +3519,7 @@ async function loadIfrcApiDocuments() {
 }
 
 function updateIfrcSelectedCount() {
-    const importBtn = document.getElementById('ifrcImportSelectedBtn');
-    if (importBtn) {
-        importBtn.disabled = selectedIfrcDocuments.size === 0;
-    }
+    updateIfrcSelectedSummary();
 }
 
 async function fetchIfrcImportJobStatus(jobId) {
@@ -3561,7 +3635,7 @@ function resumeIfrcImportJobIfAny() {
 
 async function fetchSystemImportJobStatus(jobId) {
     const cacheBust = Date.now();
-    return window.apiFetch(`/admin/ai/documents/import-system-bulk/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
+    return window.apiFetch(importSystemBulkUrl('status', jobId) + '?_=' + cacheBust, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
         cache: 'no-store'
@@ -3971,7 +4045,7 @@ async function processSelectedDocuments() {
         }
 
         try {
-            const response = await csrfFetch('/admin/ai/documents/import-system-bulk', {
+            const response = await csrfFetch(importSystemBulkUrl(null), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

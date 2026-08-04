@@ -319,8 +319,8 @@
                     </div>
                 </div>
 
-                <div id="importContent" class="tab-content hidden p-6 flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="importTab" aria-hidden="true">
-                    <div class="mb-4 flex-shrink-0">
+                <div id="importContent" class="tab-content hidden flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="importTab" aria-hidden="true">
+                    <div class="px-6 pt-6 flex-shrink-0">
                         <p class="text-sm text-gray-600 mb-4">
                             <i class="fas fa-info-circle text-blue-500 mr-1"></i>
                             {{ _('Import and process existing documents from the Document Management system') }}
@@ -336,26 +336,23 @@
                             <div id="importDocumentsGrid-colvis-placeholder" class="flex-shrink-0"></div>
                         </div>
                     </div>
-                    <div id="importLoading" class="hidden text-center py-8 flex-shrink-0">
-                        <div class="inline-flex items-center space-x-3">
-                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                            <span class="text-sm text-gray-600">{{ _('Loading documents...') }}</span>
+                    <div id="importBodyArea" class="flex flex-col flex-1 min-h-0 overflow-hidden px-6 pb-6">
+                        <div id="importLoading" class="hidden text-center py-8 flex-shrink-0">
+                            <div class="inline-flex items-center space-x-3">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                <span class="text-sm text-gray-600">{{ _('Loading documents...') }}</span>
+                            </div>
                         </div>
-                    </div>
-                    <div id="importDocumentsFetchError" class="hidden flex-shrink-0 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div>
-                    <div id="importDocumentsTruncationHint" class="hidden flex-shrink-0 mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status"></div>
-                    <div id="importDocumentsGridShell" class="relative flex flex-col flex-1 min-h-0 overflow-hidden">
-                        {{ ag_grid_container('importDocumentsGrid', show_placeholder=false, include_card=false) }}
-                    </div>
-                    <div id="importActions" class="hidden mt-4 pt-4 border-t border-gray-200 flex justify-end flex-shrink-0">
-                        <button type="button" class="btn btn-primary" id="processSelectedBtn" disabled>
-                            <i class="fas fa-robot mr-2"></i> {{ _('Process Selected') }}
-                        </button>
+                        <div id="importDocumentsFetchError" class="hidden flex-shrink-0 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div>
+                        <div id="importDocumentsTruncationHint" class="hidden flex-shrink-0 mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status"></div>
+                        <div id="importDocumentsGridShell" class="relative flex flex-col flex-1 min-h-0 overflow-hidden">
+                            {{ ag_grid_container('importDocumentsGrid', show_placeholder=false, include_card=false) }}
+                        </div>
                     </div>
                 </div>
 
-                <div id="ifrcApiContent" class="tab-content hidden px-6 pt-6 pb-3 flex flex-col min-h-0 min-w-0" role="tabpanel" aria-labelledby="ifrcApiTab" aria-hidden="true">
-                    <div class="mb-4 flex-shrink-0 relative z-30">
+                <div id="ifrcApiContent" class="tab-content hidden flex flex-col flex-1 min-h-0 overflow-hidden" role="tabpanel" aria-labelledby="ifrcApiTab" aria-hidden="true">
+                    <div class="px-6 pt-6 flex-shrink-0 relative z-30">
                         <p class="text-sm text-gray-600 mb-4">
                             <i class="fas fa-info-circle text-blue-500 mr-1"></i>
                             {{ _('Import documents from the connected external document API. Filter by document type, year, and country.') }}
@@ -402,25 +399,41 @@
                             </button>
                         </div>
                     </div>
-                    <div id="ifrcApiScrollArea" class="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
-                    <div id="ifrcLoading" class="hidden text-center py-4 flex-shrink-0">
-                        <div class="inline-flex items-center space-x-3">
-                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                            <span class="text-sm text-gray-600">{{ _('Loading documents from IFRC API...') }}</span>
+                    <div id="ifrcApiScrollArea" class="flex flex-col flex-1 min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-6 pb-6">
+                        <div id="ifrcLoading" class="hidden text-center py-4 flex-shrink-0">
+                            <div class="inline-flex items-center space-x-3">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                <span class="text-sm text-gray-600">{{ _('Loading documents from IFRC API...') }}</span>
+                            </div>
+                        </div>
+                        <p id="ifrcDocumentsEmptyHint" class="text-sm text-gray-500 py-2 pr-2 flex-shrink-0">{{ _('Click Search or Refresh to load documents from the IFRC API.') }}</p>
+                        <div id="ifrcDocumentsFetchError" class="hidden flex-shrink-0 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div>
+                        <div id="ifrcDocumentsGridShell" class="hidden relative flex flex-col flex-1 min-h-0 overflow-hidden">
+                            {{ ag_grid_container('ifrcDocumentsGrid', show_placeholder=false, include_card=false, grid_height='480px') }}
                         </div>
                     </div>
-                    <p id="ifrcDocumentsEmptyHint" class="text-sm text-gray-500 py-2 pr-2 flex-shrink-0">{{ _('Click Search or Refresh to load documents from the IFRC API.') }}</p>
-                    <div id="ifrcDocumentsFetchError" class="hidden flex-shrink-0 mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert"></div>
-                    <div id="ifrcDocumentsGridShell" class="hidden relative flex flex-col flex-1 min-h-0 overflow-hidden">
-                        {{ ag_grid_container('ifrcDocumentsGrid', show_placeholder=false, include_card=false, grid_height='480px') }}
-                    </div>
-                    <div id="ifrcActions" class="hidden mt-4 pt-4 border-t border-gray-200 flex justify-end flex-shrink-0">
-                        <button type="button" class="btn btn-success" id="ifrcImportSelectedBtn" disabled>
-                            <i class="fas fa-download mr-2"></i> {{ _('Import Selected') }}
-                        </button>
-                    </div>
-                    </div>
                 </div>
+                </div>
+
+                <div id="uploadImportModalFooter" class="upload-import-modal-footer hidden flex-shrink-0">
+                    <div id="importTabFooter" class="upload-import-tab-footer hidden w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p id="importSelectedSummary" class="text-sm text-gray-600 m-0 min-w-0"></p>
+                        <div class="flex flex-row-reverse flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+                            <button type="button" class="btn btn-primary" id="processSelectedBtn" disabled>
+                                <i class="fas fa-robot mr-2"></i> {{ _('Process Selected') }}
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="importTabCancelBtn">{{ _('Cancel') }}</button>
+                        </div>
+                    </div>
+                    <div id="ifrcTabFooter" class="upload-import-tab-footer hidden w-full flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p id="ifrcSelectedSummary" class="text-sm text-gray-600 m-0 min-w-0"></p>
+                        <div class="flex flex-row-reverse flex-wrap items-center gap-2 sm:gap-3 shrink-0">
+                            <button type="button" class="btn btn-primary" id="ifrcImportSelectedBtn" disabled>
+                                <i class="fas fa-download mr-2"></i> {{ _('Import Selected') }}
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="ifrcTabCancelBtn">{{ _('Cancel') }}</button>
+                        </div>
+                    </div>
                 </div>
 {% endcall %}
 
@@ -527,6 +540,11 @@
 window.aiDocumentsConfig = window.aiDocumentsConfig || {};
 window.aiDocumentsConfig.debug = {{ config.DEBUG | default(false) | tojson }};
 window.aiDocumentsConfig.perPage = 50;
+window.aiDocumentsConfig.urls = {
+  importSystemBulk: {{ url_for('ai_management.import_system_bulk')|tojson }},
+  importSystemBulkStatus: {{ url_for('ai_management.import_system_bulk_status', job_id='__JOB__')|tojson }},
+  importSystemBulkCancel: {{ url_for('ai_management.import_system_bulk_cancel', job_id='__JOB__')|tojson }}
+};
 window.aiDocumentsConfig.urls = {
   documentsList: {{ url_for('ai_documents.list_documents')|tojson }},
 };
@@ -666,6 +684,8 @@ window.aiDocumentsConfig.t = {
   reprocessing_started_5259d906: {{ _('Reprocessing started')|tojson }},
   resolution_b5a4b64b: {{ _('Resolution')|tojson }},
   resuming_09136a9d: {{ _('Resuming...')|tojson }},
+  import_footer_none_selected_a4c8e2b1: {{ _('Select documents in the grid')|tojson }},
+  import_footer_selected_count_b7d3f9a2: {{ _('{count} selected')|tojson }},
   selected_91b442d3: {{ _('Selected')|tojson }},
   showing_count_of_total_8f3c1a2b: {{ _('Showing {returned} of {total} matching documents. Refine search to see more.')|tojson }},
   situation_report_eb2802e8: {{ _('Situation Report')|tojson }},

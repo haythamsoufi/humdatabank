@@ -13,6 +13,43 @@ class TestApiData:
         resp = client.get("/api/v1/data")
         assert resp.status_code in (401, 403)
 
+    def test_get_data_public_scoped_without_auth(self, client, db_session, app):
+        from tests.unit.test_services.test_data_retrieval_form import _make_full_setup
+
+        with app.app_context():
+            _, template, _, ind, _, _, _, fd = _make_full_setup(
+                db_session,
+                status="submitted",
+                value="42",
+                period_name="Annual Report 2024",
+            )
+            template_id = template.id
+            indicator_bank_id = ind.id
+            form_data_id = fd.id
+
+        resp = client.get(
+            f"/api/v1/data?indicator_bank_id={indicator_bank_id}&template_id={template_id}"
+        )
+        assert resp.status_code == 200
+        assert resp.headers.get("X-Public-Data-Access") == "true"
+        payload = resp.get_json()
+        assert isinstance(payload, dict)
+        assert "data" in payload
+        assert any(row.get("id") == form_data_id for row in (payload.get("data") or []))
+
+    def test_get_data_public_blocks_analysis_without_auth(self, client, db_session, app):
+        from tests.unit.test_services.test_data_retrieval_form import _make_full_setup
+
+        with app.app_context():
+            _, template, _, ind, _, _, _, _ = _make_full_setup(db_session)
+            template_id = template.id
+            indicator_bank_id = ind.id
+
+        resp = client.get(
+            f"/api/v1/data?indicator_bank_id={indicator_bank_id}&template_id={template_id}&analysis=true"
+        )
+        assert resp.status_code == 401
+
     def test_get_data_contract_with_api_key_query_param(self, client, api_key):
         _api_key_obj, full_key = api_key
         resp = client.get(f"/api/v1/data?api_key={full_key}")

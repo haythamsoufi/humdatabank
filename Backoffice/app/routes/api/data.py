@@ -55,6 +55,10 @@ from app.services.security.api_authentication import (
     apply_user_template_scoping,
     apply_api_key_data_scoping,
 )
+from app.services.security.public_data_access import (
+    PUBLIC_DATA_MAX_PER_PAGE,
+    validate_public_data_request,
+)
 from app.utils.api_pagination import (
     parse_date_range, get_sort_params, validate_data_endpoint_params,
     validate_pagination_params,
@@ -1032,6 +1036,8 @@ def get_all_data():
     Authentication (one of):
       - Authorization: Bearer YOUR_API_KEY (full access, paginated response)
       - HTTP Basic auth or session (user-scoped access, no pagination)
+      - No auth when scoped filters are present (public-privacy form items only;
+        pagination required; see public_data_access module)
     Query Parameters:
         - template_id, assignment_id, submission_id, item_id, stable_key, version_scope, item_type,
           country_id, country_iso2, country_iso3, submission_type, period_name, indicator_bank_id: filters
@@ -1044,12 +1050,19 @@ def get_all_data():
     try:
         layout = _parse_tables_layout_param()
 
-        # Authenticate request
+        # Authenticate request (or allow scoped public read — privacy='public' items only)
+        public_data_access = False
         auth_result = authenticate_api_request()
-        # Check if it's an error response (has status_code attribute)
         if hasattr(auth_result, 'status_code'):
-            return auth_result  # Return error response
-        elevated_access, auth_user, api_key_record = auth_result
+            public_err = validate_public_data_request(request.args)
+            if public_err is not None:
+                return auth_result
+            public_data_access = True
+            elevated_access = False
+            auth_user = None
+            api_key_record = None
+        else:
+            elevated_access, auth_user, api_key_record = auth_result
 
         analysis_requested = str(request.args.get('analysis', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
         if analysis_requested and not elevated_access and auth_user is not None:
@@ -1207,14 +1220,16 @@ def get_all_data():
 
         # API key auth always paginates. Session auth paginates when per_page is requested
         # (e.g. data explorer sends per_page=10000); otherwise return all accessible rows.
-        should_paginate = elevated_access
+        # Public anonymous access always paginates (capped page size).
+        should_paginate = elevated_access or public_data_access
 
         # Validate and sanitize parameters
         if should_paginate:
-            # API key auth: use pagination parameters
             validated_params = validate_data_endpoint_params(request.args)
             page = validated_params['page']
             per_page = validated_params['per_page']
+            if public_data_access:
+                per_page = min(int(per_page), PUBLIC_DATA_MAX_PER_PAGE)
         else:
             page = 1
             per_page = None
@@ -1845,6 +1860,9 @@ def get_all_data():
         # Optionally fetch dynamic indicator and repeat section data, folding their
         # form_item_ids into the related form_items table.
         include_dynamic, include_repeat = _parse_include_flags(request.args)
+        if public_data_access:
+            include_dynamic = False
+            include_repeat = False
         array_catalog = _build_data_array_catalog(
             include_dynamic=include_dynamic,
             include_repeat=include_repeat,
@@ -1929,7 +1947,25 @@ def get_all_data():
             ]
         )
         if layout == 'star':
-            return _build_star_data_response(
+            response = _build_star_data_response(
+                data_rows,
+                form_items_table,
+                countries_table,
+                national_societies_table,
+                indicator_bank_table,
+                matrix_cells,
+                should_paginate=should_paginate,
+                total_items=total_items,
+                page=page,
+                per_page=per_page,
+                expansion_failed=expansion_failed,
+                extra=extra_keys or None,
+                assignment_statuses=assignment_statuses_table,
+                scope_meta=scope_meta,
+                array_catalog=array_catalog,
+            )
+        else:
+            response = _build_flat_data_response(
                 data_rows,
                 form_items_table,
                 countries_table,
@@ -1947,23 +1983,10 @@ def get_all_data():
                 array_catalog=array_catalog,
             )
 
-        return _build_flat_data_response(
-            data_rows,
-            form_items_table,
-            countries_table,
-            national_societies_table,
-            indicator_bank_table,
-            matrix_cells,
-            should_paginate=should_paginate,
-            total_items=total_items,
-            page=page,
-            per_page=per_page,
-            expansion_failed=expansion_failed,
-            extra=extra_keys or None,
-            assignment_statuses=assignment_statuses_table,
-            scope_meta=scope_meta,
-            array_catalog=array_catalog,
-        )
+        if public_data_access and hasattr(response, 'headers'):
+            response.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=60'
+            response.headers['X-Public-Data-Access'] = 'true'
+        return response
     except Exception as e:
         error_id = str(uuid.uuid4())
         current_app.logger.error(

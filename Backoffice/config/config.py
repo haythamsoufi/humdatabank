@@ -1104,6 +1104,11 @@ class Config:
     # Base URL for admin links in emails
     BASE_URL = os.environ.get('BASE_URL', 'http://localhost:5000')
 
+    # External Humanitarian Databank MCP server (streamable-http). When set, GET/POST /mcp
+    # on this app is reverse-proxied to that host (path preserved). Example:
+    # https://ifrc-databank-mcp-staging.azurewebsites.net
+    MCP_UPSTREAM_URL = (os.environ.get('MCP_UPSTREAM_URL') or '').strip().rstrip('/')
+
     # Notification TTL configuration (days to keep notifications before expiration)
     # Default is 90 days if not specified for a notification type
     NOTIFICATION_TTL_DAYS = {

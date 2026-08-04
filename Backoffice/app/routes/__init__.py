@@ -22,6 +22,7 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     from app.routes import forms_api as forms_api_bp
     from app.routes import plugins as plugins_api_bp
     from app.routes import public as public_bp
+    from app.routes import mcp as mcp_bp
     from app.routes import notifications as notifications_bp
     from app.routes.api import register_api_blueprints, api_bp
     from app.routes.ai import ai_bp
@@ -43,6 +44,8 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     app.register_blueprint(forms_api_bp.bp)
     app.register_blueprint(plugins_api_bp.bp)
     app.register_blueprint(public_bp.bp)
+    app.register_blueprint(mcp_bp.bp)
+    csrf.exempt(mcp_bp.bp)
     app.register_blueprint(notifications_bp.bp)
     register_api_blueprints(app)
 

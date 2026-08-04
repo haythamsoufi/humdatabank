@@ -119,7 +119,7 @@ jobs:
           req = urllib.request.Request(
               f"https://{host}/api/sitecontainers/main",
               data=payload,
-              method=PUT,
+              method="PUT",
               headers={
                   "Authorization": f"Basic {token}",
                   "Content-Type": "application/json",
@@ -135,7 +135,7 @@ jobs:
 
           restart_req = urllib.request.Request(
               f"https://{host}/api/app/restart",
-              method=POST,
+              method="POST",
               headers={"Authorization": f"Basic {token}"},
           )
           with urllib.request.urlopen(restart_req, timeout=60):

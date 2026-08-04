@@ -84,12 +84,63 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      - name: Deploy MCP to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: ifrc-databank-mcp-staging
-          images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}
-          publish-profile: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
+      - name: Deploy MCP container via Azure CLI
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
+        run: |
+          set -euo pipefail
+          python3 << 'PY'
+          import base64
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+          import xml.etree.ElementTree as ET
+
+          profile = (os.environ.get("PUBLISH_PROFILE") or "").strip()
+          if not profile:
+              print("ERROR: AZURE_MCP_PUBLISH_PROFILE is not set.")
+              sys.exit(1)
+
+          root = ET.fromstring(profile)
+          entry = next(
+              p for p in root.findall("publishProfile")
+              if p.get("publishMethod") == "MSDeploy"
+          )
+          host = entry.get("publishUrl", "").split(":")[0]
+          user = entry.get("userName", "")
+          pwd = entry.get("userPWD", "")
+          token = base64.b64encode(f"{user}:{pwd}".encode()).decode()
+
+          image = f"${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}"
+          payload = (
+              '{"properties":{"linuxFxVersion":"DOCKER|' + image + '"}}'
+          ).encode()
+          req = urllib.request.Request(
+              f"https://{host}/api/sitecontainers/main",
+              data=payload,
+              method=PUT,
+              headers={
+                  "Authorization": f"Basic {token}",
+                  "Content-Type": "application/json",
+              },
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  print(resp.read().decode()[:500])
+          except urllib.error.HTTPError as exc:
+              body = exc.read().decode() if exc.fp else ""
+              print(f"ERROR: HTTP {exc.code} updating container image: {body[:500]}")
+              sys.exit(1)
+
+          restart_req = urllib.request.Request(
+              f"https://{host}/api/app/restart",
+              method=POST,
+              headers={"Authorization": f"Basic {token}"},
+          )
+          with urllib.request.urlopen(restart_req, timeout=60):
+              print("Restarted ifrc-databank-mcp-staging")
+          PY
 
       - name: Deployment summary
         run: |

@@ -91,7 +91,8 @@ def nl2br(value):
         return ''
     # First escape HTML to prevent XSS, then convert newlines to <br>
     escaped = escape(str(value))
-    return Markup(str(escaped).replace('\n', '<br>'))
+    normalized = str(escaped).replace('\r\n', '\n').replace('\r', '\n')
+    return Markup(normalized.replace('\n', '<br>'))
 
 
 def profile_initials_filter(user):

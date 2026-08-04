@@ -13,6 +13,11 @@ from app.utils.form_localization import build_template_select_choices
 from app.models.rbac import RbacUserRole, RbacRole, RbacRolePermission, RbacPermission
 from app.models.enums import AssignmentEntityStatusValue
 from ..base import BaseForm
+from app.models.assignments import (
+    SUBMISSION_REVIEW_RECIPIENT_FDS,
+    SUBMISSION_REVIEW_RECIPIENT_SPECIFIC,
+    SUBMISSION_REVIEW_RECIPIENT_MODES,
+)
 
 
 class AssignedFormForm(BaseForm):
@@ -50,6 +55,16 @@ class AssignedFormForm(BaseForm):
         coerce=lambda x: int(x) if x and str(x).isdigit() else None,
         validators=[Optional()],
     )
+
+    submission_review_recipient_mode = SelectField(
+        "Submission review notification",
+        choices=[
+            (SUBMISSION_REVIEW_RECIPIENT_FDS, "Designated FDS member for the submitting country"),
+            (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, "Specific IFRC admin"),
+        ],
+        default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+    )
+    submission_review_recipient_user_id = HiddenField(validators=[Optional()])
 
     # Duplicate confirmation (used by client/server guard when template+period already exists)
     confirm_duplicate = HiddenField(default="0")
@@ -93,6 +108,24 @@ class AssignedFormForm(BaseForm):
             valid_owner_ids = {owner_id for owner_id, _ in self.data_owner_id.choices if owner_id}
             if current_user.id in valid_owner_ids:
                 self.data_owner_id.data = current_user.id
+
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators):
+            return False
+        if self.submission_review_recipient_mode.data == SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
+            raw_uid = self.submission_review_recipient_user_id.data
+            if not raw_uid or not str(raw_uid).strip().isdigit():
+                self.submission_review_recipient_user_id.errors.append(
+                    "Select an IFRC admin to notify when submissions arrive."
+                )
+                return False
+            user = User.query.filter_by(id=int(raw_uid), active=True).first()
+            if not user:
+                self.submission_review_recipient_user_id.errors.append(
+                    "Selected reviewer must be an active user."
+                )
+                return False
+        return True
 
 
 class AssignmentEntityStatusForm(BaseForm):

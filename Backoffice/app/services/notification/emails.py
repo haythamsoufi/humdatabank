@@ -888,6 +888,109 @@ def retry_email_delivery_log(log):
         return False
 
 
+def send_assignment_submitted_team_email(
+    *,
+    user_ids,
+    assignment_title: str,
+    submitter_name: str,
+    related_url: str,
+    notification_by_user_id=None,
+):
+    """
+    Send one team email to all entity focal points (visible To list), separate from per-user in-app notifications.
+    """
+    from app.models import User, NotificationType
+    from app.services.notification.core import translate_notification_message
+
+    notification_by_user_id = notification_by_user_id or {}
+    user_ids = [int(uid) for uid in (user_ids or []) if uid is not None]
+    if not user_ids:
+        return False
+
+    users = User.query.filter(User.id.in_(user_ids), User.active.is_(True)).all()
+    recipient_emails = sorted({u.email for u in users if u.email})
+    if not recipient_emails:
+        return False
+
+    locale = 'en'
+    params = {
+        'assignment_title': assignment_title,
+        'submitter_name': submitter_name,
+    }
+    title = translate_notification_message(
+        'notification.assignment_submitted.team_email.title', params, locale=locale
+    )
+    message = translate_notification_message(
+        'notification.assignment_submitted.team_email.message', params, locale=locale
+    )
+
+    class _TeamEmailNotification:
+        notification_type = NotificationType.assignment_submitted
+        priority = 'normal'
+        related_url = related_url
+
+        def __init__(self, email_title, email_message):
+            self.title = email_title
+            self.message = email_message
+
+    pseudo_notification = _TeamEmailNotification(title, message)
+    subject = _instant_notification_subject(pseudo_notification, locale)
+    i18n = _build_instant_email_i18n(locale, '', False, 'assignment_submitted')
+    i18n['greeting'] = _with_user_locale(locale, lambda g: g('Hello,')) or 'Hello,'
+
+    base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
+    org_name = get_org_name()
+    sanitized_notification = {
+        'title': sanitize_for_email(title),
+        'message': sanitize_for_email(message),
+        'notification_type': NotificationType.assignment_submitted,
+        'priority': 'normal',
+        'related_url': related_url,
+    }
+    body = _get_instant_template().render(
+        user={'name': '', 'email': ''},
+        notification=sanitized_notification,
+        base_url=base_url,
+        org_name=org_name,
+        is_action_required=False,
+        **i18n,
+    )
+
+    filtered_out = []
+    success = send_email(
+        subject=subject,
+        recipients=recipient_emails,
+        html=body,
+        sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+        expose_recipients_in_to=True,
+        _filtered_out=filtered_out,
+    )
+    if not success and not filtered_out:
+        current_app.logger.error(
+            "[EMAIL_NOTIFICATION] Failed to send assignment submitted team email to %d focal point(s)",
+            len(recipient_emails),
+        )
+        return False
+
+    for user in users:
+        if not user.email:
+            continue
+        linked = notification_by_user_id.get(user.id)
+        log = log_email_attempt(
+            linked.id if linked else None,
+            user.id,
+            user.email,
+            subject,
+        )
+        if success:
+            mark_email_sent(log.id)
+        elif filtered_out:
+            pass
+        else:
+            mark_email_failed(log.id, "Team email send returned False", retry=False)
+    return success or bool(filtered_out)
+
+
 def send_instant_notification_email(user, notification, override_preferences=False):
     """
     Send instant email notification for a single notification.
@@ -1000,6 +1103,11 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
                 tp['submitter_name'] = 'A focal point'
             if 'period' not in tp:
                 tp['period'] = '—'
+        if title_key in NotificationService._ASSIGNMENT_TITLE_KEYS:
+            tp = NotificationService._ensure_assignment_title_param(notif, tp, locale=locale)
+        if title_key == 'notification.assignment_submitted.title':
+            if 'submitter_name' not in tp:
+                tp['submitter_name'] = 'A focal point'
         if title_key in NotificationService._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
             tp = NotificationService._ensure_country_param(notif, tp, title_key)
         if title_key in (
@@ -1024,6 +1132,18 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
             message_params = NotificationService._ensure_country_param(notif, message_params, message_key)
         if message_key in NotificationService._ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS:
             message_params = NotificationService._ensure_assignment_sent_for_review_params(message_params)
+        if message_key in (
+            'notification.assignment_submitted.message',
+            'notification.assignment_submitted.admin.message',
+        ):
+            if 'submitter_name' not in message_params:
+                message_params['submitter_name'] = 'A focal point'
+            if 'period' not in message_params:
+                message_params['period'] = '—'
+        if message_key in NotificationService._ASSIGNMENT_TITLE_KEYS:
+            message_params = NotificationService._ensure_assignment_title_param(
+                notif, message_params, locale=locale
+            )
         with force_locale(locale):
             title = translate_notification_message(title_key, tp, locale=locale) if title_key else notif.title
             message = translate_notification_message(message_key, message_params, locale=locale) if message_key else notif.message

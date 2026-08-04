@@ -1303,6 +1303,9 @@ def _export_pdf_impl(aes_id):
                 word-wrap: break-word;
                 display: block;
             }
+            .field-value-multiline {
+                line-height: 1.4;
+            }
 
             .disaggregation-caption {
                 font-size: 9pt;

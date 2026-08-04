@@ -25,6 +25,21 @@
         </div>
     </header>
 
+    {% macro render_scalar_field_value(value, field_type='', flag_class='') %}
+        {% set ft = (field_type|string|lower) if field_type else '' %}
+        <span class="field-value{{ flag_class }}{% if ft == 'textarea' %} field-value-multiline{% endif %}">
+            {%- if ft == 'textarea' -%}
+                {{- value | nl2br -}}
+            {%- else -%}
+                {{- value | format_number -}}
+            {%- endif -%}
+        </span>
+    {% endmacro %}
+
+    {% macro field_prefill_flag_class(field_is_imputed=false, field_is_prefilled=false, field_is_carry_forward=false) -%}
+        {%- if field_is_imputed -%} field-value-imputed{%- elif field_is_prefilled or field_is_carry_forward -%} field-value-prefilled{%- endif -%}
+    {%- endmacro %}
+
     {% macro render_section(section, level=0, root_heading='h3') %}
         <section class="section {{ 'subsection' if level > 0 else '' }}">
             {% if level == 0 %}
@@ -128,6 +143,11 @@
                     {% set is_required = true if required_raw else false %}
                 {% endif %}
 
+                {% set _field_type = field.type if field.type is defined else '' %}
+                {% if (not _field_type or _field_type|string|trim == '' or _field_type|string|lower == 'none') and field.model is defined and field.model %}
+                    {% set _field_type = field.model.type %}
+                {% endif %}
+                {% set _prefill_class = field_prefill_flag_class(field_is_imputed, field_is_prefilled, field_is_carry_forward) %}
                 {% set _field_label = field.display_label if field.display_label is defined else (field.label if field.label is defined else '') %}
                 {% set _has_field_label = _field_label and _field_label|string|trim %}
                 {% if _has_field_label %}
@@ -546,14 +566,14 @@
                                     <span class="{{ 'not-reported' if is_required else 'not-reported-optional' }}">{{ _('Not Reported') }}</span>
                                 {% endif %}
                             {% else %}
-                                <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ value | format_number }}</span>
+                                {{ render_scalar_field_value(value, _field_type, _prefill_class) }}
                             {% endif %}
                         {% elif field.kind == 'question' %}
-                            <span class="field-value{% if field_is_imputed %} field-value-imputed{% elif field_is_prefilled or field_is_carry_forward %} field-value-prefilled{% endif %}">{{ value | format_number }}</span>
+                            {{ render_scalar_field_value(value, _field_type, _prefill_class) }}
                         {% elif field.kind == 'document' %}
                             <span class="field-value document-note">{{ _('See documents in the web interface') }}</span>
                         {% else %}
-                            <span class="field-value">{{ value | format_number }}</span>
+                            {{ render_scalar_field_value(value, _field_type, '') }}
                         {% endif %}
                     </div>
                 </div>

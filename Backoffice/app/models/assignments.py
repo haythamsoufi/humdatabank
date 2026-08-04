@@ -5,6 +5,13 @@ import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+SUBMISSION_REVIEW_RECIPIENT_FDS = 'fds_member'
+SUBMISSION_REVIEW_RECIPIENT_SPECIFIC = 'specific_admin'
+SUBMISSION_REVIEW_RECIPIENT_MODES = frozenset({
+    SUBMISSION_REVIEW_RECIPIENT_FDS,
+    SUBMISSION_REVIEW_RECIPIENT_SPECIFIC,
+})
 from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, JSON, and_, or_
 from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
@@ -68,11 +75,25 @@ class AssignedForm(db.Model):
     # Data ownership governance
     data_owner_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
 
+    # IFRC reviewer notified when an entity submits (default: country FDS member).
+    submission_review_recipient_mode = Column(
+        String(20),
+        nullable=False,
+        default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+        server_default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+    )
+    submission_review_recipient_user_id = Column(
+        Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True
+    )
+
     # Activation audit — who toggled is_active or closed/reopened this assignment
     activated_by_user_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     deactivated_by_user_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
 
     data_owner_user = relationship('User', foreign_keys=[data_owner_id])
+    submission_review_recipient_user = relationship(
+        'User', foreign_keys=[submission_review_recipient_user_id]
+    )
     activated_by_user = relationship('User', foreign_keys=[activated_by_user_id])
     deactivated_by_user = relationship('User', foreign_keys=[deactivated_by_user_id])
 
@@ -98,6 +119,7 @@ class AssignedForm(db.Model):
         db.Index('ix_assigned_form_assigned_at', 'assigned_at'),
         db.Index('ix_assigned_form_is_active', 'is_active'),
         db.Index('ix_assigned_form_data_owner', 'data_owner_id'),
+        db.Index('ix_assigned_form_submission_review_recipient', 'submission_review_recipient_user_id'),
         db.Index('ix_assigned_form_activated_by', 'activated_by_user_id'),
         db.Index('ix_assigned_form_deactivated_by', 'deactivated_by_user_id'),
         db.Index('ix_assigned_form_custom_name', 'custom_name'),

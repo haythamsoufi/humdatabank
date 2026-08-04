@@ -193,7 +193,7 @@ async autoLoadEntities(fieldId) {
             // For reverse lookup (entities_containing), use variable resolution once and collect entities from ALL variable columns
             debugLog('matrix-handler', '[AUTO-LOAD] Using reverse lookup via variable resolution (all variable columns)');
 
-            const response = await _mhFetch('/api/v1/variables/resolve', {
+            const response = await mhFetch('/api/v1/variables/resolve', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -276,7 +276,7 @@ async autoLoadEntities(fieldId) {
             }
 
             if (subRequests.length > 0) {
-                const batchResponse = await _mhFetch('/api/v1/matrix/auto-load-entities/batch', {
+                const batchResponse = await mhFetch('/api/v1/matrix/auto-load-entities/batch', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -334,7 +334,7 @@ async autoLoadEntities(fieldId) {
 
             let resultsByEntityId = {};
             try {
-                const resolveResponse = await _mhFetch('/api/v1/variables/resolve', {
+                const resolveResponse = await mhFetch('/api/v1/variables/resolve', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -425,7 +425,7 @@ async autoLoadEntities(fieldId) {
         try {
             // Call search endpoint to get entity data with names
             // Request up to 200 options to reduce chance of missing entities
-            const response = await _mhFetch('/forms/matrix/search-rows', {
+            const response = await mhFetch('/forms/matrix/search-rows', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -548,7 +548,7 @@ async autoLoadEntities(fieldId) {
                                     }
                                 });
 
-                                const searchResponse = await _mhFetch('/forms/matrix/search-rows', {
+                                const searchResponse = await mhFetch('/forms/matrix/search-rows', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
@@ -618,7 +618,7 @@ async autoLoadEntities(fieldId) {
                                                 value: String(missingId)  // Backoffice does string comparison
                                             });
 
-                                            const altResponse = await _mhFetch('/forms/matrix/search-rows', {
+                                            const altResponse = await mhFetch('/forms/matrix/search-rows', {
                                                 method: 'POST',
                                                 headers: {
                                                     'Content-Type': 'application/json',

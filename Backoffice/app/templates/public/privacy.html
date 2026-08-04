@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title }} — {{ ORG_NAME }}</title>
+    <link rel="icon" href="{{ org_visual_asset_url((ORGANIZATION_BRANDING or {}).get('organization_favicon_path'), 'favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
+    <style nonce="{{ csp_style_nonce() }}">
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .privacy-content h2 { margin-top: 1.75rem; margin-bottom: 0.75rem; font-size: 1.25rem; font-weight: 600; color: #0f172a; }
+        .privacy-content h3 { margin-top: 1.25rem; margin-bottom: 0.5rem; font-size: 1.05rem; font-weight: 600; color: #1e293b; }
+        .privacy-content p, .privacy-content li { color: #334155; line-height: 1.65; margin-bottom: 0.75rem; }
+        .privacy-content ul { list-style: disc; padding-left: 1.25rem; margin-bottom: 1rem; }
+        .privacy-content a { color: #b91c1c; text-decoration: underline; }
+        .privacy-content code { background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.9em; }
+        @media (min-width: 768px) {
+            .privacy-main { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+            .privacy-article { padding: 2.5rem; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased{% if show_staging_banner %} has-staging-banner{% endif %}">
+    {% include 'components/_staging_environment_banner.html' %}
+    {% set _org_logo = ((ORGANIZATION_BRANDING or {}).get('organization_favicon_path') or 'favicon.svg')|trim %}
+
+    <header class="bg-gray-900 text-white py-6 px-4 md:px-12">
+        <div class="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <a href="{{ url_for('public.landing_page') }}" class="flex items-center gap-3 font-semibold">
+                <img src="{{ org_visual_asset_url(_org_logo, 'favicon.svg') }}" alt="{{ ORG_NAME }}" class="h-9 w-auto">
+                <span class="hidden sm:inline">{{ ORG_NAME }}</span>
+            </a>
+            <a href="{{ url_for('auth.login') }}" class="text-sm font-medium underline">Portal login</a>
+        </div>
+    </header>
+
+    <main class="privacy-main max-w-4xl mx-auto px-4 md:px-12 py-10">
+        <article class="privacy-article bg-white shadow-sm rounded-xl p-6 privacy-content max-w-none">
+            {{ content_html }}
+        </article>
+        <p class="text-center text-sm text-gray-500 mt-8">&copy; {{ current_year }} {{ ORG_NAME }}</p>
+    </main>
+</body>
+</html>

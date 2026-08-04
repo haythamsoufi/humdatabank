@@ -13,6 +13,24 @@ from app.utils.api_helpers import api_error
 
 PUBLIC_DATA_MAX_PER_PAGE = 5000
 
+# Fact-row fields kept when include_dimensions is not requested (AI / Custom GPT integrations).
+PUBLIC_DATA_SLIM_ROW_FIELDS = frozenset(
+    {
+        'id',
+        'field_type',
+        'data_type',
+        'submission_type',
+        'submission_id',
+        'form_item_id',
+        'template_id',
+        'period_name',
+        'country_id',
+        'value',
+        'num_value',
+        'data_status',
+    }
+)
+
 
 def _truthy_flag(value: Any) -> bool:
     return str(value or '').strip().lower() in ('1', 'true', 'yes', 'y')
@@ -63,6 +81,21 @@ def public_data_scope_present(args: Mapping[str, Any]) -> bool:
     if _arg_int(args, 'item_id'):
         return True
     return False
+
+
+def public_include_dimensions(args: Mapping[str, Any]) -> bool:
+    """Public callers omit heavy dimension tables unless include_dimensions=true."""
+    return _truthy_flag(args.get('include_dimensions'))
+
+
+def slim_public_data_rows(rows: list) -> list:
+    """Project fact rows to a compact shape for public API consumers."""
+    slimmed = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        slimmed.append({key: row.get(key) for key in PUBLIC_DATA_SLIM_ROW_FIELDS if key in row})
+    return slimmed
 
 
 def validate_public_data_request(args: Mapping[str, Any]):

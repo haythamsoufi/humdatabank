@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ ORG_NAME }}</title>
+    <link rel="icon" href="{{ org_visual_asset_url((ORGANIZATION_BRANDING or {}).get('organization_favicon_path'), 'favicon.svg') }}" type="image/svg+xml">
     <!-- Tailwind output + FontAwesome -->
     <link rel="stylesheet" href="{{ static_url('css/output.css') }}">
     <link rel="stylesheet" href="{{ static_url('libs/fontawesome-6.5.0.min.css') }}">
@@ -54,13 +55,15 @@
 </head>
 <body class="bg-gray-50 text-gray-800 antialiased{% if show_staging_banner %} has-staging-banner{% endif %}">
     {% include 'components/_staging_environment_banner.html' %}
+    {% set _org_logo = ((ORGANIZATION_BRANDING or {}).get('organization_logo_path') or 'logo.svg')|trim %}
+    {% set _org_favicon = ((ORGANIZATION_BRANDING or {}).get('organization_favicon_path') or 'favicon.svg')|trim %}
 
     <!-- Integrated Header -->
     <header class="absolute top-0 left-0 right-0 z-30 py-8 px-4 md:px-12">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <a href="#" class="flex items-center gap-3 font-semibold text-white">
-                <img src="{{ static_url('IFRC_logo.svg') }}" alt="IFRC Logo" class="h-10 w-auto">
-                <span class="hidden sm:inline">Network Databank</span>
+            <a href="{{ url_for('public.landing_page') }}" class="flex items-center gap-3 font-semibold text-white">
+                <img src="{{ org_visual_asset_url(_org_favicon, 'favicon.svg') }}" alt="{{ ORG_NAME }}" class="h-10 w-auto">
+                <span class="hidden sm:inline">{{ ORG_SHORT_NAME or ORG_NAME }}</span>
             </a>
             <a href="{{ url_for('auth.login') }}" class="px-6 py-3 rounded-lg bg-white text-blue-900 font-semibold hover:bg-gray-200 transition shadow-md text-base">
                 <span class="hidden sm:inline">Portal Login</span>
@@ -74,7 +77,7 @@
         <div class="blur-bg"></div>
         <canvas id="network-canvas"></canvas>
         <div class="relative z-10 max-w-2xl mx-auto px-6 py-20 text-center flex flex-col items-center">
-            <img src="{{ static_url('IFRC_logo.svg') }}" alt="IFRC Logo" class="h-24 w-auto mb-8" data-animate>
+            <img src="{{ org_visual_asset_url(_org_logo, 'logo.svg') }}" alt="{{ ORG_NAME }}" class="h-24 w-auto mb-8" data-animate>
             <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6 md:mb-8 text-white" data-animate>
                 Uniting Data. Empowering Action.
             </h1>
@@ -126,7 +129,7 @@
         <div class="max-w-6xl mx-auto px-6">
             <div class="grid md:grid-cols-2 gap-x-20 gap-y-14 items-center">
                 <div class="relative" data-animate>
-                    <img src="{{ static_url('IFRC_logo.png') }}" alt="IFRC Community" class="w-full rounded-2xl shadow-2xl relative z-10">
+                    <img src="{{ static_url('IFRC_logo_horizontal.svg') }}" alt="{{ ORG_NAME }}" class="w-full rounded-2xl shadow-2xl relative z-10">
                     <div class="hidden md:block absolute top-1/2 -left-24 -translate-y-1/2 w-80 h-80 bg-blue-50 rounded-full -z-0"></div>
                 </div>
                 <div data-animate>

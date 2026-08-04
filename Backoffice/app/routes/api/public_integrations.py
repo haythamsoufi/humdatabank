@@ -98,6 +98,12 @@ def public_search_documents():
         full_coverage = full_coverage_raw in {"1", "true", "yes"}
         page = request.args.get("page", default=1, type=int)
         per_page = request.args.get("per_page", default=80, type=int)
+        latest_per_country_raw = request.args.get("latest_per_country", default="", type=str).strip().lower()
+        latest_per_country = None
+        if latest_per_country_raw in {"1", "true", "yes"}:
+            latest_per_country = True
+        elif latest_per_country_raw in {"0", "false", "no"}:
+            latest_per_country = False
 
         payload = search_public_documents(
             query,
@@ -110,6 +116,7 @@ def public_search_documents():
             full_coverage=full_coverage,
             page=page,
             per_page=per_page,
+            latest_per_country=latest_per_country,
         )
         response = json_response(payload)
         response.headers["Cache-Control"] = "private, no-store"

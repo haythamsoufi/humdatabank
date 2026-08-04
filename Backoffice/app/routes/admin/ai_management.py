@@ -12,7 +12,7 @@ import zipfile
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from flask import Blueprint, render_template, request, current_app, send_file, after_this_request
+from flask import Blueprint, render_template, request, current_app, send_file, after_this_request, redirect, abort
 from flask_login import current_user
 from werkzeug.utils import secure_filename
 from sqlalchemy import func, desc, and_
@@ -259,6 +259,203 @@ def _run_bulk_reprocess_job(app, job_id: str) -> None:
             db.session.commit()
     except Exception as e:
         logger.error("Bulk reprocess job failed: job=%s err=%s", job_id, e, exc_info=True)
+        with app.app_context():
+            from app.models import AIJob
+
+            job = AIJob.query.get(str(job_id))
+            if job:
+                job.status = "failed"
+                job.error = "Processing failed."
+                job.finished_at = utcnow()
+                db.session.commit()
+    finally:
+        _clear_reprocess_job_cancel_event(str(job_id))
+
+
+def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> None:
+    """Process one system-document bulk import job item synchronously."""
+    with app.app_context():
+        from app.models import AIJobItem
+        from app.services.ai.documents.ingest import process_submitted_document_ai_import_sync
+
+        cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
+        item = AIJobItem.query.get(int(item_id))
+        if not item:
+            return
+
+        if cancel_ev.is_set():
+            item.status = "cancelled"
+            item.error = None
+            db.session.commit()
+            return
+
+        payload = item.payload if isinstance(item.payload, dict) else {}
+        submitted_doc_id = payload.get("submitted_document_id")
+        if submitted_doc_id is None and item.entity_type == "submitted_document" and item.entity_id:
+            submitted_doc_id = int(item.entity_id)
+        try:
+            submitted_doc_id = int(submitted_doc_id)
+        except (TypeError, ValueError):
+            item.status = "failed"
+            item.error = "Invalid submitted document ID"
+            db.session.commit()
+            return
+
+        job = None
+        try:
+            from app.models import AIJob
+
+            job = AIJob.query.get(str(job_id))
+        except Exception as e:
+            current_app.logger.debug("System import job lookup failed: %s", e)
+
+        job_user_id = int(job.user_id) if job and job.user_id else None
+
+        item.status = "processing"
+        item.error = None
+        db.session.commit()
+        db.session.remove()
+
+        try:
+            if cancel_ev.is_set():
+                item = AIJobItem.query.get(int(item_id))
+                if item:
+                    item.status = "cancelled"
+                    item.error = None
+                    db.session.commit()
+                return
+
+            result = process_submitted_document_ai_import_sync(
+                submitted_doc_id,
+                user_id=job_user_id,
+            )
+
+            item = AIJobItem.query.get(int(item_id))
+            if not item:
+                return
+
+            ai_doc_id = result.get("ai_document_id")
+            if ai_doc_id:
+                item.entity_type = "ai_document"
+                item.entity_id = int(ai_doc_id)
+                try:
+                    base_payload = item.payload if isinstance(item.payload, dict) else {}
+                    new_payload = dict(base_payload)
+                    new_payload["ai_document_id"] = int(ai_doc_id)
+                    item.payload = new_payload
+                except Exception as e:
+                    current_app.logger.debug("System import item payload update failed: %s", e)
+
+            if cancel_ev.is_set():
+                item.status = "cancelled"
+                item.error = None
+            elif result.get("ok"):
+                item.status = "completed"
+                item.error = None
+            else:
+                item.status = "failed"
+                item.error = result.get("message") or result.get("code") or "Processing failed"
+            db.session.commit()
+        except Exception as e:
+            logger.error(
+                "Bulk system import item failed: job=%s item=%s err=%s",
+                job_id,
+                item_id,
+                e,
+                exc_info=True,
+            )
+            try:
+                item = AIJobItem.query.get(int(item_id))
+                if item:
+                    item.status = "failed"
+                    item.error = "Processing failed."
+                    db.session.commit()
+            except Exception as update_e:
+                current_app.logger.debug("System import item failure update failed: %s", update_e)
+                db.session.rollback()
+
+
+def _run_system_bulk_import_job(app, job_id: str) -> None:
+    """Background runner for system-document bulk import jobs."""
+    with app.app_context():
+        from app.models import AIJob
+
+        job = AIJob.query.get(str(job_id))
+        if not job:
+            return
+        if job.status in ("completed", "failed", "cancelled"):
+            return
+        job.status = "running"
+        job.started_at = utcnow()
+        db.session.commit()
+        logger.info(
+            "Bulk system import job running: job=%s total_items=%s",
+            job_id,
+            int(job.total_items or 0),
+        )
+
+    cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
+    try:
+        with app.app_context():
+            from app.models import AIJob
+
+            job = AIJob.query.get(str(job_id))
+            if not job:
+                return
+            concurrency = int(
+                (job.meta or {}).get("concurrency")
+                or current_app.config.get("AI_DOCS_SYSTEM_IMPORT_CONCURRENCY")
+                or current_app.config.get("AI_DOCS_IFRC_IMPORT_CONCURRENCY", 2)
+            )
+            concurrency = max(1, min(concurrency, 4))
+            item_ids = [it.id for it in (job.items or []) if (it.status or "queued") == "queued"]
+
+        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+            futures = []
+            for item_id in item_ids:
+                if cancel_ev.is_set():
+                    break
+                futures.append(
+                    pool.submit(
+                        _process_system_import_job_item_sync,
+                        app,
+                        job_id=str(job_id),
+                        item_id=int(item_id),
+                    )
+                )
+                import time as _time_job
+
+                _time_job.sleep(0.5)
+            for _f in as_completed(futures):
+                if cancel_ev.is_set():
+                    continue
+
+        with app.app_context():
+            from app.models import AIJob
+
+            job = AIJob.query.get(str(job_id))
+            if not job:
+                return
+            if cancel_ev.is_set() or job.status == "cancel_requested":
+                try:
+                    for it in (job.items or []):
+                        if it.status == "queued":
+                            it.status = "cancelled"
+                            it.error = None
+                    db.session.commit()
+                except Exception as e:
+                    current_app.logger.debug("System import job cancel commit failed: %s", e)
+                    db.session.rollback()
+                job.status = "cancelled"
+            else:
+                terminal = {"completed", "failed", "cancelled"}
+                all_terminal = all((it.status in terminal) for it in (job.items or []))
+                job.status = "completed" if all_terminal else "failed"
+            job.finished_at = utcnow()
+            db.session.commit()
+            logger.info("Bulk system import job finished: job=%s status=%s", job_id, job.status)
+    except Exception as e:
+        logger.error("Bulk system import job failed: job=%s err=%s", job_id, e, exc_info=True)
         with app.app_context():
             from app.models import AIJob
 
@@ -699,7 +896,6 @@ def reprocess_document_metadata(document_id):
     try:
         from app.models import AIDocument
         from app.services.ai.documents.processor import AIDocumentProcessor
-        from app.services.ai.documents.metadata import enrich_document_metadata
 
         doc = AIDocument.query.get_or_404(document_id)
 
@@ -716,8 +912,12 @@ def reprocess_document_metadata(document_id):
                 ocr_enabled=current_app.config.get('AI_OCR_ENABLED', False),
             )
             tables = extracted.get('tables') or []
-            enriched_meta = enrich_document_metadata(
-                title=getattr(doc, 'title', filename),
+            from app.services.ai.documents.submitted_metadata import (
+                apply_enriched_metadata_to_ai_doc,
+                enrich_ai_document_metadata_from_content,
+            )
+            enriched_meta = enrich_ai_document_metadata_from_content(
+                doc,
                 filename=filename,
                 text=extracted.get('text', ''),
                 total_pages=extracted.get('metadata', {}).get('total_pages'),
@@ -726,11 +926,7 @@ def reprocess_document_metadata(document_id):
                 table_extraction_success=len(tables) > 0,
                 source_url=effective_source_url,
             )
-            doc.document_date = enriched_meta.get('document_date')
-            doc.document_language = enriched_meta.get('document_language')
-            doc.document_category = enriched_meta.get('document_category')
-            doc.quality_score = enriched_meta.get('quality_score')
-            doc.source_organization = enriched_meta.get('source_organization')
+            apply_enriched_metadata_to_ai_doc(doc, enriched_meta)
             db.session.commit()
             return json_ok(
                 message='Metadata reprocessed successfully',
@@ -973,7 +1169,6 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
     with app.app_context():
         from app.models import AIDocument, AIJobItem
         from app.services.ai.documents.processor import AIDocumentProcessor
-        from app.services.ai.documents.metadata import enrich_document_metadata
 
         cancel_ev = _get_reprocess_job_cancel_event(job_id)
         item = AIJobItem.query.get(int(item_id))
@@ -1024,8 +1219,12 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
                 ocr_enabled=current_app.config.get("AI_OCR_ENABLED", False),
             )
             tables = extracted.get("tables") or []
-            enriched_meta = enrich_document_metadata(
-                title=getattr(doc, "title", filename),
+            from app.services.ai.documents.submitted_metadata import (
+                apply_enriched_metadata_to_ai_doc,
+                enrich_ai_document_metadata_from_content,
+            )
+            enriched_meta = enrich_ai_document_metadata_from_content(
+                doc,
                 filename=filename,
                 text=extracted.get("text", ""),
                 total_pages=extracted.get("metadata", {}).get("total_pages"),
@@ -1035,11 +1234,7 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
                 source_url=effective_source_url,
             )
             doc = AIDocument.query.get(doc_id)
-            doc.document_date = enriched_meta.get("document_date")
-            doc.document_language = enriched_meta.get("document_language")
-            doc.document_category = enriched_meta.get("document_category")
-            doc.quality_score = enriched_meta.get("quality_score")
-            doc.source_organization = enriched_meta.get("source_organization")
+            apply_enriched_metadata_to_ai_doc(doc, enriched_meta)
             db.session.commit()
 
             item = AIJobItem.query.get(int(item_id))
@@ -1274,6 +1469,228 @@ def bulk_reprocess_metadata_cancel(job_id: str):
                 db.session.query(AIJobItem)
                 .filter(AIJobItem.job_id == str(job_id), AIJobItem.status == "queued")
                 .update({AIJobItem.status: "cancelled", AIJobItem.error: None}, synchronize_session=False)
+            )
+        except Exception:
+            db.session.rollback()
+        db.session.commit()
+        _get_reprocess_job_cancel_event(str(job_id)).set()
+        return json_ok(status="cancel_requested")
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/documents/import-system-bulk", methods=["POST"])
+@admin_permission_required('admin.ai.manage')
+@limiter.limit("10 per minute")
+def import_system_bulk():
+    """
+    Start a server-side bulk import job for selected submitted (system) documents.
+
+    Accepts JSON {submitted_document_ids:[...], concurrency?:int}.
+    Returns 202 with job_id to poll via /admin/ai/documents/import-system-bulk/<job_id>/status
+    """
+    try:
+        if not _check_ai_reprocess_job_tables_exist():
+            return json_server_error("AI job tables not found. Please run 'flask db upgrade' and try again.")
+
+        from app.models import AIJob, AIJobItem, SubmittedDocument
+
+        ids: list[int] = []
+        concurrency = None
+        if is_json_request():
+            payload = get_json_safe() or {}
+            raw_ids = payload.get("submitted_document_ids") or payload.get("ids")
+            if isinstance(raw_ids, list):
+                for raw in raw_ids:
+                    try:
+                        ids.append(int(raw))
+                    except (TypeError, ValueError):
+                        continue
+            try:
+                concurrency = int(payload.get("concurrency")) if payload.get("concurrency") is not None else None
+            except (TypeError, ValueError):
+                concurrency = None
+        if not ids:
+            ids = parse_ids_from_request("submitted_document_ids") or parse_ids_from_request("ids")
+        if not ids:
+            return json_bad_request("No submitted document IDs provided")
+        if len(ids) > 500:
+            return json_bad_request("Too many documents selected (max 500)")
+
+        if concurrency is None:
+            concurrency = int(
+                current_app.config.get("AI_DOCS_SYSTEM_IMPORT_CONCURRENCY")
+                or current_app.config.get("AI_DOCS_IFRC_IMPORT_CONCURRENCY", 2)
+                or 2
+            )
+        concurrency = max(1, min(int(concurrency), 4))
+
+        docs = SubmittedDocument.query.filter(SubmittedDocument.id.in_(ids)).all()
+        docs_by_id = {int(d.id): d for d in docs}
+
+        job_id = str(uuid.uuid4())
+        job = AIJob(
+            id=job_id,
+            job_type="docs.bulk_import_system",
+            user_id=int(current_user.id),
+            status="queued",
+            total_items=len(ids),
+            meta={"concurrency": concurrency},
+        )
+        db.session.add(job)
+        db.session.flush()
+
+        for idx, sid in enumerate(ids):
+            doc = docs_by_id.get(int(sid))
+            status = "queued"
+            err = None
+            if not doc:
+                status = "failed"
+                err = "Submitted document not found"
+            elif getattr(doc, "source_url_unreachable", False):
+                status = "failed"
+                err = "Source URL unreachable"
+
+            it = AIJobItem(
+                job_id=job_id,
+                item_index=idx,
+                entity_type="submitted_document" if doc else None,
+                entity_id=int(sid) if doc else None,
+                status=status,
+                error=err,
+                payload={"submitted_document_id": int(sid)},
+            )
+            db.session.add(it)
+
+        db.session.commit()
+
+        t = threading.Thread(
+            target=_run_system_bulk_import_job,
+            args=(current_app._get_current_object(), job_id),
+            daemon=True,
+        )
+        t.start()
+
+        return json_accepted(
+            success=True,
+            job_id=job_id,
+            total=len(ids),
+            concurrency=concurrency,
+            message="Bulk system import started",
+        )
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/documents/import-system-bulk/<job_id>/status", methods=["GET"])
+@admin_permission_required('admin.ai.manage')
+def import_system_bulk_status(job_id: str):
+    """Return job + item statuses for a bulk system-document import job."""
+    try:
+        if not _check_ai_reprocess_job_tables_exist():
+            return json_not_found("not_found")
+
+        from app.models import AIDocument, AIJob
+
+        job = AIJob.query.get(str(job_id))
+        if not job:
+            return json_not_found("not_found")
+
+        items = job.items or []
+        completed = sum(1 for it in items if it.status == "completed")
+        failed = sum(1 for it in items if it.status == "failed")
+        cancelled = sum(1 for it in items if it.status == "cancelled")
+        processing = sum(1 for it in items if it.status in ("downloading", "processing", "queued"))
+
+        doc_ids = [int(it.entity_id) for it in items if (it.entity_type == "ai_document" and it.entity_id)]
+        docs_by_id: dict[int, dict] = {}
+        if doc_ids:
+            docs = AIDocument.query.filter(AIDocument.id.in_(doc_ids)).all()
+            for d in docs:
+                docs_by_id[int(d.id)] = {
+                    "processing_status": d.processing_status,
+                    "processing_error": d.processing_error,
+                    "total_chunks": d.total_chunks,
+                    "processed_at": d.processed_at.isoformat() if d.processed_at else None,
+                }
+
+        return json_ok(
+            success=True,
+            job={
+                "id": job.id,
+                "job_type": job.job_type,
+                "status": job.status,
+                "total_items": job.total_items,
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "started_at": job.started_at.isoformat() if job.started_at else None,
+                "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+                "error": job.error,
+                "meta": job.meta or {},
+                "counts": {
+                    "completed": completed,
+                    "failed": failed,
+                    "cancelled": cancelled,
+                    "in_progress": processing,
+                },
+            },
+            items=[
+                {
+                    "id": it.id,
+                    "index": it.item_index,
+                    "submitted_document_id": (
+                        (it.payload or {}).get("submitted_document_id")
+                        if isinstance(it.payload, dict)
+                        else None
+                    ),
+                    "ai_document_id": (
+                        int(it.entity_id) if (it.entity_type == "ai_document" and it.entity_id) else None
+                    ),
+                    "import_status": it.status,
+                    "import_error": it.error,
+                    "document": (
+                        docs_by_id.get(int(it.entity_id))
+                        if (it.entity_type == "ai_document" and it.entity_id)
+                        else None
+                    ),
+                }
+                for it in items
+            ],
+        )
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/documents/import-system-bulk/<job_id>/cancel", methods=["POST"])
+@admin_permission_required('admin.ai.manage')
+def import_system_bulk_cancel(job_id: str):
+    """Request cancellation for a running bulk system-document import job (best-effort)."""
+    try:
+        if not _check_ai_reprocess_job_tables_exist():
+            return json_not_found("not_found")
+
+        from app.models import AIJob, AIJobItem
+
+        job = AIJob.query.get(str(job_id))
+        if not job:
+            return json_not_found("not_found")
+        if job.status in ("completed", "failed", "cancelled"):
+            return json_ok(status=job.status, message="Job already finished")
+
+        job.status = "cancel_requested"
+        try:
+            (
+                db.session.query(AIJobItem)
+                .filter(
+                    AIJobItem.job_id == str(job_id),
+                    AIJobItem.status == "queued",
+                )
+                .update(
+                    {
+                        AIJobItem.status: "cancelled",
+                        AIJobItem.error: None,
+                    },
+                    synchronize_session=False,
+                )
             )
         except Exception:
             db.session.rollback()
@@ -1630,6 +2047,8 @@ def process_submitted_document(submitted_doc_id):
                 return json_error(msg, 200, success=False, code="file_not_found")
             if code == "download_failed":
                 return json_error(msg, 200, success=False, code="download_failed")
+            if code == "source_url_unreachable":
+                return json_error(msg, 200, success=False, code="source_url_unreachable")
             if code == "unsupported_file_type":
                 return json_bad_request(msg)
             return json_server_error(msg)
@@ -1769,6 +2188,8 @@ def _serialize_system_document_for_ai_import(
         "file_size": None,
         "file_pending": bool(getattr(doc, "file_pending", False)),
         "source_url": (getattr(doc, "source_url", None) or "").strip() or None,
+        "source_url_http_status": getattr(doc, "source_url_http_status", None),
+        "source_url_unreachable": bool(getattr(doc, "source_url_unreachable", False)),
         "ai_processed": ai_doc is not None,
         "ai_document_id": ai_doc.id if ai_doc else None,
         "ai_status": ai_doc.processing_status if ai_doc else None,
@@ -1867,6 +2288,44 @@ def list_system_documents():
 
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/documents/download-system-document/<int:doc_id>", methods=["GET"])
+@admin_permission_required('admin.ai.manage')
+def download_system_document_for_import(doc_id):
+    """Stream a submitted document for the AI import modal (plain 404, no HTML redirects)."""
+    from app.models import SubmittedDocument
+    from app.services.imports.fdrs_document_fetch_service import try_materialize_public_fdrs_document
+    from werkzeug.exceptions import NotFound
+
+    document = SubmittedDocument.query.get_or_404(doc_id)
+
+    def _has_local_file() -> bool:
+        return bool(
+            document.storage_path
+            and _storage.submitted_source_exists(document.storage_path)
+        )
+
+    if not _has_local_file():
+        materialized, _user_msg = try_materialize_public_fdrs_document(document)
+        if not materialized and not _has_local_file():
+            source_url = (document.source_url or "").strip()
+            if getattr(document, "file_pending", False) and source_url:
+                from app.routes.ai_documents.helpers import _validate_ifrc_fetch_url
+
+                ok, _reason = _validate_ifrc_fetch_url(source_url)
+                if ok:
+                    return redirect(source_url, code=302)
+            abort(404)
+
+    try:
+        return _storage.stream_submitted_document_response(
+            document.storage_path,
+            filename=document.filename,
+            as_attachment=True,
+        )
+    except NotFound:
+        abort(404)
 
 
 # ============================================================================

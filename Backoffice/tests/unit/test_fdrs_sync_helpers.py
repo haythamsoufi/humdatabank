@@ -845,6 +845,64 @@ def test_resolve_download_outcome_pending_when_no_file_and_404():
     assert pending is True
 
 
+def test_fdrs_url_is_downloadable():
+    from fdrs_documents_sync import fdrs_url_is_downloadable
+
+    assert fdrs_url_is_downloadable(200) is True
+    assert fdrs_url_is_downloadable(206) is True
+    assert fdrs_url_is_downloadable(403) is False
+    assert fdrs_url_is_downloadable(None) is False
+
+
+def test_resolve_fdrs_source_url_http_status_clears_on_local_file():
+    from fdrs_documents_sync import resolve_fdrs_source_url_http_status
+
+    assert resolve_fdrs_source_url_http_status(
+        is_public=True,
+        source_url="https://example.test/doc.pdf",
+        file_pending=False,
+        has_local_file=True,
+        probe_status=403,
+        existing_status=403,
+    ) is None
+
+
+def test_resolve_fdrs_source_url_http_status_stores_403():
+    from fdrs_documents_sync import resolve_fdrs_source_url_http_status
+
+    assert resolve_fdrs_source_url_http_status(
+        is_public=True,
+        source_url="https://example.test/doc.pdf",
+        file_pending=True,
+        has_local_file=False,
+        probe_status=403,
+    ) == 403
+
+
+def test_resolve_fdrs_source_url_http_status_empty_url():
+    from fdrs_documents_sync import resolve_fdrs_source_url_http_status
+
+    assert resolve_fdrs_source_url_http_status(
+        is_public=True,
+        source_url="",
+        file_pending=True,
+        has_local_file=False,
+        probe_status=None,
+    ) == 0
+
+
+def test_resolve_fdrs_source_url_http_status_private_doc():
+    from fdrs_documents_sync import resolve_fdrs_source_url_http_status
+
+    assert resolve_fdrs_source_url_http_status(
+        is_public=False,
+        source_url="https://example.test/doc.pdf",
+        file_pending=True,
+        has_local_file=False,
+        probe_status=403,
+    ) is None
+
+
 def test_document_progress_percent_scales_within_range():
     from fdrs_documents_sync import _document_progress_percent
 

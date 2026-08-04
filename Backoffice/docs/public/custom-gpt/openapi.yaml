@@ -99,6 +99,12 @@ paths:
             type: integer
             default: 80
           description: Chunks per page for full_coverage (keeps response under GPT 100k char limit)
+        - name: latest_per_country
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Auto when omitted. True keeps newest plan/report per country; false for multi-year queries
         - name: top_k
           in: query
           required: false

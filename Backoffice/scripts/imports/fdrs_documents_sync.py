@@ -5,7 +5,8 @@ GET https://data-api.ifrc.org/api/documents?apiKey=...&showunpublished=true&forc
 
 Public document URLs must be percent-encoded (spaces in paths). Use GET (HEAD is unreliable).
 HTTP 200/206 → save to submission storage and clear ``file_pending``.
-HTTP 403/404 → keep ``file_pending=True`` (retried on later syncs).
+HTTP 403/404 → keep ``file_pending=True``, set ``source_url_http_status``, retried on later syncs.
+When IFRC fixes the URL, a successful 200/206 clears ``source_url_http_status`` and saves the file.
 """
 
 from __future__ import annotations
@@ -54,6 +55,7 @@ def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
     downloaded = doc_stats.get("downloaded", 0)
     pending = doc_stats.get("pending", 0)
     download_errors = doc_stats.get("download_errors", 0)
+    url_unreachable = doc_stats.get("url_unreachable", 0)
     status_approved = doc_stats.get("status_approved", 0)
     status_pending = doc_stats.get("status_pending", 0)
     status_rejected = doc_stats.get("status_rejected", 0)
@@ -61,7 +63,7 @@ def _format_documents_done_message(doc_stats: Dict[str, Any]) -> str:
         f"FDRS documents complete: {inserted} inserted, {updated} updated; "
         f"status approved={status_approved} pending={status_pending} rejected={status_rejected}; "
         f"files saved: {downloaded}, awaiting IFRC file download: {pending}, "
-        f"download errors: {download_errors}"
+        f"unreachable URLs: {url_unreachable}, download errors: {download_errors}"
     )
 _FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
 _DEFAULT_DOWNLOAD_TIMEOUT = 120
@@ -183,6 +185,43 @@ def _resolve_download_outcome(
     ):
         return None, False
     return None, True
+
+
+def fdrs_url_is_downloadable(http_status: Optional[int]) -> bool:
+    """True when an HTTP probe status means the FDRS document URL serves bytes."""
+    return http_status in (200, 206)
+
+
+def resolve_fdrs_source_url_http_status(
+    *,
+    is_public: bool,
+    source_url: str,
+    file_pending: bool,
+    has_local_file: bool,
+    probe_status: Optional[int] = None,
+    existing_status: Optional[int] = None,
+) -> Optional[int]:
+    """
+    Persist the last failed FDRS URL probe status on ``SubmittedDocument``.
+
+    Returns ``None`` when the URL is OK, not applicable (private doc), or a local
+    copy exists. Non-downloadable probe codes (403, 404, 0, -1, …) are stored until
+    a later sync clears them after IFRC fixes the URL.
+    """
+    if not is_public:
+        return None
+    if has_local_file and not file_pending:
+        return None
+    url = (source_url or "").strip()
+    if not url:
+        return 0 if file_pending else None
+    if probe_status is not None:
+        if fdrs_url_is_downloadable(probe_status):
+            return None
+        return probe_status
+    if file_pending and existing_status is not None:
+        return existing_status
+    return None
 
 
 def _parse_year_text_bounds(year_text: Any) -> Tuple[Optional[int], Optional[int]]:
@@ -470,6 +509,7 @@ def upsert_fdrs_document_metadata(
         "downloaded": 0,
         "pending": 0,
         "download_errors": 0,
+        "url_unreachable": 0,
         "status_approved": 0,
         "status_pending": 0,
         "status_rejected": 0,
@@ -556,6 +596,7 @@ def upsert_fdrs_document_metadata(
             file_pending = True
             source_url = (row.get("source_url") or "").strip()
             is_public_doc = bool(row.get("is_public"))
+            download_status: Optional[int] = None
 
             if not is_public_doc:
                 file_pending = False
@@ -622,6 +663,18 @@ def upsert_fdrs_document_metadata(
                     file_pending = True
                     storage_path = None
 
+            has_local_file = bool(storage_path and _fdrs_local_file_exists(storage_path))
+            source_url_http_status = resolve_fdrs_source_url_http_status(
+                is_public=is_public_doc,
+                source_url=source_url,
+                file_pending=file_pending,
+                has_local_file=has_local_file,
+                probe_status=download_status,
+                existing_status=getattr(existing, "source_url_http_status", None) if existing else None,
+            )
+            if source_url_http_status is not None and not fdrs_url_is_downloadable(source_url_http_status):
+                stats["url_unreachable"] += 1
+
             if dry_run:
                 if existing:
                     stats["updated"] += 1
@@ -640,6 +693,7 @@ def upsert_fdrs_document_metadata(
                 existing.status = doc_status
                 existing.file_pending = file_pending
                 existing.storage_path = storage_path
+                existing.source_url_http_status = source_url_http_status
                 if modified_at:
                     existing.uploaded_at = modified_at
                 db.session.add(existing)
@@ -660,6 +714,7 @@ def upsert_fdrs_document_metadata(
                     is_public=bool(row.get("is_public")),
                     fdrs_import_key=import_key,
                     file_pending=file_pending,
+                    source_url_http_status=source_url_http_status,
                     status=doc_status,
                 )
                 db.session.add(entry)

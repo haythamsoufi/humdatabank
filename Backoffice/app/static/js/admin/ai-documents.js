@@ -103,35 +103,69 @@ const processingPollers = new Map();
 
 const AI_DOCS_IMPORT_JOB_STORAGE_KEY = 'ai_docs_external_api_import_job';
 const LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY = 'ai_docs_ifrc_import_job';
+const AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY = 'ai_docs_system_import_job';
 const AI_DOCS_REPROCESS_JOB_STORAGE_KEY = 'ai_docs_bulk_reprocess_job';
 const AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY = 'ai_docs_bulk_reprocess_metadata_job';
 const AI_DOCS_DONE_STATUSES = ['completed', 'failed', 'not_found'];
 
-function getStoredImportJob() {
+function _readJobStorage(key) {
     try {
-        let raw = sessionStorage.getItem(AI_DOCS_IMPORT_JOB_STORAGE_KEY);
-        if (!raw) raw = sessionStorage.getItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY);
+        let raw = localStorage.getItem(key);
+        if (!raw) {
+            raw = sessionStorage.getItem(key);
+        }
         return raw ? JSON.parse(raw) : null;
     } catch (e) {
         return null;
     }
 }
 
-function setStoredImportJob(data) {
+function _writeJobStorage(key, data) {
     try {
-        sessionStorage.setItem(AI_DOCS_IMPORT_JOB_STORAGE_KEY, JSON.stringify(data));
-        try { sessionStorage.removeItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY); } catch (e2) { /* ignore */ }
+        localStorage.setItem(key, JSON.stringify(data));
+        try { sessionStorage.removeItem(key); } catch (e2) { /* ignore */ }
         return true;
     } catch (e) {
         return false;
     }
 }
 
-function clearStoredImportJob() {
+function _clearJobStorage(key) {
     try {
-        sessionStorage.removeItem(AI_DOCS_IMPORT_JOB_STORAGE_KEY);
-        sessionStorage.removeItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY);
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
     } catch (e) { /* ignore */ }
+}
+
+function getStoredImportJob() {
+    let data = _readJobStorage(AI_DOCS_IMPORT_JOB_STORAGE_KEY);
+    if (!data) {
+        data = _readJobStorage(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY);
+    }
+    return data;
+}
+
+function setStoredImportJob(data) {
+    const ok = _writeJobStorage(AI_DOCS_IMPORT_JOB_STORAGE_KEY, data);
+    try { sessionStorage.removeItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY); localStorage.removeItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY); } catch (e2) { /* ignore */ }
+    return ok;
+}
+
+function clearStoredImportJob() {
+    _clearJobStorage(AI_DOCS_IMPORT_JOB_STORAGE_KEY);
+    _clearJobStorage(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY);
+}
+
+function getStoredSystemImportJob() {
+    return _readJobStorage(AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY);
+}
+
+function setStoredSystemImportJob(data) {
+    return _writeJobStorage(AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY, data);
+}
+
+function clearStoredSystemImportJob() {
+    _clearJobStorage(AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY);
 }
 
 function normalizeStoredImportJob(data) {
@@ -146,28 +180,20 @@ function normalizeStoredImportJob(data) {
     };
 }
 
+function normalizeStoredSystemImportJob(data) {
+    return normalizeStoredImportJob(data);
+}
+
 function getStoredReprocessJob() {
-    try {
-        const raw = sessionStorage.getItem(AI_DOCS_REPROCESS_JOB_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-        return null;
-    }
+    return _readJobStorage(AI_DOCS_REPROCESS_JOB_STORAGE_KEY);
 }
 
 function setStoredReprocessJob(data) {
-    try {
-        sessionStorage.setItem(AI_DOCS_REPROCESS_JOB_STORAGE_KEY, JSON.stringify(data));
-        return true;
-    } catch (e) {
-        return false;
-    }
+    return _writeJobStorage(AI_DOCS_REPROCESS_JOB_STORAGE_KEY, data);
 }
 
 function clearStoredReprocessJob() {
-    try {
-        sessionStorage.removeItem(AI_DOCS_REPROCESS_JOB_STORAGE_KEY);
-    } catch (e) { /* ignore */ }
+    _clearJobStorage(AI_DOCS_REPROCESS_JOB_STORAGE_KEY);
 }
 
 function normalizeStoredReprocessJob(data) {
@@ -183,21 +209,15 @@ function normalizeStoredReprocessJob(data) {
 }
 
 function getStoredMetaReprocessJob() {
-    try {
-        const raw = sessionStorage.getItem(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
+    return _readJobStorage(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY);
 }
 
 function setStoredMetaReprocessJob(data) {
-    try {
-        sessionStorage.setItem(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY, JSON.stringify(data));
-        return true;
-    } catch (e) { return false; }
+    return _writeJobStorage(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY, data);
 }
 
 function clearStoredMetaReprocessJob() {
-    try { sessionStorage.removeItem(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY); } catch (e) { /* ignore */ }
+    _clearJobStorage(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY);
 }
 
 function normalizeStoredMetaReprocessJob(data) {
@@ -254,6 +274,10 @@ function hideProcessingBanner() {
 let ifrcImportJobPollIntervalId = null;
 let ifrcImportJobId = null;
 
+// System-document bulk import job tracking (server-side job; survives page reload)
+let systemImportJobPollIntervalId = null;
+let systemImportJobId = null;
+
 // Bulk reprocess job tracking (server-side job; survives page reload)
 let bulkReprocessJobPollIntervalId = null;
 let bulkReprocessJobId = null;
@@ -265,7 +289,7 @@ let bulkMetaReprocessJobId = null;
 // Cancel button for bulk jobs (import, reprocess, or metadata reprocess)
 if (processingCancelBtn) {
     processingCancelBtn.addEventListener('click', function() {
-        if (!ifrcImportJobId && !bulkReprocessJobId && !bulkMetaReprocessJobId) {
+        if (!ifrcImportJobId && !systemImportJobId && !bulkReprocessJobId && !bulkMetaReprocessJobId) {
             return;
         }
         if (processingTitle) processingTitle.textContent = cfg.t.cancelling_ef5ba1f8;
@@ -274,6 +298,11 @@ if (processingCancelBtn) {
             try {
                 if (ifrcImportJobId) {
                     await csrfFetch(`/api/ai/documents/ifrc-api/import-bulk/${encodeURIComponent(ifrcImportJobId)}/cancel`, {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                } else if (systemImportJobId) {
+                    await csrfFetch(`/admin/ai/documents/import-system-bulk/${encodeURIComponent(systemImportJobId)}/cancel`, {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
@@ -298,6 +327,13 @@ if (processingCancelBtn) {
                 ifrcImportJobId = null;
                 window.aiDocsImportProgress = null;
                 clearStoredImportJob();
+
+                if (systemImportJobPollIntervalId) {
+                    clearInterval(systemImportJobPollIntervalId);
+                    systemImportJobPollIntervalId = null;
+                }
+                systemImportJobId = null;
+                clearStoredSystemImportJob();
 
                 if (bulkReprocessJobPollIntervalId) {
                     clearInterval(bulkReprocessJobPollIntervalId);
@@ -2225,6 +2261,8 @@ function mapSystemDocumentToRow(doc) {
         file_size: (typeof doc.file_size === 'number' && doc.file_size > 0) ? doc.file_size : null,
         file_pending: !!doc.file_pending,
         source_url: doc.source_url || null,
+        source_url_http_status: doc.source_url_http_status != null ? doc.source_url_http_status : null,
+        source_url_unreachable: !!doc.source_url_unreachable,
         uploaded_at: doc.uploaded_at || null,
         ai_processed: !!doc.ai_processed,
         ai_document_id: doc.ai_document_id != null ? doc.ai_document_id : null,
@@ -2246,6 +2284,29 @@ function importGridSourceLabel(source) {
     return '';
 }
 
+function importGridSourceUrlStatusLabel(data) {
+    if (!data || !data.source_url_unreachable) {
+        return cfg.t.file_url_available_8e4f2a1b || 'Available';
+    }
+    const status = data.source_url_http_status;
+    if (status === 0) {
+        return cfg.t.file_url_empty_9c3d1e7a || 'No URL';
+    }
+    if (status === 403) {
+        return cfg.t.file_url_forbidden_7b2a9c4d || 'URL blocked (403)';
+    }
+    if (status === 404) {
+        return cfg.t.file_url_not_found_6a1b8e3c || 'URL not found (404)';
+    }
+    if (status === -1) {
+        return cfg.t.file_url_error_5d0c7f2e || 'URL error';
+    }
+    if (status != null) {
+        return (cfg.t.file_url_http_status_4e9a6b1d || 'HTTP {status}').replace('{status}', String(status));
+    }
+    return cfg.t.file_url_unavailable_3f8e2d0c || 'URL unavailable';
+}
+
 function getImportSystemDocumentsGridOptions() {
     return {
         rowSelection: {
@@ -2254,7 +2315,8 @@ function getImportSystemDocumentsGridOptions() {
             selectAll: 'filtered'
         },
         isRowSelectable: function(node) {
-            return !!(node && node.data && !node.data.ai_processed);
+            const data = node && node.data;
+            return !!(data && !data.ai_processed && !data.source_url_unreachable);
         },
         onSelectionChanged: function() {
             syncImportSelectionFromGrid();
@@ -2298,8 +2360,8 @@ const importSystemDocumentsColumnDefs = [
             const wrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%';
             const docId = data.id != null ? parseInt(data.id, 10) : 0;
             const nameLine = docId ?
-                '<a href="/admin/documents/download/' + docId + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
-                'download title="' + escapeAttr(cfg.t.view_or_download_9e34181d) + '">' + name + '</a>' :
+                '<a href="/admin/ai/documents/download-system-document/' + docId + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
+                'target="_blank" rel="noopener noreferrer" title="' + escapeAttr(cfg.t.view_or_download_9e34181d) + '">' + name + '</a>' :
                 '<div class="text-sm font-medium text-gray-900" style="' + wrap + '" title="' + escapeAttr(data.filename || '') + '">' + name + '</div>';
             return '<div class="flex items-start gap-2 min-w-0" style="width:100%">' +
                 '<div class="flex-shrink-0 text-gray-500" style="padding-top:2px">' + icon + '</div>' +
@@ -2509,6 +2571,33 @@ const importSystemDocumentsColumnDefs = [
         cellStyle: { 'white-space': 'nowrap' }
     },
     {
+        field: 'source_url_unreachable',
+        headerName: cfg.t.file_url_status_2a7c9e4b || 'File URL',
+        width: 170,
+        minWidth: 140,
+        maxWidth: 220,
+        filter: 'customSetFilter',
+        sortable: true,
+        filterValueGetter: function(params) {
+            return importGridSourceUrlStatusLabel(params.data || {});
+        },
+        cellRenderer: function(params) {
+            const data = params.data || {};
+            const label = importGridSourceUrlStatusLabel(data);
+            if (!data.source_url_unreachable) {
+                if (data.file_pending) {
+                    return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">' +
+                        '<i class="fas fa-clock mr-1"></i>' + escapeHtml(cfg.t.pending_2d13df6f) + '</span>';
+                }
+                return '<span class="text-xs text-gray-400">\u2014</span>';
+            }
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800" title="' +
+                escapeAttr(cfg.t.file_url_unavailable_hint_1d6e8a3f || 'Excluded from AI import until IFRC fixes the document URL. Re-run FDRS sync to refresh.') + '">' +
+                '<i class="fas fa-link-slash mr-1"></i>' + escapeHtml(label) + '</span>';
+        },
+        cellStyle: { 'white-space': 'nowrap' }
+    },
+    {
         field: 'ai_processed',
         headerName: cfg.t.ai_import_eca697b5,
         width: 200,
@@ -2542,7 +2631,7 @@ function syncImportSelectionFromGrid() {
     const rows = importDocumentsGridHelper.getSelectedRows();
     selectedDocuments.clear();
     rows.forEach(function(row) {
-        if (row && row.id != null && !row.ai_processed) {
+        if (row && row.id != null && !row.ai_processed && !row.source_url_unreachable) {
             selectedDocuments.add(row.id);
         }
     });
@@ -3470,6 +3559,106 @@ function resumeIfrcImportJobIfAny() {
     startIfrcImportJobPolling(stored.jobId);
 }
 
+async function fetchSystemImportJobStatus(jobId) {
+    const cacheBust = Date.now();
+    return window.apiFetch(`/admin/ai/documents/import-system-bulk/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+        cache: 'no-store'
+    });
+}
+
+function stopSystemImportJobPolling() {
+    if (systemImportJobPollIntervalId) {
+        clearInterval(systemImportJobPollIntervalId);
+        systemImportJobPollIntervalId = null;
+    }
+}
+
+function startSystemImportJobPolling(jobId) {
+    if (!jobId) return;
+    systemImportJobId = jobId;
+    stopSystemImportJobPolling();
+
+    const poll = async () => {
+        try {
+            const data = await fetchSystemImportJobStatus(jobId);
+            if (!data || !data.success || !data.job) {
+                renderTrackedProcessingBar();
+                return;
+            }
+
+            const job = data.job;
+            const total = Number(job.total_items) || 0;
+            const counts = (job.counts || {});
+            const done = (Number(counts.completed) || 0) + (Number(counts.failed) || 0) + (Number(counts.cancelled) || 0);
+
+            const items = Array.isArray(data.items) ? data.items : [];
+            const jobItemStatusCounts = items.reduce(function(acc, it) {
+                const s = it.import_status || 'queued';
+                acc[s] = (acc[s] || 0) + 1;
+                return acc;
+            }, {});
+
+            window.aiDocsImportProgress = { total: total, done: Math.min(done, total), statusCounts: jobItemStatusCounts };
+            if (job.status === 'running') {
+                if (processingBannerUI && processingBannerUI.setCancelVisible) {
+                    processingBannerUI.setCancelVisible(true);
+                } else if (processingCancelWrap) {
+                    processingCancelWrap.classList.remove('hidden');
+                }
+            }
+            items.forEach(function (it) {
+                const docId = it && it.ai_document_id ? Number(it.ai_document_id) : null;
+                if (!docId || !Number.isFinite(docId)) return;
+                const existing = trackedProcessingDocs.get(Number(docId));
+                if (!existing) {
+                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
+                }
+                startProcessingPoll(docId);
+            });
+            renderTrackedProcessingBar();
+
+            const terminalJobStatuses = new Set(['completed', 'failed', 'cancelled']);
+            if (terminalJobStatuses.has(String(job.status || ''))) {
+                stopSystemImportJobPolling();
+                clearStoredSystemImportJob();
+                systemImportJobId = null;
+                if (processingBannerUI && processingBannerUI.setCancelVisible) {
+                    processingBannerUI.setCancelVisible(false);
+                } else if (processingCancelWrap) {
+                    processingCancelWrap.classList.add('hidden');
+                }
+                showProcessingBanner(
+                    job.status === 'cancelled' ? cfg.t.import_cancelled_2a8b4482 : cfg.t.import_complete_a218495a,
+                    job.status === 'failed' ? cfg.t.some_documents_failed_2221bc0e : cfg.t.done_f92965e2,
+                    100
+                );
+                setTimeout(function () { hideProcessingBanner(); }, 2500);
+                setTimeout(function () {
+                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
+                }, 1500);
+            }
+        } catch (e) {
+            aiDocsLog('systemImportJobPollError', String(e && e.message ? e.message : e));
+            renderTrackedProcessingBar();
+        }
+    };
+
+    poll();
+    systemImportJobPollIntervalId = setInterval(poll, 2000);
+}
+
+function resumeSystemImportJobIfAny() {
+    const stored = normalizeStoredSystemImportJob(getStoredSystemImportJob());
+    if (!stored || !stored.jobId) return;
+    const total = Number(stored.total) || 0;
+    window.aiDocsImportProgress = { total: total, done: 0 };
+    showProcessingBanner(cfg.t.importing_documents_8a49fe5a, cfg.t.resuming_09136a9d, 0);
+    if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
+    startSystemImportJobPolling(stored.jobId);
+}
+
 async function fetchBulkReprocessJobStatus(jobId) {
     const cacheBust = Date.now();
     return window.apiFetch(`/admin/ai/documents/bulk-reprocess/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
@@ -3739,19 +3928,20 @@ async function importIfrcDocuments() {
 }
 
 // Add event listener for import button; restore job after reload
-function initIfrcImport() {
+function initImportJobs() {
     const importBtn = document.getElementById('ifrcImportSelectedBtn');
     if (importBtn) {
         importBtn.addEventListener('click', importIfrcDocuments);
     }
     resumeIfrcImportJobIfAny();
+    resumeSystemImportJobIfAny();
     resumeBulkReprocessJobIfAny();
     resumeBulkMetaReprocessJobIfAny();
 }
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initIfrcImport);
+    document.addEventListener('DOMContentLoaded', initImportJobs);
 } else {
-    initIfrcImport();
+    initImportJobs();
 }
 
 async function processSelectedDocuments() {
@@ -3768,8 +3958,9 @@ async function processSelectedDocuments() {
     const docIds = Array.from(selectedDocuments);
     const confirmMsg = cfg.t.process_count_document_s_with_ai_this_wi_b44c5b13.replace('{count}', docIds.length);
 
-    const proceedWithProcessing = () => {
+    const proceedWithProcessing = async () => {
         const processBtn = document.getElementById('processSelectedBtn');
+        const originalText = processBtn ? processBtn.innerHTML : '';
         if (processBtn) {
             processBtn.disabled = true;
             processBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + escapeHtml(cfg.t.processing_21d104a5);
@@ -3779,147 +3970,52 @@ async function processSelectedDocuments() {
             closeUploadModal();
         }
 
-        (async () => {
-            let successCount = 0;
-            let failCount = 0;
-            const errors = [];
-            let fatalError = null;
+        try {
+            const response = await csrfFetch('/admin/ai/documents/import-system-bulk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ submitted_document_ids: docIds })
+            });
 
+            let result = null;
             try {
-                for (const docId of docIds) {
-                    try {
-                        window.__clientLog && window.__clientLog(`[AI Documents] Processing document ${docId}...`);
-                        const response = await csrfFetch('/admin/ai/documents/process-submitted/' + docId, {
-                            method: 'POST',
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest'
-                            }
-                        });
-
-                        // Check if response is OK
-                        if (!response.ok) {
-                            let errorText = '';
-                            try {
-                                errorText = await response.text();
-                            } catch (e) {
-                                errorText = `Unable to read error response: ${e.message}`;
-                            }
-                            console.error(`[AI Documents] HTTP error ${response.status} for document ${docId}:`, errorText);
-                            failCount++;
-                            const shortError = errorText.length > 100 ? errorText.substring(0, 100) + '...' : errorText;
-                            errors.push(`Document ${docId}: HTTP ${response.status} - ${shortError}`);
-                            continue;
-                        }
-
-                        // Read response as text first, then try to parse as JSON
-                        let responseText = '';
-                        let result;
-                        try {
-                            responseText = await response.text();
-                            result = JSON.parse(responseText);
-                        } catch (parseError) {
-                            console.error(`[AI Documents] JSON parse error for document ${docId}:`, parseError);
-                            failCount++;
-                            errors.push(`Document ${docId}: Invalid response format`);
-                            continue;
-                        }
-
-                        if (response.status === 202 && result.success && result.ai_document_id) {
-                            const aiDocId = result.ai_document_id;
-                            updateTrackedProcessingDoc(aiDocId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
-                            startProcessingPoll(aiDocId);
-                            await new Promise(function (resolve) {
-                                function check() {
-                                    const t = trackedProcessingDocs.get(Number(aiDocId));
-                                    if (t && (t.status === 'completed' || t.status === 'failed' || t.status === 'not_found')) {
-                                        resolve();
-                                    } else {
-                                        setTimeout(check, 500);
-                                    }
-                                }
-                                check();
-                            });
-                            const t = trackedProcessingDocs.get(Number(aiDocId));
-                            stopProcessingPoll(aiDocId);
-                            if (t && t.status === 'completed') {
-                                successCount++;
-                            } else {
-                                failCount++;
-                                errors.push(`Document ${docId}: ${(t && t.error) || result.error || 'Unknown error'}`);
-                            }
-                        } else if (result.success) {
-                            successCount++;
-                        } else {
-                            failCount++;
-                            errors.push(`Document ${docId}: ${result.error || 'Unknown error'}`);
-                        }
-                    } catch (error) {
-                        console.error(`[AI Documents] Exception processing document ${docId}:`, error);
-                        console.error(`[AI Documents] Error stack:`, error.stack);
-                        failCount++;
-                        const errorMsg = error.message || 'Network or unexpected error';
-                        errors.push(`Document ${docId}: ${errorMsg}`);
-                    }
-                }
-
-                // Log summary
-                window.__clientLog && window.__clientLog(`[AI Documents] Processing complete. Success: ${successCount}, Failed: ${failCount}`);
-                if (errors.length > 0) {
-                    console.error('[AI Documents] All errors:', errors);
-                }
-
-            } catch (error) {
-                console.error('[AI Documents] Fatal error processing documents:', error);
-                console.error('[AI Documents] Error stack:', error.stack);
-                fatalError = error;
+                result = await response.json();
+            } catch (parseError) {
+                throw new Error('Invalid response from server');
             }
 
-            // Show results (whether success or failure)
-            if (fatalError) {
-                const errorMsg = fatalError.message || 'Unknown error occurred';
-                if (window.showAlert) {
-                    window.showAlert(cfg.t.error_processing_documents_7f24aef8 + ' ' + errorMsg, 'error');
-                } else {
-                    if (window.showAlert) window.showAlert(cfg.t.error_processing_documents_7f24aef8 + ' ' + errorMsg, 'error');
-                    else console.error('Error:', errorMsg);
-                }
-                // Don't reload on fatal error - let user see the error
-                if (processBtn) {
-                    processBtn.disabled = false;
-                    processBtn.innerHTML = '<i class="fas fa-robot mr-2"></i>' + escapeHtml(cfg.t.process_selected_0401d5a2);
-                }
+            if (!response.ok || !result || !result.success || !result.job_id) {
+                const errMsg = (result && (result.error || result.message)) || ('HTTP ' + response.status);
+                throw new Error(errMsg);
+            }
+
+            const total = Number(result.total) || docIds.length;
+            window.aiDocsImportProgress = { total: total, done: 0 };
+            setStoredSystemImportJob({ jobId: result.job_id, total: total, startedAt: Date.now() });
+            showProcessingBanner(
+                cfg.t.importing_documents_8a49fe5a,
+                cfg.t.starting_8c6ce9f8,
+                0
+            );
+            if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
+            startSystemImportJobPolling(result.job_id);
+        } catch (error) {
+            hideProcessingBanner();
+            const errorMsg = error && error.message ? error.message : String(error);
+            if (window.showAlert) {
+                window.showAlert(cfg.t.failed_to_start_import_d9e1bb79 + ': ' + errorMsg, 'error');
             } else {
-                // Show results
-                let message = '';
-                const alertType = failCount > 0 ? 'error' : 'info';
-                if (successCount > 0) {
-                    message += cfg.t.successfully_processed_count_97c0ea56.replace('{count}', successCount);
-                    if (failCount > 0) message += '\n';
-                }
-                if (failCount > 0) {
-                    message += cfg.t.failed_count_bc24793b.replace('{count}', failCount);
-                    if (errors.length > 0) {
-                        message += '\n\n' + cfg.t.errors_c48c42c9 + '\n' + errors.slice(0, 5).join('\n');
-                        if (errors.length > 5) {
-                            message += '\n...' + cfg.t.and_count_more_6a5f73fb.replace('{count}', errors.length - 5);
-                        }
-                    }
-                }
-
-                if (window.showAlert) {
-                    window.showAlert(message, alertType);
-                } else {
-                    if (window.showAlert) window.showAlert(message, 'error');
-                else console.error(message);
-                }
-
-                // Delay reload to allow user to read error messages
-                const reloadDelay = failCount > 0 ? 5000 : 2000;
-                setTimeout(function() {
-                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
-                }, reloadDelay);
+                console.error('Failed to start system import:', errorMsg);
             }
-        })();
+        } finally {
+            if (processBtn) {
+                processBtn.disabled = false;
+                processBtn.innerHTML = originalText || ('<i class="fas fa-robot mr-2"></i>' + escapeHtml(cfg.t.process_selected_0401d5a2));
+            }
+        }
     };
 
     if (window.showConfirmation) {

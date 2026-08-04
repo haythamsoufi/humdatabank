@@ -9,11 +9,14 @@ from app.services.public_document_service import (
     PUBLIC_DOC_MAX_CONTENT_CHARS,
     _build_search_filters,
     _extract_year,
+    _should_prioritize_latest_per_country,
     filter_rows_to_public_documents,
     list_public_documents_in_scope,
+    prioritize_latest_documents_per_country,
     search_public_documents,
     slim_public_document_chunk,
 )
+from app.services.upr.query_detection import query_requests_multi_year_documents
 
 
 class TestPublicDocumentHelpers:
@@ -51,6 +54,97 @@ class TestPublicDocumentHelpers:
         assert slim["score"] == 0.82
         assert len(slim["content"]) <= 101
         assert slim["content"].endswith("…")
+
+    def test_query_requests_multi_year_documents(self):
+        assert query_requests_multi_year_documents("Syria migration activities over years") is True
+        assert query_requests_multi_year_documents("compare Syria 2024 and 2026 plans") is True
+        assert query_requests_multi_year_documents("migration in 2026 unified plans") is False
+
+    def test_should_prioritize_latest_for_snapshot_not_multi_year(self):
+        assert _should_prioritize_latest_per_country(
+            "migration unified plan 2026",
+            {"date_range": {"min": "2026-01-01", "max": "2026-12-31"}},
+            latest_per_country=None,
+        ) is True
+        assert not _should_prioritize_latest_per_country(
+            "syria migration over years",
+            {"country_name": "Syria"},
+            latest_per_country=None,
+        )
+        assert not _should_prioritize_latest_per_country(
+            "migration unified plan",
+            None,
+            latest_per_country=False,
+        )
+
+    def test_prioritize_latest_documents_per_country_keeps_newest_plan(self):
+        docs = [
+            AIDocument(
+                id=1,
+                title="Syria Unified Plan 2024",
+                filename="syria_2024.pdf",
+                file_type="pdf",
+                country_name="Syria",
+                document_date=datetime.date(2024, 1, 1),
+            ),
+            AIDocument(
+                id=2,
+                title="Syria Unified Plan 2026",
+                filename="syria_2026.pdf",
+                file_type="pdf",
+                country_name="Syria",
+                document_date=datetime.date(2026, 1, 1),
+            ),
+            AIDocument(
+                id=3,
+                title="Kenya Unified Plan 2026",
+                filename="kenya_2026.pdf",
+                file_type="pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2026, 1, 1),
+            ),
+        ]
+        selected, meta = prioritize_latest_documents_per_country(
+            docs,
+            "migration unified plan",
+            enabled=True,
+        )
+        assert meta["latest_per_country_applied"] is True
+        assert {doc.id for doc in selected} == {2, 3}
+        assert len(meta["superseded_documents"]) == 1
+        assert meta["superseded_documents"][0]["document_id"] == 1
+
+    def test_prioritize_latest_skipped_for_multi_year_query(self):
+        docs = [
+            AIDocument(
+                id=1,
+                title="Syria Unified Plan 2024",
+                filename="syria_2024.pdf",
+                file_type="pdf",
+                country_name="Syria",
+                document_date=datetime.date(2024, 1, 1),
+            ),
+            AIDocument(
+                id=2,
+                title="Syria Unified Plan 2026",
+                filename="syria_2026.pdf",
+                file_type="pdf",
+                country_name="Syria",
+                document_date=datetime.date(2026, 1, 1),
+            ),
+        ]
+        assert not _should_prioritize_latest_per_country(
+            "syria migration activities over years",
+            {"country_name": "Syria"},
+            latest_per_country=None,
+        )
+        selected, meta = prioritize_latest_documents_per_country(
+            docs,
+            "syria migration activities over years",
+            enabled=False,
+        )
+        assert meta["latest_per_country_applied"] is False
+        assert len(selected) == 2
 
 
 @pytest.mark.unit

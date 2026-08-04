@@ -6,6 +6,51 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "macros/localized_entity_phrase.html" import entity_scope_phrase, entity_scope_phrase_with_suffix %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ static_url('css/enhanced-search-dropdown.css') }}">
+<style nonce="{{ csp_nonce() }}">
+    /* Critical: keep country/entity header controls aligned before external CSS finishes loading */
+    .enhanced-search-dropdown .relative {
+        position: relative;
+    }
+    .enhanced-search-dropdown .flex {
+        align-items: center;
+    }
+    .enhanced-search-dropdown__input-slot {
+        position: absolute;
+        inset-block: 0;
+        inset-inline-end: 0;
+        display: flex;
+        align-items: center;
+        padding-inline-end: 0.5rem;
+        pointer-events: none;
+    }
+    .enhanced-search-dropdown__input-slot > * {
+        pointer-events: auto;
+    }
+    .enhanced-search-dropdown input[type="text"],
+    .enhanced-search-dropdown #search_input,
+    .enhanced-search-dropdown #entity_search_input {
+        padding-inline-end: 2rem;
+    }
+    [dir="rtl"] .enhanced-search-dropdown input[type="text"],
+    [dir="rtl"] .enhanced-search-dropdown #search_input,
+    [dir="rtl"] .enhanced-search-dropdown #entity_search_input {
+        direction: rtl;
+        text-align: right;
+        padding-inline-start: 2rem;
+        padding-inline-end: 0.75rem;
+    }
+    .dashboard-assignment-contributors {
+        position: absolute;
+        bottom: 0.5rem;
+        inset-inline-end: 0.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="sharp-ui {% if not user_countries %}dashboard-no-access dashboard-no-access-bleed{% else %}py-2{% endif %}">
 
@@ -1192,13 +1237,10 @@
 {% endblock %}
 
 {% block extra_js %}
-{# Dashboard-specific styles #}
-<link rel="stylesheet" href="{{ static_url('css/dashboard.css') }}">
 {# Include Chart.js library #}
 <script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
 
 {# Include Enhanced Search Dropdown Component #}
-<link rel="stylesheet" href="{{ static_url('css/enhanced-search-dropdown.css') }}">
 <script src="{{ static_url('js/components/enhanced-search-dropdown.js') }}"></script>
 
 <!-- Store translated messages in data attributes -->

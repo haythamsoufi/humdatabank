@@ -141,9 +141,10 @@
     position: absolute !important;
 }
 
-/* Entity dropdown positioning - ensure spacing from right edge */
+/* Entity dropdown positioning - align to input inline end by default */
 #entity_search_dropdown {
-    right: 0;
+    inset-inline-end: 0;
+    inset-inline-start: auto;
     max-width: min(24rem, calc(100vw - 2rem));
     /* Allow JavaScript to override positioning */
     position: absolute;
@@ -276,7 +277,34 @@
 
 .contributor-avatar + .contributor-avatar {
     /* Show ~20% of each previous avatar (md is 32px, overlap ~26px) */
-    margin-left: -26px;
+    margin-inline-start: -26px;
+}
+
+/* Keep stacked avatars inside the card on both LTR and RTL */
+.dashboard-assignment-contributors {
+    position: absolute;
+    bottom: 0.5rem;
+    inset-inline-end: 0.5rem;
+    max-width: calc(100% - 1rem);
+}
+
+html[dir="rtl"] .dashboard-assignment-contributors .contributor-avatar-stack {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .dashboard-assignment-contributors .contributor-avatar + .contributor-avatar {
+    margin-inline-start: 0;
+    margin-inline-end: -26px;
+}
+
+.dashboard-assignment-contributors .profile-icon-tooltip {
+    inset-inline-end: 0;
+    inset-inline-start: auto;
+}
+
+.dashboard-assignment-contributors .profile-icon-tooltip-arrow {
+    inset-inline-end: 0.75rem;
+    inset-inline-start: auto;
 }
 
 .contributor-avatar .profile-icon {

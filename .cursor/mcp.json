@@ -9,6 +9,13 @@
         "--output-dir",
         ".playwright-mcp/screenshots"
       ]
+    },
+    "humanitarian-databank": {
+      "command": "python",
+      "args": ["humanitarian-databank-mcp/server.py"],
+      "env": {
+        "DATABANK_API_BASE": "https://databank.ifrc.org/api/v1"
+      }
     }
   }
 }

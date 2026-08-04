@@ -14,7 +14,10 @@ from app.models import AIDocument
 from app.models.enums import AIDocumentProcessingStatusValue
 from app.services.ai.documents.country_detection import detect_country_id_and_name
 from app.services.ai.documents.vector_store import AIVectorStore, VectorStoreError
-from app.services.upr.query_detection import query_prefers_upr_documents
+from app.services.upr.query_detection import (
+    query_prefers_upr_documents,
+    query_requests_multi_year_documents,
+)
 
 PUBLIC_DOC_DEFAULT_TOP_K = 8
 PUBLIC_DOC_MAX_TOP_K = 12
@@ -212,6 +215,116 @@ def _apply_scope_filters_to_query(query, filters: Dict[str, Any] | None):
     return query
 
 
+def _document_year(document: AIDocument) -> int:
+    if document.document_date:
+        return int(document.document_date.year)
+    for source in (document.title, document.filename):
+        years = _YEAR_RE.findall(source or "")
+        if years:
+            return max(int(y) for y in years)
+    if document.processed_at:
+        return int(document.processed_at.year)
+    if document.created_at:
+        return int(document.created_at.year)
+    return 0
+
+
+def _document_type_key(document: AIDocument, query: str) -> str:
+    title = (document.title or "").lower()
+    filename = (document.filename or "").lower()
+    category = (document.document_category or "").lower()
+    extra = document.extra_metadata if isinstance(document.extra_metadata, dict) else {}
+    label = str(extra.get("document_type_label") or "").lower()
+    combined = f"{title} {filename} {label} {category}"
+
+    if re.search(r"\bmid[-\s]?year|\bmyr\b", combined, re.IGNORECASE):
+        return "midyear_report"
+    if re.search(r"\bannual\s+report|\bar\b", combined, re.IGNORECASE):
+        return "annual_report"
+    if re.search(r"\bunified\s+plan|\bupl\b|\bupr\b", combined, re.IGNORECASE):
+        return "unified_plan"
+    if query_prefers_upr_documents(query):
+        return "unified_plan"
+    if category:
+        return category
+    return "other"
+
+
+def _document_recency_key(document: AIDocument) -> tuple:
+    doc_date = document.document_date or date.min
+    processed = document.processed_at or document.created_at
+    processed_ord = processed.date() if processed else date.min
+    return (_document_year(document), doc_date, processed_ord, int(document.id))
+
+
+def _should_prioritize_latest_per_country(
+    query: str,
+    filters: Dict[str, Any] | None,
+    *,
+    latest_per_country: bool | None,
+) -> bool:
+    if latest_per_country is not None:
+        return bool(latest_per_country)
+    if query_requests_multi_year_documents(query):
+        return False
+    return True
+
+
+def prioritize_latest_documents_per_country(
+    documents: List[AIDocument],
+    query: str,
+    *,
+    enabled: bool,
+) -> tuple[List[AIDocument], Dict[str, Any]]:
+    """Keep the newest document per (country, document-type) group for snapshot queries."""
+    if not enabled or len(documents) <= 1:
+        return documents, {"latest_per_country_applied": False}
+
+    groups: Dict[tuple[str, str], List[AIDocument]] = {}
+    for doc in documents:
+        type_key = _document_type_key(doc, query)
+        country_keys = [name.strip().lower() for name in _document_country_names(doc)] or ["__unknown__"]
+        for country_key in country_keys:
+            groups.setdefault((country_key, type_key), []).append(doc)
+
+    selected_ids: set[int] = set()
+    superseded: List[Dict[str, Any]] = []
+    for (_country_key, type_key), docs in groups.items():
+        unique_docs = {int(doc.id): doc for doc in docs}
+        docs = list(unique_docs.values())
+        if len(docs) == 1:
+            selected_ids.add(int(docs[0].id))
+            continue
+        best = max(docs, key=_document_recency_key)
+        selected_ids.add(int(best.id))
+        for doc in docs:
+            if int(doc.id) == int(best.id):
+                continue
+            superseded.append(
+                {
+                    "document_id": int(doc.id),
+                    "document_title": doc.title,
+                    "countries": _document_country_names(doc),
+                    "document_type": type_key,
+                    "document_year": _document_year(doc),
+                    "superseded_by_document_id": int(best.id),
+                    "superseded_by_title": best.title,
+                }
+            )
+
+    selected = [doc for doc in documents if int(doc.id) in selected_ids]
+    selected.sort(key=lambda doc: (doc.title or "").lower())
+    return selected, {
+        "latest_per_country_applied": True,
+        "documents_before_dedupe": len(documents),
+        "documents_after_dedupe": len(selected),
+        "superseded_documents": sorted(
+            superseded,
+            key=lambda item: ((item.get("countries") or [""])[0], item.get("document_year") or 0),
+        ),
+    }
+
+
 def list_public_documents_in_scope(filters: Dict[str, Any] | None) -> List[AIDocument]:
     """List public, searchable, completed documents matching scope filters."""
     completed = AIDocumentProcessingStatusValue.completed.value
@@ -281,8 +394,19 @@ def _search_public_documents_full_coverage(
     max_content_chars: int,
     page: int = 1,
     per_page: int = PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE,
+    latest_per_country: bool | None = None,
 ) -> Dict[str, Any]:
     documents = list_public_documents_in_scope(filters)
+    prioritize_latest = _should_prioritize_latest_per_country(
+        raw_query,
+        filters,
+        latest_per_country=latest_per_country,
+    )
+    documents, latest_meta = prioritize_latest_documents_per_country(
+        documents,
+        raw_query,
+        enabled=prioritize_latest,
+    )
     if len(documents) > PUBLIC_DOC_FULL_COVERAGE_MAX_DOCS:
         raise ValueError(
             f"Too many documents in scope ({len(documents)}). "
@@ -352,6 +476,7 @@ def _search_public_documents_full_coverage(
         "documents_with_hits": len(docs_with_hits),
         "documents_without_hits": len(without_hits),
         "without_hits": without_hits,
+        "latest_per_country": latest_meta,
         **pagination,
     }
 
@@ -391,6 +516,7 @@ def search_public_documents(
     full_coverage: bool = False,
     page: int = 1,
     per_page: int = PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE,
+    latest_per_country: bool | None = None,
 ) -> Dict[str, Any]:
     """
     Search public AI document chunks (is_public=True only).
@@ -428,6 +554,7 @@ def search_public_documents(
             max_content_chars=min(max_content_chars, PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS),
             page=page,
             per_page=per_page,
+            latest_per_country=latest_per_country,
         )
         slimmed = coverage_payload["chunks"]
         coverage_block = coverage_payload["coverage"]
@@ -474,6 +601,13 @@ def search_public_documents(
             f"score>={min_score}. Paginate with page/per_page if coverage.has_more_pages. "
             f"Custom GPT Actions cap responses at ~{PUBLIC_DOC_ACTION_MAX_RESPONSE_CHARS} chars."
         )
+        if query_requests_multi_year_documents(raw_query):
+            notes.append("Multi-year query: all matching years kept (latest-per-country dedupe skipped).")
+        elif latest_per_country is not False:
+            notes.append(
+                "Snapshot query: kept the newest document per country and document type "
+                "(e.g. 2026 Unified Plan over 2024/2025). See coverage.latest_per_country."
+            )
     if query_prefers_upr_documents(raw_query):
         notes.append("Query matched Unified Plan / UPR document scope.")
     if year:

@@ -1341,7 +1341,6 @@ def download_document(doc_id):
         return redirect(url_for("main.dashboard"))
 
     try:
-        main_cat = _storage_category_for_submitted_document(document)
         has_local_file = bool(
             document.storage_path
             and storage.submitted_source_exists(document.storage_path)
@@ -1366,9 +1365,10 @@ def download_document(doc_id):
                     "warning" if document.source_url or document.fdrs_import_key else "danger",
                 )
                 return safe_redirect(request.args.get("next"), default_route="content_management.manage_documents")
-        return storage.stream_response(
-            main_cat, document.storage_path,
-            filename=document.filename, as_attachment=True,
+        return storage.stream_submitted_document_response(
+            document.storage_path,
+            filename=document.filename,
+            as_attachment=True,
         )
     except Exception as e:
         current_app.logger.error(f"Error downloading document: {e}", exc_info=True)

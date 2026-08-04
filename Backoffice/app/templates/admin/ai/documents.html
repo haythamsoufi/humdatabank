@@ -325,6 +325,9 @@
                             <i class="fas fa-info-circle text-blue-500 mr-1"></i>
                             {{ _('Import and process existing documents from the Document Management system') }}
                         </p>
+                        <p class="text-xs text-gray-500 mb-4">
+                            {{ _('Documents with unreachable FDRS file URLs (tagged during FDRS sync) are excluded from selection until IFRC fixes the URL and you re-run sync.') }}
+                        </p>
                         <div class="flex gap-3 mb-4">
                             <input type="text" id="importSearch" placeholder="{{ _('Search documents...')|forceescape }}" class="flex-1 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
                             <button type="button" id="importRefreshBtn" class="btn btn-secondary btn-sm">
@@ -583,6 +586,15 @@ window.aiDocumentsConfig.t = {
   failed_to_start_metadata_reprocess_801da98c: {{ _('Failed to start metadata reprocess.')|tojson }},
   failed_to_update_0ff78b34: {{ _('Failed to update.')|tojson }},
   failed_to_update_category_e480510f: {{ _('Failed to update category.')|tojson }},
+  file_url_available_8e4f2a1b: {{ _('Available')|tojson }},
+  file_url_empty_9c3d1e7a: {{ _('No URL')|tojson }},
+  file_url_error_5d0c7f2e: {{ _('URL error')|tojson }},
+  file_url_forbidden_7b2a9c4d: {{ _('URL blocked (403)')|tojson }},
+  file_url_http_status_4e9a6b1d: {{ _('HTTP {status}')|tojson }},
+  file_url_not_found_6a1b8e3c: {{ _('URL not found (404)')|tojson }},
+  file_url_status_2a7c9e4b: {{ _('File URL')|tojson }},
+  file_url_unavailable_3f8e2d0c: {{ _('URL unavailable')|tojson }},
+  file_url_unavailable_hint_1d6e8a3f: {{ _('Excluded from AI import until IFRC fixes the document URL. Re-run FDRS sync to refresh.')|tojson }},
   filename_1351017a: {{ _('Filename')|tojson }},
   found_5d695cc2: {{ _('Found')|tojson }},
   global_4cc6684d: {{ _('Global')|tojson }},

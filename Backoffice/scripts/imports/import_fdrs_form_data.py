@@ -2821,6 +2821,7 @@ def run_import(
                 stats["documents_downloaded"] = ds.get("downloaded", 0)
                 stats["documents_pending"] = ds.get("pending", 0)
                 stats["documents_download_errors"] = ds.get("download_errors", 0)
+                stats["documents_url_unreachable"] = ds.get("url_unreachable", 0)
                 stats["documents_status_approved"] = ds.get("status_approved", 0)
                 stats["documents_status_pending"] = ds.get("status_pending", 0)
                 stats["documents_status_rejected"] = ds.get("status_rejected", 0)

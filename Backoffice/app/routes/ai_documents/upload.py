@@ -587,8 +587,12 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
 
         try:
             tables = extracted.get('tables') or []
-            enriched_meta = enrich_document_metadata(
-                title=getattr(doc, 'title', filename),
+            from app.services.ai.documents.submitted_metadata import (
+                apply_enriched_metadata_to_ai_doc,
+                enrich_ai_document_metadata_from_content,
+            )
+            enriched_meta = enrich_ai_document_metadata_from_content(
+                doc,
                 filename=filename,
                 text=extracted.get('text', ''),
                 total_pages=extracted.get('metadata', {}).get('total_pages'),
@@ -597,11 +601,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
                 table_extraction_success=len(tables) > 0,
                 source_url=getattr(doc, 'source_url', None),
             )
-            doc.document_date = enriched_meta.get('document_date')
-            doc.document_language = enriched_meta.get('document_language')
-            doc.document_category = enriched_meta.get('document_category')
-            doc.quality_score = enriched_meta.get('quality_score')
-            doc.source_organization = enriched_meta.get('source_organization')
+            apply_enriched_metadata_to_ai_doc(doc, enriched_meta)
             db.session.commit()
         except Exception as _meta_err:
             logger.warning("Metadata enrichment failed for doc %s: %s", document_id, _meta_err)

@@ -39,6 +39,8 @@ class SubmittedDocument(db.Model):
     thumbnail_source_url = db.Column(db.String(2000), nullable=True)
     fdrs_import_key = db.Column(db.String(64), nullable=True)
     file_pending = db.Column(db.Boolean, default=False, nullable=False)
+    # Last HTTP probe of source_url during FDRS sync (403/404/0/-1 when unreachable; NULL when OK/local).
+    source_url_http_status = db.Column(db.Integer, nullable=True)
     uploaded_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     document_type = db.Column(db.String(255), nullable=True)
@@ -127,6 +129,21 @@ class SubmittedDocument(db.Model):
         if self.form_item:
             return self.form_item.label
         return self.document_type or 'Document'
+
+    @property
+    def source_url_unreachable(self) -> bool:
+        """True when a public FDRS document has no local file and the source URL failed probing."""
+        if not self.file_pending or not self.is_public:
+            return False
+        status = self.source_url_http_status
+        if status is not None:
+            return status not in (200, 206)
+        if not self.fdrs_import_key:
+            return False
+        if not (self.storage_path or "").strip():
+            return True
+        from app.services.platform import storage_service as storage
+        return not storage.submitted_source_exists(self.storage_path)
 
     def __repr__(self):
         field_label = self.document_label

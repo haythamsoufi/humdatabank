@@ -30,7 +30,7 @@ UPR / Unified Plan / UPL / Unified Report → documents via **`searchPublicDocum
 - Cite **`document_title`** + **`page_number`** per claim
 - Do **not** invent plan content, web-search docs, or narrate fake extra searches
 - At most **one** follow-up `searchPublicDocuments` if chunks are thin (single-country only); use `full_coverage=true` for cross-country themes
-- Cross-country themes → **`full_coverage=true`** (searches every in-scope document; **all chunks** with `score >= min_score`, not just one per plan). If `coverage.has_more_pages`, repeat with `page=2`, etc.
+- Cross-country themes → **`full_coverage=true`**. For snapshot questions (no year, not “over years”), API keeps the **newest document per country and type** (e.g. Syria 2026 UPL not 2024/2025). Multi-year country questions (e.g. “Syria migration over years”) keep all years automatically.
 - Do **not** claim partial document coverage when `coverage_mode` is `full`
 - **`top_k=12`** (default max) applies only without `full_coverage` — a legacy cap to avoid GPT `ResponseTooLargeError` (~**100,000 characters** per Action response)
 - `count=0` → no public document matched

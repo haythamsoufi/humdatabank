@@ -467,6 +467,42 @@ def submitted_source_exists(storage_path: str) -> bool:
     return exists(cat, rel_key)
 
 
+def stream_submitted_document_response(
+    storage_path: str,
+    *,
+    filename: str,
+    as_attachment: bool = True,
+    mimetype: Optional[str] = None,
+):
+    """Stream a ``SubmittedDocument`` main file using canonical path resolution."""
+    from werkzeug.exceptions import NotFound
+
+    sp = (storage_path or "").strip()
+    if not sp:
+        raise NotFound()
+
+    pair = category_rel_for_submitted_storage_path(sp)
+    if pair is None:
+        if _is_effectively_absolute_stored_path(sp) and os.path.exists(sp):
+            effective_mime = mimetype or _guess_mimetype(filename)
+            return send_file(
+                sp,
+                mimetype=effective_mime,
+                as_attachment=as_attachment,
+                download_name=filename,
+            )
+        raise NotFound()
+
+    cat, rel = pair
+    return stream_response(
+        cat,
+        rel,
+        filename=filename,
+        mimetype=mimetype,
+        as_attachment=as_attachment,
+    )
+
+
 def local_path_for_submitted_document_processing(
     storage_path: str,
 ) -> Tuple[Optional[str], bool]:

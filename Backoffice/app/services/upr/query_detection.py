@@ -48,3 +48,35 @@ def query_prefers_upr_documents(query: str) -> bool:
     if _UPR_ONLY_NEGATIVE_RE.search(q):
         return False
     return True
+
+
+_MULTI_YEAR_QUERY_RE = re.compile(
+    r"\b("
+    r"over\s+(?:the\s+)?years?|"
+    r"across\s+years?|"
+    r"year\s+over\s+year|"
+    r"year-on-year|"
+    r"yearly\s+(?:trend|change|comparison)|"
+    r"multi[-\s]?year|"
+    r"historical(?:ly)?|"
+    r"evolution|"
+    r"timeline|"
+    r"compare(?:d)?\s+(?:across|between|over)|"
+    r"from\s+20\d{2}\s+to\s+20\d{2}|"
+    r"between\s+20\d{2}\s+and\s+20\d{2}|"
+    r"multiple\s+years?|"
+    r"all\s+years?"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def query_requests_multi_year_documents(query: str) -> bool:
+    """True when the user wants documents from several years (do not keep latest only)."""
+    q = (query or "").strip()
+    if not q:
+        return False
+    if _MULTI_YEAR_QUERY_RE.search(q):
+        return True
+    years = re.findall(r"\b(20\d{2})\b", q)
+    return len(set(years)) >= 2

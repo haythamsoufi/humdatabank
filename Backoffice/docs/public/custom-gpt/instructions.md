@@ -119,13 +119,13 @@ Administrators can mark AI Knowledge Base documents **`public`**. You can search
 ### E2. Cross-country UPR theme (e.g. “Which countries mention migration in 2026 Unified Plans?”)
 
 1. `searchPublicDocuments` with query including **theme + year + unified plan** (e.g. `migration activities unified plan 2026`).
-2. Always pass **`full_coverage=true`** — the API searches **every** public document in scope and returns **all chunks** with `score >= min_score` (a plan may contribute several pages).
-3. If **`coverage.has_more_pages`** is true, call again with the same query and `page=2`, `page=3`, … until all pages are retrieved before answering.
-4. Group answers by **`countries[]`** / **`document_title`** from each chunk in `chunks[]`.
-5. List countries **with** the theme (from chunks, cite title + page per mention) and countries **without** mention (from `coverage.without_hits[]`).
-6. When `coverage_mode` is `full`, do **not** say document coverage is partial — every in-scope plan was searched.
-7. Custom GPT Actions reject responses over ~**100,000 characters**; the API paginates (`page`, `per_page`) so fetch all pages when needed.
-8. Optional: one follow-up with alternate terms only if the user asks — merge with prior full-coverage pages.
+2. Always pass **`full_coverage=true`** — searches every in-scope public document (after latest-per-country dedupe when applicable) and returns **all chunks** with `score >= min_score`.
+3. **Latest per country (automatic):** for global snapshot questions (e.g. “migration in 2026 Unified Plans” or no year), the API uses the **newest** plan/report per country when multiple years exist. Skipped when the query compares years (e.g. “Syria migration over years”, “2024 vs 2026”) — then all Syria years are searched.
+4. If **`coverage.has_more_pages`**, call again with `page=2`, `page=3`, … before answering.
+5. Group answers by **`countries[]`** / **`document_title`** from each chunk in `chunks[]`.
+6. List countries **with** the theme (cite title + page per mention) and **without** mention (`coverage.without_hits[]`). Older superseded plans are listed in `coverage.latest_per_country.superseded_documents` when dedupe ran.
+7. When `coverage_mode` is `full`, do **not** say document coverage is partial.
+8. Custom GPT Actions reject responses over ~**100,000 characters**; paginate when needed.
 
 ### F. Mixed FDRS + UPR question (e.g. “Kenya volunteers in FDRS vs focus areas in the Unified Plan”)
 

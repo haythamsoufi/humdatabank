@@ -2221,6 +2221,7 @@ function mapSystemDocumentToRow(doc) {
         language_display: doc.language_display || doc.language || '',
         uploaded_by: doc.uploaded_by || '',
         status: doc.status || '',
+        is_public: !!doc.is_public,
         file_size: (typeof doc.file_size === 'number' && doc.file_size > 0) ? doc.file_size : null,
         file_pending: !!doc.file_pending,
         source_url: doc.source_url || null,
@@ -2295,10 +2296,10 @@ const importSystemDocumentsColumnDefs = [
             const icon = getFileTypeIcon(data.filename);
             const name = escapeHtml(data.filename || '');
             const wrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%';
-            const aid = data.ai_document_id != null ? parseInt(data.ai_document_id, 10) : 0;
-            const nameLine = (data.ai_processed && aid) ?
-                '<a href="/admin/ai/documents/' + aid + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
-                'target="_blank" rel="noopener noreferrer" title="' + escapeAttr(cfg.t.view_or_download_9e34181d) + '">' + name + '</a>' :
+            const docId = data.id != null ? parseInt(data.id, 10) : 0;
+            const nameLine = docId ?
+                '<a href="/admin/documents/download/' + docId + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
+                'download title="' + escapeAttr(cfg.t.view_or_download_9e34181d) + '">' + name + '</a>' :
                 '<div class="text-sm font-medium text-gray-900" style="' + wrap + '" title="' + escapeAttr(data.filename || '') + '">' + name + '</div>';
             return '<div class="flex items-start gap-2 min-w-0" style="width:100%">' +
                 '<div class="flex-shrink-0 text-gray-500" style="padding-top:2px">' + icon + '</div>' +
@@ -2472,6 +2473,29 @@ const importSystemDocumentsColumnDefs = [
             if (!v) return '<span class="text-xs text-gray-400">\u2014</span>';
             return '<span class="text-sm text-gray-700 capitalize">' + escapeHtml(v) + '</span>';
         }
+    },
+    {
+        field: 'is_public',
+        headerName: cfg.t.public_3d067bed,
+        width: 100,
+        minWidth: 90,
+        maxWidth: 120,
+        filter: 'customSetFilter',
+        sortable: true,
+        filterValueGetter: function(params) {
+            const isPublic = params.data && (params.data.is_public === true || params.data.is_public === 'true' || params.data.is_public === 1);
+            return isPublic ? cfg.t.public_3d067bed : cfg.t.not_public_20257be8;
+        },
+        cellRenderer: function(params) {
+            const isPublic = params.data && (params.data.is_public === true || params.data.is_public === 'true' || params.data.is_public === 1);
+            if (isPublic) {
+                return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">' +
+                    escapeHtml(cfg.t.public_3d067bed) + '</span>';
+            }
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">' +
+                escapeHtml(cfg.t.not_public_20257be8) + '</span>';
+        },
+        cellStyle: { 'white-space': 'nowrap' }
     },
     {
         field: 'uploaded_at',

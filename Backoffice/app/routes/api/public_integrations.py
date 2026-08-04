@@ -94,6 +94,10 @@ def public_search_documents():
         country_id = request.args.get("country_id", type=int)
         file_type = request.args.get("file_type", default="", type=str).strip() or None
         search_mode = request.args.get("search_mode", default="hybrid", type=str)
+        full_coverage_raw = request.args.get("full_coverage", default="false", type=str).strip().lower()
+        full_coverage = full_coverage_raw in {"1", "true", "yes"}
+        page = request.args.get("page", default=1, type=int)
+        per_page = request.args.get("per_page", default=80, type=int)
 
         payload = search_public_documents(
             query,
@@ -103,6 +107,9 @@ def public_search_documents():
             country_id=country_id,
             file_type=file_type,
             search_mode=search_mode,
+            full_coverage=full_coverage,
+            page=page,
+            per_page=per_page,
         )
         response = json_response(payload)
         response.headers["Cache-Control"] = "private, no-store"

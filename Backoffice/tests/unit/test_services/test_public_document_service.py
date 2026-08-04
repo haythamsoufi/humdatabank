@@ -1,12 +1,16 @@
+import datetime
+
 import pytest
 
 from app.models import AIDocument
 from app.models.enums import AIDocumentProcessingStatusValue
 from app.services.public_document_service import (
+    PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS,
     PUBLIC_DOC_MAX_CONTENT_CHARS,
     _build_search_filters,
     _extract_year,
     filter_rows_to_public_documents,
+    list_public_documents_in_scope,
     search_public_documents,
     slim_public_document_chunk,
 )
@@ -265,3 +269,204 @@ class TestSearchPublicDocuments:
     def test_api_route_requires_query(self, client):
         resp = client.get("/api/v1/public/documents/search")
         assert resp.status_code == 400
+
+    def test_full_coverage_returns_coverage_block(self, app, db_session):
+        with app.app_context():
+            doc_a = AIDocument(
+                title="Kenya Unified Plan 2026",
+                filename="kenya.pdf",
+                file_type="pdf",
+                is_public=True,
+                searchable=True,
+                processing_status=AIDocumentProcessingStatusValue.completed.value,
+                country_name="Kenya",
+                source_url="https://example.org/upl/kenya",
+                document_date=datetime.date(2026, 1, 1),
+            )
+            doc_b = AIDocument(
+                title="Nepal Unified Plan 2026",
+                filename="nepal.pdf",
+                file_type="pdf",
+                is_public=True,
+                searchable=True,
+                processing_status=AIDocumentProcessingStatusValue.completed.value,
+                country_name="Nepal",
+                source_url="https://example.org/upl/nepal",
+                document_date=datetime.date(2026, 1, 1),
+            )
+            db_session.add_all([doc_a, doc_b])
+            db_session.commit()
+            db_session.refresh(doc_a)
+            db_session.refresh(doc_b)
+
+        per_doc_rows = {
+            doc_a.id: {
+                "chunk_id": 1,
+                "document_id": doc_a.id,
+                "document_title": "Kenya Unified Plan 2026",
+                "document_country_name": "Kenya",
+                "page_number": 2,
+                "content": "Migration and displacement programmes.",
+                "combined_score": 0.88,
+            },
+            doc_b.id: {
+                "chunk_id": 2,
+                "document_id": doc_b.id,
+                "document_title": "Nepal Unified Plan 2026",
+                "document_country_name": "Nepal",
+                "page_number": 1,
+                "content": "Health and WASH only.",
+                "combined_score": 0.05,
+            },
+        }
+
+        class FakeStore:
+            def hybrid_search_per_document(self, query_text, document_ids, **kwargs):
+                return [per_doc_rows[doc_id] for doc_id in document_ids if doc_id in per_doc_rows]
+
+        with app.app_context():
+            from app.services import public_document_service as svc
+
+            original = svc.AIVectorStore
+            svc.AIVectorStore = FakeStore
+            try:
+                out = search_public_documents(
+                    "migration unified plan 2026",
+                    full_coverage=True,
+                    min_score=0.25,
+                )
+            finally:
+                svc.AIVectorStore = original
+
+        assert out["coverage_mode"] == "full"
+        assert out["coverage"]["documents_in_scope"] == 2
+        assert out["coverage"]["documents_with_hits"] == 1
+        assert out["coverage"]["documents_without_hits"] == 1
+        assert out["coverage"]["total_matching_chunks"] == 1
+        assert out["chunks"][0]["document_title"] == "Kenya Unified Plan 2026"
+        assert len(out["chunks"][0]["content"]) <= PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS + 1
+        assert out["coverage"]["without_hits"][0]["document_title"] == "Nepal Unified Plan 2026"
+
+    def test_full_coverage_returns_all_relevant_chunks_per_document(self, app, db_session):
+        with app.app_context():
+            doc = AIDocument(
+                title="Kenya Unified Plan 2026",
+                filename="kenya.pdf",
+                file_type="pdf",
+                is_public=True,
+                searchable=True,
+                processing_status=AIDocumentProcessingStatusValue.completed.value,
+                country_name="Kenya",
+                source_url="https://example.org/upl/kenya",
+                document_date=datetime.date(2026, 1, 1),
+            )
+            db_session.add(doc)
+            db_session.commit()
+            db_session.refresh(doc)
+
+        class FakeStore:
+            def hybrid_search_per_document(self, query_text, document_ids, **kwargs):
+                assert document_ids == [doc.id]
+                return [
+                    {
+                        "chunk_id": 1,
+                        "document_id": doc.id,
+                        "document_title": "Kenya Unified Plan 2026",
+                        "page_number": 2,
+                        "content": "Migration programmes in border areas.",
+                        "combined_score": 0.9,
+                    },
+                    {
+                        "chunk_id": 2,
+                        "document_id": doc.id,
+                        "document_title": "Kenya Unified Plan 2026",
+                        "page_number": 8,
+                        "content": "Return and reintegration for migrants.",
+                        "combined_score": 0.7,
+                    },
+                    {
+                        "chunk_id": 3,
+                        "document_id": doc.id,
+                        "document_title": "Kenya Unified Plan 2026",
+                        "page_number": 12,
+                        "content": "Unrelated health section.",
+                        "combined_score": 0.1,
+                    },
+                ]
+
+        with app.app_context():
+            from app.services import public_document_service as svc
+
+            original = svc.AIVectorStore
+            svc.AIVectorStore = FakeStore
+            try:
+                out = search_public_documents(
+                    "migration unified plan 2026",
+                    full_coverage=True,
+                    min_score=0.25,
+                )
+            finally:
+                svc.AIVectorStore = original
+
+        assert out["coverage"]["documents_with_hits"] == 1
+        assert out["coverage"]["total_matching_chunks"] == 2
+        assert len(out["chunks"]) == 2
+        pages = sorted(chunk["page_number"] for chunk in out["chunks"])
+        assert pages == [2, 8]
+
+    def test_list_public_documents_in_scope_respects_upr_filters(self, app, db_session):
+        with app.app_context():
+            in_scope = AIDocument(
+                title="Syria Unified Plan 2026",
+                filename="syria.pdf",
+                file_type="pdf",
+                is_public=True,
+                searchable=True,
+                processing_status=AIDocumentProcessingStatusValue.completed.value,
+                source_url="https://example.org/upl/syria",
+                document_date=datetime.date(2026, 3, 1),
+            )
+            private = AIDocument(
+                title="Hidden Plan 2026",
+                filename="hidden.pdf",
+                file_type="pdf",
+                is_public=False,
+                searchable=True,
+                processing_status=AIDocumentProcessingStatusValue.completed.value,
+                source_url="https://example.org/upl/hidden",
+                document_date=datetime.date(2026, 3, 1),
+            )
+            db_session.add_all([in_scope, private])
+            db_session.commit()
+
+            filters = _build_search_filters("syria unified plan 2026", year=2026)
+            docs = list_public_documents_in_scope(filters)
+
+        assert len(docs) == 1
+        assert docs[0].title == "Syria Unified Plan 2026"
+
+    def test_api_route_accepts_full_coverage(self, client, app):
+        payload = {
+            "query": "migration unified plan 2026",
+            "coverage_mode": "full",
+            "coverage": {"documents_in_scope": 2, "documents_with_hits": 1, "documents_without_hits": 1},
+            "count": 1,
+            "chunks": [{"document_title": "Kenya Unified Plan 2026", "content": "Migration.", "score": 0.9}],
+            "notes": [],
+        }
+
+        with app.app_context():
+            from unittest.mock import patch
+
+            with patch(
+                "app.routes.api.public_integrations.search_public_documents",
+                return_value=payload,
+            ) as mocked:
+                resp = client.get(
+                    "/api/v1/public/documents/search"
+                    "?query=migration+unified+plan+2026&full_coverage=true"
+                )
+                assert mocked.call_args.kwargs["full_coverage"] is True
+
+        assert resp.status_code == 200
+        assert resp.get_json()["coverage_mode"] == "full"

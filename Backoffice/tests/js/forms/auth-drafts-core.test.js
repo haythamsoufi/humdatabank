@@ -14,7 +14,9 @@ import {
   resolveDraftPayloadForRestore,
   draftHasContent,
   restoreFormData,
+  canRestoreAuthDraft,
   mergeDraftRecords,
+  parseDraftRestoreContext,
   readStoredSectionId,
   getPersistedSectionContext,
   getActiveSectionContext,
@@ -214,6 +216,94 @@ describe('restoreFormData', () => {
     restoreFormData(form, { csrf_token: 'evil', title: 'ok' });
     expect(form.elements.namedItem('csrf_token').value).toBe('original');
     expect(form.elements.namedItem('title').value).toBe('ok');
+  });
+});
+
+describe('canRestoreAuthDraft', () => {
+  it('allows pending and in_progress when review is disabled', () => {
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'pending',
+      reviewEnabled: false,
+      isDelegationUser: false,
+    })).toBe(true);
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'in_progress',
+      reviewEnabled: false,
+      isDelegationUser: false,
+    })).toBe(true);
+  });
+
+  it('blocks submitted and other terminal statuses when review is disabled', () => {
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'submitted',
+      reviewEnabled: false,
+      isDelegationUser: false,
+    })).toBe(false);
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'sent_for_review',
+      reviewEnabled: false,
+      isDelegationUser: false,
+    })).toBe(false);
+  });
+
+  it('blocks NS focals when send-for-review workflow is enabled', () => {
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'pending',
+      reviewEnabled: true,
+      isDelegationUser: false,
+    })).toBe(false);
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'in_progress',
+      reviewEnabled: true,
+      isDelegationUser: false,
+    })).toBe(false);
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'requires_revision',
+      reviewEnabled: true,
+      isDelegationUser: false,
+    })).toBe(false);
+  });
+
+  it('allows ORG delegation users only while sent_for_review', () => {
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'sent_for_review',
+      reviewEnabled: true,
+      isDelegationUser: true,
+    })).toBe(true);
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'in_progress',
+      reviewEnabled: true,
+      isDelegationUser: true,
+    })).toBe(false);
+    expect(canRestoreAuthDraft({
+      assignmentStatus: 'submitted',
+      reviewEnabled: true,
+      isDelegationUser: true,
+    })).toBe(false);
+  });
+
+  it('allows restore when assignment context is absent', () => {
+    expect(canRestoreAuthDraft(null)).toBe(true);
+    expect(canRestoreAuthDraft({ assignmentStatus: '', reviewEnabled: false, isDelegationUser: false })).toBe(true);
+  });
+});
+
+describe('parseDraftRestoreContext', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('reads workflow flags from form data attributes', () => {
+    document.body.innerHTML = `
+      <form id="focalDataEntryForm"
+            data-assignment-status="sent_for_review"
+            data-review-enabled="true"
+            data-is-delegation-user="true"></form>`;
+    expect(parseDraftRestoreContext(document.getElementById('focalDataEntryForm'))).toEqual({
+      assignmentStatus: 'sent_for_review',
+      reviewEnabled: true,
+      isDelegationUser: true,
+    });
   });
 });
 

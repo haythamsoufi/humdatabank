@@ -347,8 +347,18 @@
 
         {# View-only entry form hardening TODOs: Backoffice/docs/runbooks/development/tailwind-and-template-safety.md §7 #}
 
+        {% if assignment_status is defined and assignment_status %}
+            {% set _draft_restore_raw_status = assignment_status.status %}
+            {% set _draft_restore_assignment_status = _draft_restore_raw_status.value if (_draft_restore_raw_status is not none and _draft_restore_raw_status.value is defined) else (_draft_restore_raw_status|string if _draft_restore_raw_status is not none else '') %}
+        {% else %}
+            {% set _draft_restore_assignment_status = '' %}
+        {% endif %}
+
         {% if can_edit %}
-        <form method="POST" id="focalDataEntryForm" enctype="multipart/form-data" action="{{ form_action }}">
+        <form method="POST" id="focalDataEntryForm" enctype="multipart/form-data" action="{{ form_action }}"
+              {% if form_type == 'assignment' and _draft_restore_assignment_status %}data-assignment-status="{{ _draft_restore_assignment_status }}"{% endif %}
+              {% if review_enabled is defined %}data-review-enabled="{{ 'true' if review_enabled else 'false' }}"{% endif %}
+              {% if is_delegation_user is defined %}data-is-delegation-user="{{ 'true' if is_delegation_user else 'false' }}"{% endif %}>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="submit_form" value="1">
             {% if template_id is defined %}

@@ -21,7 +21,7 @@ from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk, AIEmbedding, Country, AIJob, AIJobItem
 from app.services.ai.documents.processor import AIDocumentProcessor
 from app.utils.datetime_helpers import utcnow
-from app.routes.admin.shared import admin_required, permission_required
+from app.routes.admin.shared import admin_required, permission_required_any
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import (
     json_accepted, json_auth_required, json_bad_request, json_error,
@@ -38,6 +38,7 @@ from app.utils.constants import (
 from . import ai_docs_bp
 from .helpers import (
     IFRC_APPEALS_TITLE_YEAR_RE,
+    AI_DOCUMENTS_MANAGE_PERMISSIONS,
     _get_ifrc_basic_auth,
     _validate_ifrc_fetch_url,
     _normalize_ifrc_source_url,
@@ -444,7 +445,7 @@ def _run_ifrc_bulk_import_job(app, job_id: str) -> None:
 
 @ai_docs_bp.route('/ifrc-api/types', methods=['GET'])
 @admin_required
-@permission_required('admin.documents.manage')
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 @limiter.limit("60 per minute")
 def list_ifrc_api_types():
     """
@@ -468,7 +469,7 @@ def list_ifrc_api_types():
 
 @ai_docs_bp.route('/ifrc-api/filter-options', methods=['GET'])
 @admin_required
-@permission_required('admin.documents.manage')
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 @limiter.limit("60 per minute")
 def list_ifrc_api_filter_options():
     """
@@ -548,7 +549,7 @@ def list_ifrc_api_filter_options():
 
 @ai_docs_bp.route('/ifrc-api/list', methods=['GET'])
 @admin_required
-@permission_required('admin.documents.manage')
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 @limiter.limit("30 per minute")
 def list_ifrc_api_documents():
     """
@@ -742,7 +743,7 @@ def list_ifrc_api_documents():
 
 @ai_docs_bp.route('/ifrc-api/import', methods=['POST'])
 @admin_required
-@permission_required('admin.documents.manage')
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 @limiter.limit("10 per minute")
 def import_ifrc_api_document():
     """
@@ -936,7 +937,7 @@ def import_ifrc_api_document():
 
 @ai_docs_bp.route("/ifrc-api/import-bulk", methods=["POST"])
 @admin_required
-@permission_required("admin.documents.manage")
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 @limiter.limit("5 per minute")
 def import_ifrc_api_documents_bulk():
     """
@@ -1045,7 +1046,7 @@ def import_ifrc_api_documents_bulk():
 
 @ai_docs_bp.route("/ifrc-api/import-bulk/<job_id>/status", methods=["GET"])
 @admin_required
-@permission_required("admin.documents.manage")
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 def import_ifrc_bulk_status(job_id: str):
     """Return job + item statuses for a bulk IFRC import."""
     try:
@@ -1107,7 +1108,7 @@ def import_ifrc_bulk_status(job_id: str):
 
 @ai_docs_bp.route("/ifrc-api/import-bulk/<job_id>/cancel", methods=["POST"])
 @admin_required
-@permission_required("admin.documents.manage")
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 def import_ifrc_bulk_cancel(job_id: str):
     """Request cancellation for a running bulk IFRC import job (best-effort)."""
     try:

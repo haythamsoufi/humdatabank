@@ -22,7 +22,7 @@ from app.services.ai.documents.metadata import enrich_document_metadata, classif
 from app.services.ai.documents.embedding import AIEmbeddingService, EmbeddingError
 from app.services.ai.documents.vector_store import AIVectorStore
 from app.utils.datetime_helpers import utcnow
-from app.routes.admin.shared import admin_required, permission_required
+from app.routes.admin.shared import admin_required, permission_required_any
 from app.utils.advanced_validation import AdvancedValidator
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_accepted, json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
@@ -31,6 +31,7 @@ from app.services.platform import storage_service as _storage
 from . import ai_docs_bp
 from .helpers import (
     MAX_AI_DOCUMENT_SIZE,
+    AI_DOCUMENTS_MANAGE_PERMISSIONS,
     _ai_doc_source_ready,
     _ai_doc_storage_delete,
     _try_claim_inflight_document,
@@ -54,7 +55,7 @@ def get_document_processing_stage(document_id: int) -> Optional[str]:
 
 @ai_docs_bp.route('/upload', methods=['POST'])
 @admin_required
-@permission_required('admin.documents.manage')
+@permission_required_any(*AI_DOCUMENTS_MANAGE_PERMISSIONS)
 @limiter.limit("10 per minute")
 def upload_document():
     """

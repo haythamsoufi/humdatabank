@@ -44,6 +44,80 @@ _NO_RELEVANT_INFO_SENTINEL = "__NO_RELEVANT_INFO__"
 # "word" characters, so ``INP_2023_Country`` would not match ``\\b20``.
 IFRC_APPEALS_TITLE_YEAR_RE = re.compile(r"(?<!\d)(20\d{2})(?!\d)")
 
+# RBAC: AI Knowledge Base and legacy document-admin API callers.
+AI_DOCUMENTS_MANAGE_PERMISSIONS = ("admin.ai.manage", "admin.documents.manage")
+
+# ---------------------------------------------------------------------------
+# AI document library list filters (shared by admin page + /api/ai/documents/)
+# ---------------------------------------------------------------------------
+
+
+def parse_ai_document_library_filters(args) -> Dict[str, str]:
+    """Extract filter params from Flask request.args or any mapping."""
+    def _get(key: str) -> str:
+        raw = args.get(key, "") if hasattr(args, "get") else ""
+        return (raw or "").strip()
+
+    return {
+        "status": _get("status"),
+        "file_type": _get("file_type"),
+        "category": _get("category"),
+        "language": _get("language"),
+        "q": _get("q"),
+    }
+
+
+def ai_document_library_filters_active(filters: Dict[str, str]) -> bool:
+    """True when any library filter param is non-empty."""
+    return any((filters or {}).get(k) for k in ("status", "file_type", "category", "language", "q"))
+
+
+def apply_ai_document_library_filters(query, filters: Dict[str, str]):
+    """
+    Apply Knowledge Base filter params to an AIDocument query.
+    Mirrors document_library() / list_documents() filter semantics.
+    """
+    from app.models import AIDocument
+    from app.utils.sql_utils import safe_ilike_pattern
+
+    status = (filters or {}).get("status") or ""
+    file_type = (filters or {}).get("file_type") or ""
+    category = (filters or {}).get("category") or ""
+    language = (filters or {}).get("language") or ""
+    search_query = (filters or {}).get("q") or ""
+
+    if status:
+        query = query.filter(AIDocument.processing_status == status)
+    if file_type:
+        query = query.filter(AIDocument.file_type == file_type)
+    if category:
+        query = query.filter(AIDocument.document_category == category)
+    if language:
+        query = query.filter(AIDocument.document_language == language)
+    if search_query:
+        safe_pattern = safe_ilike_pattern(search_query)
+        query = query.filter(
+            db.or_(
+                AIDocument.title.ilike(safe_pattern),
+                AIDocument.filename.ilike(safe_pattern),
+            )
+        )
+    return query
+
+
+def compute_ai_document_status_stats(query) -> Dict[str, int]:
+    """Return document status counts for rows matching *query*."""
+    from app.models import AIDocument
+
+    return {
+        "total_documents": query.count(),
+        "completed": query.filter(AIDocument.processing_status == "completed").count(),
+        "pending": query.filter(AIDocument.processing_status == "pending").count(),
+        "processing": query.filter(AIDocument.processing_status == "processing").count(),
+        "failed": query.filter(AIDocument.processing_status == "failed").count(),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Storage helpers
 # ---------------------------------------------------------------------------

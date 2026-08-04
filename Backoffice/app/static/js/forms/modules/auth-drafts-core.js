@@ -218,6 +218,52 @@ export function getActiveSectionContext() {
   return sectionContextFromId(readStoredSectionId());
 }
 
+/** Statuses where draft restore is allowed when delegation review is not enabled. */
+export const DRAFT_RESTORE_EDITABLE_STATUSES = new Set(['pending', 'in_progress']);
+
+/** Statuses where ORG/delegation users may restore while review workflow is enabled. */
+export const DRAFT_RESTORE_DELEGATION_STATUSES = new Set(['sent_for_review']);
+
+export function normalizeAssignmentStatus(status) {
+  if (status == null || status === '') return '';
+  return String(status).trim().toLowerCase();
+}
+
+/**
+ * Read assignment workflow context from the entry form data attributes.
+ * @param {HTMLFormElement|null|undefined} form
+ * @returns {{ assignmentStatus: string, reviewEnabled: boolean, isDelegationUser: boolean }|null}
+ */
+export function parseDraftRestoreContext(form) {
+  if (!form) return null;
+  const assignmentStatus = normalizeAssignmentStatus(
+    form.dataset.assignmentStatus || form.getAttribute('data-assignment-status') || '',
+  );
+  const reviewEnabled = (form.dataset.reviewEnabled || form.getAttribute('data-review-enabled') || '') === 'true';
+  const isDelegationUser = (form.dataset.isDelegationUser || form.getAttribute('data-is-delegation-user') || '') === 'true';
+  return { assignmentStatus, reviewEnabled, isDelegationUser };
+}
+
+/**
+ * Whether a local draft may be offered for restore on this assignment.
+ * - Without delegation review: pending or in_progress only (not yet submitted).
+ * - With delegation review: NS focals never; ORG/delegation users only while sent_for_review.
+ */
+export function canRestoreAuthDraft(context) {
+  if (!context) return true;
+  const { assignmentStatus, reviewEnabled, isDelegationUser } = context;
+  if (!assignmentStatus) return true;
+
+  if (reviewEnabled) {
+    if (isDelegationUser) {
+      return DRAFT_RESTORE_DELEGATION_STATUSES.has(assignmentStatus);
+    }
+    return false;
+  }
+
+  return DRAFT_RESTORE_EDITABLE_STATUSES.has(assignmentStatus);
+}
+
 export function mergeDraftRecords(idbRec, hostRec) {
   let rec = null;
   let source = 'none';

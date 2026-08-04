@@ -124,17 +124,18 @@ FDRS_DOCUMENT_TYPE_TO_CONFIG_LABEL = {
 #   1 = Validated (Public)
 #   2 = Under Validation (Public)
 #   3 = Rejected (Public)
-#   4 = Under Validation (Private) — not imported yet (pending-only; separate Public code)
+#   4 = Under Validation (Private)
 FDRS_DOCUMENT_APPROVAL_OK = frozenset(
     {
         "Validated (Public)",
         "Validated (Private)",
         "Under Validation (Public)",
+        "Under Validation (Private)",
         "Rejected (Public)",
         "Rejected (Private)",
     }
 )
-FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3})
+FDRS_DOCUMENT_PUBLIC_OK = frozenset({0, 1, 2, 3, 4})
 
 # FDRS ``Public`` codes where the file may be fetched from ``url`` (metadata import still
 # includes private codes in FDRS_DOCUMENT_PUBLIC_OK above).

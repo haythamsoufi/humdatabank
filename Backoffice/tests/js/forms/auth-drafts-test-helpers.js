@@ -23,10 +23,17 @@ export function setupEntryFormDom({
   aesId = '100',
   withField = true,
   withCsrf = false,
+  assignmentStatus = 'in_progress',
+  reviewEnabled = false,
+  isDelegationUser = false,
+  withAssignmentContext = true,
 } = {}) {
+  const assignmentAttrs = withAssignmentContext && assignmentStatus
+    ? `data-assignment-status="${assignmentStatus}" data-review-enabled="${reviewEnabled ? 'true' : 'false'}" data-is-delegation-user="${isDelegationUser ? 'true' : 'false'}"`
+    : '';
   document.body.innerHTML = `
     <div id="presence-bar" data-aes-id="${aesId}" data-current-user-id="${userId}"></div>
-    <form id="focalDataEntryForm" action="/forms/entry/${aesId}">
+    <form id="focalDataEntryForm" action="/forms/entry/${aesId}" ${assignmentAttrs}>
       ${withCsrf ? '<input name="csrf_token" value="tok">' : ''}
       ${withField ? '<input name="indicator_1" value="server-value">' : ''}
       <button type="submit" name="action" value="save">Save</button>

@@ -428,7 +428,7 @@ def document_library():
     if not _check_ai_tables_exist():
         return render_template(
             "admin/ai/documents.html",
-            documents=[],
+            processing_doc_ids=[],
             stats=_get_default_doc_stats(),
             file_types=[],
             categories=[],
@@ -438,64 +438,53 @@ def document_library():
             current_category='',
             current_language='',
             search_query='',
+            has_active_filters=False,
+            stats_global=None,
             error="AI tables not found. Please run 'flask db upgrade' to create them.",
             title="AI Knowledge Base"
         )
 
     try:
         from app.models import AIDocument, AIDocumentChunk, AIEmbedding
+        from app.routes.ai_documents.helpers import (
+            parse_ai_document_library_filters,
+            apply_ai_document_library_filters,
+            ai_document_library_filters_active,
+            compute_ai_document_status_stats,
+        )
 
         # Self-heal stale "processing" rows before rendering the page.
         _auto_recover_stale_processing_documents()
 
-        # Get query parameters (filters still supported for bookmarkable URLs)
-        status_filter = request.args.get('status', '')
-        file_type_filter = request.args.get('file_type', '')
-        category_filter = request.args.get('category', '')
-        language_filter = request.args.get('language', '')
-        search_query = request.args.get('q', '').strip()
+        filters = parse_ai_document_library_filters(request.args)
+        has_active_filters = ai_document_library_filters_active(filters)
 
-        # Build query – load ALL documents so AG Grid can handle
-        # client-side pagination, sorting, and filtering.
-        query = db.session.query(AIDocument).options(
-            joinedload(AIDocument.country),
-            joinedload(AIDocument.countries),
+        filtered_count = (
+            apply_ai_document_library_filters(db.session.query(AIDocument), filters).count()
+            if has_active_filters else None
         )
-
-        if status_filter:
-            query = query.filter(AIDocument.processing_status == status_filter)
-        if file_type_filter:
-            query = query.filter(AIDocument.file_type == file_type_filter)
-        if category_filter:
-            query = query.filter(AIDocument.document_category == category_filter)
-        if language_filter:
-            query = query.filter(AIDocument.document_language == language_filter)
-        if search_query:
-            from app.utils.sql_utils import safe_ilike_pattern
-            safe_pattern = safe_ilike_pattern(search_query)
-            query = query.filter(
-                db.or_(
-                    AIDocument.title.ilike(safe_pattern),
-                    AIDocument.filename.ilike(safe_pattern)
-                )
-            )
-
-        # Order by most recently changed so re-imported/reprocessed docs show up immediately.
-        query = query.order_by(AIDocument.updated_at.desc(), AIDocument.created_at.desc())
-
-        # Fetch all documents (AG Grid handles client-side pagination)
-        documents = query.all()
         logger.info(
-            "AI document library loaded: user_id=%s total=%s filters(status=%s file_type=%s q=%s)",
+            "AI document library page: user_id=%s filtered_total=%s filters(status=%s file_type=%s category=%s language=%s q=%s)",
             getattr(current_user, "id", None),
-            len(documents),
-            status_filter or "",
-            file_type_filter or "",
-            search_query or "",
+            filtered_count if filtered_count is not None else "all",
+            filters.get("status") or "",
+            filters.get("file_type") or "",
+            filters.get("category") or "",
+            filters.get("language") or "",
+            filters.get("q") or "",
         )
 
-        # Get statistics
-        stats = {
+        processing_doc_ids = [
+            int(r[0]) for r in (
+                db.session.query(AIDocument.id)
+                .filter(AIDocument.processing_status.in_(("processing", "pending")))
+                .all()
+            )
+            if r and r[0] is not None
+        ]
+
+        # Global stats (always unfiltered) + filtered counts when URL filters are active.
+        global_stats = {
             'total_documents': db.session.query(AIDocument).count(),
             'completed': db.session.query(AIDocument).filter_by(processing_status='completed').count(),
             'pending': db.session.query(AIDocument).filter_by(processing_status='pending').count(),
@@ -504,6 +493,17 @@ def document_library():
             'total_chunks': db.session.query(AIDocumentChunk).count(),
             'total_embeddings': db.session.query(AIEmbedding).count(),
         }
+        if has_active_filters:
+            filtered_counts = compute_ai_document_status_stats(
+                apply_ai_document_library_filters(db.session.query(AIDocument), filters)
+            )
+            stats = {
+                **filtered_counts,
+                'total_chunks': global_stats['total_chunks'],
+                'total_embeddings': global_stats['total_embeddings'],
+            }
+        else:
+            stats = global_stats
 
         # Get unique file types for filter
         file_types = db.session.query(AIDocument.file_type).distinct().all()
@@ -517,16 +517,18 @@ def document_library():
 
         return render_template(
             "admin/ai/documents.html",
-            documents=documents,
+            processing_doc_ids=processing_doc_ids,
             stats=stats,
             file_types=file_types,
             categories=categories,
             languages=languages,
-            current_status=status_filter,
-            current_file_type=file_type_filter,
-            current_category=category_filter,
-            current_language=language_filter,
-            search_query=search_query,
+            current_status=filters.get('status', ''),
+            current_file_type=filters.get('file_type', ''),
+            current_category=filters.get('category', ''),
+            current_language=filters.get('language', ''),
+            search_query=filters.get('q', ''),
+            has_active_filters=has_active_filters,
+            stats_global=global_stats,
             title="AI Knowledge Base",
         )
 
@@ -535,7 +537,7 @@ def document_library():
         db.session.rollback()
         return render_template(
             "admin/ai/documents.html",
-            documents=[],
+            processing_doc_ids=[],
             stats=_get_default_doc_stats(),
             file_types=[],
             categories=[],
@@ -545,6 +547,8 @@ def document_library():
             current_category='',
             current_language='',
             search_query='',
+            has_active_filters=False,
+            stats_global=None,
             error="An error occurred.",
             title="AI Knowledge Base",
         )
@@ -1686,7 +1690,7 @@ def _language_display_name_for_import(language_code: str | None) -> str:
     )
 
 
-def _serialize_system_document_for_ai_import(doc, ai_doc, *, file_size: int = 0) -> dict:
+def _serialize_system_document_for_ai_import(doc, ai_doc, *, file_size: int | None = None) -> dict:
     """Serialize a SubmittedDocument row for the AI import modal grid."""
     source = "standalone"
     assignment_name = ""
@@ -1804,7 +1808,7 @@ def list_system_documents():
         # Format response
         result = []
         for doc, ai_doc in documents:
-            file_size = 0
+            file_size = None
             if doc.storage_path:
                 try:
                     from app.utils.file_paths import (

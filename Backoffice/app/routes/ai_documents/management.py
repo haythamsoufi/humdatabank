@@ -4,17 +4,26 @@ AI Document management routes: list, get, update, download, delete.
 
 import os
 import logging
+import math
 from flask import request, send_file, redirect
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload
 
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
 from app.services.platform import storage_service as _storage
 
 from . import ai_docs_bp
-from .helpers import _ai_doc_storage_delete, _ai_doc_source_ready, _validate_ifrc_fetch_url
+from .helpers import (
+    _ai_doc_storage_delete,
+    _ai_doc_source_ready,
+    _validate_ifrc_fetch_url,
+    parse_ai_document_library_filters,
+    apply_ai_document_library_filters,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,21 +35,33 @@ def list_documents():
     List all AI-processed documents accessible to the user.
 
     Query parameters:
-    - limit: Max results (default 50, max 200)
-    - offset: Pagination offset
-    - status: Filter by processing status
-    - file_type: Filter by file type
+    - page, per_page: Server-side pagination (default page=1, per_page=50, max 200)
+    - limit, offset: Legacy offset pagination (used when offset is supplied without page)
+    - status, file_type, category, language, q: Same filters as the admin Knowledge Base page
 
     Returns:
-        JSON with list of documents
+        JSON with list of documents, total, and pagination metadata
     """
     try:
-        limit = min(int(request.args.get('limit', 50)), 200)
-        offset = int(request.args.get('offset', 0))
-        status = request.args.get('status', '').strip()
-        file_type = request.args.get('file_type', '').strip()
+        filters = parse_ai_document_library_filters(request.args)
+        use_offset_mode = 'offset' in request.args and 'page' not in request.args
 
-        query = AIDocument.query
+        if use_offset_mode:
+            limit = min(int(request.args.get('limit', 50)), 200)
+            offset = max(0, int(request.args.get('offset', 0)))
+            page = (offset // limit) + 1 if limit else 1
+            per_page = limit
+        else:
+            page, per_page = validate_pagination_params(
+                request.args, default_per_page=50, max_per_page=200
+            )
+            offset = (page - 1) * per_page
+            limit = per_page
+
+        query = AIDocument.query.options(
+            joinedload(AIDocument.country),
+            joinedload(AIDocument.countries),
+        )
 
         from app.services.organization.authorization_service import AuthorizationService
         can_manage_docs = (
@@ -56,21 +77,27 @@ def list_documents():
                 )
             )
 
-        if status:
-            query = query.filter(AIDocument.processing_status == status)
-        if file_type:
-            query = query.filter(AIDocument.file_type == file_type)
-
+        query = apply_ai_document_library_filters(query, filters)
         total = query.count()
 
         # Sort by most recently changed so re-imported/reprocessed docs show up immediately in the UI.
-        documents = query.order_by(AIDocument.updated_at.desc(), AIDocument.created_at.desc()).offset(offset).limit(limit).all()
+        documents = (
+            query.order_by(AIDocument.updated_at.desc(), AIDocument.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        pages = math.ceil(total / per_page) if per_page else 0
 
         return json_ok(
             documents=[doc.to_dict() for doc in documents],
             total=total,
             limit=limit,
             offset=offset,
+            page=page,
+            per_page=per_page,
+            pages=pages,
         )
 
     except Exception as e:

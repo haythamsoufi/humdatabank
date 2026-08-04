@@ -10,7 +10,9 @@ import {
   escapeFieldName,
   getActiveSectionContext,
   getPersistedSectionContext,
+  canRestoreAuthDraft,
   mergeDraftRecords,
+  parseDraftRestoreContext,
   resolveDraftPayloadForRestore,
   restoreFormData,
   storeSuffixFromName,
@@ -885,6 +887,17 @@ export function initAuthDrafts() {
       } catch (_) { /* no-op */ }
       if (!draftHasContent(record)) {
         authDraftLog('restore_skip', { ok: true, reason: 'no_record' });
+        return;
+      }
+      const restoreContext = parseDraftRestoreContext(form);
+      if (!canRestoreAuthDraft(restoreContext)) {
+        authDraftLog('restore_skip', {
+          ok: true,
+          reason: 'assignment_not_restorable',
+          assignmentStatus: restoreContext?.assignmentStatus || '',
+          reviewEnabled: !!restoreContext?.reviewEnabled,
+          isDelegationUser: !!restoreContext?.isDelegationUser,
+        });
         return;
       }
       restorePending = true;

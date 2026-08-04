@@ -1109,6 +1109,12 @@ class Config:
     # https://ifrc-databank-mcp-staging.azurewebsites.net
     MCP_UPSTREAM_URL = (os.environ.get('MCP_UPSTREAM_URL') or '').strip().rstrip('/')
 
+    # Shareable short link target for the IFRC Network Databank Custom GPT (GET /gpt, /assistant).
+    CUSTOM_GPT_URL = (
+        os.environ.get('CUSTOM_GPT_URL')
+        or 'https://chatgpt.com/g/g-6a7217c375ac81919b0913bdd4ef15b6-ifrc-network-databank'
+    ).strip()
+
     # Notification TTL configuration (days to keep notifications before expiration)
     # Default is 90 days if not specified for a notification type
     NOTIFICATION_TTL_DAYS = {

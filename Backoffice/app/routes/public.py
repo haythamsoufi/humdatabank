@@ -1,5 +1,6 @@
 # ========== File: app/routes/public.py ==========
 from pathlib import Path
+from urllib.parse import urlparse
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify
 from app.models import db, Resource, SubmittedDocument
@@ -17,6 +18,21 @@ from app.services.forms.processing_service import slugify_age_group
 bp = Blueprint("public", __name__)
 
 THUMBNAIL_SUBFOLDER_NAME = 'thumbnails'
+
+_ALLOWED_CUSTOM_GPT_HOSTS = frozenset({'chatgpt.com', 'www.chatgpt.com'})
+
+
+def _custom_gpt_redirect_url() -> str:
+    """Return a validated Custom GPT URL from app config, or abort 404."""
+    url = (current_app.config.get('CUSTOM_GPT_URL') or '').strip()
+    if not url:
+        abort(404)
+    parsed = urlparse(url)
+    host = (parsed.hostname or '').lower()
+    if parsed.scheme != 'https' or host not in _ALLOWED_CUSTOM_GPT_HOSTS:
+        current_app.logger.error('Invalid CUSTOM_GPT_URL configured: %s', url)
+        abort(404)
+    return url
 
 # =================== RESOURCE DOWNLOAD ROUTES ===================
 # These routes allow public access to resources without API key
@@ -152,6 +168,13 @@ def legacy_public_document_download_redirect(document_id):
 def landing_page():
     """Public landing page introducing the platform and its features."""
     return render_template("public/landing.html", current_year=utcnow().year)
+
+
+@bp.route("/gpt", methods=["GET"])
+@bp.route("/assistant", methods=["GET"])
+def custom_gpt_redirect():
+    """Short public link to the IFRC Network Databank Custom GPT on ChatGPT."""
+    return redirect(_custom_gpt_redirect_url(), code=302)
 
 
 @bp.route("/privacy", methods=["GET"])

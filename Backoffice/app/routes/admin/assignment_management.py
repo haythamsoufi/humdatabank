@@ -41,9 +41,16 @@ from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
 from flask_wtf import FlaskForm
-from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField
+from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField, HiddenField
 from wtforms.validators import Optional, DataRequired
 from app.utils.entity_groups import get_enabled_entity_groups
+from app.models.assignments import (
+    SUBMISSION_REVIEW_RECIPIENT_FDS,
+    SUBMISSION_REVIEW_RECIPIENT_SPECIFIC,
+    SUBMISSION_REVIEW_RECIPIENT_MODES,
+)
+from app.services.organization.authorization_service import AuthorizationService
+from app.utils.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
 
@@ -120,6 +127,65 @@ def _delete_assignment_entity_status_with_children(aes):
     # Finally, delete the AES itself
     db.session.delete(aes)
 
+
+def _submission_review_recipient_mode_choices():
+    return [
+        (SUBMISSION_REVIEW_RECIPIENT_FDS, _('Designated FDS member for the submitting country')),
+        (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, _('Specific IFRC admin')),
+    ]
+
+
+def _apply_submission_review_recipient_from_form(assignment, form):
+    mode = form.submission_review_recipient_mode.data or SUBMISSION_REVIEW_RECIPIENT_FDS
+    if mode not in SUBMISSION_REVIEW_RECIPIENT_MODES:
+        mode = SUBMISSION_REVIEW_RECIPIENT_FDS
+    assignment.submission_review_recipient_mode = mode
+    if mode == SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
+        raw_uid = form.submission_review_recipient_user_id.data
+        assignment.submission_review_recipient_user_id = (
+            int(raw_uid) if raw_uid and str(raw_uid).strip().isdigit() else None
+        )
+    else:
+        assignment.submission_review_recipient_user_id = None
+
+
+def _validate_submission_review_recipient_form(form) -> bool:
+    if form.submission_review_recipient_mode.data != SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
+        return True
+    raw_uid = form.submission_review_recipient_user_id.data
+    if not raw_uid or not str(raw_uid).strip().isdigit():
+        form.submission_review_recipient_user_id.errors.append(
+            _('Select an IFRC admin to notify when submissions arrive.')
+        )
+        return False
+    user = User.query.filter_by(id=int(raw_uid), active=True).first()
+    if not user:
+        form.submission_review_recipient_user_id.errors.append(
+            _('Selected reviewer must be an active user.')
+        )
+        return False
+    return True
+
+
+def _admin_capable_user_search_query():
+    from sqlalchemy import distinct
+    from app.models.rbac import RbacUserRole, RbacRole, RbacRolePermission, RbacPermission
+
+    admin_user_ids = (
+        db.session.query(distinct(RbacUserRole.user_id))
+        .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+        .join(RbacRolePermission, RbacRole.id == RbacRolePermission.role_id)
+        .join(RbacPermission, RbacRolePermission.permission_id == RbacPermission.id)
+        .filter(RbacPermission.code.in_([
+            "admin.assignments.view",
+            "admin.assignments.edit",
+            "admin.assignments.create",
+        ]))
+        .scalar_subquery()
+    )
+    return User.query.filter(User.active.is_(True), User.id.in_(admin_user_ids))
+
+
 # Define the form for editing overall assignment details
 class EditAssignmentDetailsForm(FlaskForm):
     template_id = SelectField("Form Template", coerce=int, validators=[DataRequired()])
@@ -136,7 +202,18 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Require delegation review before final submission",
         default=False,
     )
+    submission_review_recipient_mode = SelectField(
+        "Submission review notification",
+        choices=_submission_review_recipient_mode_choices(),
+        default=SUBMISSION_REVIEW_RECIPIENT_FDS,
+    )
+    submission_review_recipient_user_id = HiddenField(validators=[Optional()])
     submit = SubmitField("Update Assignment")
+
+    def validate(self, extra_validators=None):
+        if not super().validate(extra_validators):
+            return False
+        return _validate_submission_review_recipient_form(self)
 
     def __init__(self, *args, **kwargs):
         super(EditAssignmentDetailsForm, self).__init__(*args, **kwargs)
@@ -200,6 +277,38 @@ def manage_assignments():
     return render_template("admin/assignments/assignments.html",
                          assignments=assignments,
                          title="Manage Assignments")
+
+
+@bp.route("/assignments/api/review-recipients/search", methods=["GET"])
+@permission_required('admin.assignments.view')
+def api_search_submission_review_recipients():
+    """Search admin-capable users for assignment submission review routing."""
+    try:
+        query = (request.args.get('q') or '').strip()
+        if not query or len(query) < 2:
+            return json_ok(users=[])
+
+        safe_pattern = safe_ilike_pattern(query)
+        users = (
+            _admin_capable_user_search_query()
+            .filter(db.or_(User.name.ilike(safe_pattern), User.email.ilike(safe_pattern)))
+            .order_by(User.name)
+            .limit(20)
+            .all()
+        )
+        role_codes_by_user_id = AuthorizationService.prefetch_role_codes([u.id for u in users])
+        return json_ok(users=[
+            {
+                'id': u.id,
+                'name': u.name or u.email,
+                'email': u.email,
+                'rbac_role_codes': role_codes_by_user_id.get(u.id, []),
+            }
+            for u in users
+        ])
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
 
 @bp.route("/assignments/gantt", methods=["GET"])
 @permission_required('admin.assignments.view')
@@ -340,6 +449,7 @@ def new_assignment():
                 requires_delegation_review=bool(form.requires_delegation_review.data),
                 activated_by_user_id=current_user.id,
             )
+            _apply_submission_review_recipient_from_form(new_assignment, form)
             sync_assigned_form_reporting_period(new_assignment)
 
             # Warn if active and no data owner (soft enforcement)
@@ -529,6 +639,7 @@ def edit_assignment(assignment_id):
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
+            _apply_submission_review_recipient_from_form(assignment, form)
 
             # Warn if active assignment has no data owner
             if assignment.is_active and not assignment.data_owner_id:

@@ -83,13 +83,27 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             "Template '%(template)s', period '%(period)s'. Due date: %(due_date)s."
         ),
 
-        'notification.assignment_submitted.title': _notification_msgid('Team update: %(template)s submitted'),
+        'notification.assignment_submitted.submitter.title': _notification_msgid('Submission successful'),
+        'notification.assignment_submitted.submitter.message': _notification_msgid(
+            'You submitted %(assignment_title)s successfully.'
+        ),
+
+        'notification.assignment_submitted.title': _notification_msgid(
+            'Team update: %(assignment_title)s submitted'
+        ),
         'notification.assignment_submitted.message': _notification_msgid(
-            'Period %(period)s: another focal point in your entity submitted this form. No action needed from you.'
+            'Another focal point in your entity submitted %(assignment_title)s. No action needed from you.'
+        ),
+
+        'notification.assignment_submitted.team_email.title': _notification_msgid(
+            'Team update: %(assignment_title)s submitted by %(submitter_name)s'
+        ),
+        'notification.assignment_submitted.team_email.message': _notification_msgid(
+            '%(submitter_name)s submitted %(assignment_title)s for your entity team.'
         ),
 
         'notification.assignment_submitted.admin.title': _notification_msgid(
-            '{submitter_name} has submitted this assignment for period {period}.'
+            '{submitter_name} has submitted {assignment_title}.'
         ),
         'notification.assignment_submitted.admin.message': _notification_msgid(
             'Please review and validate this submission in the Backoffice.'

@@ -1,25 +1,30 @@
-# Humanitarian Databank API — Reference
+# Humanitarian Databank — Public API Reference
 
-**Base URL:** `https://databank.ifrc.org/api/v1`
+**Scope:** Endpoints that work without authentication. All other `/api/v1/*`
+routes return 401 unless an API key or session is supplied.
+
+**Production bases:**
+- `https://databank.ifrc.org/api/v1`
+- `https://databank.ifrc.org/api/mobile/v1`
 
 ---
 
-## §1 Indicator Bank
+## §1 Indicator Bank (`/api/v1`)
 
 ### `GET /api/v1/indicator-bank`
 
-Returns the full indicator catalogue in one call. No authentication required.
+Returns the indicator catalogue. Cached 5 minutes (`Cache-Control: public, max-age=300`).
 
 **Query parameters**
 
 | Param | Type | Description |
 |-------|------|-------------|
 | `search` | string | Full-text search on `name` and `definition` |
-| `type` | string | Indicator type label (e.g. `"Number"`, `"Percentage"`, `"Ratio"`) |
-| `sector` | string | Sector name (e.g. `"Health"`, `"Disaster Management"`) |
+| `type` | string | Measurement type (e.g. `"Number"`, `"Percentage"`, `"Ratio"`) |
+| `sector` | string | Primary sector name (e.g. `"Health"`) |
 | `sub_sector` | string | Sub-sector name |
-| `emergency` | string | `"true"` to return only emergency-tagged indicators |
-| `archived` | string | `"true"` = only archived; `"false"` = only active; omit = all |
+| `emergency` | string | `"true"` — only emergency-tagged indicators |
+| `archived` | string | `"true"` archived only; `"false"` active only; omit = all |
 
 **Response**
 
@@ -36,16 +41,26 @@ Returns the full indicator catalogue in one call. No authentication required.
       "fdrs_kpi_code": "VO001",
       "definition": "Total active Red Cross/Crescent volunteers.",
       "aggregated_label": null,
+      "aggregated_label_translations": null,
       "area": "People",
       "area_label": "People Reached",
+      "spef_label": "People Reached",
       "data_source": null,
       "disaggregation_guidance": null,
       "monitoring_questions": [],
       "tags": ["volunteers", "capacity"],
       "name_translations": { "fr": "Nombre de volontaires" },
       "definition_translations": { "fr": "..." },
-      "sector": { "primary": "Organizational Capacity", "secondary": null, "tertiary": null },
-      "sub_sector": { "primary": "Volunteers", "secondary": null, "tertiary": null },
+      "sector": {
+        "primary": "Organizational Capacity",
+        "secondary": null,
+        "tertiary": null
+      },
+      "sub_sector": {
+        "primary": "Volunteers",
+        "secondary": null,
+        "tertiary": null
+      },
       "emergency": false,
       "related_programs": [],
       "archived": false,
@@ -58,388 +73,397 @@ Returns the full indicator catalogue in one call. No authentication required.
 
 ### `GET /api/v1/indicator-bank/<indicator_id>`
 
-Returns a single indicator (same shape as an array item above — not wrapped in
-`"indicators"`).
+Returns a single indicator object (same shape as one array item above — not wrapped
+in `"indicators"`). HTTP 404 if not found.
 
 ---
 
-## §2 `/api/v1/data`
+## §2 Mobile API Envelope
 
-Returns raw `FormData` rows. No API key required for public-data access
-(unscoped, unpaginated). API-key auth enables pagination and full dataset
-access.
+All `/api/mobile/v1/data/*` routes use this shape:
 
-### Query parameters
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `indicator_bank_id` | int | Filter by indicator bank entry |
-| `template_id` | int | Filter by form template |
-| `item_id` | int | Filter by specific form item |
-| `item_type` | string | `"indicator"`, `"question"`, or `"document_field"` |
-| `country_id` | int | Filter by country (numeric ID) |
-| `country_iso2` | string | Filter by 2-letter ISO code (resolved to `country_id`) |
-| `country_iso3` | string | Filter by 3-letter ISO code (resolved to `country_id`) |
-| `submission_id` | int | Filter by submission (AssignmentEntityStatus ID) |
-| `submission_type` | string | `"assigned"` or `"public"` |
-| `period_name` | string | Filter by reporting period label |
-| `date_from` | string | ISO date/datetime lower bound on `submitted_at` |
-| `date_to` | string | ISO date/datetime upper bound on `submitted_at` |
-| `include_full_info` | bool | Embed full `form_item_info` in every row |
-| `include_dynamic` | bool | Append `dynamic_data[]` (DynamicIndicatorData rows) |
-| `include_repeat` | bool | Append `repeat_data[]` (RepeatGroupData rows) |
-| `sort` | string | Sort field: `submitted_at` (default), `template_id`, `country_id`, `period_name` |
-| `order` | string | `desc` (default) or `asc` |
-| `page` | int | Page number (API key auth only, default 1) |
-| `per_page` | int | Page size (API key auth only, default 20, max 100 000) |
-
-### Response
-
+**Success:**
 ```json
 {
-  "data": [ /* FormData rows — see §4 */ ],
-  "total_items": 150,
-  "total_pages": null,
-  "current_page": null,
-  "per_page": null
+  "success": true,
+  "data": { },
+  "meta": { }
 }
 ```
 
-With API key auth and `page`/`per_page`:
+**Paginated list** (`data` is the array directly):
 ```json
 {
+  "success": true,
   "data": [ ... ],
-  "total_items": 3200,
-  "total_pages": 32,
-  "current_page": 1,
-  "per_page": 100
+  "meta": {
+    "total": 1500,
+    "page": 1,
+    "per_page": 500,
+    "total_pages": 3
+  }
 }
 ```
 
-When `include_dynamic=true`, an extra top-level key is added:
+**Error:**
 ```json
 {
-  "data": [...],
-  "dynamic_data": [
-    {
-      "data_type": "dynamic",
-      "section_id": 5,
-      "indicator_bank_id": 42,
-      "custom_label": "Volunteers 2023",
-      "value": "12000",
-      "country_id": 23,
-      "period_name": "Annual 2023"
-    }
-  ]
+  "success": false,
+  "error": "indicator_bank_id is required",
+  "error_code": "VALIDATION_ERROR"
 }
 ```
 
-When `include_repeat=true`:
-```json
-{
-  "repeat_data": [
-    {
-      "data_type": "repeat",
-      "section_id": 7,
-      "repeat_instance_id": 99,
-      "instance_number": 1,
-      "instance_label": "Branch A",
-      "form_item_id": 1234,
-      "value": "450"
-    }
-  ]
-}
-```
+Rate limits apply (typically 30–120 requests/minute per IP depending on route).
 
 ---
 
-## §3 `/api/v1/data/tables`
+## §3 Countries
 
-Like `/data` but bundles related lookup tables (`form_items`, `countries`) in
-the same response. Supports a star-schema layout for BI consumers.
+### `GET /api/mobile/v1/data/countrymap`
 
-### Additional query parameters (beyond those in §2)
+**Query parameters**
 
 | Param | Type | Description |
 |-------|------|-------------|
-| `related` | string | Scope of `form_items[]`: `"page"` (default, current-page rows only) or `"all"` (full filtered dataset). `countries[]` always returns all countries. |
-| `layout` | string | Response shape: `"flat"` (default) or `"star"` |
-| `indicator_bank_ids` | string | Comma-separated indicator bank IDs (e.g. `"42,17,98"`) for multi-indicator fetches |
-| `include_non_reported` | bool | Include virtual `"missing"` rows for unreported items (requires `template_id`, `country_id`, `period_name`, `submission_type=assigned`) |
-| `analysis` | bool | Enable analysis mode (requires elevated permission) |
+| `locale` | string | Language code for country names (default `"en"`) |
 
-### Flat layout response
+**Response**
 
 ```json
 {
-  "data": [ /* FormData rows — see §4 */ ],
-  "form_items": [ /* FormItem records — see §5 */ ],
-  "countries": [ /* Country records — see §6 */ ],
-  "matrix_entity_labels": {
-    "1234": { "14": "Afghanistan", "23": "Bangladesh" }
+  "success": true,
+  "data": {
+    "countries": [
+      {
+        "id": 14,
+        "name": "Afghanistan",
+        "iso2": "AF",
+        "iso3": "AFG",
+        "region": "Asia Pacific"
+      }
+    ]
   },
-  "total_items": 150,
-  "total_pages": null,
-  "current_page": null,
-  "per_page": null
+  "meta": { "total": 192 }
 }
 ```
 
-`matrix_entity_labels` maps `form_item_id → { row_prefix → display_name }` for
-matrix-type indicators whose rows are keyed to National Society or country IDs.
+> **Note:** `/api/v1/countrymap` returns richer localized data but **requires
+> authentication**. Use this mobile endpoint for public access.
 
-### Star layout response (`layout=star`)
+---
+
+## §4 Sectors and Sub-sectors
+
+### `GET /api/mobile/v1/data/sectors-subsectors`
+
+No query parameters.
+
+**Response**
 
 ```json
 {
-  "schema_version": "1.0",
-  "grain": "one row per FormData record",
-  "tables": {
-    "fact_form_values": [ ... ],
-    "dim_form_items": [ ... ],
-    "dim_countries": [ ... ],
-    "bridge_disagg_values": [ ... ]
+  "success": true,
+  "data": {
+    "sectors": [
+      {
+        "id": 1,
+        "name": "Health",
+        "description": "...",
+        "display_order": 1,
+        "logo_url": "https://databank.ifrc.org/api/v1/uploads/sectors/health.png",
+        "icon_class": "fa-heart",
+        "multilingual_names": { "fr": "Santé", "es": "Salud" },
+        "subsectors": [
+          {
+            "id": 10,
+            "name": "First Aid",
+            "description": "...",
+            "display_order": 1,
+            "multilingual_names": { "fr": "Premiers secours" },
+            "sector_id": 1
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
+Sector logo URLs point to public `GET /api/v1/uploads/sectors/<filename>` (binary
+image stream, no auth).
+
 ---
 
-## §4 FormData Row Schema
+## §5 Periods
 
-Each item in the `data[]` array:
+### `GET /api/mobile/v1/data/periods`
+
+Returns distinct reporting period labels, newest first.
+
+**Query parameters**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `template_id` | int | Form template (default `21` = FDRS) |
+| `country_id` | int | Scope to one country's assignments |
+
+**Response**
 
 ```json
 {
-  "id": 890123,
-  "submission_type": "assigned",
-  "submission_id": 45,
-  "form_item_id": 1234,
-  "template_id": 2,
-  "period_name": "Annual 2023",
-  "country_id": 14,
-  "value": "45000",
-  "num_value": 45000.0,
-  "data_status": "available",
-  "date_collected": "2024-02-10T12:00:00",
-  "submitted_at": "2024-02-10T12:00:00",
-  "disaggregation_data": {
-    "mode": "standard",
-    "values": {
-      "male_0_17": 12000,
-      "female_0_17": 11500,
-      "male_18_plus": 12000,
-      "female_18_plus": 9500
-    }
-  },
-  "prefilled_value": null,
-  "imputed_value": null,
-  "prefilled_disaggregation_data": null,
-  "imputed_disaggregation_data": null
+  "success": true,
+  "data": {
+    "periods": ["Annual 2024", "Annual 2023", "Annual 2022"]
+  }
 }
 ```
 
-For `submission_type: "public"` rows, `assignment_id` is also present.
-
-**`data_status` values:**
-
-| Value | Meaning |
-|-------|---------|
-| `"available"` | Value was reported |
-| `"data_not_available"` | Reporter marked as unavailable |
-| `"not_applicable"` | Reporter marked as not applicable |
-| `"missing"` | Virtual row — no record exists (only with `include_non_reported=true`) |
-
-**`disaggregation_data.mode` values:**
-
-| Mode | Structure |
-|------|-----------|
-| `"standard"` | `values` is a flat dict of category-key → numeric value |
-| `"matrix"` | `values` keys are `<row_entity_id>_<col_key>`; use `matrix_entity_labels` to resolve row names |
-| `"flat"` | `values` is a simple key-value payload |
-| `null` | No disaggregation data |
+> **Note:** `/api/v1/periods` returns the same data as a bare JSON array but
+> **requires authentication**.
 
 ---
 
-## §5 FormItem Record Schema
+## §6 FDRS Overview (reported values)
 
-Appears in `form_items[]` of `/data/tables`, or embedded per-row when
-`include_full_info=true`.
+### `GET /api/mobile/v1/data/fdrs-overview`
+
+Pre-aggregated numeric totals per country for one indicator. This is the public
+replacement for authenticated `/api/v1/data` queries.
+
+**Query parameters**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `indicator_bank_id` | int | **yes** | Indicator to aggregate |
+| `template_id` | int | no | Form template (default `21` = FDRS) |
+| `period_name` | string | no | Reporting period label |
+| `locale` | string | no | Localized country names (default `"en"`) |
+
+**Response**
 
 ```json
 {
-  "id": 1234,
-  "type": "indicator",
-  "label": "Number of volunteers",
-  "order": 3,
-  "display_order": 3,
-  "is_required": true,
-  "form_item_type": "indicator",
-  "layout_column_width": null,
-  "layout_break_after": false,
-  "section": {
-    "id": 10,
-    "name": "Organizational Capacity",
-    "order": 1,
-    "section_type": "standard"
-  },
-  "template": {
-    "id": 2,
-    "name": "FDRS Annual Report",
-    "description": "..."
-  },
-  "assignment": {
-    "id": 99,
+  "success": true,
+  "data": {
     "period_name": "Annual 2023",
-    "assigned_at": "2023-01-01T00:00:00"
-  },
-  "unit": "People",
-  "is_sub_indicator": false,
-  "allowed_disaggregation_options": ["by_sex", "by_age"],
-  "validation_condition": null,
-  "validation_message": null,
-  "allow_data_not_available": true,
-  "allow_not_applicable": false,
-  "allow_disability_questions": false,
-  "bank_details": {
-    "id": 42,
-    "name": "Number of volunteers",
-    "type": "Number",
-    "unit": "People",
-    "definition": "Total active Red Cross/Crescent volunteers.",
-    "sector": { "primary": "Organizational Capacity", "secondary": null, "tertiary": null },
-    "sub_sector": { "primary": "Volunteers", "secondary": null, "tertiary": null },
-    "emergency": false,
-    "related_programs": [],
-    "archived": false
+    "by_country": {
+      "14": 45000,
+      "23": 120000
+    },
+    "country_names": {
+      "14": "Afghanistan",
+      "23": "Bangladesh"
+    },
+    "country_iso2": {
+      "14": "AF",
+      "23": "BD"
+    }
   }
 }
 ```
 
-`type` / `form_item_type` values: `"indicator"`, `"question"`, `"document_field"`.
+- `by_country` keys are country ids (strings); values are summed numeric totals.
+- Only rows with reported numeric values are included (excludes "data not
+  available" and "not applicable").
+- Aggregates both official assigned submissions and public submissions.
 
-For `"question"` items, additional fields: `question_type`, `definition`,
-`options`, `lookup_list_id`, `list_display_column`, `list_filters`.
-
-For `"document_field"` items, additional field: `description`.
+**Example — volunteers in 2023:**
+```
+GET /api/mobile/v1/data/fdrs-overview?indicator_bank_id=42&period_name=Annual%202023
+```
 
 ---
 
-## §6 Country Record Schema
+## §7 Disaggregation Overview
 
-Appears in `countries[]` of `/data/tables`.
+### `GET /api/mobile/v1/data/disaggregation-overview`
+
+Pre-aggregated sex/age/regional breakdown. Anonymous callers receive global and
+regional aggregates only (`by_country` is empty).
+
+**Query parameters**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `indicator_bank_id` | int | `729` | Indicator to aggregate |
+| `template_id` | int | `21` | Form template |
+| `period_name` | string | — | Reporting period |
+| `locale` | string | `"en"` | Localized labels |
+
+**Response (anonymous)**
 
 ```json
 {
-  "id": 14,
-  "name": "Afghanistan",
-  "iso3": "AFG",
-  "iso2": "AF",
-  "national_society_name": "Afghan Red Crescent Society",
-  "region": "Asia Pacific",
-  "status": "active",
-  "preferred_language": "fa",
-  "currency_code": "AFN",
-  "multilingual_names": {
-    "fr": "Afghanistan",
-    "ar": "أفغانستان",
-    "es": "Afganistán"
-  },
-  "multilingual_national_society_names": {
-    "fr": "Croissant-Rouge Afghan"
+  "success": true,
+  "data": {
+    "period_name": "Annual 2023",
+    "indicator_bank_id": 729,
+    "total": 125000000,
+    "record_count": 850,
+    "disaggregated_count": 620,
+    "disaggregation_rate": 72.9,
+    "by_sex": [
+      { "category": "female", "value": 67000000 },
+      { "category": "male", "value": 58000000 }
+    ],
+    "by_age": [
+      { "category": "18_plus", "value": 80000000 },
+      { "category": "0_17", "value": 45000000 }
+    ],
+    "by_country": [],
+    "by_region": [
+      {
+        "region": "Africa",
+        "value": 35000000,
+        "record_count": 180,
+        "disaggregated_count": 140,
+        "disaggregation_rate": 77.8,
+        "country_count": 54
+      }
+    ],
+    "trends": [
+      {
+        "period": "Annual 2023",
+        "total": 125000000,
+        "record_count": 850,
+        "disaggregated_count": 620,
+        "disaggregation_rate": 72.9
+      }
+    ],
+    "country_details_available": false
   }
 }
 ```
 
 ---
 
-## §7 Common Query Examples
+## §8 Resources and Publications
 
-**All data for one indicator, scoped to a period:**
-```
-GET /api/v1/data?indicator_bank_id=42&period_name=Annual%202023
-```
+### `GET /api/mobile/v1/data/resources`
 
-**All data for one country using ISO code:**
-```
-GET /api/v1/data?country_iso3=BGD&period_name=Annual%202023
-```
+**Query parameters**
 
-**All indicators in a template with form item context:**
-```
-GET /api/v1/data/tables?template_id=2&period_name=Annual%202023&related=all
-```
+| Param | Type | Description |
+|-------|------|-------------|
+| `page` | int | Page number (default 1) |
+| `per_page` | int | Page size (default 20, max 100) |
+| `search` | string | Filter by title |
+| `type` | string | `publication`, `resource`, `document`, or `other` |
+| `locale` | string | Language for title/description (default `"en"`) |
+| `grouped` | bool | When `true` and no search, return `data.sections[]` by subcategory |
 
-**Multiple indicators in one request:**
-```
-GET /api/v1/data/tables?indicator_bank_ids=42,17,98&period_name=Annual%202023
-```
-
-**Data with disaggregation breakdown, with context:**
-```
-GET /api/v1/data/tables
-    ?indicator_bank_id=42
-    &country_iso2=BD
-    &include_full_info=true
-```
-
-**Star schema for BI import:**
-```
-GET /api/v1/data/tables
-    ?template_id=2
-    &period_name=Annual%202023
-    &layout=star
-    &related=all
-```
-
-**Check what was reported vs. missing for a country/period:**
-```
-GET /api/v1/data/tables
-    ?template_id=2
-    &country_id=14
-    &period_name=Annual%202023
-    &submission_type=assigned
-    &include_non_reported=true
-```
-Rows with `data_status: "missing"` indicate items not yet reported.
-
-**Filter by submission date range:**
-```
-GET /api/v1/data?template_id=2&date_from=2024-01-01&date_to=2024-06-30
-```
-
----
-
-## §8 Data Model
-
-```
-IndicatorBank (id, name, type, unit, sector, sub_sector, emergency, …)
-    └── FormItem (id, template_id, version_id, indicator_bank_id, label, section_id, …)
-            └── FormData (id, form_item_id, value, data_status, disagg_data, submitted_at)
-                    ├── [assigned] via AssignmentEntityStatus
-                    │       └── AssignedForm (template_id, period_name)
-                    │               → country_id (entity_id on AES)
-                    └── [public] via PublicSubmission
-                            └── AssignedForm (template_id, period_name)
-                                    → country_id (PublicSubmission.country_id)
-
-Country (id, name, iso2, iso3, region, national_society_name, …)
-Sector (id, name) → SubSector (id, sector_id, name)
-```
-
-- `form_item_id` in a `FormData` row links to `FormItem.id`
-- `FormItem.indicator_bank_id` links to `IndicatorBank.id`
-- `template_id` on a data row is denormalized from `AssignedForm.template_id`
-- `period_name` on a data row is denormalized from `AssignedForm.period_name`
-- Published template version scoping: only items from the published version appear in `/data/tables`
-
----
-
-## §9 Error Responses
+**Flat response (paginated)**
 
 ```json
-{ "error": "Template not found", "status": 404 }
-{ "error": "Could not fetch data", "status": 500 }
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5,
+      "title": "FDRS Guidance 2024",
+      "description": "...",
+      "resource_type": "publication",
+      "publication_date": "2024-01-15",
+      "file_url": "https://databank.ifrc.org/resources/download/5/en",
+      "thumbnail_url": "https://databank.ifrc.org/resources/thumbnail/5/en",
+      "available_languages": ["en", "fr", "es"],
+      "file_languages": ["en", "fr"],
+      "subcategory": { "id": 2, "name": "Guidance", "display_order": 1 }
+    }
+  ],
+  "meta": { "total": 42, "page": 1, "per_page": 20, "total_pages": 3 }
+}
 ```
 
-Rate-limit exceeded returns HTTP `429`.
+---
+
+## §9 Mobile Indicator Bank (paginated alternative)
+
+### `GET /api/mobile/v1/data/indicator-bank`
+
+Same indicator objects as §1, with pagination.
+
+**Query parameters:** all §1 filters plus:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `page` | int | Page number (default 1) |
+| `per_page` | int | Page size (default 500, max 2000) |
+| `sector_id` | int | Filter by sector numeric id |
+
+### `GET /api/mobile/v1/data/indicator-bank/<id>`
+
+```json
+{
+  "success": true,
+  "data": { "indicator": { /* same shape as §1 */ } }
+}
+```
+
+---
+
+## §10 Common Query Examples
+
+**Find an indicator, then get its FDRS totals:**
+```
+GET /api/v1/indicator-bank?search=people%20reached
+GET /api/mobile/v1/data/periods
+GET /api/mobile/v1/data/fdrs-overview?indicator_bank_id=729&period_name=Annual%202023
+```
+
+**Compare sectors:**
+```
+GET /api/v1/indicator-bank?sector=Health&archived=false
+GET /api/mobile/v1/data/sectors-subsectors
+```
+
+**Regional disaggregation for people reached:**
+```
+GET /api/mobile/v1/data/disaggregation-overview?period_name=Annual%202023
+```
+
+**Look up a country by ISO code, then map FDRS totals:**
+```
+GET /api/mobile/v1/data/countrymap
+# find country id for iso2=BD (23)
+GET /api/mobile/v1/data/fdrs-overview?indicator_bank_id=42&period_name=Annual%202023
+# read data.by_country["23"]
+```
+
+---
+
+## §11 Error Responses
+
+**v1 endpoints** return plain JSON errors:
+```json
+{ "error": "Indicator not found", "status": 404 }
+```
+
+**Mobile endpoints** use the envelope:
+```json
+{ "success": false, "error": "indicator_bank_id is required" }
+```
+
+HTTP 429 when rate limits are exceeded.
+
+---
+
+## §12 Endpoints That Require Authentication
+
+Do **not** call these without an API key — they will return 401:
+
+| Endpoint | Why it fails publicly |
+|----------|----------------------|
+| `GET /api/v1/data` | Raw FormData rows — auth required |
+| `GET /api/v1/data/tables` | Redirects to `/data` — auth required |
+| `GET /api/v1/periods` | Use mobile `/data/periods` instead |
+| `GET /api/v1/countrymap` | Use mobile `/data/countrymap` instead |
+| `GET /api/v1/templates` | Form structure metadata |
+| `GET /api/v1/form-items` | Form item details |
+| `GET /api/v1/submissions` | Submission records |
+| `GET /api/v1/sectors` | Use mobile `/data/sectors-subsectors` instead |
+| `GET /api/v1/resources` | Use mobile `/data/resources` instead |
+| `GET /Indicator/*` (legacy) | Blazor compat layer — API key required |
+
+For programmatic access to raw data exports, contact IFRC for an API key.

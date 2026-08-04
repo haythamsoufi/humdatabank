@@ -3041,4 +3041,131 @@
     }
     }
 })();
+
+(function initSubmissionReviewRecipientPicker() {
+    var reviewCfg = cfg.submissionReviewRecipient || {};
+    var searchInput = document.getElementById('submission-review-user-search');
+    var resultsBox = document.getElementById('submission-review-user-results');
+    var selectedWrap = document.getElementById('submission-review-selected-user');
+    var hiddenInput = document.getElementById('submission_review_recipient_user_id');
+    var picker = document.getElementById('submission-review-user-picker');
+    if (!searchInput || !resultsBox || !selectedWrap || !hiddenInput || !picker) {
+        return;
+    }
+
+    var searchUrl = (cfg.urls && cfg.urls.reviewRecipientSearch) || '';
+    var modeRadios = document.querySelectorAll('input[name="submission_review_recipient_mode"]');
+    var searchTimer = null;
+    var selectedUser = reviewCfg.user || null;
+
+    function currentMode() {
+        var checked = document.querySelector('input[name="submission_review_recipient_mode"]:checked');
+        return checked ? checked.value : 'fds_member';
+    }
+
+    function togglePickerVisibility() {
+        var show = currentMode() === 'specific_admin';
+        picker.classList.toggle('hidden', !show);
+        if (!show) {
+            resultsBox.classList.add('hidden');
+        }
+    }
+
+    function renderSelectedUser() {
+        selectedWrap.innerHTML = '';
+        if (!selectedUser) {
+            hiddenInput.value = '';
+            return;
+        }
+        hiddenInput.value = String(selectedUser.id);
+        var chip = document.createElement('div');
+        chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-sm text-gray-800';
+        chip.innerHTML = '<span><strong>' + (selectedUser.name || selectedUser.email) + '</strong>'
+            + (selectedUser.email ? ' <span class="text-gray-500">(' + selectedUser.email + ')</span>' : '')
+            + '</span>';
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'text-red-600 hover:text-red-800 text-xs font-medium';
+        clearBtn.textContent = (cfg.t && cfg.t.clearReviewer) || 'Clear';
+        clearBtn.addEventListener('click', function () {
+            selectedUser = null;
+            renderSelectedUser();
+        });
+        chip.appendChild(clearBtn);
+        selectedWrap.appendChild(chip);
+    }
+
+    function hideResults() {
+        resultsBox.classList.add('hidden');
+        resultsBox.innerHTML = '';
+    }
+
+    function renderResults(users) {
+        resultsBox.innerHTML = '';
+        if (!users || !users.length) {
+            var empty = document.createElement('div');
+            empty.className = 'p-3 text-sm text-gray-500';
+            empty.textContent = (cfg.t && cfg.t.noUsersFound) || 'No users found.';
+            resultsBox.appendChild(empty);
+            resultsBox.classList.remove('hidden');
+            return;
+        }
+        users.forEach(function (user) {
+            var row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'w-full text-left p-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0';
+            row.innerHTML = '<div class="text-sm font-medium text-gray-900">' + (user.name || user.email) + '</div>'
+                + '<div class="text-xs text-gray-500">' + user.email + '</div>';
+            row.addEventListener('click', function () {
+                selectedUser = user;
+                renderSelectedUser();
+                searchInput.value = '';
+                hideResults();
+            });
+            resultsBox.appendChild(row);
+        });
+        resultsBox.classList.remove('hidden');
+    }
+
+    function searchUsers(query) {
+        if (!searchUrl) {
+            return;
+        }
+        fetch(searchUrl + '?q=' + encodeURIComponent(query), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                renderResults((data && data.users) || []);
+            })
+            .catch(function () {
+                hideResults();
+            });
+    }
+
+    modeRadios.forEach(function (radio) {
+        radio.addEventListener('change', togglePickerVisibility);
+    });
+
+    searchInput.addEventListener('input', function () {
+        var query = (searchInput.value || '').trim();
+        clearTimeout(searchTimer);
+        if (query.length < 2) {
+            hideResults();
+            return;
+        }
+        searchTimer = setTimeout(function () {
+            searchUsers(query);
+        }, 250);
+    });
+
+    document.addEventListener('click', function (evt) {
+        if (!picker.contains(evt.target)) {
+            hideResults();
+        }
+    });
+
+    togglePickerVisibility();
+    renderSelectedUser();
+})();
 }());

@@ -308,6 +308,16 @@ class NotificationService:
         'notification.assignment_sent_for_review.admin.message',
     })
 
+    _ASSIGNMENT_TITLE_KEYS = frozenset({
+        'notification.assignment_submitted.title',
+        'notification.assignment_submitted.message',
+        'notification.assignment_submitted.submitter.title',
+        'notification.assignment_submitted.submitter.message',
+        'notification.assignment_submitted.team_email.title',
+        'notification.assignment_submitted.team_email.message',
+        'notification.assignment_submitted.admin.title',
+    })
+
     @classmethod
     def _ensure_country_param(
         cls,
@@ -363,6 +373,63 @@ class NotificationService:
             params['template'] = 'this assignment'
         if 'country' not in params:
             params['country'] = 'Unknown entity'
+        return params
+
+    @classmethod
+    def _resolve_assigned_form_for_notification(cls, notification: Notification):
+        """Load AssignedForm from an assignment-related notification."""
+        if notification.related_object_type != 'assignment' or not notification.related_object_id:
+            return None
+        try:
+            from app.models import AssignmentEntityStatus, AssignedForm
+
+            assignment_status = AssignmentEntityStatus.query.get(notification.related_object_id)
+            if assignment_status and assignment_status.assigned_form:
+                return assignment_status.assigned_form
+            return AssignedForm.query.get(notification.related_object_id)
+        except Exception as e:
+            logger.warning(
+                "[NOTIFICATION_SERVICE] Error resolving AssignedForm for notification %s: %s",
+                getattr(notification, 'id', '?'),
+                e,
+                exc_info=True,
+            )
+            return None
+
+    @classmethod
+    def _ensure_assignment_title_param(
+        cls,
+        notification: Notification,
+        params: Optional[Dict[str, Any]],
+        *,
+        locale: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Resolve assignment_title from custom name / template display rules."""
+        params = (params or {}).copy()
+        assigned_form = cls._resolve_assigned_form_for_notification(notification)
+        if assigned_form is not None:
+            try:
+                if locale:
+                    from flask_babel import force_locale
+                    with force_locale(locale):
+                        params['assignment_title'] = assigned_form.display_name
+                else:
+                    params['assignment_title'] = assigned_form.display_name
+            except Exception as e:
+                logger.debug(
+                    "[NOTIFICATION_SERVICE] Could not resolve assignment_title for notification %s: %s",
+                    getattr(notification, 'id', '?'),
+                    e,
+                )
+        if 'assignment_title' not in params or not str(params.get('assignment_title') or '').strip():
+            template = params.get('template')
+            period = params.get('period')
+            if template and period:
+                params['assignment_title'] = f"{template} \u2013 {period}"
+            elif template:
+                params['assignment_title'] = template
+            else:
+                params['assignment_title'] = 'this assignment'
         return params
 
     @classmethod
@@ -459,6 +526,11 @@ class NotificationService:
                             tp['submitter_name'] = 'A focal point'
                         if 'period' not in tp:
                             tp['period'] = '—'
+                    if title_key in cls._ASSIGNMENT_TITLE_KEYS:
+                        tp = cls._ensure_assignment_title_param(notification, tp)
+                    if title_key == 'notification.assignment_submitted.title':
+                        if 'submitter_name' not in tp:
+                            tp['submitter_name'] = 'A focal point'
                     if title_key in cls._NOTIFICATION_KEYS_WITH_COUNTRY_PARAM:
                         tp = cls._ensure_country_param(notification, tp, title_key)
                     if title_key in (
@@ -497,12 +569,17 @@ class NotificationService:
                     if message_key in keys_requiring_country:
                         message_params = cls._ensure_country_param(notification, message_params, message_key)
 
-                    # Add missing submitter_name/period for assignment_submitted.admin (older notifications may lack them)
-                    if message_key == 'notification.assignment_submitted.admin.message':
+                    # Add missing submitter_name/period for assignment_submitted (older notifications may lack them)
+                    if message_key in (
+                        'notification.assignment_submitted.message',
+                        'notification.assignment_submitted.admin.message',
+                    ):
                         if 'submitter_name' not in message_params:
                             message_params['submitter_name'] = 'A focal point'
                         if 'period' not in message_params:
                             message_params['period'] = '—'
+                    if message_key in cls._ASSIGNMENT_TITLE_KEYS:
+                        message_params = cls._ensure_assignment_title_param(notification, message_params)
 
                     if message_key in cls._ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS:
                         message_params = cls._ensure_assignment_sent_for_review_params(message_params)

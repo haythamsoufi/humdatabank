@@ -14,13 +14,19 @@ from app.utils.organization_helpers import get_org_name
 
 
 _PREVIEW_VARIANT_SUFFIXES: Dict[str, List[tuple[str, str]]] = {
-    "assignment_submitted": [("", _("Default")), ("admin", _("Admin channel"))],
+    "assignment_submitted": [
+        ("", _("Other focal points")),
+        ("submitter", _("Submitter")),
+        ("team_email", _("Team email")),
+        ("admin", _("Admin channel")),
+    ],
     "assignment_sent_for_review": [("", _("Delegation focal point")), ("admin", _("Admin FYI"))],
     "document_uploaded": [("", _("Uploaded")), ("pending", _("Pending review"))],
 }
 
 _SAMPLE_PARAMS: Dict[str, Any] = {
     "template": "Unified Country Report",
+    "assignment_title": "Unified Country Report \u2013 Jan-Jun 2026",
     "period": "Jan-Jun 2026",
     "country": "Example National Society",
     "country_name": "Example Country",

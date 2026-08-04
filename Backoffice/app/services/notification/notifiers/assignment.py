@@ -5,11 +5,14 @@ from flask_login import current_user
 from flask_babel import gettext as _
 from sqlalchemy import or_, select
 
-from app.models import NotificationType, User, Country
+from app.models import NotificationType, User
 from app.services.platform.app_settings_service import audience_bucket_enabled
 from app.services.notification.audience import (
     collect_entity_admin_audience_recipient_ids,
     get_assignment_editor_submitter_user_ids_for_entity,
+)
+from app.services.notification.assignment_review_recipient import (
+    resolve_submission_review_recipient_user_ids,
 )
 from app.services.notification.creation import create_notification
 
@@ -127,6 +130,35 @@ def notify_assignment_created(assignment_entity_status):
 
     return list(notifications) + list(admin_notifications)
 
+def _resolve_assignment_submitter_name(assignment_entity_status) -> str:
+    """Display name for whoever submitted the assignment (persisted id first, then current user)."""
+    submitter_id = getattr(assignment_entity_status, 'submitted_by_user_id', None)
+    if submitter_id:
+        submitter = User.query.get(int(submitter_id))
+        if submitter and submitter.name:
+            return submitter.name
+    if current_user and current_user.is_authenticated and current_user.name:
+        return current_user.name
+    return "A focal point"
+
+
+def _resolve_assignment_display_title(assigned_form, template_name: str | None = None) -> str:
+    """Assignment label: custom name when set, otherwise template name and period."""
+    if assigned_form is not None:
+        try:
+            title = assigned_form.display_name
+            if title and str(title).strip():
+                return str(title).strip()
+        except Exception:
+            pass
+    if template_name:
+        period_name = getattr(assigned_form, 'period_name', None) if assigned_form else None
+        if period_name:
+            return f"{template_name} \u2013 {period_name}"
+        return template_name
+    return "this assignment"
+
+
 def notify_assignment_submitted(assignment_entity_status):
     """Notify focal points and admins when an assignment is submitted for any entity type."""
     aes = assignment_entity_status
@@ -167,36 +199,68 @@ def notify_assignment_submitted(assignment_entity_status):
         user_id=None
     )
 
-    # Identify entity-scoped admins for dedupe + optional admin broadcast (never global admin blast).
-    secondary_recipients = collect_entity_admin_audience_recipient_ids(
-        NotificationType.assignment_submitted,
-        entity_type,
-        entity_id,
-    )
+    submitter_name = _resolve_assignment_submitter_name(aes)
+    submitter_user_id = getattr(aes, 'submitted_by_user_id', None)
+    if submitter_user_id is None and current_user and current_user.is_authenticated:
+        submitter_user_id = current_user.id
 
-    # Exclude users who already receive the admin/SM copy below (avoid duplicate in-app notifications).
-    exclude_from_focal = set(secondary_recipients)
+    assignment_title = _resolve_assignment_display_title(assigned_form, template_name)
+    related_url = url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id)
 
-    # Notify focal points (assignment_editor/submitter), including the submitter when they hold that role.
-    notifications = notify_entity_focal_points(
-        entity_type=entity_type,
-        entity_id=entity_id,
-        notification_type=NotificationType.assignment_submitted,
-        title_key='notification.assignment_submitted.title',
-        title_params={'template': template_name, 'period': assigned_form.period_name},
-        message_key='notification.assignment_submitted.message',
-        message_params={
-            'template': template_name,
-            'period': assigned_form.period_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id
-        },
-        related_object_type='assignment',
-        related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
-        priority='normal',
-        exclude_user_ids=list(exclude_from_focal) if exclude_from_focal else None,
-    )
+    focal_notifications = []
+    if audience_bucket_enabled(NotificationType.assignment_submitted, "focal_points"):
+        focal_point_ids = get_assignment_editor_submitter_user_ids_for_entity(entity_type, entity_id)
+        if focal_point_ids:
+            common_notification_kwargs = {
+                'entity_type': entity_type,
+                'entity_id': entity_id,
+                'notification_type': NotificationType.assignment_submitted,
+                'related_object_type': 'assignment',
+                'related_object_id': aes.id,
+                'related_url': related_url,
+                'priority': 'normal',
+                'send_email_notifications': False,
+            }
+            stored_params = {
+                'assignment_title': assignment_title,
+                'submitter_name': submitter_name,
+                'template': template_name,
+                'period': assigned_form.period_name,
+                '_entity_type': entity_type,
+                '_entity_id': entity_id,
+            }
+
+            if submitter_user_id and submitter_user_id in focal_point_ids:
+                focal_notifications.extend(create_notification(
+                    user_ids=[submitter_user_id],
+                    title_key='notification.assignment_submitted.submitter.title',
+                    title_params={'assignment_title': assignment_title},
+                    message_key='notification.assignment_submitted.submitter.message',
+                    message_params=dict(stored_params),
+                    **common_notification_kwargs,
+                ) or [])
+
+            peer_ids = [uid for uid in focal_point_ids if uid != submitter_user_id]
+            if peer_ids:
+                focal_notifications.extend(create_notification(
+                    user_ids=peer_ids,
+                    title_key='notification.assignment_submitted.title',
+                    title_params={'assignment_title': assignment_title},
+                    message_key='notification.assignment_submitted.message',
+                    message_params=dict(stored_params),
+                    **common_notification_kwargs,
+                ) or [])
+
+            from app.services.notification.emails import send_assignment_submitted_team_email
+
+            notification_by_user_id = {n.user_id: n for n in focal_notifications}
+            send_assignment_submitted_team_email(
+                user_ids=focal_point_ids,
+                assignment_title=assignment_title,
+                submitter_name=submitter_name,
+                related_url=related_url,
+                notification_by_user_id=notification_by_user_id,
+            )
 
     # Get entity name for the notification message
     from app.services.organization.entity_service import EntityService
@@ -205,7 +269,14 @@ def notify_assignment_submitted(assignment_entity_status):
         # Fallback to entity type if name not found
         entity_name = entity_type.replace('_', ' ').title()
 
-    submitter_name = current_user.name if (current_user and current_user.is_authenticated) else "A focal point"
+    secondary_recipients = resolve_submission_review_recipient_user_ids(
+        aes,
+        exclude_user_ids=[submitter_user_id] if submitter_user_id else None,
+    )
+    if secondary_recipients and not audience_bucket_enabled(
+        NotificationType.assignment_submitted, "admin_users"
+    ):
+        secondary_recipients = []
 
     if secondary_recipients:
         admin_notifications = create_notification(
@@ -214,11 +285,13 @@ def notify_assignment_submitted(assignment_entity_status):
             title_key='notification.assignment_submitted.admin.title',
             title_params={
                 'submitter_name': submitter_name,
+                'assignment_title': assignment_title,
                 'period': assigned_form.period_name,
             },
             message_key='notification.assignment_submitted.admin.message',
             message_params={
                 'template': template_name,
+                'assignment_title': assignment_title,
                 'country': entity_name,
                 'period': assigned_form.period_name,
                 'submitter_name': submitter_name,
@@ -229,14 +302,14 @@ def notify_assignment_submitted(assignment_entity_status):
             entity_id=entity_id,
             related_object_type='assignment',
             related_object_id=aes.id,
-            related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+            related_url=related_url,
             priority='high',
             override_email_preferences=True  # Always email admins for action-required review
         )
     else:
         admin_notifications = []
 
-    return notifications + (admin_notifications or [])
+    return focal_notifications + (admin_notifications or [])
 
 
 def _focal_point_ids_by_org_domain(entity_type, entity_id, *, org_only: bool, exclude_user_ids=None):

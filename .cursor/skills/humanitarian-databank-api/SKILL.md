@@ -1,23 +1,39 @@
 ---
 name: humanitarian-databank-api
 description: >-
-  Query the IFRC Humanitarian Databank public API at databank.ifrc.org to
-  retrieve submitted form data, indicator values, disaggregation breakdowns,
-  form item details, countries, and reporting periods. Use when asked about
-  IFRC Red Cross data, FDRS data, indicator values by country or period,
-  form submissions, humanitarian indicators, or when the user wants to explore
-  or analyse data from the Humanitarian Databank. No API key required for
-  public data.
+  Query IFRC Humanitarian Databank public APIs (no auth): indicator bank
+  metadata, countries, sectors, FDRS totals, disaggregation, publications.
 ---
 
-# Humanitarian Databank API
+# Humanitarian Databank — Public API
 
 The IFRC Humanitarian Databank holds data reported by National Red Cross and
 Red Crescent Societies worldwide.
 
-**Base URL:** `https://databank.ifrc.org/api/v1`
+**This skill covers public endpoints only — no API key, no login.**
 
-Full endpoint schemas and response examples are in [reference.md](reference.md).
+Most `/api/v1/data` routes and catalog endpoints (`/periods`, `/countrymap`,
+`/templates`, `/form-items`, etc.) **require authentication** and will return
+401. Do not call them from this skill.
+
+Full schemas and examples: [reference.md](reference.md).
+
+---
+
+## API Surfaces
+
+| Base URL | Use for |
+|----------|---------|
+| `https://databank.ifrc.org/api/v1` | Indicator Bank catalogue (list + detail) |
+| `https://databank.ifrc.org/api/mobile/v1` | Countries, sectors, periods, FDRS totals, disaggregation, publications |
+
+Mobile routes return a standard envelope:
+
+```json
+{ "success": true, "data": { ... }, "meta": { ... } }
+```
+
+On error: `{ "success": false, "error": "message" }` with HTTP 4xx/5xx.
 
 ---
 
@@ -25,142 +41,137 @@ Full endpoint schemas and response examples are in [reference.md](reference.md).
 
 | Concept | Description |
 |---------|-------------|
-| **Indicator Bank** | Master catalogue of measurable humanitarian indicators (e.g. "Number of volunteers"). Each entry has a stable numeric `id`. |
-| **Template** | A form containing a set of indicators (form items) grouped into sections. Each template has a `template_id`. |
-| **Form Item** | One indicator (or question/document field) within a template version. Has `form_item_id`, `indicator_bank_id`, `label`, `section`. |
-| **Assignment Period** | Reporting period label string (e.g. `"Annual 2023"`, `"FY2024"`). Passed as `period_name`. |
-| **Submission** | A country's completed form for a given template and period. `submission_type` is `"assigned"` (official) or `"public"` (open). |
-| **FormData** | A single cell of data: one form item × one submission × one country. Carries `value`, `data_status`, `disaggregation_data`. |
-| **Disaggregation** | Breakdown of a numeric value by demographic categories (e.g. by sex/age), stored under `disaggregation_data.values`. |
+| **Indicator Bank** | Master catalogue of humanitarian indicators. Each has a stable numeric `id`. |
+| **Sector / Sub-sector** | Taxonomy grouping indicators (e.g. Health → First Aid). |
+| **FDRS template** | Default form template id `21` — annual FDRS reporting. |
+| **Period** | Reporting period label (e.g. `"Annual 2023"`, `"FY2024"`). |
+| **FDRS overview** | Pre-aggregated numeric totals per country for one indicator. |
 
 ---
 
-## Endpoints
+## Endpoints (public, no auth)
 
-### `GET /api/v1/indicator-bank`
-Browse the indicator catalogue (no auth). Use this to find `indicator_bank_id`
-values before querying `/data`.
-→ See [reference.md §1](reference.md) for params and response shape.
+### Indicator Bank — `/api/v1`
 
-### `GET /api/v1/indicator-bank/<id>`
-Single indicator details (no auth).
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/indicator-bank` | Full catalogue with filters |
+| GET | `/indicator-bank/<id>` | Single indicator (same object shape) |
 
-### `GET /api/v1/data`
-Returns raw FormData rows with optional filtering. Use this to retrieve
-submitted values per indicator, country, and period.
-→ See [reference.md §2](reference.md) for all params, filtering, and response shape.
+### Public data — `/api/mobile/v1`
 
-### `GET /api/v1/data/tables`
-Like `/data` but adds related lookup tables (`form_items`, `countries`) in the
-same response. Supports a star-schema layout for BI consumers.
-→ See [reference.md §3](reference.md).
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/data/countrymap` | All countries (id, name, ISO codes, region) |
+| GET | `/data/sectors-subsectors` | Sector tree with subsectors and logo URLs |
+| GET | `/data/indicator-bank` | Paginated indicator list (same fields as v1) |
+| GET | `/data/indicator-bank/<id>` | Single indicator |
+| GET | `/data/periods` | Distinct reporting period names |
+| GET | `/data/fdrs-overview` | Country-level totals for one indicator |
+| GET | `/data/disaggregation-overview` | Global/regional sex/age breakdown |
+| GET | `/data/resources` | Publications and resource library |
 
----
-
-## Workflow 1 — Get values for a specific indicator
-
-**Step 1** — Find the indicator ID:
-```
-GET /api/v1/indicator-bank?search=volunteers
-```
-Note the `id` of the target indicator (e.g. `42`).
-
-**Step 2** — Fetch all data rows for that indicator:
-```
-GET /api/v1/data?indicator_bank_id=42
-```
-
-**Step 3** — Scope to a period:
-```
-GET /api/v1/data?indicator_bank_id=42&period_name=Annual%202023
-```
+All mobile routes are rate-limited. See [reference.md](reference.md) for params
+and response shapes.
 
 ---
 
-## Workflow 2 — Get data for a country
+## Workflow 1 — Explore the indicator catalogue
 
-Use ISO codes directly — no need to look up country IDs first:
+**Search by keyword:**
 ```
-GET /api/v1/data?country_iso2=BD&period_name=Annual%202023
-GET /api/v1/data?country_iso3=BGD&indicator_bank_id=42
+GET https://databank.ifrc.org/api/v1/indicator-bank?search=volunteers
 ```
-Or by numeric `country_id`:
+
+**Filter by sector or type:**
 ```
-GET /api/v1/data?country_id=23&indicator_bank_id=42
+GET https://databank.ifrc.org/api/v1/indicator-bank?sector=Health&type=Number
 ```
+
+**Get full details for one indicator:**
+```
+GET https://databank.ifrc.org/api/v1/indicator-bank/42
+```
+
+Response field reference: [reference.md §1](reference.md).
 
 ---
 
-## Workflow 3 — Get data with full context (form items + countries)
+## Workflow 2 — Get FDRS values for an indicator
 
-`/data/tables` bundles the related lookup tables so you don't need separate
-calls:
+**Step 1** — Find the indicator id (Workflow 1).
+
+**Step 2** — List available periods:
 ```
-GET /api/v1/data/tables
+GET https://databank.ifrc.org/api/mobile/v1/data/periods
+GET https://databank.ifrc.org/api/mobile/v1/data/periods?template_id=21
+```
+
+**Step 3** — Fetch country totals:
+```
+GET https://databank.ifrc.org/api/mobile/v1/data/fdrs-overview
     ?indicator_bank_id=42
     &period_name=Annual%202023
-    &related=all
 ```
-Response includes `data[]`, `form_items[]`, and `countries[]`.
+
+Response `data.by_country` maps country id → total. Use `data.country_names`
+and `data.country_iso2` for labels.
+
+Optional: `template_id` (default `21`), `locale` for localized country names.
 
 ---
 
-## Workflow 4 — Explore what indicators a template contains
+## Workflow 3 — Disaggregation breakdown (anonymous)
 
+Global and regional sex/age aggregates — no per-country breakdown without login:
 ```
-GET /api/v1/data/tables
-    ?template_id=2
+GET https://databank.ifrc.org/api/mobile/v1/data/disaggregation-overview
+    ?indicator_bank_id=729
     &period_name=Annual%202023
-    &related=all
 ```
-`form_items[]` in the response lists every indicator (with label, section, unit,
-bank details) that has data for that template and period.
+
+Default indicator `729` is "people reached". Response includes `by_sex`, `by_age`
+(each item has `category` + `value`), `by_region`, `trends`, and `total`.
+`by_country` is empty for anonymous callers.
 
 ---
 
-## Key Query Parameters for `/data` and `/data/tables`
+## Workflow 4 — Browse countries and sectors
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `indicator_bank_id` | int | Filter to one indicator (cross-template) |
-| `template_id` | int | Filter to one form template |
-| `country_id` | int | Filter to one country (numeric ID) |
-| `country_iso2` | string | Filter to one country by 2-letter ISO code |
-| `country_iso3` | string | Filter to one country by 3-letter ISO code |
-| `period_name` | string | Filter to one reporting period label |
-| `submission_type` | string | `"assigned"` or `"public"` |
-| `item_id` | int | Filter to a specific form item ID |
-| `item_type` | string | `"indicator"`, `"question"`, or `"document_field"` |
-| `submission_id` | int | Filter to a specific submission |
-| `date_from` | string | ISO date lower bound on `submitted_at` |
-| `date_to` | string | ISO date upper bound on `submitted_at` |
-| `include_full_info` | bool | Embed full form item info in each data row |
-| `include_dynamic` | bool | Add `dynamic_data[]` array to response |
-| `include_repeat` | bool | Add `repeat_data[]` array to response |
-| `sort` | string | `submitted_at` (default), `template_id`, `country_id`, `period_name` |
-| `order` | string | `desc` (default) or `asc` |
-| `page` / `per_page` | int | Pagination (API key auth only; default 20, max 100 000) |
-| `related` | string | `/data/tables` only: `"page"` (default) or `"all"` — scopes `form_items[]`. `countries[]` always returns all countries. |
-| `layout` | string | `/data/tables` only: `"flat"` (default) or `"star"` |
+**Countries:**
+```
+GET https://databank.ifrc.org/api/mobile/v1/data/countrymap
+GET https://databank.ifrc.org/api/mobile/v1/data/countrymap?locale=fr
+```
+
+**Sectors (with subsectors and logo URLs):**
+```
+GET https://databank.ifrc.org/api/mobile/v1/data/sectors-subsectors
+```
+
+Sector logos are served from public `/api/v1/uploads/sectors/<filename>` URLs
+embedded in the response.
 
 ---
 
-## `data_status` Values
+## Workflow 5 — Publications and resources
 
-| Value | Meaning |
-|-------|---------|
-| `"available"` | Value was reported |
-| `"data_not_available"` | Reporter marked this as unavailable |
-| `"not_applicable"` | Reporter marked this as not applicable |
-| `"missing"` | No FormData row exists (virtual row when `include_non_reported=true`) |
+```
+GET https://databank.ifrc.org/api/mobile/v1/data/resources?page=1&per_page=20
+GET https://databank.ifrc.org/api/mobile/v1/data/resources?search=FDRS&locale=en
+GET https://databank.ifrc.org/api/mobile/v1/data/resources?grouped=true
+```
 
 ---
 
 ## Tips
 
-- Always filter by at least one of `indicator_bank_id`, `template_id`, `country_id`, or `period_name` to keep responses manageable.
-- Use `country_iso2` / `country_iso3` instead of `country_id` when you only know the ISO code.
-- `/data/tables?related=all` returns form items for the **entire filtered dataset**, not just the current page. `countries[]` always includes the full country dimension.
-- `include_full_info=true` embeds `form_item_info` (label, section, unit, indicator bank details) directly in each row, avoiding a second call.
-- `indicator_bank_ids` (comma-separated) on `/data/tables` lets you fetch multiple indicators in one request.
-- Disaggregation keys under `disaggregation_data.values` vary by indicator configuration. The `mode` field (`"standard"`, `"matrix"`, or `"flat"`) describes the structure.
+- Start with `/api/v1/indicator-bank` for metadata; use mobile `/data/fdrs-overview`
+  for actual reported values.
+- Always pass `period_name` to FDRS endpoints when comparing across years.
+- FDRS template id defaults to `21`; pass `template_id` only for non-FDRS forms.
+- `/api/v1/indicator-bank` returns the full filtered list in one response (cached
+  5 min). Use mobile `/data/indicator-bank` with `page`/`per_page` for large
+  paginated reads.
+- Do not call `/api/v1/data`, `/api/v1/periods`, or `/api/v1/countrymap` — they
+  require an API key.

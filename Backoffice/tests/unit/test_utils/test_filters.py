@@ -300,6 +300,10 @@ class TestNl2br:
         result = nl2br("a\nb\nc")
         assert str(result).count("<br>") == 2
 
+    def test_crlf_normalized(self):
+        result = nl2br("line1\r\nline2")
+        assert str(result) == "line1<br>line2"
+
     def test_integer_input(self):
         result = nl2br(42)
         assert "42" in result

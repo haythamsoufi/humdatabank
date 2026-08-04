@@ -38,6 +38,22 @@ class TestLandingPage:
         assert "current_year" in kwargs
 
 
+class TestPrivacyPolicy:
+    def test_privacy_returns_200_without_login(self, client):
+        resp = client.get("/privacy")
+        assert resp.status_code == 200
+        assert b"Privacy policy" in resp.data or b"privacy" in resp.data.lower()
+
+    def test_privacy_policy_alias_returns_200(self, client):
+        resp = client.get("/privacy-policy")
+        assert resp.status_code == 200
+
+    def test_privacy_mentions_public_api(self, client):
+        resp = client.get("/privacy")
+        assert b"databank.ifrc.org/mcp" in resp.data or b"/mcp" in resp.data
+        assert b"/api/v1" in resp.data
+
+
 # =====================================================================
 # health_check
 # =====================================================================

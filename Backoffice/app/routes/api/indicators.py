@@ -76,7 +76,13 @@ def get_indicator_bank():
             emergency=request.args.get('emergency', default='', type=str).strip(),
             archived=request.args.get('archived', default=None),
         )
-        indicators_data, _total, _page, _per_page = get_indicator_list(filters)
+        limit = request.args.get('limit', default=None, type=int)
+        if limit is not None and limit > 0:
+            indicators_data, _total, _page, _per_page = get_indicator_list(
+                filters, page=1, per_page=min(limit, 50)
+            )
+        else:
+            indicators_data, _total, _page, _per_page = get_indicator_list(filters)
         current_app.logger.debug("Indicator bank API returning %s items", len(indicators_data))
         response = json_response({'indicators': indicators_data})
         # Public, rarely-changing data. Allow downstream caches (AGW, CDN, BI tools) to

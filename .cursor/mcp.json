@@ -16,6 +16,9 @@
       "env": {
         "DATABANK_API_BASE": "https://databank.ifrc.org/api/v1"
       }
+    },
+    "humanitarian-databank-prod": {
+      "url": "https://databank.ifrc.org/mcp"
     }
   }
 }

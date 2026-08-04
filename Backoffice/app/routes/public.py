@@ -1,4 +1,6 @@
 # ========== File: app/routes/public.py ==========
+from pathlib import Path
+
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app, abort, jsonify
 from app.models import db, Resource, SubmittedDocument
 from app.models.enums import DocumentStatus
@@ -150,6 +152,35 @@ def legacy_public_document_download_redirect(document_id):
 def landing_page():
     """Public landing page introducing the platform and its features."""
     return render_template("public/landing.html", current_year=utcnow().year)
+
+
+@bp.route("/privacy", methods=["GET"])
+@bp.route("/privacy-policy", methods=["GET"])
+def privacy_policy():
+    """Public privacy policy for the portal, public API, and MCP integrations."""
+    from app.services.documentation import service as docs
+
+    root = docs.docs_root()
+    file_path = Path(root) / "public" / "privacy-policy.md"
+    if not file_path.is_file():
+        current_app.logger.error("Missing public privacy policy markdown: %s", file_path)
+        abort(404)
+
+    privacy_url = url_for("public.privacy_policy")
+
+    content_html = docs.render_markdown_file(
+        root=Path(root),
+        file_path=file_path,
+        current_rel="public/privacy-policy.md",
+        doc_url_builder=lambda _rel: privacy_url,
+        asset_url_builder=lambda _rel: privacy_url,
+    )
+    return render_template(
+        "public/privacy.html",
+        page_title=docs.extract_page_title(file_path),
+        content_html=content_html,
+        current_year=utcnow().year,
+    )
 
 
 @bp.route("/health", methods=["GET"])

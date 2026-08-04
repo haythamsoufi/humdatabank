@@ -36,6 +36,31 @@ class TestApiData:
         assert isinstance(payload, dict)
         assert "data" in payload
         assert any(row.get("id") == form_data_id for row in (payload.get("data") or []))
+        assert payload.get("indicator_bank") == []
+        assert payload.get("countries") == []
+        assert "arrays" not in payload
+
+    def test_get_data_public_include_dimensions_when_requested(self, client, db_session, app):
+        from tests.unit.test_services.test_data_retrieval_form import _make_full_setup
+
+        with app.app_context():
+            _, template, _, ind, _, _, _, _ = _make_full_setup(
+                db_session,
+                status="submitted",
+                value="42",
+                period_name="Annual Report 2024",
+            )
+            template_id = template.id
+            indicator_bank_id = ind.id
+
+        resp = client.get(
+            f"/api/v1/data?indicator_bank_id={indicator_bank_id}&template_id={template_id}"
+            "&include_dimensions=true"
+        )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert isinstance(payload.get("indicator_bank"), list)
+        assert len(payload.get("indicator_bank") or []) > 0
 
     def test_get_data_public_blocks_analysis_without_auth(self, client, db_session, app):
         from tests.unit.test_services.test_data_retrieval_form import _make_full_setup

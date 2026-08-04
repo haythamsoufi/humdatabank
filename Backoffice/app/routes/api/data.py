@@ -57,6 +57,8 @@ from app.services.security.api_authentication import (
 )
 from app.services.security.public_data_access import (
     PUBLIC_DATA_MAX_PER_PAGE,
+    public_include_dimensions,
+    slim_public_data_rows,
     validate_public_data_request,
 )
 from app.utils.api_pagination import (
@@ -1915,37 +1917,48 @@ def get_all_data():
                         template=item.template
                     )
                 )
-        countries_table = _load_full_countries_table()
-        national_societies_table = _load_full_national_societies_table()
-        indicator_bank_table = _load_full_indicator_bank_table()
-        # strip=True clears matrix values out of data_rows in the same pass that
-        # extracts them into matrix_cells, avoiding a second full scan over data_rows.
-        matrix_cells = build_matrix_cells_from_data_rows(data_rows, form_items_table, strip=True)
-        matrix_cells = enrich_matrix_cells(
-            matrix_cells,
-            form_items_table,
-            countries_table=countries_table,
-            national_societies_table=national_societies_table,
-            indicator_bank_table=indicator_bank_table,
-        )
-
+        public_slim = public_data_access and not public_include_dimensions(request.args)
         extra_keys = {}
-        if include_dynamic:
-            extra_keys['dynamic_data'] = extended['dynamic_data']
-            extra_keys['dynamic_context'] = extended.get('dynamic_context', [])
-        if include_repeat:
-            extra_keys['repeat_data'] = extended['repeat_data']
+        if public_slim:
+            data_rows = slim_public_data_rows(data_rows)
+            form_items_table = []
+            countries_table = []
+            national_societies_table = []
+            indicator_bank_table = []
+            matrix_cells = []
+            assignment_statuses_table = []
+            array_catalog = None
+        else:
+            countries_table = _load_full_countries_table()
+            national_societies_table = _load_full_national_societies_table()
+            indicator_bank_table = _load_full_indicator_bank_table()
+            # strip=True clears matrix values out of data_rows in the same pass that
+            # extracts them into matrix_cells, avoiding a second full scan over data_rows.
+            matrix_cells = build_matrix_cells_from_data_rows(data_rows, form_items_table, strip=True)
+            matrix_cells = enrich_matrix_cells(
+                matrix_cells,
+                form_items_table,
+                countries_table=countries_table,
+                national_societies_table=national_societies_table,
+                indicator_bank_table=indicator_bank_table,
+            )
 
-        # Union of assigned submission_ids already seen while building data_rows /
-        # dynamic_data / repeat_data above — collected inline, so this is a cheap
-        # set union rather than a second full scan over those (potentially large) lists.
-        fact_assigned_submission_ids |= extended.get('assigned_submission_ids') or set()
-        assignment_statuses_table = _assignment_statuses_for_scope(
-            [
-                {'submission_type': 'assigned', 'submission_id': sid}
-                for sid in fact_assigned_submission_ids
-            ]
-        )
+            if include_dynamic:
+                extra_keys['dynamic_data'] = extended['dynamic_data']
+                extra_keys['dynamic_context'] = extended.get('dynamic_context', [])
+            if include_repeat:
+                extra_keys['repeat_data'] = extended['repeat_data']
+
+            # Union of assigned submission_ids already seen while building data_rows /
+            # dynamic_data / repeat_data above — collected inline, so this is a cheap
+            # set union rather than a second full scan over those (potentially large) lists.
+            fact_assigned_submission_ids |= extended.get('assigned_submission_ids') or set()
+            assignment_statuses_table = _assignment_statuses_for_scope(
+                [
+                    {'submission_type': 'assigned', 'submission_id': sid}
+                    for sid in fact_assigned_submission_ids
+                ]
+            )
         if layout == 'star':
             response = _build_star_data_response(
                 data_rows,

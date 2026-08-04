@@ -31,6 +31,7 @@ def register_api_blueprints(app):
     from app.routes.api import indicator_bank_compat  # noqa: F401
     from app.routes.api import data_quality  # noqa: F401
     from app.routes.api import validation_questions  # noqa: F401
+    from app.routes.api import public_integrations  # noqa: F401
 
     # NOW register the blueprint with all routes already added
     # All modules above register their routes directly to api_bp during import

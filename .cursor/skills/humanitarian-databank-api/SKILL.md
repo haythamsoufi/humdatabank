@@ -22,14 +22,21 @@ do not curl or web_fetch:
 
 | Tool | Use for |
 |------|---------|
-| `databank_search_indicators` | Find indicator ids by keyword |
+| `databank_aggregate_global_trend` | **Global totals by year** (deduped; preferred) |
+| `databank_resolve_indicator` | Map "volunteers" / "staff" → indicator id |
+| `databank_search_indicators` | Find indicator ids by keyword (ranked, capped) |
 | `databank_get_indicator` | Full metadata for one id |
-| `databank_get_public_data` | One page of scoped public data |
-| `databank_get_public_data_all_pages` | Global trends (auto-pagination) |
+| `databank_get_public_data` | One page of scoped public data (raw rows) |
+| `databank_get_public_data_all_pages` | Raw multi-page export (not deduped) |
 
-Example flow for volunteers by year: `databank_search_indicators(search="volunteers")`
-→ pick id → `databank_get_public_data_all_pages(indicator_bank_id=ID)` → group by
-`period_name`, sum `num_value`, chart.
+Example flow for volunteers by year:
+
+```text
+databank_aggregate_global_trend(query="volunteers")
+```
+
+One call returns `by_period` with deduplicated global totals. Do **not** sum raw
+`databank_get_public_data*` rows — multiple submissions per country+period exist.
 
 If MCP tools fail or are unavailable, use the paste workflow below.
 

@@ -1,0 +1,173 @@
+# Build and deploy humanitarian-databank-mcp to Azure App Service (staging).
+#
+# Staging app: ifrc-databank-mcp-staging (resource group ifrctgo001rg)
+# Image:       ifrcimage.azurecr.io/databank_mcp:<tag>
+#
+# Required GitHub secrets (repository → Settings → Secrets → Actions):
+#   ACR_USERNAME              — ifrcimage.azurecr.io registry username
+#   ACR_PASSWORD              — ifrcimage.azurecr.io registry password
+#   AZURE_MCP_PUBLISH_PROFILE — publish profile XML for ifrc-databank-mcp-staging
+#
+# Optional: after deploy, ensure Backoffice staging has:
+#   MCP_UPSTREAM_URL=https://ifrc-databank-mcp-staging.azurewebsites.net
+
+name: Deploy MCP to Azure
+
+run-name: Deploy MCP — ${{ inputs.environment }} (${{ inputs.version }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - Staging
+      version:
+        description: Container image tag in ACR (e.g. v1.1)
+        required: true
+        default: v1.1
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - humanitarian-databank-mcp/**
+
+env:
+  ACR_REGISTRY: ifrcimage.azurecr.io
+  IMAGE_NAME: databank_mcp
+  EFFECTIVE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.sha }}
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+    steps:
+      - name: Set deployment target
+        id: config
+        run: |
+          echo "app_name=ifrc-databank-mcp-staging" >> "$GITHUB_OUTPUT"
+          echo "resource_group=ifrctgo001rg" >> "$GITHUB_OUTPUT"
+
+      - name: Verify MCP publish profile credentials
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
+          APP_NAME: ${{ steps.config.outputs.app_name }}
+        run: |
+          python3 << 'EOF'
+          import os, sys, xml.etree.ElementTree as ET, urllib.request, urllib.error, base64
+
+          profile_xml = os.environ.get("PUBLISH_PROFILE", "").strip()
+          app_name = os.environ["APP_NAME"]
+          if not profile_xml:
+              print("ERROR: AZURE_MCP_PUBLISH_PROFILE secret is not set.")
+              sys.exit(1)
+
+          try:
+              root = ET.fromstring(profile_xml)
+          except ET.ParseError as exc:
+              print(f"ERROR: Could not parse publish profile XML: {exc}")
+              sys.exit(1)
+
+          entry = next(
+              (p for p in root.findall("publishProfile") if p.get("publishMethod") == "MSDeploy"),
+              None,
+          )
+          if entry is None:
+              print("ERROR: No MSDeploy entry found in publish profile.")
+              sys.exit(1)
+
+          scm_host = entry.get("publishUrl", "").split(":")[0]
+          msdeploy = entry.get("msdeploySite", "")
+          username = entry.get("userName", "")
+          password = entry.get("userPWD", "")
+
+          if not scm_host.startswith(app_name):
+              print(f"ERROR: Publish profile is for '{msdeploy}', expected app '{app_name}'.")
+              sys.exit(1)
+
+          token = base64.b64encode(f"{username}:{password}".encode()).decode()
+          req = urllib.request.Request(
+              f"https://{scm_host}/api/settings",
+              headers={"Authorization": f"Basic {token}"},
+          )
+          try:
+              urllib.request.urlopen(req, timeout=15)
+              print(f"OK: Credentials verified for '{msdeploy}' at {scm_host}")
+          except urllib.error.HTTPError as exc:
+              print(f"ERROR: HTTP {exc.code} from {scm_host} — credentials rejected or app unreachable.")
+              sys.exit(1)
+          except urllib.error.URLError as exc:
+              print(f"ERROR: Could not reach {scm_host}: {exc.reason}")
+              sys.exit(1)
+          EOF
+
+  build:
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: staging
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and push MCP container image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./humanitarian-databank-mcp
+          file: ./humanitarian-databank-mcp/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}
+            ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-from: type=registry,ref=${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          platforms: linux/amd64
+          provenance: false
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 10
+    environment: staging
+    permissions:
+      contents: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Deploy MCP to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ifrc-databank-mcp-staging
+          images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}
+          publish-profile: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
+
+      - name: Deployment summary
+        run: |
+          {
+            echo "## MCP deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| App | \`ifrc-databank-mcp-staging\` |"
+            echo "| Resource group | \`ifrctgo001rg\` |"
+            echo "| Image | \`${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}\` |"
+            echo "| URL | https://ifrc-databank-mcp-staging.azurewebsites.net/mcp |"
+            echo ""
+            echo "Set Backoffice \`MCP_UPSTREAM_URL\` to \`https://ifrc-databank-mcp-staging.azurewebsites.net\` if not already configured."
+          } >> "$GITHUB_STEP_SUMMARY"

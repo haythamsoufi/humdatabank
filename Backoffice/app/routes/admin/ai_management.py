@@ -1690,8 +1690,16 @@ def _language_display_name_for_import(language_code: str | None) -> str:
     )
 
 
-def _serialize_system_document_for_ai_import(doc, ai_doc, *, file_size: int | None = None) -> dict:
+def _serialize_system_document_for_ai_import(
+    doc,
+    ai_doc,
+    *,
+    aes_countries=None,
+    entity_names=None,
+) -> dict:
     """Serialize a SubmittedDocument row for the AI import modal grid."""
+    from app.utils.api_serialization import _country_for_aes
+
     source = "standalone"
     assignment_name = ""
     template_name = ""
@@ -1714,13 +1722,26 @@ def _serialize_system_document_for_ai_import(doc, ai_doc, *, file_size: int | No
             template_name = (assigned_form.template.name if assigned_form.template else "") or ""
             assignment_period = assigned_form.period_name or ""
 
-    country = doc.document_country
-    if country and getattr(country, "name", None):
-        country_name = country.name
-    elif doc.standalone_linked_display:
-        country_name = doc.standalone_linked_display
-    else:
-        country_name = ""
+    country_name = ""
+    if doc.assignment_entity_status_id:
+        aes = doc.assignment_entity_status
+        if aes:
+            country = _country_for_aes(aes, aes_countries)
+            if country and getattr(country, "name", None):
+                country_name = country.name
+    elif doc.public_submission_id:
+        public_submission = doc.public_submission
+        if public_submission and public_submission.country and public_submission.country.name:
+            country_name = public_submission.country.name
+    elif doc.country and doc.country.name:
+        country_name = doc.country.name
+    elif doc.linked_entity_type and doc.linked_entity_id:
+        if entity_names:
+            country_name = entity_names.get(
+                (doc.linked_entity_type, doc.linked_entity_id), ""
+            ) or ""
+        else:
+            country_name = doc.standalone_linked_display or ""
 
     period_display = (doc.period or "").strip() or assignment_period or ""
 
@@ -1745,7 +1766,7 @@ def _serialize_system_document_for_ai_import(doc, ai_doc, *, file_size: int | No
         "status": str(status_raw or ""),
         "is_public": bool(doc.is_public),
         "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
-        "file_size": file_size,
+        "file_size": None,
         "file_pending": bool(getattr(doc, "file_pending", False)),
         "source_url": (getattr(doc, "source_url", None) or "").strip() or None,
         "ai_processed": ai_doc is not None,
@@ -1805,36 +1826,42 @@ def list_system_documents():
         # Limit results
         documents = query.limit(limit).all()
 
-        # Format response
-        result = []
-        for doc, ai_doc in documents:
-            file_size = None
-            if doc.storage_path:
-                try:
-                    from app.utils.file_paths import (
-                        resolve_submitted_document_file,
-                        resolve_admin_document,
-                        normalize_stored_relative_path,
-                    )
-                    storage_path = (doc.storage_path or '').strip()
-                    file_path = None
-                    from app.services.platform import storage_service as _ai_storage
-                    if os.path.isabs(storage_path):
-                        file_path = storage_path
-                    else:
-                        rel_norm = storage_path.replace("\\", "/").strip()
-                        cat = _ai_storage.submitted_document_rel_storage_category(rel_norm)
-                        if cat in (_ai_storage.SUBMISSIONS, _ai_storage.ENTITY_REPO_ROOT):
-                            file_path = resolve_submitted_document_file(storage_path)
-                        else:
-                            normalized_rel = normalize_stored_relative_path(storage_path, root_folder='admin_documents')
-                            file_path = resolve_admin_document(normalized_rel)
-                    if file_path and os.path.exists(file_path):
-                        file_size = os.path.getsize(file_path)
-                except Exception as e:
-                    current_app.logger.debug("file_size get failed: %s", e)
+        from app.utils.api_serialization import batch_countries_for_aes_list
+        from app.services.organization.entity_service import EntityService
 
-            result.append(_serialize_system_document_for_ai_import(doc, ai_doc, file_size=file_size))
+        aes_list = [
+            doc.assignment_entity_status
+            for doc, _ai in documents
+            if doc.assignment_entity_status
+        ]
+        aes_countries = batch_countries_for_aes_list(aes_list)
+
+        entity_pairs = {
+            (doc.linked_entity_type, doc.linked_entity_id)
+            for doc, _ai in documents
+            if not doc.assignment_entity_status_id
+            and not doc.public_submission_id
+            and doc.linked_entity_type
+            and doc.linked_entity_id
+        }
+        entity_names = (
+            EntityService.batch_entity_names(
+                entity_pairs,
+                prefetched=EntityService.prefetch_entities(entity_pairs, include_hierarchy=False),
+            )
+            if entity_pairs
+            else {}
+        )
+
+        result = [
+            _serialize_system_document_for_ai_import(
+                doc,
+                ai_doc,
+                aes_countries=aes_countries,
+                entity_names=entity_names,
+            )
+            for doc, ai_doc in documents
+        ]
 
         return json_ok(documents=result, total=total_matching, returned=len(result))
 

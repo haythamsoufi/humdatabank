@@ -16,6 +16,10 @@ Public integrations allow software (including AI assistants) to **read** humanit
 
 - Search the indicator bank (`/api/v1/indicator-bank`)
 - Fetch scoped public form data (`/api/v1/data`) for indicators marked **public** in the Databank
+- Compact analytics for AI assistants (`/api/v1/public/global-trend`, `/api/v1/public/indicators/resolve`)
+- Search public document chunks (`/api/v1/public/documents/search`) from the AI Knowledge Base
+
+Configuration for the official Custom GPT is maintained in [`docs/public/custom-gpt/`](../docs/public/custom-gpt/README.md).
 
 No login is required for these scoped public reads. Integrations **cannot** use the public endpoints to access private or internal-only form items, authenticated exports, or user account data.
 

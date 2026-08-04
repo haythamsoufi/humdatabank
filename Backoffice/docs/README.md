@@ -74,6 +74,10 @@ Detailed setup for optional features and production:
 
 Documentation is shown in the language selected in **Account settings**. Supported guide languages include **English**, **French**, **Spanish**, **Arabic**, and **Russian**. If a page is not yet translated, the English version is shown.
 
+## Public integrations (Custom GPT)
+
+- [Custom GPT configuration](public/custom-gpt/README.md) — maintained instructions and OpenAPI schema for the shareable ChatGPT assistant (`/gpt` short link)
+
 ## Interactive tours (workflows)
 
 Step-by-step workflows used by the in-app chatbot to power interactive tours:

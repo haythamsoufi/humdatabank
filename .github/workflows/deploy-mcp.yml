@@ -5,8 +5,7 @@
 #
 # Required GitHub secrets (environment: staging):
 #   ACR_USERNAME / ACR_PASSWORD — ifrcimage.azurecr.io
-#   AZURE_MCP_SCM_USERNAME / AZURE_MCP_SCM_PASSWORD — Kudu SCM credentials
-#     az webapp deployment list-publishing-credentials -g ifrctgo001rg -n ifrc-databank-mcp-staging
+#   AZURE_MCP_PUBLISH_PROFILE — publish profile XML for ifrc-databank-mcp-staging
 
 name: Deploy MCP to Azure
 
@@ -79,57 +78,12 @@ jobs:
       contents: read
 
     steps:
-      - name: Deploy MCP container via Kudu API
-        env:
-          SCM_USERNAME: ${{ secrets.AZURE_MCP_SCM_USERNAME }}
-          SCM_PASSWORD: ${{ secrets.AZURE_MCP_SCM_PASSWORD }}
-        run: |
-          set -euo pipefail
-          python3 << 'PY'
-          import base64
-          import json
-          import os
-          import sys
-          import urllib.error
-          import urllib.request
-
-          user = (os.environ.get("SCM_USERNAME") or "").strip()
-          pwd = (os.environ.get("SCM_PASSWORD") or "").strip()
-          if not user or not pwd:
-              print("ERROR: AZURE_MCP_SCM_USERNAME / AZURE_MCP_SCM_PASSWORD are not set.")
-              sys.exit(1)
-
-          host = "ifrc-databank-mcp-staging.scm.azurewebsites.net"
-          token = base64.b64encode(f"{user}:{pwd}".encode()).decode()
-          headers = {
-              "Authorization": f"Basic {token}",
-              "Content-Type": "application/json",
-          }
-
-          image = f"${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}"
-          payload = json.dumps({"linuxFxVersion": f"DOCKER|{image}"}).encode()
-          update = urllib.request.Request(
-              f"https://{host}/api/settings",
-              data=payload,
-              method="PUT",
-              headers=headers,
-          )
-          try:
-              with urllib.request.urlopen(update, timeout=60) as resp:
-                  print(resp.read().decode()[:500])
-          except urllib.error.HTTPError as exc:
-              body = exc.read().decode() if exc.fp else ""
-              print(f"ERROR: HTTP {exc.code} updating image: {body[:500]}")
-              sys.exit(1)
-
-          restart = urllib.request.Request(
-              f"https://{host}/api/app/restart",
-              method="POST",
-              headers={"Authorization": f"Basic {token}"},
-          )
-          with urllib.request.urlopen(restart, timeout=60):
-              print("Restarted ifrc-databank-mcp-staging")
-          PY
+      - name: Deploy MCP to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ifrc-databank-mcp-staging
+          images: ${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.EFFECTIVE_VERSION }}
+          publish-profile: ${{ secrets.AZURE_MCP_PUBLISH_PROFILE }}
 
       - name: Deployment summary
         run: |

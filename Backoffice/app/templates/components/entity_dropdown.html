@@ -73,9 +73,9 @@
             <input type="text"
                    id="entity_search_input"
                    placeholder="{{ search_placeholder|forceescape }}"
-                   class="block w-64 py-2 px-3 pr-8 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                   class="block w-64 py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                    autocomplete="off">
-            <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+            <div class="enhanced-search-dropdown__input-slot">
                 <button type="button"
                         id="entity_toggle_dropdown"
                         class="text-gray-400 hover:text-gray-600"
@@ -483,13 +483,29 @@
         }
     }
 
-    // Function to position dropdown to avoid right edge
+    // Function to position dropdown to avoid viewport edge (LTR: right, RTL: left)
     function positionDropdown() {
-        // Get the input's position relative to viewport
         const inputRect = searchInput.getBoundingClientRect();
         const viewportWidth = window.innerWidth;
-        const minMargin = 16; // Minimum margin from viewport edge in pixels
-        const dropdownWidth = 384; // w-96 = 24rem = 384px (default width)
+        const minMargin = 16;
+        const dropdownWidth = searchDropdown.offsetWidth || 384;
+        const isRtl = document.documentElement.getAttribute('dir') === 'rtl';
+
+        if (isRtl) {
+            const dropdownLeftEdge = inputRect.left - (dropdownWidth - inputRect.width);
+            if (dropdownLeftEdge < minMargin) {
+                searchDropdown.style.position = 'fixed';
+                searchDropdown.style.top = (inputRect.bottom + window.scrollY + 4) + 'px';
+                searchDropdown.style.left = minMargin + 'px';
+                searchDropdown.style.right = 'auto';
+            } else {
+                searchDropdown.style.position = 'absolute';
+                searchDropdown.style.left = '0';
+                searchDropdown.style.right = 'auto';
+                searchDropdown.style.top = 'auto';
+            }
+            return;
+        }
 
         // Calculate where the dropdown would end if right-aligned to input
         const dropdownRightEdge = inputRect.right;

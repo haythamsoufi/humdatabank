@@ -6,16 +6,35 @@
 
 ---
 
-## §0 Claude.ai / sandbox environments
+## §0 Hosted AI environments (Claude.ai, ChatGPT, Copilot)
 
-Many AI chat interfaces **block outbound HTTP** to `databank.ifrc.org`. If live
-fetch fails with an egress or permissions error:
+**Live HTTP to `databank.ifrc.org` is blocked in most hosted chat sandboxes.**
+This skill remains useful for (a) telling users which curl commands to run,
+(b) parsing pasted JSON/CSV, and (c) answering questions about API shape.
 
-1. Provide the user a curl command to run locally.
-2. Ask them to paste the JSON response into the chat.
-3. Proceed using the pasted data — do not retry fetch loops.
+### Claude.ai — confirmed blockers
 
-Cursor agents with open network access can fetch URLs directly.
+| Mechanism | Result |
+|-----------|--------|
+| bash/curl egress proxy | HTTP 403, `x-deny-reason: host_not_allowed` |
+| web_fetch | Requires URL from prior web_search |
+| web_search | `databank.ifrc.org` usually not indexed — web_fetch never unlocks |
+
+**Never retry** curl, web_fetch, or web_search in a loop. On first failure,
+switch to the user-paste workflow.
+
+### User-paste workflow (required in Claude.ai)
+
+1. Print the exact curl command from [reference.md §5](reference.md) or SKILL.md.
+2. Ask the user to paste the JSON response or upload an export file.
+3. Parse and analyze using §1–§2 schemas below.
+
+See **§5** for ready-to-copy curl commands.
+
+### Environments where live fetch works
+
+Cursor agents, local terminals, Postman, browser address bar, server-side
+scripts — unrestricted outbound HTTPS to `databank.ifrc.org`.
 
 ---
 
@@ -209,6 +228,29 @@ These return **401** without an API key:
 | `GET /api/v1/sectors` | Use sector fields on indicator-bank entries |
 
 Full dataset access: `Authorization: Bearer YOUR_KEY` or `?api_key=YOUR_KEY`.
+
+---
+
+## §5 Curl commands for users (paste workflow)
+
+Give these to the user when live fetch is blocked. They run locally; Claude
+analyzes the pasted JSON.
+
+```bash
+# Indicator search
+curl -s "https://databank.ifrc.org/api/v1/indicator-bank?search=volunteers"
+
+# Single indicator
+curl -s "https://databank.ifrc.org/api/v1/indicator-bank/42"
+
+# Public data (scoped — required filters)
+curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=42&period_name=Annual%202023&page=1&per_page=500"
+
+# With country + full form item context
+curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=42&country_iso3=BGD&period_name=Annual%202023&related=all"
+```
+
+Browser alternative: paste the same URL (without `curl -s`) into the address bar.
 
 ---
 

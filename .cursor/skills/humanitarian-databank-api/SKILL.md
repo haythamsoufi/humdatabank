@@ -1,120 +1,144 @@
 ---
 name: humanitarian-databank-api
 description: >-
-  IFRC Humanitarian Databank public API (no auth): indicator bank metadata and
-  scoped /api/v1/data. Claude.ai cannot fetch live — user must paste JSON.
+  Paste-first IFRC Databank analysis. Give user curl commands immediately; parse
+  pasted JSON. Public /api/v1 only. Never live-fetch databank.ifrc.org.
 ---
 
 # Humanitarian Databank — Public API
 
 **Base URL:** `https://databank.ifrc.org/api/v1`
 
+**Mode:** User runs curl (or browser) → pastes JSON → you analyze.  
+**Or:** use the **humanitarian-databank MCP connector** when enabled (live fetch).  
 Full schemas: [reference.md](reference.md).
 
 ---
 
-## Important: Claude.ai network limits
+## MCP connector (preferred when available)
 
-Claude.ai **cannot** call `databank.ifrc.org` directly. Its sandbox blocks
-outbound HTTP to non-allowlisted hosts, and `web_fetch` only works on URLs
-already surfaced by search or pasted by the user.
+If the **humanitarian-databank** MCP tools are connected, call them directly —
+do not curl or web_fetch:
 
-**When running in Claude.ai:**
+| Tool | Use for |
+|------|---------|
+| `databank_search_indicators` | Find indicator ids by keyword |
+| `databank_get_indicator` | Full metadata for one id |
+| `databank_get_public_data` | One page of scoped public data |
+| `databank_get_public_data_all_pages` | Global trends (auto-pagination) |
 
-1. Ask the user to run the curl command below and paste the JSON response, **or**
-2. Use data the user already pasted in the conversation.
+Example flow for volunteers by year: `databank_search_indicators(search="volunteers")`
+→ pick id → `databank_get_public_data_all_pages(indicator_bank_id=ID)` → group by
+`period_name`, sum `num_value`, chart.
 
-**When running in Cursor** (or any environment with open network access), fetch
-the URLs directly.
+If MCP tools fail or are unavailable, use the paste workflow below.
 
-Example for the user to run locally:
+---
 
-```bash
-curl -s "https://databank.ifrc.org/api/v1/indicator-bank?search=volunteers"
-curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=42&period_name=Annual%202023&page=1&per_page=100"
-```
+## How to respond (Claude.ai — follow every time)
+
+When the user asks for Databank data, **do this in your first reply**:
+
+1. One sentence: live API access is blocked here; paste workflow below.
+2. Give **curl commands** (not bare `GET` URLs) from the recipes below.
+3. Say exactly what to paste back (full JSON, or one file per page if paginated).
+4. **Do not** retry curl, `web_fetch`, or `web_search`.
+5. **Do not** mention API keys, `include_full_info`, or `per_page=100000` unless
+   the user explicitly asks for authenticated/full-dataset access.
+
+Once JSON is pasted, analyze immediately — group, sum, chart, compare.
+
+---
+
+## Blocked in this environment (do not retry)
+
+| Tool | Result |
+|------|--------|
+| bash/curl | 403 `x-deny-reason: host_not_allowed` |
+| web_fetch | URL not in prior search results |
+| web_search | `databank.ifrc.org` not indexed |
 
 ---
 
 ## Public endpoints (no API key)
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/indicator-bank` | Full indicator catalogue with filters |
-| GET | `/indicator-bank/<id>` | Single indicator metadata |
-| GET | `/data?...` | Submitted values — **scoped filters required** |
+| Path | Purpose |
+|------|---------|
+| `/indicator-bank` | Indicator catalogue + search |
+| `/indicator-bank/<id>` | One indicator's metadata |
+| `/data?...` | Submitted values (scoped filters required) |
 
-All other `/api/v1/*` routes require authentication.
+**Public `/data` rules:** `privacy=public` items only · pagination required
+(`page`, `per_page`; max **5000** per page) · no `include_full_info` param ·
+no `dynamic_data` / `repeat_data` · header `X-Public-Data-Access: true`.
 
----
-
-## Public data access (`GET /api/v1/data`)
-
-Works **without an API key** when at least one scope filter is provided:
-
-- `indicator_bank_id` or `indicator_bank_ids`
-- `template_id`
-- `country_id`, `country_iso2`, or `country_iso3`
-- `period_name`
-- `submission_id`, `assignment_id`, `item_id`
-
-**Restrictions for unauthenticated access:**
-
-- Returns only form items with `privacy=public` (same data shown on the public website)
-- Pagination is always applied (`page`, `per_page`; max 5000 per page)
-- `analysis` and `include_non_reported` require authentication
-- `dynamic_data` and `repeat_data` are omitted
-
-Response includes dimension tables: `data[]`, `form_items[]`, `countries[]`,
-`national_societies[]`, `indicator_bank[]`, `matrix_cells[]`, plus pagination
-metadata. Header `X-Public-Data-Access: true` confirms public mode.
-
-For full dataset access (all form items, no scope requirement), use an API key:
-`Authorization: Bearer YOUR_KEY` or `?api_key=YOUR_KEY`.
-
-→ Full parameter reference: [reference.md §2](reference.md)
+Context tables are in the same response: `form_items[]`, `countries[]`,
+`indicator_bank[]` — use `related=all` to load all matching form items.
 
 ---
 
-## Workflow — indicator values by country and period
+## Recipe: total volunteers by year (global trend)
 
-**Step 1** — Find the indicator id:
-```
-GET /api/v1/indicator-bank?search=volunteers
-```
+Use when the user asks for volunteers over time across all countries.
 
-**Step 2** — Fetch submitted values (public, scoped):
+**Step 1 — user runs, pastes JSON:**
+```bash
+curl -s "https://databank.ifrc.org/api/v1/indicator-bank?search=volunteers"
 ```
-GET /api/v1/data?indicator_bank_id=42&period_name=Annual%202023&page=1&per_page=500
-```
+Pick the indicator whose `name` best matches (e.g. "Number of volunteers").
+There may be several — confirm with the user if ambiguous. Note its `id`.
 
-**Step 3** — Filter to one country:
+**Step 2 — user runs one curl per page, pastes each JSON** (replace `ID`):
+```bash
+curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=ID&related=all&page=1&per_page=5000"
+curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=ID&related=all&page=2&per_page=5000"
 ```
-GET /api/v1/data?indicator_bank_id=42&country_iso3=BGD&period_name=Annual%202023
-```
+Stop when `current_page >= total_pages`. Browser works too: paste the same URL
+in the address bar.
 
-Use `related=all` to include all matching `form_items[]` for the filtered dataset.
+**Step 3 — you analyze pasted JSON:**
+- Filter `data[]` where `data_status == "available"`.
+- Group by `period_name`; sum `num_value` (or parse `value`) across all countries.
+- Sort periods chronologically (e.g. "Annual 2020" … "Annual 2024").
+- Output a table and/or trend summary. Use `countries[]` only if country breakdown
+  is requested.
+
+Do **not** use `include_full_info=true` (ignored). Do **not** suggest
+`per_page=100000` without an API key.
 
 ---
 
-## Indicator Bank metadata
+## Recipe: one indicator, one period, all countries
 
+```bash
+curl -s "https://databank.ifrc.org/api/v1/indicator-bank?search=volunteers"
+curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=ID&period_name=Annual%202023&related=all&page=1&per_page=5000"
 ```
-GET /api/v1/indicator-bank?search=volunteers
-GET /api/v1/indicator-bank?sector=Health&type=Number&archived=false
-GET /api/v1/indicator-bank/42
+
+---
+
+## Recipe: one country
+
+```bash
+curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=ID&country_iso3=BGD&related=all&page=1&per_page=5000"
 ```
 
-Each indicator includes: name, definition, type, unit, sector/sub-sector,
-FDRS KPI code, tags, translations, disaggregation guidance, monitoring questions.
+---
 
-→ Field reference: [reference.md §1](reference.md)
+## Indicator Bank fields
+
+Search/filter: `search`, `type`, `sector`, `sub_sector`, `emergency`, `archived`.
+
+Each indicator: `id`, `name`, `definition`, `type`, `unit`, `sector`, `sub_sector`,
+`fdrs_kpi_code`, `tags`, translations, `disaggregation_guidance`.
+
+→ Full schema: [reference.md §1](reference.md)
 
 ---
 
 ## Tips
 
-- Unscoped `GET /api/v1/data` (no filters) returns **401** — always include a scope filter for public access.
-- Prefer `country_iso2` / `country_iso3` over numeric `country_id` when you only know the ISO code.
-- FDRS annual reporting uses `template_id=21` when scoping by template.
-- In Claude.ai, never attempt curl/fetch to databank.ifrc.org — ask the user to paste JSON instead.
+- If user already pasted/uploaded JSON, skip curl — analyze immediately.
+- Unscoped `/data` (no filters) returns **401** — always include `indicator_bank_id` or similar.
+- FDRS template id is **21** when filtering by template.
+- Authenticated access (API key, larger exports) only when user explicitly requests it.

@@ -155,10 +155,8 @@
                                     {% endif %}
 
                                 </div>
-                                {# Bottom corner elements - RTL aware positioning #}
-                                {% set current_lang = _ui_language %}
-                                <!-- Debug: Current language is {{ current_lang }} -->
-                                <div class="absolute bottom-2 flex items-center space-x-2 {% if current_lang == 'ar' %}left-2{% else %}right-2{% endif %}">
+                                {# Bottom corner elements — positioned with logical CSS (dashboard.css) #}
+                                <div class="dashboard-assignment-contributors flex items-center space-x-2">
                                     {# "Self-Reported" label #}
                                     {% if item.type == 'assigned' and item.item_object.assigned_form.period_name == 'Self-Reported' %}
                                         {{ status_label(_('Self-Reported'), 'success') }}
@@ -181,7 +179,7 @@
                                                     </div>
                                                 {% endfor %}
                                             </div>
-                                            <div class="profile-icon-tooltip absolute bottom-full mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50 shadow-lg border border-gray-700 min-w-[200px] max-w-xs {% if current_lang == 'ar' %}left-0{% else %}right-0{% endif %}">
+                                            <div class="profile-icon-tooltip absolute bottom-full mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 pointer-events-none transition-opacity duration-200 z-50 shadow-lg border border-gray-700 min-w-[200px] max-w-xs">
                                                 {% if contributors|length <= 1 %}
                                                     <div class="font-semibold text-gray-200 mb-1">{{ _('Last modified by') }}:</div>
                                                     <div class="font-medium text-white mb-1 break-words">{{ item.last_modified_user.name or _('Unknown') }}</div>
@@ -210,7 +208,7 @@
                                                         {% endfor %}
                                                     </div>
                                                 {% endif %}
-                                                <div class="absolute top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800 {% if current_lang == 'ar' %}left-3{% else %}right-3{% endif %}"></div>
+                                                <div class="profile-icon-tooltip-arrow absolute top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
                                             </div>
                                         </div>
                                     {% endif %}

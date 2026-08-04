@@ -18,7 +18,27 @@
 .enhanced-search-dropdown label {
     white-space: nowrap;
     font-size: 0.875rem;
-    margin-right: 0.25rem;
+    margin-inline-end: 0.25rem;
+}
+
+.enhanced-search-dropdown input[type="text"],
+.enhanced-search-dropdown #search_input,
+.enhanced-search-dropdown #entity_search_input {
+    padding-inline-end: 2rem;
+}
+
+.enhanced-search-dropdown__input-slot {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    display: flex;
+    align-items: center;
+    padding-inline-end: 0.5rem;
+    pointer-events: none;
+}
+
+.enhanced-search-dropdown__input-slot > * {
+    pointer-events: auto;
 }
 
 /* Make the entire dropdown component more compact */
@@ -126,6 +146,15 @@
 }
 
 /* RTL support */
+[dir="rtl"] .enhanced-search-dropdown input[type="text"],
+[dir="rtl"] .enhanced-search-dropdown #search_input,
+[dir="rtl"] .enhanced-search-dropdown #entity_search_input {
+    direction: rtl;
+    text-align: right;
+    padding-inline-start: 2rem;
+    padding-inline-end: 0.75rem;
+}
+
 [dir="rtl"] .enhanced-search-dropdown .dropdown-option.highlighted {
     border-left: none;
     border-right: 3px solid #3b82f6;

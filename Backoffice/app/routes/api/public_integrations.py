@@ -8,6 +8,7 @@ from flask import current_app, request
 
 from app.routes.api import api_bp
 from app.services.public_analytics_service import aggregate_global_trend, resolve_indicator_query
+from app.services.public_document_service import search_public_documents
 from app.utils.api_helpers import api_error, json_response
 from app.utils.rate_limiting import api_rate_limit
 
@@ -71,3 +72,50 @@ def public_resolve_indicator():
             exc_info=True,
         )
         return api_error("Could not resolve indicator", 500, error_id, None)
+
+
+@api_bp.route("/public/documents/search", methods=["GET"])
+@api_rate_limit()
+def public_search_documents():
+    """
+    Search public AI document chunks for Custom GPT and other assistants.
+
+    Returns compact text chunks from documents marked is_public=True.
+    The caller (e.g. Custom GPT) synthesizes the final answer from chunks.
+    """
+    try:
+        query = request.args.get("query", default="", type=str).strip()
+        if not query:
+            return api_error("query is required", 400)
+
+        top_k = request.args.get("top_k", default=8, type=int)
+        min_score = request.args.get("min_score", default=0.25, type=float)
+        country_name = request.args.get("country_name", default="", type=str).strip() or None
+        country_id = request.args.get("country_id", type=int)
+        file_type = request.args.get("file_type", default="", type=str).strip() or None
+        search_mode = request.args.get("search_mode", default="hybrid", type=str)
+
+        payload = search_public_documents(
+            query,
+            top_k=top_k,
+            min_score=min_score,
+            country_name=country_name,
+            country_id=country_id,
+            file_type=file_type,
+            search_mode=search_mode,
+        )
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 400)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/documents/search failed [ID: %s]: %s",
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not search public documents", 500, error_id, None)

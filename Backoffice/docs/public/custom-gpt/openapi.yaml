@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: IFRC Humanitarian Databank Public API
   version: 1.1.0
-  description: Public read-only API for FDRS/UPR stats and public document chunks. Prefer /public/* routes. No auth. Privacy https://databank.ifrc.org/privacy
+  description: Public FDRS stats and UPR data plus Unified Plan/report documents. Prefer /public/* routes. No auth. Privacy https://databank.ifrc.org/privacy
 
 servers:
   - url: https://databank.ifrc.org/api/v1
@@ -70,7 +70,7 @@ paths:
     get:
       operationId: searchPublicDocuments
       summary: Search public document chunks
-      description: Public AI Knowledge Base chunks only. Use for Unified Plans and reports. Synthesize answer from chunks[] and cite title and page.
+      description: Public AI Knowledge Base chunks only. Use full_coverage=true for cross-country UPR themes. Cite title and page.
       parameters:
         - name: query
           in: query
@@ -78,6 +78,27 @@ paths:
           schema:
             type: string
           description: User question with country and year if relevant
+        - name: full_coverage
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Search every in-scope document; return all chunks above min_score (paginated)
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Page when full_coverage has many matching chunks
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 80
+          description: Chunks per page for full_coverage (keeps response under GPT 100k char limit)
         - name: top_k
           in: query
           required: false

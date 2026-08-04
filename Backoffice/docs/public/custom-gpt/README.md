@@ -4,9 +4,13 @@ Canonical files for the shareable ChatGPT Custom GPT:
 
 | File | Use in ChatGPT |
 |------|----------------|
-| [`instructions.md`](instructions.md) | **Instructions** field (copy full content) |
+| [`instructions-core.md`](instructions-core.md) | **Instructions** field (paste; must stay **≤8000** chars) |
+| [`instructions.md`](instructions.md) | **Knowledge** upload (full workflows, FDRS/UPR detail) |
 | [`openapi.yaml`](openapi.yaml) | **Actions → Import from URL** or paste schema |
+| [`profile.md`](profile.md) | **Name**, **Description**, **Conversation starters** |
 | This README | Maintainer notes only |
+
+ChatGPT caps the **Instructions** field at **8000 characters**. The full [`instructions.md`](instructions.md) is ~11.8k chars — use the hybrid setup below, not a full paste.
 
 **Live GPT (production):** [IFRC Network Databank](https://chatgpt.com/g/g-6a7217c375ac81919b0913bdd4ef15b6-ifrc-network-databank)  
 **Short link:** `https://databank.ifrc.org/gpt` (redirects to the GPT after Backoffice deploy)  
@@ -20,14 +24,12 @@ Update these files whenever you change public integration endpoints under `/api/
 
 1. **Create / edit GPT** → Configure → Actions → import [`openapi.yaml`](openapi.yaml) (or paste manually; max ~30 operations).
 2. **Schema limits:** ChatGPT rejects operation `description` fields longer than **300 characters** — keep [`openapi.yaml`](openapi.yaml) concise (details belong in [`instructions.md`](instructions.md)).
-3. **Authentication:** None (public endpoints only).
-3. **Instructions:** paste [`instructions.md`](instructions.md).
-4. **Privacy policy:** `https://databank.ifrc.org/privacy`.
-5. **Suggested conversation starters** (optional):
-   - Global volunteer trend by reporting year
-   - Compare staff numbers for Kenya and Bangladesh
-   - Summarize focus areas in Syria Unified Plan 2026
-   - Which countries reported volunteers in Annual 2023?
+3. **Action payload limit:** request and response bodies must stay under **~100,000 characters** each or ChatGPT returns `ResponseTooLargeError`. Use `full_coverage=true` with `page`/`per_page` for cross-country document queries; keep `top_k≤12` for non–full-coverage search.
+4. **Authentication:** None (public endpoints only).
+5. **Instructions:** paste [`instructions-core.md`](instructions-core.md) (~2.5k chars).
+6. **Knowledge:** upload [`instructions.md`](instructions.md) as a reference file (full workflows).
+7. **Description & starters:** copy from [`profile.md`](profile.md).
+8. **Privacy policy:** `https://databank.ifrc.org/privacy`.
 
 ## Related repo docs
 

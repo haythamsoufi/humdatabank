@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from flask import current_app
+from sqlalchemy import text
 
 from app.models import AIDocument
 from app.models.enums import AIDocumentProcessingStatusValue
@@ -17,6 +20,11 @@ PUBLIC_DOC_DEFAULT_TOP_K = 8
 PUBLIC_DOC_MAX_TOP_K = 12
 PUBLIC_DOC_DEFAULT_MIN_SCORE = 0.25
 PUBLIC_DOC_MAX_CONTENT_CHARS = 1200
+PUBLIC_DOC_FULL_COVERAGE_MAX_DOCS = 250
+PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS = 800
+PUBLIC_DOC_FULL_COVERAGE_CHUNKS_PER_DOC = 20
+PUBLIC_DOC_ACTION_MAX_RESPONSE_CHARS = 95_000
+PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE = 80
 
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
@@ -142,6 +150,80 @@ def _public_searchable_document_ids(document_ids: set[int]) -> set[int]:
     return {int(row[0]) for row in rows}
 
 
+def _document_country_names(document: AIDocument) -> List[str]:
+    names: List[str] = []
+    try:
+        for country in document.countries or []:
+            if country and country.name:
+                names.append(country.name)
+    except Exception:
+        pass
+    if not names and document.country_name:
+        names.append(document.country_name.strip())
+    elif document.country and document.country.name and document.country.name not in names:
+        names.append(document.country.name)
+    return names
+
+
+def _apply_scope_filters_to_query(query, filters: Dict[str, Any] | None):
+    """Apply the same document-level filters used by vector search."""
+    if not filters:
+        return query
+
+    if filters.get("country_id"):
+        query = query.filter(AIVectorStore._country_id_filter(int(filters["country_id"])))
+    if filters.get("country_name"):
+        query = query.filter(AIVectorStore._country_name_filter(filters["country_name"]))
+    if filters.get("file_type"):
+        query = query.filter(AIDocument.file_type == filters["file_type"])
+    if filters.get("user_id"):
+        query = query.filter(AIDocument.user_id == filters["user_id"])
+    if "is_api_import" in filters:
+        if filters.get("is_api_import") is True:
+            query = query.filter(AIDocument.source_url.isnot(None))
+        elif filters.get("is_api_import") is False:
+            query = query.filter(AIDocument.source_url.is_(None))
+    if "is_system_document" in filters:
+        if filters.get("is_system_document") is True:
+            query = query.filter(AIDocument.submitted_document_id.isnot(None))
+        elif filters.get("is_system_document") is False:
+            query = query.filter(AIDocument.submitted_document_id.is_(None))
+    if filters.get("workflow_role"):
+        role_val = str(filters["workflow_role"]).strip()
+        role_json = json.dumps([role_val])
+        query = query.filter(
+            text("(ai_documents.extra_metadata->'roles')::jsonb @> CAST(:workflow_role_json AS jsonb)").bindparams(
+                workflow_role_json=role_json
+            )
+        )
+    if filters.get("date_range"):
+        dr = filters["date_range"]
+        min_d, max_d = None, None
+        if isinstance(dr, (list, tuple)) and len(dr) >= 2:
+            min_d, max_d = dr[0], dr[1]
+        elif isinstance(dr, dict):
+            min_d, max_d = dr.get("min"), dr.get("max")
+        if min_d is not None:
+            d = min_d if isinstance(min_d, date) else date.fromisoformat(str(min_d)[:10])
+            query = query.filter(AIDocument.document_date >= d)
+        if max_d is not None:
+            d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
+            query = query.filter(AIDocument.document_date <= d)
+    return query
+
+
+def list_public_documents_in_scope(filters: Dict[str, Any] | None) -> List[AIDocument]:
+    """List public, searchable, completed documents matching scope filters."""
+    completed = AIDocumentProcessingStatusValue.completed.value
+    query = AIDocument.query.filter(
+        AIDocument.is_public.is_(True),
+        AIDocument.searchable.is_(True),
+        AIDocument.processing_status == completed,
+    )
+    query = _apply_scope_filters_to_query(query, filters)
+    return query.order_by(AIDocument.title).all()
+
+
 def filter_rows_to_public_documents(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Defense-in-depth: drop any chunk whose parent document is not public/searchable.
@@ -162,6 +244,140 @@ def filter_rows_to_public_documents(rows: List[Dict[str, Any]]) -> List[Dict[str
     ]
 
 
+def _estimate_json_chars(payload: Dict[str, Any]) -> int:
+    return len(json.dumps(payload, ensure_ascii=False, default=str))
+
+
+def _paginate_full_coverage_hits(
+    hits: List[Dict[str, Any]],
+    *,
+    page: int,
+    per_page: int,
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    total = len(hits)
+    per_page = max(1, int(per_page))
+    page = max(1, int(page))
+    total_pages = max(1, (total + per_page - 1) // per_page) if total else 1
+    if page > total_pages:
+        page = total_pages
+    start = (page - 1) * per_page
+    page_hits = hits[start : start + per_page]
+    return page_hits, {
+        "total_matching_chunks": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "has_more_pages": page < total_pages,
+    }
+
+
+def _search_public_documents_full_coverage(
+    vector_store: AIVectorStore,
+    raw_query: str,
+    *,
+    filters: Dict[str, Any] | None,
+    min_score: float,
+    mode: str,
+    max_content_chars: int,
+    page: int = 1,
+    per_page: int = PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE,
+) -> Dict[str, Any]:
+    documents = list_public_documents_in_scope(filters)
+    if len(documents) > PUBLIC_DOC_FULL_COVERAGE_MAX_DOCS:
+        raise ValueError(
+            f"Too many documents in scope ({len(documents)}). "
+            f"Narrow filters (year, country) or use full_coverage=false."
+        )
+
+    doc_ids = [int(doc.id) for doc in documents]
+    scope_without_hits = {
+        int(doc.id): {
+            "document_id": int(doc.id),
+            "document_title": doc.title,
+            "countries": _document_country_names(doc),
+        }
+        for doc in documents
+    }
+
+    try:
+        if mode == "vector":
+            rows: List[Dict[str, Any]] = []
+            for doc_id in doc_ids:
+                doc_filters = dict(filters or {})
+                doc_filters["document_id"] = doc_id
+                rows.extend(
+                    vector_store.search_similar(
+                        query_text=raw_query,
+                        top_k=PUBLIC_DOC_FULL_COVERAGE_CHUNKS_PER_DOC,
+                        filters=doc_filters,
+                        user_id=None,
+                        user_role="public",
+                    )
+                )
+        else:
+            rows = vector_store.hybrid_search_per_document(
+                raw_query,
+                doc_ids,
+                chunks_per_doc=PUBLIC_DOC_FULL_COVERAGE_CHUNKS_PER_DOC,
+                filters=filters,
+                user_id=None,
+                user_role="public",
+            )
+    except VectorStoreError as exc:
+        current_app.logger.error("Public document full-coverage search failed: %s", exc)
+        raise ValueError("Document search is temporarily unavailable") from exc
+
+    rows = filter_rows_to_public_documents(rows)
+    hits: List[Dict[str, Any]] = []
+    docs_with_hits: set[int] = set()
+
+    for row in rows:
+        score = _chunk_score(row)
+        doc_id = row.get("document_id")
+        if doc_id is None or score < min_score:
+            continue
+        doc_id = int(doc_id)
+        hits.append(slim_public_document_chunk(row, max_content_chars=max_content_chars))
+        docs_with_hits.add(doc_id)
+        scope_without_hits.pop(doc_id, None)
+
+    without_hits = list(scope_without_hits.values())
+    hits.sort(key=lambda chunk: chunk.get("score") or 0.0, reverse=True)
+    without_hits.sort(key=lambda item: (item.get("document_title") or "").lower())
+
+    page_hits, pagination = _paginate_full_coverage_hits(hits, page=page, per_page=per_page)
+
+    coverage: Dict[str, Any] = {
+        "documents_in_scope": len(documents),
+        "documents_with_hits": len(docs_with_hits),
+        "documents_without_hits": len(without_hits),
+        "without_hits": without_hits,
+        **pagination,
+    }
+
+    # Shrink page size if the JSON would exceed Custom GPT Actions limit (~100k chars).
+    while page_hits and _estimate_json_chars({"chunks": page_hits, "coverage": coverage}) > PUBLIC_DOC_ACTION_MAX_RESPONSE_CHARS:
+        if len(page_hits) == 1:
+            slim = dict(page_hits[0])
+            content = slim.get("content") or ""
+            if len(content) > 200:
+                slim["content"] = _truncate(content, max(200, len(content) // 2))
+                page_hits = [slim]
+                coverage["content_truncated_for_limit"] = True
+                break
+            break
+        page_hits = page_hits[:-1]
+        coverage["chunks_trimmed_for_limit"] = True
+        coverage["per_page"] = len(page_hits)
+
+    return {
+        "chunks": page_hits,
+        "count": len(page_hits),
+        "coverage_mode": "full",
+        "coverage": coverage,
+    }
+
+
 def search_public_documents(
     query: str,
     *,
@@ -172,6 +388,9 @@ def search_public_documents(
     file_type: str | None = None,
     search_mode: str = "hybrid",
     max_content_chars: int = PUBLIC_DOC_MAX_CONTENT_CHARS,
+    full_coverage: bool = False,
+    page: int = 1,
+    per_page: int = PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE,
 ) -> Dict[str, Any]:
     """
     Search public AI document chunks (is_public=True only).
@@ -198,47 +417,72 @@ def search_public_documents(
     )
 
     vector_store = AIVectorStore()
-    try:
-        if mode == "vector":
-            rows = vector_store.search_similar(
-                query_text=raw_query,
-                top_k=top_k * 2,
-                filters=filters,
-                user_id=None,
-                user_role="public",
-            )
-        else:
-            rows = vector_store.hybrid_search(
-                query_text=raw_query,
-                top_k=top_k * 2,
-                filters=filters,
-                user_id=None,
-                user_role="public",
-            )
-    except VectorStoreError as exc:
-        current_app.logger.error("Public document search failed: %s", exc)
-        raise ValueError("Document search is temporarily unavailable") from exc
 
-    rows = filter_rows_to_public_documents(rows)
-    filtered = [row for row in rows if _chunk_score(row) >= min_score]
-    slimmed = [
-        slim_public_document_chunk(row, max_content_chars=max_content_chars)
-        for row in filtered[:top_k]
-    ]
+    if full_coverage:
+        coverage_payload = _search_public_documents_full_coverage(
+            vector_store,
+            raw_query,
+            filters=filters,
+            min_score=min_score,
+            mode=mode,
+            max_content_chars=min(max_content_chars, PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS),
+            page=page,
+            per_page=per_page,
+        )
+        slimmed = coverage_payload["chunks"]
+        coverage_block = coverage_payload["coverage"]
+        coverage_mode = coverage_payload["coverage_mode"]
+    else:
+        try:
+            if mode == "vector":
+                rows = vector_store.search_similar(
+                    query_text=raw_query,
+                    top_k=top_k * 2,
+                    filters=filters,
+                    user_id=None,
+                    user_role="public",
+                )
+            else:
+                rows = vector_store.hybrid_search(
+                    query_text=raw_query,
+                    top_k=top_k * 2,
+                    filters=filters,
+                    user_id=None,
+                    user_role="public",
+                )
+        except VectorStoreError as exc:
+            current_app.logger.error("Public document search failed: %s", exc)
+            raise ValueError("Document search is temporarily unavailable") from exc
+
+        rows = filter_rows_to_public_documents(rows)
+        filtered = [row for row in rows if _chunk_score(row) >= min_score]
+        slimmed = [
+            slim_public_document_chunk(row, max_content_chars=max_content_chars)
+            for row in filtered[:top_k]
+        ]
+        coverage_block = None
+        coverage_mode = "top_k"
 
     notes = [
         "Only documents marked public in the AI Knowledge Base are searchable.",
         "Use the returned chunk content to answer; cite document_title and page_number.",
         "For numeric indicator trends, prefer GET /api/v1/public/global-trend.",
     ]
+    if full_coverage:
+        notes.append(
+            "Full coverage: searched every public document in scope; returns all chunks with "
+            f"score>={min_score}. Paginate with page/per_page if coverage.has_more_pages. "
+            f"Custom GPT Actions cap responses at ~{PUBLIC_DOC_ACTION_MAX_RESPONSE_CHARS} chars."
+        )
     if query_prefers_upr_documents(raw_query):
         notes.append("Query matched Unified Plan / UPR document scope.")
     if year:
         notes.append(f"Applied document year filter: {year}.")
 
-    return {
+    payload: Dict[str, Any] = {
         "query": raw_query,
         "search_mode": mode,
+        "coverage_mode": coverage_mode,
         "visibility": "public_only",
         "filters_applied": filters or {},
         "min_score": min_score,
@@ -246,3 +490,6 @@ def search_public_documents(
         "chunks": slimmed,
         "notes": notes,
     }
+    if coverage_block is not None:
+        payload["coverage"] = coverage_block
+    return payload

@@ -196,6 +196,8 @@ def _check_document_access(document: SubmittedDocument, user, *, action: str = "
     is_system_manager = AuthorizationService.is_system_manager(user)
     if is_admin_with_perm or is_system_manager:
         return True, None
+    if AuthorizationService.has_rbac_permission(user, 'admin.ai.manage'):
+        return True, None
     if not AuthorizationService.has_rbac_permission(user, 'assignment.documents.upload'):
         return False, f"Access denied. Document {action} permission required."
     if not _focal_user_can_access_submitted_document(document, user):
@@ -1325,7 +1327,7 @@ def serve_document_file(doc_id):
         abort(404)
 
 @bp.route("/documents/download/<int:doc_id>", methods=["GET"])
-@permission_required_any('admin.documents.manage', 'assignment.documents.upload')
+@permission_required_any('admin.documents.manage', 'assignment.documents.upload', 'admin.ai.manage')
 def download_document(doc_id):
     """Download a submitted document."""
     document = SubmittedDocument.query.get(doc_id)

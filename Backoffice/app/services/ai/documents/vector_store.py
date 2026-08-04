@@ -768,6 +768,82 @@ class AIVectorStore:
         # Return top_k results
         return combined_results[:top_k]
 
+    def hybrid_search_per_document(
+        self,
+        query_text: str,
+        document_ids: List[int],
+        *,
+        chunks_per_doc: int = 20,
+        keyword_weight: float = 0.3,
+        vector_weight: float = 0.7,
+        filters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        user_role: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Return all top matching chunks for each document_id (up to chunks_per_doc each).
+
+        Computes the query embedding once, then runs scoped vector + keyword search per document.
+        Caller filters by min_score for relevance.
+        """
+        if not document_ids:
+            return []
+
+        vq = (query_text or "").strip()
+        if not vq:
+            return []
+
+        per_doc = max(1, int(chunks_per_doc))
+        query_embedding, _ = self._get_cached_embedding(vq)
+        all_results: List[Dict[str, Any]] = []
+
+        for doc_id in document_ids:
+            doc_filters = dict(filters or {})
+            doc_filters["document_id"] = int(doc_id)
+
+            vector_results = self._search_similar_with_embedding(
+                query_embedding=query_embedding,
+                query_text=vq,
+                top_k=per_doc,
+                filters=doc_filters,
+                user_id=user_id,
+                user_role=user_role,
+            )
+            keyword_results = self._keyword_search(
+                query_text=vq,
+                top_k=per_doc,
+                filters=doc_filters,
+                user_id=user_id,
+                user_role=user_role,
+            )
+            combined = self._combine_search_results(
+                vector_results=vector_results,
+                keyword_results=keyword_results,
+                vector_weight=vector_weight,
+                keyword_weight=keyword_weight,
+            )
+            all_results.extend(combined[:per_doc])
+
+        return all_results
+
+    def hybrid_search_best_per_document(
+        self,
+        query_text: str,
+        document_ids: List[int],
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
+        """Back-compat shim: one best chunk per document."""
+        rows = self.hybrid_search_per_document(query_text, document_ids, chunks_per_doc=1, **kwargs)
+        best_by_doc: Dict[int, Dict[str, Any]] = {}
+        for row in rows:
+            doc_id = row.get("document_id")
+            if doc_id is None:
+                continue
+            doc_id = int(doc_id)
+            if doc_id not in best_by_doc:
+                best_by_doc[doc_id] = row
+        return list(best_by_doc.values())
+
     def keyword_search(
         self,
         query_text: str,

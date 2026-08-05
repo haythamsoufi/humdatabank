@@ -60,11 +60,11 @@ class AssignedFormForm(BaseForm):
         "Submission review notification",
         choices=[
             (SUBMISSION_REVIEW_RECIPIENT_FDS, "Designated FDS member for the submitting country"),
-            (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, "Specific IFRC admin"),
+            (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, "Specific IFRC admin(s)"),
         ],
         default=SUBMISSION_REVIEW_RECIPIENT_FDS,
     )
-    submission_review_recipient_user_id = HiddenField(validators=[Optional()])
+    submission_review_recipient_user_ids = HiddenField(validators=[Optional()])
 
     # Duplicate confirmation (used by client/server guard when template+period already exists)
     confirm_duplicate = HiddenField(default="0")
@@ -113,16 +113,44 @@ class AssignedFormForm(BaseForm):
         if not super().validate(extra_validators):
             return False
         if self.submission_review_recipient_mode.data == SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
-            raw_uid = self.submission_review_recipient_user_id.data
-            if not raw_uid or not str(raw_uid).strip().isdigit():
-                self.submission_review_recipient_user_id.errors.append(
-                    "Select an IFRC admin to notify when submissions arrive."
+            user_ids = []
+            raw = self.submission_review_recipient_user_ids.data
+            if raw:
+                seen = set()
+                for part in str(raw).split(','):
+                    part = part.strip()
+                    if part.isdigit():
+                        uid = int(part)
+                        if uid not in seen:
+                            seen.add(uid)
+                            user_ids.append(uid)
+            if not user_ids:
+                self.submission_review_recipient_user_ids.errors.append(
+                    "Select at least one IFRC admin to notify when submissions arrive."
                 )
                 return False
-            user = User.query.filter_by(id=int(raw_uid), active=True).first()
-            if not user:
-                self.submission_review_recipient_user_id.errors.append(
-                    "Selected reviewer must be an active user."
+            from app import db
+            from sqlalchemy import distinct
+            admin_user_ids = (
+                db.session.query(distinct(RbacUserRole.user_id))
+                .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+                .join(RbacRolePermission, RbacRole.id == RbacRolePermission.role_id)
+                .join(RbacPermission, RbacRolePermission.permission_id == RbacPermission.id)
+                .filter(RbacPermission.code.in_([
+                    "admin.assignments.view",
+                    "admin.assignments.edit",
+                    "admin.assignments.create",
+                ]))
+                .scalar_subquery()
+            )
+            valid_count = (
+                User.query
+                .filter(User.active == True, User.id.in_(user_ids), User.id.in_(admin_user_ids))
+                .count()
+            )
+            if valid_count != len(user_ids):
+                self.submission_review_recipient_user_ids.errors.append(
+                    "All selected reviewers must be active IFRC admins."
                 )
                 return False
         return True

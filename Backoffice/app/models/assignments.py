@@ -12,12 +12,29 @@ SUBMISSION_REVIEW_RECIPIENT_MODES = frozenset({
     SUBMISSION_REVIEW_RECIPIENT_FDS,
     SUBMISSION_REVIEW_RECIPIENT_SPECIFIC,
 })
-from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, JSON, and_, or_
+from sqlalchemy import Column, Integer, ForeignKey, String, DateTime, Date, Boolean, Enum, JSON, and_, or_, Table
 from sqlalchemy.orm import relationship, backref, foreign
 from sqlalchemy import and_
 from ..extensions import db
 from .enums import AssignmentEntityStatusValue, PublicSubmissionStatus
 from app.utils.datetime_helpers import utcnow
+
+assigned_form_submission_review_recipient = Table(
+    'assigned_form_submission_review_recipient',
+    db.metadata,
+    Column(
+        'assigned_form_id',
+        Integer,
+        ForeignKey('assigned_form.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+    Column(
+        'user_id',
+        Integer,
+        ForeignKey('user.id', ondelete='CASCADE'),
+        primary_key=True,
+    ),
+)
 
 
 class ReportingPeriod(db.Model):
@@ -82,17 +99,15 @@ class AssignedForm(db.Model):
         default=SUBMISSION_REVIEW_RECIPIENT_FDS,
         server_default=SUBMISSION_REVIEW_RECIPIENT_FDS,
     )
-    submission_review_recipient_user_id = Column(
-        Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True
-    )
-
     # Activation audit — who toggled is_active or closed/reopened this assignment
     activated_by_user_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
     deactivated_by_user_id = Column(Integer, ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
 
     data_owner_user = relationship('User', foreign_keys=[data_owner_id])
-    submission_review_recipient_user = relationship(
-        'User', foreign_keys=[submission_review_recipient_user_id]
+    submission_review_recipient_users = relationship(
+        'User',
+        secondary=assigned_form_submission_review_recipient,
+        lazy='select',
     )
     activated_by_user = relationship('User', foreign_keys=[activated_by_user_id])
     deactivated_by_user = relationship('User', foreign_keys=[deactivated_by_user_id])
@@ -119,11 +134,14 @@ class AssignedForm(db.Model):
         db.Index('ix_assigned_form_assigned_at', 'assigned_at'),
         db.Index('ix_assigned_form_is_active', 'is_active'),
         db.Index('ix_assigned_form_data_owner', 'data_owner_id'),
-        db.Index('ix_assigned_form_submission_review_recipient', 'submission_review_recipient_user_id'),
         db.Index('ix_assigned_form_activated_by', 'activated_by_user_id'),
         db.Index('ix_assigned_form_deactivated_by', 'deactivated_by_user_id'),
         db.Index('ix_assigned_form_custom_name', 'custom_name'),
     )
+
+    @property
+    def submission_review_recipient_user_ids_csv(self) -> str:
+        return ','.join(str(u.id) for u in self.submission_review_recipient_users)
 
     @property
     def earliest_due_date(self):

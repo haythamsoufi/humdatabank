@@ -3046,8 +3046,8 @@
     var reviewCfg = cfg.submissionReviewRecipient || {};
     var searchInput = document.getElementById('submission-review-user-search');
     var resultsBox = document.getElementById('submission-review-user-results');
-    var selectedWrap = document.getElementById('submission-review-selected-user');
-    var hiddenInput = document.getElementById('submission_review_recipient_user_id');
+    var selectedWrap = document.getElementById('submission-review-selected-users');
+    var hiddenInput = document.getElementById('submission_review_recipient_user_ids');
     var picker = document.getElementById('submission-review-user-picker');
     if (!searchInput || !resultsBox || !selectedWrap || !hiddenInput || !picker) {
         return;
@@ -3056,7 +3056,7 @@
     var searchUrl = (cfg.urls && cfg.urls.reviewRecipientSearch) || '';
     var modeRadios = document.querySelectorAll('input[name="submission_review_recipient_mode"]');
     var searchTimer = null;
-    var selectedUser = reviewCfg.user || null;
+    var selectedUsers = Array.isArray(reviewCfg.users) ? reviewCfg.users.slice() : [];
 
     function currentMode() {
         var checked = document.querySelector('input[name="submission_review_recipient_mode"]:checked');
@@ -3071,28 +3071,47 @@
         }
     }
 
-    function renderSelectedUser() {
+    function isSelected(userId) {
+        return selectedUsers.some(function (user) {
+            return String(user.id) === String(userId);
+        });
+    }
+
+    function syncHiddenInput() {
+        hiddenInput.value = selectedUsers.map(function (user) {
+            return String(user.id);
+        }).join(',');
+    }
+
+    function removeSelectedUser(userId) {
+        selectedUsers = selectedUsers.filter(function (user) {
+            return String(user.id) !== String(userId);
+        });
+        renderSelectedUsers();
+    }
+
+    function renderSelectedUsers() {
         selectedWrap.innerHTML = '';
-        if (!selectedUser) {
-            hiddenInput.value = '';
+        syncHiddenInput();
+        if (!selectedUsers.length) {
             return;
         }
-        hiddenInput.value = String(selectedUser.id);
-        var chip = document.createElement('div');
-        chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-sm text-gray-800';
-        chip.innerHTML = '<span><strong>' + (selectedUser.name || selectedUser.email) + '</strong>'
-            + (selectedUser.email ? ' <span class="text-gray-500">(' + selectedUser.email + ')</span>' : '')
-            + '</span>';
-        var clearBtn = document.createElement('button');
-        clearBtn.type = 'button';
-        clearBtn.className = 'text-red-600 hover:text-red-800 text-xs font-medium';
-        clearBtn.textContent = (cfg.t && cfg.t.clearReviewer) || 'Clear';
-        clearBtn.addEventListener('click', function () {
-            selectedUser = null;
-            renderSelectedUser();
+        selectedUsers.forEach(function (user) {
+            var chip = document.createElement('div');
+            chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-sm text-gray-800';
+            chip.innerHTML = '<span><strong>' + (user.name || user.email) + '</strong>'
+                + (user.email ? ' <span class="text-gray-500">(' + user.email + ')</span>' : '')
+                + '</span>';
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'text-red-600 hover:text-red-800 text-xs font-medium';
+            removeBtn.textContent = (cfg.t && cfg.t.clearReviewer) || 'Remove';
+            removeBtn.addEventListener('click', function () {
+                removeSelectedUser(user.id);
+            });
+            chip.appendChild(removeBtn);
+            selectedWrap.appendChild(chip);
         });
-        chip.appendChild(clearBtn);
-        selectedWrap.appendChild(chip);
     }
 
     function hideResults() {
@@ -3102,7 +3121,10 @@
 
     function renderResults(users) {
         resultsBox.innerHTML = '';
-        if (!users || !users.length) {
+        var availableUsers = (users || []).filter(function (user) {
+            return !isSelected(user.id);
+        });
+        if (!availableUsers.length) {
             var empty = document.createElement('div');
             empty.className = 'p-3 text-sm text-gray-500';
             empty.textContent = (cfg.t && cfg.t.noUsersFound) || 'No users found.';
@@ -3110,15 +3132,17 @@
             resultsBox.classList.remove('hidden');
             return;
         }
-        users.forEach(function (user) {
+        availableUsers.forEach(function (user) {
             var row = document.createElement('button');
             row.type = 'button';
             row.className = 'w-full text-left p-3 hover:bg-gray-100 border-b border-gray-200 last:border-b-0';
             row.innerHTML = '<div class="text-sm font-medium text-gray-900">' + (user.name || user.email) + '</div>'
                 + '<div class="text-xs text-gray-500">' + user.email + '</div>';
             row.addEventListener('click', function () {
-                selectedUser = user;
-                renderSelectedUser();
+                if (!isSelected(user.id)) {
+                    selectedUsers.push(user);
+                    renderSelectedUsers();
+                }
                 searchInput.value = '';
                 hideResults();
             });
@@ -3166,6 +3190,6 @@
     });
 
     togglePickerVisibility();
-    renderSelectedUser();
+    renderSelectedUsers();
 })();
 }());

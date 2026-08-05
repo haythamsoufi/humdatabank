@@ -26,6 +26,16 @@ def notify_document_uploaded(assignment_entity_status, document_name):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
+    from app.services.organization.entity_service import EntityService
+
+    entity_name = EntityService.get_localized_entity_name(
+        entity_type, entity_id, include_hierarchy=True
+    )
+    if not entity_name or entity_name.startswith('Unknown'):
+        entity_name = entity_type.replace('_', ' ').title()
+
+    uploader_id = current_user.id if current_user.is_authenticated else None
+
     # Notify other focal points using translation keys
     return notify_entity_focal_points(
         entity_type=entity_type,
@@ -37,8 +47,10 @@ def notify_document_uploaded(assignment_entity_status, document_name):
         message_params={
             'document': document_name,
             'document_type': _('Document'),
+            'country': entity_name,
             '_entity_type': entity_type,
-            '_entity_id': entity_id
+            '_entity_id': entity_id,
+            '_actor_user_id': uploader_id,
         },
         related_object_type='assignment',
         related_object_id=aes.id,
@@ -174,8 +186,10 @@ def notify_standalone_document_uploaded(document, country_id):
                     message_params={
                         'document': document.filename,
                         'document_type': document.document_type or _('Document'),
+                        'country': country_name,
                         '_entity_type': 'country',
-                        '_entity_id': country_id
+                        '_entity_id': country_id,
+                        '_actor_user_id': uploader_id,
                     },
                         entity_type='country',
                         entity_id=country_id,
@@ -320,8 +334,10 @@ def notify_standalone_document_uploaded(document, country_id):
                         message_params={
                             'document': document.filename,
                             'document_type': document.document_type or _('Document'),
+                            'country': country_name,
                             '_entity_type': 'country',
-                            '_entity_id': country_id
+                            '_entity_id': country_id,
+                            '_actor_user_id': uploader_id,
                         },
                         entity_type='country',
                         entity_id=country_id,

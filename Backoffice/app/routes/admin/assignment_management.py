@@ -131,8 +131,23 @@ def _delete_assignment_entity_status_with_children(aes):
 def _submission_review_recipient_mode_choices():
     return [
         (SUBMISSION_REVIEW_RECIPIENT_FDS, _('Designated FDS member for the submitting country')),
-        (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, _('Specific IFRC admin')),
+        (SUBMISSION_REVIEW_RECIPIENT_SPECIFIC, _('Specific IFRC admin(s)')),
     ]
+
+
+def _parse_submission_review_recipient_user_ids(raw) -> list:
+    if not raw:
+        return []
+    seen = set()
+    result = []
+    for part in str(raw).split(','):
+        part = part.strip()
+        if part.isdigit():
+            uid = int(part)
+            if uid not in seen:
+                seen.add(uid)
+                result.append(uid)
+    return result
 
 
 def _apply_submission_review_recipient_from_form(assignment, form):
@@ -141,30 +156,64 @@ def _apply_submission_review_recipient_from_form(assignment, form):
         mode = SUBMISSION_REVIEW_RECIPIENT_FDS
     assignment.submission_review_recipient_mode = mode
     if mode == SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
-        raw_uid = form.submission_review_recipient_user_id.data
-        assignment.submission_review_recipient_user_id = (
-            int(raw_uid) if raw_uid and str(raw_uid).strip().isdigit() else None
+        user_ids = _parse_submission_review_recipient_user_ids(
+            form.submission_review_recipient_user_ids.data
         )
+        users = (
+            _admin_capable_user_search_query()
+            .filter(User.id.in_(user_ids))
+            .all()
+            if user_ids
+            else []
+        )
+        users_by_id = {u.id: u for u in users}
+        assignment.submission_review_recipient_users = [
+            users_by_id[uid] for uid in user_ids if uid in users_by_id
+        ]
     else:
-        assignment.submission_review_recipient_user_id = None
+        assignment.submission_review_recipient_users = []
 
 
 def _validate_submission_review_recipient_form(form) -> bool:
     if form.submission_review_recipient_mode.data != SUBMISSION_REVIEW_RECIPIENT_SPECIFIC:
         return True
-    raw_uid = form.submission_review_recipient_user_id.data
-    if not raw_uid or not str(raw_uid).strip().isdigit():
-        form.submission_review_recipient_user_id.errors.append(
-            _('Select an IFRC admin to notify when submissions arrive.')
+    user_ids = _parse_submission_review_recipient_user_ids(
+        form.submission_review_recipient_user_ids.data
+    )
+    if not user_ids:
+        form.submission_review_recipient_user_ids.errors.append(
+            _('Select at least one IFRC admin to notify when submissions arrive.')
         )
         return False
-    user = User.query.filter_by(id=int(raw_uid), active=True).first()
-    if not user:
-        form.submission_review_recipient_user_id.errors.append(
-            _('Selected reviewer must be an active user.')
+    users = (
+        _admin_capable_user_search_query()
+        .filter(User.id.in_(user_ids))
+        .all()
+    )
+    valid_ids = {u.id for u in users}
+    if len(valid_ids) != len(user_ids):
+        form.submission_review_recipient_user_ids.errors.append(
+            _('All selected reviewers must be active IFRC admins.')
         )
         return False
     return True
+
+
+def _submission_review_recipient_users_for_template(form, assignment=None):
+    if form.is_submitted() and form.submission_review_recipient_user_ids.data:
+        user_ids = _parse_submission_review_recipient_user_ids(
+            form.submission_review_recipient_user_ids.data
+        )
+    elif assignment:
+        return list(assignment.submission_review_recipient_users)
+    else:
+        return []
+
+    if not user_ids:
+        return []
+    users = User.query.filter(User.id.in_(user_ids)).all()
+    users_by_id = {u.id: u for u in users}
+    return [users_by_id[uid] for uid in user_ids if uid in users_by_id]
 
 
 def _admin_capable_user_search_query():
@@ -207,7 +256,7 @@ class EditAssignmentDetailsForm(FlaskForm):
         choices=_submission_review_recipient_mode_choices(),
         default=SUBMISSION_REVIEW_RECIPIENT_FDS,
     )
-    submission_review_recipient_user_id = HiddenField(validators=[Optional()])
+    submission_review_recipient_user_ids = HiddenField(validators=[Optional()])
     submit = SubmitField("Update Assignment")
 
     def validate(self, extra_validators=None):
@@ -417,7 +466,8 @@ def new_assignment():
                                      title="Create New Assignment",
                                      countries_by_region=get_countries_by_region(),
                                      get_localized_country_name=get_localized_country_name,
-                                     enabled_entity_types=enabled_entity_groups)
+                                     enabled_entity_types=enabled_entity_groups,
+                                     submission_review_recipient_users=_submission_review_recipient_users_for_template(form))
 
             # Duplicate guard: never auto-reactivate. Require explicit confirmation to create a duplicate.
             period_name = (form.period_name.data or '').strip()
@@ -591,7 +641,8 @@ def new_assignment():
                          title="Create New Assignment",
                          countries_by_region=countries_by_region,
                          get_localized_country_name=get_localized_country_name,
-                         enabled_entity_types=enabled_entity_groups)
+                         enabled_entity_types=enabled_entity_groups,
+                         submission_review_recipient_users=_submission_review_recipient_users_for_template(form))
 
 
 @bp.route("/assignments/check_duplicate", methods=["GET"])
@@ -627,6 +678,10 @@ def check_assignment_duplicate():
 def edit_assignment(assignment_id):
     assignment = AssignedForm.query.get_or_404(assignment_id)
     form = EditAssignmentDetailsForm(obj=assignment)
+    if not form.is_submitted():
+        form.submission_review_recipient_user_ids.data = (
+            assignment.submission_review_recipient_user_ids_csv
+        )
     enabled_entity_groups = get_enabled_entity_groups()
 
     if form.validate_on_submit():
@@ -714,7 +769,8 @@ def edit_assignment(assignment_id):
                          get_localized_country_name=get_localized_country_name,
                          EntityService=EntityService,
                          title=f"Edit Assignment: {assignment.period_name}",
-                         enabled_entity_types=enabled_entity_groups)
+                         enabled_entity_types=enabled_entity_groups,
+                         submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment))
 
 @bp.route("/assignments/edit/<int:assignment_id>/add_countries", methods=["POST"])
 @permission_required('admin.assignments.entities.manage')

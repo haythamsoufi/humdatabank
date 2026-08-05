@@ -205,13 +205,28 @@ def send_dispatch(
 
         entity_name = dispatch_entity_names.get((et, eid)) or str(eid)
 
+        assignment_title = template.name
+        if period_name:
+            assignment_title = f"{template.name} \u2013 {period_name}"
+        if aes_id:
+            try:
+                from app.models.assignments import AssignmentEntityStatus
+
+                aes = AssignmentEntityStatus.query.get(aes_id)
+                if aes and aes.assigned_form:
+                    assignment_title = aes.assigned_form.display_name or assignment_title
+            except Exception:
+                pass
+
+        title_params = {"assignment_title": assignment_title}
+
         if "in_app" in channels:
             n = len(entity_questions)
             create_notification(
                 user_ids=user_ids,
                 notification_type=NotificationType.validation_questions,
                 title_key="notification.validation_questions.title",
-                title_params={"template": template.name, "period": period_name},
+                title_params=title_params,
                 message_key="notification.validation_questions.message",
                 message_params={"count": n, "entity": entity_name},
                 entity_type=et,
@@ -232,7 +247,7 @@ def send_dispatch(
                 user_ids=user_ids,
                 notification_type=NotificationType.validation_questions,
                 title_key="notification.validation_questions.title",
-                title_params={"template": template.name, "period": period_name},
+                title_params=title_params,
                 message_key="notification.validation_questions.message",
                 message_params={"count": len(entity_questions), "entity": entity_name, "summary": plain_summary},
                 entity_type=et,

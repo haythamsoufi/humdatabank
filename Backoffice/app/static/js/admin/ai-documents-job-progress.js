@@ -104,7 +104,28 @@
     docPollers: new Map(),
     hideTimer: null,
     standaloneMode: false,
+    docListExpanded: false,
+    optimisticJob: false,
   };
+
+  function clearBannerHideTimer() {
+    if (state.hideTimer) {
+      clearTimeout(state.hideTimer);
+      state.hideTimer = null;
+    }
+  }
+
+  function isJobTerminalDisplay() {
+    var job = state.activeJob;
+    return !!(job && !state.standaloneMode && TERMINAL_JOB_STATUSES.indexOf(String(job.status || '')) >= 0);
+  }
+
+  function stopAllDocPolls() {
+    state.docPollers.forEach(function (timer) {
+      clearInterval(timer);
+    });
+    state.docPollers.clear();
+  }
 
   function log() {
     if (!state.debug) return;
@@ -140,30 +161,447 @@
     } catch (e) { /* ignore */ }
   }
 
-  function showBanner(title, detail, progress, opts) {
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function itemImportStatus(it) {
+    return String((it && (it.import_status || it.reprocess_status || it.status)) || 'queued');
+  }
+
+  function resolveItemDocId(it) {
+    if (!it) return null;
+    var docId = it.ai_document_id;
+    if (docId == null && it.requested_document_id != null) docId = it.requested_document_id;
+    if (docId == null && it.document && it.document.id != null) docId = it.document.id;
+    if (docId == null && it.entity_id != null) docId = it.entity_id;
+    if (docId == null && it.payload && it.payload.document_id != null) docId = it.payload.document_id;
+    if (docId == null || !Number.isFinite(Number(docId))) return null;
+    return Number(docId);
+  }
+
+  function defaultStageForItemStatus(status, t) {
+    if (status === 'downloading') return t.downloading_ae314963 || 'Downloading';
+    if (status === 'processing') return t.processing_643562a9 || 'Processing';
+    if (status === 'completed') return t.completed_07ca5050 || 'Done';
+    if (status === 'failed') return t.failed_d7c8c85b || 'Failed';
+    if (status === 'cancelled') return t.cancel_ea478870 || 'Cancelled';
+    return t.pending_2d13df6f || 'Queued';
+  }
+
+  function defaultProgressForItemStatus(status, tracked) {
+    if (tracked && typeof tracked.progress === 'number') return clampPercent(tracked.progress);
+    if (status === 'completed' || status === 'failed' || status === 'cancelled') return 100;
+    if (status === 'downloading') return 12;
+    if (status === 'processing') return 20;
+    return 0;
+  }
+
+  function isTerminalItemStatus(status) {
+    var st = String(status || '');
+    return st === 'completed' || st === 'failed' || st === 'cancelled' || st === 'not_found';
+  }
+
+  function isInFlightDocRow(row) {
+    if (!row) return false;
+    var itemSt = String(row.itemStatus || '');
+    var st = String(row.status || '');
+    if (isTerminalItemStatus(itemSt) || isTerminalItemStatus(st)) return false;
+    if (itemSt === 'downloading' || itemSt === 'processing') return true;
+    if (itemSt === 'queued') return false;
+    return st === 'downloading' || st === 'processing' || st === 'pending';
+  }
+
+  function filterInFlightDocRows(rows) {
+    return (rows || []).filter(isInFlightDocRow);
+  }
+
+  function resolveJobItemForDoc(docId) {
+    var job = state.activeJob;
+    if (!job || !Array.isArray(job.items)) return null;
+    var id = Number(docId);
+    if (!Number.isFinite(id)) return null;
+    for (var i = 0; i < job.items.length; i += 1) {
+      if (resolveItemDocId(job.items[i]) === id) return job.items[i];
+    }
+    return null;
+  }
+
+  function syncTrackedDocFromJobItem(it, opts) {
     opts = opts || {};
-    var pct = clampPercent(progress);
+    var docId = resolveItemDocId(it);
+    if (docId == null) return;
+    var st = itemImportStatus(it);
+    var t = state.t;
+    if (st === 'completed') {
+      updateDocEntry(docId, {
+        silent: !!opts.silent,
+        status: 'completed',
+        stage: t.completed_07ca5050 || 'Done',
+        progress: 100,
+        error: '',
+      });
+      stopDocPoll(docId);
+      return;
+    }
+    if (st === 'failed') {
+      updateDocEntry(docId, {
+        silent: !!opts.silent,
+        status: 'failed',
+        stage: t.failed_d7c8c85b || 'Failed',
+        progress: 100,
+        error: (it && (it.reprocess_error || it.import_error || it.error)) || '',
+      });
+      stopDocPoll(docId);
+      return;
+    }
+    if (st === 'cancelled' || st === 'not_found') {
+      updateDocEntry(docId, {
+        silent: !!opts.silent,
+        status: st,
+        stage: defaultStageForItemStatus(st, t),
+        progress: 100,
+      });
+      stopDocPoll(docId);
+    }
+  }
+
+  function resolveJobTotal(job) {
+    if (!job) return 0;
+    return Number(job.total) || Number(job.snapshot && job.snapshot.total_items) || 0;
+  }
+
+  function isSingleDocContext(job, totalDocsFallback) {
+    if (job && !state.standaloneMode) {
+      return resolveJobTotal(job) === 1;
+    }
+    var n = Number(totalDocsFallback);
+    return Number.isFinite(n) && n === 1;
+  }
+
+  function resolveSingleDocStage(job, trackedDocs, t) {
+    if (trackedDocs && trackedDocs.size) {
+      var entries = Array.from(trackedDocs.entries());
+      for (var i = 0; i < entries.length; i += 1) {
+        var data = entries[i][1] || {};
+        if (data.stage && !isTerminalItemStatus(data.status)) return data.stage;
+      }
+      if (entries[0][1] && entries[0][1].stage) return entries[0][1].stage;
+    }
+    if (job && Array.isArray(job.items) && job.items.length) {
+      var it = job.items[0];
+      var docId = resolveItemDocId(it);
+      var tracked = docId != null ? trackedDocs.get(docId) : null;
+      if (tracked && tracked.stage) return tracked.stage;
+      return defaultStageForItemStatus(itemImportStatus(it), t);
+    }
+    return t.preparing_0862f67f || 'Preparing...';
+  }
+
+  function docListToggleLabel(expanded, count, t) {
+    if (expanded) return t.hide_details_6c4e8b91 || 'Hide details';
+    var base = t.show_details_3f7a2d18 || 'Show details';
+    return count > 0 ? (base + ' (' + count + ')') : base;
+  }
+
+  function resolveItemLabel(it, idx, t) {
+    var docId = resolveItemDocId(it);
+    if (docId != null) return '#' + docId;
+    var submittedId = it && it.submitted_document_id;
+    if (submittedId != null && String(submittedId).trim() !== '') {
+      return 'Import #' + submittedId;
+    }
+    return (t.document_09453598 || 'Document') + ' ' + (Number(it.index != null ? it.index : idx) + 1);
+  }
+
+  function formatJobOverallText(prog, t) {
+    var done = Number(prog.done) || 0;
+    var total = Number(prog.total) || 0;
+    var active = Number(prog.inFlight) || 0;
+    if (total <= 0) return '';
+    if (done >= total) return done + '/' + total;
+    if (active > 0) {
+      return done + '/' + total + ' · ' + active + ' ' + (t.in_progress_8b6e4a2c || 'in progress');
+    }
+    return done + '/' + total;
+  }
+  function buildDocRowsFromJob(job, trackedDocs, t) {
+    var items = Array.isArray(job && job.items) ? job.items.slice() : [];
+    items.sort(function (a, b) {
+      return (Number(a.index) || 0) - (Number(b.index) || 0);
+    });
+    if (!items.length) {
+      if (trackedDocs.size) return buildDocRowsFromTracked(trackedDocs);
+      if (job && Number(job.total) > 0) {
+        items = [];
+        for (var i = 0; i < Number(job.total); i += 1) {
+          items.push({ index: i, import_status: 'queued' });
+        }
+      } else {
+        return [];
+      }
+    }
+    return items.map(function (it, idx) {
+      var docId = resolveItemDocId(it);
+      var itemStatus = itemImportStatus(it);
+      var tracked = (docId != null && trackedDocs.has(docId)) ? trackedDocs.get(docId) : null;
+      var status = itemStatus;
+      var stage = defaultStageForItemStatus(itemStatus, t);
+      var progress = defaultProgressForItemStatus(itemStatus, null);
+      if (!isTerminalItemStatus(itemStatus) && tracked) {
+        if (tracked.stage) stage = tracked.stage;
+        progress = defaultProgressForItemStatus(itemStatus, tracked);
+        if (tracked.status && !isTerminalItemStatus(tracked.status)) {
+          status = tracked.status;
+        }
+      }
+      var label = docId != null
+        ? ('#' + docId)
+        : ((t.document_09453598 || 'Document') + ' ' + (Number(it.index != null ? it.index : idx) + 1));
+      return { label: label, stage: stage, progress: progress, status: status, itemStatus: itemStatus };
+    });
+  }
+
+  function buildDocRowsFromTracked(trackedDocs) {
+    return Array.from(trackedDocs.entries())
+      .map(function (pair) {
+        var data = pair[1] || {};
+        return {
+          docId: Number(pair[0]),
+          label: '#' + pair[0],
+          stage: data.stage || '',
+          progress: clampPercent(data.progress || 0),
+          status: data.status || 'pending',
+          itemStatus: data.status || 'pending',
+        };
+      })
+      .sort(function (a, b) {
+        return Number(a.docId) - Number(b.docId);
+      });
+  }
+
+  function trackedDocCountsAsDone(row) {
+    if (TERMINAL_DOC_STATUSES.indexOf(row.status) < 0) return false;
+    var tracked = state.trackedDocs.get(Number(row.docId));
+    if (
+      tracked &&
+      tracked.reprocessRequestedAt &&
+      !tracked.seenNonCompletedSinceRequest &&
+      (Date.now() - Number(tracked.reprocessRequestedAt)) < 120000
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  function buildOptimisticJobItems(docIds, status) {
+    status = status || 'queued';
+    return (docIds || []).map(function (id, idx) {
+      var docId = Number(id);
+      return {
+        index: idx,
+        ai_document_id: docId,
+        reprocess_status: status,
+        import_status: status,
+        status: status,
+      };
+    });
+  }
+
+  function beginOptimisticJob(jobType, total, docIds, opts) {
+    opts = opts || {};
+    clearBannerHideTimer();
+    state.standaloneMode = false;
+    state.docListExpanded = false;
+    state.optimisticJob = true;
+    var requestTs = opts.requestTs || null;
+    var ids = (docIds || []).map(Number).filter(function (n) { return Number.isFinite(n); });
+    ids.forEach(function (id) {
+      trackDoc(id, { silent: true });
+      updateDocEntry(id, {
+        silent: true,
+        status: 'pending',
+        stage: state.t.pending_2d13df6f || 'Queued',
+        progress: 0,
+        reprocessRequestedAt: requestTs,
+        seenNonCompletedSinceRequest: false,
+      });
+    });
+    var n = Number(total) || ids.length || 0;
+    var normalizedType = normalizeJobType(jobType);
+    state.activeJob = {
+      jobId: '',
+      jobType: normalizedType,
+      status: 'running',
+      total: n,
+      snapshot: {
+        total_items: n,
+        counts: { completed: 0, failed: 0, cancelled: 0, in_progress: n },
+      },
+      items: buildOptimisticJobItems(ids, 'queued'),
+      startedAt: Date.now(),
+    };
+    renderFromState();
+  }
+
+  function activateJob(jobId, jobType, total) {
+    clearBannerHideTimer();
+    state.optimisticJob = false;
+    var normalizedType = normalizeJobType(jobType);
+    if (!state.activeJob || normalizeJobType(state.activeJob.jobType) !== normalizedType) {
+      startJob(normalizedType, jobId, total);
+      return;
+    }
+    state.activeJob.jobId = String(jobId);
+    state.activeJob.status = 'running';
+    state.activeJob.total = Number(total) || state.activeJob.total || 0;
+    if (state.activeJob.snapshot) {
+      state.activeJob.snapshot.total_items = state.activeJob.total;
+    }
+    state.standaloneMode = false;
+    persistActiveJob(state.activeJob);
+    ensureMasterPoll();
+    renderFromState();
+  }
+
+  function failOptimisticJob(docIds, errorMsg) {
+    clearBannerHideTimer();
+    state.optimisticJob = false;
+    var msg = errorMsg || '';
+    (docIds || []).forEach(function (id) {
+      var docId = Number(id);
+      if (!Number.isFinite(docId)) return;
+      updateDocEntry(docId, {
+        silent: true,
+        status: 'failed',
+        stage: state.t.failed_d7c8c85b || 'Failed',
+        progress: 100,
+        error: msg,
+      });
+      stopDocPoll(docId);
+    });
+    state.activeJob = null;
+    stopMasterPoll();
+    renderFromState();
+  }
+
+  function renderDocListHtml(rows) {
+    if (!rows || !rows.length) return '';
+    return rows.map(function (row) {
+      var pct = clampPercent(row.progress);
+      var rowClass = 'ai-docs-progress-doc-row';
+      if (row.status === 'completed' || row.itemStatus === 'completed') rowClass += ' is-done';
+      if (row.status === 'failed' || row.itemStatus === 'failed') rowClass += ' is-failed';
+      return '<div class="' + rowClass + '">' +
+        '<span class="ai-docs-progress-doc-label">' + escapeHtml(row.label) + '</span>' +
+        '<span class="ai-docs-progress-doc-stage">' + escapeHtml(row.stage) + '</span>' +
+        '<span class="ai-docs-progress-doc-pct">' + pct + '%</span>' +
+        '<div class="ai-docs-progress-doc-bar"><span style="width:' + pct + '%"></span></div>' +
+        '</div>';
+    }).join('');
+  }
+
+  function renderBannerState(opts) {
+    opts = opts || {};
+    if (!opts.preserveHideTimer && !isJobTerminalDisplay() && !opts.terminalComplete) {
+      clearBannerHideTimer();
+    }
+    var title = opts.title || '';
+    var overallText = opts.overallText || '';
+    var detailText = opts.detailText || '';
+    var pct = clampPercent(opts.percent || 0);
+    var docRows = opts.docRows || [];
+    var singleDoc = !!opts.singleDocMode;
+    var showDocList = !singleDoc && docRows.length > 0;
+    var docListExpanded = !!opts.docListExpanded;
+    var docListHtml = showDocList && docListExpanded ? renderDocListHtml(docRows) : '';
+    var t = state.t;
+
     if (state.bannerUI && state.bannerUI.exists && state.bannerUI.exists()) {
       state.bannerUI.update({
         title: title,
-        detail: detail,
+        detail: singleDoc ? detailText : overallText,
         progress: pct,
         showPercent: true,
         percentText: pct + '%',
       });
       if (opts.showCancel) state.bannerUI.setCancelVisible(true);
       if (opts.hideCancel) state.bannerUI.setCancelVisible(false);
-      return;
+      if (typeof opts.showSpinner === 'boolean') {
+        state.bannerUI.setSpinnerVisible(opts.showSpinner);
+      } else if (isJobTerminalDisplay() || opts.terminalComplete) {
+        state.bannerUI.setSpinnerVisible(false);
+      }
     }
+
     var b = state.bannerEls;
-    if (!b.banner) return;
-    b.banner.classList.remove('hidden');
-    if (b.title) b.title.textContent = title || '';
-    if (b.detail) b.detail.textContent = detail || '';
+    if (b.banner) b.banner.classList.remove('hidden');
+    if (b.title) b.title.textContent = title;
+    if (b.overall) {
+      if (singleDoc || !overallText) {
+        b.overall.textContent = '';
+        b.overall.classList.add('hidden');
+      } else {
+        b.overall.textContent = overallText;
+        b.overall.classList.remove('hidden');
+      }
+    }
+    if (b.detail) {
+      if (singleDoc) {
+        b.detail.textContent = detailText;
+        b.detail.classList.toggle('hidden', !detailText);
+      } else {
+        b.detail.textContent = overallText;
+        b.detail.classList.add('hidden');
+      }
+    }
     if (b.percent) b.percent.textContent = pct + '%';
     if (b.bar) b.bar.style.width = pct + '%';
+    var showSpinner = opts.showSpinner;
+    if (showSpinner === undefined) {
+      showSpinner = !(isJobTerminalDisplay() || opts.terminalComplete);
+    }
+    if (b.spinner) b.spinner.classList.toggle('hidden', !showSpinner);
     if (opts.showCancel && b.cancelWrap) b.cancelWrap.classList.remove('hidden');
     if (opts.hideCancel && b.cancelWrap) b.cancelWrap.classList.add('hidden');
+
+    var toggleEl = state.bannerEls.docListToggle;
+    if (toggleEl) {
+      if (showDocList) {
+        toggleEl.textContent = docListToggleLabel(docListExpanded, docRows.length, t);
+        toggleEl.setAttribute('aria-expanded', docListExpanded ? 'true' : 'false');
+        toggleEl.classList.remove('hidden');
+      } else {
+        toggleEl.classList.add('hidden');
+      }
+    }
+
+    var listEl = state.bannerEls.docList;
+    if (listEl) {
+      if (docListHtml) {
+        listEl.innerHTML = docListHtml;
+        listEl.classList.remove('hidden');
+      } else {
+        listEl.innerHTML = '';
+        listEl.classList.add('hidden');
+      }
+    }
+  }
+
+  function showBanner(title, detail, progress, opts) {
+    opts = opts || {};
+    renderBannerState({
+      title: title,
+      overallText: detail,
+      percent: progress,
+      docRows: opts.docRows || [],
+      showCancel: opts.showCancel,
+      hideCancel: opts.hideCancel,
+    });
   }
 
   function hideBanner() {
@@ -171,12 +609,21 @@
       clearTimeout(state.hideTimer);
       state.hideTimer = null;
     }
+    if (state.bannerEls.docList) {
+      state.bannerEls.docList.innerHTML = '';
+      state.bannerEls.docList.classList.add('hidden');
+    }
+    if (state.bannerEls.docListToggle) {
+      state.bannerEls.docListToggle.classList.add('hidden');
+    }
     if (state.bannerUI && state.bannerUI.hide) {
       state.bannerUI.hide();
+      if (state.bannerUI.setSpinnerVisible) state.bannerUI.setSpinnerVisible(true);
       return;
     }
     if (state.bannerEls.banner) state.bannerEls.banner.classList.add('hidden');
     if (state.bannerEls.cancelWrap) state.bannerEls.cancelWrap.classList.add('hidden');
+    if (state.bannerEls.spinner) state.bannerEls.spinner.classList.remove('hidden');
   }
 
   function jobDoneCount(counts) {
@@ -195,9 +642,9 @@
 
     if (Array.isArray(items)) {
       items.forEach(function (it) {
-        var st = it.import_status || it.status;
-        if (st === 'completed' || st === 'failed' || st === 'cancelled') return;
-        var docId = it.ai_document_id || (it.document && it.document.id);
+        var st = itemImportStatus(it);
+        if (isTerminalItemStatus(st)) return;
+        var docId = resolveItemDocId(it);
         if (docId != null && trackedDocs.has(Number(docId))) {
           partial += (trackedDocs.get(Number(docId)).progress || 0) / 100;
         } else if (st === 'downloading') {
@@ -233,25 +680,10 @@
     if (job && !state.standaloneMode) {
       var spec = getSpec(job.jobType);
       var prog = computeJobProgress(job.snapshot, job.items, state.trackedDocs);
-      var current = Math.min(prog.total, prog.done + (prog.inFlight > 0 ? 1 : 0));
-      var title = jobTitle(spec, t) + ' (' + current + '/' + prog.total + ')';
-
-      var entries = Array.from(state.trackedDocs.entries()).map(function (pair) {
-        return { id: pair[0], data: pair[1] || {} };
-      });
-      entries.sort(function (a, b) { return (b.data.updatedAt || 0) - (a.data.updatedAt || 0); });
-      var focus = entries.find(function (x) { return TERMINAL_DOC_STATUSES.indexOf(x.data.status) < 0; }) || entries[0];
-
-      var detail;
-      if (focus && focus.data) {
-        detail = '#' + focus.id + ' • ' + t.stage_5f483ab8 + ' ' + (focus.data.stage || t.preparing_0862f67f) + ' • ' + clampPercent(focus.data.progress || 0) + '%';
-      } else if (prog.inFlight > 0 && prog.done === 0) {
-        detail = '0/' + prog.total + ' ' + t.starting_8c6ce9f8;
-      } else if (prog.inFlight > 0) {
-        detail = prog.done + '/' + prog.total + ' – ' + t.working_9c8a77ee;
-      } else {
-        detail = prog.done + '/' + prog.total;
-      }
+      var title = jobTitle(spec, t);
+      var overallText = prog.done + '/' + prog.total;
+      var docRows = filterInFlightDocRows(buildDocRowsFromJob(job, state.trackedDocs, t));
+      var singleDoc = isSingleDocContext(job, prog.total);
 
       if (TERMINAL_JOB_STATUSES.indexOf(String(job.status || '')) >= 0) {
         if (job.status === 'cancelled') {
@@ -263,37 +695,70 @@
         } else {
           title = t.reprocess_complete_f1001d0e;
         }
-        detail = (Number(prog.counts.failed) || 0) > 0 ? t.some_documents_failed_2221bc0e : t.done_f92965e2;
-        showBanner(title, detail, 100, { hideCancel: true });
+        overallText = singleDoc ? '' : (prog.done + '/' + prog.total);
+        if ((Number(prog.counts.failed) || 0) > 0) {
+          overallText += singleDoc ? '' : (' · ' + t.some_documents_failed_2221bc0e);
+        }
+        renderBannerState({
+          title: title,
+          overallText: overallText,
+          detailText: singleDoc ? (t.done_f92965e2 || 'Done') : '',
+          singleDocMode: singleDoc,
+          percent: 100,
+          docRows: docRows,
+          docListExpanded: state.docListExpanded,
+          hideCancel: true,
+          terminalComplete: true,
+          showSpinner: false,
+        });
         return;
       }
 
-      showBanner(title, detail, prog.percent, {
+      renderBannerState({
+        title: title,
+        overallText: singleDoc ? '' : overallText,
+        detailText: singleDoc ? resolveSingleDocStage(job, state.trackedDocs, t) : '',
+        singleDocMode: singleDoc,
+        percent: prog.percent,
+        docRows: docRows,
+        docListExpanded: state.docListExpanded,
         showCancel: job.status === 'running' || job.status === 'queued' || job.status === 'cancel_requested',
       });
       return;
     }
 
-    var docEntries = Array.from(state.trackedDocs.entries()).map(function (pair) {
-      return { id: pair[0], data: pair[1] || {} };
-    });
-    if (!docEntries.length) {
+    var allDocRows = buildDocRowsFromTracked(state.trackedDocs);
+    if (!allDocRows.length) {
       hideBanner();
       return;
     }
 
-    var doneDocs = docEntries.filter(function (x) { return TERMINAL_DOC_STATUSES.indexOf(x.data.status) >= 0; }).length;
-    var failedDocs = docEntries.filter(function (x) { return x.data.status === 'failed'; }).length;
-    var inProg = docEntries.find(function (x) { return TERMINAL_DOC_STATUSES.indexOf(x.data.status) < 0; }) || docEntries[0];
-    var totalDocs = docEntries.length;
+    var docRows = filterInFlightDocRows(allDocRows);
+    var singleDoc = isSingleDocContext(null, totalDocs);
+    var doneDocs = allDocRows.filter(function (row) {
+      return trackedDocCountsAsDone(row);
+    }).length;
+    var failedDocs = allDocRows.filter(function (row) { return row.status === 'failed'; }).length;
+    var totalDocs = allDocRows.length;
+    var overallText = doneDocs + '/' + totalDocs;
+    var inProg = allDocRows.find(function (row) { return TERMINAL_DOC_STATUSES.indexOf(row.status) < 0; });
+    var perDocPct = totalDocs === 1 && inProg
+      ? clampPercent(inProg.progress || 0)
+      : clampPercent(totalDocs > 0 ? (doneDocs / totalDocs) * 100 : 0);
 
     if (doneDocs >= totalDocs) {
-      showBanner(
-        failedDocs > 0 ? t.processing_finished_1b8f5c57 : t.processing_complete_930a1b79,
-        failedDocs > 0 ? t.some_documents_failed_aaa3128a + ' (' + failedDocs + '/' + totalDocs + ')' : t.done_f5940523,
-        100,
-        { hideCancel: true }
-      );
+      renderBannerState({
+        title: failedDocs > 0 ? t.processing_finished_1b8f5c57 : t.processing_complete_930a1b79,
+        overallText: singleDoc ? '' : (overallText + (failedDocs > 0 ? (' · ' + failedDocs + ' ' + t.failed_26934eb3) : '')),
+        detailText: singleDoc ? (failedDocs > 0 ? t.failed_d7c8c85b : (t.done_f92965e2 || 'Done')) : '',
+        singleDocMode: singleDoc,
+        percent: 100,
+        docRows: docRows,
+        docListExpanded: state.docListExpanded,
+        hideCancel: true,
+        terminalComplete: true,
+        showSpinner: false,
+      });
       if (!state.hideTimer) {
         state.hideTimer = setTimeout(function () {
           state.hideTimer = null;
@@ -309,19 +774,20 @@
       state.hideTimer = null;
     }
 
-    var displayCurrent = Math.min(doneDocs + (inProg ? 1 : 0), totalDocs);
-    var perDocPct = totalDocs === 1 && inProg
-      ? clampPercent(inProg.data.progress || 0)
-      : clampPercent(totalDocs > 0 ? (doneDocs / totalDocs) * 100 : 0);
-    var detailLine = inProg
-      ? '#' + inProg.id + ' • ' + t.stage_5f483ab8 + ' ' + (inProg.data.stage || t.preparing_0862f67f) + ' • ' + clampPercent(inProg.data.progress || 0) + '%'
-      : t.working_9c8a77ee;
-    showBanner(t.processing_documents_4c764ed2 + ' (' + displayCurrent + '/' + totalDocs + ')', detailLine, perDocPct);
+    renderBannerState({
+      title: t.processing_documents_4c764ed2,
+      overallText: singleDoc ? '' : overallText,
+      detailText: singleDoc ? resolveSingleDocStage(null, state.trackedDocs, t) : '',
+      singleDocMode: singleDoc,
+      percent: perDocPct,
+      docRows: docRows,
+      docListExpanded: state.docListExpanded,
+    });
   }
 
   async function fetchJobStatus(job) {
     var spec = getSpec(job.jobType);
-    if (!spec) return null;
+    if (!spec || !job.jobId) return null;
     var url = spec.statusUrl(job.jobId, state.urls) + '?_=' + Date.now();
     var fetchImpl = state.fetchFn || window.apiFetch || fetch;
     if (fetchImpl === fetch) {
@@ -348,14 +814,22 @@
   }
 
   function finishJob(jobType) {
-    renderFromState();
+    var job = state.activeJob;
+    if (!job || normalizeJobType(job.jobType) !== normalizeJobType(jobType)) return;
+    if (job.finishHandled) return;
+    job.finishHandled = true;
+
+    stopMasterPoll();
+    stopAllDocPolls();
     clearPersistedJob(jobType);
+    renderFromState();
     if (state.hooks.onJobComplete) {
-      try { state.hooks.onJobComplete(jobType, state.activeJob); } catch (e) { /* ignore */ }
+      try { state.hooks.onJobComplete(jobType, job); } catch (e) { /* ignore */ }
     }
+    clearBannerHideTimer();
     state.hideTimer = setTimeout(function () {
       state.hideTimer = null;
-      if (state.activeJob && state.activeJob.jobType === jobType) {
+      if (state.activeJob && normalizeJobType(state.activeJob.jobType) === normalizeJobType(jobType)) {
         state.activeJob = null;
       }
       hideBanner();
@@ -366,6 +840,7 @@
     if (!payload || !payload.success || !payload.job) return;
     var job = payload.job;
     var items = Array.isArray(payload.items) ? payload.items : [];
+    var jobTerminal = TERMINAL_JOB_STATUSES.indexOf(String(job.status || '')) >= 0;
     state.activeJob = {
       jobId: String(job.id),
       jobType: jobType,
@@ -374,18 +849,23 @@
       snapshot: job,
       items: items,
       startedAt: (state.activeJob && state.activeJob.startedAt) || Date.now(),
+      finishHandled: !!(state.activeJob && state.activeJob.finishHandled),
     };
     state.standaloneMode = false;
 
     items.forEach(function (it) {
-      var docId = it.ai_document_id;
-      if (docId == null && it.document && it.document.id != null) docId = it.document.id;
-      if (docId == null || !Number.isFinite(Number(docId))) return;
-      trackDoc(Number(docId), { silent: true });
-      startDocPoll(Number(docId));
+      var docId = resolveItemDocId(it);
+      if (docId == null) return;
+      var st = itemImportStatus(it);
+      if (!jobTerminal && (st === 'downloading' || st === 'processing')) {
+        trackDoc(docId, { silent: true });
+        startDocPoll(docId);
+      } else if (isTerminalItemStatus(st)) {
+        syncTrackedDocFromJobItem(it, { silent: true });
+      }
     });
 
-    if (TERMINAL_JOB_STATUSES.indexOf(String(job.status || '')) >= 0) {
+    if (jobTerminal) {
       finishJob(jobType);
       return;
     }
@@ -484,6 +964,13 @@
 
     var poll = async function () {
       try {
+        var jobItem = resolveJobItemForDoc(docId);
+        if (jobItem && isTerminalItemStatus(itemImportStatus(jobItem))) {
+          syncTrackedDocFromJobItem(jobItem, { silent: true });
+          renderFromState();
+          return;
+        }
+
         var data = await fetchDocStatus(docId);
         if (!data.success) {
           if (data.error === 'not_found') {
@@ -554,7 +1041,10 @@
   }
 
   function startJob(jobType, jobId, total) {
+    clearBannerHideTimer();
     state.standaloneMode = false;
+    state.optimisticJob = false;
+    state.docListExpanded = false;
     state.activeJob = {
       jobId: String(jobId),
       jobType: jobType,
@@ -569,7 +1059,6 @@
     };
     persistActiveJob(state.activeJob);
     ensureMasterPoll();
-    showBanner(state.t.starting_import_b06c80dc, state.t.resuming_09136a9d, 0, { showCancel: true });
     renderFromState();
   }
 
@@ -604,6 +1093,7 @@
     state.trackedDocs.clear();
     state.activeJob = null;
     state.standaloneMode = false;
+    state.docListExpanded = false;
     hideBanner();
   }
 
@@ -641,6 +1131,7 @@
         detailId: 'processingStatusDetail',
         percentId: 'processingStatusPercent',
         barId: 'processingStatusBar',
+        spinnerId: 'processingStatusSpinner',
         cancelWrapId: 'processingStatusCancelWrap',
         cancelBtnId: 'processingStatusCancelBtn',
       });
@@ -649,8 +1140,12 @@
       banner: document.getElementById('processingStatusBanner'),
       title: document.getElementById('processingStatusTitle'),
       detail: document.getElementById('processingStatusDetail'),
+      overall: document.getElementById('processingStatusOverall'),
+      docList: document.getElementById('processingStatusDocList'),
+      docListToggle: document.getElementById('processingStatusDocListToggle'),
       percent: document.getElementById('processingStatusPercent'),
       bar: document.getElementById('processingStatusBar'),
+      spinner: document.getElementById('processingStatusSpinner'),
       cancelWrap: document.getElementById('processingStatusCancelWrap'),
       cancelBtn: document.getElementById('processingStatusCancelBtn'),
     };
@@ -660,6 +1155,15 @@
       cancelBtn.dataset.aiDocsProgressBound = '1';
       cancelBtn.addEventListener('click', function () {
         if (state.activeJob) cancelActiveJob();
+      });
+    }
+
+    var docListToggle = state.bannerEls.docListToggle;
+    if (docListToggle && !docListToggle.dataset.aiDocsProgressBound) {
+      docListToggle.dataset.aiDocsProgressBound = '1';
+      docListToggle.addEventListener('click', function () {
+        state.docListExpanded = !state.docListExpanded;
+        renderFromState();
       });
     }
 
@@ -679,6 +1183,9 @@
   window.AiDocsJobProgress = {
     init: init,
     startJob: startJob,
+    beginOptimisticJob: beginOptimisticJob,
+    activateJob: activateJob,
+    failOptimisticJob: failOptimisticJob,
     trackDoc: trackDoc,
     updateDoc: updateDocEntry,
     startDocPoll: startDocPoll,

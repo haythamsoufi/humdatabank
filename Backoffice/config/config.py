@@ -742,6 +742,9 @@ class Config:
 
     # Document Processing
     AI_MAX_DOCUMENT_SIZE_MB = int(os.environ.get('AI_MAX_DOCUMENT_SIZE_MB', '50'))
+    # Text-only PDF processing: drop embedded images before extraction to cut memory/size.
+    AI_PDF_STRIP_IMAGES_ENABLED = _parse_bool(os.environ.get('AI_PDF_STRIP_IMAGES_ENABLED'), default=True)
+    AI_PDF_STRIP_IMAGES_MIN_MB = int(os.environ.get('AI_PDF_STRIP_IMAGES_MIN_MB', '10'))
     AI_CHUNK_SIZE = int(os.environ.get('AI_CHUNK_SIZE', '512'))  # tokens
     AI_CHUNK_OVERLAP = int(os.environ.get('AI_CHUNK_OVERLAP', '50'))  # tokens
     # Table extraction (PDFs): when enabled, we attempt to extract tables into structured table chunks.

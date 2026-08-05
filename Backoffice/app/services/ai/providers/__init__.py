@@ -58,19 +58,30 @@ def get_embedding_provider():
     Uses AI_EMBEDDING_PROVIDER ('openai' | 'local'), AI_EMBEDDING_MODEL,
     AI_EMBEDDING_DIMENSIONS, OPENAI_API_KEY, etc.
     """
-    from flask import current_app
+    from flask import current_app, g, has_app_context
 
-    provider_name = (current_app.config.get("AI_EMBEDDING_PROVIDER") or "openai").strip().lower()
-    dimensions = _resolve_embedding_dimensions()
+    if has_app_context():
+        cached = getattr(g, "_ai_embedding_provider", None)
+        if cached is not None:
+            return cached
+        provider = _build_embedding_provider(current_app.config)
+        g._ai_embedding_provider = provider
+        return provider
+    return _build_embedding_provider({})
+
+
+def _build_embedding_provider(config):
+    provider_name = (config.get("AI_EMBEDDING_PROVIDER") or "openai").strip().lower()
+    dimensions = _resolve_embedding_dimensions_from_config(config)
 
     if provider_name == "local":
-        model_name = current_app.config.get("AI_EMBEDDING_MODEL", "local")
+        model_name = config.get("AI_EMBEDDING_MODEL", "local")
         return LocalEmbeddingProvider(dimensions=dimensions, model_name=model_name)
 
     if provider_name == "openai":
-        api_key = current_app.config.get("OPENAI_API_KEY")
-        model = current_app.config.get("AI_EMBEDDING_MODEL", "text-embedding-3-small")
-        timeout = int(current_app.config.get("AI_HTTP_TIMEOUT_SECONDS", 60))
+        api_key = config.get("OPENAI_API_KEY")
+        model = config.get("AI_EMBEDDING_MODEL", "text-embedding-3-small")
+        timeout = int(config.get("AI_HTTP_TIMEOUT_SECONDS", 60))
         return OpenAIEmbeddingProvider(
             model=model,
             dimensions=dimensions,
@@ -81,12 +92,9 @@ def get_embedding_provider():
     raise ValueError(f"Unknown AI_EMBEDDING_PROVIDER: {provider_name!r}")
 
 
-def _resolve_embedding_dimensions() -> int:
-    import os
-    from flask import current_app
-
+def _resolve_embedding_dimensions_from_config(config) -> int:
     try:
-        cfg = current_app.config.get("AI_EMBEDDING_DIMENSIONS")
+        cfg = config.get("AI_EMBEDDING_DIMENSIONS")
         if cfg not in (None, ""):
             return int(cfg)
     except Exception:

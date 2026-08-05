@@ -71,7 +71,25 @@ class TestGetEmbeddingProvider:
         with app.app_context():
             app.config["AI_EMBEDDING_PROVIDER"] = "openai"
             app.config["OPENAI_API_KEY"] = ""
+            from flask import g
+
+            if hasattr(g, "_ai_embedding_provider"):
+                delattr(g, "_ai_embedding_provider")
             from app.services.ai.providers import get_embedding_provider
 
             with pytest.raises((ValueError, RuntimeError), match="OPENAI|key|required"):
                 get_embedding_provider()
+
+    def test_get_embedding_provider_is_cached_per_request(self, app):
+        with app.app_context():
+            app.config["AI_EMBEDDING_PROVIDER"] = "local"
+            app.config["AI_EMBEDDING_DIMENSIONS"] = 64
+            from flask import g
+
+            if hasattr(g, "_ai_embedding_provider"):
+                delattr(g, "_ai_embedding_provider")
+            from app.services.ai.providers import get_embedding_provider
+
+            first = get_embedding_provider()
+            second = get_embedding_provider()
+            assert first is second

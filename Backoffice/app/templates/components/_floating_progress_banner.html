@@ -16,7 +16,7 @@
     percent_id,
     bar_id,
     spinner_id=None,
-    spinner_classes='mt-0.5 animate-spin rounded-full h-4 w-4 flex-shrink-0',
+    spinner_classes='mt-0 animate-spin rounded-full h-3.5 w-3.5 flex-shrink-0',
     spinner_style='border-bottom: 2px solid rgba(255,255,255,0.85);',
     title_default='Processing...',
     detail_default='Preparing...',
@@ -32,6 +32,8 @@
     cancel_button_label=None,
     cancel_button_aria_label=None,
     buttons=None,
+    overall_id=None,
+    doc_list_id=None,
     width='22rem'
 ) -%}
 <div id="{{ banner_id }}"
@@ -39,9 +41,9 @@
      style="z-index: 11050; width: {{ width }}; background: rgba(0,0,0,0.92); color: #ffffff; border: 1px solid rgba(255,255,255,0.10);"
      role="status"
      aria-live="polite">
-    <div class="px-4 py-3">
-        <div class="flex items-start justify-between gap-3">
-            <div class="flex items-start gap-3 min-w-0">
+    <div class="px-3 py-2">
+        <div class="flex items-start justify-between gap-2">
+            <div class="flex items-start gap-2 min-w-0">
                 {% if spinner_id %}
                 <div id="{{ spinner_id }}"
                      class="{{ spinner_classes }}"
@@ -50,9 +52,12 @@
                 <div class="{{ spinner_classes }}"
                      style="{{ spinner_style }}"></div>
                 {% endif %}
-                <div class="min-w-0">
-                    <p class="text-sm font-semibold truncate" id="{{ title_id }}">{{ title_default }}</p>
-                    <p class="{{ detail_classes }}" style="{{ detail_style }}" id="{{ detail_id }}">{{ detail_default }}</p>
+                <div class="min-w-0 leading-tight">
+                    <p class="text-sm font-semibold truncate leading-snug" id="{{ title_id }}">{{ title_default }}</p>
+                    {% if overall_id %}
+                    <p class="text-[11px] font-medium tabular-nums leading-none mt-0.5 empty:hidden" style="color: rgba(255,255,255,0.82);" id="{{ overall_id }}"></p>
+                    {% endif %}
+                    <p class="{{ detail_classes }}{% if overall_id %} hidden{% endif %}" style="{{ detail_style }}" id="{{ detail_id }}">{{ detail_default }}</p>
                 </div>
             </div>
             {% if show_percent %}
@@ -61,23 +66,42 @@
         </div>
 
         {% if show_progress %}
-        <div class="mt-2 w-full rounded-full h-1.5" style="background: rgba(255,255,255,0.18);">
-            <div id="{{ bar_id }}" class="h-1.5 rounded-full transition-all duration-300" style="width: 0%; background: rgba(255,255,255,0.95);"></div>
+        <div class="mt-1.5 w-full rounded-full h-1" style="background: rgba(255,255,255,0.18);">
+            <div id="{{ bar_id }}" class="h-1 rounded-full transition-all duration-300" style="width: 0%; background: rgba(255,255,255,0.95);"></div>
         </div>
         {% endif %}
 
-        {% if cancel_wrap_id and cancel_button_id %}
-        <div id="{{ cancel_wrap_id }}" class="hidden mt-3 flex justify-end">
-            <button type="button"
-                    id="{{ cancel_button_id }}"
-                    class="processing-status-cancel-btn text-xs font-medium px-3 py-1.5 rounded border transition-colors"
-                    style="color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); background: transparent;"
-                    aria-label="{{ cancel_button_aria_label or cancel_button_label or 'Cancel' }}">{{ cancel_button_label or 'Cancel' }}</button>
+        {% if doc_list_id or (cancel_wrap_id and cancel_button_id) %}
+        <div class="ai-floating-progress-footer{% if show_progress %} mt-1.5{% elif doc_list_id or cancel_wrap_id %} mt-1{% endif %}">
+            <div class="ai-floating-progress-toolbar flex items-center justify-between gap-2 min-h-[1.375rem]">
+                {% if doc_list_id %}
+                <button type="button"
+                        id="{{ doc_list_id }}Toggle"
+                        class="ai-docs-progress-doc-toggle hidden text-[11px] font-medium text-left rounded px-0 py-0 transition-colors leading-tight min-w-0"
+                        style="color: rgba(255,255,255,0.78);"
+                        aria-expanded="false"
+                        aria-controls="{{ doc_list_id }}"></button>
+                {% else %}
+                <span class="flex-1" aria-hidden="true"></span>
+                {% endif %}
+                {% if cancel_wrap_id and cancel_button_id %}
+                <div id="{{ cancel_wrap_id }}" class="hidden flex-shrink-0">
+                    <button type="button"
+                            id="{{ cancel_button_id }}"
+                            class="processing-status-cancel-btn text-[11px] font-medium px-2 py-0.5 rounded border transition-colors leading-tight"
+                            style="color: rgba(255,255,255,0.9); border-color: rgba(255,255,255,0.4); background: transparent;"
+                            aria-label="{{ cancel_button_aria_label or cancel_button_label or 'Cancel' }}">{{ cancel_button_label or 'Cancel' }}</button>
+                </div>
+                {% endif %}
+            </div>
+            {% if doc_list_id %}
+            <div id="{{ doc_list_id }}" class="ai-docs-progress-doc-list hidden max-h-36 overflow-y-auto space-y-1" aria-live="polite"></div>
+            {% endif %}
         </div>
         {% endif %}
 
         {% if buttons %}
-        <div class="mt-3 flex justify-end gap-2">
+        <div class="mt-2 flex justify-end gap-2">
             {% for b in buttons %}
             <button type="button"
                     id="{{ b.id }}"

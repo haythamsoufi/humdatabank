@@ -1128,6 +1128,120 @@ class TestAIDocumentProcessor:
         assert 'text' in result
         assert 'Header' in result['text']
 
+    def test_pdf_strips_images_when_over_size_limit(self, app, tmp_path):
+        """Oversized image-heavy PDFs are stripped before the size gate."""
+        import fitz
+        from app.services.ai.documents.processor import AIDocumentProcessor
+
+        pdf_path = tmp_path / "annual_report.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        width, height = 2500, 2500
+        samples = bytes([180, 90, 40]) * (width * height)
+        pix = fitz.Pixmap(fitz.csRGB, width, height, samples, 0)
+        page.insert_image(fitz.Rect(0, 0, 400, 400), pixmap=pix)
+        page.insert_text((72, 500), "Nigeria annual report narrative")
+        doc.save(str(pdf_path))
+        doc.close()
+
+        assert pdf_path.stat().st_size > 1024 * 1024
+
+        with app.app_context():
+            app.config["AI_MAX_DOCUMENT_SIZE_MB"] = 1
+            app.config["AI_PDF_STRIP_IMAGES_ENABLED"] = True
+            processor = AIDocumentProcessor()
+            result = processor.process_document(
+                file_path=str(pdf_path),
+                filename="annual_report.pdf",
+                extract_images=False,
+            )
+
+        assert "Nigeria annual report narrative" in result["text"]
+
+    def test_pdf_strips_when_multimodal_enabled_and_over_limit(self, app, tmp_path):
+        """Multimodal must not block stripping for oversized PDFs."""
+        import fitz
+        from app.services.ai.documents.processor import AIDocumentProcessor
+
+        pdf_path = tmp_path / "annual_report.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        width, height = 2500, 2500
+        samples = bytes([180, 90, 40]) * (width * height)
+        pix = fitz.Pixmap(fitz.csRGB, width, height, samples, 0)
+        page.insert_image(fitz.Rect(0, 0, 400, 400), pixmap=pix)
+        page.insert_text((72, 500), "Multimodal annual report narrative")
+        doc.save(str(pdf_path))
+        doc.close()
+
+        with app.app_context():
+            app.config["AI_MAX_DOCUMENT_SIZE_MB"] = 1
+            app.config["AI_PDF_STRIP_IMAGES_ENABLED"] = True
+            app.config["AI_MULTIMODAL_ENABLED"] = True
+            processor = AIDocumentProcessor()
+            result = processor.process_document(
+                file_path=str(pdf_path),
+                filename="annual_report.pdf",
+                extract_images=True,
+            )
+
+        assert "Multimodal annual report narrative" in result["text"]
+
+
+class TestAIDocumentMetadataHelpers:
+    def test_truncate_section_title(self):
+        from app.services.ai.documents.metadata import truncate_section_title
+
+        assert truncate_section_title(None) is None
+        assert truncate_section_title("  ") is None
+        assert truncate_section_title("Short title") == "Short title"
+        long = "A" * 600
+        out = truncate_section_title(long)
+        assert out is not None
+        assert len(out) == 500
+        assert out.endswith("…")
+
+    def test_sanitize_chunk_content_for_fts(self):
+        from app.services.ai.documents.metadata import sanitize_chunk_content_for_fts
+
+        assert sanitize_chunk_content_for_fts(None) == ""
+        assert sanitize_chunk_content_for_fts("short text") == "short text"
+        long_token = "x" * 3000
+        out = sanitize_chunk_content_for_fts(f"before {long_token} after")
+        assert "before " in out
+        assert " after" in out
+        for token in out.split():
+            assert len(token) <= 2047
+
+    def test_is_ocr_available_respects_config(self, app):
+        from app.services.ai.documents.processor import is_ocr_available, reset_ocr_availability_cache
+
+        reset_ocr_availability_cache()
+        with app.app_context():
+            app.config["AI_OCR_ENABLED"] = False
+            reset_ocr_availability_cache()
+            assert is_ocr_available() is False
+
+    def test_is_ocr_available_cached_when_tesseract_missing(self, app, monkeypatch):
+        from app.services.ai.documents.processor import is_ocr_available, reset_ocr_availability_cache
+        import pytesseract
+
+        reset_ocr_availability_cache()
+        monkeypatch.setattr("shutil.which", lambda _cmd: None)
+        monkeypatch.setattr("os.path.isfile", lambda _path: False)
+        monkeypatch.setattr(
+            pytesseract,
+            "get_tesseract_version",
+            lambda: (_ for _ in ()).throw(RuntimeError("tesseract missing")),
+        )
+
+        with app.app_context():
+            app.config["AI_OCR_ENABLED"] = True
+            reset_ocr_availability_cache()
+            assert is_ocr_available() is False
+            assert is_ocr_available() is False
+        reset_ocr_availability_cache()
+
 
 # ============================================================================
 # Test AIReasoningTraceService

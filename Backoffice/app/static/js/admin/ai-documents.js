@@ -27,12 +27,6 @@ const processingDocIdsFromPage = (function() {
     } catch (e) {
         return [];
     }
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initAiDocsJobProgress);
-} else {
-    initAiDocsJobProgress();
-}
-
 })();
 
 // Helper function to get file icon HTML
@@ -148,7 +142,21 @@ function startSystemImportJobPolling(jobId, total) {
 }
 
 function startBulkReprocessJobPolling(jobId, total) {
+    if (jobProgress && jobProgress.activateJob) {
+        jobProgress.activateJob(jobId, 'docs.bulk_reprocess', total || 0);
+        return;
+    }
     if (jobProgress && jobProgress.startJob) jobProgress.startJob('docs.bulk_reprocess', jobId, total || 0);
+}
+
+function beginBulkReprocessJob(total, docIds, requestTs) {
+    if (jobProgress && jobProgress.beginOptimisticJob) {
+        jobProgress.beginOptimisticJob('docs.bulk_reprocess', total || 0, docIds || [], { requestTs: requestTs || null });
+    }
+}
+
+function failBulkReprocessJob(docIds, errorMsg) {
+    if (jobProgress && jobProgress.failOptimisticJob) jobProgress.failOptimisticJob(docIds || [], errorMsg || '');
 }
 
 function startBulkMetaReprocessJobPolling(jobId, total) {
@@ -1004,16 +1012,9 @@ function initializeDocumentsBulkActions() {
 
             aiDocsLog('bulkReprocessSelected:begin', { targets: ids });
 
+            beginBulkReprocessJob(ids.length, ids, requestTs);
             ids.forEach(function(id) {
                 updateDocumentInGrid(id, { processing_status: 'pending', processing_error: '' });
-                updateTrackedProcessingDoc(id, {
-                    status: 'pending',
-                    stage: 'Queued...',
-                    progress: 0,
-                    reprocessRequestedAt: requestTs,
-                    seenNonCompletedSinceRequest: false
-                });
-                startProcessingPoll(id);
             });
 
             // Start server-side bulk job (avoids per-document rate limits and survives reload).
@@ -1034,10 +1035,9 @@ function initializeDocumentsBulkActions() {
                 startBulkReprocessJobPolling(result.job_id, result.total || ids.length);
             } catch (error) {
                 aiDocsLog('bulkReprocessSelected:startError', { error: error && (error.message || String(error)) });
+                failBulkReprocessJob(ids, error && (error.message || String(error)));
                 ids.forEach(function(id) {
                     updateDocumentInGrid(id, { processing_status: 'failed', processing_error: error.message || '' });
-                    updateTrackedProcessingDoc(id, { status: 'failed', stage: 'Failed', progress: 100, error: error.message || '' });
-                    stopProcessingPoll(id);
                 });
             }
 

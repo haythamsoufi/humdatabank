@@ -74,6 +74,14 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
         if rest and "/" not in rest:
             return True
 
+    # Polled document library list + status during import/reprocess (GET only)
+    if method == "GET" and path == "/api/ai/documents":
+        return True
+    if method == "GET" and path.startswith("/api/ai/documents/"):
+        rest = path[len("/api/ai/documents/") :]
+        if rest and "/" not in rest and rest.isdigit():
+            return True
+
     # Session / CSRF / client error plumbing
     if path in (
         "/api/v1/csrf-token",

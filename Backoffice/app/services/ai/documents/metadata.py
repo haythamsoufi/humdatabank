@@ -370,6 +370,53 @@ def classify_chunk_semantic_type(content: str, chunk_type: Optional[str] = None)
     return "paragraph"
 
 
+def truncate_section_title(title: Optional[str], max_len: int = 500) -> Optional[str]:
+    """Fit section_title into ai_document_chunks.section_title (varchar 500)."""
+    if title is None:
+        return None
+    text = str(title).strip()
+    if not text:
+        return None
+    if len(text) <= max_len:
+        return text
+    if max_len <= 1:
+        return text[:max_len]
+    return text[: max_len - 1].rstrip() + "…"
+
+
+_PG_FTS_MAX_WORD_LEN = 2047
+
+
+def sanitize_chunk_content_for_fts(content: Optional[str], max_word_len: int = _PG_FTS_MAX_WORD_LEN) -> str:
+    """
+    Break overlong whitespace-delimited tokens before chunk insert.
+
+    PostgreSQL to_tsvector('simple', content) ignores tokens longer than 2047 chars and
+    emits NOTICE lines; splitting keeps keyword search useful without log spam.
+    """
+    if content is None:
+        return ""
+    text = str(content)
+    if not text or max_word_len < 1:
+        return text
+
+    parts: List[str] = []
+    changed = False
+    for token in re.split(r"(\s+)", text):
+        if not token:
+            continue
+        if token.isspace() or len(token) <= max_word_len:
+            parts.append(token)
+            continue
+        changed = True
+        for i in range(0, len(token), max_word_len):
+            segment = token[i : i + max_word_len]
+            if parts and parts[-1] and not parts[-1].isspace():
+                parts.append(" ")
+            parts.append(segment)
+    return "".join(parts) if changed else text
+
+
 def build_heading_hierarchy(
     section_title: Optional[str],
     chunk_index: int,

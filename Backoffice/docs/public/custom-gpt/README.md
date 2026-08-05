@@ -9,6 +9,7 @@ Canonical files for the shareable ChatGPT Custom GPT:
 | [`openapi.yaml`](openapi.yaml) | **Actions → Import from URL** or paste schema |
 | [`profile.md`](profile.md) | **Name**, **Description**, **Conversation starters** |
 | This README | Maintainer notes only |
+| [`../../../humanitarian-databank-mcp/README.md`](../../../humanitarian-databank-mcp/README.md) | **MCP connector** (Claude/Cursor; same tools as Actions) |
 
 ChatGPT caps the **Instructions** field at **8000 characters**. The full [`instructions.md`](instructions.md) is ~11.8k chars — use the hybrid setup below, not a full paste.
 

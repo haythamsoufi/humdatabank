@@ -5,7 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn uvicorn
 
-COPY databank_client.py databank_analytics.py server.py ./
+COPY databank_client.py databank_analytics.py instructions.py server.py ./
+COPY assets/ ./assets/
 
 ENV MCP_TRANSPORT=streamable-http
 ENV DATABANK_API_BASE=https://databank.ifrc.org/api/v1

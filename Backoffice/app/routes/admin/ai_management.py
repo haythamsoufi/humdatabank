@@ -28,6 +28,11 @@ from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.error_handling import handle_json_view_exception
 from app.services.platform import storage_service as _storage
+from app.services.ai.ai_job_runner import (
+    ensure_ai_job_running,
+    get_active_ai_document_jobs_for_user,
+    start_ai_job_thread,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -661,6 +666,20 @@ def _auto_recover_stale_processing_documents() -> int:
         return 0
 
 
+@bp.route("/documents/active-jobs", methods=["GET"])
+@admin_permission_required('admin.ai.manage')
+def ai_documents_active_jobs():
+    """Return in-flight AI document batch jobs for the current user (UI resume)."""
+    try:
+        if not _check_ai_reprocess_job_tables_exist():
+            return json_ok(success=True, jobs=[])
+        user_id = int(getattr(current_user, "id", 0) or 0)
+        jobs = get_active_ai_document_jobs_for_user(user_id)
+        return json_ok(success=True, jobs=jobs)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
 @bp.route("/documents", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def document_library():
@@ -669,6 +688,7 @@ def document_library():
         return render_template(
             "admin/ai/documents.html",
             processing_doc_ids=[],
+            active_jobs=[],
             stats=_get_default_doc_stats(),
             file_types=[],
             categories=[],
@@ -723,6 +743,27 @@ def document_library():
             if r and r[0] is not None
         ]
 
+        active_jobs = []
+        if _check_ai_reprocess_job_tables_exist():
+            user_id = int(getattr(current_user, "id", 0) or 0)
+            active_jobs = get_active_ai_document_jobs_for_user(user_id)
+            worker_app = current_app._get_current_object()
+            for active in active_jobs:
+                job_type = active.get("job_type")
+                jid = active.get("job_id")
+                if not jid:
+                    continue
+                if job_type == "docs.bulk_import_system":
+                    ensure_ai_job_running(worker_app, jid, _run_system_bulk_import_job)
+                elif job_type == "docs.bulk_reprocess":
+                    ensure_ai_job_running(worker_app, jid, _run_bulk_reprocess_job)
+                elif job_type == "docs.bulk_reprocess_metadata":
+                    ensure_ai_job_running(worker_app, jid, _run_bulk_metadata_reprocess_job)
+                elif job_type == "ifrc_api_bulk":
+                    from app.routes.ai_documents.ifrc import _run_ifrc_bulk_import_job
+
+                    ensure_ai_job_running(worker_app, jid, _run_ifrc_bulk_import_job)
+
         # Global stats (always unfiltered) + filtered counts when URL filters are active.
         global_stats = {
             'total_documents': db.session.query(AIDocument).count(),
@@ -758,6 +799,7 @@ def document_library():
         return render_template(
             "admin/ai/documents.html",
             processing_doc_ids=processing_doc_ids,
+            active_jobs=active_jobs,
             stats=stats,
             file_types=file_types,
             categories=categories,
@@ -778,6 +820,7 @@ def document_library():
         return render_template(
             "admin/ai/documents.html",
             processing_doc_ids=[],
+            active_jobs=[],
             stats=_get_default_doc_stats(),
             file_types=[],
             categories=[],
@@ -1077,13 +1120,8 @@ def bulk_reprocess_documents():
 
         db.session.commit()
 
-        # Kick off background job runner
-        t = threading.Thread(
-            target=_run_bulk_reprocess_job,
-            args=(current_app._get_current_object(), job_id),
-            daemon=True,
-        )
-        t.start()
+        # Kick off background job runner (survives browser close; orphan-resumable).
+        start_ai_job_thread(current_app._get_current_object(), job_id, _run_bulk_reprocess_job)
 
         return json_accepted(
             success=True,
@@ -1103,6 +1141,8 @@ def bulk_reprocess_status(job_id: str):
     try:
         if not _check_ai_reprocess_job_tables_exist():
             return json_not_found("not_found")
+
+        ensure_ai_job_running(current_app._get_current_object(), job_id, _run_bulk_reprocess_job)
 
         from app.models import AIDocument, AIJob
 
@@ -1422,12 +1462,7 @@ def bulk_reprocess_metadata_documents():
 
         db.session.commit()
 
-        t = threading.Thread(
-            target=_run_bulk_metadata_reprocess_job,
-            args=(current_app._get_current_object(), job_id),
-            daemon=True,
-        )
-        t.start()
+        start_ai_job_thread(current_app._get_current_object(), job_id, _run_bulk_metadata_reprocess_job)
 
         return json_accepted(
             success=True,
@@ -1446,6 +1481,8 @@ def bulk_reprocess_metadata_status(job_id: str):
     try:
         if not _check_ai_reprocess_job_tables_exist():
             return json_not_found("not_found")
+
+        ensure_ai_job_running(current_app._get_current_object(), job_id, _run_bulk_metadata_reprocess_job)
 
         from app.models import AIJob
 
@@ -1607,12 +1644,7 @@ def import_system_bulk():
 
         db.session.commit()
 
-        t = threading.Thread(
-            target=_run_system_bulk_import_job,
-            args=(current_app._get_current_object(), job_id),
-            daemon=True,
-        )
-        t.start()
+        start_ai_job_thread(current_app._get_current_object(), job_id, _run_system_bulk_import_job)
 
         return json_accepted(
             success=True,
@@ -1632,6 +1664,8 @@ def import_system_bulk_status(job_id: str):
     try:
         if not _check_ai_reprocess_job_tables_exist():
             return json_not_found("not_found")
+
+        ensure_ai_job_running(current_app._get_current_object(), job_id, _run_system_bulk_import_job)
 
         from app.models import AIDocument, AIJob
 

@@ -10,33 +10,43 @@ description: >-
 **Base URL:** `https://databank.ifrc.org/api/v1`
 
 **Mode:** User runs curl (or browser) → pastes JSON → you analyze.  
-**Or:** use the **humanitarian-databank MCP connector** when enabled (live fetch).  
-Full schemas: [reference.md](reference.md).
+**Or:** use the **IFRC Network Databank** MCP connector when enabled (live fetch).  
+Full schemas: [reference.md](reference.md). Custom GPT parity: [`Backoffice/docs/public/custom-gpt/`](../../Backoffice/docs/public/custom-gpt/README.md).
 
 ---
 
 ## MCP connector (preferred when available)
 
-If the **humanitarian-databank** MCP tools are connected, call them directly —
-do not curl or web_fetch:
+If the **humanitarian-databank** / **IFRC Network Databank** MCP tools are connected,
+call them directly — do not curl or web_fetch:
 
-| Tool | Use for |
-|------|---------|
-| `databank_aggregate_global_trend` | **Global totals by year** (deduped; preferred) |
-| `databank_resolve_indicator` | Map "volunteers" / "staff" → indicator id |
-| `databank_search_indicators` | Find indicator ids by keyword (ranked, capped) |
-| `databank_get_indicator` | Full metadata for one id |
-| `databank_get_public_data` | One page of scoped public data (raw rows) |
-| `databank_get_public_data_all_pages` | Raw multi-page export (not deduped) |
+| Tool | Custom GPT | Use for |
+|------|------------|---------|
+| `databank_aggregate_global_trend` | `getGlobalTrend` | **Global totals by year** (deduped; preferred) |
+| `databank_resolve_indicator` | `resolveIndicator` | Map "volunteers" / "staff" → indicator id |
+| `databank_search_public_documents` | `searchPublicDocuments` | **UPR/FDRS public document chunks** (cite title + page) |
+| `databank_search_indicators` | `getIndicatorBank` | Find indicator ids by keyword (ranked, capped) |
+| `databank_get_indicator` | `getIndicatorById` | Full metadata for one id |
+| `databank_get_public_data` | `getPublicData` | One page of scoped public data (raw rows) |
+| `databank_get_public_data_all_pages` | — | Raw multi-page export (not deduped) |
 
-Example flow for volunteers by year:
+**FDRS numeric:** resolve → aggregate_global_trend or get_public_data (`template_id=21` for FDRS-only).  
+**UPR documents:** `databank_search_public_documents` — answer only from `chunks[].content`; use `full_coverage=true` for cross-country themes.
+
+Example — volunteers by year:
 
 ```text
 databank_aggregate_global_trend(query="volunteers")
 ```
 
-One call returns `by_period` with deduplicated global totals. Do **not** sum raw
-`databank_get_public_data*` rows — multiple submissions per country+period exist.
+Example — Unified Plan summary:
+
+```text
+databank_search_public_documents(query="Syria unified plan 2026 focus areas")
+```
+
+Do **not** sum raw `databank_get_public_data*` rows for worldwide totals.  
+Never set `include_dimensions=true` unless the user explicitly needs join tables.
 
 If MCP tools fail or are unavailable, use the paste workflow below.
 
@@ -71,6 +81,9 @@ Once JSON is pasted, analyze immediately — group, sum, chart, compare.
 
 | Path | Purpose |
 |------|---------|
+| `/public/global-trend` | Deduped global totals by period (preferred for trends) |
+| `/public/indicators/resolve` | Map metric name → indicator id |
+| `/public/documents/search` | Public document chunks (UPR plans/reports) |
 | `/indicator-bank` | Indicator catalogue + search |
 | `/indicator-bank/<id>` | One indicator's metadata |
 | `/data?...` | Submitted values (scoped filters required) |

@@ -1025,12 +1025,9 @@ def import_ifrc_api_documents_bulk():
 
         db.session.commit()
 
-        t = threading.Thread(
-            target=_run_ifrc_bulk_import_job,
-            args=(current_app._get_current_object(), job_id),
-            daemon=True,
-        )
-        t.start()
+        from app.services.ai.ai_job_runner import start_ai_job_thread
+
+        start_ai_job_thread(current_app._get_current_object(), job_id, _run_ifrc_bulk_import_job)
 
         return json_accepted(
             job_id=job_id,
@@ -1050,6 +1047,10 @@ def import_ifrc_api_documents_bulk():
 def import_ifrc_bulk_status(job_id: str):
     """Return job + item statuses for a bulk IFRC import."""
     try:
+        from app.services.ai.ai_job_runner import ensure_ai_job_running
+
+        ensure_ai_job_running(current_app._get_current_object(), job_id, _run_ifrc_bulk_import_job)
+
         job = AIJob.query.get(str(job_id))
         if not job:
             return json_not_found("not_found")

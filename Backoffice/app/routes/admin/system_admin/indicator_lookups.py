@@ -904,6 +904,7 @@ def edit_spef_lookup(sid: int):
             field = getattr(form, f"name_{lang}", None)
             if field is not None:
                 row.set_name_translation(lang, field.data or "")
+        flag_modified(row, "name_translations")
         db.session.add(row)
         db.session.flush()
         for ind in IndicatorBank.query.filter_by(indicator_spef_id=sid).all():

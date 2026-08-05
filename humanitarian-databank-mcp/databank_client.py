@@ -76,6 +76,82 @@ def get_indicator(indicator_id: int) -> Dict[str, Any]:
     return _get(f"/indicator-bank/{int(indicator_id)}")
 
 
+def get_public_global_trend(
+    *,
+    query: str = "",
+    indicator_bank_id: Optional[int] = None,
+    period_name: str = "",
+    max_pages: int = 20,
+) -> Dict[str, Any]:
+    """Compact deduped global totals via GET /public/global-trend."""
+    params: Dict[str, Any] = {"max_pages": max(1, min(int(max_pages), 20))}
+    if indicator_bank_id is not None:
+        params["indicator_bank_id"] = int(indicator_bank_id)
+    if query.strip():
+        params["query"] = query.strip()
+    if period_name.strip():
+        params["period_name"] = period_name.strip()
+    if indicator_bank_id is None and not query.strip():
+        raise DatabankAPIError("Provide indicator_bank_id or query for global trend.")
+    return _get("/public/global-trend", params)
+
+
+def resolve_public_indicator(
+    query: str,
+    *,
+    limit: int = 5,
+) -> Dict[str, Any]:
+    """Map natural-language metric to indicator id via GET /public/indicators/resolve."""
+    raw = (query or "").strip()
+    if not raw:
+        raise DatabankAPIError("query is required")
+    return _get(
+        "/public/indicators/resolve",
+        {"query": raw, "limit": max(1, min(int(limit), 20))},
+    )
+
+
+def search_public_documents(
+    query: str,
+    *,
+    full_coverage: bool = False,
+    page: int = 1,
+    per_page: int = 80,
+    latest_per_country: Optional[bool] = None,
+    top_k: int = 8,
+    min_score: float = 0.25,
+    country_name: str = "",
+    country_id: Optional[int] = None,
+    file_type: str = "",
+    search_mode: str = "hybrid",
+) -> Dict[str, Any]:
+    """Search public AI document chunks via GET /public/documents/search."""
+    raw = (query or "").strip()
+    if not raw:
+        raise DatabankAPIError("query is required")
+
+    params: Dict[str, Any] = {
+        "query": raw,
+        "full_coverage": "true" if full_coverage else "false",
+        "page": max(1, int(page)),
+        "per_page": max(1, min(int(per_page), 200)),
+        "top_k": max(1, min(int(top_k), 12)),
+        "min_score": min_score,
+        "search_mode": search_mode or "hybrid",
+    }
+    if latest_per_country is True:
+        params["latest_per_country"] = "true"
+    elif latest_per_country is False:
+        params["latest_per_country"] = "false"
+    if country_name.strip():
+        params["country_name"] = country_name.strip()
+    if country_id is not None:
+        params["country_id"] = int(country_id)
+    if file_type.strip():
+        params["file_type"] = file_type.strip()
+    return _get("/public/documents/search", params)
+
+
 def get_public_data_page(
     *,
     indicator_bank_id: Optional[int] = None,

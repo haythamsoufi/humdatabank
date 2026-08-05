@@ -535,7 +535,9 @@
 {% from "components/ag_grid_includes.html" import ag_grid_js %}
 {{ ag_grid_js() }}
 <script src="{{ static_url('js/core/floating-progress-banner.js') }}"></script>
+<script src="{{ static_url('js/admin/ai-documents-job-progress.js') }}"></script>
 <script type="application/json" id="ai-documents-processing-ids">{{ (processing_doc_ids or [])|tojson }}</script>
+<script type="application/json" id="ai-documents-active-jobs">{{ (active_jobs or [])|tojson }}</script>
 <script nonce="{{ csp_nonce() }}">
 window.aiDocumentsConfig = window.aiDocumentsConfig || {};
 window.aiDocumentsConfig.debug = {{ config.DEBUG | default(false) | tojson }};
@@ -543,10 +545,9 @@ window.aiDocumentsConfig.perPage = 50;
 window.aiDocumentsConfig.urls = {
   importSystemBulk: {{ url_for('ai_management.import_system_bulk')|tojson }},
   importSystemBulkStatus: {{ url_for('ai_management.import_system_bulk_status', job_id='__JOB__')|tojson }},
-  importSystemBulkCancel: {{ url_for('ai_management.import_system_bulk_cancel', job_id='__JOB__')|tojson }}
-};
-window.aiDocumentsConfig.urls = {
+  importSystemBulkCancel: {{ url_for('ai_management.import_system_bulk_cancel', job_id='__JOB__')|tojson }},
   documentsList: {{ url_for('ai_documents.list_documents')|tojson }},
+  activeJobs: {{ url_for('ai_management.ai_documents_active_jobs')|tojson }}
 };
 window.aiDocumentsConfig.t = {
   ai_import_eca697b5: {{ _('AI import')|tojson }},

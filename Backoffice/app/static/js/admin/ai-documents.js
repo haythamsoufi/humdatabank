@@ -27,6 +27,12 @@ const processingDocIdsFromPage = (function() {
     } catch (e) {
         return [];
     }
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAiDocsJobProgress);
+} else {
+    initAiDocsJobProgress();
+}
+
 })();
 
 // Helper function to get file icon HTML
@@ -91,606 +97,84 @@ function getCategoryLabel(value) {
     return opt ? opt.label : value.replace(/_/g, ' ');
 }
 
-// Processing status UI helpers
-const processingBannerUI = (window.FloatingProgressBanner && typeof window.FloatingProgressBanner.fromIds === 'function')
-    ? window.FloatingProgressBanner.fromIds({
-        bannerId: 'processingStatusBanner',
-        titleId: 'processingStatusTitle',
-        detailId: 'processingStatusDetail',
-        percentId: 'processingStatusPercent',
-        barId: 'processingStatusBar',
-        cancelWrapId: 'processingStatusCancelWrap',
-        cancelBtnId: 'processingStatusCancelBtn',
-    })
-    : null;
-const processingBanner = document.getElementById('processingStatusBanner');
-const processingTitle = document.getElementById('processingStatusTitle');
-const processingDetail = document.getElementById('processingStatusDetail');
-const processingPercent = document.getElementById('processingStatusPercent');
-const processingBar = document.getElementById('processingStatusBar');
-const processingCancelWrap = document.getElementById('processingStatusCancelWrap');
-const processingCancelBtn = document.getElementById('processingStatusCancelBtn');
-const processingPollers = new Map();
-
-const AI_DOCS_IMPORT_JOB_STORAGE_KEY = 'ai_docs_external_api_import_job';
-const LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY = 'ai_docs_ifrc_import_job';
-const AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY = 'ai_docs_system_import_job';
-const AI_DOCS_REPROCESS_JOB_STORAGE_KEY = 'ai_docs_bulk_reprocess_job';
-const AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY = 'ai_docs_bulk_reprocess_metadata_job';
-const AI_DOCS_DONE_STATUSES = ['completed', 'failed', 'not_found'];
-
-function _readJobStorage(key) {
-    try {
-        let raw = localStorage.getItem(key);
-        if (!raw) {
-            raw = sessionStorage.getItem(key);
-        }
-        return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-        return null;
-    }
-}
-
-function _writeJobStorage(key, data) {
-    try {
-        localStorage.setItem(key, JSON.stringify(data));
-        try { sessionStorage.removeItem(key); } catch (e2) { /* ignore */ }
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-function _clearJobStorage(key) {
-    try {
-        localStorage.removeItem(key);
-        sessionStorage.removeItem(key);
-    } catch (e) { /* ignore */ }
-}
-
-function getStoredImportJob() {
-    let data = _readJobStorage(AI_DOCS_IMPORT_JOB_STORAGE_KEY);
-    if (!data) {
-        data = _readJobStorage(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY);
-    }
-    return data;
-}
-
-function setStoredImportJob(data) {
-    const ok = _writeJobStorage(AI_DOCS_IMPORT_JOB_STORAGE_KEY, data);
-    try { sessionStorage.removeItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY); localStorage.removeItem(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY); } catch (e2) { /* ignore */ }
-    return ok;
-}
-
-function clearStoredImportJob() {
-    _clearJobStorage(AI_DOCS_IMPORT_JOB_STORAGE_KEY);
-    _clearJobStorage(LEGACY_AI_DOCS_IMPORT_JOB_STORAGE_KEY);
-}
-
-function getStoredSystemImportJob() {
-    return _readJobStorage(AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY);
-}
-
-function setStoredSystemImportJob(data) {
-    return _writeJobStorage(AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY, data);
-}
-
-function clearStoredSystemImportJob() {
-    _clearJobStorage(AI_DOCS_SYSTEM_IMPORT_JOB_STORAGE_KEY);
-}
-
-function normalizeStoredImportJob(data) {
-    if (!data || typeof data !== 'object') return null;
-    const jobId = (data.jobId || data.job_id || '').toString().trim();
-    if (!jobId) return null;
-    const total = Number(data.total) || 0;
-    return {
-        jobId: jobId,
-        total: total,
-        startedAt: data.startedAt || null,
-    };
-}
-
-function normalizeStoredSystemImportJob(data) {
-    return normalizeStoredImportJob(data);
-}
-
-function getStoredReprocessJob() {
-    return _readJobStorage(AI_DOCS_REPROCESS_JOB_STORAGE_KEY);
-}
-
-function setStoredReprocessJob(data) {
-    return _writeJobStorage(AI_DOCS_REPROCESS_JOB_STORAGE_KEY, data);
-}
-
-function clearStoredReprocessJob() {
-    _clearJobStorage(AI_DOCS_REPROCESS_JOB_STORAGE_KEY);
-}
-
-function normalizeStoredReprocessJob(data) {
-    if (!data || typeof data !== 'object') return null;
-    const jobId = (data.jobId || data.job_id || '').toString().trim();
-    if (!jobId) return null;
-    const total = Number(data.total) || 0;
-    return {
-        jobId: jobId,
-        total: total,
-        startedAt: data.startedAt || null,
-    };
-}
-
-function getStoredMetaReprocessJob() {
-    return _readJobStorage(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY);
-}
-
-function setStoredMetaReprocessJob(data) {
-    return _writeJobStorage(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY, data);
-}
-
-function clearStoredMetaReprocessJob() {
-    _clearJobStorage(AI_DOCS_META_REPROCESS_JOB_STORAGE_KEY);
-}
-
-function normalizeStoredMetaReprocessJob(data) {
-    if (!data || typeof data !== 'object') return null;
-    const jobId = (data.jobId || data.job_id || '').toString().trim();
-    if (!jobId) return null;
-    return { jobId: jobId, total: Number(data.total) || 0, startedAt: data.startedAt || null };
-}
-
-// Debug logs (kept lightweight; logs only on meaningful state changes)
-// SECURITY: Debug mode controlled by server-side configuration, defaults to false
+// Processing status — server-backed jobs via ai-documents-job-progress.js
+var jobProgress = window.AiDocsJobProgress;
 const AI_DOCS_DEBUG = !!(cfg.debug);
 function aiDocsLog() {
     if (!AI_DOCS_DEBUG) return;
     try {
-        // eslint-disable-next-line no-console
         window.__clientLog && window.__clientLog.apply(null, ['[AI Docs]'].concat(Array.from(arguments)));
-    } catch (e) {
-        // ignore
-    }
+    } catch (e) { /* ignore */ }
 }
 
+
+var processingCancelWrap = document.getElementById('processingStatusCancelWrap');
+
 function showProcessingBanner(title, detail, progress) {
-    if (processingBannerUI && processingBannerUI.exists && processingBannerUI.exists()) {
-        processingBannerUI.update({
-            title: title,
-            detail: detail,
-            progress: progress,
-            showPercent: true,
-            percentText: `${progress}%`,
-        });
-        return;
-    }
-    // Fallback (if helper failed to load)
-    if (!processingBanner) return;
-    processingBanner.classList.remove('hidden');
-    if (processingTitle) processingTitle.textContent = title;
-    if (processingDetail) processingDetail.textContent = detail;
-    if (processingPercent) processingPercent.textContent = `${progress}%`;
-    if (processingBar) processingBar.style.width = `${progress}%`;
+    if (jobProgress && jobProgress.setStandaloneMode) jobProgress.setStandaloneMode(true);
+    if (jobProgress && jobProgress.showBanner) jobProgress.showBanner(title, detail, progress);
 }
 
 function hideProcessingBanner() {
-    if (processingBannerUI && processingBannerUI.exists && processingBannerUI.exists()) {
-        processingBannerUI.hide();
-        return;
-    }
-    if (!processingBanner) return;
-    processingBanner.classList.add('hidden');
-    if (processingCancelWrap) processingCancelWrap.classList.add('hidden');
-}
-
-// External API bulk import job tracking (server-side job; survives page reload)
-let ifrcImportJobPollIntervalId = null;
-let ifrcImportJobId = null;
-
-// System-document bulk import job tracking (server-side job; survives page reload)
-let systemImportJobPollIntervalId = null;
-let systemImportJobId = null;
-
-// Bulk reprocess job tracking (server-side job; survives page reload)
-let bulkReprocessJobPollIntervalId = null;
-let bulkReprocessJobId = null;
-
-// Bulk metadata reprocess job tracking
-let bulkMetaReprocessJobPollIntervalId = null;
-let bulkMetaReprocessJobId = null;
-
-// Cancel button for bulk jobs (import, reprocess, or metadata reprocess)
-if (processingCancelBtn) {
-    processingCancelBtn.addEventListener('click', function() {
-        if (!ifrcImportJobId && !systemImportJobId && !bulkReprocessJobId && !bulkMetaReprocessJobId) {
-            return;
-        }
-        if (processingTitle) processingTitle.textContent = cfg.t.cancelling_ef5ba1f8;
-        if (processingCancelWrap) processingCancelWrap.classList.add('hidden');
-        (async function () {
-            try {
-                if (ifrcImportJobId) {
-                    await csrfFetch(`/api/ai/documents/ifrc-api/import-bulk/${encodeURIComponent(ifrcImportJobId)}/cancel`, {
-                        method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    });
-                } else if (systemImportJobId) {
-                    await csrfFetch(importSystemBulkUrl('cancel', systemImportJobId), {
-                        method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    });
-                } else if (bulkReprocessJobId) {
-                    await csrfFetch(`/admin/ai/documents/bulk-reprocess/${encodeURIComponent(bulkReprocessJobId)}/cancel`, {
-                        method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    });
-                } else if (bulkMetaReprocessJobId) {
-                    await csrfFetch(`/admin/ai/documents/bulk-reprocess-metadata/${encodeURIComponent(bulkMetaReprocessJobId)}/cancel`, {
-                        method: 'POST',
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    });
-                }
-            } catch (e) {
-                // ignore
-            } finally {
-                if (ifrcImportJobPollIntervalId) {
-                    clearInterval(ifrcImportJobPollIntervalId);
-                    ifrcImportJobPollIntervalId = null;
-                }
-                ifrcImportJobId = null;
-                window.aiDocsImportProgress = null;
-                clearStoredImportJob();
-
-                if (systemImportJobPollIntervalId) {
-                    clearInterval(systemImportJobPollIntervalId);
-                    systemImportJobPollIntervalId = null;
-                }
-                systemImportJobId = null;
-                clearStoredSystemImportJob();
-
-                if (bulkReprocessJobPollIntervalId) {
-                    clearInterval(bulkReprocessJobPollIntervalId);
-                    bulkReprocessJobPollIntervalId = null;
-                }
-                bulkReprocessJobId = null;
-                clearStoredReprocessJob();
-
-                if (bulkMetaReprocessJobPollIntervalId) {
-                    clearInterval(bulkMetaReprocessJobPollIntervalId);
-                    bulkMetaReprocessJobPollIntervalId = null;
-                }
-                bulkMetaReprocessJobId = null;
-                clearStoredMetaReprocessJob();
-
-                clearTrackedProcessing();
-            }
-        })();
-    });
-}
-
-// Track multiple documents and render a single pinned progress bar.
-// For 1 document: show real progress from the backend.
-// For N documents: progress = processedCount / totalCount (updates on each completed/failed doc).
-const trackedProcessingDocs = new Map(); // docId -> { status, stage, progress, error, updatedAt }
-let trackedProcessingHideTimer = null;
-let _lastRenderSummaryKey = '';
-
-function clampPercent(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return 0;
-    return Math.max(0, Math.min(100, Math.round(n)));
+    if (jobProgress && jobProgress.hideBanner) jobProgress.hideBanner();
 }
 
 function trackProcessingDoc(docId) {
-    if (docId === null || docId === undefined) return;
-    const id = Number(docId);
-    if (!Number.isFinite(id)) return;
-    if (!trackedProcessingDocs.has(id)) {
-        trackedProcessingDocs.set(id, {
-            status: 'pending',
-            stage: cfg.t.preparing_0862f67f,
-            progress: 0,
-            error: '',
-            updatedAt: Date.now(),
-            // Reprocess tracking to avoid stale "completed" responses right after reprocess is requested
-            reprocessRequestedAt: null,
-            seenNonCompletedSinceRequest: false
-        });
-        aiDocsLog('trackProcessingDoc', { id });
-    }
-}
-
-function removeTrackedProcessingDoc(docId) {
-    const id = Number(docId);
-    if (!Number.isFinite(id)) return;
-    if (trackedProcessingDocs.has(id)) {
-        trackedProcessingDocs.delete(id);
-        renderTrackedProcessingBar();
-    }
+    if (jobProgress && jobProgress.trackDoc) jobProgress.trackDoc(docId);
 }
 
 function updateTrackedProcessingDoc(docId, patch) {
-    const id = Number(docId);
-    if (!Number.isFinite(id)) return;
-    trackProcessingDoc(id);
-    const prev = trackedProcessingDocs.get(id) || {};
-    const next = Object.assign({}, prev, patch || {}, { updatedAt: Date.now() });
-    // Normalize progress
-    if (typeof next.progress === 'number') {
-        next.progress = clampPercent(next.progress);
-    }
-    trackedProcessingDocs.set(id, next);
-    const changed = (prev.status !== next.status) ||
-        (prev.stage !== next.stage) ||
-        (prev.progress !== next.progress) ||
-        (prev.error !== next.error);
-    if (changed) {
-        aiDocsLog('docState', { id, status: next.status, stage: next.stage, progress: next.progress, error: next.error });
-    }
-    renderTrackedProcessingBar();
+    if (jobProgress && jobProgress.updateDoc) jobProgress.updateDoc(docId, patch);
 }
 
 function clearTrackedProcessing() {
-    trackedProcessingDocs.clear();
-    if (trackedProcessingHideTimer) {
-        clearTimeout(trackedProcessingHideTimer);
-        trackedProcessingHideTimer = null;
-    }
-    hideProcessingBanner();
-}
-
-function renderTrackedProcessingBar() {
-    if (!processingBanner) return;
-
-    const entries = Array.from(trackedProcessingDocs.entries()).map(function(pair) {
-        return { id: pair[0], data: pair[1] || {} };
-    });
-
-    if (!entries.length) {
-        // IMPORTANT: During external API import, we may render before the first doc is tracked
-        // (e.g. while PDFs are still downloading and no ai_document_id exists yet).
-        // Do not hide the banner (and cancel) in that moment.
-        const importInProgress = window.aiDocsImportProgress &&
-            (window.aiDocsImportProgress.total || 0) > 0 &&
-            (window.aiDocsImportProgress.done || 0) < (window.aiDocsImportProgress.total || 0);
-        if (importInProgress) {
-            const total = window.aiDocsImportProgress.total || 0;
-            const doneCount = window.aiDocsImportProgress.done || 0;
-            const sCounts = window.aiDocsImportProgress.statusCounts || {};
-            // "downloading" covers items actively fetching; "processing" covers items
-            // whose file was downloaded and the document record created but full
-            // processing (extraction + embedding) hasn't completed yet.
-            const activeDownloads = (sCounts.downloading || 0) + (sCounts.processing || 0);
-            let detail;
-            if (activeDownloads > 0) {
-                detail = `${doneCount}/${total} \u2013 ` + cfg.t.downloading_ae314963 + ` ${activeDownloads}...`;
-            } else if (doneCount > 0) {
-                detail = `${doneCount}/${total} ` + cfg.t.starting_8c6ce9f8;
-            } else {
-                detail = total > 1 ? `0/${total} ` + cfg.t.starting_8c6ce9f8 : cfg.t.starting_import_b06c80dc + '...';
-            }
-            const inFlight = activeDownloads;
-            const effectiveDone = doneCount + (inFlight > 0 ? Math.min(inFlight, Math.max(0, total - doneCount)) * 0.5 : 0);
-            const overallPct = total > 0 ? clampPercent((effectiveDone / total) * 100) : 0;
-            showProcessingBanner(cfg.t.importing_documents_8a49fe5a, detail, overallPct);
-            if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                processingBannerUI.setCancelVisible(true);
-            } else if (processingCancelWrap) {
-                processingCancelWrap.classList.remove('hidden');
-            }
-            return;
-        }
-        hideProcessingBanner();
-        return;
-    }
-
-    const doneStatuses = new Set(AI_DOCS_DONE_STATUSES);
-    let total = entries.length;
-    let done = entries.filter(function(x) { return doneStatuses.has(x.data.status); }).length;
-    const failed = entries.filter(function(x) { return x.data.status === 'failed'; }).length;
-    // Multi-doc import: use override so banner shows (done/total) e.g. (2/4) instead of (1/1)
-    if (window.aiDocsImportProgress && window.aiDocsImportProgress.total > 0) {
-        total = window.aiDocsImportProgress.total;
-        done = Math.min(window.aiDocsImportProgress.done || 0, total);
-    }
-
-    // Pick a "current" document to show stage/progress details
-    const sortedByUpdate = entries.slice().sort(function(a, b) {
-        return (b.data.updatedAt || 0) - (a.data.updatedAt || 0);
-    });
-    const inProgress = sortedByUpdate.find(function(x) { return !doneStatuses.has(x.data.status); });
-    const focus = inProgress || sortedByUpdate[0];
-
-    // Progress semantics:
-    // - Single doc: percent reflects that doc's actual backend progress (0-100).
-    // - Multiple docs: percent reflects OVERALL completion based on done/total (updates when each doc completes/fails).
-    //   Per-doc stage progress is still shown in the detail line for the "current" doc.
-    const percentOverall = clampPercent(total > 0 ? (done / total) * 100 : 0);
-    const perDocProgress = entries.map(function(x) {
-        const st = x.data && x.data.status;
-        if (doneStatuses.has(st)) return 100;
-        return clampPercent(x.data && typeof x.data.progress === 'number' ? x.data.progress : 0);
-    });
-    const sumProgress = perDocProgress.reduce(function(acc, v) { return acc + v; }, 0);
-    const percentAverage = clampPercent(total > 0 ? (sumProgress / total) : 0);
-
-    let title;
-    let detail;
-
-    if (done >= total) {
-        title = (failed > 0) ? cfg.t.processing_finished_1b8f5c57 : cfg.t.processing_complete_930a1b79;
-        detail = (failed > 0)
-            ? (cfg.t.some_documents_failed_aaa3128a + ` (${failed}/${total})`)
-            : cfg.t.done_f5940523;
-    } else {
-        // Show "current/total": count completed + 1 if one is in progress, so we don't show "0/1" while a doc is processing
-        const displayCurrent = Math.min(done + (inProgress ? 1 : 0), total);
-        title = (window.aiDocsImportProgress ? cfg.t.importing_documents_8a49fe5a : cfg.t.processing_documents_4c764ed2) + ` (${displayCurrent}/${total})`;
-        if (focus && focus.data) {
-            const focusId = focus.id;
-            const focusStage = focus.data.stage || cfg.t.preparing_0862f67f;
-            const focusPct = clampPercent(typeof focus.data.progress === 'number' ? focus.data.progress : 0);
-            detail = `#${focusId} • ${cfg.t.stage_5f483ab8} ${focusStage} • ${focusPct}%`;
-        } else {
-            detail = cfg.t.working_9c8a77ee;
-        }
-    }
-
-    // Cancel any pending auto-hide while work is ongoing
-    if (done < total && trackedProcessingHideTimer) {
-        clearTimeout(trackedProcessingHideTimer);
-        trackedProcessingHideTimer = null;
-    }
-
-    // Choose which percentage to display
-    const useImportAverage = !!(window.aiDocsImportProgress && window.aiDocsImportProgress.total > 0 && total > 1);
-    const percentToShow = (total <= 1)
-        ? clampPercent((focus && focus.data && typeof focus.data.progress === 'number') ? focus.data.progress : 0)
-        : (useImportAverage ? percentAverage : percentOverall);
-    showProcessingBanner(title, detail, percentToShow);
-
-    const summaryKey = [entries.length, done, failed, title, detail, percentToShow].join('|');
-    if (summaryKey !== _lastRenderSummaryKey) {
-        _lastRenderSummaryKey = summaryKey;
-        aiDocsLog('progress', {
-            total,
-            done,
-            failed,
-            percentShown: percentToShow,
-            percentOverall,
-            percentAverage,
-            sumProgress,
-            title,
-            detail
-        });
-    }
-
-    // Auto-hide only when EVERYTHING is done (and not in the middle of a multi-doc import)
-    const importInProgress = window.aiDocsImportProgress && (window.aiDocsImportProgress.done || 0) < (window.aiDocsImportProgress.total || 0);
-    if (done >= total && !trackedProcessingHideTimer && !importInProgress) {
-        trackedProcessingHideTimer = setTimeout(function() {
-            trackedProcessingHideTimer = null;
-            window.aiDocsImportProgress = null;
-            clearTrackedProcessing();
-        }, 1500);
-    }
-}
-
-async function fetchDocumentStatus(docId) {
-    // Avoid any intermediary/browser caching so the grid and progress bar update reliably.
-    const cacheBust = Date.now();
-    const response = await ((window.getFetch && window.getFetch()) || fetch)(`/admin/ai/documents/${docId}/status?_=${cacheBust}`, {
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    if (response.status === 404) {
-        return { success: false, error: 'not_found', document: { id: docId }, stage: 'Not Found', progress: 100 };
-    }
-    // Best-effort JSON parsing (avoid throwing on HTML error pages)
-    try {
-        return await response.json();
-    } catch (e) {
-        return { success: false, error: 'invalid_response', document: { id: docId }, stage: 'Error', progress: 0 };
-    }
+    if (jobProgress && jobProgress.clearAll) jobProgress.clearAll();
 }
 
 function startProcessingPoll(docId) {
-    const pollKey = String(docId);
-    if (processingPollers.has(pollKey)) return;
-    trackProcessingDoc(docId);
-    renderTrackedProcessingBar();
-    aiDocsLog('startProcessingPoll', { docId: pollKey });
-
-    const poll = async () => {
-        try {
-            const data = await fetchDocumentStatus(pollKey);
-            if (!data.success) {
-                if (data.error === 'not_found') {
-                    stopProcessingPoll(pollKey);
-                    updateTrackedProcessingDoc(docId, { status: 'not_found', stage: 'Not Found', progress: 100 });
-                    // Remove stale row from grid (best-effort)
-                    removeDocumentFromGrid(docId);
-                }
-                // Keep the pinned bar responsive even on transient errors
-                if (data.error && data.error !== 'not_found') {
-                    updateTrackedProcessingDoc(docId, {
-                        status: 'processing',
-                        stage: data.stage || 'Error',
-                        progress: typeof data.progress === 'number' ? data.progress : 0,
-                        error: data.error
-                    });
-                }
-                return;
-            }
-
-            const status = data.document.processing_status;
-            const stage = data.stage || 'Processing';
-            const progress = typeof data.progress === 'number' ? data.progress : 0;
-
-            if (status === 'processing' || status === 'pending') {
-                updateTrackedProcessingDoc(docId, {
-                    status: status,
-                    stage: stage,
-                    progress: progress,
-                    error: data.document.processing_error || '',
-                    seenNonCompletedSinceRequest: true
-                });
-                updateDocumentInGrid(docId, {
-                    processing_status: status,
-                    processing_error: data.document.processing_error || '',
-                    total_chunks: data.document.total_chunks || 0
-                });
-            } else if (status === 'completed') {
-                // Guard against stale "completed" immediately after reprocess is requested.
-                const tracked = trackedProcessingDocs.get(Number(docId));
-                const requestedAt = tracked && tracked.reprocessRequestedAt ? tracked.reprocessRequestedAt : null;
-                const seenNonCompleted = tracked && tracked.seenNonCompletedSinceRequest;
-                const withinWarmup = requestedAt && !seenNonCompleted && (Date.now() - requestedAt) < 8000;
-                if (withinWarmup) {
-                    updateTrackedProcessingDoc(docId, {
-                        status: 'pending',
-                        stage: 'Starting...',
-                        progress: 0
-                    });
-                    // Keep polling until backend flips to pending/processing (or timeout passes)
-                } else {
-                    updateTrackedProcessingDoc(docId, { status: 'completed', stage: 'Done', progress: 100, error: '' });
-                    updateDocumentInGrid(docId, {
-                        processing_status: 'completed',
-                        processing_error: '',
-                        total_chunks: data.document.total_chunks || 0
-                    });
-                    stopProcessingPoll(pollKey);
-                    void refreshAiDocumentGridRowFromApi(docId);
-                }
-            } else if (status === 'failed') {
-                const errorMsg = data.document.processing_error || cfg.t.processing_failed_ad62fd55;
-                updateTrackedProcessingDoc(docId, { status: 'failed', stage: 'Failed', progress: 100, error: errorMsg });
-                updateDocumentInGrid(docId, {
-                    processing_status: 'failed',
-                    processing_error: data.document.processing_error || errorMsg,
-                    total_chunks: data.document.total_chunks || 0
-                });
-                stopProcessingPoll(pollKey);
-                void refreshAiDocumentGridRowFromApi(docId);
-            }
-        } catch (error) {
-            console.error('Status polling error:', error);
-        }
-    };
-
-    poll();
-    const intervalId = setInterval(poll, 2000);
-    processingPollers.set(pollKey, intervalId);
+    if (jobProgress && jobProgress.startDocPoll) jobProgress.startDocPoll(docId);
 }
 
 function stopProcessingPoll(docId) {
-    const pollKey = String(docId);
-    const intervalId = processingPollers.get(pollKey);
-    if (intervalId) {
-        clearInterval(intervalId);
-        processingPollers.delete(pollKey);
-        aiDocsLog('stopProcessingPoll', { docId: pollKey });
-    }
+    if (jobProgress && jobProgress.stopDocPoll) jobProgress.stopDocPoll(docId);
+}
+
+function startIfrcImportJobPolling(jobId, total) {
+    if (jobProgress && jobProgress.startJob) jobProgress.startJob('ifrc_api_bulk', jobId, total || 0);
+}
+
+function startSystemImportJobPolling(jobId, total) {
+    if (jobProgress && jobProgress.startJob) jobProgress.startJob('docs.bulk_import_system', jobId, total || 0);
+}
+
+function startBulkReprocessJobPolling(jobId, total) {
+    if (jobProgress && jobProgress.startJob) jobProgress.startJob('docs.bulk_reprocess', jobId, total || 0);
+}
+
+function startBulkMetaReprocessJobPolling(jobId, total) {
+    if (jobProgress && jobProgress.startJob) jobProgress.startJob('docs.bulk_reprocess_metadata', jobId, total || 0);
+}
+
+function initAiDocsJobProgress() {
+    if (!jobProgress || typeof jobProgress.init !== 'function') return;
+    jobProgress.init({
+        cfg: cfg,
+        csrfFetchFn: (typeof csrfFetch === 'function') ? csrfFetch : null,
+        fetchFn: window.apiFetch || null,
+        hooks: {
+            onDocGridPatch: function (docId, patch) { updateDocumentInGrid(docId, patch); },
+            onDocRefresh: function (docId) { void refreshAiDocumentGridRowFromApi(docId); },
+            onDocRemove: function (docId) { removeDocumentFromGrid(docId); },
+            onJobComplete: function (jobType) {
+                setTimeout(function () {
+                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
+                    if (jobType === 'ifrc_api_bulk') {
+                        try { loadIfrcApiDocuments(); } catch (e2) { /* ignore */ }
+                    }
+                }, 800);
+            },
+        },
+    });
 }
 
 function getRowNodeByDocId(docId) {
@@ -1546,9 +1030,8 @@ function initializeDocumentsBulkActions() {
                 if (!result.success || !result.job_id) {
                     throw new Error(result.error || 'Failed to start bulk reprocess');
                 }
-                setStoredReprocessJob({ jobId: result.job_id, total: result.total || ids.length, startedAt: Date.now() });
                 if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
-                startBulkReprocessJobPolling(result.job_id);
+                startBulkReprocessJobPolling(result.job_id, result.total || ids.length);
             } catch (error) {
                 aiDocsLog('bulkReprocessSelected:startError', { error: error && (error.message || String(error)) });
                 ids.forEach(function(id) {
@@ -1599,8 +1082,7 @@ function initializeDocumentsBulkActions() {
                 if (!result.success || !result.job_id) {
                     throw new Error(result.error || 'Failed to start metadata reprocess');
                 }
-                setStoredMetaReprocessJob({ jobId: result.job_id, total: result.total || ids.length, startedAt: Date.now() });
-                startBulkMetaReprocessJobPolling(result.job_id);
+                startBulkMetaReprocessJobPolling(result.job_id, result.total || ids.length);
             } catch (error) {
                 hideProcessingBanner();
                 if (processingCancelWrap) processingCancelWrap.classList.add('hidden');
@@ -1792,11 +1274,6 @@ if (document.readyState === 'loading') {
     initializeDocumentsBulkActions();
 }
 
-// Start polling for documents already processing
-processingDocIdsFromPage.forEach(function(docId) {
-    startProcessingPoll(docId);
-});
-
 // Upload form handling
 function initializeUploadForm() {
     const dropZone = document.getElementById('dropZone');
@@ -1903,7 +1380,7 @@ function initializeUploadForm() {
                 startProcessingPoll(docId);
                 await new Promise(function (resolve) {
                     function check() {
-                        const t = trackedProcessingDocs.get(Number(docId));
+                        const t = (jobProgress && jobProgress.getDocState ? jobProgress.getDocState(docId) : null);
                         if (t && (t.status === 'completed' || t.status === 'failed' || t.status === 'not_found')) {
                             resolve();
                         } else {
@@ -1912,7 +1389,7 @@ function initializeUploadForm() {
                     }
                     check();
                 });
-                const t = trackedProcessingDocs.get(Number(docId));
+                const t = (jobProgress && jobProgress.getDocState ? jobProgress.getDocState(docId) : null);
                 stopProcessingPoll(docId);
                 if (t && t.status === 'completed') {
                     showProcessingBanner(cfg.t.upload_complete_f79598ab, cfg.t.done_f92965e2, 100);
@@ -3522,391 +2999,6 @@ function updateIfrcSelectedCount() {
     updateIfrcSelectedSummary();
 }
 
-async function fetchIfrcImportJobStatus(jobId) {
-    const cacheBust = Date.now();
-    return window.apiFetch(`/api/ai/documents/ifrc-api/import-bulk/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin'
-    });
-}
-
-function stopIfrcImportJobPolling() {
-    if (ifrcImportJobPollIntervalId) {
-        clearInterval(ifrcImportJobPollIntervalId);
-        ifrcImportJobPollIntervalId = null;
-    }
-}
-
-function startIfrcImportJobPolling(jobId) {
-    if (!jobId) return;
-    ifrcImportJobId = jobId;
-    stopIfrcImportJobPolling();
-
-    const poll = async () => {
-        try {
-            const data = await fetchIfrcImportJobStatus(jobId);
-            if (!data || !data.success || !data.job) {
-                // Bad or unexpected response — still re-render so the banner reflects
-                // whatever aiDocsImportProgress was last set to (keeps it live).
-                renderTrackedProcessingBar();
-                return;
-            }
-
-            const job = data.job;
-            const total = Number(job.total_items) || 0;
-            const counts = (job.counts || {});
-            const done = (Number(counts.completed) || 0) + (Number(counts.failed) || 0) + (Number(counts.cancelled) || 0);
-
-            // Start per-document polling as soon as each ai_document_id exists.
-            const items = Array.isArray(data.items) ? data.items : [];
-
-            // Compute per-status counts so the banner can show meaningful progress
-            // during the download phase (before any ai_document_id is assigned).
-            const jobItemStatusCounts = items.reduce(function(acc, it) {
-                const s = it.import_status || 'queued';
-                acc[s] = (acc[s] || 0) + 1;
-                return acc;
-            }, {});
-
-            window.aiDocsImportProgress = { total: total, done: Math.min(done, total), statusCounts: jobItemStatusCounts };
-            if (job.status === 'running') {
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(true);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.remove('hidden');
-                }
-            }
-            items.forEach(function (it) {
-                const docId = it && it.ai_document_id ? Number(it.ai_document_id) : null;
-                if (!docId || !Number.isFinite(docId)) return;
-                // Ensure we track it so banner doesn't flicker when grid isn't updated yet.
-                const existing = trackedProcessingDocs.get(Number(docId));
-                if (!existing) {
-                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
-                }
-                startProcessingPoll(docId);
-            });
-            // Re-render banner summary even if no docs exist yet.
-            renderTrackedProcessingBar();
-
-            const terminalJobStatuses = new Set(['completed', 'failed', 'cancelled']);
-            if (terminalJobStatuses.has(String(job.status || ''))) {
-                stopIfrcImportJobPolling();
-                clearStoredImportJob();
-                ifrcImportJobId = null;
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(false);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.add('hidden');
-                }
-                showProcessingBanner(
-                    job.status === 'cancelled' ? cfg.t.import_cancelled_2a8b4482 : cfg.t.import_complete_a218495a,
-                    job.status === 'failed' ? cfg.t.some_documents_failed_2221bc0e : cfg.t.done_f92965e2,
-                    100
-                );
-                setTimeout(function () { hideProcessingBanner(); }, 2500);
-                // Refresh grids/lists once shortly after completion so user sees new docs.
-                setTimeout(function () {
-                    try { loadIfrcApiDocuments(); } catch (e) { /* ignore */ }
-                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
-                }, 800);
-            }
-        } catch (e) {
-            // Keep banner visible but don't spam errors; retry on next tick.
-            aiDocsLog('ifrcImportJobPollError', String(e && e.message ? e.message : e));
-            // Still re-render so the banner stays live even on transient network errors.
-            renderTrackedProcessingBar();
-        }
-    };
-
-    poll();
-    ifrcImportJobPollIntervalId = setInterval(poll, 2000);
-}
-
-function resumeIfrcImportJobIfAny() {
-    const stored = normalizeStoredImportJob(getStoredImportJob());
-    if (!stored || !stored.jobId) return;
-    const total = Number(stored.total) || 0;
-    window.aiDocsImportProgress = { total: total, done: 0 };
-    showProcessingBanner(cfg.t.importing_documents_8a49fe5a, cfg.t.resuming_09136a9d, 0);
-    if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
-    startIfrcImportJobPolling(stored.jobId);
-}
-
-async function fetchSystemImportJobStatus(jobId) {
-    const cacheBust = Date.now();
-    return window.apiFetch(importSystemBulkUrl('status', jobId) + '?_=' + cacheBust, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-        cache: 'no-store'
-    });
-}
-
-function stopSystemImportJobPolling() {
-    if (systemImportJobPollIntervalId) {
-        clearInterval(systemImportJobPollIntervalId);
-        systemImportJobPollIntervalId = null;
-    }
-}
-
-function startSystemImportJobPolling(jobId) {
-    if (!jobId) return;
-    systemImportJobId = jobId;
-    stopSystemImportJobPolling();
-
-    const poll = async () => {
-        try {
-            const data = await fetchSystemImportJobStatus(jobId);
-            if (!data || !data.success || !data.job) {
-                renderTrackedProcessingBar();
-                return;
-            }
-
-            const job = data.job;
-            const total = Number(job.total_items) || 0;
-            const counts = (job.counts || {});
-            const done = (Number(counts.completed) || 0) + (Number(counts.failed) || 0) + (Number(counts.cancelled) || 0);
-
-            const items = Array.isArray(data.items) ? data.items : [];
-            const jobItemStatusCounts = items.reduce(function(acc, it) {
-                const s = it.import_status || 'queued';
-                acc[s] = (acc[s] || 0) + 1;
-                return acc;
-            }, {});
-
-            window.aiDocsImportProgress = { total: total, done: Math.min(done, total), statusCounts: jobItemStatusCounts };
-            if (job.status === 'running') {
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(true);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.remove('hidden');
-                }
-            }
-            items.forEach(function (it) {
-                const docId = it && it.ai_document_id ? Number(it.ai_document_id) : null;
-                if (!docId || !Number.isFinite(docId)) return;
-                const existing = trackedProcessingDocs.get(Number(docId));
-                if (!existing) {
-                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
-                }
-                startProcessingPoll(docId);
-            });
-            renderTrackedProcessingBar();
-
-            const terminalJobStatuses = new Set(['completed', 'failed', 'cancelled']);
-            if (terminalJobStatuses.has(String(job.status || ''))) {
-                stopSystemImportJobPolling();
-                clearStoredSystemImportJob();
-                systemImportJobId = null;
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(false);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.add('hidden');
-                }
-                showProcessingBanner(
-                    job.status === 'cancelled' ? cfg.t.import_cancelled_2a8b4482 : cfg.t.import_complete_a218495a,
-                    job.status === 'failed' ? cfg.t.some_documents_failed_2221bc0e : cfg.t.done_f92965e2,
-                    100
-                );
-                setTimeout(function () { hideProcessingBanner(); }, 2500);
-                setTimeout(function () {
-                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
-                }, 1500);
-            }
-        } catch (e) {
-            aiDocsLog('systemImportJobPollError', String(e && e.message ? e.message : e));
-            renderTrackedProcessingBar();
-        }
-    };
-
-    poll();
-    systemImportJobPollIntervalId = setInterval(poll, 2000);
-}
-
-function resumeSystemImportJobIfAny() {
-    const stored = normalizeStoredSystemImportJob(getStoredSystemImportJob());
-    if (!stored || !stored.jobId) return;
-    const total = Number(stored.total) || 0;
-    window.aiDocsImportProgress = { total: total, done: 0 };
-    showProcessingBanner(cfg.t.importing_documents_8a49fe5a, cfg.t.resuming_09136a9d, 0);
-    if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
-    startSystemImportJobPolling(stored.jobId);
-}
-
-async function fetchBulkReprocessJobStatus(jobId) {
-    const cacheBust = Date.now();
-    return window.apiFetch(`/admin/ai/documents/bulk-reprocess/${encodeURIComponent(jobId)}/status?_=${cacheBust}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'same-origin',
-        cache: 'no-store'
-    });
-}
-
-function stopBulkReprocessJobPolling() {
-    if (bulkReprocessJobPollIntervalId) {
-        clearInterval(bulkReprocessJobPollIntervalId);
-        bulkReprocessJobPollIntervalId = null;
-    }
-}
-
-function startBulkReprocessJobPolling(jobId) {
-    if (!jobId) return;
-    bulkReprocessJobId = jobId;
-    stopBulkReprocessJobPolling();
-
-    const poll = async () => {
-        try {
-            const data = await fetchBulkReprocessJobStatus(jobId);
-            if (!data || !data.success || !data.job) return;
-
-            const job = data.job;
-            const total = Number(job.total_items) || 0;
-            const counts = (job.counts || {});
-            const done = (Number(counts.completed) || 0) + (Number(counts.failed) || 0) + (Number(counts.cancelled) || 0);
-
-            if (job.status === 'running') {
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(true);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.remove('hidden');
-                }
-            }
-
-            const items = Array.isArray(data.items) ? data.items : [];
-            items.forEach(function (it) {
-                const docId = it && it.ai_document_id ? Number(it.ai_document_id) : null;
-                if (!docId || !Number.isFinite(docId)) return;
-                const existing = trackedProcessingDocs.get(Number(docId));
-                if (!existing) {
-                    updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
-                }
-                startProcessingPoll(docId);
-            });
-            renderTrackedProcessingBar();
-
-            const terminalJobStatuses = new Set(['completed', 'failed', 'cancelled']);
-            if (terminalJobStatuses.has(String(job.status || ''))) {
-                stopBulkReprocessJobPolling();
-                clearStoredReprocessJob();
-                bulkReprocessJobId = null;
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(false);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.add('hidden');
-                }
-                showProcessingBanner(
-                    job.status === 'cancelled' ? cfg.t.reprocess_cancelled_97d2acd3 : cfg.t.reprocess_complete_f1001d0e,
-                    (Number(counts.failed) || 0) > 0 ? cfg.t.some_documents_failed_2221bc0e : cfg.t.done_f92965e2,
-                    100
-                );
-                setTimeout(function () { hideProcessingBanner(); }, 2500);
-                setTimeout(function () {
-                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
-                }, 800);
-            } else {
-                // Let renderTrackedProcessingBar() own the banner when we have per-doc state (avoids overwriting with "0/1")
-                if (trackedProcessingDocs.size === 0) {
-                    const pct = total > 0 ? Math.round(Math.min(100, (done / total) * 100)) : 0;
-                    showProcessingBanner(cfg.t.reprocessing_documents_d4993939, `${done}/${total}`, pct);
-                }
-            }
-        } catch (e) {
-            aiDocsLog('bulkReprocessJobPollError', String(e && e.message ? e.message : e));
-        }
-    };
-
-    poll();
-    bulkReprocessJobPollIntervalId = setInterval(poll, 2000);
-}
-
-function resumeBulkReprocessJobIfAny() {
-    const stored = normalizeStoredReprocessJob(getStoredReprocessJob());
-    if (!stored || !stored.jobId) return;
-    showProcessingBanner(cfg.t.reprocessing_documents_d4993939, cfg.t.resuming_09136a9d, 0);
-    if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
-    startBulkReprocessJobPolling(stored.jobId);
-}
-
-function stopBulkMetaReprocessJobPolling() {
-    if (bulkMetaReprocessJobPollIntervalId) {
-        clearInterval(bulkMetaReprocessJobPollIntervalId);
-        bulkMetaReprocessJobPollIntervalId = null;
-    }
-}
-
-async function fetchBulkMetaReprocessJobStatus(jobId) {
-    const response = await csrfFetch(`/admin/ai/documents/bulk-reprocess-metadata/${encodeURIComponent(jobId)}/status`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    });
-    return response.json();
-}
-
-function startBulkMetaReprocessJobPolling(jobId) {
-    if (!jobId) return;
-    bulkMetaReprocessJobId = jobId;
-    stopBulkMetaReprocessJobPolling();
-
-    const poll = async () => {
-        try {
-            const data = await fetchBulkMetaReprocessJobStatus(jobId);
-            if (!data || !data.success || !data.job) return;
-
-            const job = data.job;
-            const total = Number(job.total_items) || 0;
-            const counts = job.counts || {};
-            const done = (Number(counts.completed) || 0) + (Number(counts.failed) || 0) + (Number(counts.cancelled) || 0);
-            const pct = total > 0 ? Math.round(Math.min(100, (done / total) * 100)) : 0;
-
-            if (job.status === 'running') {
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(true);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.remove('hidden');
-                }
-            }
-
-            const terminalJobStatuses = new Set(['completed', 'failed', 'cancelled']);
-            if (terminalJobStatuses.has(String(job.status || ''))) {
-                stopBulkMetaReprocessJobPolling();
-                clearStoredMetaReprocessJob();
-                bulkMetaReprocessJobId = null;
-                if (processingBannerUI && processingBannerUI.setCancelVisible) {
-                    processingBannerUI.setCancelVisible(false);
-                } else if (processingCancelWrap) {
-                    processingCancelWrap.classList.add('hidden');
-                }
-                const titleText = job.status === 'cancelled'
-                    ? cfg.t.metadata_reprocess_cancelled_3e89b850
-                    : cfg.t.metadata_reprocess_complete_87ff8292;
-                const detailText = (Number(counts.failed) || 0) > 0
-                    ? done + '/' + cfg.t.total_fbb44b44 + ' (' + (Number(counts.failed) || 0) + ' ' + cfg.t.failed_26934eb3 + ')'
-                    : done + '/' + cfg.t.total_fbb44b44;
-                showProcessingBanner(titleText, detailText.replace(cfg.t.total_fbb44b44, String(total)), 100);
-                setTimeout(function() { hideProcessingBanner(); }, 2500);
-                // Reload grid so updated metadata columns are visible
-                setTimeout(function() {
-                    try { reloadDocumentsGrid(); } catch (e) { /* ignore */ }
-                }, 800);
-            } else {
-                showProcessingBanner(cfg.t.reprocessing_metadata_e6c7cf5c, `${done}/${total}`, pct);
-            }
-        } catch (e) {
-            aiDocsLog('bulkMetaReprocessJobPollError', String(e && e.message ? e.message : e));
-        }
-    };
-
-    poll();
-    bulkMetaReprocessJobPollIntervalId = setInterval(poll, 2000);
-}
-
-function resumeBulkMetaReprocessJobIfAny() {
-    const stored = normalizeStoredMetaReprocessJob(getStoredMetaReprocessJob());
-    if (!stored || !stored.jobId) return;
-    showProcessingBanner(cfg.t.reprocessing_metadata_e6c7cf5c, cfg.t.resuming_09136a9d, 0);
-    if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
-    startBulkMetaReprocessJobPolling(stored.jobId);
-}
-
 // Import selected documents from external API (server-side bulk job; parallel)
 async function importIfrcDocuments() {
     const importBtn = document.getElementById('ifrcImportSelectedBtn');
@@ -3945,13 +3037,7 @@ async function importIfrcDocuments() {
     importBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>' + escapeHtml(cfg.t.importing_fa072aec);
 
     const total = items.length;
-    window.aiDocsImportProgress = { total: total, done: 0 };
-    showProcessingBanner(
-        cfg.t.importing_documents_8a49fe5a,
-        total > 1 ? `0/${total} ${cfg.t.starting_8c6ce9f8}` : cfg.t.starting_import_b06c80dc + '...',
-        0
-    );
-    if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
+    if (jobProgress && jobProgress.setStandaloneMode) jobProgress.setStandaloneMode(false);
 
     try {
         // Encode the payload as base64 so WAF content-inspection rules do not
@@ -3972,17 +3058,14 @@ async function importIfrcDocuments() {
             throw new Error((result && result.error) ? result.error : 'Failed to start bulk import');
         }
 
-        // Persist job ID so reload resumes.
-        setStoredImportJob({ jobId: result.job_id, total: total, startedAt: Date.now() });
-
-        // Close modal and start polling job status.
+        // Close modal and start server-backed job polling.
         const uploadModal = document.getElementById('uploadImportModal');
         if (uploadModal) {
             uploadModal.classList.add('hidden');
             document.body.style.overflow = '';
         }
 
-        startIfrcImportJobPolling(result.job_id);
+        startIfrcImportJobPolling(result.job_id, total);
 
         // Reset UI selection
         selectedIfrcDocuments.clear();
@@ -4007,10 +3090,6 @@ function initImportJobs() {
     if (importBtn) {
         importBtn.addEventListener('click', importIfrcDocuments);
     }
-    resumeIfrcImportJobIfAny();
-    resumeSystemImportJobIfAny();
-    resumeBulkReprocessJobIfAny();
-    resumeBulkMetaReprocessJobIfAny();
 }
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initImportJobs);
@@ -4067,15 +3146,7 @@ async function processSelectedDocuments() {
             }
 
             const total = Number(result.total) || docIds.length;
-            window.aiDocsImportProgress = { total: total, done: 0 };
-            setStoredSystemImportJob({ jobId: result.job_id, total: total, startedAt: Date.now() });
-            showProcessingBanner(
-                cfg.t.importing_documents_8a49fe5a,
-                cfg.t.starting_8c6ce9f8,
-                0
-            );
-            if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
-            startSystemImportJobPolling(result.job_id);
+            startSystemImportJobPolling(result.job_id, total);
         } catch (error) {
             hideProcessingBanner();
             const errorMsg = error && error.message ? error.message : String(error);
@@ -5152,6 +4223,12 @@ async function reprocessDocument(id) {
     } else {
         proceedWithReprocess();
     }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAiDocsJobProgress);
+} else {
+    initAiDocsJobProgress();
 }
 
 })();

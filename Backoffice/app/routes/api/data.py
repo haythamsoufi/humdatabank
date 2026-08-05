@@ -80,7 +80,9 @@ from app.utils.api_data_filters import (
     VERSION_SCOPE_PUBLISHED,
     apply_form_data_version_scoping,
     build_data_api_scope_meta,
+    parse_assignment_id_filters,
     parse_data_item_filters,
+    resolve_assignment_scope,
     resolve_template_published_version_id,
 )
 from app.services.data_retrieval.shared import (
@@ -187,8 +189,8 @@ _DATA_ARRAY_CATALOG = {
         ),
         'grain': 'form_data × matrix row entity × column × source',
         'key_fields': [
-            'form_data_id', 'form_item_id', 'form_item_label', 'value',
-            'matrix.parent_form_data_id', 'matrix.source',
+            'form_data_id', 'form_item_id', 'value',
+            'matrix.source',
             'matrix.row.entity_id', 'matrix.row.label',
             'matrix.column.key', 'matrix.column.label',
             'matrix.entity.id', 'matrix.entity.name',
@@ -261,7 +263,7 @@ def _collect_scoped_assignment_status_ids(
     template_id: Optional[int] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
-    assignment_id: Optional[int] = None,
+    assignment_ids: Optional[List[int]] = None,
     submission_id: Optional[int] = None,
     allowed_template_ids: Optional[Sequence[int]] = None,
     allowed_country_ids: Optional[Sequence[int]] = None,
@@ -274,7 +276,7 @@ def _collect_scoped_assignment_status_ids(
     """
     period = (period_name or '').strip() or None
     has_scope = any(
-        v is not None for v in (template_id, country_id, period, assignment_id, submission_id)
+        v is not None for v in (template_id, country_id, period, assignment_ids, submission_id)
     )
     if not has_scope:
         return []
@@ -302,10 +304,14 @@ def _collect_scoped_assignment_status_ids(
         AssignmentEntityStatus.assigned_form_id == AssignedForm.id,
     )
 
-    if assignment_id is not None:
+    if assignment_ids:
         # Exact assignment scope — ignore coarser template/period filters that may
         # conflict (e.g. leftover period_name in a BI query).
-        q = q.filter(AssignedForm.id == int(assignment_id))
+        ids = [int(x) for x in assignment_ids]
+        if len(ids) == 1:
+            q = q.filter(AssignedForm.id == ids[0])
+        else:
+            q = q.filter(AssignedForm.id.in_(ids))
     else:
         if template_id is not None:
             q = q.filter(AssignedForm.template_id == int(template_id))
@@ -332,8 +338,8 @@ def _collect_scoped_assignment_status_ids(
                 )
             q = q.filter(period_filter)
 
-    # Still apply RBAC template allow-list when assignment_id is used.
-    if assignment_id is not None and allowed_template_ids is not None:
+    # Still apply RBAC template allow-list when assignment scope is used.
+    if assignment_ids and allowed_template_ids is not None:
         q = q.filter(AssignedForm.template_id.in_(list(allowed_template_ids)))
 
     if country_id is not None:
@@ -381,7 +387,7 @@ def _build_assignment_statuses_table(
     template_id: Optional[int] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
-    assignment_id: Optional[int] = None,
+    assignment_ids: Optional[List[int]] = None,
     submission_id: Optional[int] = None,
     submission_type: Optional[str] = None,
     allowed_template_ids: Optional[Sequence[int]] = None,
@@ -397,7 +403,7 @@ def _build_assignment_statuses_table(
             template_id=template_id,
             country_id=country_id,
             period_name=period_name,
-            assignment_id=assignment_id,
+            assignment_ids=assignment_ids,
             submission_id=submission_id,
             allowed_template_ids=allowed_template_ids,
             allowed_country_ids=allowed_country_ids,
@@ -582,7 +588,7 @@ def _parse_include_flags(args):
 def _fetch_extended_data(
     *,
     template_id, submission_id, item_id, country_id, period_name,
-    assignment_id, indicator_bank_id, submission_type,
+    assignment_ids, indicator_bank_id, submission_type,
     include_dynamic, include_repeat,
     minimal_country_info,
     elevated_access, auth_user,
@@ -664,13 +670,13 @@ def _fetch_extended_data(
                 submission_id=submission_id,
                 country_id=country_id,
                 period_name=period_name,
-                assignment_id=assignment_id,
+                assignment_ids=assignment_ids,
                 indicator_bank_id=indicator_bank_id,
                 submission_type=submission_type,
                 preload=True,
             )
             needs_join = bool(
-                template_id or country_id or period_name or submission_id or assignment_id
+                template_id or country_id or period_name or submission_id or assignment_ids
             )
             dq = _apply_user_scoping(dq, needs_join)
 
@@ -720,12 +726,12 @@ def _fetch_extended_data(
                 item_id=item_id,
                 country_id=country_id,
                 period_name=period_name,
-                assignment_id=assignment_id,
+                assignment_ids=assignment_ids,
                 submission_type=submission_type,
                 preload=True,
             )
             needs_join = bool(
-                template_id or country_id or period_name or submission_id or assignment_id
+                template_id or country_id or period_name or submission_id or assignment_ids
             )
             rq = _apply_user_scoping(rq, needs_join)
 
@@ -1041,7 +1047,7 @@ def get_all_data():
       - No auth when scoped filters are present (public-privacy form items only;
         pagination required; see public_data_access module)
     Query Parameters:
-        - template_id, assignment_id, submission_id, item_id, stable_key, version_scope, item_type,
+        - template_id, assignment_id (single or comma-separated), submission_id, item_id, stable_key, version_scope, item_type,
           country_id, country_iso2, country_iso3, submission_type, period_name, indicator_bank_id: filters
         - date_from, date_to, sort, order, page, per_page
         - related: scope of related form_items ('page' or 'all'); default 'page'
@@ -1076,27 +1082,34 @@ def get_all_data():
                 return api_error('Forbidden: analysis access is required', 403)
 
         template_id = request.args.get('template_id', type=int)
-        assignment_id = request.args.get('assignment_id', type=int)
-        if assignment_id is None:
-            # Legacy alias
-            assignment_id = request.args.get('assigned_form_id', type=int)
-        # Prefer exact AssignedForm scope; derive template_id for version/item filters when omitted.
-        if assignment_id is not None and template_id is None:
-            af = AssignedForm.query.get(int(assignment_id))
-            if af is None:
-                return api_error('Assignment not found', 404)
-            template_id = af.template_id
+        assignment_ids = parse_assignment_id_filters(request.args)
+        scoped_template_ids: List[int] = []
+        if assignment_ids:
+            template_id, scoped_template_ids, assignment_error = resolve_assignment_scope(
+                assignment_ids,
+                template_id=template_id,
+            )
+            if assignment_error:
+                return api_error(assignment_error['message'], assignment_error['status'])
+        elif template_id is not None:
+            scoped_template_ids = [int(template_id)]
+
         submission_id = request.args.get('submission_id', type=int)
         item_id = request.args.get('item_id', type=int)
         item_id, stable_key_filter, version_scope, filter_error = parse_data_item_filters(
             request.args,
             template_id=template_id,
+            template_ids=scoped_template_ids,
             item_id=item_id,
         )
         if filter_error:
             return api_error(filter_error['message'], filter_error['status'])
 
-        published_version_id = resolve_template_published_version_id(template_id)
+        published_version_id = (
+            resolve_template_published_version_id(template_id)
+            if template_id is not None
+            else None
+        )
 
         item_type = request.args.get('item_type', type=str)
         country_id = request.args.get('country_id', type=int)
@@ -1122,10 +1135,11 @@ def get_all_data():
         period_name = request.args.get('period_name', type=str)
         scope_meta = build_data_api_scope_meta(
             template_id=template_id,
+            template_ids=scoped_template_ids if len(scoped_template_ids) > 1 else None,
             published_version_id=published_version_id,
             version_scope=version_scope,
             stable_key=stable_key_filter,
-            assignment_id=assignment_id,
+            assignment_ids=assignment_ids,
             period_name=period_name,
         )
         indicator_bank_id = request.args.get('indicator_bank_id', type=int)
@@ -1141,6 +1155,11 @@ def get_all_data():
             except Exception:
                 indicator_bank_ids = None
         include_non_reported = str(request.args.get('include_non_reported', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
+        if include_non_reported and len(scoped_template_ids) > 1:
+            return api_error(
+                'include_non_reported is only supported when assignment scope uses a single template',
+                400,
+            )
 
         def _is_blankish_scalar(v: Any) -> bool:
             """
@@ -1254,7 +1273,7 @@ def get_all_data():
             item_type=item_type,
             country_id=country_id,
             period_name=period_name,
-            assignment_id=assignment_id,
+            assignment_ids=assignment_ids,
             indicator_bank_id=indicator_bank_id,
             indicator_bank_ids=indicator_bank_ids,
             submission_type=submission_type,
@@ -1272,7 +1291,7 @@ def get_all_data():
                 template_id is None
                 and country_id is None
                 and period_name is None
-                and assignment_id is None
+                and not assignment_ids
             ):
                 assigned_form_data_query = assigned_form_data_query.join(AssignmentEntityStatus)
             assigned_form_data_query = assigned_form_data_query.filter(FormData.submitted_at >= date_from)
@@ -1287,7 +1306,7 @@ def get_all_data():
                 template_id is None
                 and country_id is None
                 and period_name is None
-                and assignment_id is None
+                and not assignment_ids
                 and date_from is None
             ):
                 assigned_form_data_query = assigned_form_data_query.join(AssignmentEntityStatus)
@@ -1306,7 +1325,7 @@ def get_all_data():
                 template_id=template_id,
                 country_id=country_id,
                 period_name=period_name,
-                assignment_id=assignment_id,
+                assignment_ids=assignment_ids,
                 submission_id=submission_id,
                 submission_type=submission_type,
                 allowed_template_ids=aes_allowed_template_ids,
@@ -1323,6 +1342,13 @@ def get_all_data():
                 allowed_template_ids = get_user_allowed_template_ids(auth_user.id)
                 if template_id is not None and template_id not in allowed_template_ids:
                     return api_error('Forbidden: no access to requested template', 403)
+                if scoped_template_ids:
+                    denied = [
+                        tid for tid in scoped_template_ids
+                        if tid not in allowed_template_ids
+                    ]
+                    if denied:
+                        return api_error('Forbidden: no access to one or more requested templates', 403)
                 aes_allowed_template_ids = allowed_template_ids
                 aes_allowed_country_ids = _get_user_allowed_country_ids(auth_user)
 
@@ -1333,7 +1359,7 @@ def get_all_data():
                 template_id,
                 country_id,
                 period_name,
-                assignment_id=assignment_id,
+                assignment_ids=assignment_ids,
             )
             assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
 
@@ -1408,7 +1434,7 @@ def get_all_data():
                 template_id,
                 country_id,
                 period_name,
-                assignment_id=assignment_id,
+                assignment_ids=assignment_ids,
             )
             assigned_form_data_query, public_form_data_query = get_form_data_queries(scoped_queries)
             if assigned_form_data_query is not None:
@@ -1470,6 +1496,7 @@ def get_all_data():
             published_version_id=published_version_id,
             version_scope=version_scope,
             stable_key=stable_key_filter,
+            template_ids=scoped_template_ids if len(scoped_template_ids) > 1 else None,
         )
 
         if submission_type == 'assigned' and public_form_data_query is not None:
@@ -1679,7 +1706,7 @@ def get_all_data():
             and not should_paginate
             and template_id is not None
             and country_id is not None
-            and (assignment_id is not None or period_name)
+            and (assignment_ids or period_name)
             and (not submission_type or str(submission_type).strip().lower() == 'assigned')
         ):
             try:
@@ -1747,11 +1774,24 @@ def get_all_data():
                                 aes_list.append((aes, None))
                     else:
                         # 2) No assigned rows returned; fall back to a single matching assignment.
-                        # Prefer exact assignment_id when provided (avoids period_name collisions).
-                        af = None
-                        if assignment_id is not None:
-                            af = _AssignedForm.query.get(int(assignment_id))
-                        if not af and period_name:
+                        # Prefer exact assignment scope when provided (avoids period_name collisions).
+                        if assignment_ids:
+                            for aid in assignment_ids:
+                                af = _AssignedForm.query.get(int(aid))
+                                if not af:
+                                    continue
+                                aes = (
+                                    _AES.query
+                                    .filter(
+                                        _AES.assigned_form_id == af.id,
+                                        _AES.entity_type == 'country',
+                                        _AES.entity_id == int(country_id),
+                                    )
+                                    .first()
+                                )
+                                if aes:
+                                    aes_list.append((aes, af))
+                        elif period_name:
                             af = (
                                 _AssignedForm.query
                                 .filter(_AssignedForm.template_id == int(template_id))
@@ -1768,18 +1808,18 @@ def get_all_data():
                                     .order_by(_AssignedForm.id.desc())
                                     .first()
                                 )
-                        if af:
-                            aes = (
-                                _AES.query
-                                .filter(
-                                    _AES.assigned_form_id == af.id,
-                                    _AES.entity_type == 'country',
-                                    _AES.entity_id == int(country_id),
+                            if af:
+                                aes = (
+                                    _AES.query
+                                    .filter(
+                                        _AES.assigned_form_id == af.id,
+                                        _AES.entity_type == 'country',
+                                        _AES.entity_id == int(country_id),
+                                    )
+                                    .first()
                                 )
-                                .first()
-                            )
-                            if aes:
-                                aes_list.append((aes, af))
+                                if aes:
+                                    aes_list.append((aes, af))
 
                     aes_ids = [int(aes.id) for (aes, _af) in aes_list if aes and aes.id]
                     if aes_ids:
@@ -1875,7 +1915,7 @@ def get_all_data():
             item_id=item_id,
             country_id=country_id,
             period_name=period_name,
-            assignment_id=assignment_id,
+            assignment_ids=assignment_ids,
             indicator_bank_id=indicator_bank_id,
             submission_type=submission_type,
             include_dynamic=include_dynamic,
@@ -1932,16 +1972,22 @@ def get_all_data():
             countries_table = _load_full_countries_table()
             national_societies_table = _load_full_national_societies_table()
             indicator_bank_table = _load_full_indicator_bank_table()
-            # strip=True clears matrix values out of data_rows in the same pass that
-            # extracts them into matrix_cells, avoiding a second full scan over data_rows.
-            matrix_cells = build_matrix_cells_from_data_rows(data_rows, form_items_table, strip=True)
-            matrix_cells = enrich_matrix_cells(
-                matrix_cells,
-                form_items_table,
-                countries_table=countries_table,
-                national_societies_table=national_societies_table,
-                indicator_bank_table=indicator_bank_table,
-            )
+            # Flat layout normalizes matrix cells into matrix_cells[] and strips them
+            # from data[]. Star layout keeps matrix payloads on fact_form_values as a
+            # long array on disaggregation_data.
+            if layout == 'star':
+                matrix_cells = []
+            else:
+                matrix_cells = build_matrix_cells_from_data_rows(
+                    data_rows, form_items_table, strip=True,
+                )
+                matrix_cells = enrich_matrix_cells(
+                    matrix_cells,
+                    form_items_table,
+                    countries_table=countries_table,
+                    national_societies_table=national_societies_table,
+                    indicator_bank_table=indicator_bank_table,
+                )
 
             if include_dynamic:
                 extra_keys['dynamic_data'] = extended['dynamic_data']

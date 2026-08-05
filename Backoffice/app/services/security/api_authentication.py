@@ -349,6 +349,7 @@ def authenticate_api_request():
                 else:
                     g.api_key_data_scope = None
                     elevated_access = True
+                g.api_elevated_data_access = elevated_access
 
                 # Log API key usage for security monitoring (optional)
                 if current_app.config.get('LOG_API_KEY_USAGE', False):
@@ -364,6 +365,7 @@ def authenticate_api_request():
                 g.api_key_record = None
                 g.api_key_usage_id = None
                 g.api_key_usage_client_name = None
+                g.api_elevated_data_access = True
                 return (True, None, None)
             return api_error("Invalid API key", 401)
         except Exception as e:
@@ -440,7 +442,7 @@ def apply_user_template_scoping(
     template_id=None,
     country_id=None,
     period_name=None,
-    assignment_id=None,
+    assignment_ids=None,
 ):
     """Apply RBAC template + entity-level filtering to queries for user-scoped access."""
     assigned_form_data_query = queries['assigned']
@@ -464,7 +466,7 @@ def apply_user_template_scoping(
             template_id is not None
             or country_id is not None
             or period_name is not None
-            or assignment_id is not None
+            or assignment_ids
         )
         if joins_exist:
             assigned_form_data_query = assigned_form_data_query.filter(AssignedForm.template_id.in_(allowed_template_ids))
@@ -504,7 +506,7 @@ def apply_api_key_data_scoping(
     template_id=None,
     country_id=None,
     period_name=None,
-    assignment_id=None,
+    assignment_ids=None,
 ):
     """
     Restrict data queries to template/country IDs allowed on a scoped API key.
@@ -538,7 +540,7 @@ def apply_api_key_data_scoping(
                 template_id is not None
                 or country_id is not None
                 or period_name is not None
-                or assignment_id is not None
+                or assignment_ids
             )
             if joins_exist:
                 assigned_form_data_query = assigned_form_data_query.filter(

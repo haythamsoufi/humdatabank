@@ -678,6 +678,8 @@ class TestDataHelpers:
                 'lookup_list_id': 'country_map',
                 'join_dimension': 'countries',
                 'row_entity_type': 'country',
+                'show_row_totals': False,
+                'show_column_totals': False,
             },
         }]
         data_rows = [{
@@ -819,7 +821,7 @@ class TestDataHelpers:
         with patch("app.routes.api.data.AssignmentEntityStatus") as mock_aes:
             mock_aes.query = q
             ids = _collect_scoped_assignment_status_ids(
-                assignment_id=99,
+                assignment_ids=[99],
                 template_id=33,
                 period_name="wrong-period",
             )

@@ -45,11 +45,17 @@ def can_view_non_public_form_items(user) -> bool:
     """
     Determine if a user may view non-public (organization-network / internal) form items.
 
-    Returns True for: system managers, admins, users with data-explore RBAC, or users
-    whose email belongs to the organization domain (same-org / internal users, e.g.
-    focal points identified by organization_email_domain in settings).
+    Returns True for: full-access API keys, system managers, admins, users with
+    data-explore RBAC, or users whose email belongs to the organization domain
+    (same-org / internal users, e.g. focal points identified by
+    organization_email_domain in settings).
     """
     try:
+        from flask import g, has_request_context
+
+        if has_request_context() and getattr(g, "api_elevated_data_access", False):
+            return True
+
         from app.services.organization.authorization_service import AuthorizationService
         from app.services.platform.app_settings_service import is_organization_email
         if not user or not getattr(user, "is_authenticated", False):

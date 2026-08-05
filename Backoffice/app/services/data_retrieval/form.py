@@ -28,6 +28,15 @@ from .shared import (
 logger = logging.getLogger(__name__)
 
 
+def _filter_by_assignment_ids(query, assignment_ids: Optional[List[int]]):
+    if not assignment_ids:
+        return query
+    ids = [int(x) for x in assignment_ids]
+    if len(ids) == 1:
+        return query.filter(AssignedForm.id == ids[0])
+    return query.filter(AssignedForm.id.in_(ids))
+
+
 def query_form_data(
     *,
     template_id: Optional[int] = None,
@@ -36,7 +45,7 @@ def query_form_data(
     item_type: Optional[str] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
-    assignment_id: Optional[int] = None,
+    assignment_ids: Optional[List[int]] = None,
     indicator_bank_id: Optional[int] = None,
     indicator_bank_ids: Optional[List[int]] = None,
     submission_type: Optional[str] = None,
@@ -49,7 +58,8 @@ def query_form_data(
 
     Returns a dict with two query objects: 'assigned' and 'public'. Callers may further iterate .all().
 
-    ``assignment_id`` filters by ``AssignedForm.id`` (API-facing name for an assignment).
+    ``assignment_ids`` filters by ``AssignedForm.id`` (API-facing assignment scope).
+    Accepts one or many ids; comma-separated lists are parsed in the route layer.
     """
     try:
         assigned_q = FormData.query
@@ -63,14 +73,14 @@ def query_form_data(
         ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
 
         # Assigned path joins lazily: add joins only when needed to avoid ambiguous columns
-        needs_af_join = bool(template_id or country_id or period_name or assignment_id)
+        needs_af_join = bool(template_id or country_id or period_name or assignment_ids)
         if needs_af_join:
             assigned_q = assigned_q.join(AssignmentEntityStatus).join(AssignedForm)
 
-        if assignment_id:
+        if assignment_ids:
             # Exact assignment scope wins over template_id / period_name.
-            assigned_q = assigned_q.filter(AssignedForm.id == assignment_id)
-            public_q = public_q.filter(AssignedForm.id == assignment_id)
+            assigned_q = _filter_by_assignment_ids(assigned_q, assignment_ids)
+            public_q = _filter_by_assignment_ids(public_q, assignment_ids)
         else:
             if template_id:
                 assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
@@ -205,7 +215,7 @@ def query_dynamic_indicator_data(
     submission_id: Optional[int] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
-    assignment_id: Optional[int] = None,
+    assignment_ids: Optional[List[int]] = None,
     section_id: Optional[int] = None,
     indicator_bank_id: Optional[int] = None,
     submission_type: Optional[str] = None,
@@ -224,7 +234,7 @@ def query_dynamic_indicator_data(
     from app.models.forms import DynamicIndicatorData
 
     needs_aes_join = bool(
-        template_id or country_id or period_name or submission_id or assignment_id
+        template_id or country_id or period_name or submission_id or assignment_ids
     )
 
     # --- Assigned path ---
@@ -248,9 +258,9 @@ def query_dynamic_indicator_data(
         ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
 
     # --- Shared filters ---
-    if assignment_id:
-        assigned_q = assigned_q.filter(AssignedForm.id == assignment_id)
-        public_q = public_q.filter(AssignedForm.id == assignment_id)
+    if assignment_ids:
+        assigned_q = _filter_by_assignment_ids(assigned_q, assignment_ids)
+        public_q = _filter_by_assignment_ids(public_q, assignment_ids)
     else:
         if template_id:
             assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)
@@ -313,7 +323,7 @@ def query_repeat_group_data(
     item_id: Optional[int] = None,
     country_id: Optional[int] = None,
     period_name: Optional[str] = None,
-    assignment_id: Optional[int] = None,
+    assignment_ids: Optional[List[int]] = None,
     section_id: Optional[int] = None,
     submission_type: Optional[str] = None,
     preload: bool = False,
@@ -329,7 +339,7 @@ def query_repeat_group_data(
     from app.models.forms import RepeatGroupData, RepeatGroupInstance
 
     needs_instance_join = bool(
-        template_id or country_id or period_name or submission_id or section_id or assignment_id
+        template_id or country_id or period_name or submission_id or section_id or assignment_ids
     )
 
     # --- Assigned path ---
@@ -357,9 +367,9 @@ def query_repeat_group_data(
         ).join(AssignedForm, PublicSubmission.assigned_form_id == AssignedForm.id)
 
     # --- Shared filters ---
-    if assignment_id:
-        assigned_q = assigned_q.filter(AssignedForm.id == assignment_id)
-        public_q = public_q.filter(AssignedForm.id == assignment_id)
+    if assignment_ids:
+        assigned_q = _filter_by_assignment_ids(assigned_q, assignment_ids)
+        public_q = _filter_by_assignment_ids(public_q, assignment_ids)
     else:
         if template_id:
             assigned_q = assigned_q.filter(AssignedForm.template_id == template_id)

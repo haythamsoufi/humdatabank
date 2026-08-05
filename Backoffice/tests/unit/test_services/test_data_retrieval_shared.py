@@ -261,6 +261,13 @@ class TestCanViewNonPublicFormItems:
             from app.services.data_retrieval.shared import can_view_non_public_form_items
             assert can_view_non_public_form_items(None) is False
 
+    def test_elevated_api_key_returns_true(self, app):
+        with app.test_request_context("/"):
+            from flask import g
+            from app.services.data_retrieval.shared import can_view_non_public_form_items
+            g.api_elevated_data_access = True
+            assert can_view_non_public_form_items(None) is True
+
     def test_unauthenticated_user_returns_false(self, app):
         with app.app_context():
             from app.services.data_retrieval.shared import can_view_non_public_form_items

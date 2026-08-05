@@ -652,7 +652,7 @@ def get_api_paths():
                     "plus full dimension tables (form_items, countries, indicator_bank). "
                     "Use layout=flat (default) for the legacy bundle or layout=star for a "
                     "dimensional export (fact_form_values, dim_*, bridge_disagg_values). "
-                    "fact_form_values includes static, dynamic, repeat, and matrix rows (schema 1.1)."
+                    "fact_form_values includes static, dynamic, and repeat rows; matrix values are a long array on disaggregation_data (schema 1.1)."
                     "countries[] and indicator_bank[] are always the full catalog (~192 / ~466 rows)."
                 ),
                 "operationId": "getFormData",

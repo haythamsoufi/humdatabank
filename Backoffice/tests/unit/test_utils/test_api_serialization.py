@@ -34,6 +34,7 @@ from app.utils.api_serialization import (
     build_bridge_disagg_from_flat_rows,
     build_star_schema_tables,
     enrich_matrix_cells,
+    format_matrix_disagg_as_long_rows,
     _wrap_disagg_dict,
     _resolve_matrix_cell,
 )
@@ -1293,8 +1294,10 @@ class TestEnrichMatrixCells:
         assert matrix['entity']['id'] == 10
         assert matrix['entity']['name'] == 'Kenya'
         assert matrix['entity']['iso2'] == 'KE'
-        assert enriched[0]['form_item_label'] == 'Funding matrix'
-        assert 'row_entity_label' not in enriched[0]
+        assert enriched[0]['matrix']['entity']['iso2'] == 'KE'
+        assert 'form_item_label' not in enriched[0]
+        assert 'parent_form_data_id' not in enriched[0]['matrix']
+        assert enriched[0]['form_data_id'] == 100
 
     def test_resolves_manual_matrix_row_label(self):
         form_items = [{
@@ -1422,6 +1425,152 @@ class TestBuildBridgeDisaggFromFlatRows:
 
 
 # ---------------------------------------------------------------------------
+# format_matrix_disagg_as_long_rows
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestFormatMatrixDisaggAsLongRows:
+    def test_converts_wide_matrix_to_long_rows(self):
+        form_items = {
+            12: {
+                'matrix_config': {
+                    'columns': [
+                        {'name': 'SP2', 'label': 'SP2 column'},
+                        {'name': 'SP3', 'label': 'SP3 column'},
+                    ],
+                    'show_row_totals': False,
+                    'show_column_totals': False,
+                },
+            },
+        }
+        result = format_matrix_disagg_as_long_rows(
+            {'mode': 'matrix', 'values': {'42_SP2': 1, '43_SP3': 2}},
+            form_item_id=12,
+            form_items_index=form_items,
+        )
+        assert result == [
+            {
+                'row_entity_id': 42,
+                'column_key': 'SP2',
+                'column_label': 'SP2 column',
+                'value': 1,
+            },
+            {
+                'row_entity_id': 43,
+                'column_key': 'SP3',
+                'column_label': 'SP3 column',
+                'value': 2,
+            },
+        ]
+
+    def test_includes_calculated_row_column_and_grand_totals(self):
+        form_items = {
+            12: {
+                'matrix_config': {
+                    'columns': [
+                        {'name': 'SP2', 'label': 'SP2 column'},
+                        {'name': 'SP3', 'label': 'SP3 column'},
+                    ],
+                    'show_row_totals': True,
+                    'show_column_totals': True,
+                },
+            },
+        }
+        result = format_matrix_disagg_as_long_rows(
+            {
+                'mode': 'matrix',
+                'values': {'42_SP2': 1000, '42_SP3': 200, '43_SP2': 50},
+            },
+            form_item_id=12,
+            form_items_index=form_items,
+        )
+        assert result[:3] == [
+            {'row_entity_id': 42, 'column_key': 'SP2', 'column_label': 'SP2 column', 'value': 1000},
+            {'row_entity_id': 42, 'column_key': 'SP3', 'column_label': 'SP3 column', 'value': 200},
+            {'row_entity_id': 43, 'column_key': 'SP2', 'column_label': 'SP2 column', 'value': 50},
+        ]
+        totals = [row for row in result if row.get('is_calculated_total')]
+        assert totals == [
+            {
+                'row_entity_id': 42,
+                'column_key': 'Total',
+                'column_label': 'Total',
+                'value': 1200,
+                'is_calculated_total': True,
+                'total_kind': 'row',
+            },
+            {
+                'row_entity_id': 43,
+                'column_key': 'Total',
+                'column_label': 'Total',
+                'value': 50,
+                'is_calculated_total': True,
+                'total_kind': 'row',
+            },
+            {
+                'row_entity_id': None,
+                'column_key': 'SP2',
+                'column_label': 'SP2 column',
+                'value': 1050,
+                'is_calculated_total': True,
+                'total_kind': 'column',
+            },
+            {
+                'row_entity_id': None,
+                'column_key': 'SP3',
+                'column_label': 'SP3 column',
+                'value': 200,
+                'is_calculated_total': True,
+                'total_kind': 'column',
+            },
+            {
+                'row_entity_id': None,
+                'column_key': 'Total',
+                'column_label': 'Total',
+                'value': 1250,
+                'is_calculated_total': True,
+                'total_kind': 'grand',
+            },
+        ]
+
+    def test_manual_row_total_override_when_enabled(self):
+        form_items = {
+            12: {
+                'matrix_config': {
+                    'columns': [{'name': 'SP2', 'label': 'SP2 column'}],
+                    'show_row_totals': True,
+                    'show_column_totals': False,
+                    'row_total_manual_enabled': True,
+                },
+            },
+        }
+        result = format_matrix_disagg_as_long_rows(
+            {
+                'mode': 'matrix',
+                'values': {
+                    '42_SP2': 100,
+                    '42_Total': {'isModified': True, 'modified': 999},
+                },
+            },
+            form_item_id=12,
+            form_items_index=form_items,
+        )
+        row_total = next(r for r in result if r.get('total_kind') == 'row')
+        assert row_total['value'] == 999
+
+    def test_non_matrix_payload_unchanged(self):
+        payload = {'mode': 'sex', 'values': {'male': 3, 'female': 2}}
+        assert format_matrix_disagg_as_long_rows(payload) == payload
+
+    def test_empty_matrix_marker_returns_empty_list(self):
+        assert format_matrix_disagg_as_long_rows({
+            'mode': 'matrix',
+            'values': {},
+            'matrix_cells': True,
+        }) == []
+
+
+# ---------------------------------------------------------------------------
 # build_star_schema_tables
 # ---------------------------------------------------------------------------
 
@@ -1482,11 +1631,31 @@ class TestBuildStarSchemaTables:
             result = build_star_schema_tables(rows, [], [])
             assert len(result['bridge_disagg_values']) == 2
 
+    def test_fact_rows_include_disagg_json(self, app):
+        with app.app_context():
+            rows = [{
+                'id': 1, 'form_item_id': 10, 'country_id': 2,
+                'template_id': None, 'period_name': None,
+                'submission_id': None, 'submission_type': 'assigned',
+                'value': 5, 'num_value': 5.0, 'data_status': 'available',
+                'submitted_at': '2024-01-01', 'is_missing': False,
+                'disaggregation_data': {'mode': 'sex', 'values': {'male': 3, 'female': 2}},
+                'prefilled_disaggregation_data': None,
+                'imputed_disaggregation_data': None,
+            }]
+            result = build_star_schema_tables(rows, [], [])
+            fact = result['fact_form_values'][0]
+            assert fact['disaggregation_data'] == {'mode': 'sex', 'values': {'male': 3, 'female': 2}}
+
     def test_merges_dynamic_and_repeat_into_fact_rows(self, app):
         with app.app_context():
             static = [{
                 'id': 1, 'field_type': 'static', 'data_type': 'static',
-                'form_item_id': 10, 'country_id': 2, 'value': 5,
+                'form_item_id': 12, 'country_id': 2, 'value': 5,
+                'disaggregation_data': {
+                    'mode': 'matrix',
+                    'values': {'42_SP2': 1},
+                },
             }]
             dynamic = [{
                 'id': 2, 'field_type': 'dynamic', 'data_type': 'dynamic',
@@ -1503,32 +1672,23 @@ class TestBuildStarSchemaTables:
                     'label': 'Matrix item',
                     'matrix_config': {
                         'columns': [{'name': 'SP2', 'label': 'SP2 column'}],
+                        'show_row_totals': False,
+                        'show_column_totals': False,
                     },
                 }],
                 [{'id': 42, 'name': 'Test Country', 'iso2': 'TC', 'iso3': 'TST'}],
                 dynamic_data=dynamic,
                 repeat_data=repeat,
-                matrix_cells=[{
-                    'form_data_id': 1,
-                    'form_item_id': 12,
-                    'row_entity_id': 42,
-                    'column_key': 'SP2',
-                    'join_dimension': 'countries',
-                    'value': 1,
-                    'source': 'reported',
-                }],
             )
-            assert len(result['fact_form_values']) == 4
+            assert len(result['fact_form_values']) == 3
+            assert result['fact_form_values'][0]['disaggregation_data'] == [{
+                'row_entity_id': 42,
+                'column_key': 'SP2',
+                'column_label': 'SP2 column',
+                'value': 1,
+            }]
             assert result['fact_form_values'][1]['indicator_bank_id'] == 619
             assert result['fact_form_values'][2]['repeat_instance_id'] == 9
-            matrix_fact = result['fact_form_values'][3]
-            assert matrix_fact['field_type'] == 'matrix'
-            assert matrix_fact['id'] is None
-            assert matrix_fact['matrix']['column']['key'] == 'SP2'
-            assert matrix_fact['matrix']['column']['label'] == 'SP2 column'
-            assert matrix_fact['matrix']['row']['label'] == 'Test Country'
-            assert matrix_fact['matrix']['entity']['id'] == 42
-            assert matrix_fact['matrix']['parent_form_data_id'] == 1
             assert 'fact_matrix_cells' not in result
 
     def test_with_template_ids_queries_db(self, app):

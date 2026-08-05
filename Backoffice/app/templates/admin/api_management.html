@@ -120,6 +120,14 @@
     #epSurfaceBtns .ep-surface-btn:disabled .opacity-60 {
         opacity: 0.55 !important;
     }
+    #queryParams select[multiple].api-builder-multiselect {
+        min-height: 6.5rem;
+    }
+    #queryParams .api-builder-multiselect-hint {
+        font-size: 0.65rem;
+        color: rgb(107 114 128);
+        margin-top: 0.15rem;
+    }
     /* AI identity: trigger only (panel is position:fixed on body — escapes AG Grid overflow) */
     .ep-ai-identity-tip-trigger {
         position: relative;
@@ -861,12 +869,14 @@ const assignmentOptionsById = Object.fromEntries(
         return [String(item.id), item];
     })
 );
-const assignmentSelectOptions = [''].concat(
-    (assignmentOptions || []).map(function(item) { return String(item.id); })
-);
-const assignmentSelectLabels = [''].concat(
-    (assignmentOptions || []).map(function(item) { return item.label || String(item.id); })
-);
+const assignmentMultiOptions = (assignmentOptions || []).map(function(item) {
+    return String(item.id);
+});
+const assignmentMultiLabels = (assignmentOptions || []).map(function(item) {
+    return item.label || String(item.id);
+});
+const assignmentSelectOptions = [''].concat(assignmentMultiOptions);
+const assignmentSelectLabels = [''].concat(assignmentMultiLabels);
 
 $(document).ready(function() {
 {% if config.CLIENT_CONSOLE_LOGGING %}
@@ -1082,7 +1092,7 @@ try {
                 {name: 'submission_id', type: 'number', placeholder: {{ _("Submission ID")|tojson|safe }}, description: {{ _("Filter by submission ID")|tojson|safe }}},
                 {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: {{ _("Filter by item type")|tojson|safe }}},
                 {name: 'item_id', type: 'number', placeholder: {{ _("Item ID")|tojson|safe }}, description: {{ _("Filter by form item ID")|tojson|safe }}},
-                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: {{ _("Filter by assignment ID")|tojson|safe }}},
+                {name: 'assignment_id', type: 'multiselect', options: assignmentMultiOptions, labels: assignmentMultiLabels, description: {{ _("Filter by one or more assignment IDs (comma-separated in the URL)")|tojson|safe }}},
                 {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
                 {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: {{ _("Filter by submission type")|tojson|safe }}},
                 {name: 'date_from', type: 'text', placeholder: {{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")|tojson|safe }}, description: {{ _("Filter by submission date from (ISO format)")|tojson|safe }}},
@@ -1100,7 +1110,7 @@ try {
                 {name: 'item_type', type: 'select', options: ['', 'indicator', 'question', 'document_field'], description: {{ _("Filter by item type")|tojson|safe }}},
                 {name: 'item_id', type: 'number', placeholder: {{ _("Item ID")|tojson|safe }}, description: {{ _("Filter by form item ID")|tojson|safe }}},
                 {name: 'indicator_bank_id', type: 'number', placeholder: {{ _("Indicator Bank ID")|tojson|safe }}, description: {{ _("Filter by indicator bank ID")|tojson|safe }}},
-                {name: 'assignment_id', type: 'select', options: assignmentSelectOptions, labels: assignmentSelectLabels, description: {{ _("Filter by assignment ID")|tojson|safe }}},
+                {name: 'assignment_id', type: 'multiselect', options: assignmentMultiOptions, labels: assignmentMultiLabels, description: {{ _("Filter by one or more assignment IDs (comma-separated in the URL)")|tojson|safe }}},
                 {name: 'country_id', type: 'select', options: [''].concat(countryOptions), labels: [''].concat(countryLabels), description: {{ _("Filter by country ID")|tojson|safe }}},
                 {name: 'submission_type', type: 'select', options: ['', 'assigned', 'public'], description: {{ _("Filter by submission type")|tojson|safe }}},
                 {name: 'date_from', type: 'text', placeholder: {{ _("YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS")|tojson|safe }}, description: {{ _("Filter by submission date from (ISO format)")|tojson|safe }}},
@@ -1186,6 +1196,38 @@ try {
             return String(path || '').replace(/<[^>]+>/g, '').replace(/\{[^}]+\}/g, '');
         }
 
+        function getSelectedParamValues(inputEl, param) {
+            if (!inputEl) {
+                return [];
+            }
+            if (param && param.type === 'multiselect') {
+                return Array.from(inputEl.selectedOptions || [])
+                    .map(function(opt) { return String(opt.value || '').trim(); })
+                    .filter(Boolean);
+            }
+            const value = String(inputEl.value || '').trim();
+            return value ? [value] : [];
+        }
+
+        function formatParamQueryValue(values) {
+            if (!values || !values.length) {
+                return '';
+            }
+            return values.join(',');
+        }
+
+        function isAssignmentScopeActive() {
+            const assignmentCheckbox = document.getElementById('enable_assignment_id');
+            const assignmentInput = document.getElementById('assignment_id');
+            if (!assignmentCheckbox || !assignmentCheckbox.checked || !assignmentInput) {
+                return false;
+            }
+            const paramDef = (currentParamDefinitions || []).find(function(p) {
+                return p.name === 'assignment_id';
+            });
+            return getSelectedParamValues(assignmentInput, paramDef).length > 0;
+        }
+
         // Build query parameter inputs dynamically
         function createQueryParamInputs() {
             const queryParamsContainer = document.getElementById('queryParams');
@@ -1224,21 +1266,47 @@ try {
 
                 // Input / Select
                 let inputEl;
-                if (param.type === 'select') {
+                let inputWrap = null;
+                if (param.type === 'multiselect') {
+                    inputWrap = document.createElement('div');
+                    inputWrap.className = 'w-2/5 min-w-0 flex flex-col';
+                    inputEl = document.createElement('select');
+                    inputEl.multiple = true;
+                    inputEl.size = Math.min(8, Math.max(4, (param.options || []).length));
+                    inputEl.className = 'api-builder-multiselect w-full bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2';
+                    const hint = document.createElement('span');
+                    hint.className = 'api-builder-multiselect-hint';
+                    hint.textContent = {{ _("Ctrl+click or Shift+click to select multiple")|tojson|safe }};
+                    inputWrap.appendChild(inputEl);
+                    inputWrap.appendChild(hint);
+                } else if (param.type === 'select') {
                     inputEl = document.createElement('select');
                     inputEl.className = (
                         param.name === 'assignment_id'
                             ? 'w-2/5 min-w-0 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2'
                             : 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2'
                     );
+                } else {
+                    inputEl = document.createElement('input');
+                    inputEl.type = param.type || 'text';
+                    inputEl.className = 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2';
+                    if (param.placeholder) inputEl.placeholder = param.placeholder;
+                }
+
+                if (param.type === 'select' || param.type === 'multiselect') {
                     (param.options || []).forEach((opt, index) => {
                         const optEl = document.createElement('option');
                         optEl.value = opt;
-                        // Use labels if available, otherwise use the option value
-                        if (param.labels && param.labels[index]) {
-                            optEl.textContent = opt === '' ? {{ _("-- none --")|tojson|safe }} : param.labels[index];
+                        if (param.type === 'select') {
+                            if (param.labels && param.labels[index]) {
+                                optEl.textContent = opt === '' ? {{ _("-- none --")|tojson|safe }} : param.labels[index];
+                            } else {
+                                optEl.textContent = opt === '' ? {{ _("-- none --")|tojson|safe }} : opt;
+                            }
+                        } else if (param.labels && param.labels[index]) {
+                            optEl.textContent = param.labels[index];
                         } else {
-                            optEl.textContent = opt === '' ? {{ _("-- none --")|tojson|safe }} : opt;
+                            optEl.textContent = opt;
                         }
                         // For 'order' parameter, set 'desc' as default (first option)
                         if (param.name === 'order' && opt === 'desc') {
@@ -1246,11 +1314,6 @@ try {
                         }
                         inputEl.appendChild(optEl);
                     });
-                } else {
-                    inputEl = document.createElement('input');
-                    inputEl.type = param.type || 'text';
-                    inputEl.className = 'w-1/4 bg-white border border-gray-300 text-gray-900 text-sm rounded-md focus:ring-blue-500 focus:border-blue-500 py-1.5 px-2';
-                    if (param.placeholder) inputEl.placeholder = param.placeholder;
                 }
                 inputEl.id = param.name;
                 inputEl.disabled = true;
@@ -1262,7 +1325,11 @@ try {
                 desc.textContent = param.description || '';
 
                 row.appendChild(checkboxContainer);
-                row.appendChild(inputEl);
+                if (inputWrap) {
+                    row.appendChild(inputWrap);
+                } else {
+                    row.appendChild(inputEl);
+                }
                 row.appendChild(desc);
 
                 queryParamsContainer.appendChild(row);
@@ -1387,14 +1454,7 @@ try {
 
         function collectEnabledQueryParams() {
             const params = new URLSearchParams();
-            const assignmentCheckbox = document.getElementById('enable_assignment_id');
-            const assignmentInput = document.getElementById('assignment_id');
-            const assignmentEnabled = !!(
-                assignmentCheckbox &&
-                assignmentCheckbox.checked &&
-                assignmentInput &&
-                assignmentInput.value !== ''
-            );
+            const assignmentEnabled = isAssignmentScopeActive();
 
             currentParamDefinitions.forEach(param => {
                 if (param.name === 'api_key') {
@@ -1409,8 +1469,13 @@ try {
                 }
                 const checkbox = document.getElementById(`enable_${param.name}`);
                 const inputEl = document.getElementById(param.name);
-                if (checkbox && checkbox.checked && inputEl && inputEl.value !== '') {
-                    params.append(param.name, inputEl.value);
+                if (!checkbox || !checkbox.checked || !inputEl) {
+                    return;
+                }
+                const values = getSelectedParamValues(inputEl, param);
+                const queryValue = formatParamQueryValue(values);
+                if (queryValue) {
+                    params.append(param.name, queryValue);
                 }
             });
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional
 
+from app.utils.api_data_filters import parse_assignment_id_filters
 from app.utils.api_helpers import api_error
 
 PUBLIC_DATA_MAX_PER_PAGE = 5000
@@ -72,9 +73,7 @@ def public_data_scope_present(args: Mapping[str, Any]) -> bool:
         return True
     if _arg_str(args, 'period_name'):
         return True
-    if _arg_int(args, 'assignment_id'):
-        return True
-    if _arg_int(args, 'assigned_form_id'):
+    if parse_assignment_id_filters(args):
         return True
     if _arg_int(args, 'submission_id'):
         return True

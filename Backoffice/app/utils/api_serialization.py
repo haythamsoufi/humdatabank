@@ -272,7 +272,6 @@ def _resolve_matrix_entity_snapshot(join_dimension, row_entity_id, dim_indexes):
 
 def build_matrix_context(
     *,
-    form_data_id=None,
     row_entity_id=None,
     row_entity_type=None,
     row_entity_label=None,
@@ -290,7 +289,6 @@ def build_matrix_context(
 ):
     """Build a grouped matrix context for nested expansion in BI tools."""
     return {
-        'parent_form_data_id': form_data_id,
         'source': source,
         'row': {
             'entity_id': row_entity_id,
@@ -383,9 +381,7 @@ def enrich_matrix_cells(
             for key, value in cell.items()
             if key not in _MATRIX_CELL_NESTED_KEYS
         }
-        out['form_item_label'] = form_item.get('label')
         out['matrix'] = build_matrix_context(
-            form_data_id=cell.get('form_data_id'),
             row_entity_id=row_entity_id,
             row_entity_type=cell.get('row_entity_type'),
             row_entity_label=row_entity_label,
@@ -410,6 +406,197 @@ def _coerce_matrix_entity_id(raw):
         return int(raw)
     except (TypeError, ValueError):
         return raw
+
+
+MATRIX_ROW_TOTAL_COLUMN = 'Total'
+
+
+def _matrix_config_flag(matrix_config, key, default=True):
+    if not matrix_config:
+        return default
+    value = matrix_config.get(key)
+    if value is None:
+        return default
+    return bool(value)
+
+
+def _matrix_column_defs(matrix_config):
+    columns = (matrix_config or {}).get('columns') or []
+    defs = []
+    for col in columns:
+        if isinstance(col, dict):
+            name = col.get('name')
+            if not name:
+                continue
+            defs.append({
+                'name': str(name),
+                'type': col.get('type') or 'number',
+                'label': col.get('label') or str(name),
+            })
+        elif col:
+            name = str(col)
+            defs.append({'name': name, 'type': 'number', 'label': name})
+    return defs
+
+
+def _matrix_row_total_cell_key(row_id):
+    return f'{row_id}_{MATRIX_ROW_TOTAL_COLUMN}'
+
+
+def _is_matrix_row_total_key(key):
+    return isinstance(key, str) and key.endswith(f'_{MATRIX_ROW_TOTAL_COLUMN}')
+
+
+def _matrix_cell_value_to_number(value):
+    resolved = _resolve_matrix_cell(value)
+    if resolved is None or resolved == '':
+        return 0
+    if isinstance(resolved, bool):
+        return 1 if resolved else 0
+    if isinstance(resolved, (int, float)):
+        return float(resolved)
+    try:
+        return float(str(resolved).replace(',', '').strip())
+    except (TypeError, ValueError):
+        return 0
+
+
+def _stored_matrix_row_total_manual_scalar(stored):
+    if stored is None or stored == '':
+        return None
+    if isinstance(stored, dict):
+        if stored.get('isModified') and stored.get('modified') not in (None, ''):
+            return _matrix_cell_value_to_number(stored.get('modified'))
+        return None
+    num = _matrix_cell_value_to_number(stored)
+    return num if num else None
+
+
+def _parse_matrix_cell_key(key, matrix_config=None):
+    """Split ``rowId_columnName`` using matrix column names (longest suffix match)."""
+    if not isinstance(key, str) or key.startswith('_'):
+        return None, None
+    column_defs = _matrix_column_defs(matrix_config)
+    if column_defs:
+        for col in sorted(column_defs, key=lambda c: len(c['name']), reverse=True):
+            suffix = f"_{col['name']}"
+            if key.endswith(suffix) and len(key) > len(suffix):
+                return key[:-len(suffix)], col['name']
+        if _matrix_config_flag(matrix_config, 'show_row_totals', True):
+            total_suffix = f'_{MATRIX_ROW_TOTAL_COLUMN}'
+            if key.endswith(total_suffix) and len(key) > len(total_suffix):
+                return key[:-len(total_suffix)], MATRIX_ROW_TOTAL_COLUMN
+        return None, None
+    return parse_matrix_disagg_key(key)
+
+
+def _iter_matrix_data_cells(values, matrix_config):
+    column_names = {col['name'] for col in _matrix_column_defs(matrix_config)}
+    for key, raw in (values or {}).items():
+        row_id, column_key = _parse_matrix_cell_key(key, matrix_config)
+        if row_id is None or not column_key:
+            continue
+        if column_key == MATRIX_ROW_TOTAL_COLUMN:
+            continue
+        if column_names and column_key not in column_names:
+            continue
+        yield row_id, column_key, _matrix_cell_value_to_number(raw)
+
+
+def _effective_matrix_row_total(values, row_id, matrix_config):
+    row_sum = sum(value for rid, _, value in _iter_matrix_data_cells(values, matrix_config) if rid == row_id)
+    if not _matrix_config_flag(matrix_config, 'row_total_manual_enabled', False):
+        return row_sum
+    manual = _stored_matrix_row_total_manual_scalar(
+        (values or {}).get(_matrix_row_total_cell_key(row_id))
+    )
+    return manual if manual is not None else row_sum
+
+
+def _compute_matrix_calculated_total_rows(values, matrix_config):
+    if not isinstance(values, dict) or not values:
+        return []
+    matrix_config = matrix_config or {}
+    show_row_totals = _matrix_config_flag(matrix_config, 'show_row_totals', True)
+    show_column_totals = _matrix_config_flag(matrix_config, 'show_column_totals', True)
+    if not show_row_totals and not show_column_totals:
+        return []
+
+    data_cells = list(_iter_matrix_data_cells(values, matrix_config))
+    row_ids = sorted(
+        {row_id for row_id, _, _ in data_cells},
+        key=lambda x: (0, int(x)) if str(x).lstrip('-').isdigit() else (1, str(x)),
+    )
+    column_defs = _matrix_column_defs(matrix_config)
+    totals = []
+
+    if show_row_totals:
+        for row_id in row_ids:
+            totals.append({
+                'row_entity_id': _coerce_matrix_entity_id(row_id),
+                'column_key': MATRIX_ROW_TOTAL_COLUMN,
+                'column_label': MATRIX_ROW_TOTAL_COLUMN,
+                'value': _effective_matrix_row_total(values, row_id, matrix_config),
+                'is_calculated_total': True,
+                'total_kind': 'row',
+            })
+
+    if show_column_totals and column_defs:
+        for col in column_defs:
+            col_sum = sum(
+                value for _, column_key, value in data_cells
+                if column_key == col['name']
+            )
+            totals.append({
+                'row_entity_id': None,
+                'column_key': col['name'],
+                'column_label': col['label'],
+                'value': col_sum,
+                'is_calculated_total': True,
+                'total_kind': 'column',
+            })
+
+    if show_row_totals and show_column_totals:
+        if _matrix_config_flag(matrix_config, 'row_total_manual_enabled', False):
+            grand_total = sum(
+                _effective_matrix_row_total(values, row_id, matrix_config)
+                for row_id in row_ids
+            )
+        else:
+            grand_total = sum(value for _, _, value in data_cells)
+        totals.append({
+            'row_entity_id': None,
+            'column_key': MATRIX_ROW_TOTAL_COLUMN,
+            'column_label': MATRIX_ROW_TOTAL_COLUMN,
+            'value': grand_total,
+            'is_calculated_total': True,
+            'total_kind': 'grand',
+        })
+
+    return totals
+
+
+def _build_matrix_long_rows_from_values(values, matrix_config):
+    rows = []
+    for key, val in (values or {}).items():
+        if _is_matrix_row_total_key(key) and _matrix_config_flag(matrix_config, 'show_row_totals', True):
+            continue
+        row_entity_raw, column_key = _parse_matrix_cell_key(key, matrix_config)
+        if row_entity_raw is None or not column_key:
+            continue
+        if column_key == MATRIX_ROW_TOTAL_COLUMN:
+            continue
+        cell = {
+            'row_entity_id': _coerce_matrix_entity_id(row_entity_raw),
+            'column_key': column_key,
+            'value': _resolve_matrix_cell(val),
+        }
+        column_label = _lookup_matrix_column_label(matrix_config, column_key)
+        if column_label:
+            cell['column_label'] = column_label
+        rows.append(cell)
+    rows.extend(_compute_matrix_calculated_total_rows(values, matrix_config))
+    return rows
 
 
 def parse_matrix_disagg_key(key):
@@ -471,16 +658,18 @@ def build_matrix_cells_from_data_rows(data_rows, form_items_table=None, *, strip
             values = disagg.get('values') or {}
             if not isinstance(values, dict):
                 continue
-            for key, val in values.items():
-                row_entity_raw, column_key = parse_matrix_disagg_key(key)
-                if row_entity_raw is None:
-                    continue
+            for cell in _build_matrix_long_rows_from_values(values, join_meta):
                 cells.append({
                     **base,
-                    'row_entity_id': _coerce_matrix_entity_id(row_entity_raw),
-                    'column_key': column_key,
-                    'value': _resolve_matrix_cell(val),
+                    'row_entity_id': cell.get('row_entity_id'),
+                    'column_key': cell.get('column_key'),
+                    'value': cell.get('value'),
                     'source': source,
+                    **({
+                        k: cell[k]
+                        for k in ('is_calculated_total', 'total_kind')
+                        if k in cell
+                    }),
                 })
             if strip and values:
                 row[field] = {
@@ -1513,7 +1702,7 @@ def serialize_repeat_data_item(
 # ---------------------------------------------------------------------------
 
 STAR_SCHEMA_VERSION = '1.1'
-STAR_SCHEMA_GRAIN = 'one row per submission field value (static, dynamic, repeat, matrix)'
+STAR_SCHEMA_GRAIN = 'one row per submission field value (static, dynamic, repeat); matrix cells are a long array on disaggregation_data'
 
 
 def format_dim_template(template):
@@ -1605,7 +1794,6 @@ def format_fact_matrix_cell_row(cell):
     matrix = cell.get('matrix')
     if not matrix:
         matrix = build_matrix_context(
-            form_data_id=cell.get('form_data_id'),
             row_entity_id=cell.get('row_entity_id'),
             row_entity_type=cell.get('row_entity_type'),
             row_entity_label=cell.get('row_entity_label'),
@@ -1621,7 +1809,7 @@ def format_fact_matrix_cell_row(cell):
             entity_country_id=cell.get('entity_country_id'),
             entity_country_name=cell.get('entity_country_name'),
         )
-    form_data_id = cell.get('form_data_id') or matrix.get('parent_form_data_id')
+    form_data_id = cell.get('form_data_id')
     row = matrix.get('row') or {}
     column = matrix.get('column') or {}
     row_entity_id = row.get('entity_id')
@@ -1634,7 +1822,6 @@ def format_fact_matrix_cell_row(cell):
         'field_type': 'matrix',
         'data_type': 'static',
         'form_item_id': cell.get('form_item_id'),
-        'form_item_label': cell.get('form_item_label'),
         'indicator_bank_id': None,
         'country_id': cell.get('country_id'),
         'template_id': cell.get('template_id'),
@@ -1677,6 +1864,9 @@ def format_fact_submission_value_row(flat_row):
         'matrix': None,
         'value': flat_row.get('value'),
         'num_value': flat_row.get('num_value'),
+        'disaggregation_data': flat_row.get('disaggregation_data'),
+        'prefilled_disaggregation_data': flat_row.get('prefilled_disaggregation_data'),
+        'imputed_disaggregation_data': flat_row.get('imputed_disaggregation_data'),
         'data_status': flat_row.get('data_status'),
         'submitted_at': flat_row.get('submitted_at'),
         'is_missing': flat_row.get('is_missing', False),
@@ -1684,6 +1874,45 @@ def format_fact_submission_value_row(flat_row):
 
 
 format_fact_form_value_row = format_fact_submission_value_row
+
+
+def format_matrix_disagg_as_long_rows(disagg, *, form_item_id=None, form_items_index=None):
+    """
+    Convert wide matrix disaggregation payloads to a Power Query-friendly long array.
+
+    Input: ``{"mode": "matrix", "values": {"42_SP2": 1000, ...}}`` (or empty marker).
+    Output: ``[{"row_entity_id": 42, "column_key": "SP2", "value": 1000, ...}, ...]``.
+
+    Non-matrix payloads (sex/age/total/plugin JSON) are returned unchanged.
+    """
+    if disagg is None:
+        return None
+    if not isinstance(disagg, dict):
+        return disagg
+    if disagg.get('matrix_cells'):
+        return []
+    if disagg.get('mode') != 'matrix':
+        return disagg
+    values = disagg.get('values')
+    if not isinstance(values, dict) or not values:
+        return []
+    form_item = (form_items_index or {}).get(form_item_id) or {}
+    matrix_config = form_item.get('matrix_config') or {}
+    return _build_matrix_long_rows_from_values(values, matrix_config)
+
+
+def _apply_star_schema_disagg_format(fact_row, *, form_items_index=None):
+    """Normalize disaggregation payloads on a star-schema fact row."""
+    if not fact_row:
+        return fact_row
+    form_item_id = fact_row.get('form_item_id')
+    for field in _MATRIX_DISAGG_FIELDS:
+        fact_row[field] = format_matrix_disagg_as_long_rows(
+            fact_row.get(field),
+            form_item_id=form_item_id,
+            form_items_index=form_items_index,
+        )
+    return fact_row
 
 
 def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
@@ -1748,29 +1977,21 @@ def build_star_schema_tables(
     """
     Assemble star-schema table dicts from unified flat fact sources.
 
-    ``fact_form_values`` includes static, dynamic, repeat, and matrix rows.
+    ``fact_form_values`` includes static, dynamic, and repeat rows. Matrix cell
+    values are returned as a long array on ``disaggregation_data`` (no mode wrapper).
 
     When ``assignment_statuses`` is provided (pre-scoped AES rows, including pending
     with no FormData), it replaces fact-derived assigned ``dim_submission`` rows.
     """
     value_rows = list(data_rows or []) + list(dynamic_data or []) + list(repeat_data or [])
-    fact_rows = [
-        r for r in (format_fact_submission_value_row(row) for row in value_rows)
-        if r is not None
-    ]
-    enriched_matrix_cells = enrich_matrix_cells(
-        matrix_cells,
-        form_items_table,
-        countries_table=countries_table,
-        national_societies_table=national_societies_table,
-        indicator_bank_table=indicator_bank_table,
-    )
-    fact_rows.extend(
-        r for r in (
-            format_fact_matrix_cell_row(cell) for cell in enriched_matrix_cells
-        )
-        if r is not None
-    )
+    form_items_index = _index_dimension_table(form_items_table)
+    fact_rows = []
+    for row in value_rows:
+        fact = format_fact_submission_value_row(row)
+        if fact is None:
+            continue
+        _apply_star_schema_disagg_format(fact, form_items_index=form_items_index)
+        fact_rows.append(fact)
 
     template_ids = {
         int(r['template_id'])

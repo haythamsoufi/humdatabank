@@ -6,7 +6,7 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 from tests.factories import create_test_admin
-from app.models import IndicatorBankType, IndicatorBankUnit
+from app.models import IndicatorBankSpef, IndicatorBankType, IndicatorBankUnit
 
 pytestmark = [pytest.mark.unit]
 
@@ -36,6 +36,20 @@ def _create_type(db_session, code="testtype", name="Test Type"):
     if existing:
         return existing
     row = IndicatorBankType(
+        code=code, name=name, sort_order=10, is_active=True
+    )
+    db_session.add(row)
+    db_session.commit()
+    db_session.refresh(row)
+    return row
+
+
+def _create_spef(db_session, code="EF9", name="Test SPEF"):
+    """Create an IndicatorBankSpef row for tests."""
+    existing = IndicatorBankSpef.query.filter_by(code=code).first()
+    if existing:
+        return existing
+    row = IndicatorBankSpef(
         code=code, name=name, sort_order=10, is_active=True
     )
     db_session.add(row)
@@ -654,3 +668,36 @@ class TestDeleteMeasurementUnit:
             follow_redirects=False,
         )
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# GET/POST /admin/indicator-bank/spef-lookups/<sid>/edit
+# ---------------------------------------------------------------------------
+
+class TestEditSpefLookup:
+    def test_post_saves_name_translations(self, logged_in_client, db_session, app):
+        with app.app_context():
+            row = _create_spef(db_session, "SP8", "Strategy Priority 8")
+            row_id = row.id
+            app.config["TRANSLATABLE_LANGUAGES"] = ["fr", "es"]
+
+        resp = logged_in_client.post(
+            f"/admin/indicator-bank/spef-lookups/{row_id}/edit",
+            data={
+                "code": "SP8",
+                "name": "Strategy Priority 8",
+                "sort_order": "10",
+                "is_active": "y",
+                "name_fr": "Priorité stratégique 8",
+                "name_es": "Prioridad estratégica 8",
+            },
+            follow_redirects=False,
+        )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            refreshed = IndicatorBankSpef.query.get(row_id)
+            assert refreshed.name_translations == {
+                "fr": "Priorité stratégique 8",
+                "es": "Prioridad estratégica 8",
+            }

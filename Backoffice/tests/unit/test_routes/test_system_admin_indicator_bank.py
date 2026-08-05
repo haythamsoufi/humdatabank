@@ -4,6 +4,7 @@ Targeting 100% code coverage of indicator bank management routes.
 """
 import json
 import io
+import base64
 import pytest
 from unittest.mock import patch, MagicMock, call
 from app.models import IndicatorBank, CommonWord
@@ -21,6 +22,15 @@ def _mock_render(return_value="<html>ok</html>"):
         "app.routes.admin.system_admin.indicator_bank.render_template",
         return_value=return_value,
     )
+
+
+def _json(data):
+    return json.dumps(data)
+
+
+def _waf_payload(data):
+    encoded = base64.b64encode(json.dumps(data).encode()).decode()
+    return json.dumps({"payload": encoded})
 
 
 def _create_indicator(db_session, name="Test Indicator", itype="number", unit=None):
@@ -348,12 +358,50 @@ class TestEditIndicatorBank:
     def test_post_json_updates_name_translation(self, logged_in_client, db_session, app):
         with app.app_context():
             ind = _create_indicator(db_session, name="Trans Edit Indicator")
+            ind_id = ind.id
         resp = logged_in_client.post(
-            f"/admin/indicator_bank/edit/{ind.id}",
-            data=json.dumps({"name_fr": "Indicateur en français"}),
+            f"/admin/indicator_bank/edit/{ind_id}",
+            data=_json({"name_fr": "Indicateur en français"}),
             content_type="application/json",
         )
         assert resp.status_code == 200
+        with app.app_context():
+            refreshed = IndicatorBank.query.get(ind_id)
+            assert (refreshed.name_translations or {}).get("fr") == "Indicateur en français"
+
+    def test_post_waf_form_saves_name_translations(self, logged_in_client, db_session, app):
+        from app.models import IndicatorBankType
+
+        with app.app_context():
+            app.config["TRANSLATABLE_LANGUAGES"] = ["fr"]
+            row_type = IndicatorBankType.query.filter_by(code="number").first()
+            if row_type is None:
+                row_type = IndicatorBankType(
+                    code="number", name="Number", sort_order=0, is_active=True
+                )
+                db_session.add(row_type)
+                db_session.commit()
+                db_session.refresh(row_type)
+            ind = _create_indicator(db_session, name="WAF Trans Indicator")
+            ind_id = ind.id
+            type_id = row_type.id
+
+        resp = logged_in_client.post(
+            f"/admin/indicator_bank/edit/{ind_id}",
+            data=_waf_payload({
+                "name": "WAF Trans Indicator",
+                "type": str(type_id),
+                "unit": "",
+                "definition": "",
+                "name_fr": "Nom français",
+            }),
+            content_type="application/json",
+            headers={"X-Requested-With": "XMLHttpRequest"},
+        )
+        assert resp.status_code == 200
+        with app.app_context():
+            refreshed = IndicatorBank.query.get(ind_id)
+            assert (refreshed.name_translations or {}).get("fr") == "Nom français"
 
     def test_post_json_updates_definition_translation(self, logged_in_client, db_session, app):
         with app.app_context():
@@ -536,13 +584,19 @@ class TestArchiveIndicatorBank:
 class TestUpdateIndicatorTranslations:
     def test_update_translations_success(self, logged_in_client, db_session, app):
         with app.app_context():
+            app.config["TRANSLATABLE_LANGUAGES"] = ["fr"]
             ind = _create_indicator(db_session, name="Trans Update Indicator")
+            ind_id = ind.id
         resp = logged_in_client.post(
-            f"/admin/indicator_bank/translations/{ind.id}",
+            f"/admin/indicator_bank/translations/{ind_id}",
             data={"name_fr": "Nom en français", "definition_fr": "Définition"},
             follow_redirects=False,
         )
         assert resp.status_code == 302
+        with app.app_context():
+            refreshed = IndicatorBank.query.get(ind_id)
+            assert (refreshed.name_translations or {}).get("fr") == "Nom en français"
+            assert (refreshed.definition_translations or {}).get("fr") == "Définition"
 
     def test_update_translations_404(self, logged_in_client, db_session):
         resp = logged_in_client.post(

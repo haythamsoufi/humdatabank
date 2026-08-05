@@ -9,6 +9,7 @@ from flask_wtf.file import FileField, FileAllowed
 from app.utils.request_utils import get_request_data
 from wtforms import StringField, TextAreaField, SubmitField, SelectField, BooleanField, IntegerField
 from wtforms.validators import DataRequired, Optional, Length, ValidationError
+from sqlalchemy.orm.attributes import flag_modified
 from app.extensions import db
 from app.models import (
     IndicatorBank,
@@ -337,6 +338,8 @@ class IndicatorBankForm(BaseForm, MultilingualFieldsMixin):
 
         self._apply_multilingual_field(indicator_bank, "name", "set_name_translation")
         self._apply_multilingual_field(indicator_bank, "aggregated_label", "set_aggregated_label_translation")
+        flag_modified(indicator_bank, "name_translations")
+        flag_modified(indicator_bank, "aggregated_label_translations")
 
         indicator_bank.archived = self.archived.data
         indicator_bank.emergency = self.emergency.data
@@ -457,6 +460,7 @@ class CommonWordForm(BaseForm, MultilingualFieldsMixin):
             field = getattr(self, f"meaning_{lang}", None)
             if field is not None:
                 common_word.set_meaning_translation(lang, field.data or "")
+        flag_modified(common_word, "meaning_translations")
 
     def populate_from_common_word(self, common_word):
         """Populate the form with data from an existing common word."""

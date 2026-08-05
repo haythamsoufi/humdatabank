@@ -9,6 +9,7 @@ from app.services.public_document_service import (
     PUBLIC_DOC_MAX_CONTENT_CHARS,
     _build_search_filters,
     _extract_year,
+    _public_document_link_fields,
     _should_prioritize_latest_per_country,
     filter_rows_to_public_documents,
     list_public_documents_in_scope,
@@ -61,11 +62,21 @@ class TestPublicDocumentHelpers:
             "document_id": 9,
             "document_title": "Syria Unified Plan 2026",
             "source_url": "https://idrl.ifrc.org/Document/Download/12345",
+            "has_local_file": True,
             "content": "Migration programmes.",
             "combined_score": 0.82,
         }
         slim = slim_public_document_chunk(row, max_content_chars=500)
         assert slim["source_url"] == "https://idrl.ifrc.org/Document/Download/12345"
+        assert slim["document_url"] == "https://idrl.ifrc.org/Document/Download/12345"
+
+    def test_public_document_link_fields_prefers_local_download_when_no_source(self):
+        links = _public_document_link_fields(42, source_url=None, has_local_file=True)
+        assert links["source_url"] is None
+        assert links["download_url"] is None or links["download_url"].endswith("/public/documents/42/download")
+        assert links["document_url"] == links["download_url"]
+
+    def test_query_requests_multi_year_documents(self):
         assert query_requests_multi_year_documents("Syria migration activities over years") is True
         assert query_requests_multi_year_documents("compare Syria 2024 and 2026 plans") is True
         assert query_requests_multi_year_documents("migration in 2026 unified plans") is False

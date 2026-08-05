@@ -134,13 +134,13 @@ paths:
             default: hybrid
       responses:
         "200":
-          description: chunks with content, document_title, page_number, score, source_url
+          description: chunks with content, document_title, page_number, score, document_url
 
   /public/documents/{document_id}:
     get:
       operationId: getPublicDocument
       summary: Public document metadata
-      description: Title, countries, and source_url for one public AI document. Use when the user asks for a link to a cited document.
+      description: Title, countries, source_url, download_url, document_url for one public AI document.
       parameters:
         - name: document_id
           in: path
@@ -149,9 +149,28 @@ paths:
             type: integer
       responses:
         "200":
-          description: document_id, document_title, source_url, countries
+          description: document_id, document_title, document_url, source_url, download_url
         "404":
           description: Document not found or not public
+
+  /public/documents/{document_id}/download:
+    get:
+      operationId: downloadPublicDocument
+      summary: Download public AI document
+      description: Streams a Databank-hosted file or redirects to external source_url. Use document_url from search when sharing links.
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: File stream
+        "302":
+          description: Redirect to external source_url
+        "404":
+          description: Document not found or file unavailable
 
   /indicator-bank:
     get:

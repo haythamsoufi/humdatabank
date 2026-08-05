@@ -14,7 +14,7 @@ import threading
 from datetime import timedelta
 from typing import Callable, Optional
 
-from app.utils.datetime_helpers import utcnow
+from app.utils.datetime_helpers import ensure_utc, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +83,9 @@ def start_ai_job_thread(app, job_id: str, target: Callable) -> None:
 
 
 def _latest_item_activity(job) -> Optional[object]:
-    latest = job.started_at or job.created_at
+    latest = ensure_utc(job.started_at or job.created_at)
     for item in job.items or []:
-        touched = item.updated_at or item.created_at
+        touched = ensure_utc(item.updated_at or item.created_at)
         if touched and (latest is None or touched > latest):
             latest = touched
     return latest
@@ -134,7 +134,7 @@ def _recover_stuck_job_items(job, *, stale_seconds: int) -> None:
     for item in job.items or []:
         if item.status not in ("downloading", "processing"):
             continue
-        touched = item.updated_at or item.created_at
+        touched = ensure_utc(item.updated_at or item.created_at)
         if touched and touched > cutoff:
             continue
         item.status = "failed"
@@ -194,7 +194,7 @@ def reconcile_stale_ai_job(job_id: str) -> bool:
     if is_job_thread_alive(str(job.id)):
         return False
 
-    last_activity = _latest_item_activity(job) or job.created_at
+    last_activity = ensure_utc(_latest_item_activity(job) or job.created_at)
     if last_activity and last_activity > utcnow() - timedelta(seconds=abandon_seconds):
         # Worker thread may have died recently — caller can resume queued work.
         return False

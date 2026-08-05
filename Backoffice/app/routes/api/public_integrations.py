@@ -8,7 +8,11 @@ from flask import current_app, request
 
 from app.routes.api import api_bp
 from app.services.public_analytics_service import aggregate_global_trend, resolve_indicator_query
-from app.services.public_document_service import get_public_document_metadata, search_public_documents
+from app.services.public_document_service import (
+    get_public_document_metadata,
+    search_public_documents,
+    stream_public_ai_document_download,
+)
 from app.utils.api_helpers import api_error, json_response
 from app.utils.rate_limiting import api_rate_limit
 
@@ -157,3 +161,25 @@ def public_get_document(document_id: int):
             exc_info=True,
         )
         return api_error("Could not load public document", 500, error_id, None)
+
+
+@api_bp.route("/public/documents/<int:document_id>/download", methods=["GET"])
+@api_rate_limit()
+def public_download_ai_document(document_id: int):
+    """Download or redirect to a public AI Knowledge Base document (no login)."""
+    try:
+        response = stream_public_ai_document_download(document_id)
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 404)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/documents/%s/download failed [ID: %s]: %s",
+            document_id,
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not download public document", 500, error_id, None)

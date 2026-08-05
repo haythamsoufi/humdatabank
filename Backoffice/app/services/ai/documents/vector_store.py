@@ -149,6 +149,12 @@ class AIVectorStore:
         )
 
     @staticmethod
+    def _document_storage_ready(document: AIDocument) -> bool:
+        from app.routes.ai_documents.helpers import _ai_doc_source_ready
+
+        return bool(getattr(document, "storage_path", None) and _ai_doc_source_ready(document))
+
+    @staticmethod
     def _format_chunk_result(
         chunk: AIDocumentChunk,
         document: AIDocument,
@@ -215,6 +221,10 @@ class AIVectorStore:
             "document_category": getattr(document, "document_category", None),
             "source_organization": getattr(document, "source_organization", None),
             "source_url": (getattr(document, "source_url", None) or "").strip() or None,
+            "has_local_file": bool(
+                getattr(document, "storage_path", None)
+                and AIVectorStore._document_storage_ready(document)
+            ),
             "quality_score": getattr(document, "quality_score", None),
             # Chunk semantic metadata
             "semantic_type": getattr(chunk, "semantic_type", None),

@@ -61,13 +61,68 @@ def _document_source_url(document: AIDocument | Dict[str, Any] | None) -> str | 
     return url or None
 
 
-def _document_scope_entry(document: AIDocument) -> Dict[str, Any]:
+def _ai_document_has_local_file(document: AIDocument) -> bool:
+    from app.routes.ai_documents.helpers import _ai_doc_source_ready
+
+    return bool(getattr(document, "storage_path", None) and _ai_doc_source_ready(document))
+
+
+def _public_document_link_fields(
+    document_id: int | None,
+    *,
+    source_url: str | None = None,
+    has_local_file: bool = False,
+) -> Dict[str, str | None]:
+    """Build shareable links: external source_url and/or Databank-hosted download."""
+    download_url = None
+    if document_id and has_local_file:
+        try:
+            from flask import url_for
+
+            download_url = url_for(
+                "api.public_download_ai_document",
+                document_id=int(document_id),
+                _external=True,
+            )
+        except RuntimeError:
+            download_url = None
+    document_url = source_url or download_url
     return {
-        "document_id": int(document.id),
+        "source_url": source_url,
+        "download_url": download_url,
+        "document_url": document_url,
+    }
+
+
+def _load_public_ai_document(document_id: int) -> AIDocument:
+    completed = AIDocumentProcessingStatusValue.completed.value
+    doc = AIDocument.query.filter(
+        AIDocument.id == int(document_id),
+        AIDocument.is_public.is_(True),
+        AIDocument.searchable.is_(True),
+        AIDocument.processing_status == completed,
+    ).first()
+    if not doc:
+        raise ValueError("Document not found or not public")
+    return doc
+
+
+def _document_scope_entry(document: AIDocument) -> Dict[str, Any]:
+    doc_id = int(document.id)
+    source_url = _document_source_url(document)
+    entry = {
+        "document_id": doc_id,
         "document_title": document.title,
         "countries": _document_country_names(document),
-        "source_url": _document_source_url(document),
     }
+    entry.update(
+        _public_document_link_fields(
+            doc_id,
+            source_url=source_url,
+            has_local_file=_ai_document_has_local_file(document),
+        )
+    )
+    return entry
 
 
 def slim_public_document_chunk(row: Dict[str, Any], *, max_content_chars: int) -> Dict[str, Any]:
@@ -77,9 +132,17 @@ def slim_public_document_chunk(row: Dict[str, Any], *, max_content_chars: int) -
     if not country_names and row.get("document_country_name"):
         country_names = [row["document_country_name"]]
 
+    doc_id = row.get("document_id")
+    source_url = _document_source_url(row)
+    links = _public_document_link_fields(
+        int(doc_id) if doc_id is not None else None,
+        source_url=source_url,
+        has_local_file=bool(row.get("has_local_file")),
+    )
+
     return {
         "chunk_id": row.get("chunk_id"),
-        "document_id": row.get("document_id"),
+        "document_id": doc_id,
         "document_title": row.get("document_title"),
         "document_filename": row.get("document_filename"),
         "document_date": row.get("document_date"),
@@ -91,7 +154,7 @@ def slim_public_document_chunk(row: Dict[str, Any], *, max_content_chars: int) -
         "content": _truncate(row.get("content"), max_content_chars),
         "score": round(_chunk_score(row), 4),
         "source_organization": row.get("source_organization"),
-        "source_url": _document_source_url(row),
+        **links,
     }
 
 
@@ -648,25 +711,82 @@ def search_public_documents(
 
 
 def get_public_document_metadata(document_id: int) -> Dict[str, Any]:
-    """Return public metadata for a single AI document (including source URL when available)."""
-    completed = AIDocumentProcessingStatusValue.completed.value
-    doc = AIDocument.query.filter(
-        AIDocument.id == int(document_id),
-        AIDocument.is_public.is_(True),
-        AIDocument.searchable.is_(True),
-        AIDocument.processing_status == completed,
-    ).first()
-    if not doc:
-        raise ValueError("Document not found or not public")
-
+    """Return public metadata for a single AI document (including shareable links)."""
+    doc = _load_public_ai_document(document_id)
     doc_date = doc.document_date.isoformat() if doc.document_date else None
-    return {
+    source_url = _document_source_url(doc)
+    payload = {
         "document_id": int(doc.id),
         "document_title": doc.title,
         "document_filename": doc.filename,
         "document_date": doc_date,
         "document_category": doc.document_category,
         "countries": _document_country_names(doc),
-        "source_url": _document_source_url(doc),
         "visibility": "public_only",
+        "has_local_file": _ai_document_has_local_file(doc),
     }
+    payload.update(
+        _public_document_link_fields(
+            int(doc.id),
+            source_url=source_url,
+            has_local_file=bool(payload["has_local_file"]),
+        )
+    )
+    return payload
+
+
+def stream_public_ai_document_download(document_id: int):
+    """Stream or redirect a public AI document file (no login required)."""
+    import os
+
+    from flask import redirect, send_file
+
+    from app.routes.ai_documents.helpers import _ai_doc_source_ready, _validate_ifrc_fetch_url
+    from app.services.platform.storage_service import StorageService
+
+    doc = _load_public_ai_document(document_id)
+    source_url = _document_source_url(doc)
+    if source_url:
+        ok, _reason = _validate_ifrc_fetch_url(source_url)
+        if ok:
+            return redirect(source_url, code=302)
+
+    if not doc.storage_path or not _ai_doc_source_ready(doc):
+        raise ValueError("Document file not available")
+
+    storage = StorageService()
+    if getattr(doc, "submitted_document_id", None):
+        storage_path = doc.storage_path.strip()
+        category_rel = storage.category_rel_for_submitted_storage_path(storage_path)
+        if category_rel is None:
+            if storage_path and os.path.exists(storage_path):
+                return send_file(
+                    storage_path,
+                    as_attachment=True,
+                    download_name=doc.filename,
+                    mimetype="application/octet-stream",
+                )
+            raise ValueError("Document file not available")
+        category, rel = category_rel
+        return storage.stream_response(
+            category,
+            rel,
+            filename=doc.filename,
+            mimetype="application/octet-stream",
+            as_attachment=True,
+        )
+
+    if os.path.isabs(doc.storage_path):
+        return send_file(
+            doc.storage_path,
+            as_attachment=True,
+            download_name=doc.filename,
+            mimetype="application/octet-stream",
+        )
+    return storage.stream_response(
+        storage.AI_DOCUMENTS,
+        doc.storage_path,
+        filename=doc.filename,
+        mimetype="application/octet-stream",
+        as_attachment=True,
+    )

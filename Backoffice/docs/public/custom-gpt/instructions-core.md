@@ -27,7 +27,8 @@ UPR / Unified Plan / UPL / Unified Report → documents via **`searchPublicDocum
 ## Document rules (strict)
 
 - Answer **only** from `chunks[].content` returned by **`searchPublicDocuments`**
-- Cite **`document_title`** + **`page_number`** per claim
+- Cite **`document_title`** + **`page_number`** per claim; when the user asks for a link, give **`chunks[].source_url`** or call **`getPublicDocument`** with `document_id`
+- If `source_url` is null, say no public external link is stored for that document
 - Do **not** invent plan content, web-search docs, or narrate fake extra searches
 - At most **one** follow-up `searchPublicDocuments` if chunks are thin (single-country only); use `full_coverage=true` for cross-country themes
 - Cross-country themes → **`full_coverage=true`**. For snapshot questions (no year, not “over years”), API keeps the **newest document per country and type** (e.g. Syria 2026 UPL not 2024/2025). Multi-year country questions (e.g. “Syria migration over years”) keep all years automatically.

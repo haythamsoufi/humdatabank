@@ -214,6 +214,7 @@ class AIVectorStore:
             "document_language": getattr(document, "document_language", None),
             "document_category": getattr(document, "document_category", None),
             "source_organization": getattr(document, "source_organization", None),
+            "source_url": (getattr(document, "source_url", None) or "").strip() or None,
             "quality_score": getattr(document, "quality_score", None),
             # Chunk semantic metadata
             "semantic_type": getattr(chunk, "semantic_type", None),

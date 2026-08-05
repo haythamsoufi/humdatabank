@@ -50,6 +50,26 @@ def _chunk_score(row: Dict[str, Any]) -> float:
     return 0.0
 
 
+def _document_source_url(document: AIDocument | Dict[str, Any] | None) -> str | None:
+    if document is None:
+        return None
+    if isinstance(document, dict):
+        raw = document.get("source_url")
+    else:
+        raw = getattr(document, "source_url", None)
+    url = (raw or "").strip()
+    return url or None
+
+
+def _document_scope_entry(document: AIDocument) -> Dict[str, Any]:
+    return {
+        "document_id": int(document.id),
+        "document_title": document.title,
+        "countries": _document_country_names(document),
+        "source_url": _document_source_url(document),
+    }
+
+
 def slim_public_document_chunk(row: Dict[str, Any], *, max_content_chars: int) -> Dict[str, Any]:
     """Project a vector-store hit to a compact shape for Custom GPT Actions."""
     countries = row.get("document_countries") or []
@@ -71,6 +91,7 @@ def slim_public_document_chunk(row: Dict[str, Any], *, max_content_chars: int) -
         "content": _truncate(row.get("content"), max_content_chars),
         "score": round(_chunk_score(row), 4),
         "source_organization": row.get("source_organization"),
+        "source_url": _document_source_url(row),
     }
 
 
@@ -307,6 +328,7 @@ def prioritize_latest_documents_per_country(
                     "countries": _document_country_names(doc),
                     "document_type": type_key,
                     "document_year": _document_year(doc),
+                    "source_url": _document_source_url(doc),
                     "superseded_by_document_id": int(best.id),
                     "superseded_by_title": best.title,
                 }
@@ -415,11 +437,7 @@ def _search_public_documents_full_coverage(
 
     doc_ids = [int(doc.id) for doc in documents]
     scope_without_hits = {
-        int(doc.id): {
-            "document_id": int(doc.id),
-            "document_title": doc.title,
-            "countries": _document_country_names(doc),
-        }
+        int(doc.id): _document_scope_entry(doc)
         for doc in documents
     }
 
@@ -627,3 +645,28 @@ def search_public_documents(
     if coverage_block is not None:
         payload["coverage"] = coverage_block
     return payload
+
+
+def get_public_document_metadata(document_id: int) -> Dict[str, Any]:
+    """Return public metadata for a single AI document (including source URL when available)."""
+    completed = AIDocumentProcessingStatusValue.completed.value
+    doc = AIDocument.query.filter(
+        AIDocument.id == int(document_id),
+        AIDocument.is_public.is_(True),
+        AIDocument.searchable.is_(True),
+        AIDocument.processing_status == completed,
+    ).first()
+    if not doc:
+        raise ValueError("Document not found or not public")
+
+    doc_date = doc.document_date.isoformat() if doc.document_date else None
+    return {
+        "document_id": int(doc.id),
+        "document_title": doc.title,
+        "document_filename": doc.filename,
+        "document_date": doc_date,
+        "document_category": doc.document_category,
+        "countries": _document_country_names(doc),
+        "source_url": _document_source_url(doc),
+        "visibility": "public_only",
+    }

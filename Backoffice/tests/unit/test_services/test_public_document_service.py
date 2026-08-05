@@ -55,7 +55,17 @@ class TestPublicDocumentHelpers:
         assert len(slim["content"]) <= 101
         assert slim["content"].endswith("…")
 
-    def test_query_requests_multi_year_documents(self):
+    def test_slim_public_document_chunk_includes_source_url(self):
+        row = {
+            "chunk_id": 1,
+            "document_id": 9,
+            "document_title": "Syria Unified Plan 2026",
+            "source_url": "https://idrl.ifrc.org/Document/Download/12345",
+            "content": "Migration programmes.",
+            "combined_score": 0.82,
+        }
+        slim = slim_public_document_chunk(row, max_content_chars=500)
+        assert slim["source_url"] == "https://idrl.ifrc.org/Document/Download/12345"
         assert query_requests_multi_year_documents("Syria migration activities over years") is True
         assert query_requests_multi_year_documents("compare Syria 2024 and 2026 plans") is True
         assert query_requests_multi_year_documents("migration in 2026 unified plans") is False

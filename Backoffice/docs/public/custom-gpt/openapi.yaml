@@ -134,7 +134,24 @@ paths:
             default: hybrid
       responses:
         "200":
-          description: chunks with content, document_title, page_number, score
+          description: chunks with content, document_title, page_number, score, source_url
+
+  /public/documents/{document_id}:
+    get:
+      operationId: getPublicDocument
+      summary: Public document metadata
+      description: Title, countries, and source_url for one public AI document. Use when the user asks for a link to a cited document.
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: document_id, document_title, source_url, countries
+        "404":
+          description: Document not found or not public
 
   /indicator-bank:
     get:

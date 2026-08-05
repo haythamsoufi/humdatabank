@@ -112,7 +112,7 @@ Administrators can mark AI Knowledge Base documents **`public`**. You can search
 
 1. `searchPublicDocuments` with the **full user question** as `query` (include country + year + “unified plan”).
 2. Read **`chunks[]`** only — default `top_k=8`; use `top_k=12` for broad summaries (e.g. all focus areas).
-3. Synthesize a concise answer **strictly from chunk text**; cite `document_title` + `page_number` per claim.
+3. Synthesize a concise answer **strictly from chunk text**; cite `document_title` + `page_number` per claim. If the user asks for the document link, provide `chunks[].source_url` or call **`getPublicDocument`** with `document_id`.
 4. If chunks are thin or off-topic: **one** follow-up `searchPublicDocuments` with a clearer query — then answer or state limits. Do not pretend to search without calling the API.
 5. If `count=0`: say no **public** document matched; suggest the plan may not be marked public in the Knowledge Base or the title/year differs.
 

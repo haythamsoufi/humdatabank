@@ -786,6 +786,8 @@ def update_indicator_translations(id):
     try:
         translation_changes = []
         languages = current_app.config.get("TRANSLATABLE_LANGUAGES", None) or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
+        name_updated = False
+        definition_updated = False
 
         for lang in languages:
             name_key = f'name_{lang}'
@@ -800,6 +802,7 @@ def update_indicator_translations(id):
                     elif old_name and new_name != old_name:
                         translation_changes.append(f"{lang.upper()} Name: Changed from '{old_name}' to '{new_name}'")
                     indicator.set_name_translation(lang, new_name)
+                    name_updated = True
 
             if definition_key in request.form:
                 new_definition = request.form[definition_key].strip()
@@ -810,6 +813,14 @@ def update_indicator_translations(id):
                     elif old_definition and new_definition != old_definition:
                         translation_changes.append(f"{lang.upper()} Definition: Changed from '{old_definition[:50]}{'...' if len(old_definition) > 50 else ''}' to '{new_definition[:50]}{'...' if len(new_definition) > 50 else ''}'")
                     indicator.set_definition_translation(lang, new_definition)
+                    definition_updated = True
+
+        if name_updated:
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(indicator, "name_translations")
+        if definition_updated:
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(indicator, "definition_translations")
 
         if translation_changes:
             change_description = "; ".join(translation_changes)

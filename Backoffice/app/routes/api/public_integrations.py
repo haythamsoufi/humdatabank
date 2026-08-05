@@ -8,7 +8,7 @@ from flask import current_app, request
 
 from app.routes.api import api_bp
 from app.services.public_analytics_service import aggregate_global_trend, resolve_indicator_query
-from app.services.public_document_service import search_public_documents
+from app.services.public_document_service import get_public_document_metadata, search_public_documents
 from app.utils.api_helpers import api_error, json_response
 from app.utils.rate_limiting import api_rate_limit
 
@@ -133,3 +133,27 @@ def public_search_documents():
             exc_info=True,
         )
         return api_error("Could not search public documents", 500, error_id, None)
+
+
+@api_bp.route("/public/documents/<int:document_id>", methods=["GET"])
+@api_rate_limit()
+def public_get_document(document_id: int):
+    """Public metadata for one AI document (title, countries, source_url)."""
+    try:
+        payload = get_public_document_metadata(document_id)
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 404)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/documents/%s failed [ID: %s]: %s",
+            document_id,
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not load public document", 500, error_id, None)

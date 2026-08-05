@@ -114,11 +114,16 @@ def notify_public_submission_received(public_submission):
         from app.models.forms import FormTemplate
 
         template_name = 'Unknown Template'
+        assignment_title = template_name
         country_name = 'Unknown Country'
         if public_submission.assigned_form and public_submission.assigned_form.template_id:
             template = FormTemplate.query.get(public_submission.assigned_form.template_id)
             if template:
                 template_name = template.name
+            try:
+                assignment_title = public_submission.assigned_form.display_name or template_name
+            except Exception:
+                assignment_title = template_name
         if public_submission.country:
             country_name = public_submission.country.name
 
@@ -131,6 +136,7 @@ def notify_public_submission_received(public_submission):
             message_key='notification.public_submission_received.message',
             message_params={
                 'template': template_name,
+                'assignment_title': assignment_title,
                 'country': country_name,
                 'submitter': public_submission.submitter_name or public_submission.submitter_email or 'Unknown'
             },

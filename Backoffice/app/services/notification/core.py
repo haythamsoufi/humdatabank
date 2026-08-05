@@ -78,21 +78,23 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
     # in messages.pot; otherwise manage_translations shows unrelated/old entries only.
     translation_sources = {
         # Assignment notifications (title = headline; message = detail — avoid repeating the same sentence in both)
-        'notification.assignment_created.title': _notification_msgid('New Assignment Created'),
+        'notification.assignment_created.title': _notification_msgid(
+            'New assignment: %(assignment_title)s'
+        ),
         'notification.assignment_created.message': _notification_msgid(
-            "Template '%(template)s', period '%(period)s'. Due date: %(due_date)s."
+            '%(country)s — due %(due_date)s.'
         ),
 
         'notification.assignment_submitted.submitter.title': _notification_msgid('Submission successful'),
         'notification.assignment_submitted.submitter.message': _notification_msgid(
-            'You submitted %(assignment_title)s successfully.'
+            'You submitted %(assignment_title)s for %(country)s successfully.'
         ),
 
         'notification.assignment_submitted.title': _notification_msgid(
             'Team update: %(assignment_title)s submitted'
         ),
         'notification.assignment_submitted.message': _notification_msgid(
-            'Another focal point in your entity submitted %(assignment_title)s. No action needed from you.'
+            '%(submitter_name)s submitted %(assignment_title)s for %(country)s. No action needed from you.'
         ),
 
         'notification.assignment_submitted.team_email.title': _notification_msgid(
@@ -106,48 +108,52 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             '{submitter_name} has submitted {assignment_title}.'
         ),
         'notification.assignment_submitted.admin.message': _notification_msgid(
-            'Please review and validate this submission in the Backoffice.'
+            'Please review and validate this submission for %(country)s in the Backoffice.'
         ),
 
-        'notification.assignment_approved.title': _notification_msgid('Assignment approved'),
+        'notification.assignment_approved.title': _notification_msgid(
+            'Assignment approved: %(assignment_title)s'
+        ),
         'notification.assignment_approved.message': _notification_msgid(
-            "Your assignment '%(template)s' has been approved."
+            '%(actor_name)s approved this assignment for %(country)s.'
         ),
 
-        'notification.assignment_reopened.title': _notification_msgid('Assignment reopened'),
+        'notification.assignment_reopened.title': _notification_msgid(
+            'Assignment reopened: %(assignment_title)s'
+        ),
         'notification.assignment_reopened.message': _notification_msgid(
-            "Assignment '%(template)s' has been reopened."
+            '%(actor_name)s reopened this assignment for %(country)s.'
         ),
 
         'notification.assignment_sent_for_review.title': _notification_msgid(
-            'Review requested: %(template)s — %(country)s'
+            'Review requested: %(assignment_title)s — %(country)s'
         ),
         'notification.assignment_sent_for_review.message': _notification_msgid(
-            '%(submitter_name)s sent the %(template)s assignment for %(country)s (period %(period)s) for your review before submission.'
+            '%(submitter_name)s sent this assignment for %(country)s for your review before submission.'
         ),
         'notification.assignment_sent_for_review.admin.title': _notification_msgid(
-            'Sent for review: %(template)s — %(country)s'
+            'Sent for review: %(assignment_title)s — %(country)s'
         ),
         'notification.assignment_sent_for_review.admin.message': _notification_msgid(
-            '%(submitter_name)s escalated the %(template)s assignment for %(country)s (period %(period)s) for delegation review.'
+            '%(submitter_name)s escalated this assignment for %(country)s for delegation review.'
         ),
 
         'notification.assignment_returned_for_revision.title': _notification_msgid(
-            'Changes requested: %(template)s'
+            'Changes requested: %(assignment_title)s — %(country)s'
         ),
         'notification.assignment_returned_for_revision.message': _notification_msgid(
-            'Period %(period)s: delegation returned this assignment for your changes before resubmitting for review.'
+            '%(actor_name)s returned this assignment for your changes before resubmitting for review.'
         ),
 
         # Document notifications
         'notification.document_uploaded.title': _notification_msgid('Document uploaded'),
         'notification.document_uploaded.message': _notification_msgid(
-            "'%(document)s' (%(document_type)s) was uploaded."
+            "'%(document)s' (%(document_type)s) was uploaded for %(country)s."
         ),
 
         'notification.document_uploaded.pending.title': _notification_msgid('Document pending review'),
         'notification.document_uploaded.pending.message': _notification_msgid(
-            "'%(document)s' (%(document_type)s) has been uploaded and requires approval."
+            "'%(document)s' (%(document_type)s) for %(country)s requires approval."
         ),
 
         # Access request notifications
@@ -167,19 +173,25 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
         'notification.form_updated.message': _notification_msgid('Form data has been updated.'),
 
         # Deadline notifications
-        'notification.deadline_reminder.title': _notification_msgid('Deadline reminder'),
+        'notification.deadline_reminder.title': _notification_msgid(
+            'Deadline reminder: %(assignment_title)s'
+        ),
         'notification.deadline_reminder.message': _notification_msgid(
-            "Assignment '%(template)s' is due on %(due_date)s."
+            '%(country)s — due on %(due_date)s.'
         ),
 
         # Self-report notifications
-        'notification.self_report_created.title': _notification_msgid('Self report created'),
-        'notification.self_report_created.message': _notification_msgid('A new self-report has been created.'),
+        'notification.self_report_created.title': _notification_msgid(
+            'Self report created: %(assignment_title)s'
+        ),
+        'notification.self_report_created.message': _notification_msgid(
+            'A new self-report is available for %(country)s.'
+        ),
 
         # Public submission notifications
         'notification.public_submission_received.title': _notification_msgid('Public submission received'),
         'notification.public_submission_received.message': _notification_msgid(
-            "From %(submitter)s (%(country)s) for '%(template)s'."
+            "From %(submitter)s (%(country)s) for %(assignment_title)s."
         ),
 
         # Admin message notifications (these use custom messages, so we handle them specially)
@@ -200,7 +212,7 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
 
         # Validation questions (data quality checks)
         'notification.validation_questions.title': _notification_msgid(
-            'Validation questions for %(template)s (%(period)s)'
+            'Validation questions: %(assignment_title)s'
         ),
         'notification.validation_questions.message': _notification_msgid(
             '%(count)s data validation question(s) for %(entity)s require your response.'

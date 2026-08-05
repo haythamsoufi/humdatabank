@@ -21,13 +21,72 @@ from app.services.notification.core import (
     notify_entity_focal_points,
 )
 
+
+def _resolve_entity_name(entity_type, entity_id) -> str:
+    from app.services.organization.entity_service import EntityService
+
+    entity_name = EntityService.get_localized_entity_name(
+        entity_type, entity_id, include_hierarchy=True
+    )
+    if not entity_name or entity_name.startswith('Unknown'):
+        return entity_type.replace('_', ' ').title()
+    return entity_name
+
+
+def _resolve_current_actor_name(*, fallback: str = "An administrator") -> str:
+    if current_user and current_user.is_authenticated and current_user.name:
+        return current_user.name
+    return fallback
+
+
+def _resolve_current_actor_user_id():
+    if current_user and current_user.is_authenticated:
+        return current_user.id
+    return None
+
+
+def _resolve_approved_by_name(assignment_entity_status) -> str:
+    approver_id = getattr(assignment_entity_status, 'approved_by_user_id', None)
+    if approver_id:
+        approver = User.query.get(int(approver_id))
+        if approver and approver.name:
+            return approver.name
+    return _resolve_current_actor_name(fallback="An administrator")
+
+
+def _build_assignment_notification_params(
+    aes,
+    assigned_form,
+    template_name: str,
+    *,
+    actor_name: str | None = None,
+    actor_user_id=None,
+    due_date_str: str | None = None,
+) -> dict:
+    """Shared message params: display title, entity, and optional actor."""
+    params = {
+        'assignment_title': _resolve_assignment_display_title(assigned_form, template_name),
+        'template': template_name,
+        'period': assigned_form.period_name if assigned_form else '',
+        'country': _resolve_entity_name(aes.entity_type, aes.entity_id),
+        '_entity_type': aes.entity_type,
+        '_entity_id': aes.entity_id,
+    }
+    if due_date_str is not None:
+        params['due_date'] = due_date_str
+    if actor_name is not None:
+        params['actor_name'] = actor_name
+    if actor_user_id is not None:
+        params['_actor_user_id'] = actor_user_id
+    return params
+
+
 def notify_assignment_created(assignment_entity_status):
     """Notify focal points (and optionally entity-scoped admins) when a new assignment is created."""
     aes = assignment_entity_status
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -73,21 +132,22 @@ def notify_assignment_created(assignment_entity_status):
     # Use assigned_form_id instead of AES ID for related_object_id to ensure proper deduplication
     # across multiple entities in the same assignment
     due_date_str = aes.due_date.strftime('%Y-%m-%d') if aes.due_date else _('No deadline set')
+    message_params = _build_assignment_notification_params(
+        aes, assigned_form, template_name, due_date_str=due_date_str
+    )
+    title_params = {
+        'assignment_title': message_params['assignment_title'],
+        'country': message_params['country'],
+    }
 
     notifications = notify_entity_focal_points(
         entity_type=entity_type,
         entity_id=entity_id,
         notification_type=NotificationType.assignment_created,
         title_key='notification.assignment_created.title',
-        title_params=None,
+        title_params=title_params,
         message_key='notification.assignment_created.message',
-        message_params={
-            'template': template_name,
-            'period': assigned_form.period_name,
-            'due_date': due_date_str,
-            '_entity_type': entity_type,  # Store entity info for label (prefixed with _ to avoid translation)
-            '_entity_id': entity_id
-        },
+        message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.assigned_form_id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
@@ -111,15 +171,9 @@ def notify_assignment_created(assignment_entity_status):
                 user_ids=admin_only,
                 notification_type=NotificationType.assignment_created,
                 title_key='notification.assignment_created.title',
-                title_params=None,
+                title_params=title_params,
                 message_key='notification.assignment_created.message',
-                message_params={
-                    'template': template_name,
-                    'period': assigned_form.period_name,
-                    'due_date': due_date_str,
-                    '_entity_type': entity_type,
-                    '_entity_id': entity_id,
-                },
+                message_params=dict(message_params),
                 related_object_type='assignment',
                 related_object_id=aes.assigned_form_id,
                 related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
@@ -165,7 +219,6 @@ def notify_assignment_submitted(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -205,6 +258,7 @@ def notify_assignment_submitted(assignment_entity_status):
         submitter_user_id = current_user.id
 
     assignment_title = _resolve_assignment_display_title(assigned_form, template_name)
+    entity_name = _resolve_entity_name(entity_type, entity_id)
     related_url = url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id)
 
     focal_notifications = []
@@ -224,6 +278,7 @@ def notify_assignment_submitted(assignment_entity_status):
             stored_params = {
                 'assignment_title': assignment_title,
                 'submitter_name': submitter_name,
+                'country': entity_name,
                 'template': template_name,
                 'period': assigned_form.period_name,
                 '_entity_type': entity_type,
@@ -262,12 +317,6 @@ def notify_assignment_submitted(assignment_entity_status):
                 notification_by_user_id=notification_by_user_id,
             )
 
-    # Get entity name for the notification message
-    from app.services.organization.entity_service import EntityService
-    entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True)
-    if not entity_name or entity_name.startswith('Unknown'):
-        # Fallback to entity type if name not found
-        entity_name = entity_type.replace('_', ' ').title()
 
     secondary_recipients = resolve_submission_review_recipient_user_ids(
         aes,
@@ -337,7 +386,6 @@ def notify_assignment_sent_for_review(assignment_entity_status):
     entity_id = aes.entity_id
     assigned_form = aes.assigned_form
     from app.models.forms import FormTemplate
-    from app.services.organization.entity_service import EntityService
 
     template = FormTemplate.query.get(assigned_form.template_id) if assigned_form and assigned_form.template_id else None
     template_name = template.name if template else "Unknown Template"
@@ -345,15 +393,28 @@ def notify_assignment_sent_for_review(assignment_entity_status):
     if assigned_form and (assigned_form.period_name or "").startswith("[LOADTEST]"):
         return []
 
-    entity_name = EntityService.get_localized_entity_name(entity_type, entity_id, include_hierarchy=True)
-    if not entity_name or entity_name.startswith('Unknown'):
-        entity_name = entity_type.replace('_', ' ').title()
+    entity_name = _resolve_entity_name(entity_type, entity_id)
+    assignment_title = _resolve_assignment_display_title(assigned_form, template_name)
 
     submitter_name = (
         current_user.name
         if (current_user and current_user.is_authenticated and current_user.name)
         else "A National Society focal point"
     )
+    submitter_user_id = getattr(aes, 'submitted_by_user_id', None)
+    if submitter_user_id is None and current_user and current_user.is_authenticated:
+        submitter_user_id = current_user.id
+
+    message_params = _build_assignment_notification_params(
+        aes, assigned_form, template_name
+    )
+    message_params['submitter_name'] = submitter_name
+    if submitter_user_id is not None:
+        message_params['_actor_user_id'] = submitter_user_id
+    title_params = {
+        'assignment_title': assignment_title,
+        'country': entity_name,
+    }
 
     log_entity_activity(
         entity_type=entity_type,
@@ -384,20 +445,9 @@ def notify_assignment_sent_for_review(assignment_entity_status):
             user_ids=org_focal_ids,
             notification_type=NotificationType.assignment_sent_for_review,
             title_key='notification.assignment_sent_for_review.title',
-            title_params={
-                'template': template_name,
-                'period': assigned_form.period_name,
-                'country': entity_name,
-            },
+            title_params=title_params,
             message_key='notification.assignment_sent_for_review.message',
-            message_params={
-                'template': template_name,
-                'period': assigned_form.period_name,
-                'country': entity_name,
-                'submitter_name': submitter_name,
-                '_entity_type': entity_type,
-                '_entity_id': entity_id,
-            },
+            message_params=dict(message_params),
             entity_type=entity_type,
             entity_id=entity_id,
             related_object_type='assignment',
@@ -421,20 +471,9 @@ def notify_assignment_sent_for_review(assignment_entity_status):
             user_ids=admin_only,
             notification_type=NotificationType.assignment_sent_for_review,
             title_key='notification.assignment_sent_for_review.admin.title',
-            title_params={
-                'template': template_name,
-                'period': assigned_form.period_name,
-                'country': entity_name,
-            },
+            title_params=title_params,
             message_key='notification.assignment_sent_for_review.admin.message',
-            message_params={
-                'template': template_name,
-                'period': assigned_form.period_name,
-                'country': entity_name,
-                'submitter_name': submitter_name,
-                '_entity_type': entity_type,
-                '_entity_id': entity_id,
-            },
+            message_params=dict(message_params),
             entity_type=entity_type,
             entity_id=entity_id,
             related_object_type='assignment',
@@ -489,18 +528,27 @@ def notify_assignment_returned_for_revision(assignment_entity_status):
     if not audience_bucket_enabled(NotificationType.assignment_returned_for_revision, "focal_points"):
         return []
 
+    actor_name = _resolve_current_actor_name(fallback="Delegation reviewer")
+    actor_user_id = _resolve_current_actor_user_id()
+    message_params = _build_assignment_notification_params(
+        aes,
+        assigned_form,
+        template_name,
+        actor_name=actor_name,
+        actor_user_id=actor_user_id,
+    )
+    title_params = {
+        'assignment_title': message_params['assignment_title'],
+        'country': message_params['country'],
+    }
+
     return create_notification(
         user_ids=ns_focal_ids,
         notification_type=NotificationType.assignment_returned_for_revision,
         title_key='notification.assignment_returned_for_revision.title',
-        title_params={'template': template_name, 'period': assigned_form.period_name},
+        title_params=title_params,
         message_key='notification.assignment_returned_for_revision.message',
-        message_params={
-            'template': template_name,
-            'period': assigned_form.period_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id,
-        },
+        message_params=message_params,
         entity_type=entity_type,
         entity_id=entity_id,
         related_object_type='assignment',
@@ -516,7 +564,6 @@ def notify_assignment_approved(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -541,19 +588,26 @@ def notify_assignment_approved(assignment_entity_status):
         user_id=None
     )
 
+    actor_name = _resolve_approved_by_name(aes)
+    actor_user_id = getattr(aes, 'approved_by_user_id', None) or _resolve_current_actor_user_id()
+    message_params = _build_assignment_notification_params(
+        aes,
+        assigned_form,
+        template_name,
+        actor_name=actor_name,
+        actor_user_id=actor_user_id,
+    )
+    title_params = {'assignment_title': message_params['assignment_title']}
+
     # Create notifications for focal points using translation keys
     return notify_entity_focal_points(
         entity_type=entity_type,
         entity_id=entity_id,
         notification_type=NotificationType.assignment_approved,
         title_key='notification.assignment_approved.title',
-        title_params=None,
+        title_params=title_params,
         message_key='notification.assignment_approved.message',
-        message_params={
-            'template': template_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id
-        },
+        message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
@@ -567,7 +621,6 @@ def notify_assignment_reopened(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -592,19 +645,26 @@ def notify_assignment_reopened(assignment_entity_status):
         user_id=None
     )
 
+    actor_name = _resolve_current_actor_name(fallback="An administrator")
+    actor_user_id = _resolve_current_actor_user_id()
+    message_params = _build_assignment_notification_params(
+        aes,
+        assigned_form,
+        template_name,
+        actor_name=actor_name,
+        actor_user_id=actor_user_id,
+    )
+    title_params = {'assignment_title': message_params['assignment_title']}
+
     # Create notifications for focal points using translation keys
     notifications = notify_entity_focal_points(
         entity_type=entity_type,
         entity_id=entity_id,
         notification_type=NotificationType.assignment_reopened,
         title_key='notification.assignment_reopened.title',
-        title_params=None,
+        title_params=title_params,
         message_key='notification.assignment_reopened.message',
-        message_params={
-            'template': template_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id
-        },
+        message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
@@ -618,7 +678,6 @@ def notify_self_report_created(assignment_entity_status):
     entity_type = aes.entity_type
     entity_id = aes.entity_id
 
-    from app.services.organization.entity_service import EntityService
     from app.models.forms import FormTemplate
 
     # Get template directly via template_id to avoid stale relationship data
@@ -643,19 +702,18 @@ def notify_self_report_created(assignment_entity_status):
         user_id=None
     )
 
+    message_params = _build_assignment_notification_params(aes, assigned_form, template_name)
+    title_params = {'assignment_title': message_params['assignment_title']}
+
     # Create notifications for focal points using translation keys
     return notify_entity_focal_points(
         entity_type=entity_type,
         entity_id=entity_id,
         notification_type=NotificationType.self_report_created,
         title_key='notification.self_report_created.title',
-        title_params=None,
+        title_params=title_params,
         message_key='notification.self_report_created.message',
-        message_params={
-            'template': template_name,
-            '_entity_type': entity_type,
-            '_entity_id': entity_id
-        },
+        message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),

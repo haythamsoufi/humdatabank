@@ -163,6 +163,9 @@ class NotificationService:
             return None
         if nt_val == 'access_request_received' and n.related_object_type == 'country_access_request' and n.related_object_id:
             return car_id_to_user_id.get(int(n.related_object_id))
+        actor_uid = cls._actor_user_id_from_params(getattr(n, 'message_params', None))
+        if actor_uid is not None and nt_val == 'document_uploaded':
+            return actor_uid
         if n.related_object_type != 'assignment' or not n.related_object_id:
             return None
         aes = assignment_status_cache.get(n.related_object_id)
@@ -172,7 +175,35 @@ class NotificationService:
             return getattr(aes, 'submitted_by_user_id', None)
         if nt_val == 'assignment_approved':
             return getattr(aes, 'approved_by_user_id', None)
+        if nt_val == 'assignment_sent_for_review':
+            return getattr(aes, 'submitted_by_user_id', None)
+        actor_uid = cls._actor_user_id_from_params(getattr(n, 'message_params', None))
+        if actor_uid is not None:
+            return actor_uid
         return None
+
+    @staticmethod
+    def _params_dict(raw_params) -> Dict[str, Any]:
+        if raw_params is None:
+            return {}
+        if isinstance(raw_params, dict):
+            return raw_params.copy()
+        try:
+            import json
+            return json.loads(raw_params) if isinstance(raw_params, str) else {}
+        except Exception:
+            return {}
+
+    @classmethod
+    def _actor_user_id_from_params(cls, raw_params) -> Optional[int]:
+        params = cls._params_dict(raw_params)
+        actor_uid = params.get('_actor_user_id')
+        if actor_uid is None:
+            return None
+        try:
+            return int(actor_uid)
+        except (TypeError, ValueError):
+            return None
 
     @classmethod
     def _build_assignment_caches_for_notifications(
@@ -294,13 +325,31 @@ class NotificationService:
     _MESSAGE_KEYS_WITH_COUNTRY_PARAM = frozenset({
         'notification.user_added_to_country.message',
         'notification.public_submission_received.message',
+        'notification.assignment_created.message',
+        'notification.assignment_submitted.message',
+        'notification.assignment_submitted.submitter.message',
+        'notification.assignment_submitted.admin.message',
+        'notification.assignment_approved.message',
+        'notification.assignment_reopened.message',
         'notification.assignment_sent_for_review.message',
         'notification.assignment_sent_for_review.admin.message',
+        'notification.assignment_returned_for_revision.message',
+        'notification.self_report_created.message',
+        'notification.document_uploaded.message',
+        'notification.document_uploaded.pending.message',
+        'notification.deadline_reminder.message',
     })
 
     _NOTIFICATION_KEYS_WITH_COUNTRY_PARAM = _MESSAGE_KEYS_WITH_COUNTRY_PARAM | frozenset({
+        'notification.assignment_created.title',
+        'notification.assignment_approved.title',
+        'notification.assignment_reopened.title',
         'notification.assignment_sent_for_review.title',
         'notification.assignment_sent_for_review.admin.title',
+        'notification.assignment_returned_for_revision.title',
+        'notification.self_report_created.title',
+        'notification.deadline_reminder.title',
+        'notification.validation_questions.title',
     })
 
     _ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS = frozenset({
@@ -309,6 +358,8 @@ class NotificationService:
     })
 
     _ASSIGNMENT_TITLE_KEYS = frozenset({
+        'notification.assignment_created.title',
+        'notification.assignment_created.message',
         'notification.assignment_submitted.title',
         'notification.assignment_submitted.message',
         'notification.assignment_submitted.submitter.title',
@@ -316,6 +367,28 @@ class NotificationService:
         'notification.assignment_submitted.team_email.title',
         'notification.assignment_submitted.team_email.message',
         'notification.assignment_submitted.admin.title',
+        'notification.assignment_approved.title',
+        'notification.assignment_approved.message',
+        'notification.assignment_reopened.title',
+        'notification.assignment_reopened.message',
+        'notification.assignment_sent_for_review.title',
+        'notification.assignment_sent_for_review.message',
+        'notification.assignment_sent_for_review.admin.title',
+        'notification.assignment_sent_for_review.admin.message',
+        'notification.assignment_returned_for_revision.title',
+        'notification.assignment_returned_for_revision.message',
+        'notification.self_report_created.title',
+        'notification.self_report_created.message',
+        'notification.deadline_reminder.title',
+        'notification.deadline_reminder.message',
+        'notification.validation_questions.title',
+        'notification.public_submission_received.message',
+    })
+
+    _ACTOR_NAME_KEYS = frozenset({
+        'notification.assignment_approved.message',
+        'notification.assignment_reopened.message',
+        'notification.assignment_returned_for_revision.message',
     })
 
     @classmethod
@@ -369,10 +442,69 @@ class NotificationService:
             params['submitter_name'] = 'A National Society focal point'
         if 'period' not in params:
             params['period'] = '—'
-        if 'template' not in params:
-            params['template'] = 'this assignment'
+        if 'assignment_title' not in params and 'template' in params:
+            template = params.get('template')
+            period = params.get('period')
+            if template and period and period != '—':
+                params['assignment_title'] = f"{template} \u2013 {period}"
+            elif template:
+                params['assignment_title'] = template
+            else:
+                params['assignment_title'] = 'this assignment'
         if 'country' not in params:
             params['country'] = 'Unknown entity'
+        return params
+
+    @classmethod
+    def _ensure_actor_name_param(
+        cls,
+        notification: Notification,
+        params: Optional[Dict[str, Any]],
+        translation_key: Optional[str],
+        *,
+        assignment_status_cache: Optional[Dict[Any, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Backfill actor_name for assignment workflow notifications."""
+        if not translation_key or translation_key not in cls._ACTOR_NAME_KEYS:
+            return params or {}
+        params = (params or {}).copy()
+        if params.get('actor_name'):
+            return params
+
+        actor_uid = cls._actor_user_id_from_params(params)
+        if actor_uid is None and notification.related_object_type == 'assignment' and notification.related_object_id:
+            aes = (assignment_status_cache or {}).get(notification.related_object_id)
+            if aes is not None:
+                nt_val = (
+                    notification.notification_type.value
+                    if hasattr(notification.notification_type, 'value')
+                    else notification.notification_type
+                )
+                if nt_val == 'assignment_approved':
+                    actor_uid = getattr(aes, 'approved_by_user_id', None)
+
+        if actor_uid:
+            try:
+                actor = User.query.get(int(actor_uid))
+                if actor and actor.name:
+                    params['actor_name'] = actor.name
+                    return params
+            except Exception as e:
+                logger.debug(
+                    "[NOTIFICATION_SERVICE] Could not resolve actor_name for notification %s: %s",
+                    getattr(notification, 'id', '?'),
+                    e,
+                )
+
+        nt_val = (
+            notification.notification_type.value
+            if hasattr(notification.notification_type, 'value')
+            else notification.notification_type
+        )
+        if nt_val == 'assignment_returned_for_revision':
+            params['actor_name'] = 'Delegation reviewer'
+        else:
+            params['actor_name'] = 'An administrator'
         return params
 
     @classmethod
@@ -538,6 +670,8 @@ class NotificationService:
                         'notification.assignment_sent_for_review.admin.title',
                     ):
                         tp = cls._ensure_assignment_sent_for_review_params(tp)
+                    if title_key in cls._ACTOR_NAME_KEYS:
+                        tp = cls._ensure_actor_name_param(notification, tp, title_key)
                     translated_title = translate_notification_message(title_key, tp, locale=locale_to_use)
                 except Exception as e:
                     logger.warning(f"Error translating title_key '{title_key}' for notification {notification.id}: {e}", exc_info=True)
@@ -583,6 +717,15 @@ class NotificationService:
 
                     if message_key in cls._ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS:
                         message_params = cls._ensure_assignment_sent_for_review_params(message_params)
+
+                    if message_key in cls._ACTOR_NAME_KEYS:
+                        message_params = cls._ensure_actor_name_param(
+                            notification, message_params, message_key
+                        )
+
+                    message_params = cls._apply_localized_country_param(
+                        notification, message_key, message_params, locale=locale_to_use
+                    )
 
                     # Localize template names in params if they exist
                     # This needs to happen at display time to respect user's current language

@@ -31,6 +31,7 @@ _SAMPLE_PARAMS: Dict[str, Any] = {
     "country": "Example National Society",
     "country_name": "Example Country",
     "submitter_name": "Jamie Example",
+    "actor_name": "Alex Admin",
     "submitter": "public@example.org",
     "due_date": "2026-06-30",
     "document": "Annual Report.pdf",

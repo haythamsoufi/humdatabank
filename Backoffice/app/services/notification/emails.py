@@ -1115,6 +1115,8 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
             'notification.assignment_sent_for_review.admin.title',
         ):
             tp = NotificationService._ensure_assignment_sent_for_review_params(tp)
+        if title_key in NotificationService._ACTOR_NAME_KEYS:
+            tp = NotificationService._ensure_actor_name_param(notif, tp, title_key)
         if message_params is None:
             message_params = {}
         elif not isinstance(message_params, dict):
@@ -1132,6 +1134,10 @@ def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
             message_params = NotificationService._ensure_country_param(notif, message_params, message_key)
         if message_key in NotificationService._ASSIGNMENT_SENT_FOR_REVIEW_MESSAGE_KEYS:
             message_params = NotificationService._ensure_assignment_sent_for_review_params(message_params)
+        if message_key in NotificationService._ACTOR_NAME_KEYS:
+            message_params = NotificationService._ensure_actor_name_param(
+                notif, message_params, message_key
+            )
         if message_key in (
             'notification.assignment_submitted.message',
             'notification.assignment_submitted.admin.message',

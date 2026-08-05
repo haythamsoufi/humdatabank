@@ -16,9 +16,9 @@ from sqlalchemy import or_, null
 
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk, AIEmbedding, Country
-from app.services.ai.documents.processor import AIDocumentProcessor, DocumentProcessingError
+from app.services.ai.documents.processor import AIDocumentProcessor, DocumentProcessingError, is_ocr_available
 from app.services.ai.documents.chunking import AIChunkingService
-from app.services.ai.documents.metadata import enrich_document_metadata, classify_chunk_semantic_type, build_heading_hierarchy
+from app.services.ai.documents.metadata import enrich_document_metadata, classify_chunk_semantic_type, build_heading_hierarchy, truncate_section_title, sanitize_chunk_content_for_fts
 from app.services.ai.documents.embedding import AIEmbeddingService, EmbeddingError
 from app.services.ai.documents.vector_store import AIVectorStore
 from app.utils.datetime_helpers import utcnow
@@ -578,7 +578,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
             file_path=file_path,
             filename=filename,
             extract_images=current_app.config.get('AI_MULTIMODAL_ENABLED', False),
-            ocr_enabled=current_app.config.get('AI_OCR_ENABLED', False)
+            ocr_enabled=is_ocr_available(),
         )
         import time as _time_proc
         _time_proc.sleep(0)
@@ -651,18 +651,18 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
             )
             chunk_record = AIDocumentChunk(
                 document_id=document_id,
-                content=chunk.content,
+                content=sanitize_chunk_content_for_fts(chunk.content),
                 content_length=chunk.char_count,
                 token_count=chunk.token_count,
                 chunk_index=chunk.chunk_index,
                 page_number=chunk.page_number,
-                section_title=chunk.section_title,
+                section_title=truncate_section_title(chunk.section_title),
                 chunk_type=chunk.chunk_type,
                 overlap_with_previous=chunk.overlap_chars,
                 extra_metadata=extra_metadata,
                 semantic_type=classify_chunk_semantic_type(chunk.content, chunk.chunk_type),
                 heading_hierarchy=build_heading_hierarchy(
-                    section_title=chunk.section_title,
+                    section_title=truncate_section_title(chunk.section_title),
                     chunk_index=chunk.chunk_index,
                     page_number=chunk.page_number,
                     document_title=getattr(doc, 'title', None),

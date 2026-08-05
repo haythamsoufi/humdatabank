@@ -262,6 +262,13 @@ class DebugManager:
             ):
                 logging.getLogger(_noisy).setLevel(logging.WARNING)
 
+        # PDF OCR renders PNG pages; PIL/pytesseract are very chatty at DEBUG.
+        for _noisy_imaging in ("PIL", "PIL.PngImagePlugin", "PIL.Image", "pytesseract"):
+            logging.getLogger(_noisy_imaging).setLevel(logging.WARNING)
+
+        # PostgreSQL server NOTICEs (e.g. FTS tokens >2047 chars) via SQLAlchemy dialect.
+        logging.getLogger("sqlalchemy.dialects.postgresql").setLevel(logging.WARNING)
+
     def get_logger(self, name: str) -> logging.Logger:
         """Get a properly configured logger for a module."""
         logger = logging.getLogger(name)

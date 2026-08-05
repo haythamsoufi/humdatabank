@@ -48,12 +48,16 @@
     'processingStatusDetail',
     'processingStatusPercent',
     'processingStatusBar',
+    spinner_id='processingStatusSpinner',
     title_default=_('Processing...'),
     detail_default=_('Preparing...'),
+    overall_id='processingStatusOverall',
+    doc_list_id='processingStatusDocList',
     cancel_wrap_id='processingStatusCancelWrap',
     cancel_button_id='processingStatusCancelBtn',
     cancel_button_label=_('Cancel'),
-    cancel_button_aria_label=_('Cancel import')
+    cancel_button_aria_label=_('Cancel import'),
+    width='20rem'
 ) }}
 
 <!-- Statistics -->
@@ -617,7 +621,7 @@ window.aiDocumentsConfig.t = {
   filename_1351017a: {{ _('Filename')|tojson }},
   found_5d695cc2: {{ _('Found')|tojson }},
   global_4cc6684d: {{ _('Global')|tojson }},
-  guideline_a3928106: {{ _('Guideline')|tojson }},
+  hide_details_6c4e8b91: {{ _('Hide details')|tojson }},
   import_cancelled_2a8b4482: {{ _('Import cancelled')|tojson }},
   import_complete_a218495a: {{ _('Import complete')|tojson }},
   import_is_in_progress_are_you_sure_you_w_bf66d0d2: {{ _('Import is in progress. Are you sure you want to leave?')|tojson }},
@@ -688,6 +692,7 @@ window.aiDocumentsConfig.t = {
   import_footer_none_selected_a4c8e2b1: {{ _('Select documents in the grid')|tojson }},
   import_footer_selected_count_b7d3f9a2: {{ _('{count} selected')|tojson }},
   selected_91b442d3: {{ _('Selected')|tojson }},
+  show_details_3f7a2d18: {{ _('Show details')|tojson }},
   showing_count_of_total_8f3c1a2b: {{ _('Showing {returned} of {total} matching documents. Refine search to see more.')|tojson }},
   situation_report_eb2802e8: {{ _('Situation Report')|tojson }},
   some_documents_failed_2221bc0e: {{ _('Some documents failed')|tojson }},

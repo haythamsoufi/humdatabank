@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from flask import current_app
 
+from app.services.ai.documents.metadata import truncate_section_title
+
 logger = logging.getLogger(__name__)
 
 _PAGE_MARK_RE = re.compile(r"^\s*\[Page\s+(\d+)\]\s*$", re.IGNORECASE)
@@ -601,7 +603,7 @@ class AIChunkingService:
             char_count=len(content),
             token_count=self.count_tokens(content),
             page_number=page_number,
-            section_title=section_title,
+            section_title=truncate_section_title(section_title),
             chunk_type=chunk_type,
             overlap_chars=overlap_chars,
             metadata=metadata if (isinstance(metadata, dict) and metadata) else None

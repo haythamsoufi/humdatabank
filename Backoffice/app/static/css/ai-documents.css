@@ -646,6 +646,113 @@
     }
 }
 
+/* Floating progress banner — AI documents page */
+#processingStatusBanner {
+    width: 20rem !important;
+}
+
+#processingStatusBanner .ai-floating-progress-footer:has(#processingStatusCancelWrap.hidden):not(:has(#processingStatusDocListToggle:not(.hidden))) {
+    min-height: 0;
+}
+
+#processingStatusBanner .ai-floating-progress-toolbar:has(#processingStatusDocListToggle.hidden):has(#processingStatusCancelWrap.hidden) {
+    display: none;
+}
+
+#processingStatusBanner #processingStatusOverall:empty {
+    display: none;
+}
+
+/* Floating progress banner — per-document rows */
+.ai-docs-progress-doc-toggle {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+.ai-docs-progress-doc-toggle:hover,
+.ai-docs-progress-doc-toggle:focus-visible {
+    color: rgba(255, 255, 255, 0.95);
+    outline: none;
+}
+
+.ai-docs-progress-doc-list {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 0.375rem;
+}
+
+.ai-docs-progress-doc-list:not(.hidden) {
+    margin-top: 0.375rem;
+}
+
+.ai-docs-progress-doc-row {
+    display: grid;
+    grid-template-columns: minmax(0, 4.5rem) minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    gap: 0.125rem 0.5rem;
+    align-items: center;
+    font-size: 0.6875rem;
+    line-height: 1.25;
+}
+
+.ai-docs-progress-doc-row.is-done {
+    opacity: 0.72;
+}
+
+.ai-docs-progress-doc-row.is-failed .ai-docs-progress-doc-label {
+    color: #fca5a5;
+}
+
+.ai-docs-progress-doc-label {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.92);
+    font-variant-numeric: tabular-nums;
+}
+
+.ai-docs-progress-doc-stage {
+    grid-column: 2;
+    grid-row: 1;
+    color: rgba(255, 255, 255, 0.78);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ai-docs-progress-doc-pct {
+    grid-column: 3;
+    grid-row: 1;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 500;
+}
+
+.ai-docs-progress-doc-bar {
+    grid-column: 2 / span 2;
+    grid-row: 2;
+    height: 3px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+}
+
+.ai-docs-progress-doc-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.88);
+    transition: width 0.3s ease;
+}
+
+.ai-docs-progress-doc-row.is-failed .ai-docs-progress-doc-bar > span {
+    background: #f87171;
+}
+
+.ai-docs-progress-doc-row.is-done .ai-docs-progress-doc-bar > span {
+    background: #86efac;
+}
+
 @media (max-width: 480px) {
     #documentsGrid-container,
     #documentsGrid.ag-theme-alpine {

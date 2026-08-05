@@ -8,6 +8,8 @@ Supports PDF, Word, Excel, Text, and Markdown files.
 import os
 import hashlib
 import logging
+import tempfile
+import threading
 from typing import Dict, List, Optional, Tuple, Any
 from pathlib import Path
 import mimetypes
@@ -16,6 +18,12 @@ import re
 from flask import current_app
 
 logger = logging.getLogger(__name__)
+
+# PyMuPDF find_tables() uses module-level TEXTPAGE state; serialize across workers.
+_PYMUPDF_TABLE_FIND_LOCK = threading.Lock()
+
+_OCR_USABLE: Optional[bool] = None
+_OCR_UNAVAILABLE_LOGGED = False
 
 _YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
 _AMOUNT_RE = re.compile(r"\b\d+(?:\.\d+)?\s*[MK]\b|\b\d{1,3}(?:,\d{3})+\b", re.IGNORECASE)
@@ -35,6 +43,58 @@ _PDF_CORRUPTION_HINTS = (
 class DocumentProcessingError(Exception):
     """Raised when document processing fails."""
     pass
+
+
+def is_ocr_available(*, config=None) -> bool:
+    """
+    True when OCR is enabled in config and the Tesseract binary is callable.
+
+    Result is cached for the process; use reset_ocr_availability_cache() in tests.
+    """
+    global _OCR_USABLE
+    if config is None:
+        try:
+            config = current_app.config
+        except RuntimeError:
+            return False
+    if not bool(config.get("AI_OCR_ENABLED", False)):
+        return False
+    if _OCR_USABLE is not None:
+        return _OCR_USABLE
+    try:
+        import shutil
+
+        import pytesseract
+
+        cmd = getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract")
+        if os.path.isfile(cmd):
+            _OCR_USABLE = True
+        elif shutil.which(os.path.basename(cmd) or "tesseract"):
+            _OCR_USABLE = True
+        else:
+            pytesseract.get_tesseract_version()
+            _OCR_USABLE = True
+    except Exception:
+        _OCR_USABLE = False
+    return _OCR_USABLE
+
+
+def reset_ocr_availability_cache() -> None:
+    """Clear cached OCR availability (tests only)."""
+    global _OCR_USABLE, _OCR_UNAVAILABLE_LOGGED
+    _OCR_USABLE = None
+    _OCR_UNAVAILABLE_LOGGED = False
+
+
+def _log_ocr_unavailable_once() -> None:
+    global _OCR_UNAVAILABLE_LOGGED
+    if _OCR_UNAVAILABLE_LOGGED:
+        return
+    _OCR_UNAVAILABLE_LOGGED = True
+    logger.warning(
+        "AI_OCR_ENABLED is true but the Tesseract binary is not available; OCR will be skipped. "
+        "Install Tesseract or set AI_OCR_ENABLED=false."
+    )
 
 
 class AIDocumentProcessor:
@@ -119,40 +179,236 @@ class AIDocumentProcessor:
         if not os.path.exists(file_path):
             raise DocumentProcessingError(f"File not found: {file_path}")
 
-        # Check file size
-        file_size = os.path.getsize(file_path)
-        if file_size > self.max_file_size:
-            raise DocumentProcessingError(
-                f"File too large: {file_size / 1024 / 1024:.1f}MB "
-                f"(max: {self.max_file_size / 1024 / 1024:.1f}MB)"
-            )
-
-        # Get file type
+        # Check file size (PDFs may be stripped first — see _prepare_pdf_processing_path).
         file_type = self.get_file_type(filename)
         if not file_type:
             raise DocumentProcessingError(f"Unsupported file type: {filename}")
 
-        logger.info(f"Processing {file_type} document: {filename} ({file_size / 1024:.1f}KB)")
+        processing_path = file_path
+        temp_processing_path: Optional[str] = None
+        if file_type == 'pdf':
+            processing_path, temp_processing_path = self._prepare_pdf_processing_path(
+                file_path,
+                extract_images=extract_images,
+            )
 
-        # Route to appropriate processor
         try:
+            file_size = os.path.getsize(processing_path)
+            if file_size > self.max_file_size:
+                raise DocumentProcessingError(
+                    f"File too large: {file_size / 1024 / 1024:.1f}MB "
+                    f"(max: {self.max_file_size / 1024 / 1024:.1f}MB)"
+                )
+
+            logger.info(
+                "Processing %s document: %s (%.1fKB%s)",
+                file_type,
+                filename,
+                file_size / 1024,
+                " stripped" if temp_processing_path else "",
+            )
+
+            # Route to appropriate processor
             if file_type == 'pdf':
-                return self._process_pdf(file_path, filename, extract_images, ocr_enabled, max_pages=max_pages)
+                return self._process_pdf(
+                    processing_path,
+                    filename,
+                    extract_images,
+                    ocr_enabled,
+                    max_pages=max_pages,
+                )
             elif file_type == 'word':
-                return self._process_word(file_path, filename)
+                return self._process_word(processing_path, filename)
             elif file_type == 'excel':
-                return self._process_excel(file_path, filename)
+                return self._process_excel(processing_path, filename)
             elif file_type == 'text':
-                return self._process_text(file_path, filename)
+                return self._process_text(processing_path, filename)
             elif file_type == 'markdown':
-                return self._process_markdown(file_path, filename)
+                return self._process_markdown(processing_path, filename)
             elif file_type == 'html':
-                return self._process_html(file_path, filename)
+                return self._process_html(processing_path, filename)
             else:
                 raise DocumentProcessingError(f"No processor for file type: {file_type}")
+        except DocumentProcessingError:
+            raise
         except Exception as e:
             logger.error(f"Error processing {filename}: {str(e)}", exc_info=True)
             raise DocumentProcessingError("Failed to process document.")
+        finally:
+            if temp_processing_path:
+                try:
+                    os.unlink(temp_processing_path)
+                except OSError as e:
+                    logger.debug("Failed to remove temp PDF %s: %s", temp_processing_path, e)
+
+    def _should_strip_pdf_images(self, *, file_size: int, extract_images: bool) -> bool:
+        try:
+            strip_enabled = bool(current_app.config.get("AI_PDF_STRIP_IMAGES_ENABLED", True))
+        except Exception as e:
+            logger.debug("AI_PDF_STRIP_IMAGES_ENABLED parse failed: %s", e)
+            strip_enabled = True
+        if not strip_enabled:
+            return False
+        # Oversized files must be stripped for text extraction even when multimodal is on.
+        if file_size > self.max_file_size:
+            return True
+        if extract_images:
+            return False
+        try:
+            min_strip_mb = int(current_app.config.get("AI_PDF_STRIP_IMAGES_MIN_MB", 10))
+        except Exception as e:
+            logger.debug("AI_PDF_STRIP_IMAGES_MIN_MB parse failed: %s", e)
+            min_strip_mb = 10
+        return file_size >= max(0, min_strip_mb) * 1024 * 1024
+
+    def _strip_pdf_images_to_temp(self, file_path: str) -> str:
+        """Write a temp copy of a PDF with raster images removed (text/vectors kept)."""
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as exc:
+            raise DocumentProcessingError("PyMuPDF (fitz) not installed. Run: pip install PyMuPDF") from exc
+
+        doc = fitz.open(file_path)
+        try:
+            for page in doc:
+                for img in page.get_images(full=True):
+                    try:
+                        page.delete_image(int(img[0]))
+                    except Exception as e:
+                        logger.debug("delete_image failed on xref %s: %s", img[0], e)
+
+            try:
+                for emb_name in doc.embfile_names() or []:
+                    try:
+                        doc.del_embfile(emb_name)
+                    except Exception as e:
+                        logger.debug("del_embfile failed for %s: %s", emb_name, e)
+            except Exception as e:
+                logger.debug("embfile_names failed: %s", e)
+
+            fd, temp_path = tempfile.mkstemp(suffix=".pdf", prefix="ai_pdf_nimg_")
+            os.close(fd)
+            doc.save(temp_path, garbage=4, deflate=True, clean=True)
+            return temp_path
+        finally:
+            doc.close()
+
+    def _create_text_only_pdf_temp(self, file_path: str) -> str:
+        """Fallback: rebuild a minimal PDF containing extracted text only."""
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as exc:
+            raise DocumentProcessingError("PyMuPDF (fitz) not installed. Run: pip install PyMuPDF") from exc
+
+        src = fitz.open(file_path)
+        dst = fitz.open()
+        try:
+            for page in src:
+                try:
+                    text = page.get_text("text", sort=True)
+                except TypeError:
+                    text = page.get_text("text")
+                text = (text or "").strip()
+                new_page = dst.new_page(width=page.rect.width, height=page.rect.height)
+                if not text:
+                    continue
+                margin = 36.0
+                rect = fitz.Rect(
+                    margin,
+                    margin,
+                    max(margin + 1.0, page.rect.width - margin),
+                    max(margin + 1.0, page.rect.height - margin),
+                )
+                try:
+                    new_page.insert_textbox(rect, text, fontsize=9, lineheight=1.15)
+                except Exception:
+                    new_page.insert_text((margin, margin + 12), text[:50000])
+
+            fd, temp_path = tempfile.mkstemp(suffix=".pdf", prefix="ai_pdf_txt_")
+            os.close(fd)
+            dst.save(temp_path, garbage=4, deflate=True, clean=True)
+            return temp_path
+        finally:
+            src.close()
+            dst.close()
+
+    @staticmethod
+    def _strip_reduced_size_enough(original_size: int, stripped_size: int) -> bool:
+        if stripped_size <= 0:
+            return False
+        if stripped_size < original_size * 0.85:
+            return True
+        # At least 5MB saved on very large files.
+        return (original_size - stripped_size) >= (5 * 1024 * 1024)
+
+    def _prepare_pdf_processing_path(
+        self,
+        file_path: str,
+        *,
+        extract_images: bool,
+    ) -> Tuple[str, Optional[str]]:
+        """
+        Optionally strip embedded images before text extraction.
+
+        Returns (path_to_process, temp_path_to_delete_or_none).
+        The original stored file is never modified.
+        """
+        try:
+            file_size = os.path.getsize(file_path)
+        except OSError as e:
+            raise DocumentProcessingError(f"File not found: {file_path}") from e
+
+        if not self._should_strip_pdf_images(file_size=file_size, extract_images=extract_images):
+            return file_path, None
+
+        temp_path: Optional[str] = None
+        try:
+            temp_path = self._strip_pdf_images_to_temp(file_path)
+            stripped_size = os.path.getsize(temp_path)
+            if (
+                stripped_size > self.max_file_size
+                and not self._strip_reduced_size_enough(file_size, stripped_size)
+            ):
+                logger.info(
+                    "Image strip insufficient for %s (%.1fMB -> %.1fMB); rebuilding text-only PDF",
+                    os.path.basename(file_path),
+                    file_size / 1024 / 1024,
+                    stripped_size / 1024 / 1024,
+                )
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+                temp_path = self._create_text_only_pdf_temp(file_path)
+                stripped_size = os.path.getsize(temp_path)
+        except DocumentProcessingError:
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+            raise
+        except Exception as e:
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+            logger.warning("PDF image strip failed for %s: %s", file_path, e)
+            return file_path, None
+
+        try:
+            stripped_size = os.path.getsize(temp_path)
+        except OSError:
+            stripped_size = file_size
+
+        logger.info(
+            "Prepared PDF for processing: %s (%.1fMB -> %.1fMB)",
+            os.path.basename(file_path),
+            file_size / 1024 / 1024,
+            stripped_size / 1024 / 1024,
+        )
+        return temp_path, temp_path
 
     def _process_pdf(
         self,
@@ -260,7 +516,7 @@ class AIDocumentProcessor:
                         if page_tables:
                             result['tables'].extend(page_tables)
                     except Exception as e_tables:
-                        logger.debug(f"Table extraction failed on page {page_num}: {e_tables}", exc_info=True)
+                        logger.debug("Table extraction failed on page %s: %s", page_num, e_tables)
 
                 exclude_table_text = bool(current_app.config.get("AI_EXCLUDE_TABLE_TEXT_FROM_PDF_TEXT", True))
                 table_bboxes = [
@@ -519,7 +775,13 @@ class AIDocumentProcessor:
         if not callable(find_tables):
             return tables_out
 
-        finder = find_tables()
+        with _PYMUPDF_TABLE_FIND_LOCK:
+            try:
+                finder = find_tables()
+            except ValueError as exc:
+                # Concurrent find_tables() calls can corrupt PyMuPDF's module-level TEXTPAGE.
+                logger.debug("Table extraction skipped on page %s: %s", page_num, exc)
+                return tables_out
         # API shape differs slightly across versions; handle defensively.
         raw_tables = getattr(finder, "tables", None) or []
         for idx, t in enumerate(raw_tables):
@@ -1134,7 +1396,8 @@ class AIDocumentProcessor:
 
     def _ocr_page(self, page, page_num: int) -> str:
         """Perform OCR on a PDF page (for scanned documents)."""
-        if not current_app.config.get('AI_OCR_ENABLED', False):
+        if not is_ocr_available():
+            _log_ocr_unavailable_once()
             return ""
 
         try:
@@ -1156,7 +1419,7 @@ class AIDocumentProcessor:
             logger.warning("pytesseract not installed, skipping OCR")
             return ""
         except Exception as e:
-            logger.warning(f"OCR failed on page {page_num}: {str(e)}")
+            logger.debug("OCR failed on page %s: %s", page_num, e)
             return ""
 
     def _extract_images_from_page(self, page, page_num: int) -> List[Dict[str, Any]]:

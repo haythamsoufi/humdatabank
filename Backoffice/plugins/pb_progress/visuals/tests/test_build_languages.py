@@ -33,6 +33,18 @@ def test_resolve_build_languages_honours_env(monkeypatch, minimal_workbook) -> N
 
 
 @pytest.mark.unit
+def test_resolve_build_languages_all_returns_every_language(monkeypatch, minimal_workbook) -> None:
+    monkeypatch.setenv("PB_REPORT_EXCEL", str(minimal_workbook))
+    monkeypatch.setenv("PB_REPORT_LANGUAGE", "all")
+    assert resolve_build_languages(minimal_workbook) == (
+        "English",
+        "French",
+        "Spanish",
+        "Arabic",
+    )
+
+
+@pytest.mark.unit
 def test_language_subprocess_args_single_language() -> None:
     assert _language_subprocess_args({"PB_REPORT_LANGUAGE": "French"}) == ["--language", "French"]
 

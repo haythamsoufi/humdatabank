@@ -7,6 +7,7 @@ from flask_login import current_user
 from app.utils.api_helpers import get_json_safe
 from app.utils.mobile_auth import mobile_auth_required
 from app.utils.mobile_responses import mobile_ok, mobile_bad_request
+from app.utils.notification_push import is_notifications_push_enabled, PUSH_NOT_ENABLED_CODE
 from app.routes.api.mobile import mobile_bp
 
 
@@ -14,6 +15,12 @@ from app.routes.api.mobile import mobile_bp
 @mobile_auth_required
 def register_device():
     """Register a device for push notifications."""
+    if not is_notifications_push_enabled():
+        return mobile_bad_request(
+            'Push notifications are not enabled on this deployment.',
+            error_code=PUSH_NOT_ENABLED_CODE,
+        )
+
     from app.services.notification.push import PushNotificationService
     data = get_json_safe()
     device_token = data.get('device_token')
@@ -79,6 +86,9 @@ def unregister_device():
 @mobile_auth_required
 def device_heartbeat():
     """Lightweight heartbeat to update device last_active_at."""
+    if not is_notifications_push_enabled():
+        return mobile_ok(data={'updated': False})
+
     from app.services.notification.push import PushNotificationService
     from app.services.platform.user_analytics_service import _update_session_activity_explicit
     from flask import session as flask_session, g

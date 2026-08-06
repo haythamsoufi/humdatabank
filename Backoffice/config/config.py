@@ -1160,7 +1160,7 @@ class Config:
     # Feature flags for notifications (env: true/false only).
     # Notification delivery is HTTP-only (no WS). AI chat/docs WS use WEBSOCKET_ENABLED.
     FEATURES = {
-        'notifications_push_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_PUSH_ENABLED'), default=True),
+        'notifications_push_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_PUSH_ENABLED'), default=False),
         'notifications_email_digests_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_EMAIL_DIGESTS_ENABLED'), default=True),
         'notifications_analytics_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_ANALYTICS_ENABLED'), default=True),
         'notifications_webhooks_enabled': _parse_bool(os.environ.get('FEATURES_NOTIFICATIONS_WEBHOOKS_ENABLED'), default=False),

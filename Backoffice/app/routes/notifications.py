@@ -84,9 +84,27 @@ def get_notification_type_labels():
     }
 
 
-def get_notification_types_for_user(user):
+_PREFERENCE_AUDIENCE_BUCKETS = ("focal_points", "admin_users", "system_managers")
+
+
+def get_preference_eligible_notification_types(merged_rules=None):
+    """
+    Notification types users may toggle in preference UIs.
+
+    Uses the notification registry (active emitters with audience buckets).
+    ``merged_rules`` is accepted for backwards compatibility but not used.
+    """
+    from app.utils.notification_registry import list_preference_configurable_notification_types
+
+    return list_preference_configurable_notification_types()
+
+
+def get_notification_types_for_user(user, *, for_admin_configuration=False):
     """
     Get notification types available for a user based on RBAC and audience rules.
+
+    When ``for_admin_configuration`` is True (admin user-management form), return every
+    preference-configurable type so operators can configure delivery before or after role changes.
 
     Returns:
         dict: {
@@ -94,26 +112,25 @@ def get_notification_types_for_user(user):
             'for_user': list of notification types relevant to the user's role,
         }
     """
-    from app.services.platform.app_settings_service import get_merged_notification_audience_rules
+    from app.utils.notification_registry import (
+        list_notification_types_for_role_buckets,
+        list_preference_configurable_notification_types,
+    )
 
     all_types = [nt.value for nt in NotificationType]
-    merged_rules = get_merged_notification_audience_rules()
 
-    is_focal_point = AuthorizationService.has_role(user, "assignment_editor_submitter")
-    is_system_manager = AuthorizationService.is_system_manager(user)
-    is_org_admin = AuthorizationService.is_admin(user) and not is_system_manager
+    if for_admin_configuration:
+        relevant_types = list_preference_configurable_notification_types()
+    else:
+        is_focal_point = AuthorizationService.has_role(user, "assignment_editor_submitter")
+        is_system_manager = AuthorizationService.is_system_manager(user)
+        is_org_admin = AuthorizationService.is_admin(user) and not is_system_manager
 
-    relevant_types = []
-    for nt_val in all_types:
-        row = merged_rules.get(nt_val)
-        if not row:
-            continue
-        if (
-            (is_focal_point and row.get("focal_points"))
-            or (is_system_manager and row.get("system_managers"))
-            or (is_org_admin and row.get("admin_users"))
-        ):
-            relevant_types.append(nt_val)
+        relevant_types = list_notification_types_for_role_buckets(
+            is_focal_point=is_focal_point,
+            is_system_manager=is_system_manager,
+            is_org_admin=is_org_admin,
+        )
 
     return {
         'all': all_types,
@@ -527,19 +544,11 @@ def api_get_notification_preferences():
         logger.info("[NOTIF_PREFS_FETCH] served user_id=%s", current_user.id)
         preferences = NotificationService.get_notification_preferences(current_user.id)
 
+        from app.utils.notification_push import preferences_for_client
+
         return json_ok(
             success=True,
-            preferences={
-                'email_notifications': preferences.email_notifications,
-                'notification_types_enabled': preferences.notification_types_enabled,
-                'notification_frequency': preferences.notification_frequency,
-                'sound_enabled': preferences.sound_enabled,
-                'push_notifications': getattr(preferences, 'push_notifications', True),
-                'push_notification_types_enabled': getattr(preferences, 'push_notification_types_enabled', []),
-                'digest_day': getattr(preferences, 'digest_day', None),
-                'digest_time': getattr(preferences, 'digest_time', None),
-                'timezone': getattr(preferences, 'timezone', None)
-            }
+            preferences=preferences_for_client(preferences)
         )
 
     except Exception as e:
@@ -596,6 +605,7 @@ def api_update_notification_preferences():
                 user_id,
                 email_notifications=data.get('email_notifications'),
                 notification_types_enabled=data.get('notification_types_enabled'),
+                in_app_notification_types_enabled=data.get('in_app_notification_types_enabled'),
                 notification_frequency=data.get('notification_frequency'),
                 sound_enabled=data.get('sound_enabled'),
                 push_notifications=data.get('push_notifications'),
@@ -608,19 +618,11 @@ def api_update_notification_preferences():
             return handle_json_view_exception(service_error, 'Service error.', status_code=500)
 
         if preferences:
+            from app.utils.notification_push import preferences_for_client
+
             return json_ok(
                 success=True,
-                preferences={
-                    'email_notifications': preferences.email_notifications,
-                    'notification_types_enabled': preferences.notification_types_enabled,
-                    'notification_frequency': preferences.notification_frequency,
-                    'sound_enabled': preferences.sound_enabled,
-                    'push_notifications': getattr(preferences, 'push_notifications', True),
-                    'push_notification_types_enabled': getattr(preferences, 'push_notification_types_enabled', []),
-                    'digest_day': getattr(preferences, 'digest_day', None),
-                    'digest_time': getattr(preferences, 'digest_time', None),
-                    'timezone': getattr(preferences, 'timezone', None)
-                }
+                preferences=preferences_for_client(preferences)
             )
         else:
             current_app.logger.error("Service returned None - preferences update failed")
@@ -1078,6 +1080,14 @@ def api_export_notifications():
 def register_device():
     """Register a device for push notifications"""
     try:
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+
+        if not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE, success=False)
+
         data = get_json_or_form()
 
         device_token = data.get('device_token')
@@ -1237,6 +1247,14 @@ def api_admin_send_push():
         send_push = data.get('send_push', False)  # Default to False - must be explicitly enabled
         category = data.get('category')  # Optional category
         tags = data.get('tags')  # Optional tags (list or comma-separated string)
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+
+        if send_push and not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE, success=False)
+
         from app.services.communication.campaign_email_templates_service import normalize_campaign_email_template_key
         email_template_key = normalize_campaign_email_template_key(data.get('email_template_key'))
         email_template_html = (data.get('email_template_html') or '').strip() or None
@@ -2329,8 +2347,10 @@ def api_create_campaign():
             return json_bad_request(error_message, success=False)
 
         # Validate delivery methods
+        from app.utils.notification_push import is_notifications_push_enabled
+
         send_email = data.get('send_email', True)
-        send_push = data.get('send_push', True)
+        send_push = data.get('send_push', True) and is_notifications_push_enabled()
         if not send_email and not send_push:
             error_message = 'At least one delivery method must be selected'
             flash(error_message, 'danger')
@@ -2519,7 +2539,8 @@ def api_update_campaign(campaign_id):
         if 'send_email' in data:
             campaign.send_email = data['send_email']
         if 'send_push' in data:
-            campaign.send_push = data['send_push']
+            from app.utils.notification_push import is_notifications_push_enabled
+            campaign.send_push = bool(data['send_push']) and is_notifications_push_enabled()
         if 'override_preferences' in data:
             campaign.override_preferences = data['override_preferences']
         if 'redirect_type' in data:

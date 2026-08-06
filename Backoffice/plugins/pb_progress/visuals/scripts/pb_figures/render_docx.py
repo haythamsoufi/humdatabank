@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from docx import Document
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -19,11 +20,18 @@ from .line_chart import render_line_chart_svg
 from .donut_chart import render_donut_svg
 from .svg_raster import write_svg_png
 from .payload import build_payload
-from .report_meta import report_parts, report_titles
+from .report_meta import report_parts, report_titles, section_uses_part_heading_only
 
 CHART_WIDTH_PX = 481
 IFRC_RED = RGBColor(0xC2, 0x25, 0x26)
 _DOCX_STYLES = ("Normal", "Title", "Heading 1", "Heading 2", "List Paragraph")
+_DOCX_PAGE_MARGIN = Inches(0.5)
+_DOCX_PAGE_WIDTH_IN = 8.5
+_DOCX_CONTENT_WIDTH_IN = _DOCX_PAGE_WIDTH_IN - (2 * 0.5)
+_DOCX_LABEL_COL_IN = 2.85
+_DOCX_YEAR_COL_IN = 0.55
+_DOCX_DONUT_COL_IN = 0.55
+_DOCX_TABLE_FONT = 9
 
 
 def _set_rfonts(r_pr, font_name: str) -> None:
@@ -91,6 +99,50 @@ def _configure_document(doc: Document, language: str) -> None:
         _set_rfonts(style.element.get_or_add_rPr(), font_name)
 
 
+def _configure_page_margins(doc: Document) -> None:
+    for section in doc.sections:
+        section.top_margin = _DOCX_PAGE_MARGIN
+        section.bottom_margin = _DOCX_PAGE_MARGIN
+        section.left_margin = _DOCX_PAGE_MARGIN
+        section.right_margin = _DOCX_PAGE_MARGIN
+
+
+def _cumulative_table_widths(n_years: int) -> list[float]:
+    return [_DOCX_LABEL_COL_IN] + [_DOCX_YEAR_COL_IN] * n_years
+
+
+def _chart_area_width(n_years: int) -> float:
+    return n_years * _DOCX_YEAR_COL_IN
+
+
+def _unavailable_row_widths() -> list[float]:
+    return [_DOCX_LABEL_COL_IN, _DOCX_CONTENT_WIDTH_IN - _DOCX_LABEL_COL_IN]
+
+
+def _donut_row_widths(*, has_target: bool) -> list[float]:
+    if has_target:
+        target_col = _DOCX_CONTENT_WIDTH_IN - _DOCX_LABEL_COL_IN - _DOCX_DONUT_COL_IN
+        return [_DOCX_LABEL_COL_IN, _DOCX_DONUT_COL_IN, target_col]
+    return [_DOCX_LABEL_COL_IN, _DOCX_DONUT_COL_IN]
+
+
+def _donut_pair_widths() -> list[float]:
+    return [_DOCX_LABEL_COL_IN, _DOCX_DONUT_COL_IN, _DOCX_LABEL_COL_IN, _DOCX_DONUT_COL_IN]
+
+
+def _set_cell_vertical_alignment(
+    cell,
+    alignment: WD_CELL_VERTICAL_ALIGNMENT = WD_CELL_VERTICAL_ALIGNMENT.CENTER,
+) -> None:
+    cell.vertical_alignment = alignment
+
+
+def _center_table_cells(table) -> None:
+    for row in table.rows:
+        for cell in row.cells:
+            _set_cell_vertical_alignment(cell)
+
+
 def _style_heading_paragraph(paragraph, language: str, *, size: int, color: RGBColor | None = None) -> None:
     _apply_paragraph_language(paragraph, language)
     for run in paragraph.runs:
@@ -119,7 +171,7 @@ def render_line_chart_asset(
     show_labels: bool = True,
     session=None,
 ) -> Path:
-    del session, language
+    del session
     svg = render_line_chart_svg(
         item,
         width,
@@ -127,6 +179,7 @@ def render_line_chart_asset(
         show_value_labels=show_labels,
         show_target_labels=show_labels,
         target_label=target_label,
+        language=language,
     )
     write_svg_png(svg, output_path, width=width, height=110)
     return output_path
@@ -181,7 +234,7 @@ def _set_cell_text(
     *,
     language: str = "English",
     bold: bool = False,
-    size: int = 9,
+    size: int = _DOCX_TABLE_FONT,
     align_right: bool = False,
     align_center: bool = False,
 ) -> None:
@@ -196,6 +249,7 @@ def _set_cell_text(
     _apply_paragraph_language(p, language, alignment=alignment)
     run = p.add_run(text)
     _style_run(run, language, bold=bold, size=size)
+    _set_cell_vertical_alignment(cell)
 
 
 def _set_column_widths(table, widths: list[float]) -> None:
@@ -241,18 +295,20 @@ def _add_cumulative_block(
     if item.get("unavailable"):
         table = doc.add_table(rows=2, cols=2)
         _set_table_inner_borders(table)
-        _set_column_widths(table, [2.05, 4.45])
-        _set_cell_text(table.cell(0, 0), item["label"], language=language, size=10)
+        _set_table_fixed_layout(table)
+        _set_column_widths(table, _unavailable_row_widths())
+        _set_cell_text(table.cell(0, 0), item["label"], language=language)
         merged = table.cell(0, 1)
         merged.merge(table.cell(1, 1))
         _set_cell_text(
             merged,
             item.get("unavailable_label") or not_available(language),
             language=language,
-            size=10,
             align_center=True,
         )
         table.cell(1, 0).text = ""
+        _set_cell_vertical_alignment(table.cell(1, 0))
+        _center_table_cells(table)
         doc.add_paragraph("")
         return
 
@@ -264,15 +320,19 @@ def _add_cumulative_block(
     n_rows = 2 + int(show_reporting) + int(show_implementing)
     table = doc.add_table(rows=n_rows, cols=n_years + 1)
     _set_table_inner_borders(table)
-    widths = [2.05] + [0.55] * n_years
-    _set_column_widths(table, widths)
+    _set_table_fixed_layout(table)
+    _set_column_widths(table, _cumulative_table_widths(n_years))
 
-    _set_cell_text(table.cell(0, 0), item["label"], language=language, size=10)
+    _set_cell_text(table.cell(0, 0), item["label"], language=language)
     chart_cell = table.cell(0, 1)
     chart_cell.merge(table.cell(0, n_years))
     chart_cell.text = ""
     _apply_paragraph_language(chart_cell.paragraphs[0], language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
-    chart_cell.paragraphs[0].add_run().add_picture(str(chart_path), width=Inches(4.45))
+    chart_cell.paragraphs[0].add_run().add_picture(
+        str(chart_path),
+        width=Inches(_chart_area_width(n_years)),
+    )
+    _set_cell_vertical_alignment(chart_cell)
 
     _add_data_row(table, 1, labels["year"], item["years"], language=language, bold_label=True, bold_values=True)
     row_idx = 2
@@ -282,6 +342,7 @@ def _add_cumulative_block(
     if show_implementing:
         _add_data_row(table, row_idx, labels["implementing"], item["implementing"], language=language)
 
+    _center_table_cells(table)
     doc.add_paragraph("")
 
 
@@ -305,6 +366,7 @@ def _add_donut_image_cell(cell, image_path: Path, *, language: str) -> None:
     cell.text = ""
     _apply_paragraph_language(cell.paragraphs[0], language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
     cell.paragraphs[0].add_run().add_picture(str(image_path), width=Inches(0.45))
+    _set_cell_vertical_alignment(cell)
 
 
 def _add_donut_block(
@@ -319,33 +381,38 @@ def _add_donut_block(
     if item.get("unavailable"):
         table = doc.add_table(rows=1, cols=2)
         _set_table_inner_borders(table)
-        _set_column_widths(table, [2.05, 4.45])
-        _set_cell_text(table.cell(0, 0), item["label"], language=language, size=10)
+        _set_table_fixed_layout(table)
+        _set_column_widths(table, _unavailable_row_widths())
+        _set_cell_text(table.cell(0, 0), item["label"], language=language)
         _set_cell_text(
             table.cell(0, 1),
             item.get("unavailable_label") or not_available(language),
             language=language,
-            size=10,
             align_center=True,
         )
+        _center_table_cells(table)
         doc.add_paragraph("")
         return
 
     donut_path = assets_dir / f"{block_id}_donut.png"
     render_donut_asset(item, donut_path, language=language, session=session)
 
-    table = doc.add_table(rows=1, cols=3 if item.get("target_label") else 2)
+    has_target = bool(item.get("target_label"))
+    table = doc.add_table(rows=1, cols=3 if has_target else 2)
     _set_table_inner_borders(table)
-    if item.get("target_label"):
-        _set_column_widths(table, [2.05, 0.7, 1.8])
-    else:
-        _set_column_widths(table, [2.75, 0.7])
+    _set_table_fixed_layout(table)
+    _set_column_widths(table, _donut_row_widths(has_target=has_target))
 
-    _set_cell_text(table.cell(0, 0), item["label"], language=language, size=10)
+    _set_cell_text(table.cell(0, 0), item["label"], language=language)
     _add_donut_image_cell(table.cell(0, 1), donut_path, language=language)
-    if item.get("target_label"):
-        _set_cell_text(table.cell(0, 2), item["target_label"].replace("\n", " "), language=language, size=10)
+    if has_target:
+        _set_cell_text(
+            table.cell(0, 2),
+            item["target_label"].replace("\n", " "),
+            language=language,
+        )
 
+    _center_table_cells(table)
     doc.add_paragraph("")
 
 
@@ -374,39 +441,45 @@ def _add_donut_pair_block(
     table = doc.add_table(rows=1, cols=4)
     _set_table_inner_borders(table)
     _set_table_fixed_layout(table)
-    _set_column_widths(table, [1.35, 0.45, 1.35, 0.45])
+    _set_column_widths(table, _donut_pair_widths())
     _set_row_cant_split(table.rows[0])
 
-    _set_cell_text(table.cell(0, 0), left["label"], language=language, size=10)
+    _set_cell_text(table.cell(0, 0), left["label"], language=language)
     if left.get("unavailable"):
         _set_cell_text(
             table.cell(0, 1),
             left.get("unavailable_label") or not_available(language),
             language=language,
-            size=10,
             align_center=True,
         )
     else:
         _add_donut_image_cell(table.cell(0, 1), left_path, language=language)
-    _set_cell_text(table.cell(0, 2), right["label"], language=language, size=10)
+    _set_cell_text(table.cell(0, 2), right["label"], language=language)
     if right.get("unavailable"):
         _set_cell_text(
             table.cell(0, 3),
             right.get("unavailable_label") or not_available(language),
             language=language,
-            size=10,
             align_center=True,
         )
     else:
         _add_donut_image_cell(table.cell(0, 3), right_path, language=language)
 
+    _center_table_cells(table)
     doc.add_paragraph("")
 
 
-def _add_sp_section(doc: Document, payload: dict[str, Any], assets_dir: Path) -> None:
+def _add_sp_section(
+    doc: Document,
+    payload: dict[str, Any],
+    assets_dir: Path,
+    *,
+    show_section_title: bool = True,
+) -> None:
     language = payload.get("language", "English")
-    title = doc.add_paragraph(payload["title"])
-    _style_heading_paragraph(title, language, size=12, color=IFRC_RED)
+    if show_section_title:
+        title = doc.add_paragraph(payload["title"])
+        _style_heading_paragraph(title, language, size=12, color=IFRC_RED)
 
     labels = payload["table_labels"]
     target_label = payload["headers"]["target"]
@@ -449,6 +522,7 @@ def render_report_docx(
 
     doc = Document()
     _configure_document(doc, language)
+    _configure_page_margins(doc)
     heading = doc.add_heading(report_title, level=0)
     _style_heading_paragraph(heading, language, size=16, color=IFRC_RED)
     doc.add_paragraph("")
@@ -466,7 +540,12 @@ def render_report_docx(
                 if not section_has_indicators(full_mapping, section):
                     continue
                 payload = build_payload(model, section, language, mapping=full_mapping)
-                _add_sp_section(doc, payload, assets_dir)
+                _add_sp_section(
+                    doc,
+                    payload,
+                    assets_dir,
+                    show_section_title=not section_uses_part_heading_only(part["id"]),
+                )
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)

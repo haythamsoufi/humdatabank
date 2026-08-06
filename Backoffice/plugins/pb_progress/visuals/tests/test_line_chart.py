@@ -45,6 +45,29 @@ class LineChartNullValueTests(unittest.TestCase):
         self.assertTrue(above)
         self.assertLess(ly, point_y)
 
+    def test_render_line_chart_svg_arabic_uses_tajawal_and_rtl(self) -> None:
+        from pb_figures.calculations import format_value
+
+        item = {
+            "values": [10.0, 219_300_000.0, 30.0],
+            "value_labels": ["10", format_value(219_300_000, None, "Arabic"), "30"],
+            "annual_target": 45.0,
+            "annual_target_label": format_value(46_000_000, None, "Arabic"),
+        }
+        svg = render_line_chart_svg(
+            item,
+            481,
+            chart_id="asset-line",
+            show_value_labels=True,
+            show_target_labels=True,
+            target_label="Target",
+            language="Arabic",
+        )
+        self.assertIn("Tajawal", svg)
+        self.assertIn('direction="rtl"', svg)
+        self.assertIn("unicode-bidi", svg)
+        ET.fromstring(svg)
+
     def test_render_line_chart_svg_is_valid_xml(self) -> None:
         item = {
             "values": [10.0, 20.0, 30.0, 40.0, 50.0],

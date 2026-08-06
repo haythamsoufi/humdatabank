@@ -160,8 +160,43 @@ document.addEventListener("DOMContentLoaded", function () {
     return isNarrowViewport() || tocOverlapsContent();
   }
 
+  function reportChromeMeta(lang) {
+    const blob = document.getElementById("pb-report-header-i18n");
+    if (!blob) return {};
+    try {
+      return JSON.parse(blob.textContent || "{}")[lang] || {};
+    } catch (error) {
+      tocWarn("chrome i18n parse failed", { lang: lang, error: String(error) });
+      return {};
+    }
+  }
+
   function tocTitleText() {
-    return "Contents";
+    return reportChromeMeta(activeLang).contentsLabel || "Contents";
+  }
+
+  function tocExpandLabel() {
+    return reportChromeMeta(activeLang).tocExpandLabel || "Expand table of contents";
+  }
+
+  function tocCollapseLabel() {
+    return reportChromeMeta(activeLang).tocCollapseLabel || "Collapse table of contents";
+  }
+
+  function applyTocDirection(toc) {
+    if (!toc) return;
+    const panel = panels.find((p) => p.dataset.lang === activeLang);
+    const dir = (panel && panel.dataset.dir) || "ltr";
+    toc.setAttribute("dir", dir);
+    toc.classList.toggle("pb-report-toc-rtl", dir === "rtl");
+  }
+
+  function refreshTocChrome(toc) {
+    if (!toc) return;
+    const title = toc.querySelector("#toc-title");
+    if (title) title.textContent = tocTitleText();
+    applyTocDirection(toc);
+    updateTocToggleButton(toc);
   }
 
   function ensureTocHeader(toc) {
@@ -198,7 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
     btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
     btn.setAttribute(
       "aria-label",
-      collapsed ? "Expand table of contents" : "Collapse table of contents"
+      collapsed ? tocExpandLabel() : tocCollapseLabel()
     );
     btn.title = btn.getAttribute("aria-label");
     if (collapsed) {
@@ -368,7 +403,11 @@ document.addEventListener("DOMContentLoaded", function () {
       tocNav.innerHTML =
         '<div class="pb-toc-header">' +
         '<h2 id="toc-title">' + tocTitleText() + "</h2>" +
-        '<button type="button" class="pb-toc-toggle-btn" aria-controls="toc" aria-expanded="true" aria-label="Collapse table of contents" title="Collapse table of contents"><span class="pb-toc-toggle-chevron pb-toc-toggle-chevron-up" aria-hidden="true"></span></button>' +
+        '<button type="button" class="pb-toc-toggle-btn" aria-controls="toc" aria-expanded="true" aria-label="' +
+        tocCollapseLabel().replace(/"/g, "&quot;") +
+        '" title="' +
+        tocCollapseLabel().replace(/"/g, "&quot;") +
+        '"><span class="pb-toc-toggle-chevron pb-toc-toggle-chevron-up" aria-hidden="true"></span></button>' +
         "</div>" +
         '<ul class="toc-list"></ul>';
 
@@ -425,6 +464,7 @@ document.addEventListener("DOMContentLoaded", function () {
       tocWarn("toc is empty — no .report-part h2[data-anchor] in active panel");
     }
     sanitizeTocChrome(toc);
+    refreshTocChrome(toc);
     pinTocBelowToolbar();
   }
 
@@ -432,6 +472,40 @@ document.addEventListener("DOMContentLoaded", function () {
     const href = wordHref(lang);
     const link = document.getElementById("pb-download-word");
     if (link) link.setAttribute("href", href);
+  }
+
+  function updateReportHeader(lang) {
+    const blob = document.getElementById("pb-report-header-i18n");
+    const header = document.getElementById("title-block-header");
+    if (!blob || !header) return;
+
+    let meta;
+    try {
+      meta = JSON.parse(blob.textContent || "{}")[lang];
+    } catch (error) {
+      tocWarn("header i18n parse failed", { lang: lang, error: String(error) });
+      return;
+    }
+    if (!meta) return;
+
+    const titleEl = header.querySelector("h1.title");
+    if (titleEl && meta.title) titleEl.textContent = meta.title;
+
+    const metaBlocks = header.querySelectorAll(".quarto-title-meta > div");
+    if (metaBlocks[0]) {
+      const authorHeading = metaBlocks[0].querySelector(".quarto-title-meta-heading");
+      const authorValue = metaBlocks[0].querySelector(".quarto-title-meta-contents p");
+      if (authorHeading && meta.authorLabel) authorHeading.textContent = meta.authorLabel;
+      if (authorValue && meta.author) authorValue.textContent = meta.author;
+    }
+    if (metaBlocks[1]) {
+      const publishedHeading = metaBlocks[1].querySelector(".quarto-title-meta-heading");
+      const publishedValue = metaBlocks[1].querySelector(".quarto-title-meta-contents p.date");
+      if (publishedHeading && meta.publishedLabel) publishedHeading.textContent = meta.publishedLabel;
+      if (publishedValue && meta.date) publishedValue.textContent = meta.date;
+    }
+
+    if (meta.title) document.title = meta.title;
   }
 
   function setLanguage(lang) {
@@ -450,9 +524,12 @@ document.addEventListener("DOMContentLoaded", function () {
     applyAnchors(activePanel);
     rebuildToc(activePanel);
     updateWordLink(lang);
+    updateReportHeader(lang);
 
     const dir = activePanel.dataset.dir || "ltr";
     if (main) main.setAttribute("dir", dir);
+    const titleHeader = document.getElementById("title-block-header");
+    if (titleHeader) titleHeader.setAttribute("dir", dir);
     document.documentElement.setAttribute("lang", slug(lang).slice(0, 2));
     document.documentElement.classList.toggle("pb-report-arabic", lang === "Arabic");
 

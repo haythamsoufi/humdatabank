@@ -293,6 +293,9 @@ def app():
     app.config['MOBILE_JWT_SECRET'] = 'test-mobile-jwt-secret-for-pytest-32b!'
     app.config['API_KEY'] = os.environ.get('API_KEY') or 'test-api-key'
     app.config['SCHEDULER_ENABLED'] = False
+    _features = dict(app.config.get('FEATURES') or {})
+    _features['notifications_push_enabled'] = True
+    app.config['FEATURES'] = _features
     # Allow oversized multipart payloads to reach route handlers that enforce their own limits.
     app.config['MAX_CONTENT_LENGTH'] = 60 * 1024 * 1024
     # Keep logout redirects on the local login route during tests (avoid B2C end_session URLs).

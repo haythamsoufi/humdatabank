@@ -1,0 +1,15 @@
+{% macro part_of_filter_checkboxes(categories, manage_mode=false) %}
+{% if categories %}
+    {% for category in categories %}
+    <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox"
+               class="category-filter-checkbox{% if manage_mode %} category-filter-manage{% endif %} h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+               value="{{ category|e }}"
+               data-category="{{ category|e }}">
+        <span class="text-sm text-gray-700">{{ category }}</span>
+    </label>
+    {% endfor %}
+{% else %}
+    <span class="text-xs text-gray-500">{{ _('No categories available') }}</span>
+{% endif %}
+{% endmacro %}

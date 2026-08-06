@@ -1785,6 +1785,7 @@ class NotificationService:
                 user_id=user_id,
                 email_notifications=True,
                 notification_types_enabled=[],
+                in_app_notification_types_enabled=[],
                 notification_frequency='instant',
                 sound_enabled=True,
                 push_notifications=True,
@@ -1801,6 +1802,7 @@ class NotificationService:
         user_id: int,
         email_notifications: Optional[bool] = None,
         notification_types_enabled: Optional[Dict[str, bool]] = None,
+        in_app_notification_types_enabled: Optional[List[str]] = None,
         notification_frequency: Optional[str] = None,
         sound_enabled: Optional[bool] = None,
         push_notifications: Optional[bool] = None,
@@ -1816,6 +1818,7 @@ class NotificationService:
             user_id: ID of the user
             email_notifications: Enable/disable email notifications
             notification_types_enabled: Dict of notification types and their enabled status
+            in_app_notification_types_enabled: List of notification types enabled in-app
             notification_frequency: Notification frequency ('instant', 'daily', 'weekly')
             sound_enabled: Enable/disable sound notifications
             push_notifications: Enable/disable push notifications
@@ -1826,6 +1829,14 @@ class NotificationService:
         """
         try:
             preferences = cls.get_notification_preferences(user_id)
+
+            from app.utils.notification_push import strip_push_preference_kwargs
+            push_updates = strip_push_preference_kwargs({
+                'push_notifications': push_notifications,
+                'push_notification_types_enabled': push_notification_types_enabled,
+            })
+            push_notifications = push_updates.get('push_notifications')
+            push_notification_types_enabled = push_updates.get('push_notification_types_enabled')
 
             if email_notifications is not None:
                 preferences.email_notifications = email_notifications
@@ -1838,6 +1849,12 @@ class NotificationService:
                     preferences.notification_types_enabled = notification_types_enabled
                 else:
                     preferences.notification_types_enabled = []
+
+            if in_app_notification_types_enabled is not None:
+                if isinstance(in_app_notification_types_enabled, list):
+                    preferences.in_app_notification_types_enabled = in_app_notification_types_enabled
+                else:
+                    preferences.in_app_notification_types_enabled = []
 
             if notification_frequency is not None:
                 preferences.notification_frequency = notification_frequency

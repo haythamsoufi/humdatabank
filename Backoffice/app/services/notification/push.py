@@ -120,6 +120,14 @@ class PushNotificationService:
         Returns:
             Dict with success status and results
         """
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            push_disabled_service_result,
+        )
+
+        if not is_notifications_push_enabled():
+            return push_disabled_service_result()
+
         try:
             # Get all active devices for the user (exclude logged-out devices)
             devices = UserDevice.query.filter_by(
@@ -397,6 +405,14 @@ class PushNotificationService:
         Returns:
             Dict with success status
         """
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            push_disabled_service_result,
+        )
+
+        if not is_notifications_push_enabled():
+            return push_disabled_service_result()
+
         try:
             # Check if device already exists by token (exact match)
             existing_device = UserDevice.query.filter_by(device_token=device_token).first()
@@ -626,6 +642,11 @@ class PushNotificationService:
         Returns:
             True if update was performed, False if throttled or device not found
         """
+        from app.utils.notification_push import is_notifications_push_enabled
+
+        if not is_notifications_push_enabled():
+            return False
+
         try:
             from datetime import timedelta
 

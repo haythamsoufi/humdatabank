@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import html
+import re
 from pathlib import Path
 from typing import Any
 
+from .languages import is_rtl
 from .payload import build_payload
 from .layouts import cumulative_table_rows
 from .line_chart import (
@@ -19,11 +21,39 @@ from .line_chart import (
     y_scale,
 )
 from .render_docx import render_donut_asset, render_line_chart_asset
+from .report_meta import cross_cutting_section
 DASHBOARD_WIDTH = 827
 LABEL_COL = 290
 DASHBOARD_PAD_H = 44
 GRID_GAP = 12
 _RAW_TABLE = ' markdown="0"'
+_ARABIC_MILLIONS_NUM_FIRST = re.compile(r"^([\d.,]+)\s+(.+)$")
+_ARABIC_MILLIONS_WORD_FIRST = re.compile(r"^(.+?)\s+([\d.,]+)$")
+
+
+def _chart_label_html(label: str, *, language: str) -> str:
+    """Render chart overlay label; Arabic uses HTML bidi so browsers shape text correctly."""
+    text = str(label or "").strip()
+    if not text:
+        return ""
+    if not is_rtl(language):
+        return html.escape(text)
+
+    match = _ARABIC_MILLIONS_WORD_FIRST.match(text)
+    if not match:
+        num_first = _ARABIC_MILLIONS_NUM_FIRST.match(text)
+        if num_first:
+            num, word = num_first.group(1), num_first.group(2).strip()
+        else:
+            return f'<span dir="rtl">{html.escape(text)}</span>'
+    else:
+        word, num = match.group(1).strip(), match.group(2)
+
+    return (
+        f'<span dir="rtl">'
+        f"{html.escape(word)} <bdi dir=\"ltr\">{html.escape(num)}</bdi>"
+        f"</span>"
+    )
 
 
 def _indicator_colgroup() -> str:
@@ -46,6 +76,8 @@ def _esc_multiline(text: str | None) -> str:
 def _render_value_labels(
     item: dict[str, Any],
     chart_width: int,
+    *,
+    language: str = "English",
 ) -> str:
     annual_target = item.get("annual_target")
     _, y_max = y_scale(
@@ -66,7 +98,7 @@ def _render_value_labels(
         x_pct = x_percent(i, len(item["values"]), chart_width)
         parts.append(
             f'<span class="chart-value-label" style="left:{x_pct:.4f}%;top:{y_pct:.4f}%;'
-            f'transform:{transform}">{_esc(label)}</span>'
+            f'transform:{transform}">{_chart_label_html(label, language=language)}</span>'
         )
     return "".join(parts)
 
@@ -75,6 +107,8 @@ def _render_target_labels(
     item: dict[str, Any],
     target_label: str,
     chart_width: int,
+    *,
+    language: str = "English",
 ) -> str:
     annual_target = item.get("annual_target")
     if annual_target is None:
@@ -103,7 +137,8 @@ def _render_target_labels(
             value_transform = "translateY(-50%)"
         parts.append(
             f'<span class="chart-target-value" style="top:{y_pct:.4f}%;left:{right_pct:.4f}%;'
-            f'transform:{value_transform}">{_esc(item["annual_target_label"])}</span>'
+            f'transform:{value_transform}">'
+            f'{_chart_label_html(str(item["annual_target_label"]), language=language)}</span>'
         )
     return "".join(parts)
 
@@ -197,6 +232,7 @@ def _render_line_block(
     chart_width: int,
     chart_id_prefix: str = "sp",
     asset_refs: dict[str, str] | None = None,
+    language: str = "English",
 ) -> str:
     if item.get("unavailable"):
         return _render_unavailable_line_block(item)
@@ -204,22 +240,35 @@ def _render_line_block(
     footer_class = "x-axis-footer year-only" if year_only else "x-axis-footer"
     asset_refs = asset_refs or {}
     line_src = asset_refs.get(f"line_{chart_index}", "")
+    label_overlays = ""
+    if is_rtl(language):
+        label_overlays = (
+            _render_target_labels(item, target_label, chart_width, language=language)
+            + _render_value_labels(item, chart_width, language=language)
+        )
     if line_src:
         chart_inner = (
             f'<div class="line-chart-inner" style="--chart-width:{chart_width}">'
             f'<img class="line-chart-img" src="{_esc(line_src)}" alt="" '
             f'width="{chart_width}" height="110" role="presentation">'
+            f"{label_overlays}"
             "</div>"
         )
     else:
         chart_svg = render_line_chart_svg(
-            item, chart_width, chart_id=f"{chart_id_prefix}-line-{chart_index}",
+            item,
+            chart_width,
+            chart_id=f"{chart_id_prefix}-line-{chart_index}",
+            show_value_labels=not is_rtl(language),
+            show_target_labels=not is_rtl(language),
+            target_label=target_label,
+            language=language,
         )
         chart_inner = (
             f'<div class="line-chart-inner" style="--chart-width:{chart_width}">'
             f"{chart_svg}"
-            f'{_render_target_labels(item, target_label, chart_width)}'
-            f'{_render_value_labels(item, chart_width)}'
+            f'{_render_target_labels(item, target_label, chart_width, language=language)}'
+            f'{_render_value_labels(item, chart_width, language=language)}'
             "</div>"
         )
     return (
@@ -302,11 +351,15 @@ def _append_section_tail(parts: list[str], footnote: str) -> None:
 def _render_sp_html(
     payload: dict[str, Any],
     asset_refs: dict[str, str],
+    *,
+    language: str = "English",
 ) -> str:
     chart_width = _chart_width()
     target_label = payload["headers"]["target"]
     chart_id_prefix = payload["section"].lower()
-    parts = [f'<div class="dash-title">{_esc(payload["title"])}</div>']
+    parts: list[str] = []
+    if not cross_cutting_section(payload["section"]):
+        parts.append(f'<div class="dash-title">{_esc(payload["title"])}</div>')
 
     for idx, item in enumerate(payload["cumulative"]):
         parts.append(
@@ -318,6 +371,7 @@ def _render_sp_html(
                 chart_width=chart_width,
                 chart_id_prefix=chart_id_prefix,
                 asset_refs=asset_refs,
+                language=language,
             )
         )
 
@@ -336,9 +390,11 @@ def _render_sp_html(
 def build_dashboard_html(
     payload: dict[str, Any],
     asset_refs: dict[str, str],
+    *,
+    language: str = "English",
 ) -> str:
     """Return inner HTML for a dashboard section (no wrapper)."""
-    return _render_sp_html(payload, asset_refs)
+    return _render_sp_html(payload, asset_refs, language=language)
 
 
 def render_section_assets(
@@ -365,6 +421,7 @@ def render_section_assets(
             target_label,
             assets_dir / filename,
             language=language,
+            show_labels=not is_rtl(language),
         )
         refs[f"line_{idx}"] = filename
 
@@ -417,6 +474,6 @@ def build_section_embed(
     else:
         local_refs = expected_asset_refs(payload)
     url_refs = {key: f"{asset_url_prefix}/{filename}" for key, filename in local_refs.items()}
-    inner = build_dashboard_html(payload, url_refs)
+    inner = build_dashboard_html(payload, url_refs, language=language)
     direction = ' dir="rtl"' if language == "Arabic" else ""
     return f'<div class="pb-dashboard"{direction}>{inner}</div>'

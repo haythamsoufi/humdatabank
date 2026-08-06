@@ -1138,7 +1138,29 @@
         function loadCategoriesOnce() {
             if (categoriesLoaded) return;
             categoriesLoaded = true;
+            if (typeof bootstrapPartOfCategoriesFromConfig === 'function' && bootstrapPartOfCategoriesFromConfig()) {
+                return;
+            }
             loadCategoriesAndMapping();
+        }
+
+        function loadCategoriesForAssignCountriesIfPresent() {
+            if (document.getElementById('category-filters-entity')) {
+                loadCategoriesOnce();
+            }
+        }
+
+        function onEntityTabPanelShown(panel) {
+            if (!panel) return;
+            if (panel.id === 'manage-entities-panel') {
+                loadCategoriesOnce();
+                scheduleEntityGridInit();
+            } else if (panel.id === 'add-entities-panel') {
+                setTimeout(initializeAddEntitiesSubTabs, 50);
+                // Countries-only layout has no sub-tab nav; initializeAddEntitiesSubTabs
+                // returns early and would never load Part of filters otherwise.
+                loadCategoriesForAssignCountriesIfPresent();
+            }
         }
 
         function activateEntityTab(tabId) {
@@ -1212,15 +1234,7 @@
                     const afterDisplay = window.getComputedStyle(panel).display;
                     window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: SHOWING panel', panel.id, 'after - hidden:', afterHidden, 'display:', afterDisplay);
 
-                    // Initialize AG Grid when "Manage Existing Entities" tab is shown
-                    if (panel.id === 'manage-entities-panel') {
-                        loadCategoriesOnce();
-                        scheduleEntityGridInit();
-                    }
-                    // Initialize sub-tabs when "Add Entities" tab is shown
-                    if (panel.id === 'add-entities-panel') {
-                        setTimeout(initializeAddEntitiesSubTabs, 50);
-                    }
+                    onEntityTabPanelShown(panel);
                 } else {
                     // Add hidden class and explicitly hide
                     panel.classList.add('hidden');
@@ -1240,6 +1254,7 @@
                     targetPanel.classList.remove('hidden');
                     targetPanel.style.display = 'block';
                     targetPanelFound = true;
+                    onEntityTabPanelShown(targetPanel);
 
                     // Hide all other panels
                     allPanels.forEach(panel => {
@@ -1317,7 +1332,10 @@
             const addEntitiesSubTabButtons = document.querySelectorAll('#add-entities-subtabs button[role="tab"]');
             const addEntitiesSubTabPanels = document.querySelectorAll('#add-entities-subtabs-content > div[role="tabpanel"]');
 
-            if (addEntitiesSubTabButtons.length === 0) return;
+            if (addEntitiesSubTabButtons.length === 0) {
+                loadCategoriesForAssignCountriesIfPresent();
+                return;
+            }
 
             function activateAddEntitiesSubTab(panelId) {
                 // Update buttons
@@ -1380,11 +1398,13 @@
             }
         }
 
-        // Initialize on page load if add-entities panel is visible
+        // Initialize on page load if add-entities panel is visible (incl. new assignments
+        // with no top-level entity tabs — only the Assign Countries block is shown).
         setTimeout(function() {
             const addEntitiesPanel = document.getElementById('add-entities-panel');
             if (addEntitiesPanel && !addEntitiesPanel.classList.contains('hidden')) {
                 initializeAddEntitiesSubTabs();
+                loadCategoriesForAssignCountriesIfPresent();
             }
         }, 100);
 
@@ -1573,6 +1593,10 @@
 
         // Load categories and build mapping
         function loadCategoriesAndMapping() {
+            if (bootstrapPartOfCategoriesFromConfig()) {
+                return;
+            }
+
             const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
             // Load categories list
@@ -1671,6 +1695,11 @@
             const container = document.getElementById(containerId);
             if (!container) return;
 
+            // Keep server-rendered checkboxes — only build dynamically when the container is empty.
+            if (container.querySelector('.category-filter-checkbox')) {
+                return;
+            }
+
             container.innerHTML = '';
 
             if (availableCategories.length === 0) {
@@ -1698,17 +1727,92 @@
                 label.appendChild(checkbox);
                 label.appendChild(span);
                 container.appendChild(label);
-
-                checkbox.addEventListener('change', function() {
-                    onChange(category, this.checked);
-                });
             });
+        }
+
+        function bindCategoryFilterDelegation() {
+            const entityContainer = document.getElementById('category-filters-entity');
+            if (entityContainer && entityContainer.dataset.filterDelegationBound !== 'true') {
+                entityContainer.dataset.filterDelegationBound = 'true';
+                entityContainer.addEventListener('change', function (event) {
+                    const checkbox = event.target;
+                    if (!checkbox.classList.contains('category-filter-checkbox') || checkbox.classList.contains('category-filter-manage')) {
+                        return;
+                    }
+                    const category = checkbox.dataset.category || checkbox.value;
+                    handleCategoryFilterChange(category, checkbox.checked);
+                });
+            }
+
+            const manageContainer = document.getElementById('category-filters-manage');
+            if (manageContainer && manageContainer.dataset.filterDelegationBound !== 'true') {
+                manageContainer.dataset.filterDelegationBound = 'true';
+                manageContainer.addEventListener('change', function (event) {
+                    const checkbox = event.target;
+                    if (!checkbox.classList.contains('category-filter-manage')) {
+                        return;
+                    }
+                    const category = checkbox.dataset.category || checkbox.value;
+                    handleManageCategoryFilterChange(category, checkbox.checked);
+                });
+            }
         }
 
         // Render category filters in both Add Entities and Manage Existing Entities panels
         function renderCategoryFilters() {
             renderCategoryFiltersTo('category-filters-entity', handleCategoryFilterChange);
             renderCategoryFiltersTo('category-filters-manage', handleManageCategoryFilterChange);
+            bindCategoryFilterDelegation();
+        }
+
+        function bootstrapPartOfCategoriesFromConfig() {
+            const categories = cfg.partOfCategories;
+            const mapping = cfg.partOfCategoryToCountries;
+            const hasServerRenderedFilters = !!document.querySelector(
+                '#category-filters-entity .category-filter-checkbox, #category-filters-manage .category-filter-checkbox'
+            );
+
+            if (Array.isArray(categories) && categories.length > 0) {
+                availableCategories = categories;
+            } else if (hasServerRenderedFilters) {
+                availableCategories = Array.from(
+                    document.querySelectorAll('#category-filters-entity .category-filter-checkbox')
+                ).map(function (cb) {
+                    return cb.dataset.category || cb.value;
+                }).filter(Boolean);
+            } else {
+                return false;
+            }
+
+            if (mapping && typeof mapping === 'object') {
+                categoryToCountriesMap = mapping;
+            }
+
+            renderCategoryFilters();
+            bindCategoryFilterDelegation();
+            return true;
+        }
+
+        function bootstrapVisiblePartOfFiltersIfNeeded() {
+            const entityFilters = document.getElementById('category-filters-entity');
+            const manageFilters = document.getElementById('category-filters-manage');
+            if (!entityFilters && !manageFilters) return;
+
+            const addEntitiesPanel = document.getElementById('add-entities-panel');
+            const managePanel = document.getElementById('manage-entities-panel');
+            const assignCountriesVisible = entityFilters && addEntitiesPanel && !addEntitiesPanel.classList.contains('hidden');
+            const manageVisible = manageFilters && managePanel && !managePanel.classList.contains('hidden');
+            const hasServerRenderedFilters = !!document.querySelector(
+                '#category-filters-entity .category-filter-checkbox, #category-filters-manage .category-filter-checkbox'
+            );
+
+            if (assignCountriesVisible || manageVisible || hasServerRenderedFilters) {
+                if (bootstrapPartOfCategoriesFromConfig()) {
+                    categoriesLoaded = true;
+                } else {
+                    bindCategoryFilterDelegation();
+                }
+            }
         }
 
         // Handle category filter checkbox change
@@ -1789,6 +1893,8 @@
             });
             gridApi.setGridOption('rowData', filtered);
         }
+
+        bootstrapVisiblePartOfFiltersIfNeeded();
 
         // Category filters are now loaded directly from activateEntityTab /
         // activateAddEntitiesSubTab (see loadCategoriesOnce above) whenever the Manage

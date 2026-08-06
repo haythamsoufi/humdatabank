@@ -285,6 +285,17 @@ def audit_trail():
 @mobile_auth_required(permission='admin.communication.manage')
 def admin_send_notification():
     """Send push/email notification to selected users (admin)."""
+    from app.utils.notification_push import (
+        is_notifications_push_enabled,
+        PUSH_NOT_ENABLED_CODE,
+    )
+
+    if not is_notifications_push_enabled():
+        return mobile_bad_request(
+            'Push notifications are not enabled on this deployment.',
+            error_code=PUSH_NOT_ENABLED_CODE,
+        )
+
     data = get_json_safe()
 
     title = data.get('title', '').strip()

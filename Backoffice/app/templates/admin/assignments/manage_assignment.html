@@ -14,6 +14,7 @@
 {% from "components/_page_header.html" import page_header %}
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
 {% from "macros/year_picker.html" import year_picker %}
+{% from "macros/part_of_filter_checkboxes.html" import part_of_filter_checkboxes %}
 {% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
 
 {% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}
@@ -547,7 +548,7 @@
                 <div class="flex items-center gap-3 flex-wrap mb-4">
                     <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
                     <div id="category-filters-manage" class="flex items-center gap-3 flex-wrap">
-                        {# Category checkboxes will be dynamically added here #}
+                        {{ part_of_filter_checkboxes(part_of_programs or [], manage_mode=true) }}
                     </div>
                 </div>
                 {% endif %}
@@ -652,7 +653,7 @@
                             <div class="flex items-center gap-3 flex-wrap">
                                 <span class="text-sm font-bold text-gray-800">{{ _('Part of:') }}</span>
                                 <div id="category-filters-entity" class="flex items-center gap-3 flex-wrap">
-                                    {# Category checkboxes will be dynamically added here #}
+                                    {{ part_of_filter_checkboxes(part_of_programs or []) }}
                                 </div>
                             </div>
                          </div>
@@ -1065,6 +1066,8 @@ window.manageAssignmentConfig = {
         {%- endfor -%}
         {%- endif -%}
     ],
+    partOfCategories: {{ (part_of_programs or [])|tojson }},
+    partOfCategoryToCountries: {{ (part_of_category_to_countries or {})|tojson }},
     urls: {
         apiPartOfPrograms: {{ url_for('organization.api_get_part_of_programs')|tojson }},
         organizationIndex: {{ url_for('organization.index')|tojson }},

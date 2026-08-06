@@ -1,0 +1,27 @@
+{
+  "ui.table_implementing_row": {
+    "id": "ui.table_implementing_row",
+    "category": "ui",
+    "EN": "Implementing",
+    "FR": "Mise en œuvre",
+    "SP": "Aplicación",
+    "AR": "عدد الجمعيات الوطنية المنفذة"
+  },
+  "ui.table_reporting_row": {
+    "id": "ui.table_reporting_row",
+    "category": "ui",
+    "EN": "Reporting",
+    "FR": "SN rapportant",
+    "SP": "Información remitida",
+    "AR": "عدد الجمعيات الوطنية التي قدمت التقارير"
+  },
+  "ui.national_societies": "MISSING",
+  "ui.ns_implementing_header": {
+    "id": "ui.ns_implementing_header",
+    "category": "ui",
+    "EN": "#NSs Implementing",
+    "FR": "# SN mettant en œuvre des activités",
+    "SP": "Cantidad de Sociedades Nacionales que lo aplican",
+    "AR": "#جمعية وطنية منفذة"
+  }
+}

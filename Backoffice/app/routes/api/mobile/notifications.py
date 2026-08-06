@@ -104,20 +104,10 @@ def mark_notifications_unread():
 def get_notification_preferences():
     """Return current user's notification preferences."""
     from app.services.notification.service import NotificationService
+    from app.utils.notification_push import preferences_for_client
+
     prefs = NotificationService.get_notification_preferences(current_user.id)
-    return mobile_ok(data={
-        'preferences': {
-            'email_notifications': prefs.email_notifications,
-            'notification_frequency': prefs.notification_frequency,
-            'sound_enabled': prefs.sound_enabled,
-            'push_notifications': prefs.push_notifications,
-            'notification_types_enabled': prefs.notification_types_enabled or [],
-            'push_notification_types_enabled': prefs.push_notification_types_enabled or [],
-            'digest_day': prefs.digest_day,
-            'digest_time': prefs.digest_time,
-            'timezone': getattr(prefs, 'timezone', None),
-        },
-    })
+    return mobile_ok(data={'preferences': preferences_for_client(prefs)})
 
 
 @mobile_bp.route('/notifications/preferences', methods=['POST'])
@@ -132,6 +122,7 @@ def update_notification_preferences():
             user_id=current_user.id,
             email_notifications=data.get('email_notifications'),
             notification_types_enabled=data.get('notification_types_enabled'),
+            in_app_notification_types_enabled=data.get('in_app_notification_types_enabled'),
             notification_frequency=data.get('notification_frequency'),
             sound_enabled=data.get('sound_enabled'),
             push_notifications=data.get('push_notifications'),

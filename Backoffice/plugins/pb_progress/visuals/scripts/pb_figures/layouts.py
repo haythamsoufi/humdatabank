@@ -12,7 +12,7 @@ from .translations import TranslationsError, load_parts_order, load_section_orde
 
 SECTION_COLUMN = "Strategic Priority / Enabling Function"
 
-# Fallback when SectionOrder sheet is unavailable (CLI choices, tests).
+# Fallback when PB_REPORT_SECTION_ORDER is unset (CLI choices, tests).
 KNOWN_SECTION_CODES: tuple[str, ...] = (
     "CC1",
     "EF1", "EF2", "EF3", "EF4",
@@ -33,7 +33,7 @@ LINE_CHART_SECTIONS: frozenset[str] = frozenset({"SP4"})
 
 
 def section_codes(excel_path: Path | str | None = None) -> list[str]:
-    """All dashboard section codes in SectionOrder sheet order."""
+    """All dashboard section codes in configured section order."""
     try:
         order = load_section_order(excel_path)
         codes: list[str] = []

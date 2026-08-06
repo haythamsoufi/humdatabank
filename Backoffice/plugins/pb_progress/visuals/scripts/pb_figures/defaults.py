@@ -1,4 +1,4 @@
-"""Fallback report metadata when SG Report.xlsx omits Translations/SectionOrder."""
+"""Fallback report metadata when SG Report.xlsx omits Translations."""
 
 from __future__ import annotations
 
@@ -34,6 +34,24 @@ DEFAULT_TRANSLATIONS: dict[str, dict[str, str]] = {
         "French": "Fonctions habilitantes",
         "Spanish": "Funciones de apoyo",
         "Arabic": "الوظائف التمكينية",
+    },
+    "ui.contents": {
+        "English": "Contents",
+        "French": "Sommaire",
+        "Spanish": "Contenido",
+        "Arabic": "المحتويات",
+    },
+    "ui.toc_expand": {
+        "English": "Expand table of contents",
+        "French": "Développer le sommaire",
+        "Spanish": "Expandir índice",
+        "Arabic": "توسيع جدول المحتويات",
+    },
+    "ui.toc_collapse": {
+        "English": "Collapse table of contents",
+        "French": "Réduire le sommaire",
+        "Spanish": "Contraer índice",
+        "Arabic": "طي جدول المحتويات",
     },
 }
 

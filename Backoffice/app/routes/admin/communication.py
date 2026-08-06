@@ -387,6 +387,14 @@ def api_send_notifications():
         send_push = data.get('send_push', False)
         override_preferences = data.get('override_preferences', False)
 
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+        if send_push and not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE)
+        send_push = send_push and is_notifications_push_enabled()
+
         # Validation
         if not user_ids:
             return json_bad_request('No users selected')

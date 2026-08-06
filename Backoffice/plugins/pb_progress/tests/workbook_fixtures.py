@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -25,31 +26,29 @@ def _translations_sheet() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _section_order_sheet(section_order: dict[str, list[str]]) -> pd.DataFrame:
+def section_order_env_json(section_order: dict[str, list[str]]) -> str:
     rows: list[dict[str, object]] = []
     order = 1
     for part, sections in section_order.items():
         for section in sections:
             rows.append({"part": part, "section": section, "order": order})
             order += 1
-    return pd.DataFrame(rows)
+    return json.dumps(rows)
+
+
+def apply_section_order_env(monkeypatch, section_order: dict[str, list[str]] | None = None) -> None:
+    if section_order is None:
+        section_order = {"sp": ["SP1"]}
+    monkeypatch.setenv("PB_REPORT_SECTION_ORDER", section_order_env_json(section_order))
 
 
 def write_test_workbook(
     path: Path,
     *,
     mapping_rows: list[dict[str, object]],
-    section_order: dict[str, list[str]] | None = None,
     final_rows: list[dict[str, object]] | None = None,
 ) -> Path:
     """Write a minimal valid SG Report workbook for pipeline integration tests."""
-    if section_order is None:
-        section_order = {
-            "cc": ["CC1"],
-            "sp": ["SP1"],
-            "ef": ["EF1"],
-        }
-
     mapping = pd.DataFrame(mapping_rows)
     if final_rows is None:
         final_rows = [
@@ -82,7 +81,6 @@ def write_test_workbook(
         final.to_excel(writer, sheet_name="Final", index=False)
         total_reported.to_excel(writer, sheet_name="TotalReported", index=False)
         _translations_sheet().to_excel(writer, sheet_name="Translations", index=False)
-        _section_order_sheet(section_order).to_excel(writer, sheet_name="SectionOrder", index=False)
     return path
 
 

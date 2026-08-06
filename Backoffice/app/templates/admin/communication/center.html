@@ -401,6 +401,7 @@
                                                 <span class="text-xs text-gray-500">{{ _('HTML email with optional template') }}</span>
                                             </div>
                                         </label>
+                                        {% if notifications_push_enabled %}
                                         <label class="flex items-center space-x-3 cursor-pointer">
                                             <input type="checkbox"
                                                    id="send-push"
@@ -410,6 +411,7 @@
                                                 <span class="text-xs text-gray-500">{{ _('Short alert on registered devices') }}</span>
                                             </div>
                                         </label>
+                                        {% endif %}
                                     </div>
                                     <p id="delivery-method-hint" class="text-xs text-gray-500 mt-3 mb-0 hidden"></p>
                                 </div>
@@ -430,6 +432,7 @@
                             </div>
                         </div>
 
+                        {% if notifications_push_enabled %}
                         <!-- Mobile push only -->
                         <div id="push-delivery-options" class="hidden rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 space-y-4">
                             <div class="flex items-center gap-2 text-sm font-semibold text-indigo-900">
@@ -496,6 +499,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -554,6 +558,7 @@
                                         aria-selected="true">
                                     <i class="fas fa-envelope text-[10px] mr-1.5" aria-hidden="true"></i>{{ _('Email') }}
                                 </button>
+                                {% if notifications_push_enabled %}
                                 <button type="button"
                                         role="tab"
                                         id="compose-tab-push"
@@ -562,6 +567,7 @@
                                         aria-selected="false">
                                     <i class="fas fa-mobile-alt text-[10px] mr-1.5" aria-hidden="true"></i>{{ _('Mobile Push') }}
                                 </button>
+                                {% endif %}
                             {% endcall %}
                         </div>
 
@@ -589,9 +595,11 @@
                             <div id="compose-email-text-slot" class="space-y-4"></div>
                         </div>
 
+                        {% if notifications_push_enabled %}
                         <div id="compose-pane-push" class="compose-channel-pane space-y-4 hidden">
                             <div id="compose-push-text-slot" class="space-y-4"></div>
                         </div>
+                        {% endif %}
 
                         <!-- Title + message (reparented into active channel pane by JS) -->
                         <div id="title-field-wrap" class="hidden">
@@ -1433,6 +1441,7 @@
     window.campaignsData = {{ campaigns|tojson|safe }};
 
     window.communicationPageConfig = {
+        notificationsPushEnabled: {{ notifications_push_enabled|tojson }},
         failedEmailDeliveryCount: {{ (failed_email_delivery_count or 0)|tojson }},
         campaignEmailTemplates: {{ campaign_email_templates|tojson|safe }},
         urls: {

@@ -338,16 +338,17 @@ def _format_millions_arabic(value: float) -> str:
     millions = round(value / 1_000_000, 1)
     num = f"{millions:g}"
     if millions == 1:
-        suffix = " مليون"
+        suffix = "مليون"
     elif millions == 2:
-        suffix = " مليونان"
+        suffix = "مليونان"
     elif 3 <= millions <= 10:
-        suffix = " ملايين"
+        suffix = "ملايين"
     elif 11 <= millions <= 99:
-        suffix = " مليونا"
+        suffix = "مليونا"
     else:
-        suffix = " مليون"
-    return f"{num}{suffix}"
+        suffix = "مليون"
+    # Arabic suffix before the LTR number so RTL renderers join the word correctly.
+    return f"{suffix} {num}"
 
 
 def format_value(value: float | int | None, unit: str | None, language: str = "English") -> str | None:
@@ -376,7 +377,8 @@ def format_donut_value(value: float | int | None, unit: str | None, language: st
     if value < 1_000_000:
         return _format_under_million(float(value))
     if language == "Arabic":
-        return f"{round(float(value) / 1_000_000):.0f}\n مليون"
+        millions = round(float(value) / 1_000_000)
+        return f"مليون\n{millions}"
     return _format_millions_english(float(value))
 
 

@@ -104,11 +104,13 @@
                     aria-controls="panel-notifications" aria-selected="false">
                 <i class="fas fa-bell mr-1.5"></i>{{ _('Notification Preferences') }}
             </button>
+            {% if notifications_push_enabled %}
             <button type="button" role="tab" id="registered-devices-tab" data-tab="devices"
                     class="{{ admin_underline_tab_btn_classes(false) }}"
                     aria-controls="panel-devices" aria-selected="false">
                 <i class="fas fa-mobile-alt mr-1.5"></i>{{ _('Registered Devices') }}
             </button>
+            {% endif %}
             {% if can_view_user_analytics %}
             <button type="button" role="tab" id="analytics-tab" data-tab="analytics"
                     class="{{ admin_underline_tab_btn_classes(false) }}"
@@ -1092,7 +1094,14 @@ window.userFormConfig = {
                     <p class="text-sm font-semibold text-gray-800 mb-1">
                         <i class="fas fa-sliders-h mr-2 text-blue-600"></i>{{ _('Notification types') }}
                     </p>
-                    <p class="text-xs text-gray-500 mb-4">{{ _('Choose email and push delivery per notification type.') }}</p>
+                    <p class="text-xs text-gray-500 mb-2">
+                        {% if notifications_push_enabled %}
+                        {{ _('Choose in-app, email, and push delivery per notification type.') }}
+                        {% else %}
+                        {{ _('Choose in-app and email delivery per notification type.') }}
+                        {% endif %}
+                    </p>
+                    <p class="text-xs text-gray-500 mb-4">{{ _('System-only notifications (for example welcome emails and digest receipts) are not listed here and cannot be disabled.') }}</p>
 
                     <div class="overflow-x-auto rounded-lg border border-gray-200">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -1102,14 +1111,26 @@ window.userFormConfig = {
                                         {{ _('Type') }}
                                     </th>
                                     <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        {{ _('In-app') }}
+                                    </th>
+                                    <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         {{ _('Email') }}
                                     </th>
+                                    {% if notifications_push_enabled %}
                                     <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         {{ _('Push') }}
                                     </th>
+                                    {% endif %}
                                 </tr>
                                 <tr class="bg-gray-50 border-t border-gray-200">
                                     <td class="px-4 py-2"></td>
+                                    <td class="px-4 py-2 text-center">
+                                        <label class="inline-flex items-center space-x-2 cursor-pointer group">
+                                            <input type="checkbox" id="select-all-in-app-admin"
+                                                   class="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded border-gray-300">
+                                            <span class="text-xs text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select all') }}</span>
+                                        </label>
+                                    </td>
                                     <td class="px-4 py-2 text-center">
                                         <label class="inline-flex items-center space-x-2 cursor-pointer group">
                                             <input type="checkbox" id="select-all-email-admin"
@@ -1117,6 +1138,7 @@ window.userFormConfig = {
                                             <span class="text-xs text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select all') }}</span>
                                         </label>
                                     </td>
+                                    {% if notifications_push_enabled %}
                                     <td class="px-4 py-2 text-center">
                                         <label class="inline-flex items-center space-x-2 cursor-pointer group">
                                             <input type="checkbox" id="select-all-push-admin"
@@ -1124,13 +1146,22 @@ window.userFormConfig = {
                                             <span class="text-xs text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select all') }}</span>
                                         </label>
                                     </td>
+                                    {% endif %}
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 {% for notif_type in notification_types_info.for_user %}
                                 <tr class="hover:bg-gray-50 transition-colors duration-150">
                                     <td class="px-4 py-3 whitespace-nowrap">
-                                        <span class="text-sm text-gray-900">{{ notif_type.replace('_', ' ').title() }}</span>
+                                        <span class="text-sm text-gray-900">{{ notification_type_labels.get(notif_type, notif_type.replace('_', ' ').title()) }}</span>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap text-center">
+                                        {% set in_app_enabled = not preferences.in_app_notification_types_enabled or notif_type in preferences.in_app_notification_types_enabled %}
+                                        <input type="checkbox"
+                                               name="notification_type_in_app"
+                                               value="{{ notif_type }}"
+                                               class="notification-type-in-app-admin form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer border-gray-300"
+                                               {% if in_app_enabled %}checked{% endif %}>
                                     </td>
                                     <td class="px-4 py-3 whitespace-nowrap text-center">
                                         {% set email_enabled = not preferences.notification_types_enabled or notif_type in preferences.notification_types_enabled %}
@@ -1140,6 +1171,7 @@ window.userFormConfig = {
                                                class="notification-type-email-admin form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer border-gray-300"
                                                {% if email_enabled %}checked{% endif %}>
                                     </td>
+                                    {% if notifications_push_enabled %}
                                     <td class="px-4 py-3 whitespace-nowrap text-center">
                                         {% set push_enabled = not preferences.push_notification_types_enabled or notif_type in preferences.push_notification_types_enabled %}
                                         <input type="checkbox"
@@ -1148,6 +1180,7 @@ window.userFormConfig = {
                                                class="notification-type-push-admin form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer border-gray-300"
                                                {% if push_enabled %}checked{% endif %}>
                                     </td>
+                                    {% endif %}
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -1158,7 +1191,7 @@ window.userFormConfig = {
             {% endif %}
 
             {# Registered Devices Tab #}
-            {% if user %}
+            {% if user and notifications_push_enabled %}
             <div id="panel-devices" class="user-form-panel hidden" role="tabpanel" aria-labelledby="registered-devices-tab">
                 <div class="mb-4">
                     <p class="text-sm text-gray-600">

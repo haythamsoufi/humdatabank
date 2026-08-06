@@ -1322,6 +1322,8 @@ from app.services.notification.dedup import (
 from app.services.notification.creation import (
     create_notification,
     is_notification_type_enabled_for_user,
+    is_in_app_notification_type_enabled_for_user,
+    is_email_notification_type_enabled_for_user,
     get_user_preferences_batch,
     IN_APP_ONLY_NOTIFICATION_TYPES,
 )

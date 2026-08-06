@@ -259,6 +259,52 @@ def iter_registry_specs_display_order() -> Iterator[Dict[str, Any]]:
         yield spec
 
 
+def list_preference_configurable_notification_types() -> List[str]:
+    """
+    Notification types exposed in user/admin preference UIs.
+
+    Active emitters with non-empty ``audiences`` (System Configuration buckets).
+    Independent of whether those buckets are currently enabled — preferences apply
+    when a type can be delivered to a role.
+    """
+    types: List[str] = []
+    for spec in iter_registry_specs_display_order():
+        if not spec.get("emitter_active"):
+            continue
+        audiences = spec.get("audiences") or []
+        if audiences:
+            types.append(spec["type_key"])
+    return types
+
+
+def list_notification_types_for_role_buckets(
+    *,
+    is_focal_point: bool,
+    is_system_manager: bool,
+    is_org_admin: bool,
+) -> List[str]:
+    """
+    Preference types relevant to a user's RBAC class.
+
+    Uses registry ``audiences`` (which buckets may apply), not live toggle state.
+    """
+    types: List[str] = []
+    for spec in iter_registry_specs_display_order():
+        if not spec.get("emitter_active"):
+            continue
+        audiences = spec.get("audiences") or []
+        if not audiences:
+            continue
+        type_key = spec["type_key"]
+        if (
+            (is_focal_point and "focal_points" in audiences)
+            or (is_system_manager and "system_managers" in audiences)
+            or (is_org_admin and "admin_users" in audiences)
+        ):
+            types.append(type_key)
+    return types
+
+
 def validate_registry_specs() -> None:
     """Raise AssertionError if registry keys diverge from NotificationType."""
     from app.models.enums import NotificationType

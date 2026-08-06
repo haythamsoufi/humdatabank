@@ -51,7 +51,7 @@ _PB_REPORT_FA_FIX = (
     "</style>"
 )
 _PB_REPORT_TOC_PIN_FIX = (
-    '<style id="pb-report-toc-pin-fix-v7">'
+    '<style id="pb-report-toc-pin-fix-v8">'
     "#pb-scroll-headers{display:none!important;}"
     "#toc.pb-report-toc-pinned,#quarto-margin-sidebar #toc.pb-report-toc-pinned,"
     "#quarto-sidebar #toc.pb-report-toc-pinned{"
@@ -97,24 +97,40 @@ _PB_REPORT_TOC_PIN_FIX = (
     "#toc.pb-report-toc-pinned a.pb-toc-link:hover,#toc.pb-report-toc-pinned a.pb-toc-link:focus-visible{color:#c22526!important;}"
     "#toc.pb-report-toc-pinned ul ul a.pb-toc-link{color:#666!important;}"
     "#toc.pb-report-toc-pinned ul ul a.pb-toc-link:hover,#toc.pb-report-toc-pinned ul ul a.pb-toc-link:focus-visible{color:#c22526!important;}"
+    "#toc.pb-report-toc-pinned[dir=rtl],#toc.pb-report-toc-pinned.pb-report-toc-rtl{direction:rtl!important;text-align:right!important;"
+    "font-family:'Tajawal','Segoe UI',sans-serif!important;}"
+    "#toc.pb-report-toc-pinned[dir=rtl] ul ul,#toc.pb-report-toc-pinned.pb-report-toc-rtl ul ul{padding-left:0!important;padding-right:0.65rem!important;}"
+    "#toc.pb-report-toc-pinned[dir=rtl] .pb-toc-header,#toc.pb-report-toc-pinned.pb-report-toc-rtl .pb-toc-header{flex-direction:row-reverse!important;}"
+    "#toc.pb-report-toc-pinned[dir=rtl] .pb-toc-link,#toc.pb-report-toc-pinned.pb-report-toc-rtl .pb-toc-link,"
+    "#toc.pb-report-toc-pinned[dir=rtl] .nav-link,#toc.pb-report-toc-pinned.pb-report-toc-rtl .nav-link{text-align:right!important;}"
     "</style>"
-    '<script id="pb-report-toc-pin-script-v7">'
+    '<script id="pb-report-toc-pin-script-v8">'
     "document.addEventListener('DOMContentLoaded',function(){"
     "var TOC_NARROW_MAX=1100,TOC_STATE_KEY='pb-report-toc-user-state';"
+    "function activeLang(){var m=document.getElementById('pb-active-language');"
+    "if(m&&m.textContent)return m.textContent.trim();"
+    "var p=document.querySelector('.pb-lang-panel:not([hidden])');return p&&p.dataset.lang?p.dataset.lang:'English';}"
+    "function chromeMeta(lang){var b=document.getElementById('pb-report-header-i18n');if(!b)return{};"
+    "try{return JSON.parse(b.textContent||'{}')[lang]||{};}catch(e){return{};}}"
+    "function titleText(){return chromeMeta(activeLang()).contentsLabel||'Contents';}"
+    "function expandLabel(){return chromeMeta(activeLang()).tocExpandLabel||'Expand table of contents';}"
+    "function collapseLabel(){return chromeMeta(activeLang()).tocCollapseLabel||'Collapse table of contents';}"
+    "function applyTocDir(toc){if(!toc)return;var p=document.querySelector('.pb-lang-panel:not([hidden])');"
+    "var dir=p&&p.dataset.dir?p.dataset.dir:'ltr';toc.setAttribute('dir',dir);toc.classList.toggle('pb-report-toc-rtl',dir==='rtl');}"
     "function isNarrow(){return window.innerWidth<TOC_NARROW_MAX;}"
     "function overlaps(){var toc=document.getElementById('toc'),sample=document.querySelector('.pb-lang-panel:not([hidden]) .pb-dashboard')||document.querySelector('.pb-dashboard');"
     "if(!toc||!sample)return isNarrow();var tr=toc.getBoundingClientRect(),cr=sample.getBoundingClientRect();"
     "return tr.width>0&&tr.left<cr.right-24;}"
     "function shouldAutoCollapse(){return isNarrow()||overlaps();}"
-    "function titleText(){return 'Contents';}"
     "function ensureHeader(toc){if(!toc||toc.querySelector('.pb-toc-header'))return;"
     "var title=toc.querySelector('#toc-title'),header=document.createElement('div');header.className='pb-toc-header';"
     "if(title){title.textContent=titleText();header.appendChild(title);}else{header.innerHTML='<h2 id=\"toc-title\">'+titleText()+'</h2>';}"
     "var btn=document.createElement('button');btn.type='button';btn.className='pb-toc-toggle-btn';btn.setAttribute('aria-controls','toc');"
     "btn.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();toggleToc(true);});header.appendChild(btn);toc.insertBefore(header,toc.firstChild);}"
     "function updateBtn(toc){var btn=toc.querySelector('.pb-toc-toggle-btn');if(!btn)return;var c=toc.classList.contains('pb-report-toc-collapsed');"
-    "btn.setAttribute('aria-expanded',c?'false':'true');btn.setAttribute('aria-label',c?'Expand table of contents':'Collapse table of contents');"
+    "btn.setAttribute('aria-expanded',c?'false':'true');btn.setAttribute('aria-label',c?expandLabel():collapseLabel());"
     "btn.title=btn.getAttribute('aria-label');"
+    "var title=toc.querySelector('#toc-title');if(title)title.textContent=titleText();applyTocDir(toc);"
     "if(c){btn.innerHTML='<span class=\"pb-toc-toggle-label\">'+titleText()+'</span><span class=\"pb-toc-toggle-chevron\" aria-hidden=\"true\"></span>';}"
     "else{btn.innerHTML='<span class=\"pb-toc-toggle-chevron pb-toc-toggle-chevron-up\" aria-hidden=\"true\"></span>';}}"
     "function setCollapsed(c,user){var toc=document.getElementById('toc');if(!toc)return;ensureHeader(toc);toc.classList.toggle('pb-report-toc-collapsed',c);"
@@ -134,6 +150,7 @@ _PB_REPORT_TOC_PIN_FIX = (
     "window.addEventListener('pb-report-toolbar-resize',pin);"
     "window.addEventListener('scroll',pin,{passive:true});"
     "window.addEventListener('resize',applyResponsive);"
+    "document.addEventListener('pb-language-changed',function(){var toc=document.getElementById('toc');if(toc)updateBtn(toc);});"
     "setTimeout(pin,0);"
     "});</script>"
 )
@@ -1014,7 +1031,7 @@ class PBProgressService:
         version: str,
         excel_info: dict[str, Any],
     ) -> dict[str, Any]:
-        """Load mapping, translations, and section order from the uploaded workbook."""
+        """Load mapping and translations from the uploaded workbook; derive section order from SPEF."""
         result: dict[str, Any] = {"excel": excel_info}
         try:
             from plugins.pb_progress.db_source import DbSourceError, get_editable_translations_config, import_config_from_excel
@@ -1235,6 +1252,23 @@ class PBProgressService:
         quarto_exe = cls._resolve_quarto_exe()
         if quarto_exe:
             env["PB_QUARTO_EXE"] = quarto_exe
+
+        from plugins.pb_progress.db_source import resolve_section_order_config
+
+        section_order_config = resolve_section_order_config(version, excel_path)
+        if section_order_config:
+            env["PB_REPORT_SECTION_ORDER"] = json.dumps(section_order_config)
+            section_codes = [
+                str(row.get("section") or "").strip()
+                for row in section_order_config
+                if str(row.get("section") or "").strip()
+            ]
+            if section_codes:
+                from plugins.pb_progress.db_source import resolve_section_title_translations
+
+                title_translations = resolve_section_title_translations(section_codes)
+                if title_translations:
+                    env["PB_REPORT_SECTION_TITLES"] = json.dumps(title_translations)
 
         return env
 
@@ -1559,11 +1593,13 @@ class PBProgressService:
                 "pb-report-toc-pin-fix-v4",
                 "pb-report-toc-pin-fix-v5",
                 "pb-report-toc-pin-fix-v6",
+                "pb-report-toc-pin-fix-v7",
                 "pb-report-toc-pin-script-v2",
                 "pb-report-toc-pin-script-v3",
                 "pb-report-toc-pin-script-v4",
                 "pb-report-toc-pin-script-v5",
                 "pb-report-toc-pin-script-v6",
+                "pb-report-toc-pin-script-v7",
             ):
                 html = re.sub(
                     rf'<style id="{old_toc_fix}"[^>]*>.*?</style>',
@@ -1584,7 +1620,7 @@ class PBProgressService:
                     html = html.replace("</head>", _PB_REPORT_FA_FIX + "</head>", 1)
                 else:
                     html = _PB_REPORT_FA_FIX + html
-            if 'id="pb-report-toc-pin-fix-v7"' not in html and (
+            if 'id="pb-report-toc-pin-fix-v8"' not in html and (
                 "pb-language-panels" in html or "rebuildToc" in html
             ):
                 if "</head>" in html:

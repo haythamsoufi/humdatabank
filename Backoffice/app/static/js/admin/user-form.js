@@ -1749,10 +1749,28 @@
         }
 
         // Notification preferences select all functionality
+        const selectAllInAppAdmin = document.getElementById('select-all-in-app-admin');
         const selectAllEmailAdmin = document.getElementById('select-all-email-admin');
         const selectAllPushAdmin = document.getElementById('select-all-push-admin');
+        const inAppCheckboxesAdmin = document.querySelectorAll('.notification-type-in-app-admin');
         const emailCheckboxesAdmin = document.querySelectorAll('.notification-type-email-admin');
         const pushCheckboxesAdmin = document.querySelectorAll('.notification-type-push-admin');
+
+        if (selectAllInAppAdmin) {
+            selectAllInAppAdmin.addEventListener('change', function() {
+                inAppCheckboxesAdmin.forEach(cb => cb.checked = this.checked);
+            });
+
+            inAppCheckboxesAdmin.forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const allChecked = Array.from(inAppCheckboxesAdmin).every(c => c.checked);
+                    selectAllInAppAdmin.checked = allChecked;
+                });
+            });
+
+            const allInAppChecked = inAppCheckboxesAdmin.length > 0 && Array.from(inAppCheckboxesAdmin).every(c => c.checked);
+            selectAllInAppAdmin.checked = allInAppChecked;
+        }
 
         if (selectAllEmailAdmin) {
             selectAllEmailAdmin.addEventListener('change', function() {

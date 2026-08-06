@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.defaults import DEFAULT_PARTS_ORDER, DEFAULT_SECTION_ORDER  # noqa: E402
 from pb_figures.report_meta import report_parts  # noqa: E402
-from pb_figures.translations import _load_bundle, clear_cache, load_section_order  # noqa: E402
+from pb_figures.translations import _bundle_cache_key, _load_bundle, clear_cache, load_section_order  # noqa: E402
 
 
 def _write_minimal_workbook(path: Path) -> None:
@@ -62,7 +62,7 @@ class TranslationDefaultsTests(unittest.TestCase):
             path = Path(tmpdir) / "SG Report.xlsx"
             _write_minimal_workbook(path)
 
-            translations, section_order, parts_order = _load_bundle(str(path.resolve()))
+            translations, section_order, parts_order = _load_bundle(_bundle_cache_key(path.resolve()))
 
             self.assertIn("report.title", translations)
             self.assertEqual(section_order, DEFAULT_SECTION_ORDER)
@@ -87,20 +87,57 @@ class TranslationDefaultsTests(unittest.TestCase):
             self.assertEqual(order, DEFAULT_SECTION_ORDER)
 
     def test_parts_order_prefers_sp_before_ef_when_legacy_per_part_orders(self) -> None:
-        from pb_figures.translations import _parse_section_order_sheet
+        from pb_figures.translations import _parse_section_order_rows
 
-        order_df = pd.DataFrame(
-            [
-                {"part": "sp", "section": "SP1", "order": 1},
-                {"part": "sp", "section": "SP2", "order": 2},
-                {"part": "ef", "section": "EF2", "order": 1},
-                {"part": "ef", "section": "EF3", "order": 2},
-            ]
-        )
-        section_order, parts_order = _parse_section_order_sheet(order_df)
+        rows = [
+            {"part": "sp", "section": "SP1", "order": 1},
+            {"part": "sp", "section": "SP2", "order": 2},
+            {"part": "ef", "section": "EF2", "order": 1},
+            {"part": "ef", "section": "EF3", "order": 2},
+        ]
+        section_order, parts_order = _parse_section_order_rows(rows)
         self.assertEqual(parts_order, ("sp", "ef"))
         self.assertEqual(section_order["sp"], ["SP1", "SP2"])
         self.assertEqual(section_order["ef"], ["EF2", "EF3"])
+
+    def test_load_bundle_uses_env_section_order(self) -> None:
+        import os
+        import json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "SG Report.xlsx"
+            _write_minimal_workbook(path)
+            rows = [{"part": "sp", "section": "SP2", "order": 1}]
+            os.environ["PB_REPORT_SECTION_ORDER"] = json.dumps(rows)
+            try:
+                clear_cache()
+                _, section_order, _ = _load_bundle(_bundle_cache_key(path.resolve()))
+                self.assertEqual(section_order, {"sp": ["SP2"]})
+            finally:
+                os.environ.pop("PB_REPORT_SECTION_ORDER", None)
+                clear_cache()
+
+    def test_load_bundle_uses_env_section_titles(self) -> None:
+        import json
+        import os
+
+        from pb_figures.translations import section_title_for
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "SG Report.xlsx"
+            _write_minimal_workbook(path)
+            rows = [{"part": "sp", "section": "SP1", "order": 1}]
+            titles = {"section.SP1": {"English": "Bank SP1", "French": "Banque SP1"}}
+            os.environ["PB_REPORT_SECTION_ORDER"] = json.dumps(rows)
+            os.environ["PB_REPORT_SECTION_TITLES"] = json.dumps(titles)
+            try:
+                clear_cache()
+                self.assertEqual(section_title_for("SP1", "English", path), "Bank SP1")
+                self.assertEqual(section_title_for("SP1", "French", path), "Banque SP1")
+            finally:
+                os.environ.pop("PB_REPORT_SECTION_ORDER", None)
+                os.environ.pop("PB_REPORT_SECTION_TITLES", None)
+                clear_cache()
 
 
 if __name__ == "__main__":

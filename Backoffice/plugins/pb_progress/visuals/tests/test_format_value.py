@@ -29,6 +29,10 @@ class FormatValueTests(unittest.TestCase):
         self.assertEqual(format_value(23, "Percentage"), "23%")
         self.assertEqual(format_value(25, "percent"), "25%")
 
+    def test_arabic_millions_use_rtl_word_order(self) -> None:
+        self.assertEqual(format_value(219_300_000, None, "Arabic"), "مليون 219.3")
+        self.assertEqual(format_value(2_000_000, None, "Arabic"), "مليونان 2")
+
 
 class TableLabelTests(unittest.TestCase):
     def test_reporting_and_implementing_include_national_societies_prefix(self) -> None:

@@ -1050,21 +1050,24 @@ def edit_user(user_id):
 
             # Handle notification preferences
             from app.services.notification.service import NotificationService
-            from app.models import NotificationType
+            from app.routes.notifications import get_preference_eligible_notification_types
+            from app.utils.notification_push import is_notifications_push_enabled
 
             # Get or create notification preferences for the user
             preferences = NotificationService.get_notification_preferences(user.id)
 
             # Get enabled notification types from form
+            in_app_types = request.form.getlist('notification_type_in_app')
             email_types = request.form.getlist('notification_type_email')
-            push_types = request.form.getlist('notification_type_push')
+            push_types = request.form.getlist('notification_type_push') if is_notifications_push_enabled() else []
 
-            # Get all notification types to determine if all are selected
-            all_types = [nt.value for nt in NotificationType]
+            # Match types shown in the admin preferences table (audience-configurable only)
+            all_types = get_preference_eligible_notification_types()
 
             # Determine if all types are selected
+            all_in_app_selected = len(in_app_types) == len(all_types)
             all_email_selected = len(email_types) == len(all_types)
-            all_push_selected = len(push_types) == len(all_types)
+            all_push_selected = is_notifications_push_enabled() and len(push_types) == len(all_types)
 
             # Update notification preferences from form data
             # email_notifications and push_notifications are determined by whether any types are selected
@@ -1072,7 +1075,8 @@ def edit_user(user_id):
             preferences.email_notifications = all_email_selected or len(email_types) > 0
             preferences.sound_enabled = request.form.get('sound_enabled') == 'on'
             preferences.notification_frequency = frequency
-            preferences.push_notifications = all_push_selected or len(push_types) > 0
+            if is_notifications_push_enabled():
+                preferences.push_notifications = all_push_selected or len(push_types) > 0
 
             # Handle digest day and time
             if frequency == 'daily' or frequency == 'weekly':
@@ -1086,8 +1090,10 @@ def edit_user(user_id):
                 preferences.digest_time = None
 
             # If all types are selected, send empty list (backend interprets as all enabled)
+            preferences.in_app_notification_types_enabled = [] if all_in_app_selected else in_app_types
             preferences.notification_types_enabled = [] if all_email_selected else email_types
-            preferences.push_notification_types_enabled = [] if all_push_selected else push_types
+            if is_notifications_push_enabled():
+                preferences.push_notification_types_enabled = [] if all_push_selected else push_types
 
             # Handle entity permissions from form (NS Structure and Secretariat).
             # Requires admin.users.grants.manage or system manager; self-editing is blocked.
@@ -1192,16 +1198,18 @@ def edit_user(user_id):
 
     # Load notification preferences for the user
     from app.services.notification.service import NotificationService
-    from app.routes.notifications import get_notification_types_for_user
+    from app.routes.notifications import get_notification_type_labels, get_notification_types_for_user
 
     preferences = NotificationService.get_notification_preferences(user.id)
-    notification_types_info = get_notification_types_for_user(user)
+    notification_types_info = get_notification_types_for_user(user, for_admin_configuration=True)
 
     # Ensure push notification fields exist (for backward compatibility)
     if not hasattr(preferences, 'push_notifications'):
         preferences.push_notifications = True
     if not hasattr(preferences, 'push_notification_types_enabled'):
         preferences.push_notification_types_enabled = []
+    if not hasattr(preferences, 'in_app_notification_types_enabled'):
+        preferences.in_app_notification_types_enabled = []
     # Ensure digest fields exist (for backward compatibility)
     if not hasattr(preferences, 'digest_day'):
         preferences.digest_day = None
@@ -1209,10 +1217,13 @@ def edit_user(user_id):
         preferences.digest_time = None
 
     # Load registered devices ordered by last activity then creation (most recent first)
-    # Get all devices including logged-out ones (for admin view)
-    registered_devices = UserDevice.query.filter_by(user_id=user.id) \
-        .order_by(UserDevice.last_active_at.desc().nullslast(), UserDevice.created_at.desc().nullslast()) \
-        .all()
+    from app.utils.notification_push import is_notifications_push_enabled
+
+    registered_devices = []
+    if is_notifications_push_enabled():
+        registered_devices = UserDevice.query.filter_by(user_id=user.id) \
+            .order_by(UserDevice.last_active_at.desc().nullslast(), UserDevice.created_at.desc().nullslast()) \
+            .all()
 
     computed_role_type = _compute_role_type_for_user_id(user.id, check_admin_grants=True)
     selected_role_type = _selected_role_type_for_rerender(form)
@@ -1228,6 +1239,7 @@ def edit_user(user_id):
                            roles_read_only=roles_read_only,
                            preferences=preferences,
                            notification_types_info=notification_types_info,
+                           notification_type_labels=get_notification_type_labels(),
                            registered_devices=registered_devices,
                            computed_role_type=computed_role_type,
                            selected_role_type=selected_role_type,
@@ -1242,6 +1254,14 @@ def edit_user(user_id):
 def kickout_device(user_id, device_id):
     """Kick out (end session) for a specific device. Keeps device registered."""
     try:
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+
+        if not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE)
+
         from datetime import datetime
 
         # Verify user exists
@@ -1287,6 +1307,14 @@ def kickout_device(user_id, device_id):
 def remove_device(user_id, device_id):
     """Remove a device from the registry. Permanently deletes the device record."""
     try:
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+
+        if not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE)
+
         # Verify user exists
         user = User.query.get_or_404(user_id)
 

@@ -14,7 +14,13 @@ import pytest
 
 from plugins.pb_progress.db_source import validate_uploaded_workbook
 from plugins.pb_progress.service import PBProgressService
-from workbook_fixtures import cumulative_docx_item, sp1_mapping_row, write_test_workbook
+from workbook_fixtures import (
+    apply_section_order_env,
+    cumulative_docx_item,
+    section_order_env_json,
+    sp1_mapping_row,
+    write_test_workbook,
+)
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 VISUALS_ROOT = PLUGIN_ROOT / "visuals"
@@ -29,19 +35,16 @@ def build_workspace(tmp_path, monkeypatch):
     workspace.mkdir()
     monkeypatch.setenv("PB_VISUALS_BUILD_ROOT", str(workspace))
     monkeypatch.setenv("PB_BUILD_WORKERS", "1")
+    apply_section_order_env(monkeypatch, {"sp": ["SP1"]})
     yield workspace
     monkeypatch.delenv("PB_VISUALS_BUILD_ROOT", raising=False)
 
 
 @pytest.fixture
 def staging_workbook(tmp_path):
-    """Workbook shape that broke staging: CC1 in SectionOrder, no CC1 mapping."""
+    """Minimal workbook with SP1 mapping only."""
     path = tmp_path / "staging_gap.xlsx"
-    write_test_workbook(
-        path,
-        mapping_rows=[sp1_mapping_row()],
-        section_order={"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
-    )
+    write_test_workbook(path, mapping_rows=[sp1_mapping_row()])
     return path
 
 
@@ -77,8 +80,14 @@ def test_generate_body_skips_unmapped_cc1(
     staging_workbook, build_workspace, tmp_path, monkeypatch
 ) -> None:
     from pb_figures.data import build_model, load_mapping
+    from pb_figures.translations import clear_cache
     from pre_render import _generate_body
 
+    monkeypatch.setenv(
+        "PB_REPORT_SECTION_ORDER",
+        section_order_env_json({"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]}),
+    )
+    clear_cache()
     body_path = tmp_path / "_body.qmd"
     monkeypatch.setenv("PB_REPORT_EXCEL", str(staging_workbook))
     model = build_model(staging_workbook)
@@ -90,10 +99,10 @@ def test_generate_body_skips_unmapped_cc1(
 
 
 @pytest.mark.pb_progress
-def test_validate_workbook_reports_section_order_gaps(staging_workbook) -> None:
+def test_validate_workbook_has_no_section_order_gaps(staging_workbook) -> None:
     summary = validate_uploaded_workbook(staging_workbook)
     assert summary["valid"] is True
-    assert "CC1" in summary["sections_without_indicators"]
+    assert summary["sections_without_indicators"] == []
 
 
 @pytest.mark.pb_progress
@@ -185,6 +194,7 @@ def test_pre_render_figures_only_subprocess(staging_workbook, build_workspace) -
     env["PB_REPORT_YEAR"] = "2027"
     env["PB_BUILD_WORKERS"] = "1"
     env["PB_FIGURES_RENDERER"] = "html"
+    env["PB_REPORT_SECTION_ORDER"] = section_order_env_json({"sp": ["SP1"]})
     env["PYTHONUNBUFFERED"] = "1"
 
     result = subprocess.run(
@@ -214,6 +224,7 @@ def test_generate_docx_subprocess(staging_workbook, build_workspace) -> None:
     env["PB_REPORT_LANGUAGE"] = "English"
     env["PB_REPORT_YEAR"] = "2027"
     env["PB_BUILD_WORKERS"] = "1"
+    env["PB_REPORT_SECTION_ORDER"] = section_order_env_json({"sp": ["SP1"]})
 
     result = subprocess.run(
         [

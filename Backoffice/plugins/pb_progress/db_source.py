@@ -71,7 +71,7 @@ class WorkbookValidationError(ValueError):
 
 
 REQUIRED_UPLOAD_SHEETS: tuple[str, ...] = ("Mapping", "Final", "TotalReported")
-OPTIONAL_UPLOAD_SHEETS: tuple[str, ...] = ("Translations", "SectionOrder")
+OPTIONAL_UPLOAD_SHEETS: tuple[str, ...] = ("Translations",)
 
 
 def _visuals_scripts_path() -> Path:
@@ -125,14 +125,6 @@ def validate_uploaded_workbook(path: Path | str) -> dict[str, Any]:
         raise WorkbookValidationError(str(exc)) from exc
 
     sections = sorted(model["section"].dropna().astype(str).unique())
-    from pb_figures.workbook_validation import sections_without_indicators
-
-    unmapped_sections = sections_without_indicators(workbook_path)
-    for section in unmapped_sections:
-        warnings.append(
-            f"Section '{section}' appears in SectionOrder but has no Mapping indicators; "
-            "it will be omitted from the generated report."
-        )
 
     return {
         "valid": True,
@@ -140,7 +132,7 @@ def validate_uploaded_workbook(path: Path | str) -> dict[str, Any]:
         "indicator_count": int(model["ID"].nunique()),
         "row_count": len(model),
         "sections": sections,
-        "sections_without_indicators": unmapped_sections,
+        "sections_without_indicators": [],
     }
 
 
@@ -237,6 +229,76 @@ def _spef_rows_by_code(codes: Iterable[str]) -> dict[str, IndicatorBankSpef]:
     return {(row.code or "").upper(): row for row in rows}
 
 
+def _build_section_order_rows(sections: set[str]) -> list[dict[str, Any]]:
+    if not sections:
+        return []
+    try:
+        spef_by_code = _spef_rows_by_code(sections)
+    except RuntimeError:
+        spef_by_code = {}
+    sort_by_code = {code: spef.sort_order for code, spef in spef_by_code.items()}
+    ordered: list[dict[str, Any]] = []
+    for section in sorted(sections, key=lambda code: _section_sort_key(code, sort_by_code)):
+        spef = spef_by_code.get(section)
+        order = spef.sort_order if spef is not None else 9999
+        ordered.append({"part": _section_part(section), "section": section, "order": order})
+    return ordered
+
+
+def build_section_order_from_mapping_rows(mapping_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Derive report section order from mapping rows and Indicator Bank SPEF sort_order."""
+    sections: set[str] = set()
+    indicator_ids = [int(i) for i in {_normalize_id(row.get("id")) for row in mapping_rows} if i.isdigit()]
+    indicators: dict[str, IndicatorBank] = {}
+    try:
+        indicators = _load_indicators_by_id(indicator_ids)
+    except RuntimeError:
+        pass
+    for row in mapping_rows:
+        indicator_id = _normalize_id(row.get("id"))
+        indicator = indicators.get(indicator_id)
+        if indicator is not None:
+            sections.add(_indicator_section_code(indicator))
+            continue
+        section = _normalize_section_code(row.get("section"))
+        if section:
+            sections.add(section)
+    return _build_section_order_rows(sections)
+
+
+def _mapping_rows_from_workbook(path: Path) -> list[dict[str, Any]]:
+    mapping_df = pd.read_excel(path, sheet_name="Mapping", header=MAPPING_HEADER_ROW)
+    rows: list[dict[str, Any]] = []
+    for _, row in mapping_df.iterrows():
+        indicator_id = _normalize_id(row.get("ID"))
+        if not indicator_id:
+            continue
+        rows.append(
+            {
+                "id": indicator_id,
+                "section": _normalize_section_code(str(row.get(SECTION_COLUMN) or "").strip() or None),
+            }
+        )
+    return rows
+
+
+def build_section_order_from_workbook(path: Path | str) -> list[dict[str, Any]]:
+    """Derive section order from a workbook Mapping sheet and Indicator Bank SPEF."""
+    return build_section_order_from_mapping_rows(_mapping_rows_from_workbook(Path(path)))
+
+
+def resolve_section_order_config(version: str, excel_path: Path | str) -> list[dict[str, Any]]:
+    """Section order for report builds: plugin store, or SPEF order from Mapping."""
+    version = validate_version(version)
+    source = PBProgressDataStore.get_data_source(version)
+    if source == "system":
+        return build_section_order_from_bank(version)
+    stored = PBProgressDataStore.get_section_order_config(version)
+    if stored:
+        return stored
+    return build_section_order_from_workbook(excel_path)
+
+
 def build_section_order_from_bank(version: str) -> list[dict[str, Any]]:
     """Derive report section order from tagged indicators and SPEF catalog sort_order."""
     version = validate_version(version)
@@ -247,18 +309,7 @@ def build_section_order_from_bank(version: str) -> list[dict[str, Any]]:
     sections: set[str] = set()
     for indicator in _query_tagged_indicator_rows(tag):
         sections.add(_indicator_section_code(indicator))
-    if not sections:
-        return []
-
-    spef_by_code = _spef_rows_by_code(sections)
-    sort_by_code = {code: spef.sort_order for code, spef in spef_by_code.items()}
-
-    ordered: list[dict[str, Any]] = []
-    for section in sorted(sections, key=lambda code: _section_sort_key(code, sort_by_code)):
-        spef = spef_by_code.get(section)
-        order = spef.sort_order if spef is not None else 9999
-        ordered.append({"part": _section_part(section), "section": section, "order": order})
-    return ordered
+    return _build_section_order_rows(sections)
 
 
 def _section_translation_rows(section_codes: Iterable[str]) -> list[dict[str, str]]:
@@ -293,6 +344,29 @@ def merge_translations_with_section_titles(
     for row in _section_translation_rows(section_codes):
         merged[row["id"]] = row
     return list(merged.values())
+
+
+_SECTION_TITLE_LANGS = {
+    "EN": "English",
+    "FR": "French",
+    "SP": "Spanish",
+    "AR": "Arabic",
+}
+
+
+def resolve_section_title_translations(section_codes: Iterable[str]) -> dict[str, dict[str, str]]:
+    """Bank-managed section.* titles for report builds (PB_REPORT_SECTION_TITLES)."""
+    result: dict[str, dict[str, str]] = {}
+    for row in _section_translation_rows(section_codes):
+        code = row["id"]
+        entry: dict[str, str] = {}
+        for excel_col, lang in _SECTION_TITLE_LANGS.items():
+            text = (row.get(excel_col) or "").strip()
+            if text:
+                entry[lang] = text
+        if entry:
+            result[code] = entry
+    return result
 
 
 def _normalize_id(value: Any) -> str:
@@ -731,10 +805,15 @@ def import_config_from_excel(version: str) -> dict[str, Any]:
         translations_rows = validate_translations_config(filter_editable_translations(translations_rows))
 
     PBProgressDataStore.save_translations_config(version, translations_rows)
+
+    section_order_config = build_section_order_from_workbook(path)
+    PBProgressDataStore.save_section_order_config(version, section_order_config)
+
     return {
         "version": version,
         "mapping_count": len(mapping_rows),
         "translations_count": len(translations_rows),
+        "section_order_count": len(section_order_config),
     }
 
 
@@ -1022,14 +1101,12 @@ def build_dataset(version: str) -> dict[str, pd.DataFrame]:
     final_df = pd.DataFrame(final_rows)
     total_reported_df = _build_total_reported(final_df)
     translations_df = pd.DataFrame(translations_config or [], columns=["id", "EN", "FR", "SP", "AR"])
-    section_order_df = pd.DataFrame(section_order_config or [], columns=["part", "section", "order"])
 
     return {
         "mapping": mapping_df,
         "final": final_df,
         "total_reported": total_reported_df,
         "translations": translations_df,
-        "sectionorder": section_order_df,
     }
 
 
@@ -1044,8 +1121,6 @@ def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
     if translations_df.empty:
         translations_df = pd.DataFrame(default_translations_config_rows())
 
-    section_order_df = sheets["sectionorder"]
-
     with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
         empty = pd.DataFrame()
         empty.to_excel(writer, sheet_name="Mapping", index=False, startrow=MAPPING_HEADER_ROW)
@@ -1053,7 +1128,6 @@ def export_dataset_to_excel(version: str, output_path: Path | str) -> Path:
         sheets["final"].to_excel(writer, sheet_name="Final", index=False)
         sheets["total_reported"].to_excel(writer, sheet_name="TotalReported", index=False)
         translations_df.to_excel(writer, sheet_name="Translations", index=False)
-        section_order_df.to_excel(writer, sheet_name="SectionOrder", index=False)
     return output_path
 
 

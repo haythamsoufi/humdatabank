@@ -11,7 +11,7 @@ from .report_meta import report_parts
 
 
 def sections_without_indicators(excel_path: Path | str | None = None) -> list[str]:
-    """Return section codes listed in SectionOrder that have no Mapping rows."""
+    """Return configured section codes that have no Mapping rows."""
     path = resolve_excel(excel_path)
     mapping = load_mapping(path)
     missing: list[str] = []

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -14,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.config import build_workers, cleanup_build_copy, resolve_excel, resolve_report_output
-from pb_figures.data import build_model, load_mapping, load_sg_report
-from pb_figures.languages import discover_languages, docx_filename
+from pb_figures.data import build_model, load_mapping
+from pb_figures.languages import LANGUAGES, docx_filename, resolve_build_languages
 from pb_figures.layouts import SECTION_CODES
 from pb_figures.render_docx import render_report_docx
 
@@ -45,11 +44,8 @@ def _resolve_languages(excel: Path, args: argparse.Namespace) -> list[str]:
     if args.language:
         return [args.language]
     if args.all_languages:
-        return list(discover_languages(load_sg_report(excel)["mapping"]))
-    env_lang = os.environ.get("PB_REPORT_LANGUAGE")
-    if env_lang and env_lang.lower() not in ("all", "*"):
-        return [env_lang]
-    return list(discover_languages(load_sg_report(excel)["mapping"]))
+        return list(LANGUAGES)
+    return list(resolve_build_languages(excel))
 
 
 def main() -> None:

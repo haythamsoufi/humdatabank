@@ -36,7 +36,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
-from app.utils.country_utils import get_countries_by_region
+from app.utils.country_utils import get_countries_by_region_with_part_of
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
@@ -53,6 +53,15 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.utils.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
+
+def _manage_assignment_country_context():
+    countries_by_region, part_of_programs, part_of_category_to_countries = get_countries_by_region_with_part_of()
+    return {
+        'countries_by_region': countries_by_region,
+        'part_of_programs': part_of_programs,
+        'part_of_category_to_countries': part_of_category_to_countries,
+    }
+
 
 # --- Internal utilities ---
 def _supported_language_codes():
@@ -464,10 +473,10 @@ def new_assignment():
                                      assignment=None,
                                      assignment_entity_display={},
                                      title="Create New Assignment",
-                                     countries_by_region=get_countries_by_region(),
                                      get_localized_country_name=get_localized_country_name,
                                      enabled_entity_types=enabled_entity_groups,
-                                     submission_review_recipient_users=_submission_review_recipient_users_for_template(form))
+                                     submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
+                                     **_manage_assignment_country_context())
 
             # Duplicate guard: never auto-reactivate. Require explicit confirmation to create a duplicate.
             period_name = (form.period_name.data or '').strip()
@@ -631,18 +640,15 @@ def new_assignment():
             flash("Error creating assignment.", "danger")
             current_app.logger.error(f"Error creating assignment: {e}", exc_info=True)
 
-    # Prepare country data for template
-    countries_by_region = get_countries_by_region()
-
     return render_template("admin/assignments/manage_assignment.html",
                          form=form,
                          assignment=None,
                          assignment_entity_display={},
                          title="Create New Assignment",
-                         countries_by_region=countries_by_region,
                          get_localized_country_name=get_localized_country_name,
                          enabled_entity_types=enabled_entity_groups,
-                         submission_review_recipient_users=_submission_review_recipient_users_for_template(form))
+                         submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
+                         **_manage_assignment_country_context())
 
 
 @bp.route("/assignments/check_duplicate", methods=["GET"])
@@ -717,7 +723,6 @@ def edit_assignment(assignment_id):
     assignment_countries = assignment.country_statuses.all()
     # Get all assignment entity statuses (for entity management)
     assignment_entities = assignment.entity_statuses.all()
-    countries_by_region = get_countries_by_region()
 
     from app.services.organization.entity_service import EntityService
 
@@ -763,14 +768,14 @@ def edit_assignment(assignment_id):
                          assignment_entities=assignment_entities,
                          assignment_entity_display=assignment_entity_display,
                          assignment_entity_fds_members=assignment_entity_fds_members,
-                         countries_by_region=countries_by_region,
                          edit_aes_form=edit_aes_form,
                          assignment_entity_status_choices=assignment_entity_status_choices,
                          get_localized_country_name=get_localized_country_name,
                          EntityService=EntityService,
                          title=f"Edit Assignment: {assignment.period_name}",
                          enabled_entity_types=enabled_entity_groups,
-                         submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment))
+                         submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment),
+                         **_manage_assignment_country_context())
 
 @bp.route("/assignments/edit/<int:assignment_id>/add_countries", methods=["POST"])
 @permission_required('admin.assignments.entities.manage')

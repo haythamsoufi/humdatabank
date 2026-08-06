@@ -1,7 +1,9 @@
-"""Load UI translations and section order from SG Report.xlsx."""
+"""Load UI translations and section order for P&B report builds."""
 
 from __future__ import annotations
 
+import json
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,9 +19,7 @@ EXCEL_TO_LANG = {
     "AR": "Arabic",
 }
 
-REQUIRED_SHEETS = ("Translations", "SectionOrder")
-
-# Tie-break when multiple parts share the same minimum SectionOrder value (legacy per-part rows).
+# Tie-break when multiple parts share the same minimum order value (legacy per-part rows).
 _PART_RANK = {"cc": 0, "sp": 1, "ef": 2}
 
 
@@ -55,17 +55,14 @@ def _parse_translations_sheet(trans_df: pd.DataFrame) -> dict[str, dict[str, str
     return translations
 
 
-def _parse_section_order_sheet(order_df: pd.DataFrame) -> tuple[dict[str, list[str]], tuple[str, ...]]:
-    if order_df.empty or not {"part", "section", "order"}.issubset(order_df.columns):
-        return {}, ()
-
+def _parse_section_order_rows(rows: list[dict[str, object]]) -> tuple[dict[str, list[str]], tuple[str, ...]]:
     parsed: dict[str, list[tuple[int, str]]] = {}
     part_min_order: dict[str, int] = {}
-    for _, row in order_df.iterrows():
+    for row in rows:
         part = str(row.get("part", "") or "").strip().lower()
         section = str(row.get("section", "") or "").strip()
         order = row.get("order")
-        if not part or not section or pd.isna(order):
+        if not part or not section or order is None or (isinstance(order, float) and pd.isna(order)):
             continue
         order_int = int(order)
         parsed.setdefault(part, []).append((order_int, section))
@@ -84,10 +81,59 @@ def _parse_section_order_sheet(order_df: pd.DataFrame) -> tuple[dict[str, list[s
     return section_order, parts_order
 
 
+def _section_order_from_env() -> tuple[dict[str, list[str]], tuple[str, ...]] | None:
+    raw = (os.environ.get("PB_REPORT_SECTION_ORDER") or "").strip()
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, list):
+        return None
+    section_order, parts_order = _parse_section_order_rows(payload)
+    if not section_order:
+        return None
+    return section_order, parts_order
+
+
+def _section_titles_from_env() -> dict[str, dict[str, str]] | None:
+    raw = (os.environ.get("PB_REPORT_SECTION_TITLES") or "").strip()
+    if not raw:
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    result: dict[str, dict[str, str]] = {}
+    for code, entry in payload.items():
+        if not isinstance(code, str) or not isinstance(entry, dict):
+            continue
+        langs = {
+            str(lang): str(text).strip()
+            for lang, text in entry.items()
+            if text is not None and str(text).strip()
+        }
+        if langs:
+            result[code] = langs
+    return result or None
+
+
+def _bundle_cache_key(path: Path) -> tuple[str, str, str]:
+    return (
+        str(path.resolve()),
+        os.environ.get("PB_REPORT_SECTION_ORDER", ""),
+        os.environ.get("PB_REPORT_SECTION_TITLES", ""),
+    )
+
+
 @lru_cache(maxsize=8)
 def _load_bundle(
-    excel_path_str: str,
+    cache_key: tuple[str, str, str],
 ) -> tuple[dict[str, dict[str, str]], dict[str, list[str]], tuple[str, ...]]:
+    excel_path_str, _section_order_key, _section_titles_key = cache_key
     path = Path(excel_path_str)
     if not path.exists():
         raise TranslationsError(f"Excel workbook not found: {path}")
@@ -108,24 +154,19 @@ def _load_bundle(
         if parsed_translations:
             translations.update(parsed_translations)
 
-    try:
-        order_df = pd.read_excel(path, sheet_name="SectionOrder", keep_default_na=False)
-    except ValueError:
-        order_df = pd.DataFrame()
-    except (PermissionError, OSError) as exc:
-        raise TranslationsError(f"Cannot read {path.name}: {exc}") from exc
-    else:
-        parsed_section_order, parsed_parts_order = _parse_section_order_sheet(order_df)
-        if parsed_section_order:
-            section_order = parsed_section_order
-        if parsed_parts_order:
-            parts_order = parsed_parts_order
+    env_titles = _section_titles_from_env()
+    if env_titles:
+        translations.update(env_titles)
+
+    env_order = _section_order_from_env()
+    if env_order is not None:
+        section_order, parts_order = env_order
 
     if not translations:
         raise TranslationsError(f"{path.name} → Translations sheet has no usable rows")
 
     if not section_order:
-        raise TranslationsError(f"{path.name} → SectionOrder sheet has no usable rows")
+        raise TranslationsError(f"{path.name} → section order is empty")
 
     return translations, section_order, parts_order
 
@@ -135,18 +176,18 @@ def clear_cache() -> None:
 
 
 def load_translations(excel_path: Path | str | None = None) -> dict[str, dict[str, str]]:
-    translations, _, _ = _load_bundle(str(resolve_excel(excel_path)))
+    translations, _, _ = _load_bundle(_bundle_cache_key(resolve_excel(excel_path)))
     return translations
 
 
 def load_section_order(excel_path: Path | str | None = None) -> dict[str, list[str]]:
-    _, section_order, _ = _load_bundle(str(resolve_excel(excel_path)))
+    _, section_order, _ = _load_bundle(_bundle_cache_key(resolve_excel(excel_path)))
     return section_order
 
 
 def load_parts_order(excel_path: Path | str | None = None) -> tuple[str, ...]:
-    """Report part ids (e.g. cc, sp, ef) sorted by the lowest SectionOrder row per part."""
-    _, _, parts_order = _load_bundle(str(resolve_excel(excel_path)))
+    """Report part ids (e.g. cc, sp, ef) sorted by the lowest order row per part."""
+    _, _, parts_order = _load_bundle(_bundle_cache_key(resolve_excel(excel_path)))
     return parts_order
 
 

@@ -213,6 +213,7 @@ class NotificationPreferences(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=False)
     email_notifications = db.Column(db.Boolean, default=True, nullable=False)
     notification_types_enabled = db.Column(db.JSON, default=list, nullable=False)
+    in_app_notification_types_enabled = db.Column(db.JSON, default=list, nullable=False)
     notification_frequency = db.Column(db.String(20), default='instant', nullable=False)
     digest_day = db.Column(db.String(10), nullable=True)  # For weekly: 'monday', 'tuesday', etc.
     digest_time = db.Column(db.String(10), nullable=True)  # Time in HH:MM format (24-hour)

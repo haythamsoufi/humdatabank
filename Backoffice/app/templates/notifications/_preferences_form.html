@@ -72,7 +72,14 @@
     <div class="pref-group mt-6">
         <div class="mb-4">
             <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ _('Notification Types') }}</h3>
-            <p class="text-sm text-gray-600">{{ _('Configure which notification types to receive via email and push notifications') }}</p>
+            <p class="text-sm text-gray-600">
+                {% if notifications_push_enabled %}
+                {{ _('Configure in-app, email, and push delivery per notification type.') }}
+                {% else %}
+                {{ _('Configure in-app and email delivery per notification type.') }}
+                {% endif %}
+            </p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('System-only notifications (for example welcome emails and digest receipts) are not listed here and cannot be disabled.') }}</p>
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
@@ -83,14 +90,26 @@
                             {{ _('Notification Type') }}
                         </th>
                         <th scope="col" class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
+                            {{ _('In-app') }}
+                        </th>
+                        <th scope="col" class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                             {{ _('Email') }}
                         </th>
+                        {% if notifications_push_enabled %}
                         <th scope="col" class="px-6 py-4 text-center text-sm font-semibold text-gray-900">
                             {{ _('Push') }}
                         </th>
+                        {% endif %}
                     </tr>
                     <tr class="bg-gray-50 border-t border-gray-200">
                         <td class="px-6 py-2"></td>
+                        <td class="px-6 py-2 text-center">
+                            <label class="inline-flex items-center space-x-2 cursor-pointer group">
+                                <input type="checkbox" id="select-all-in-app"
+                                       class="form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded">
+                                <span class="text-sm text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select All') }}</span>
+                            </label>
+                        </td>
                         <td class="px-6 py-2 text-center">
                             <label class="inline-flex items-center space-x-2 cursor-pointer group">
                                 <input type="checkbox" id="select-all-email"
@@ -98,6 +117,7 @@
                                 <span class="text-sm text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select All') }}</span>
                             </label>
                         </td>
+                        {% if notifications_push_enabled %}
                         <td class="px-6 py-2 text-center">
                             <label class="inline-flex items-center space-x-2 cursor-pointer group">
                                 <input type="checkbox" id="select-all-push"
@@ -105,6 +125,7 @@
                                 <span class="text-sm text-gray-700 font-medium group-hover:text-gray-900">{{ _('Select All') }}</span>
                             </label>
                         </td>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -115,16 +136,24 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <input type="checkbox"
+                                   class="notification-type-in-app form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
+                                   data-type="{{ notif_type }}"
+                                   {% if not preferences.in_app_notification_types_enabled or notif_type in preferences.in_app_notification_types_enabled %}checked{% endif %}>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <input type="checkbox"
                                    class="notification-type-email form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
                                    data-type="{{ notif_type }}"
                                    {% if not preferences.notification_types_enabled or notif_type in preferences.notification_types_enabled %}checked{% endif %}>
                         </td>
+                        {% if notifications_push_enabled %}
                         <td class="px-6 py-4 whitespace-nowrap text-center">
                             <input type="checkbox"
                                    class="notification-type-push form-checkbox h-5 w-5 text-blue-600 focus:ring-blue-500 focus:ring-2 rounded cursor-pointer"
                                    data-type="{{ notif_type }}"
                                    {% if not preferences.push_notification_types_enabled or notif_type in preferences.push_notification_types_enabled %}checked{% endif %}>
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>

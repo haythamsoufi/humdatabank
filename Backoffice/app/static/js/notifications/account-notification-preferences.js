@@ -18,11 +18,14 @@ class AccountNotificationPreferences {
         document.getElementById('pref-frequency')?.addEventListener('change', (e) => this.toggleDigestSchedule(e.target.value));
         document.getElementById('pref-digest-day')?.addEventListener('change', () => this.updateDigestPreviewFromForm());
         document.getElementById('pref-digest-time')?.addEventListener('change', () => this.updateDigestPreviewFromForm());
+        document.getElementById('select-all-in-app')?.addEventListener('change', (e) => this.toggleSelectAll('in-app', e.target.checked));
         document.getElementById('select-all-email')?.addEventListener('change', (e) => this.toggleSelectAll('email', e.target.checked));
         document.getElementById('select-all-push')?.addEventListener('change', (e) => this.toggleSelectAll('push', e.target.checked));
 
         this.root.addEventListener('change', (e) => {
-            if (e.target.classList.contains('notification-type-email')) {
+            if (e.target.classList.contains('notification-type-in-app')) {
+                this.updateSelectAllState('in-app');
+            } else if (e.target.classList.contains('notification-type-email')) {
                 this.updateSelectAllState('email');
             } else if (e.target.classList.contains('notification-type-push')) {
                 this.updateSelectAllState('push');
@@ -62,6 +65,14 @@ class AccountNotificationPreferences {
         if (digestTimeEl) {
             digestTimeEl.value = preferences.digest_time || '09:00';
         }
+
+        const inAppEnabledTypes = preferences.in_app_notification_types_enabled || [];
+        const allInAppEnabled = inAppEnabledTypes.length === 0;
+        this.root.querySelectorAll('.notification-type-in-app').forEach((checkbox) => {
+            const type = checkbox.getAttribute('data-type');
+            checkbox.checked = allInAppEnabled || inAppEnabledTypes.includes(type);
+        });
+        this.updateSelectAllState('in-app');
 
         const emailEnabledTypes = preferences.notification_types_enabled || [];
         const allEmailEnabled = emailEnabledTypes.length === 0;
@@ -130,15 +141,30 @@ class AccountNotificationPreferences {
     }
 
     toggleSelectAll(type, checked) {
-        const selector = type === 'email' ? '.notification-type-email' : '.notification-type-push';
+        const selectorMap = {
+            'in-app': '.notification-type-in-app',
+            email: '.notification-type-email',
+            push: '.notification-type-push',
+        };
+        const selector = selectorMap[type] || '.notification-type-email';
         this.root.querySelectorAll(selector).forEach((checkbox) => {
             checkbox.checked = checked;
         });
     }
 
     updateSelectAllState(type) {
-        const selector = type === 'email' ? '.notification-type-email' : '.notification-type-push';
-        const selectAllId = type === 'email' ? 'select-all-email' : 'select-all-push';
+        const selectorMap = {
+            'in-app': '.notification-type-in-app',
+            email: '.notification-type-email',
+            push: '.notification-type-push',
+        };
+        const selectAllMap = {
+            'in-app': 'select-all-in-app',
+            email: 'select-all-email',
+            push: 'select-all-push',
+        };
+        const selector = selectorMap[type] || '.notification-type-email';
+        const selectAllId = selectAllMap[type] || 'select-all-email';
         const checkboxes = Array.from(this.root.querySelectorAll(selector));
         const allChecked = checkboxes.length > 0 && checkboxes.every((cb) => cb.checked);
         const selectAllCheckbox = document.getElementById(selectAllId);
@@ -158,15 +184,19 @@ class AccountNotificationPreferences {
             saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
         }
 
-        const allNotificationTypes = Array.from(this.root.querySelectorAll('.notification-type-email'))
+        const allNotificationTypes = Array.from(this.root.querySelectorAll('.notification-type-in-app'))
+            .map((cb) => cb.getAttribute('data-type'));
+        const enabledInAppTypes = Array.from(this.root.querySelectorAll('.notification-type-in-app:checked'))
             .map((cb) => cb.getAttribute('data-type'));
         const enabledEmailTypes = Array.from(this.root.querySelectorAll('.notification-type-email:checked'))
             .map((cb) => cb.getAttribute('data-type'));
         const enabledPushTypes = Array.from(this.root.querySelectorAll('.notification-type-push:checked'))
             .map((cb) => cb.getAttribute('data-type'));
 
+        const allInAppSelected = enabledInAppTypes.length === allNotificationTypes.length;
         const allEmailSelected = enabledEmailTypes.length === allNotificationTypes.length;
         const allPushSelected = enabledPushTypes.length === allNotificationTypes.length;
+        const inAppTypesToSend = allInAppSelected ? [] : enabledInAppTypes;
         const emailTypesToSend = allEmailSelected ? [] : enabledEmailTypes;
         const pushTypesToSend = allPushSelected ? [] : enabledPushTypes;
         const emailNotifications = allEmailSelected || enabledEmailTypes.length > 0;
@@ -177,6 +207,7 @@ class AccountNotificationPreferences {
             email_notifications: emailNotifications,
             sound_enabled: document.getElementById('pref-sound-enabled').checked,
             notification_frequency: frequency,
+            in_app_notification_types_enabled: inAppTypesToSend,
             notification_types_enabled: emailTypesToSend,
             push_notifications: pushNotifications,
             push_notification_types_enabled: pushTypesToSend,
@@ -192,9 +223,13 @@ class AccountNotificationPreferences {
             preferences.digest_time = null;
         }
 
-        if (!emailNotifications && !pushNotifications) {
-            const message = 'You are disabling all email and push notifications. '
-                + 'You will not receive any notifications. Are you sure?';
+        if (!enabledInAppTypes.length && !emailNotifications && !pushNotifications) {
+            const pushUiEnabled = this.root.querySelector('.notification-type-push') !== null;
+            const message = pushUiEnabled
+                ? 'You are disabling all in-app, email, and push notifications. '
+                    + 'You will not receive any notifications. Are you sure?'
+                : 'You are disabling all in-app and email notifications. '
+                    + 'You will not receive any notifications. Are you sure?';
             const restoreButton = () => {
                 if (saveButton && originalNodes) {
                     saveButton.disabled = false;

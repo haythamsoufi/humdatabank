@@ -379,6 +379,28 @@ def test_spef_section_titles_falls_back_to_catalog_by_area(monkeypatch):
 
 
 @pytest.mark.unit
+def test_resolve_section_title_translations(monkeypatch):
+    from plugins.pb_progress.db_source import resolve_section_title_translations
+
+    class Spef:
+        code = "SP2"
+        name = "Health and Care"
+
+        def get_name_translation(self, lang: str) -> str:
+            return {"fr": "Santé et soins", "es": "Salud y cuidado"}.get(lang, "")
+
+    monkeypatch.setattr(
+        "plugins.pb_progress.db_source._spef_rows_by_code",
+        lambda _codes: {"SP2": Spef()},
+    )
+
+    titles = resolve_section_title_translations(["SP2"])
+    assert titles["section.SP2"]["English"] == "Health and Care"
+    assert titles["section.SP2"]["French"] == "Santé et soins"
+    assert titles["section.SP2"]["Spanish"] == "Salud y cuidado"
+
+
+@pytest.mark.unit
 def test_build_section_order_from_bank(monkeypatch):
     from plugins.pb_progress.db_source import build_section_order_from_bank
 
@@ -506,12 +528,6 @@ def test_export_dataset_to_excel_always_writes_metadata_sheets(tmp_path, monkeyp
             "final": pd.DataFrame({"ID": ["1"], "Year": ["2027"], "Value": [1]}),
             "total_reported": pd.DataFrame({"Source": ["Manual"], "Year": ["2027"], "TotalReported": [1]}),
             "translations": pd.DataFrame(),
-            "sectionorder": pd.DataFrame(
-                [
-                    {"part": "cc", "section": "CC1", "order": 1},
-                    {"part": "sp", "section": "SP1", "order": 1},
-                ]
-            ),
         },
     )
 
@@ -520,11 +536,9 @@ def test_export_dataset_to_excel_always_writes_metadata_sheets(tmp_path, monkeyp
 
     with pd.ExcelFile(output_path) as workbook:
         assert "Translations" in workbook.sheet_names
-        assert "SectionOrder" in workbook.sheet_names
+        assert "SectionOrder" not in workbook.sheet_names
         translations = pd.read_excel(workbook, sheet_name="Translations")
-        section_order = pd.read_excel(workbook, sheet_name="SectionOrder")
     assert not translations.empty
-    assert not section_order.empty
 
 
 def _write_minimal_valid_workbook(path: Path) -> None:
@@ -572,59 +586,44 @@ def test_validate_uploaded_workbook_accepts_minimal_valid_file(tmp_path):
     assert summary["row_count"] == 1
     assert summary["sections"] == ["SP1"]
     assert any("Translations" in warning for warning in summary["warnings"])
-    assert any("SectionOrder" in warning for warning in summary["warnings"])
-    assert "SP1" not in summary["sections_without_indicators"]
-    assert len(summary["sections_without_indicators"]) >= 1
+    assert summary["sections_without_indicators"] == []
 
 
 @pytest.mark.unit
-def test_validate_uploaded_workbook_warns_on_section_order_gaps(tmp_path):
-    path = tmp_path / "section_gap.xlsx"
-    mapping = pd.DataFrame(
-        {
-            "Strategic Priority / Enabling Function": ["SP1"],
-            "ID": ["1"],
-            "Source": ["Manual"],
-            "English": ["Indicator one"],
-            "SP EN": ["Priority 1"],
-            "Type": ["Cumulative"],
-            "Unit": ["People"],
-        }
-    )
-    final = pd.DataFrame(
-        {
-            "Index": [1],
-            "Strategic Priority / Enabling Function": ["SP1"],
-            "ID": ["1"],
-            "Source": ["Manual"],
-            "Year": ["2027"],
-            "Value": [100],
-            "Implementing": [10],
-            "Count": [5],
-        }
-    )
-    total_reported = pd.DataFrame({"Source": ["Manual"], "Year": ["2027"], "TotalReported": [10]})
-    translations = pd.DataFrame({"id": ["report.title"], "EN": ["Title"]})
-    section_order = pd.DataFrame(
-        [
-            {"part": "cc", "section": "CC1", "order": 1},
-            {"part": "sp", "section": "SP1", "order": 2},
-        ]
-    )
-    with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        empty = pd.DataFrame()
-        empty.to_excel(writer, sheet_name="Mapping", index=False, startrow=3)
-        mapping.to_excel(writer, sheet_name="Mapping", index=False, startrow=3)
-        final.to_excel(writer, sheet_name="Final", index=False)
-        total_reported.to_excel(writer, sheet_name="TotalReported", index=False)
-        translations.to_excel(writer, sheet_name="Translations", index=False)
-        section_order.to_excel(writer, sheet_name="SectionOrder", index=False)
+def test_build_section_order_from_mapping_rows_uses_spef_sort_order(monkeypatch):
+    from plugins.pb_progress.db_source import build_section_order_from_mapping_rows
 
-    summary = validate_uploaded_workbook(path)
+    class SpefRow:
+        def __init__(self, code: str, sort_order: int):
+            self.code = code
+            self.sort_order = sort_order
+            self.name = code
+            self.is_active = True
 
-    assert summary["valid"] is True
-    assert summary["sections_without_indicators"] == ["CC1"]
-    assert any("CC1" in warning for warning in summary["warnings"])
+        def get_name_translation(self, _lang: str) -> str:
+            return ""
+
+    class Indicator:
+        def __init__(self, indicator_id: int, section_code: str):
+            self.id = indicator_id
+            self.area = None
+            self.spef_area = SpefRow(section_code, {"SP2": 2, "SP1": 1}[section_code])
+
+    monkeypatch.setattr(
+        "plugins.pb_progress.db_source._load_indicators_by_id",
+        lambda _ids: {"2": Indicator(2, "SP2"), "1": Indicator(1, "SP1")},
+    )
+    monkeypatch.setattr(
+        "plugins.pb_progress.db_source._spef_rows_by_code",
+        lambda codes: {
+            code: SpefRow(code, {"SP1": 1, "SP2": 2}[code])
+            for code in codes
+        },
+    )
+
+    rows = build_section_order_from_mapping_rows([{"id": "2"}, {"id": "1"}])
+
+    assert [row["section"] for row in rows] == ["SP1", "SP2"]
 
 
 @pytest.mark.unit
@@ -788,7 +787,8 @@ def test_generate_system_dataset_uploads_without_downloading_blob(monkeypatch):
     assert summary["total_reported_rows"] == 1
 
 
-def _write_workbook_with_section_order(path: Path, *, part: str = "sp") -> None:
+def _write_workbook_for_import(path: Path, *, part: str = "sp") -> None:
+    del part  # section order is no longer stored in Excel
     mapping = pd.DataFrame(
         {
             "Strategic Priority / Enabling Function": ["SP1"],
@@ -813,20 +813,18 @@ def _write_workbook_with_section_order(path: Path, *, part: str = "sp") -> None:
         }
     )
     total_reported = pd.DataFrame({"Source": ["Manual"], "Year": ["2027"], "TotalReported": [10]})
-    section_order = pd.DataFrame({"part": [part], "section": ["SP1"], "order": [1]})
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
         empty = pd.DataFrame()
         empty.to_excel(writer, sheet_name="Mapping", index=False, startrow=3)
         mapping.to_excel(writer, sheet_name="Mapping", index=False, startrow=3)
         final.to_excel(writer, sheet_name="Final", index=False)
         total_reported.to_excel(writer, sheet_name="TotalReported", index=False)
-        section_order.to_excel(writer, sheet_name="SectionOrder", index=False)
 
 
 @pytest.mark.unit
 def test_import_config_from_excel_validates_translations(tmp_path, monkeypatch):
     path = tmp_path / "SG Report.xlsx"
-    _write_workbook_with_section_order(path)
+    _write_workbook_for_import(path)
     translations = pd.DataFrame({"id": ["report.title", "report.title"], "EN": ["One", "Two"]})
     with pd.ExcelWriter(path, engine="openpyxl", mode="a", if_sheet_exists="replace") as writer:
         translations.to_excel(writer, sheet_name="Translations", index=False)

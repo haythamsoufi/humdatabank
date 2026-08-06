@@ -15,9 +15,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.render_docx import (  # noqa: E402
+    _DOCX_LABEL_COL_IN,
+    _DOCX_PAGE_MARGIN,
     _add_donut_pair_block,
+    _configure_page_margins,
+    _cumulative_table_widths,
+    _set_cell_text,
     _set_table_inner_borders,
 )
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 
 
 class TableInnerBorderTests(unittest.TestCase):
@@ -40,6 +46,26 @@ class TableInnerBorderTests(unittest.TestCase):
             self.assertEqual(element.get(qn("w:val")), "single")
             self.assertEqual(element.get(qn("w:color")), "C0C0C0")
             self.assertEqual(element.get(qn("w:sz")), "4")
+
+    def test_configure_page_margins_uses_narrow_margins(self) -> None:
+        doc = Document()
+        _configure_page_margins(doc)
+        section = doc.sections[0]
+        self.assertEqual(section.left_margin, _DOCX_PAGE_MARGIN)
+        self.assertEqual(section.right_margin, _DOCX_PAGE_MARGIN)
+
+    def test_set_cell_text_centers_vertically(self) -> None:
+        doc = Document()
+        table = doc.add_table(rows=1, cols=1)
+        _set_cell_text(table.cell(0, 0), "Indicator label")
+        cell = table.cell(0, 0)
+        self.assertEqual(cell.vertical_alignment, WD_CELL_VERTICAL_ALIGNMENT.CENTER)
+        self.assertEqual(cell.text, "Indicator label")
+
+    def test_cumulative_table_widths_widen_indicator_column(self) -> None:
+        widths = _cumulative_table_widths(5)
+        self.assertEqual(widths[0], _DOCX_LABEL_COL_IN)
+        self.assertGreater(widths[0], 2.05)
 
 
 class DonutPairTableTests(unittest.TestCase):

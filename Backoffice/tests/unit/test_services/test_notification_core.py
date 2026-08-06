@@ -18,6 +18,8 @@ from app.services.notification.core import (
     calculate_notification_expiration,
     generate_group_id,
     is_notification_type_enabled_for_user,
+    is_in_app_notification_type_enabled_for_user,
+    is_email_notification_type_enabled_for_user,
     get_user_preferences_batch,
     create_notification,
 )
@@ -503,6 +505,7 @@ class TestIsNotificationTypeEnabledForUser:
                 user_id=user.id,
                 email_notifications=True,
                 notification_types_enabled=[],
+                in_app_notification_types_enabled=[],
                 notification_frequency='instant',
                 sound_enabled=False
             )
@@ -527,6 +530,7 @@ class TestIsNotificationTypeEnabledForUser:
                 user_id=user.id,
                 email_notifications=True,
                 notification_types_enabled=['admin_message'],
+                in_app_notification_types_enabled=['admin_message'],
                 notification_frequency='instant',
                 sound_enabled=False
             )
@@ -551,6 +555,7 @@ class TestIsNotificationTypeEnabledForUser:
                 user_id=user.id,
                 email_notifications=True,
                 notification_types_enabled=['deadline_reminder'],
+                in_app_notification_types_enabled=['deadline_reminder'],
                 notification_frequency='instant',
                 sound_enabled=False
             )
@@ -561,11 +566,46 @@ class TestIsNotificationTypeEnabledForUser:
 
         assert result is False
 
+    def test_in_app_and_email_preferences_are_independent(self, app, db_session):
+        from app.models import NotificationPreferences, User
+        from app import db
+
+        with app.app_context():
+            user = User(email='notif_split@test.com', name='Split', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            pref = NotificationPreferences(
+                user_id=user.id,
+                email_notifications=True,
+                notification_types_enabled=['assignment_created'],
+                in_app_notification_types_enabled=['assignment_submitted'],
+                notification_frequency='instant',
+                sound_enabled=False,
+            )
+            db.session.add(pref)
+            db.session.commit()
+
+            assert is_in_app_notification_type_enabled_for_user(
+                user.id, NotificationType.assignment_submitted
+            ) is True
+            assert is_in_app_notification_type_enabled_for_user(
+                user.id, NotificationType.assignment_created
+            ) is False
+            assert is_email_notification_type_enabled_for_user(
+                user.id, NotificationType.assignment_created
+            ) is True
+            assert is_email_notification_type_enabled_for_user(
+                user.id, NotificationType.assignment_submitted
+            ) is False
+
     def test_uses_cache_when_provided(self, app, db_session):
         from app.models import NotificationPreferences
         with app.app_context():
             mock_pref = MagicMock()
             mock_pref.notification_types_enabled = []
+            mock_pref.in_app_notification_types_enabled = []
             cache = {42: mock_pref}
             result = is_notification_type_enabled_for_user(
                 42, NotificationType.admin_message, preferences_cache=cache
@@ -604,6 +644,7 @@ class TestGetUserPreferencesBatch:
                 user_id=user.id,
                 email_notifications=True,
                 notification_types_enabled=[],
+                in_app_notification_types_enabled=[],
                 notification_frequency='instant',
                 sound_enabled=False
             )

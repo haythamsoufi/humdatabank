@@ -98,10 +98,12 @@ def discover_languages(mapping: pd.DataFrame) -> tuple[str, ...]:
 
 
 def resolve_build_languages(excel: Path | str | None = None) -> tuple[str, ...]:
-    """Languages to build — honours PB_REPORT_LANGUAGE, else all Excel languages."""
+    """Languages to build — honours PB_REPORT_LANGUAGE, else Excel-detected languages."""
     requested = (os.environ.get("PB_REPORT_LANGUAGE") or "").strip()
     if requested.lower() not in ("", "all", "*"):
         return (requested,)
+    if requested.lower() in ("all", "*"):
+        return LANGUAGES
     from .config import resolve_excel
     from .data import load_sg_report
 
@@ -116,6 +118,10 @@ def excel_text(row: pd.Series, language: str, field: str) -> str:
     value = row.get(col)
 
     if _is_empty(value) and language == "Arabic" and field in ("target", "annual_target"):
+        fallback_col = language_spec("English")[field]
+        value = row.get(fallback_col)
+
+    if _is_empty(value) and language != "English":
         fallback_col = language_spec("English")[field]
         value = row.get(fallback_col)
 

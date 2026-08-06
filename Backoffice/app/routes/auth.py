@@ -1551,11 +1551,15 @@ def account_settings():
         form.translation_review_tool_enabled.data = current_user.translation_review_tool_enabled
         form.profile_color.data = current_user.profile_color if current_user.profile_color else '#3B82F6'
 
-    # Get user's registered devices
+    # Get user's registered devices (mobile push only)
     from app.models.system import UserDevice
-    registered_devices = UserDevice.query.filter_by(user_id=current_user.id) \
-        .order_by(UserDevice.last_active_at.desc().nullslast(), UserDevice.created_at.desc().nullslast()) \
-        .all()
+    from app.utils.notification_push import is_notifications_push_enabled
+
+    registered_devices = []
+    if is_notifications_push_enabled():
+        registered_devices = UserDevice.query.filter_by(user_id=current_user.id) \
+            .order_by(UserDevice.last_active_at.desc().nullslast(), UserDevice.created_at.desc().nullslast()) \
+            .all()
 
     # Entity permissions for display in Entity Access tab
     entity_permissions = []
@@ -1700,6 +1704,13 @@ def kickout_own_device(device_id):
     """Kick out (end session) for user's own device. Keeps device registered."""
     try:
         from app.models.system import UserDevice
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+
+        if not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE, success=False)
 
         # Verify device exists and belongs to current user
         device = UserDevice.query.filter_by(id=device_id, user_id=current_user.id).first_or_404()
@@ -1737,6 +1748,13 @@ def remove_own_device(device_id):
     """Remove user's own device from the registry. Permanently deletes the device record."""
     try:
         from app.models.system import UserDevice
+        from app.utils.notification_push import (
+            is_notifications_push_enabled,
+            PUSH_NOT_ENABLED_MESSAGE,
+        )
+
+        if not is_notifications_push_enabled():
+            return json_bad_request(PUSH_NOT_ENABLED_MESSAGE, success=False)
 
         # Verify device exists and belongs to current user
         device = UserDevice.query.filter_by(id=device_id, user_id=current_user.id).first_or_404()

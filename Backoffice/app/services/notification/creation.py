@@ -29,76 +29,117 @@ IN_APP_ONLY_NOTIFICATION_TYPES = frozenset({
 })
 
 
+IN_APP_ONLY_NOTIFICATION_TYPES = frozenset({
+    NotificationType.document_uploaded,
+    NotificationType.email_digest,
+})
+
+
+def _notification_type_value(notification_type) -> str:
+    if hasattr(notification_type, 'value'):
+        return str(notification_type.value)
+    return str(notification_type)
+
+
+def _is_type_in_preference_list(notification_type_str: str, enabled_list) -> bool:
+    """Empty list means all types in that channel are enabled."""
+    types = enabled_list or []
+    if not types:
+        return True
+    return notification_type_str in types
+
+
+def _in_app_types_enabled_list(preferences) -> list:
+    enabled = getattr(preferences, 'in_app_notification_types_enabled', None)
+    if enabled is None:
+        return preferences.notification_types_enabled or []
+    return enabled or []
+
+
 def is_notification_type_enabled_for_user(
     user_id: int,
     notification_type: 'NotificationType',
     preferences_cache: Optional[Dict[int, Any]] = None
 ) -> bool:
     """
-    Check if a notification type is enabled for a user based on their preferences.
+    Check if a notification type is enabled for in-app delivery for a user.
 
-    Args:
-        user_id (int): User ID to check
-        notification_type (NotificationType): The notification type to check
-        preferences_cache (dict, optional): Cache of user preferences {user_id: preferences}
-                                            to avoid repeated database queries
-
-    Returns:
-        bool: True if notification type is enabled, False otherwise
-
-    Logic:
-        - If preferences don't exist, default to enabled (create default preferences)
-        - If notification_types_enabled is empty/None, all types are enabled
-        - If notification_types_enabled has values, only those types are enabled
+    Uses ``in_app_notification_types_enabled`` (empty list = all enabled).
     """
+    return is_in_app_notification_type_enabled_for_user(
+        user_id, notification_type, preferences_cache=preferences_cache
+    )
+
+
+def is_in_app_notification_type_enabled_for_user(
+    user_id: int,
+    notification_type: 'NotificationType',
+    preferences_cache: Optional[Dict[int, Any]] = None
+) -> bool:
+    """Whether the user should receive in-app notifications for this type."""
+    notification_type_str = _notification_type_value(notification_type)
+    preferences = _get_or_create_preferences_for_check(user_id, preferences_cache)
+    if preferences is None:
+        return True
+    return _is_type_in_preference_list(
+        notification_type_str,
+        _in_app_types_enabled_list(preferences),
+    )
+
+
+def is_email_notification_type_enabled_for_user(
+    user_id: int,
+    notification_type: 'NotificationType',
+    preferences_cache: Optional[Dict[int, Any]] = None
+) -> bool:
+    """Whether the user should receive email for this notification type."""
+    notification_type_str = _notification_type_value(notification_type)
+    preferences = _get_or_create_preferences_for_check(user_id, preferences_cache)
+    if preferences is None:
+        return True
+    return _is_type_in_preference_list(
+        notification_type_str,
+        preferences.notification_types_enabled or [],
+    )
+
+
+def _get_or_create_preferences_for_check(
+    user_id: int,
+    preferences_cache: Optional[Dict[int, Any]] = None,
+):
+    """Load preferences for preference checks; create defaults when missing."""
     try:
-        # Get notification type as string value
-        if hasattr(notification_type, 'value'):
-            notification_type_str = notification_type.value
-        else:
-            notification_type_str = str(notification_type)
-
-        # Use cache if provided, otherwise fetch from database
         if preferences_cache and user_id in preferences_cache:
-            preferences = preferences_cache[user_id]
-        else:
-            preferences = NotificationPreferences.query.filter_by(user_id=user_id).first()
+            return preferences_cache[user_id]
 
-            # Create default preferences if they don't exist
-            if not preferences:
-                preferences = NotificationPreferences(
-                    user_id=user_id,
-                    email_notifications=True,
-                    notification_types_enabled=[],  # Empty = all enabled
-                    notification_frequency='instant',
-                    sound_enabled=False
-                )
-                db.session.add(preferences)
-                try:
-                    db.session.commit()
-                    current_app.logger.debug(f"Created default notification preferences for user {user_id}")
-                except Exception as e:
-                    current_app.logger.error(f"Error creating default preferences for user {user_id}: {str(e)}")
-                    db.session.rollback()
-                    # If we can't create preferences, default to enabled
-                    return True
+        preferences = NotificationPreferences.query.filter_by(user_id=user_id).first()
 
-            # Update cache if provided
-            if preferences_cache is not None:
-                preferences_cache[user_id] = preferences
+        if not preferences:
+            preferences = NotificationPreferences(
+                user_id=user_id,
+                email_notifications=True,
+                notification_types_enabled=[],
+                in_app_notification_types_enabled=[],
+                notification_frequency='instant',
+                sound_enabled=False
+            )
+            db.session.add(preferences)
+            try:
+                db.session.commit()
+                current_app.logger.debug(f"Created default notification preferences for user {user_id}")
+            except Exception as e:
+                current_app.logger.error(f"Error creating default preferences for user {user_id}: {str(e)}")
+                db.session.rollback()
+                return None
 
-        # If notification_types_enabled is empty/None, all types are enabled
-        enabled_types = preferences.notification_types_enabled or []
-        if not enabled_types:
-            return True
+        if preferences_cache is not None:
+            preferences_cache[user_id] = preferences
 
-        # Check if this specific type is in the enabled list
-        return notification_type_str in enabled_types
+        return preferences
 
     except Exception as e:
         current_app.logger.error(f"Error checking notification type for user {user_id}: {str(e)}")
-        # On error, default to enabled to avoid blocking notifications
-        return True
+        return None
 
 
 def get_user_preferences_batch(user_ids: List[int]) -> Dict[int, Any]:
@@ -132,6 +173,7 @@ def get_user_preferences_batch(user_ids: List[int]) -> Dict[int, Any]:
                     user_id=user_id,
                     email_notifications=True,
                     notification_types_enabled=[],  # Empty = all enabled
+                    in_app_notification_types_enabled=[],  # Empty = all enabled
                     notification_frequency='instant',
                     sound_enabled=False
                 )
@@ -799,22 +841,24 @@ def create_notification(
             # Send push notifications for bulk inserts (optional)
             if send_push_notifications:
                 try:
+                    from app.utils.notification_push import is_notifications_push_enabled
                     from app.services.notification.push import PushNotificationService
 
-                    # Send push notifications to all users who received notifications
-                    user_ids_to_notify = list(set([uid for uid, _ in deduplicated_user_ids]))
-                    if user_ids_to_notify:
-                        PushNotificationService.send_bulk_push_notifications(
-                            user_ids=user_ids_to_notify,
-                            title=title,
-                            body=message,
-                            data={
-                                'notification_type': notification_type.value if hasattr(notification_type, 'value') else str(notification_type),
-                                'related_url': related_url,
-                                'priority': priority
-                            } if related_url else None,
-                            priority=priority
-                        )
+                    if is_notifications_push_enabled():
+                        # Send push notifications to all users who received notifications
+                        user_ids_to_notify = list(set([uid for uid, _ in deduplicated_user_ids]))
+                        if user_ids_to_notify:
+                            PushNotificationService.send_bulk_push_notifications(
+                                user_ids=user_ids_to_notify,
+                                title=title,
+                                body=message,
+                                data={
+                                    'notification_type': notification_type.value if hasattr(notification_type, 'value') else str(notification_type),
+                                    'related_url': related_url,
+                                    'priority': priority
+                                } if related_url else None,
+                                priority=priority
+                            )
                 except Exception as e:
                     # Don't fail notification creation if push notifications fail
                     current_app.logger.warning(f"Failed to send push notifications: {str(e)}")
@@ -875,9 +919,11 @@ def create_notification(
                                 should_send = True
 
                             if should_send:
-                                # Check if notification type is enabled
-                                if preferences.notification_types_enabled and \
-                                   notification.notification_type.value not in preferences.notification_types_enabled:
+                                if not is_email_notification_type_enabled_for_user(
+                                    user.id,
+                                    notification.notification_type,
+                                    preferences_cache=preferences_map,
+                                ):
                                     should_send = False
 
                         if should_send:
@@ -1064,49 +1110,51 @@ def create_notification(
             # Send push notifications for regular inserts (optional)
             if send_push_notifications:
                 try:
+                    from app.utils.notification_push import is_notifications_push_enabled
                     from app.services.notification.push import PushNotificationService
 
-                    # Send push notifications to all users who received notifications
-                    user_ids_to_notify = list(set([n.user_id for n in notifications]))
-                    if user_ids_to_notify:
-                        current_app.logger.debug(
-                            f"[PUSH_NOTIFICATION] Attempting to send push notifications: users={len(user_ids_to_notify)}"
-                        )
+                    if is_notifications_push_enabled():
+                        # Send push notifications to all users who received notifications
+                        user_ids_to_notify = list(set([n.user_id for n in notifications]))
+                        if user_ids_to_notify:
+                            current_app.logger.debug(
+                                f"[PUSH_NOTIFICATION] Attempting to send push notifications: users={len(user_ids_to_notify)}"
+                            )
 
-                        push_result = PushNotificationService.send_bulk_push_notifications(
-                            user_ids=user_ids_to_notify,
-                            title=title,
-                            body=message,
-                            data={
-                                'notification_type': notification_type.value if hasattr(notification_type, 'value') else str(notification_type),
-                                'related_url': related_url,
-                                'priority': priority
-                            } if related_url else None,
-                            priority=priority
-                        )
+                            push_result = PushNotificationService.send_bulk_push_notifications(
+                                user_ids=user_ids_to_notify,
+                                title=title,
+                                body=message,
+                                data={
+                                    'notification_type': notification_type.value if hasattr(notification_type, 'value') else str(notification_type),
+                                    'related_url': related_url,
+                                    'priority': priority
+                                } if related_url else None,
+                                priority=priority
+                            )
 
-                        if push_result:
-                            total_devices = push_result.get('total_devices', 0)
-                            total_failure = push_result.get('total_failure', 0)
-                            # INFO only when something actually happened (devices>0) or there were failures.
-                            if total_devices or total_failure:
-                                current_app.logger.info(
-                                    f"[PUSH_NOTIFICATION] Push result: success={push_result.get('success')}, "
-                                    f"users={push_result.get('total_users')}, devices={total_devices}, "
-                                    f"sent={push_result.get('total_success')}, failed={total_failure}"
-                                )
+                            if push_result:
+                                total_devices = push_result.get('total_devices', 0)
+                                total_failure = push_result.get('total_failure', 0)
+                                # INFO only when something actually happened (devices>0) or there were failures.
+                                if total_devices or total_failure:
+                                    current_app.logger.info(
+                                        f"[PUSH_NOTIFICATION] Push result: success={push_result.get('success')}, "
+                                        f"users={push_result.get('total_users')}, devices={total_devices}, "
+                                        f"sent={push_result.get('total_success')}, failed={total_failure}"
+                                    )
+                                else:
+                                    current_app.logger.debug(
+                                        f"[PUSH_NOTIFICATION] Push result: users={push_result.get('total_users')}, devices=0"
+                                    )
                             else:
-                                current_app.logger.debug(
-                                    f"[PUSH_NOTIFICATION] Push result: users={push_result.get('total_users')}, devices=0"
+                                current_app.logger.warning(
+                                    f"[PUSH_NOTIFICATION] Push notification service returned no result"
                                 )
                         else:
-                            current_app.logger.warning(
-                                f"[PUSH_NOTIFICATION] Push notification service returned no result"
+                            current_app.logger.debug(
+                                f"[PUSH_NOTIFICATION] No users to send push notifications to"
                             )
-                    else:
-                        current_app.logger.debug(
-                            f"[PUSH_NOTIFICATION] No users to send push notifications to"
-                        )
                 except Exception as e:
                     # Don't fail notification creation if push notifications fail
                     current_app.logger.warning(
@@ -1156,9 +1204,11 @@ def create_notification(
                                 should_send = True
 
                             if should_send:
-                                # Check if notification type is enabled
-                                if preferences.notification_types_enabled and \
-                                   notification.notification_type.value not in preferences.notification_types_enabled:
+                                if not is_email_notification_type_enabled_for_user(
+                                    user.id,
+                                    notification.notification_type,
+                                    preferences_cache=preferences_map,
+                                ):
                                     should_send = False
 
                         if should_send:

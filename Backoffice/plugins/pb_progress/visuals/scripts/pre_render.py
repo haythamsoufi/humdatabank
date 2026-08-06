@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import shutil
 import sys
@@ -23,10 +24,12 @@ from pb_figures.render_embed import build_section_embed, render_section_assets  
 from pb_figures.translations import clear_cache  # noqa: E402
 from pb_figures.report_meta import (  # noqa: E402
     load_model,
+    report_header_meta,
     report_parts,
     report_section_assets_dir,
     report_section_assets_ref,
     section_titles,
+    section_uses_part_heading_only,
 )
 
 SectionJob = tuple[str, str, str]  # language, section, renderer
@@ -252,10 +255,11 @@ def _render_language_panel(
                 continue
             heading = titles.get(section, section)
             lines.append('<section class="report-section">')
-            lines.append(
-                f'<h3 class="report-section-title" data-anchor="{_section_anchor(section)}">'
-                f"{html.escape(heading)}</h3>"
-            )
+            if not section_uses_part_heading_only(part["id"]):
+                lines.append(
+                    f'<h3 class="report-section-title" data-anchor="{_section_anchor(section)}">'
+                    f"{html.escape(heading)}</h3>"
+                )
             assets_dir = report_section_assets_dir(resolve_report_dir(), language, section)
             asset_prefix = report_section_assets_ref(language, section)
             dashboard_html = build_section_embed(
@@ -286,7 +290,9 @@ def _generate_body(output: Path, model, languages: tuple[str, ...], excel: Path,
                 language, model, excel, mapping, visible=language == default_language,
             )
         )
+    header_json = json.dumps(report_header_meta(languages, excel), ensure_ascii=False)
     lines.extend([
+        f'<script type="application/json" id="pb-report-header-i18n">{header_json}</script>',
         "</div>",
         "```",
     ])

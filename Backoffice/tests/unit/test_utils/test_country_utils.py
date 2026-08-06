@@ -2,7 +2,11 @@
 Unit tests for country utility functions.
 """
 import pytest
-from app.utils.country_utils import resolve_country_from_iso, get_countries_by_region
+from app.utils.country_utils import (
+    resolve_country_from_iso,
+    get_countries_by_region,
+    get_countries_by_region_with_part_of,
+)
 
 
 @pytest.mark.unit
@@ -128,3 +132,27 @@ class TestGetCountriesByRegion:
                     found = True
                     break
             assert found, f"Country {country.name} not found in any region"
+
+
+@pytest.mark.unit
+class TestGetCountriesByRegionWithPartOf:
+    """Test combined country + Part of loading."""
+
+    def test_builds_region_grouping_and_part_of_mapping(self, db_session, app):
+        with app.app_context():
+            from tests.factories import create_test_country
+            from app.models import NationalSociety
+
+            country = create_test_country(db_session, name='PartOfLand', region='Europe')
+            ns = NationalSociety(name='PartOf NS', country_id=country.id, part_of=['FDRS', 'PERC'])
+            db_session.add(ns)
+            db_session.commit()
+
+            regions, programs, mapping = get_countries_by_region_with_part_of()
+
+            assert 'FDRS' in programs
+            assert 'PERC' in programs
+            assert country.id in mapping['FDRS']
+            assert country.id in mapping['PERC']
+            found = any(country in countries for countries in regions.values())
+            assert found

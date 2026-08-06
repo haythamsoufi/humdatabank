@@ -7,7 +7,8 @@ Data sources (read-only — scripts never write to these sheets):
   Mapping          Indicator metadata and translations (header row 4).
   TotalReported    Denominator for "out of N NSs" labels.
   Translations     UI labels and section titles.
-  SectionOrder     Report section display order.
+
+Section display order comes from Indicator Bank SPEF (PB_REPORT_SECTION_ORDER at build time).
 
 Tableau relationships replicated in build_model():
   Mapping.ID = Final.ID
@@ -51,7 +52,7 @@ def load_sg_report(excel_path: Path | str | None = None) -> dict[str, pd.DataFra
         "final": pd.read_excel(path, sheet_name="Final"),
         "total_reported": pd.read_excel(path, sheet_name="TotalReported"),
     }
-    for optional in ("Translations", "SectionOrder"):
+    for optional in ("Translations",):
         try:
             sheets[optional.lower()] = pd.read_excel(path, sheet_name=optional)
         except ValueError:

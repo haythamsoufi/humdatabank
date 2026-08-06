@@ -140,6 +140,10 @@ def notify_assignment_created(assignment_entity_status):
         'country': message_params['country'],
     }
 
+    exclude_user_ids = None
+    if current_user and current_user.is_authenticated:
+        exclude_user_ids = [current_user.id]
+
     notifications = notify_entity_focal_points(
         entity_type=entity_type,
         entity_id=entity_id,
@@ -151,7 +155,8 @@ def notify_assignment_created(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.assigned_form_id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
-        priority='normal'
+        priority='normal',
+        exclude_user_ids=exclude_user_ids,
     ) or []
 
     # Optional admin channels (org admins vs system managers are separate settings buckets).
@@ -160,6 +165,7 @@ def notify_assignment_created(assignment_entity_status):
         NotificationType.assignment_created,
         entity_type,
         entity_id,
+        exclude_user_ids=exclude_user_ids,
     )
     if secondary_recipients:
         focal_cover = set(

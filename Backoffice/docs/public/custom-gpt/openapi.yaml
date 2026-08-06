@@ -70,7 +70,7 @@ paths:
     get:
       operationId: searchPublicDocuments
       summary: Search public document chunks
-      description: Public AI Knowledge Base chunks only. Use full_coverage=true for cross-country UPR themes. Cite title and page.
+      description: Public AI Knowledge Base chunks only. Use full_coverage=true for cross-country UPR themes. Cite title and page; link country names to document_url when citing plans/reports.
       parameters:
         - name: query
           in: query

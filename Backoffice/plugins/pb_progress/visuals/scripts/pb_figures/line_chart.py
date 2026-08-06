@@ -7,7 +7,14 @@ import re
 from pathlib import Path
 
 from .config import COLOR_TARGET, COLOR_VALUE
+from .font_faces import tajawal_face_css
+from .languages import is_rtl
 from .styles import resolve_style, style_payload
+
+_LATIN_CHART_FONT = '"Open Sans", "Segoe UI", sans-serif'
+_ARABIC_CHART_FONT = '"Tajawal", sans-serif'
+_ARABIC_MILLIONS_NUM_FIRST = re.compile(r"^([\d.,]+)\s+(.+)$")
+_ARABIC_MILLIONS_WORD_FIRST = re.compile(r"^(.+?)\s+([\d.,]+)$")
 
 # Chart canvas constants (pixels)
 CHART_HEIGHT = 110
@@ -21,6 +28,74 @@ MIN_LABEL_CLEARANCE_FROM_BOTTOM = 12
 
 LINE_CHART_JS_PATH = Path(__file__).parent / "templates" / "line_chart.js"
 _LINE_CHART_JS_PLACEHOLDER = "__LINE_CHART_JS__"
+
+
+def _chart_font_family(language: str) -> str:
+    return _ARABIC_CHART_FONT if is_rtl(language) else _LATIN_CHART_FONT
+
+
+def _svg_font_family_attr(language: str) -> str:
+    """Escape font-family for double-quoted SVG/XML attributes."""
+    return html.escape(_chart_font_family(language), quote=True)
+
+
+def _svg_embedded_style(css: str) -> str:
+    return f"<style><![CDATA[{css}]]></style>"
+
+
+def _svg_style_defs(language: str) -> str:
+    if not is_rtl(language):
+        return ""
+    return f"<defs>{_svg_embedded_style(tajawal_face_css(inline=True))}</defs>"
+
+
+def _svg_chart_text(
+    label: str,
+    *,
+    x: float,
+    y: float,
+    language: str,
+    fill: str,
+    font_size: int | str,
+    font_weight: str = "700",
+    text_anchor: str = "middle",
+    dominant_baseline: str | None = None,
+) -> str:
+    font_family = _svg_font_family_attr(language)
+    baseline_attr = f' dominant-baseline="{dominant_baseline}"' if dominant_baseline else ""
+    text = str(label or "").strip()
+    if not text:
+        return ""
+
+    if is_rtl(language):
+        match = _ARABIC_MILLIONS_WORD_FIRST.match(text)
+        if not match:
+            match_num_first = _ARABIC_MILLIONS_NUM_FIRST.match(text)
+            if match_num_first:
+                num, word = match_num_first.group(1), match_num_first.group(2).strip()
+            else:
+                num, word = None, text
+        else:
+            word, num = match.group(1).strip(), match.group(2)
+
+        if num:
+            inner = (
+                f'<tspan>{html.escape(word)} </tspan>'
+                f'<tspan direction="ltr" unicode-bidi="embed">{html.escape(num)}</tspan>'
+            )
+        else:
+            inner = html.escape(word)
+        return (
+            f'<text x="{x:.2f}" y="{y:.2f}" text-anchor="{text_anchor}" fill="{fill}" '
+            f'font-size="{font_size}" font-weight="{font_weight}" font-family="{font_family}" '
+            f'direction="rtl"{baseline_attr}>{inner}</text>'
+        )
+
+    return (
+        f'<text x="{x:.2f}" y="{y:.2f}" text-anchor="{text_anchor}" fill="{fill}" '
+        f'font-size="{font_size}" font-weight="{font_weight}" font-family="{font_family}"{baseline_attr}>'
+        f"{html.escape(text)}</text>"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +254,7 @@ def render_line_chart_svg(
     show_value_labels: bool = False,
     show_target_labels: bool = False,
     target_label: str | None = None,
+    language: str = "English",
 ) -> str:
     """Render line geometry as SVG (labels optional for PNG assets)."""
     values = item["values"]
@@ -222,7 +298,6 @@ def render_line_chart_svg(
     stroke_width = style["line_stroke_width"]
     marker_r = style.get("marker_radius", 3.5)
     is_modern = style.get("name") == "modern"
-    font_family = "Open Sans, Segoe UI, sans-serif"
     label_layout = target_label_layout(
         values,
         item["value_labels"],
@@ -233,6 +308,8 @@ def render_line_chart_svg(
 
     if fx.get("area_fill") or fx.get("line_shadow"):
         parts.append("<defs>")
+        if is_rtl(language):
+            parts.append(_svg_embedded_style(tajawal_face_css(inline=True)))
         if fx.get("area_fill"):
             top_op = "0.16" if is_modern else "0.10"
             mid_op = "0.05" if is_modern else "0.04"
@@ -255,6 +332,8 @@ def render_line_chart_svg(
                 f"</filter>"
             )
         parts.append("</defs>")
+    elif is_rtl(language):
+        parts.append(_svg_style_defs(language))
 
     if annual_target is not None and show_target_line:
         ty = y_at(annual_target)
@@ -267,9 +346,16 @@ def render_line_chart_svg(
             tag_y = ty + 4 if label_layout["tag_below"] else ty - 5
             tag_baseline = "hanging" if label_layout["tag_below"] else "auto"
             parts.append(
-                f'<text x="{pad_l + 4:.2f}" y="{tag_y:.2f}" fill="{COLOR_TARGET}" '
-                f'font-size="9" font-weight="700" font-family="{font_family}" '
-                f'dominant-baseline="{tag_baseline}">{html.escape(target_label)}</text>'
+                _svg_chart_text(
+                    target_label,
+                    x=pad_l + 4,
+                    y=tag_y,
+                    language=language,
+                    fill=COLOR_TARGET,
+                    font_size=9,
+                    text_anchor="start",
+                    dominant_baseline=tag_baseline,
+                )
             )
         if show_target_labels and item.get("annual_target_label"):
             value_y = ty
@@ -281,10 +367,16 @@ def render_line_chart_svg(
                 value_y = ty + 4
                 value_baseline = "hanging"
             parts.append(
-                f'<text x="{pad_l + plot_w + 6:.2f}" y="{value_y:.2f}" fill="{COLOR_TARGET}" '
-                f'font-size="10" font-weight="700" font-family="{font_family}" '
-                f'dominant-baseline="{value_baseline}">'
-                f'{html.escape(str(item["annual_target_label"]))}</text>'
+                _svg_chart_text(
+                    str(item["annual_target_label"]),
+                    x=pad_l + plot_w + 6,
+                    y=value_y,
+                    language=language,
+                    fill=COLOR_TARGET,
+                    font_size=10,
+                    text_anchor="start",
+                    dominant_baseline=value_baseline,
+                )
             )
 
     if fx.get("area_fill"):
@@ -331,9 +423,14 @@ def render_line_chart_svg(
             if label:
                 ly, _ = _value_label_y_px(i, value, values, annual_target, y_max)
                 parts.append(
-                    f'<text x="{cx:.2f}" y="{ly:.2f}" text-anchor="middle" fill="{COLOR_VALUE}" '
-                    f'font-size="10" font-weight="700" font-family="{font_family}">'
-                    f'{html.escape(str(label))}</text>'
+                    _svg_chart_text(
+                        str(label),
+                        x=cx,
+                        y=ly,
+                        language=language,
+                        fill=COLOR_VALUE,
+                        font_size=10,
+                    )
                 )
 
     parts.append("</svg>")

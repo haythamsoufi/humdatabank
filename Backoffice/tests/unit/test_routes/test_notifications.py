@@ -979,13 +979,56 @@ class TestGetNotificationTypesForUser:
             from app.routes.notifications import get_notification_types_for_user
             from app.models import User
             user = User.query.get(admin_user.id)
-            rules = {
-                "admin_message": {"admin_users": True, "focal_points": False, "system_managers": False}
-            }
-            with patch("app.services.platform.app_settings_service.get_merged_notification_audience_rules", return_value=rules):
-                result = get_notification_types_for_user(user)
+            result = get_notification_types_for_user(user)
 
-        assert "admin_message" in result["for_user"]
+        assert "public_submission_received" in result["for_user"]
+        assert "access_request_received" in result["for_user"]
+
+    def test_admin_configuration_includes_all_preference_eligible_types(self, app, admin_user):
+        with app.app_context():
+            from app.routes.notifications import get_notification_types_for_user
+            from app.models import User
+
+            user = User.query.get(admin_user.id)
+            admin_config = get_notification_types_for_user(user, for_admin_configuration=True)
+
+        assert "assignment_created" in admin_config["for_user"]
+        assert "public_submission_received" in admin_config["for_user"]
+
+    def test_focal_point_sees_assignment_created_in_self_service_list(self, app, db_session):
+        from app.models import User
+        from app.models.rbac import RbacRole, RbacUserRole
+        from app import db
+
+        with app.app_context():
+            from app.routes.notifications import get_notification_types_for_user
+
+            user = User(email="fp-prefs@test.com", name="FP Prefs", active=True)
+            user.set_password("pw")
+            db.session.add(user)
+            db.session.flush()
+            role = RbacRole.query.filter_by(code="assignment_editor_submitter").first()
+            if not role:
+                role = RbacRole(code="assignment_editor_submitter", name="AES")
+                db.session.add(role)
+                db.session.flush()
+            db.session.add(RbacUserRole(user_id=user.id, role_id=role.id))
+            db.session.commit()
+
+            result = get_notification_types_for_user(user)
+
+        assert "assignment_created" in result["for_user"]
+
+    def test_preference_eligible_excludes_types_without_audience_rules(self, app):
+        with app.app_context():
+            from app.routes.notifications import get_preference_eligible_notification_types
+
+            eligible = get_preference_eligible_notification_types()
+
+        assert "assignment_created" in eligible
+        assert "account_welcome" not in eligible
+        assert "email_digest" not in eligible
+        assert "deadline_reminder" not in eligible
 
 
 # ---------------------------------------------------------------------------

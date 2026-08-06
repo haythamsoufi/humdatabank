@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from app.models import Country
@@ -11,6 +11,60 @@ def get_country_region_name(country) -> str:
     if getattr(country, "secretariat_regional_office", None) is not None:
         return country.secretariat_regional_office.name
     return country.region if country.region else "Unassigned Region"
+
+
+def get_part_of_category_data() -> Tuple[List[str], Dict[str, List[int]]]:
+    """Return sorted Part of category names and category -> country_id mapping from NS records."""
+    _, programs, mapping = get_countries_by_region_with_part_of()
+    return programs, mapping
+
+
+def _part_of_from_national_societies(country_id: int, national_societies) -> Tuple[set, Dict[str, set]]:
+    """Extract Part of categories and mapping entries from a country's NS records."""
+    categories: set = set()
+    category_to_countries: Dict[str, set] = defaultdict(set)
+    for ns in national_societies or []:
+        part_of = ns.part_of
+        if not part_of or not isinstance(part_of, list):
+            continue
+        for item in part_of:
+            if item and isinstance(item, str):
+                category = item.strip()
+                if category:
+                    categories.add(category)
+                    category_to_countries[category].add(country_id)
+    return categories, category_to_countries
+
+
+def get_countries_by_region_with_part_of() -> Tuple[dict, List[str], Dict[str, List[int]]]:
+    """Load countries grouped by region and Part of filter data in one query batch.
+
+    Returns:
+        countries_by_region, sorted part_of category names, category -> country_ids mapping
+    """
+    countries_by_region = defaultdict(list)
+    all_categories: set = set()
+    category_to_countries: Dict[str, set] = defaultdict(set)
+
+    all_countries = (
+        Country.query.options(
+            joinedload(Country.secretariat_regional_office),
+            joinedload(Country.national_societies),
+        )
+        .order_by(Country.region, Country.name)
+        .all()
+    )
+    for country in all_countries:
+        region_name = get_country_region_name(country)
+        countries_by_region[region_name].append(country)
+        ns_categories, ns_mapping = _part_of_from_national_societies(country.id, country.national_societies)
+        all_categories.update(ns_categories)
+        for category, country_ids in ns_mapping.items():
+            category_to_countries[category].update(country_ids)
+
+    programs = sorted(all_categories)
+    mapping = {category: sorted(ids) for category, ids in category_to_countries.items()}
+    return countries_by_region, programs, mapping
 
 
 def get_countries_by_region():

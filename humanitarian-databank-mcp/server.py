@@ -209,7 +209,7 @@ def databank_get_documents_catalog(
     country_id: Optional[int] = None,
     country_name: str = "",
     file_type: str = "",
-    include_documents: bool = True,
+    include_documents: bool = False,
 ) -> str:
     """Inventory public documents by type/year/country — counts, not semantic search.
 

@@ -164,7 +164,7 @@ def get_public_documents_catalog(
     country_id: Optional[int] = None,
     country_name: str = "",
     file_type: str = "",
-    include_documents: bool = True,
+    include_documents: bool = False,
 ) -> Dict[str, Any]:
     """Inventory public documents by type/year/country via GET /public/documents/catalog."""
     params: Dict[str, Any] = {"include_documents": "true" if include_documents else "false"}

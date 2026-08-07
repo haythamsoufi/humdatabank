@@ -12,6 +12,8 @@
 {% set azure_b2c_configured = azure_b2c_configured | default(false) %}
 {% set can_create_user = (current_is_system_manager or has_permission('admin.users.create')) and (not azure_b2c_configured) %}
 {% set can_edit_user = current_is_system_manager or has_permission('admin.users.edit') %}
+{% set can_view_analytics = can_view_analytics | default(current_is_system_manager or has_permission('admin.analytics.view')) %}
+{% set overview = user_overview_stats | default({}) %}
 
 {% from "components/_page_header.html" import page_header %}
 {% block title %}{{ _('Manage Users') }}{% endblock %}
@@ -87,6 +89,74 @@
     ],
     actions=header_actions.items
 ) }}
+
+    {# Overview metrics — same stat-card pattern as admin/dashboard.html #}
+    <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Total Users') }}</h3>
+                <i class="fas fa-users text-blue-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ overview.total_users | default(users | length) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('All registered accounts') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Users Without Entity Access') }}</h3>
+                <i class="fas fa-map-marker-slash {{ 'text-amber-500' if overview.users_without_entity_access | default(0) > 0 else 'text-gray-400' }}"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums {{ 'text-amber-600' if overview.users_without_entity_access | default(0) > 0 else 'text-gray-600' }}">{{ overview.users_without_entity_access | default(0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Active users with no assigned entities') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Never Logged In') }}</h3>
+                <i class="fas fa-user-clock {{ 'text-orange-500' if overview.never_logged_in | default(0) > 0 else 'text-gray-400' }}"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums {{ 'text-orange-600' if overview.never_logged_in | default(0) > 0 else 'text-gray-600' }}">{{ overview.never_logged_in | default(0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Active accounts with no successful login') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Stale Accounts (90+ days)') }}</h3>
+                <i class="fas fa-history {{ 'text-red-500' if overview.stale_accounts_90d | default(0) > 0 else 'text-gray-400' }}"></i>
+            </div>
+            <p class="text-2xl font-bold tabular-nums {{ 'text-red-600' if overview.stale_accounts_90d | default(0) > 0 else 'text-gray-600' }}">{{ overview.stale_accounts_90d | default(0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Active users inactive for 90+ days') }}</p>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('New Users This Week') }}</h3>
+                <i class="fas fa-user-plus text-purple-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-purple-600 tabular-nums">{{ overview.new_users_this_week | default(0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Accounts created in the last 7 days') }}</p>
+        </div>
+
+        {% if can_view_analytics %}
+        <a href="{{ url_for('analytics.login_logs') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _("Today's Logins") }}</h3>
+                <i class="fas fa-sign-in-alt text-indigo-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-indigo-600 tabular-nums">{{ overview.today_logins | default(0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Successful logins today') }}</p>
+        </a>
+
+        <a href="{{ url_for('analytics.session_logs') }}" class="bg-white p-4 rounded-lg shadow border border-gray-200 hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-gray-700">{{ _('Active Sessions') }}</h3>
+                <i class="fas fa-broadcast-tower text-teal-500"></i>
+            </div>
+            <p class="text-2xl font-bold text-teal-600 tabular-nums">{{ overview.active_sessions | default(0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('Currently signed in') }}</p>
+        </a>
+        {% endif %}
+    </div>
 
     {% from "components/ag_grid_includes.html" import ag_grid_container %}
     <!-- Main Table Card -->

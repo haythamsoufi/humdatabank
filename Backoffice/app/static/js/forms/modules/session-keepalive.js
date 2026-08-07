@@ -2,7 +2,7 @@
 //
 // Problem: users filling out the form in the browser make no server requests
 // while typing, so session['last_activity'] is never refreshed.  After the
-// configured SESSION_INACTIVITY_TIMEOUT (default 30 minutes) the middleware
+// configured SESSION_INACTIVITY_TIMEOUT (default 2 hours) the middleware
 // in app/middleware/session_timeout.py invalidates the session and the next
 // save attempt returns 401, losing unsaved data.
 //
@@ -24,16 +24,17 @@ import { debugLog } from './debug.js';
 const MODULE_NAME = 'session-keepalive';
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
-// Keepalive fires every 20 min while the user is active.
-// This is intentionally shorter than the 30-min inactivity window.
-const KEEPALIVE_INTERVAL_MS = 20 * 60 * 1000;
+// Keepalive fires every 60 min while the user is active.
+// This is intentionally shorter than the 2-hour inactivity window and also
+// refreshes CSRF before the 1-hour WTF_CSRF_TIME_LIMIT.
+const KEEPALIVE_INTERVAL_MS = 60 * 60 * 1000;
 
 // User must have interacted within the last KEEPALIVE_INTERVAL_MS for the
 // ping to be sent; otherwise it is skipped (idle session should expire).
 const ACTIVITY_WINDOW_MS = KEEPALIVE_INTERVAL_MS;
 
-// Warn user at 25 min idle (5 min before the 30-min timeout).
-const WARN_IDLE_MS = 25 * 60 * 1000;
+// Warn user at 115 min idle (5 min before the 2-hour timeout).
+const WARN_IDLE_MS = 115 * 60 * 1000;
 
 const KEEPALIVE_URL = '/api/forms/session/keepalive';
 

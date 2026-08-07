@@ -295,6 +295,25 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 - **Shared helpers**: `app.utils.ai_utils` (e.g. `openai_model_supports_sampling_params`, `sanitize_page_context`). RAG: `app.services.ai_vector_store`, `app.services.ai_embedding_service`. Agent: `app.services.ai_agent_executor`, `app.services.ai_tools_registry`. Shared chat request handling: `app.services.ai_chat_request` (parse, resolve conversation, idempotency).
 - **Optional dependencies**: `flask-sock` required for WebSocket endpoints (`/api/ai/v2/ws`, document QA WS). Without it, AI HTTP and SSE still work. `redis` (and `REDIS_URL`) optional for cross-worker WebSocket rate limiting; in-memory limiter used otherwise. `pgvector` required for RAG document search; run migrations so `ai_documents`, `ai_embeddings`, `ai_document_chunks` exist. For full chat (non-fallback): at least one of `OPENAI_API_KEY`, `GEMINI_API_KEY`, or Azure/Copilot keys. For RAG embeddings: `OPENAI_API_KEY` when `AI_EMBEDDING_PROVIDER=openai`, or local model when `AI_EMBEDDING_PROVIDER=local` (dimensions must match DB).
 
+### AI document batch jobs & processing (`AI_DOCS_*`)
+
+Cross-worker batch imports/reprocess jobs use `AIJob` / `AIJobItem` with the generic runner in `Backoffice/app/services/ai/ai_job_runner.py`. Single-document upload/reprocess uses background threads plus `ai_documents.processing_stage` / `processing_heartbeat_at` (no job row).
+
+| Config key | Default | Purpose |
+|------------|---------|---------|
+| `AI_DOCS_JOB_STALE_SECONDS` | `180` | Mark stuck in-flight job items failed when no live runner thread (60–3600) |
+| `AI_DOCS_REPROCESS_CONCURRENCY` | `1` | Default worker count for bulk reprocess jobs (max 4) |
+| `AI_DOCS_SYSTEM_IMPORT_CONCURRENCY` | falls back to IFRC | Default worker count for system-document bulk import |
+| `AI_DOCS_IFRC_IMPORT_CONCURRENCY` | `2` | Default worker count for IFRC API bulk import |
+| `AI_DOCS_AUTOFIX_STALE_PROCESSING_TIMEOUT_SECONDS` | `900` | Documents page auto-recovery for stale `processing` rows |
+| `AI_DOCS_STUCK_NO_STAGE_TIMEOUT_SECONDS` | `3600` | Status poll marks `processing` failed when no stage/heartbeat |
+| `AI_DOCS_STUCK_PENDING_TIMEOUT_SECONDS` | `900` | Status poll marks long-idle `pending` failed |
+| `AI_DOCS_DUPLICATE_WAIT_SECONDS` | *(upload path)* | Wait for duplicate in-flight document before failing |
+
+Advisory-lock namespace for AI batch jobs: see [multi-instance without Redis](Backoffice/docs/runbooks/deployment/multi-instance-without-redis.md) §3.3.
+
+**Reusable pattern (migrate other features):** [Background jobs & progress UI](Backoffice/docs/architecture/background-jobs-and-progress-ui.md) — bulk runner, single-entity heartbeat, frontend banner, migration checklist for agents.
+
 ## Testing and Quality
 
 ### Backoffice Testing
@@ -795,25 +814,29 @@ See also [`Backoffice/docs/template-version-submission-identity.md`](../Backoffi
 
 ### Data API (`GET /api/v1/data`)
 
-Unified submission data endpoint. Returns fact arrays plus full dimension tables in one response.
+Unified submission data endpoint. Returns fact arrays plus dimension tables in one response.
 
 | Array | Content |
 |-------|---------|
-| `data[]` | Static FormData rows (`field_type: static`). Matrix values are in `matrix_cells[]`, not nested here. |
+| `data[]` | Static FormData rows (`field_type: static`). Matrix values are in `matrix_cells[]`, not nested here. `disaggregation_data`/`prefilled_disaggregation_data`/`imputed_disaggregation_data` ({mode, values}) are canonical; the raw on-disk `*_disagg_data` fields and `form_item_type` (on `form_items[]`, alias of `type`) are deprecated but retained for backward compatibility. |
 | `dynamic_data[]` | Dynamic indicator rows |
 | `dynamic_context[]` | Dynamic section bindings (e.g. emergency appeals) |
 | `repeat_data[]` | Repeat-group field rows |
-| `form_items[]` | Form items referenced by facts (`related=page` or `all`) |
-| `countries[]` | Full country dimension (~192 rows) |
-| `national_societies[]` | Full National Society dimension |
-| `indicator_bank[]` | Full indicator bank (~466 rows) |
-| `matrix_cells[]` | Normalized matrix cells; matrix-specific fields grouped under `matrix` (`row`, `column`, `entity`) |
+| `form_items[]` | Form items referenced by facts (`related=page` or `all`). `[assignment_year]` placeholders in labels/matrix column names are substituted when the request is scoped to a single assignment. |
+| `countries[]` / `national_societies[]` / `indicator_bank[]` | Full dimension tables (~860 rows combined). Included by default for authenticated callers, omitted by default for public callers — see `include_dimensions`. |
+| `matrix_cells[]` | Normalized matrix cells; matrix-specific fields grouped under `matrix` (`row`, `column`, `entity`). Includes calculated row/column/grand totals flagged via top-level `is_calculated_total`/`total_kind` (`row`\|`column`\|`grand`) — check before summing `value`, or pass `include_calculated_totals=false` to omit them. Some matrix items are configured (Form Builder → matrix item → Display → "Include Calculated Totals in API") to never emit `is_calculated_total` rows regardless of this flag — see `include_calculated_totals` below. |
 | `assignment_statuses[]` | AssignmentEntityStatus rows for assigned `submission_id`s (workflow status / due date); join when `submission_type` is `assigned` |
-| `arrays` | Catalog describing each top-level array |
+| `arrays` | Catalog describing each top-level array (included/excluded, grain, key fields) |
 
 **Legacy:** `GET /api/v1/data/tables` returns HTTP 308 redirect to `/api/v1/data` (same query string).
 
-**Query parameters:** `template_id`, `stable_key`, `version_scope`, `country_id`, `country_iso2`, `country_iso3`, `related`, `layout` (`flat`|`star`), `include_dynamic`, `include_repeat`, `include_non_reported`, `page`, `per_page`, …
+**Query parameters:** `template_id`, `assignment_id` (single or comma-separated `AssignedForm.id`s), `submission_id` (`AssignmentEntityStatus.id`), `item_id`, `stable_key`, `version_scope`, `country_id`, `country_iso2`, `country_iso3`, `period_name`, `indicator_bank_id`, `indicator_bank_ids`, `date_from`, `date_to`, `sort`, `order`, `related`, `layout` (`flat`|`star`), `include_dynamic`, `include_repeat`, `include_dimensions`, `include_calculated_totals`, `include_non_reported`, `page`, `per_page`, …
+
+**`assignment_id` vs. `submission_id`:** the two are easy to confuse since both are colloquially "the assignment". `assignment_id` expects an `AssignedForm.id`; `submission_id` expects an `AssignmentEntityStatus.id` — the id used by `assignment_statuses[]`, workflow, and status views. Passing a submission id as `assignment_id` (with no other `assignment_id` in the same call) auto-resolves to the equivalent `submission_id` lookup; the 404 for any id that still fails to resolve names the id and suggests the swap.
+
+**`include_dimensions`** (default `true` for session/API-key auth, `false` for public/unauthenticated): pass `false` on authenticated calls once `countries[]`/`national_societies[]`/`indicator_bank[]` are already cached client-side (e.g. via `/countrymap`, `/nationalsocietymap`, `/indicator-bank`) to shrink the response; pass `true` on public calls to opt into the full dimensions.
+
+**`include_calculated_totals`** (default `true`): request-wide override — pass `false` to strip calculated row/column/grand totals from `matrix_cells[]` / `bridge_disagg_values[]` / `disaggregation_data` for every matrix in the response. This can only *remove* totals, never force them back in. Independently, each matrix item's `matrix_config.include_calculated_totals_in_api` flag (set via the Form Builder's matrix Display properties) controls the *default* for that item — it decouples on-screen totals (`show_row_totals`/`show_column_totals`, always shown to people filling in the form) from API/export exposure, so a form author can show totals in the UI while keeping them out of every API response and data export for that matrix, without callers needing to remember `include_calculated_totals=false`.
 
 **Examples**
 
@@ -821,9 +844,10 @@ Unified submission data endpoint. Returns fact arrays plus full dimension tables
 GET /api/v1/data?template_id=33&related=all
 GET /api/v1/data?template_id=12&stable_key=<uuid>
 GET /api/v1/data?template_id=12&version_scope=all&layout=star
+GET /api/v1/data?submission_id=1610&item_id=1403
 ```
 
-**Star layout (`layout=star`):** all facts live under `data.tables.fact_form_values` (static, dynamic, repeat, and matrix rows — filter by `field_type`). Matrix rows have `id: null` and `matrix: { row, column, entity, source }` — expand `matrix` selectively in Power Query. Non-matrix rows have `matrix: null`.
+**Star layout (`layout=star`, `schema_version: "1.2"`):** all facts live under `data.tables.fact_form_values` (static, dynamic, and repeat rows — filter by `field_type`); every row keeps its real `id`/`value`/etc. from the underlying FormData/DynamicIndicatorData/RepeatGroupData record. `matrix` is always `null` here (unlike `matrix_cells[].matrix` in the flat layout, a different, row/column/entity-grouped shape) — matrix cell values instead appear as a long array directly on `disaggregation_data`/`prefilled_disaggregation_data`/`imputed_disaggregation_data`: `[{row_entity_id, column_key, column_label, value, is_calculated_total?, total_kind?}, …]`. The same long array, keyed by `form_data_id`, is mirrored in `data.tables.bridge_disagg_values[]` for BI tools that prefer a dedicated bridge table over expanding a nested array.
 
 ## Troubleshooting (Common)
 

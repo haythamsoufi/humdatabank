@@ -115,19 +115,28 @@ export const TranslationUtils = (() => {
     });
   }
 
+  function fieldHasContent(field, editor) {
+    if (editor && !editor.classList.contains('hidden')) {
+      const raw = editor.innerHTML;
+      return !!(raw && raw !== '<br>' && raw.trim() !== '');
+    }
+    return !!(field && String(field.value || '').trim());
+  }
+
   // Populate translation inputs within a modal for a given cssPrefix.
   // Also updates a sibling rich-text editor div (id = fieldId + '-editor') when
   // BlankTranslationEditor has been activated for the definitions tab.
-  function populateFields(cssPrefix, translations, baseEnglishText = '', fieldSuffix = '') {
+  // When onlyEmpty is true, existing non-empty values are left unchanged (auto-translate fill-gaps).
+  function populateFields(cssPrefix, translations, baseEnglishText = '', fieldSuffix = '', onlyEmpty = false) {
     const suffix = fieldSuffix ? `-${fieldSuffix}` : '';
     supportedLanguages.forEach(langCode => {
       if (langCode === 'en') return;
       const fieldId = `${cssPrefix}-translation${suffix}-${langCode}`;
       const value = (translations && translations[langCode]) || '';
       const field = document.getElementById(fieldId);
-      if (field) field.value = value;
-      // Also refresh rich-text editor if present (BlankTranslationEditor)
       const editor = document.getElementById(fieldId + '-editor');
+      if (onlyEmpty && fieldHasContent(field, editor)) return;
+      if (field) field.value = value;
       if (editor) editor.innerHTML = value;
     });
   }

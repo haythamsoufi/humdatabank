@@ -43,6 +43,10 @@ from app.utils.api_serialization import (
     build_star_schema_tables,
     build_matrix_cells_from_data_rows,
     enrich_matrix_cells,
+    filter_calculated_totals,
+    strip_calculated_totals_from_fact_rows,
+    form_items_need_assignment_year_resolution,
+    resolve_assignment_year_placeholders,
     STAR_SCHEMA_VERSION,
     STAR_SCHEMA_GRAIN,
     serialize_dynamic_data_item,
@@ -82,6 +86,7 @@ from app.utils.api_data_filters import (
     build_data_api_scope_meta,
     parse_assignment_id_filters,
     parse_data_item_filters,
+    resolve_assignment_entity_status_fallback,
     resolve_assignment_scope,
     resolve_template_published_version_id,
 )
@@ -99,7 +104,11 @@ _DATA_ARRAY_CATALOG = {
         'description': (
             'Submitted answers for static form items (FormData). One row per saved value. '
             'Join to form_items via form_item_id and to countries via country_id. '
-            'Matrix cell values are normalized in matrix_cells[] (not duplicated here).'
+            'Matrix cell values are normalized in matrix_cells[] (not duplicated here). '
+            'Non-matrix disaggregation lives in disaggregation_data ({mode, values}, canonical) '
+            '— the raw disagg_data on-disk fields (prefilled_disagg_data/imputed_disagg_data) '
+            'are deprecated aliases kept for backward compatibility; prefer '
+            'prefilled_disaggregation_data/imputed_disaggregation_data.'
         ),
         'grain': 'submission × static form_item',
         'key_fields': [
@@ -149,7 +158,8 @@ _DATA_ARRAY_CATALOG = {
         'title': 'Form item definitions',
         'description': (
             'Labels and config for form fields referenced by fact rows. Scope controlled by '
-            'related=page (current page only) or related=all (full filtered dataset).'
+            'related=page (current page only) or related=all (full filtered dataset). '
+            '`type` is canonical; `form_item_type` is a deprecated alias with the same value.'
         ),
         'grain': 'form_item',
         'key_fields': ['id', 'stable_key', 'label', 'type', 'section', 'bank_details', 'matrix_config'],
@@ -185,11 +195,19 @@ _DATA_ARRAY_CATALOG = {
         'title': 'Matrix cell values',
         'description': (
             'Normalized matrix disaggregation rows parsed from data[]. One row per cell. '
-            'Matrix-specific fields are grouped under matrix (row, column, entity).'
+            'Matrix-specific fields are grouped under matrix (row, column, entity). '
+            'Includes calculated row/column/grand totals alongside raw cells — check the '
+            'top-level is_calculated_total flag (and total_kind: row|column|grand) before '
+            'summing value, or totals will be double- (or quadruple-) counted. Pass '
+            'include_calculated_totals=false to omit these rows entirely and receive '
+            'only raw reported/prefilled/imputed cells. Some matrix items are configured '
+            'in the Form Builder to never expose calculated totals via the API even when '
+            'include_calculated_totals is left at its default — such items simply never '
+            'emit is_calculated_total rows.'
         ),
         'grain': 'form_data × matrix row entity × column × source',
         'key_fields': [
-            'form_data_id', 'form_item_id', 'value',
+            'form_data_id', 'form_item_id', 'value', 'is_calculated_total', 'total_kind',
             'matrix.source',
             'matrix.row.entity_id', 'matrix.row.label',
             'matrix.column.key', 'matrix.column.label',
@@ -213,14 +231,18 @@ _DATA_ARRAY_CATALOG = {
 }
 
 
-def _build_data_array_catalog(*, include_dynamic: bool, include_repeat: bool) -> dict:
+def _build_data_array_catalog(
+    *, include_dynamic: bool, include_repeat: bool, include_dimensions: bool = True,
+) -> dict:
     """Return catalog entries for arrays present in this response."""
     catalog = {
         'data': {**_DATA_ARRAY_CATALOG['data'], 'included': True},
         'form_items': {**_DATA_ARRAY_CATALOG['form_items'], 'included': True},
-        'countries': {**_DATA_ARRAY_CATALOG['countries'], 'included': True},
-        'national_societies': {**_DATA_ARRAY_CATALOG['national_societies'], 'included': True},
-        'indicator_bank': {**_DATA_ARRAY_CATALOG['indicator_bank'], 'included': True},
+        'countries': {**_DATA_ARRAY_CATALOG['countries'], 'included': include_dimensions},
+        'national_societies': {
+            **_DATA_ARRAY_CATALOG['national_societies'], 'included': include_dimensions,
+        },
+        'indicator_bank': {**_DATA_ARRAY_CATALOG['indicator_bank'], 'included': include_dimensions},
         'matrix_cells': {**_DATA_ARRAY_CATALOG['matrix_cells'], 'included': True},
         'assignment_statuses': {**_DATA_ARRAY_CATALOG['assignment_statuses'], 'included': True},
     }
@@ -583,6 +605,76 @@ def _parse_include_flags(args):
         return True
 
     return _parse_flag('include_dynamic'), _parse_flag('include_repeat')
+
+
+def _resolve_include_dimensions(args, *, public_data_access: bool) -> bool:
+    """
+    Whether to include the full countries[] / national_societies[] / indicator_bank[]
+    dimension tables (~860 rows combined) in the response.
+
+    Polarity differs by auth path so the default never changes for existing callers:
+      - Public (unauthenticated) requests: default False, opt in with include_dimensions=true
+        (see public_include_dimensions — used by the Custom GPT integration, which prefers
+        the compact data[]-only shape).
+      - Authenticated requests (session or API key): default True (unchanged historical
+        behavior), opt out with include_dimensions=false when a client already has these
+        dimensions cached (e.g. via /countrymap, /nationalsocietymap, /indicator-bank) and
+        only needs the fact rows for this query.
+    """
+    if public_data_access:
+        return public_include_dimensions(args)
+    raw = args.get('include_dimensions')
+    if raw is None or str(raw).strip() == '':
+        return True
+    return str(raw).strip().lower() not in ('0', 'false', 'no', 'n')
+
+
+def _resolve_include_calculated_totals(args) -> bool:
+    """
+    Whether ``matrix_cells[]`` / ``bridge_disagg_values[]`` / the star-layout
+    ``fact_form_values[].disaggregation_data`` long arrays include calculated
+    row/column/grand totals alongside raw reported cells.
+
+    Defaults to True (unchanged historical behavior). Pass
+    ``include_calculated_totals=false`` to receive only raw cells — useful for
+    callers that sum ``value`` themselves and want to avoid double-counting totals
+    that are already flagged via ``is_calculated_total`` / ``total_kind``.
+    """
+    raw = args.get('include_calculated_totals')
+    if raw is None or str(raw).strip() == '':
+        return True
+    return str(raw).strip().lower() not in ('0', 'false', 'no', 'n')
+
+
+def _resolve_single_assignment_year(*, submission_id, assignment_ids, period_name):
+    """
+    Best-effort resolve the reporting year when the request is scoped to one assignment.
+
+    Used to fill in ``[assignment_year]`` placeholders in form_items[].label and matrix
+    column names (see resolve_assignment_year_placeholders). Returns None (leaving
+    placeholders untouched) for multi-assignment / unscoped requests rather than
+    guessing at an ambiguous year.
+    """
+    from sqlalchemy.orm import joinedload
+    from app.services.forms.variable_resolution_service import VariableResolutionService
+    try:
+        if submission_id is not None:
+            aes = (
+                AssignmentEntityStatus.query
+                .options(joinedload(AssignmentEntityStatus.assigned_form))
+                .get(int(submission_id))
+            )
+            if aes and aes.assigned_form:
+                return VariableResolutionService.get_assignment_year(aes.assigned_form)
+        if assignment_ids and len(assignment_ids) == 1:
+            af = AssignedForm.query.get(int(assignment_ids[0]))
+            if af:
+                return VariableResolutionService.get_assignment_year(af)
+        if period_name:
+            return VariableResolutionService.get_assignment_year_from_period_name(period_name)
+    except Exception as e:
+        current_app.logger.debug("_resolve_single_assignment_year failed: %s", e)
+    return None
 
 
 def _fetch_extended_data(
@@ -979,6 +1071,7 @@ def _build_star_data_response(
     assignment_statuses=None,
     scope_meta=None,
     array_catalog=None,
+    include_calculated_totals=True,
 ):
     """Star-schema dimensional tables for BI / integrator consumers."""
     dynamic_data = repeat_data = dynamic_context = None
@@ -992,12 +1085,14 @@ def _build_star_data_response(
         countries_table,
         dynamic_data=dynamic_data,
         repeat_data=repeat_data,
-        matrix_cells=matrix_cells,
         national_societies_table=national_societies_table,
         indicator_bank_table=indicator_bank_table,
         dynamic_context=dynamic_context,
         assignment_statuses=assignment_statuses,
     )
+    if not include_calculated_totals:
+        tables['bridge_disagg_values'] = filter_calculated_totals(tables['bridge_disagg_values'])
+        strip_calculated_totals_from_fact_rows(tables['fact_form_values'])
     if should_paginate:
         total_pages = (total_items + per_page - 1) // per_page if per_page > 0 else 1
         meta = {
@@ -1053,6 +1148,16 @@ def get_all_data():
         - related: scope of related form_items ('page' or 'all'); default 'page'
         - layout: ``flat`` (default) or ``star`` (dimensional tables for BI)
         - include_dynamic / include_repeat: default true; pass ``false`` to omit extended arrays
+        - include_dimensions: default true for authenticated callers (false for public);
+          pass ``false``/``true`` to override and skip/include countries[], national_societies[],
+          indicator_bank[] (~860 rows combined)
+        - include_calculated_totals: default true; pass ``false`` to drop calculated
+          row/column/grand totals from matrix_cells[] / bridge_disagg_values[] /
+          fact_form_values[].disaggregation_data, keeping only raw reported cells.
+          Individual matrix items can also be configured (matrix_config.
+          include_calculated_totals_in_api) to always exclude calculated totals
+          from the API regardless of this flag — this only ever removes totals,
+          never forces totals back in for an item configured to omit them
         - include_non_reported, analysis, indicator_bank_ids: see data explorer / BI use cases
     """
     try:
@@ -1072,6 +1177,12 @@ def get_all_data():
         else:
             elevated_access, auth_user, api_key_record = auth_result
 
+        # Whether to include the full countries[] / national_societies[] / indicator_bank[]
+        # dimension tables (~860 rows combined). Computed once up front so every response
+        # path (including the "no accessible rows" shortcuts below) stays consistent.
+        include_dims = _resolve_include_dimensions(request.args, public_data_access=public_data_access)
+        include_calculated_totals = _resolve_include_calculated_totals(request.args)
+
         analysis_requested = str(request.args.get('analysis', '') or '').strip().lower() in ['1', 'true', 'yes', 'y']
         if analysis_requested and not elevated_access and auth_user is not None:
             from app.services.organization.authorization_service import AuthorizationService
@@ -1083,6 +1194,7 @@ def get_all_data():
 
         template_id = request.args.get('template_id', type=int)
         assignment_ids = parse_assignment_id_filters(request.args)
+        submission_id = request.args.get('submission_id', type=int)
         scoped_template_ids: List[int] = []
         if assignment_ids:
             template_id, scoped_template_ids, assignment_error = resolve_assignment_scope(
@@ -1090,11 +1202,24 @@ def get_all_data():
                 template_id=template_id,
             )
             if assignment_error:
-                return api_error(assignment_error['message'], assignment_error['status'])
+                # Common mix-up: the id is an AssignmentEntityStatus id (submission_id),
+                # not an AssignedForm id. Only auto-resolve the unambiguous single-id case
+                # and only when the caller didn't already pass an explicit submission_id.
+                fallback = (
+                    resolve_assignment_entity_status_fallback(assignment_ids)
+                    if assignment_error.get('status') == 404 and submission_id is None
+                    else None
+                )
+                if fallback is None:
+                    return api_error(assignment_error['message'], assignment_error['status'])
+                submission_id, fallback_template_id = fallback
+                assignment_ids = None
+                if fallback_template_id is not None:
+                    scoped_template_ids = [fallback_template_id]
+                    template_id = fallback_template_id
         elif template_id is not None:
             scoped_template_ids = [int(template_id)]
 
-        submission_id = request.args.get('submission_id', type=int)
         item_id = request.args.get('item_id', type=int)
         item_id, stable_key_filter, version_scope, filter_error = parse_data_item_filters(
             request.args,
@@ -1384,10 +1509,11 @@ def get_all_data():
                             _catalog = _build_data_array_catalog(
                                 include_dynamic=_inc_dyn,
                                 include_repeat=_inc_rep,
+                                include_dimensions=include_dims,
                             )
-                            _countries = _load_full_countries_table()
-                            _national_societies = _load_full_national_societies_table()
-                            _indicator_bank = _load_full_indicator_bank_table()
+                            _countries = _load_full_countries_table() if include_dims else []
+                            _national_societies = _load_full_national_societies_table() if include_dims else []
+                            _indicator_bank = _load_full_indicator_bank_table() if include_dims else []
                             _assignment_statuses = _assignment_statuses_for_scope()
                             if layout == 'star':
                                 return _build_star_data_response(
@@ -1457,10 +1583,11 @@ def get_all_data():
                             _catalog = _build_data_array_catalog(
                                 include_dynamic=_inc_dyn,
                                 include_repeat=_inc_rep,
+                                include_dimensions=include_dims,
                             )
-                            _countries = _load_full_countries_table()
-                            _national_societies = _load_full_national_societies_table()
-                            _indicator_bank = _load_full_indicator_bank_table()
+                            _countries = _load_full_countries_table() if include_dims else []
+                            _national_societies = _load_full_national_societies_table() if include_dims else []
+                            _indicator_bank = _load_full_indicator_bank_table() if include_dims else []
                             _assignment_statuses = _assignment_statuses_for_scope()
                             if layout == 'star':
                                 return _build_star_data_response(
@@ -1908,6 +2035,7 @@ def get_all_data():
         array_catalog = _build_data_array_catalog(
             include_dynamic=include_dynamic,
             include_repeat=include_repeat,
+            include_dimensions=include_dims,
         )
         extended = _fetch_extended_data(
             template_id=template_id,
@@ -1957,7 +2085,15 @@ def get_all_data():
                         template=item.template
                     )
                 )
-        public_slim = public_data_access and not public_include_dimensions(request.args)
+        if form_items_need_assignment_year_resolution(form_items_table):
+            _assignment_year = _resolve_single_assignment_year(
+                submission_id=submission_id,
+                assignment_ids=assignment_ids,
+                period_name=period_name,
+            )
+            if _assignment_year:
+                resolve_assignment_year_placeholders(form_items_table, _assignment_year)
+        public_slim = public_data_access and not include_dims
         extra_keys = {}
         if public_slim:
             data_rows = slim_public_data_rows(data_rows)
@@ -1969,9 +2105,14 @@ def get_all_data():
             assignment_statuses_table = []
             array_catalog = None
         else:
-            countries_table = _load_full_countries_table()
-            national_societies_table = _load_full_national_societies_table()
-            indicator_bank_table = _load_full_indicator_bank_table()
+            if include_dims:
+                countries_table = _load_full_countries_table()
+                national_societies_table = _load_full_national_societies_table()
+                indicator_bank_table = _load_full_indicator_bank_table()
+            else:
+                countries_table = []
+                national_societies_table = []
+                indicator_bank_table = []
             # Flat layout normalizes matrix cells into matrix_cells[] and strips them
             # from data[]. Star layout keeps matrix payloads on fact_form_values as a
             # long array on disaggregation_data.
@@ -1988,6 +2129,8 @@ def get_all_data():
                     national_societies_table=national_societies_table,
                     indicator_bank_table=indicator_bank_table,
                 )
+                if not include_calculated_totals:
+                    matrix_cells = filter_calculated_totals(matrix_cells)
 
             if include_dynamic:
                 extra_keys['dynamic_data'] = extended['dynamic_data']
@@ -2022,6 +2165,7 @@ def get_all_data():
                 assignment_statuses=assignment_statuses_table,
                 scope_meta=scope_meta,
                 array_catalog=array_catalog,
+                include_calculated_totals=include_calculated_totals,
             )
         else:
             response = _build_flat_data_response(

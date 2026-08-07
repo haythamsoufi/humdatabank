@@ -179,6 +179,45 @@ If Azure Application Gateway WAF is configured:
 - Run `flask sync-indicator-embeddings` to update AI search.
 - Spot-check **Public Assignments** (Admin → Public Assignments) so intended indicators/countries are published as expected; downstream consumers may cache responses briefly.
 
+### After Renaming a Matrix Column (Form Builder)
+
+Matrix field cells are stored in `disagg_data` as `{row}_{column_name}`. Renaming a column's internal `name` in the form builder (not just its display label) leaves old cell keys behind in every row saved before the rename — they no longer match any row/column pairing, so they're silently excluded from the UI and totals, but stay in the JSON forever (e.g. `form_data.id=286867` had a lingering `"...NS 2025 Total Funding": 0` key after item 1403's column was renamed to `ns_fun`).
+
+New saves are protected automatically (`app.utils.api_serialization.prune_stale_matrix_cell_keys`, wired into both the top-level and repeat-group matrix save paths, plus the client-side collector in `matrix-handler.js`). After a rename, clean up the **existing** rows:
+
+```bash
+cd Backoffice
+
+# 1. Preview affected rows (safe, read-only)
+python scripts/ops/prune_stale_matrix_cell_keys.py --form-item-id <ITEM_ID> --dry-run
+
+# 2. Apply after reviewing the dry-run output
+python scripts/ops/prune_stale_matrix_cell_keys.py --form-item-id <ITEM_ID> --force
+```
+
+Omit `--form-item-id` to scan every matrix item at once (still `--dry-run` first).
+
+**On production** (no direct DB access — App Service is on private networking, see [Backup & restore](../data/backup-and-restore.md)). The repo root's `azure-webapp/` tooling opens an `az webapp create-remote-connection` SSH tunnel to the running container (which already has production's `DATABASE_URL` in its environment) and runs a command non-interactively — this is the same mechanism `azure_webapp_ssh.ps1` uses for interactive sessions:
+
+1. Take a DB snapshot first if pruning a large number of rows (see [Maintenance window checklist](#maintenance-window-checklist-template)).
+2. Requires `az login` (access to the target subscription) and the Windows OpenSSH client. From the repo root:
+   ```powershell
+   . .\azure-webapp\azure_webapp_config.ps1
+   $t = Resolve-AzureWebAppEnvironment -Name PROD   # or STAGING
+
+   # 1. Preview (safe, read-only)
+   .\azure-webapp\azure_webapp_run.ps1 -WebApp $t.WebApp -ResourceGroup $t.ResourceGroup -Port $t.Port -Label $t.Label `
+       -Command "cd /app && python scripts/ops/prune_stale_matrix_cell_keys.py --form-item-id <ITEM_ID> --dry-run"
+
+   # 2. Apply after reviewing the dry-run output
+   .\azure-webapp\azure_webapp_run.ps1 -WebApp $t.WebApp -ResourceGroup $t.ResourceGroup -Port $t.Port -Label $t.Label `
+       -Command "cd /app && python scripts/ops/prune_stale_matrix_cell_keys.py --form-item-id <ITEM_ID> --force"
+   ```
+   Use `cd /app` (not `Backoffice/`) — that's the deployed app root inside the container (see `entrypoint.sh`). Omit `--form-item-id` to scan every matrix item. `--force` is preferred over the interactive confirmation prompt here since the SSH tunnel is a one-shot non-interactive command.
+
+   Fallback with no local Azure CLI/OpenSSH: Azure Portal → App Service → **Development Tools → SSH** (browser-based Kudu console, no password needed) and run the same two commands from `/app`.
+3. Re-run the `--dry-run` command — it should report "No stale matrix cell keys found" once cleanup is complete.
+
 ### After a Code Deployment
 
 1. Confirm `python -m flask db heads` returns one head.

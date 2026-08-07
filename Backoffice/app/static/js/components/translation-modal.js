@@ -108,12 +108,23 @@ export const TranslationModal = {
       return Array.from(new Set(codes));
     }
 
-    function populateFieldsFallback(translations = {}, suffix = '') {
+    function fieldHasContentFallback(field, editor) {
+      if (editor && !editor.classList.contains('hidden')) {
+        const raw = editor.innerHTML;
+        return !!(raw && raw !== '<br>' && raw.trim() !== '');
+      }
+      return !!(field && String(field.value || '').trim());
+    }
+
+    function populateFieldsFallback(translations = {}, suffix = '', onlyEmpty = false) {
       const languages = getLanguagesFromDom(suffix);
       languages.forEach(code => {
         const id = suffix ? `${cssPrefix}-translation-${suffix}-${code}` : `${cssPrefix}-translation-${code}`;
         const field = document.getElementById(id);
+        const editor = document.getElementById(id + '-editor');
+        if (onlyEmpty && fieldHasContentFallback(field, editor)) return;
         if (field) field.value = translations[code] || '';
+        if (editor) editor.innerHTML = translations[code] || '';
       });
     }
 
@@ -370,13 +381,16 @@ export const TranslationModal = {
                   : data.translations;
                 try { console.log('[TranslationModal] Populate flat result', { cssPrefix, flat }); } catch (_) {}
                 if (window.TranslationModalUtils) {
-                  window.TranslationModalUtils.populateFields(cssPrefix, flat);
+                  window.TranslationModalUtils.populateFields(cssPrefix, flat, '', '', true);
                 } else {
-                  populateFieldsFallback(flat);
+                  populateFieldsFallback(flat, '', true);
                 }
-                // Auto-save to hidden if callback provided
+                // Auto-save merged modal state (preserves existing translations we skipped)
                 if (typeof onSaveHiddenFields === 'function') {
-                  try { onSaveHiddenFields(flat); } catch (_) {}
+                  const collected = window.TranslationModalUtils
+                    ? window.TranslationModalUtils.collectFields(cssPrefix)
+                    : collectFieldsFallback();
+                  try { onSaveHiddenFields(collected); } catch (_) {}
                 }
                 autoBtn.replaceChildren();
                 {
@@ -509,19 +523,19 @@ export const TranslationModal = {
                 try { console.log('[TranslationModal] Populate tab', { cssPrefix, suffix, source, sourceKeys: Object.keys(source || {}) }); } catch (_) {}
 
                 if (window.TranslationModalUtils) {
-                  window.TranslationModalUtils.populateFields(cssPrefix, source, '', suffix);
+                  window.TranslationModalUtils.populateFields(cssPrefix, source, '', suffix, true);
                 } else {
-                  populateFieldsFallback(source, suffix);
+                  populateFieldsFallback(source, suffix, true);
                 }
               });
               if (typeof onSaveHiddenFields === 'function') {
-                const normalized = {};
-                tabSuffixes.forEach(suffix => {
-                  if (results[suffix] && Object.keys(results[suffix]).length > 0) {
-                    normalized[suffix] = extractMapForSuffix(results[suffix], suffix);
-                  }
+                const collectedByTab = {};
+                tabSuffixes.forEach(sfx => {
+                  collectedByTab[sfx] = window.TranslationModalUtils
+                    ? window.TranslationModalUtils.collectFields(cssPrefix, sfx)
+                    : collectFieldsFallback(sfx);
                 });
-                try { onSaveHiddenFields(normalized); } catch (_) {}
+                try { onSaveHiddenFields(collectedByTab); } catch (_) {}
               }
               const hasPartialErrors = Object.keys(tabErrors).length > 0;
               autoBtn.replaceChildren();

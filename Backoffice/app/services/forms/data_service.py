@@ -1549,6 +1549,18 @@ class FormDataService(
                     logger.warning(f"Invalid matrix data for field {matrix.id}: {matrix_data_json} - {e}")
                     matrix_data = {}
 
+            if matrix_data:
+                from app.utils.api_serialization import prune_stale_matrix_cell_keys
+                matrix_config = (matrix.config or {}).get('matrix_config') or {}
+                pruned_matrix_data = prune_stale_matrix_cell_keys(matrix_data, matrix_config)
+                if len(pruned_matrix_data) != len(matrix_data):
+                    dropped_keys = sorted(set(matrix_data) - set(pruned_matrix_data))
+                    logger.info(
+                        f"Matrix field {matrix.id}: dropped {len(dropped_keys)} stale cell key(s) "
+                        f"no longer matching current columns: {dropped_keys}"
+                    )
+                matrix_data = pruned_matrix_data
+
             # Determine final value and disagg_data
             if data_not_available:
                 final_value = None

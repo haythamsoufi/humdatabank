@@ -705,7 +705,7 @@ class Config:
     SESSION_PERMANENT = True
     PERMANENT_SESSION_LIFETIME = timedelta(hours=10)
     SESSION_INACTIVITY_TIMEOUT = timedelta(
-        minutes=int(os.environ.get('SESSION_INACTIVITY_TIMEOUT_MINUTES', 30))
+        minutes=int(os.environ.get('SESSION_INACTIVITY_TIMEOUT_MINUTES', 120))
     )
     # Azure/OAuth: reuse an active session from the same device when duplicate callbacks arrive within this window
     OAUTH_LOGIN_DEDUP_SECONDS = int(os.environ.get('OAUTH_LOGIN_DEDUP_SECONDS', 90))

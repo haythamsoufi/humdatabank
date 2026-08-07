@@ -163,8 +163,58 @@ function startBulkMetaReprocessJobPolling(jobId, total) {
     if (jobProgress && jobProgress.startJob) jobProgress.startJob('docs.bulk_reprocess_metadata', jobId, total || 0);
 }
 
+function registerAiDocsJobSpecs() {
+    if (!jobProgress || typeof jobProgress.registerJobSpec !== 'function') return;
+    jobProgress.registerJobSpec('ifrc_api_bulk', {
+        storageKey: 'ai_docs_external_api_import_job',
+        statusUrl: function (jobId) {
+            return '/api/ai/documents/ifrc-api/import-bulk/' + encodeURIComponent(jobId) + '/status';
+        },
+        cancelUrl: function (jobId) {
+            return '/api/ai/documents/ifrc-api/import-bulk/' + encodeURIComponent(jobId) + '/cancel';
+        },
+        titleImport: true,
+    });
+    jobProgress.registerJobSpec('docs_b_bulk_import_system', {
+        storageKey: 'ai_docs_system_import_job',
+        statusUrl: function (jobId, urls) {
+            var tpl = urls && urls.importSystemBulkStatus;
+            if (tpl) return String(tpl).replace('__JOB__', encodeURIComponent(jobId));
+            return '/admin/ai/documents/import-system-bulk/' + encodeURIComponent(jobId) + '/status';
+        },
+        cancelUrl: function (jobId, urls) {
+            var tpl = urls && urls.importSystemBulkCancel;
+            if (tpl) return String(tpl).replace('__JOB__', encodeURIComponent(jobId));
+            return '/admin/ai/documents/import-system-bulk/' + encodeURIComponent(jobId) + '/cancel';
+        },
+        titleImport: true,
+    });
+    jobProgress.registerJobSpec('docs_bulk_reprocess', {
+        storageKey: 'ai_docs_bulk_reprocess_job',
+        statusUrl: function (jobId) {
+            return '/admin/ai/documents/bulk-reprocess/' + encodeURIComponent(jobId) + '/status';
+        },
+        cancelUrl: function (jobId) {
+            return '/admin/ai/documents/bulk-reprocess/' + encodeURIComponent(jobId) + '/cancel';
+        },
+        titleImport: false,
+    });
+    jobProgress.registerJobSpec('docs_bulk_reprocess_metadata', {
+        storageKey: 'ai_docs_bulk_reprocess_metadata_job',
+        statusUrl: function (jobId) {
+            return '/admin/ai/documents/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/status';
+        },
+        cancelUrl: function (jobId) {
+            return '/admin/ai/documents/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/cancel';
+        },
+        titleImport: false,
+        metadataOnly: true,
+    });
+}
+
 function initAiDocsJobProgress() {
     if (!jobProgress || typeof jobProgress.init !== 'function') return;
+    registerAiDocsJobSpecs();
     jobProgress.init({
         cfg: cfg,
         csrfFetchFn: (typeof csrfFetch === 'function') ? csrfFetch : null,
@@ -1274,6 +1324,16 @@ if (document.readyState === 'loading') {
     initializeDocumentsBulkActions();
 }
 
+// Mirrors csrf.js's responseIndicatesCsrfFailure(), but operates on an already-parsed
+// XHR JSON payload (xhr.onload parses the body itself, so there's no Response to clone/re-read).
+function isCsrfFailureResponse(status, payload) {
+    if (status !== 400 && status !== 403) return false;
+    if (!payload) return false;
+    if (payload.csrf_refresh_required || payload.error === 'CSRF validation failed') return true;
+    const message = String(payload.message || payload.error || '').toLowerCase();
+    return message.includes('csrf');
+}
+
 // Upload form handling
 function initializeUploadForm() {
     const dropZone = document.getElementById('dropZone');
@@ -1364,19 +1424,72 @@ function initializeUploadForm() {
         try {
             window.__clientLog && window.__clientLog('Uploading file:', fileInput.files[0].name);
 
-            const response = await csrfFetch('/api/ai/documents/upload', {
-                method: 'POST',
-                body: formData
-            });
+            // Mirror csrfFetch's pre-flight: don't race an in-flight refresh, and
+            // proactively refresh an aging token before a (potentially long) upload
+            // starts rather than only discovering it's stale after the server rejects it.
+            if (typeof waitForPendingCsrfRefresh === 'function') {
+                await waitForPendingCsrfRefresh();
+            }
+            if (typeof refreshCSRFTokenIfStale === 'function') {
+                await refreshCSRFTokenIfStale().catch(function () { return null; });
+            }
 
-            const result = await response.json();
-            window.__clientLog && window.__clientLog('Upload response:', result);
+            function performUploadXhr(csrfToken) {
+                if (csrfToken) {
+                    formData.set('csrf_token', csrfToken);
+                }
+                return new Promise(function (resolve, reject) {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/ai/documents/upload', true);
+                    xhr.withCredentials = true;
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                    if (csrfToken) {
+                        xhr.setRequestHeader('X-CSRFToken', csrfToken);
+                    }
+                    xhr.upload.onprogress = function (evt) {
+                        if (!evt.lengthComputable) return;
+                        const pct = Math.round((evt.loaded / evt.total) * 100);
+                        progressBar.style.width = pct + '%';
+                        uploadStatus.textContent = cfg.t.uploading_f2870421 + ' (' + pct + '%)';
+                    };
+                    xhr.onerror = function () {
+                        reject(new Error('Upload failed'));
+                    };
+                    xhr.onload = function () {
+                        let payload = null;
+                        try {
+                            payload = JSON.parse(xhr.responseText || '{}');
+                        } catch (parseErr) {
+                            reject(parseErr);
+                            return;
+                        }
+                        resolve({ status: xhr.status, result: payload });
+                    };
+                    xhr.send(formData);
+                });
+            }
 
-            if (response.status === 202 && result.success && result.document_id) {
+            const token = (typeof getCSRFToken === 'function') ? getCSRFToken() : null;
+            let result = await performUploadXhr(token);
+
+            // Retry once with a freshly-refreshed token if the server rejected this one as
+            // stale/invalid — csrfFetch does the same for regular fetch-based requests.
+            if (isCsrfFailureResponse(result.status, result.result) && typeof refreshCSRFToken === 'function') {
+                const newToken = await refreshCSRFToken();
+                if (newToken) {
+                    result = await performUploadXhr(newToken);
+                }
+            }
+
+            const response = { status: result.status };
+            const uploadResult = result.result;
+            window.__clientLog && window.__clientLog('Upload response:', uploadResult);
+
+            if (response.status === 202 && uploadResult.success && uploadResult.document_id) {
                 uploadProgress.classList.add('hidden');
-                const docId = result.document_id;
+                const docId = uploadResult.document_id;
                 showProcessingBanner(cfg.t.processing_upload_9cb556a5, cfg.t.starting_8c6ce9f8, 0);
-                updateTrackedProcessingDoc(docId, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
+                updateTrackedProcessingDoc(docId, { resetProgress: true, status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
                 startProcessingPoll(docId);
                 await new Promise(function (resolve) {
                     function check() {
@@ -1397,12 +1510,12 @@ function initializeUploadForm() {
                 reloadDocumentsGrid();
                 setTimeout(function() { hideProcessingBanner(); uploadForm.dataset.uploading = '0'; uploadBtn.disabled = false; }, 2000);
                 } else {
-                    uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + ((t && t.error) || result.error || 'Unknown error');
+                    uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + ((t && t.error) || uploadResult.error || 'Unknown error');
                     hideProcessingBanner();
                     uploadForm.dataset.uploading = '0';
                     uploadBtn.disabled = false;
                 }
-            } else if (result.success) {
+            } else if (uploadResult.success) {
                 uploadStatus.textContent = cfg.t.upload_complete_635c737d;
                 progressBar.style.width = '100%';
                 closeUploadModal();
@@ -1414,7 +1527,7 @@ function initializeUploadForm() {
                 }, 1500);
             } else {
                 progressBar.style.width = '100%';
-                uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + (result.error || 'Unknown error');
+                uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + (uploadResult.error || 'Unknown error');
                 uploadForm.dataset.uploading = '0';
                 uploadBtn.disabled = false;
             }
@@ -4169,7 +4282,7 @@ async function reprocessDocument(id) {
         // Optimistically update the row UI immediately (spinner in Actions, status badge updates on poll)
         updateDocumentInGrid(id, { processing_status: 'pending', processing_error: '' });
         const requestTs = Date.now();
-        updateTrackedProcessingDoc(id, { status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0, reprocessRequestedAt: requestTs, seenNonCompletedSinceRequest: false });
+        updateTrackedProcessingDoc(id, { resetProgress: true, status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0, reprocessRequestedAt: requestTs, seenNonCompletedSinceRequest: false });
         showProcessingBanner(cfg.t.reprocessing_started_5259d906, cfg.t.preparing_0862f67f, 0);
         startProcessingPoll(id);
 
@@ -4183,10 +4296,8 @@ async function reprocessDocument(id) {
 
             const result = await response.json();
 
-            if (result.success) {
-                // Do not force-complete here; rely on status polling to reflect the real state.
-                // (Some environments process synchronously, others may be async.)
-                // We keep polling until we see completed/failed.
+            if (response.status === 202 || result.success) {
+                // Background reprocess started; status polling reflects DB truth.
             } else {
                 updateDocumentInGrid(id, { processing_status: 'failed', processing_error: result.error || '' });
                 updateTrackedProcessingDoc(id, { status: 'failed', stage: 'Failed', progress: 100, error: result.error || '' });
@@ -4199,15 +4310,7 @@ async function reprocessDocument(id) {
                 }
             }
         } catch (error) {
-            updateDocumentInGrid(id, { processing_status: 'failed', processing_error: error.message || '' });
-            updateTrackedProcessingDoc(id, { status: 'failed', stage: 'Failed', progress: 100, error: error.message || '' });
-            stopProcessingPoll(id);
-            if (window.showAlert) {
-                window.showAlert(cfg.t.error_3d9f514d + ' ' + error.message, 'error');
-            } else {
-                if (window.showAlert) window.showAlert(cfg.t.error_3d9f514d + ' ' + error.message, 'error');
-                else console.error(error.message);
-            }
+            console.error('Reprocess request error (polling continues):', error);
         }
     };
 

@@ -8,11 +8,9 @@ import re
 import requests
 import json
 import base64
-import threading
 import uuid
 import time
 from typing import Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import request, current_app, g
 from flask_login import current_user
 from sqlalchemy import or_
@@ -46,6 +44,7 @@ from .helpers import (
     _download_ifrc_document,
     _summarize_processing_error,
 )
+from app.services.ai.ai_job_runner import job_cancel_requested, run_ai_job, signal_job_cancel
 from .upload import _process_document_sync, _run_import_process_in_thread
 
 logger = logging.getLogger(__name__)
@@ -147,30 +146,11 @@ def _ifrc_display_country_name(
     return stripped or raw
 
 
-_IMPORT_JOB_CANCEL_EVENTS: Dict[str, threading.Event] = {}
-_IMPORT_JOB_CANCEL_LOCK = threading.Lock()
-
-
-def _get_import_job_cancel_event(job_id: str) -> threading.Event:
-    with _IMPORT_JOB_CANCEL_LOCK:
-        ev = _IMPORT_JOB_CANCEL_EVENTS.get(job_id)
-        if ev is None:
-            ev = threading.Event()
-            _IMPORT_JOB_CANCEL_EVENTS[job_id] = ev
-        return ev
-
-
-def _clear_import_job_cancel_event(job_id: str) -> None:
-    with _IMPORT_JOB_CANCEL_LOCK:
-        _IMPORT_JOB_CANCEL_EVENTS.pop(job_id, None)
-
-
 def _process_ifrc_job_item_sync(app, *, job_id: str, item_id: int) -> None:
     """
     Sync processing for one IFRC import job item.
     """
     with app.app_context():
-        cancel_ev = _get_import_job_cancel_event(job_id)
         item = AIJobItem.query.get(int(item_id))
         if not item:
             return
@@ -178,7 +158,7 @@ def _process_ifrc_job_item_sync(app, *, job_id: str, item_id: int) -> None:
         job = AIJob.query.get(str(job_id))
         job_user_id = int(job.user_id) if job and job.user_id else None
 
-        if cancel_ev.is_set():
+        if job_cancel_requested(job_id):
             item.status = "cancelled"
             item.error = None
             db.session.commit()
@@ -206,7 +186,7 @@ def _process_ifrc_job_item_sync(app, *, job_id: str, item_id: int) -> None:
             _time.sleep(0)
             temp_path, filename, file_size, content_hash, file_type = _download_ifrc_document(url)
 
-            if cancel_ev.is_set():
+            if job_cancel_requested(job_id):
                 item = AIJobItem.query.get(int(item_id))
                 if item:
                     item.status = "cancelled"
@@ -369,73 +349,14 @@ def _process_ifrc_job_item_sync(app, *, job_id: str, item_id: int) -> None:
 
 def _run_ifrc_bulk_import_job(app, job_id: str) -> None:
     """Background runner for IFRC bulk import jobs."""
-    with app.app_context():
-        job = AIJob.query.get(str(job_id))
-        if not job:
-            return
-        if job.status in ("completed", "failed", "cancelled"):
-            return
-        job.status = "running"
-        job.started_at = utcnow()
-        db.session.commit()
-        logger.info("Bulk IFRC import job running: job=%s total_items=%s", job_id, int(job.total_items or 0))
-
-    cancel_ev = _get_import_job_cancel_event(job_id)
-    try:
-        with app.app_context():
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            concurrency = int((job.meta or {}).get("concurrency") or current_app.config.get("AI_DOCS_IFRC_IMPORT_CONCURRENCY", 2))
-            concurrency = max(1, min(concurrency, 4))
-            item_ids = [it.id for it in (job.items or []) if (it.status or "queued") == "queued"]
-
-        with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            futures = []
-            for item_id in item_ids:
-                if cancel_ev.is_set():
-                    break
-                futures.append(pool.submit(_process_ifrc_job_item_sync, app, job_id=job_id, item_id=int(item_id)))
-                import time as _time_job
-                _time_job.sleep(0.5)
-
-            for _f in as_completed(futures):
-                if cancel_ev.is_set():
-                    continue
-
-        with app.app_context():
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            if cancel_ev.is_set() or job.status == "cancel_requested":
-                try:
-                    for it in (job.items or []):
-                        if it.status == "queued":
-                            it.status = "cancelled"
-                            it.error = None
-                    db.session.commit()
-                except Exception as e:
-                    logger.debug("cancel job items commit failed: %s", e)
-                    db.session.rollback()
-                job.status = "cancelled"
-            else:
-                terminal = {"completed", "failed", "cancelled"}
-                all_terminal = all((it.status in terminal) for it in (job.items or []))
-                job.status = "completed" if all_terminal else "failed"
-            job.finished_at = utcnow()
-            db.session.commit()
-            logger.info("Bulk IFRC import job finished: job=%s status=%s", job_id, job.status)
-    except Exception as e:
-        logger.error("Bulk IFRC import job failed: job=%s err=%s", job_id, e, exc_info=True)
-        with app.app_context():
-            job = AIJob.query.get(str(job_id))
-            if job:
-                job.status = "failed"
-                job.error = "Processing failed."
-                job.finished_at = utcnow()
-                db.session.commit()
-    finally:
-        _clear_import_job_cancel_event(job_id)
+    run_ai_job(
+        app,
+        job_id,
+        _process_ifrc_job_item_sync,
+        concurrency_config_keys=("AI_DOCS_IFRC_IMPORT_CONCURRENCY",),
+        default_concurrency=2,
+        stagger_seconds=0.5,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1140,7 +1061,7 @@ def import_ifrc_bulk_cancel(job_id: str):
             logger.debug("bulk cancel items update failed: %s", e)
             db.session.rollback()
         db.session.commit()
-        _get_import_job_cancel_event(str(job_id)).set()
+        signal_job_cancel(str(job_id))
         return json_ok(status="cancel_requested")
     except Exception as e:
         logger.error("Bulk IFRC import cancel error: %s", e, exc_info=True)

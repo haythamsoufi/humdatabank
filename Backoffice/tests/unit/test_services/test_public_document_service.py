@@ -8,9 +8,11 @@ from app.services.public_document_service import (
     PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS,
     PUBLIC_DOC_MAX_CONTENT_CHARS,
     _build_search_filters,
+    _document_type_key,
     _extract_year,
     _public_document_link_fields,
     _should_prioritize_latest_per_country,
+    catalog_public_documents,
     filter_rows_to_public_documents,
     list_public_documents_in_scope,
     prioritize_latest_documents_per_country,
@@ -585,3 +587,178 @@ class TestSearchPublicDocuments:
 
         assert resp.status_code == 200
         assert resp.get_json()["coverage_mode"] == "full"
+
+
+@pytest.mark.unit
+class TestCatalogPublicDocuments:
+    def _doc(
+        self,
+        db_session,
+        *,
+        title,
+        filename,
+        is_public=True,
+        searchable=True,
+        status=None,
+        country_name=None,
+        document_date=None,
+    ):
+        doc = AIDocument(
+            title=title,
+            filename=filename,
+            file_type="pdf",
+            is_public=is_public,
+            searchable=searchable,
+            processing_status=status or AIDocumentProcessingStatusValue.completed.value,
+            country_name=country_name,
+            document_date=document_date,
+        )
+        db_session.add(doc)
+        db_session.commit()
+        db_session.refresh(doc)
+        return doc
+
+    def test_rejects_unknown_document_type(self, app):
+        with app.app_context():
+            with pytest.raises(ValueError, match="Unknown document_type"):
+                catalog_public_documents(document_type="not_a_real_type")
+
+    def test_excludes_private_non_searchable_and_pending_documents(self, app, db_session):
+        """Security: only is_public + searchable + completed documents may be counted —
+        same visibility scope as search_public_documents, verified independently here."""
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 3, 1),
+            )
+            self._doc(
+                db_session,
+                title="Nepal Annual Report 2024",
+                filename="nepal_ar_2024.pdf",
+                is_public=False,
+                country_name="Nepal",
+                document_date=datetime.date(2024, 3, 1),
+            )
+            self._doc(
+                db_session,
+                title="Chad Annual Report 2024",
+                filename="chad_ar_2024.pdf",
+                searchable=False,
+                country_name="Chad",
+                document_date=datetime.date(2024, 3, 1),
+            )
+            self._doc(
+                db_session,
+                title="Peru Annual Report 2024",
+                filename="peru_ar_2024.pdf",
+                status=AIDocumentProcessingStatusValue.pending.value,
+                country_name="Peru",
+                document_date=datetime.date(2024, 3, 1),
+            )
+
+            out = catalog_public_documents(document_type="annual_report")
+
+        assert out["total_documents"] == 1
+        assert out["countries_count"] == 1
+        assert out["visibility"] == "public_only"
+        assert [c["country"] for c in out["by_country"]] == ["Kenya"]
+
+    def test_filters_by_year_and_omitting_year_gives_breakdown(self, app, db_session):
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2023",
+                filename="kenya_ar_2023.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2023, 3, 1),
+            )
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 3, 1),
+            )
+
+            scoped = catalog_public_documents(document_type="annual_report", year=2024)
+            all_years = catalog_public_documents(document_type="annual_report")
+
+        assert scoped["total_documents"] == 1
+        assert scoped["by_year"] == [{"year": 2024, "document_count": 1, "countries_count": 1}]
+
+        assert all_years["total_documents"] == 2
+        # Newest year first.
+        assert [b["year"] for b in all_years["by_year"]] == [2024, 2023]
+
+    def test_all_types_when_document_type_omitted(self, app, db_session):
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 1, 1),
+            )
+            self._doc(
+                db_session,
+                title="Nepal Unified Plan 2026",
+                filename="nepal_upl_2026.pdf",
+                country_name="Nepal",
+                document_date=datetime.date(2026, 1, 1),
+            )
+
+            out = catalog_public_documents()
+
+        assert out["total_documents"] == 2
+        assert out["by_type"] == {"annual_report": 1, "unified_plan": 1}
+
+    def test_country_name_filter_scopes_results(self, app, db_session):
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 1, 1),
+            )
+            self._doc(
+                db_session,
+                title="Nepal Annual Report 2024",
+                filename="nepal_ar_2024.pdf",
+                country_name="Nepal",
+                document_date=datetime.date(2024, 1, 1),
+            )
+
+            out = catalog_public_documents(document_type="annual_report", country_name="Kenya")
+
+        assert out["total_documents"] == 1
+        assert out["by_country"][0]["country"] == "Kenya"
+
+    def test_include_documents_false_keeps_counts_but_drops_listing(self, app, db_session):
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 1, 1),
+            )
+
+            out = catalog_public_documents(document_type="annual_report", include_documents=False)
+
+        assert out["total_documents"] == 1
+        assert out["by_country"][0]["documents"] == []
+        assert any("include_documents=false" in note for note in out["notes"])
+
+    def test_document_type_key_detects_annual_report_and_unified_plan(self, app, db_session):
+        with app.app_context():
+            ar = self._doc(db_session, title="Kenya Annual Report 2024", filename="kenya_ar.pdf")
+            upl = self._doc(db_session, title="Syria Unified Plan 2026", filename="syria_upl.pdf")
+            other = self._doc(db_session, title="Random Briefing Note", filename="brief.pdf")
+
+        assert _document_type_key(ar, "") == "annual_report"
+        assert _document_type_key(upl, "") == "unified_plan"
+        assert _document_type_key(other, "") == "other"

@@ -10,6 +10,8 @@ $ErrorActionPreference = 'Stop'
 
 $target = Resolve-AzureWebAppEnvironment -Name $Environment
 
+# Called bare (not `$exitCode = ...`) so the downloaded file's contents print to the
+# real console instead of being captured. See Use-AzureWebAppTunnel for why.
 Use-AzureWebAppTunnel `
     -WebApp $target.WebApp `
     -ResourceGroup $target.ResourceGroup `
@@ -18,12 +20,10 @@ Use-AzureWebAppTunnel `
     -LogPrefix 'azure_webapp_download' `
     -Action {
         param($Ctx)
-        $pscp = $Ctx.PscpPath
-        if (-not $pscp) { throw 'pscp not found' }
         if (Test-Path $LocalPath) { Remove-Item $LocalPath -Force }
-        & $pscp -batch -hostkey $Ctx.HostKey -P $Ctx.Port -pw $Ctx.Password "root@127.0.0.1:$RemotePath" $LocalPath
-        if ($LASTEXITCODE -ne 0) { throw "pscp download failed ($LASTEXITCODE)" }
+        Receive-AzureWebAppRemoteFile -RemotePath $RemotePath -LocalPath $LocalPath -LocalPort $Ctx.Port
         Write-Host "Downloaded to $LocalPath"
         if (Test-Path $LocalPath) { Get-Content $LocalPath }
-        return 0
     }
+
+exit $LASTEXITCODE

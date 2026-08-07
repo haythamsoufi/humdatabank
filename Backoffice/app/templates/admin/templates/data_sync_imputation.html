@@ -470,6 +470,8 @@
   </div>
 </div>
 
+<script type="application/json" id="data-sync-active-jobs">{{ (active_fdrs_jobs or [])|tojson }}</script>
+
 <script nonce="{{ csp_nonce() }}">
 // Flash message function (uses centralized FlashMessages.addSafe from core layout)
 function showSaveMessage(message, type = 'success') {
@@ -1450,8 +1452,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const DATA_SYNC_POLL_INITIAL_MS = 2000;
     const DATA_SYNC_POLL_MAX_MS = 5000;
     const DATA_SYNC_POLL_BACKOFF_FACTOR = 1.5;
+    const DATA_SYNC_STORAGE_KEY = 'fdrs_data_sync_job_' + currentTemplateId;
     let dataSyncUIMode = 'settings';
     let dataSyncStopRequested = false;
+    let dataSyncLastPercent = 0;
+
+    function readDataSyncActiveJobs() {
+        const el = document.getElementById('data-sync-active-jobs');
+        if (!el) return [];
+        try {
+            return JSON.parse(el.textContent || '[]') || [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writeDataSyncStorage(jobId) {
+        try {
+            localStorage.setItem(DATA_SYNC_STORAGE_KEY, JSON.stringify({ jobId: jobId }));
+        } catch (e) { /* ignore */ }
+    }
+
+    function clearDataSyncStorage() {
+        try {
+            localStorage.removeItem(DATA_SYNC_STORAGE_KEY);
+        } catch (e) { /* ignore */ }
+    }
 
     function updateDataSyncUrlTemplates(templateId) {
         dataSyncStatusUrlTemplate = templateApiUrl(TEMPLATE_API_URLS.dataSyncStatus, templateId);
@@ -1610,14 +1636,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (dataSyncProgressText) dataSyncProgressText.textContent = '0%';
         if (dataSyncProgressCount) dataSyncProgressCount.textContent = '';
         if (dataSyncConfigSummaryBody) dataSyncConfigSummaryBody.innerHTML = '';
+        dataSyncLastPercent = 0;
         stopDataSyncPolling();
         resetDataSyncRunButton();
         resetDataSyncStopButton();
         setDataSyncUIMode('settings');
     }
 
-    function setDataSyncProgress(percent, stage, message, current, total) {
-        const pct = Math.max(0, Math.min(100, Number(percent || 0)));
+    function setDataSyncProgress(percent, stage, message, current, total, opts) {
+        opts = opts || {};
+        if (opts.resetProgress) {
+            dataSyncLastPercent = 0;
+        }
+        const raw = Math.max(0, Math.min(100, Number(percent || 0)));
+        const pct = opts.resetProgress ? raw : Math.max(dataSyncLastPercent, raw);
+        dataSyncLastPercent = pct;
         if (dataSyncProgressBar) dataSyncProgressBar.style.width = pct + '%';
         if (dataSyncProgressText) dataSyncProgressText.textContent = `${Math.round(pct)}%`;
         if (dataSyncProgressStage) {
@@ -1649,6 +1682,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (job.status === 'completed') {
                     stopDataSyncPolling();
+                    clearDataSyncStorage();
                     dataSyncResult.classList.remove('hidden');
                     const stats = job.stats || {};
                     let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Errors: ${stats.errors || 0}`;
@@ -1665,6 +1699,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (job.status === 'failed') {
                     stopDataSyncPolling();
+                    clearDataSyncStorage();
                     dataSyncResult.classList.remove('hidden');
                     dataSyncResultText.textContent = job.error || {{ _("Sync failed")|tojson|safe }};
                     dataSyncResultText.className = 'text-sm text-red-700';
@@ -1673,6 +1708,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 if (job.status === 'cancelled') {
                     stopDataSyncPolling();
+                    clearDataSyncStorage();
                     dataSyncResult.classList.remove('hidden');
                     dataSyncResultText.textContent = job.error || {{ _("Sync cancelled.")|tojson|safe }};
                     dataSyncResultText.className = 'text-sm text-amber-700';
@@ -1800,7 +1836,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderDataSyncConfigSummary(params);
             setDataSyncUIMode('running');
             if (dataSyncProgress) dataSyncProgress.classList.remove('hidden');
-            setDataSyncProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null);
+            setDataSyncProgress(0, 'starting', {{ _("Starting...")|tojson|safe }}, 0, null, { resetProgress: true });
             dataSyncRunBtn.disabled = true;
             dataSyncRunBtnText.textContent = {{ _("Running...")|tojson|safe }};
             dataSyncRunBtn.insertAdjacentHTML('afterbegin', '<i class="fas fa-spinner fa-spin mr-2"></i>');
@@ -1836,6 +1872,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(data.error || {{ _("Sync failed")|tojson|safe }});
                 }
                 dataSyncActiveJobId = data.job_id;
+                writeDataSyncStorage(data.job_id);
                 dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
                 pollDataSyncStatus();
             })
@@ -1847,6 +1884,34 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    function resumeDataSyncJobIfNeeded() {
+        let jobId = null;
+        const serverJobs = readDataSyncActiveJobs().filter(function (j) { return j && j.job_id; });
+        if (serverJobs.length) {
+            jobId = serverJobs[0].job_id;
+        } else {
+            try {
+                const stored = JSON.parse(localStorage.getItem(DATA_SYNC_STORAGE_KEY) || 'null');
+                if (stored && stored.jobId) {
+                    jobId = stored.jobId;
+                }
+            } catch (e) { /* ignore */ }
+        }
+        if (!jobId || !dataSyncModal) return;
+
+        dataSyncActiveJobId = jobId;
+        writeDataSyncStorage(jobId);
+        dataSyncModal.classList.remove('hidden');
+        dataSyncModal.classList.add('flex');
+        setDataSyncUIMode('running');
+        if (dataSyncProgress) dataSyncProgress.classList.remove('hidden');
+        setDataSyncProgress(0, 'resuming', {{ _("Resuming sync...")|tojson|safe }}, 0, null, { resetProgress: true });
+        dataSyncPollDelayMs = DATA_SYNC_POLL_INITIAL_MS;
+        pollDataSyncStatus();
+    }
+
+    resumeDataSyncJobIfNeeded();
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function() {

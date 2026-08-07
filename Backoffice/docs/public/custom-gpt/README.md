@@ -11,7 +11,7 @@ Canonical files for the shareable ChatGPT Custom GPT:
 | This README | Maintainer notes only |
 | [`../../../humanitarian-databank-mcp/README.md`](../../../humanitarian-databank-mcp/README.md) | **MCP connector** (Claude/Cursor; same tools as Actions) |
 
-ChatGPT caps the **Instructions** field at **8000 characters**. The full [`instructions.md`](instructions.md) is ~11.8k chars — use the hybrid setup below, not a full paste.
+ChatGPT caps the **Instructions** field at **8000 characters**. The full [`instructions.md`](instructions.md) is ~20k chars — use the hybrid setup below, not a full paste.
 
 **Live GPT (production):** [IFRC Network Databank](https://chatgpt.com/g/g-6a7217c375ac81919b0913bdd4ef15b6-ifrc-network-databank)  
 **Short link:** `https://databank.ifrc.org/gpt` (redirects to the GPT after Backoffice deploy)  
@@ -27,10 +27,18 @@ Update these files whenever you change public integration endpoints under `/api/
 2. **Schema limits:** ChatGPT rejects operation `description` fields longer than **300 characters** — keep [`openapi.yaml`](openapi.yaml) concise (details belong in [`instructions.md`](instructions.md)).
 3. **Action payload limit:** request and response bodies must stay under **~100,000 characters** each or ChatGPT returns `ResponseTooLargeError`. Use `full_coverage=true` with `page`/`per_page` for cross-country document queries; keep `top_k≤12` for non–full-coverage search.
 4. **Authentication:** None (public endpoints only).
-5. **Instructions:** paste [`instructions-core.md`](instructions-core.md) (~2.5k chars).
-6. **Knowledge:** upload [`instructions.md`](instructions.md) as a reference file (full workflows).
+5. **Instructions:** paste [`instructions-core.md`](instructions-core.md) (~7.3k chars, stay under 8000).
+6. **Knowledge:** upload [`instructions.md`](instructions.md) as a reference file (full workflows). The file includes rules **not** to cite it in user answers — refresh Instructions + Knowledge together after edits.
 7. **Description & starters:** copy from [`profile.md`](profile.md).
 8. **Privacy policy:** `https://databank.ifrc.org/privacy`.
+
+### GPT cites `instructions.md` as a source
+
+ChatGPT can treat uploaded **Knowledge** as citable material. If the live GPT lists `instructions.md` (or “knowledge file”) in a **Sources** block:
+
+1. Re-paste [`instructions-core.md`](instructions-core.md) into **Instructions** (includes **Sources (strict)**).
+2. Re-upload [`instructions.md`](instructions.md) to **Knowledge** (top banner + **Sources users may see**).
+3. Optional: rename the upload in the GPT editor to something like `databank-operator-guide` (filename alone does not fix behavior; the content rules do).
 
 ## Related repo docs
 

@@ -11,7 +11,6 @@ import os
 import sys
 import threading
 import time
-import uuid
 import logging
 import openpyxl
 import re
@@ -26,15 +25,18 @@ from app.utils.request_utils import get_json_or_form, is_json_request
 from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_accepted, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.services.imports.async_import_job_store import (
-    FDRS_DATA_SYNC_JOB_TYPE,
-    create_import_job,
     cleanup_expired_import_jobs,
-    clear_import_job_logging_state,
     get_import_job,
-    get_import_job_logging_state,
-    is_import_job_cancel_requested,
-    request_import_job_cancel,
     update_import_job,
+)
+from app.services.imports.fdrs_data_sync_job import (
+    build_fdrs_data_sync_status_payload,
+    create_fdrs_data_sync_job,
+    ensure_fdrs_data_sync_job_running,
+    get_active_fdrs_data_sync_jobs_for_user,
+    request_fdrs_data_sync_cancel,
+    start_fdrs_data_sync_job,
+    _run_fdrs_data_sync_job,
 )
 bp = Blueprint("data_sync_imputation", __name__, url_prefix="/admin/templates/data-sync")
 
@@ -53,44 +55,25 @@ def _country_by_aes_id_for_assignments(assignments):
 
 
 # ----------------------------------
-# Data sync cancel signals (per-worker thread events)
+# Data sync job cleanup (PostgreSQL-backed via async_import_job_store)
 # ----------------------------------
 _DATA_SYNC_LOCK = threading.Lock()
+# Legacy in-process cancel events — still used by UPR Excel import until migrated.
 _DATA_SYNC_CANCEL_EVENTS: Dict[str, threading.Event] = {}
-_DATA_SYNC_STALE_SECONDS = 15 * 60
 
 
-def _reconcile_stale_data_sync_job(job_id: str) -> None:
-    """Mark long-idle running jobs as failed/cancelled (worker recycle orphan recovery)."""
-    job = get_import_job(job_id)
-    if not job:
-        return
-    status = job.get("status")
-    if status not in ("running", "cancel_requested"):
-        return
-    updated_ts = job.get("updated_ts")
-    if updated_ts is None:
-        return
-    if time.time() - float(updated_ts) <= _DATA_SYNC_STALE_SECONDS:
-        return
-    if status == "cancel_requested":
-        update_import_job(
-            job_id,
-            force=True,
-            status="cancelled",
-            stage="cancelled",
-            message="Cancelled",
-            error="Sync cancelled by user.",
-        )
-        return
-    update_import_job(
-        job_id,
-        force=True,
-        status="failed",
-        stage="failed",
-        message="Stopped",
-        error="The sync worker stopped responding (likely after an app restart). Re-run the sync.",
-    )
+def _get_data_sync_cancel_event(job_id: str) -> threading.Event:
+    with _DATA_SYNC_LOCK:
+        ev = _DATA_SYNC_CANCEL_EVENTS.get(job_id)
+        if ev is None:
+            ev = threading.Event()
+            _DATA_SYNC_CANCEL_EVENTS[job_id] = ev
+        return ev
+
+
+def _clear_data_sync_cancel_event(job_id: str) -> None:
+    with _DATA_SYNC_LOCK:
+        _DATA_SYNC_CANCEL_EVENTS.pop(job_id, None)
 
 
 def _cleanup_data_sync_jobs_locked(now_ts: Optional[float] = None) -> None:
@@ -136,20 +119,6 @@ def _parse_reported_import_states(data: Dict[str, Any]) -> Optional[List[int]]:
             % (", ".join(str(x) for x in sorted(set(bad))),)
         )
     return out
-
-
-def _get_data_sync_cancel_event(job_id: str) -> threading.Event:
-    with _DATA_SYNC_LOCK:
-        ev = _DATA_SYNC_CANCEL_EVENTS.get(job_id)
-        if ev is None:
-            ev = threading.Event()
-            _DATA_SYNC_CANCEL_EVENTS[job_id] = ev
-        return ev
-
-
-def _clear_data_sync_cancel_event(job_id: str) -> None:
-    with _DATA_SYNC_LOCK:
-        _DATA_SYNC_CANCEL_EVENTS.pop(job_id, None)
 
 
 def _published_sections_query(template: FormTemplate):
@@ -342,6 +311,19 @@ def render_data_sync_imputation_page(template_id: int):
     accessible_templates = _accessible_templates_for_user(current_user)
     fdrs_years_start, fdrs_years_end = _fdrs_default_years_bounds()
 
+    active_fdrs_jobs: List[Dict[str, Any]] = []
+    user_id = int(getattr(current_user, "id", 0) or 0)
+    if user_id:
+        active_fdrs_jobs = get_active_fdrs_data_sync_jobs_for_user(
+            user_id,
+            template_id=template_id,
+        )
+        worker_app = current_app._get_current_object()
+        for active in active_fdrs_jobs:
+            jid = active.get("job_id")
+            if jid:
+                ensure_fdrs_data_sync_job_running(worker_app, str(jid))
+
     return render_template(
         "admin/templates/data_sync_imputation.html",
         template=template,
@@ -352,6 +334,7 @@ def render_data_sync_imputation_page(template_id: int):
         accessible_templates=accessible_templates,
         fdrs_years_start=fdrs_years_start,
         fdrs_years_end=fdrs_years_end,
+        active_fdrs_jobs=active_fdrs_jobs,
     )
 
 
@@ -1324,208 +1307,31 @@ def run_data_sync(template_id: int):
             tmp.close()
             preview_path = tmp.name
 
-        # Async mode: run in background and expose progress via polling endpoint.
+        # Async mode: run in background via ai_job_runner and expose progress via polling.
         if async_mode:
-            job_id = uuid.uuid4().hex
             sync_user_id = int(getattr(current_user, "id", 0) or 0) or None
             with _DATA_SYNC_LOCK:
                 _cleanup_data_sync_jobs_locked(time.time())
-            create_import_job(
-                job_id=job_id,
-                job_type=FDRS_DATA_SYNC_JOB_TYPE,
+
+            job_id = create_fdrs_data_sync_job(
                 user_id=int(getattr(current_user, "id", 0) or 0),
-                initial={
-                    "template_id": template_id,
-                    "status": "queued",
-                    "stage": "queued",
-                    "message": "Queued",
-                    "current": 0,
-                    "total": None,
-                    "percent": 0.0,
-                    "stats": None,
-                    "error": None,
-                    "preview_path": preview_path,
-                    "download_ready": False,
-                    "last_logged_pct": None,
-                },
+                template_id=template_id,
+                dry_run=dry_run,
+                batch_size=batch_size,
+                fdrs_years=fdrs_years,
+                test_limit=test_limit,
+                imputed_use_cache=imputed_use_cache,
+                sync_documents=sync_documents,
+                fdrs_reported_import_states=fdrs_reported_import_states,
+                preview_path=preview_path,
+                sync_user_id=sync_user_id,
             )
 
             worker_app = current_app._get_current_object()
-
-            def _run_job(app=worker_app) -> None:
-                log = logging.getLogger(__name__)
-                cancel_ev = _get_data_sync_cancel_event(job_id)
-                last_cancel_db_check = 0.0
-
-                def _progress_cb(payload: Dict[str, Any]) -> None:
-                    stage = payload.get("stage") or ""
-                    pct = payload.get("percent")
-                    msg = payload.get("message") or ""
-                    existing = get_import_job(job_id) or {}
-                    if stage.startswith(("documents", "assignment_status")):
-                        current = payload.get("current")
-                        total = payload.get("total")
-                    else:
-                        current = payload.get("current") if payload.get("current") is not None else existing.get("current")
-                        total = payload.get("total") if payload.get("total") is not None else existing.get("total")
-                    update_import_job(
-                        job_id,
-                        status="running",
-                        stage=payload.get("stage") or existing.get("stage"),
-                        message=payload.get("message") or existing.get("message"),
-                        current=current,
-                        total=total,
-                        percent=float(payload.get("percent") or existing.get("percent") or 0.0),
-                        stats=payload.get("stats") if payload.get("stats") is not None else existing.get("stats"),
-                    )
-
-                    try:
-                        pct_f = float(pct) if pct is not None else None
-                    except Exception:
-                        pct_f = None
-                    log_state = get_import_job_logging_state(job_id)
-                    last_logged = log_state.get("last_logged_pct")
-                    should_log = (
-                        stage
-                        in (
-                            "documents_plan",
-                            "documents_done",
-                            "assignment_status_plan",
-                            "assignment_status_done",
-                            "complete",
-                            "failed",
-                            "cancelled",
-                        )
-                        or (stage and stage != "upsert" and not stage.endswith("_upsert"))
-                        or (
-                            pct_f is not None
-                            and (last_logged is None or abs(pct_f - float(last_logged)) >= 5.0)
-                        )
-                    )
-                    if should_log and pct_f is not None:
-                        log_state["last_logged_pct"] = pct_f
-                        update_import_job(job_id, last_logged_pct=pct_f)
-                    if should_log:
-                        app.logger.info(
-                            "Data sync %s: %s %s%% %s",
-                            job_id,
-                            stage or "-",
-                            f"{pct_f:.1f}" if pct_f is not None else "-",
-                            msg,
-                        )
-
-                def _cancel_check() -> bool:
-                    nonlocal last_cancel_db_check
-                    if cancel_ev.is_set():
-                        return True
-                    now = time.time()
-                    if now - last_cancel_db_check >= 1.0:
-                        last_cancel_db_check = now
-                        if is_import_job_cancel_requested(job_id):
-                            cancel_ev.set()
-                            return True
-                    return False
-
-                with app.app_context():
-                    update_import_job(
-                        job_id,
-                        force=True,
-                        status="running",
-                        stage="starting",
-                        message="Starting...",
-                        worker_pid=os.getpid(),
-                    )
-                    app.logger.info(
-                        "Data sync %s: starting (template_id=%s, dry_run=%s, test=%s, sync_documents=%s)",
-                        job_id,
-                        template_id,
-                        dry_run,
-                        test_mode,
-                        sync_documents,
-                    )
-
-                    try:
-                        from import_fdrs_form_data import FdrsSyncCancelled
-
-                        stats = run_import(
-                            input_path=None,
-                            fdrs_api_url=None,
-                            fdrs_from_data_api=True,
-                            fdrs_data_api_base=None,
-                            fdrs_data_api_key=None,
-                            fdrs_imputed_url=None,
-                            fdrs_imputed_from_api=False,
-                            fdrs_imputed_kpi_codes_path=None,
-                            fdrs_imputed_use_cache=imputed_use_cache,
-                            fdrs_years=fdrs_years,
-                            fdrs_reported_import_states=fdrs_reported_import_states,
-                            indicator_mapping_path=None,
-                            indicator_bank_api_base=None,
-                            indicator_bank_api_key=None,
-                            databank_base_url=None,
-                            databank_api_key=None,
-                            preview_excel_path=preview_path if dry_run else None,
-                            test_limit=test_limit,
-                            dry_run=dry_run,
-                            batch_size=batch_size,
-                            template_id=template_id,
-                            progress_cb=_progress_cb,
-                            cancel_check=_cancel_check,
-                            sync_user_id=sync_user_id,
-                            sync_documents=sync_documents,
-                        )
-                        update_import_job(
-                            job_id,
-                            force=True,
-                            status="completed",
-                            stage="complete",
-                            message="Completed",
-                            percent=100.0,
-                            stats=dict(stats or {}),
-                            download_ready=bool(dry_run and preview_path and os.path.isfile(preview_path)),
-                        )
-                        app.logger.info(
-                            "Data sync %s: completed loaded=%s skipped=%s inserted=%s updated=%s errors=%s",
-                            job_id,
-                            stats.get("loaded"),
-                            stats.get("skipped"),
-                            stats.get("inserted"),
-                            stats.get("updated"),
-                            stats.get("errors"),
-                        )
-                    except FdrsSyncCancelled:
-                        update_import_job(
-                            job_id,
-                            force=True,
-                            status="cancelled",
-                            stage="cancelled",
-                            message="Cancelled",
-                            error="Sync cancelled by user.",
-                        )
-                        app.logger.info("Data sync %s: cancelled", job_id)
-                    except Exception as e:
-                        log.exception("Async data sync job failed: %s", e)
-                        err_msg = str(e).strip() or type(e).__name__
-                        if len(err_msg) > 2000:
-                            err_msg = err_msg[:1997] + "..."
-                        update_import_job(
-                            job_id,
-                            force=True,
-                            status="failed",
-                            stage="failed",
-                            message="Failed",
-                            error=err_msg,
-                        )
-                        app.logger.error("Data sync %s: failed: %s", job_id, e, exc_info=True)
-                    finally:
-                        _clear_data_sync_cancel_event(job_id)
-                        clear_import_job_logging_state(job_id)
-                        db.session.remove()
-
             if current_app.config.get("TESTING"):
-                _run_job(worker_app)
+                _run_fdrs_data_sync_job(worker_app, job_id)
             else:
-                threading.Thread(target=_run_job, args=(worker_app,), daemon=True).start()
+                start_fdrs_data_sync_job(worker_app, job_id)
             return json_accepted(job_id=job_id)
 
         stats = run_import(
@@ -1602,34 +1408,25 @@ def data_sync_status(template_id: int, job_id: str):
     """Poll data sync job status (for live UI progress)."""
     with _DATA_SYNC_LOCK:
         _cleanup_data_sync_jobs_locked(time.time())
+
     job = get_import_job(job_id)
     if not job or int(job.get("template_id") or 0) != int(template_id):
         return json_not_found("Job not found")
     if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
         return json_forbidden("Access denied")
 
-    _reconcile_stale_data_sync_job(job_id)
-    job = get_import_job(job_id) or job
+    ensure_fdrs_data_sync_job_running(current_app._get_current_object(), job_id)
+    job_payload = build_fdrs_data_sync_status_payload(job_id, template_id)
+    if not job_payload:
+        return json_not_found("Job not found")
 
-    resp = {
-        "success": True,
-        "job": {
-            "job_id": job_id,
-            "status": job.get("status"),
-            "stage": job.get("stage"),
-            "message": job.get("message"),
-            "current": job.get("current"),
-            "total": job.get("total"),
-            "percent": job.get("percent"),
-            "stats": job.get("stats"),
-            "error": job.get("error"),
-            "started_at": job.get("started_at"),
-            "updated_at": job.get("updated_at"),
-            "download_ready": bool(job.get("download_ready")),
-        },
-    }
+    resp = {"success": True, "job": job_payload}
     if resp["job"]["download_ready"]:
-        resp["job"]["download_url"] = url_for("data_sync_imputation.data_sync_download", template_id=template_id, job_id=job_id)
+        resp["job"]["download_url"] = url_for(
+            "data_sync_imputation.data_sync_download",
+            template_id=template_id,
+            job_id=job_id,
+        )
     return json_ok(**resp) if isinstance(resp, dict) else json_ok(data=resp)
 
 
@@ -1647,9 +1444,8 @@ def data_sync_cancel(template_id: int, job_id: str):
     if status in ("completed", "failed", "cancelled"):
         return json_ok(status=status)
 
-    request_import_job_cancel(job_id)
-    _get_data_sync_cancel_event(job_id).set()
-    return json_ok(status="cancel_requested")
+    final_status = request_fdrs_data_sync_cancel(job_id)
+    return json_ok(status=final_status)
 
 
 @bp.route("/<int:template_id>/data-sync-download/<job_id>", methods=["GET"])

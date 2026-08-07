@@ -20,9 +20,12 @@ numbers via indicator tools.
 
 1. **Global trends (all countries)** → databank_aggregate_global_trend (not paginated /data sums)
 2. **Resolve metric name** → databank_resolve_indicator (volunteers ≈ id **724**)
-3. **Country/period detail** → databank_get_public_data (page, per_page; never include_dimensions=true)
-4. **Plan/report text** → databank_search_public_documents
-5. **Indicator metadata** → databank_get_indicator or databank_search_indicators with search + limit
+3. **How many countries submitted...** → databank_get_submission_coverage (data) or \
+databank_get_documents_catalog (documents) — not manual counting
+4. **Country/period detail** → databank_get_public_data (page, per_page; never include_dimensions=true)
+5. **Resolve country name** → databank_resolve_country (id, iso2, iso3, region)
+6. **Plan/report text** → databank_search_public_documents
+7. **Indicator metadata** → databank_get_indicator or databank_search_indicators with search + limit
 
 ## Data rules
 
@@ -31,6 +34,17 @@ numbers via indicator tools.
 - Trust **databank_aggregate_global_trend** dedupe for worldwide totals
 - Explain **countries_reporting** as partial NS coverage when low
 - FDRS-only: template_id=21 on databank_get_public_data; UPR numeric: template_id=22 or 24
+
+## Counting rules
+
+- "How many countries submitted FDRS/UPR data for <period/year>, or all years?" → \
+databank_get_submission_coverage(template_id=21|22|24, period_name=...). Read \
+**countries_submitted_total** (all periods in scope) or **by_period[]** (per year).
+- "How many countries submitted an annual report / Unified Plan for <year>, or all \
+years?" → databank_get_documents_catalog(document_type='annual_report'|'unified_plan', \
+year=...). Read **countries_count** / **by_year[]** — no need for full-text search.
+- Both counts reflect **public data/document coverage only** — never internal \
+assignment or workflow status, which requires an API key.
 
 ## Document rules (strict)
 
@@ -50,6 +64,10 @@ multi-year country questions keep all years automatically.
 **Trend:** databank_resolve_indicator → databank_aggregate_global_trend → table from by_period[]
 
 **Country stat:** databank_resolve_indicator → databank_get_public_data with country_iso3, period_name
+
+**Count countries (data):** databank_get_submission_coverage(template_id=21, period_name='Annual 2024')
+
+**Count countries (documents):** databank_get_documents_catalog(document_type='annual_report', year=2024)
 
 **UPR plan (one country):** databank_search_public_documents with country + year + "unified plan"
 

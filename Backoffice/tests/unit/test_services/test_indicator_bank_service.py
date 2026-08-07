@@ -57,7 +57,12 @@ class TestApiKeyDataAccess:
 
 @pytest.mark.unit
 class TestStarSchemaSerialization:
-    def test_format_fact_row_strips_disagg(self):
+    def test_format_fact_row_passes_through_disagg_and_nulls_matrix(self):
+        """format_fact_form_value_row() alone does not transform disaggregation_data —
+        that normalization (raw dict -> long array for matrix mode) happens separately
+        in _apply_star_schema_disagg_format(), applied by build_star_schema_tables().
+        ``matrix`` is always None on this row shape (see docstring); matrix cell
+        context is not broken out into separate fact rows in the star layout."""
         row = format_fact_form_value_row({
             "id": 1,
             "form_item_id": 10,
@@ -72,19 +77,32 @@ class TestStarSchemaSerialization:
             "submitted_at": "2024-01-01T00:00:00",
             "disaggregation_data": {"mode": "total", "values": {"total": 1}},
         })
-        assert "disaggregation_data" not in row
+        assert row["disaggregation_data"] == {"mode": "total", "values": {"total": 1}}
+        assert row["matrix"] is None
         assert row["form_item_id"] == 10
 
     def test_format_bridge_disagg_rows(self):
+        """Matrix mode expands into parsed row_entity_id/column_key cells plus
+        calculated row/column/grand totals (flagged is_calculated_total/total_kind),
+        keeping bridge_disagg_values a complete mirror of disaggregation_data instead
+        of a partial view keyed by the raw, unparsed composite string."""
         rows = format_bridge_disagg_rows(
             1,
             {"mode": "matrix", "values": {"10_SP2": 100, "_meta": "x"}},
             source="reported",
         )
-        assert len(rows) == 1
-        assert rows[0]["form_data_id"] == 1
-        assert rows[0]["key"] == "10_SP2"
-        assert rows[0]["value"] == 100
+        raw = [r for r in rows if not r.get("is_calculated_total")]
+        totals = [r for r in rows if r.get("is_calculated_total")]
+        assert len(raw) == 1
+        assert raw[0]["form_data_id"] == 1
+        assert raw[0]["row_entity_id"] == 10
+        assert raw[0]["column_key"] == "SP2"
+        assert raw[0]["value"] == 100
+        assert "key" not in raw[0]
+        # No matrix_config supplied: row/grand totals default to shown (grand doesn't
+        # need column defs); column totals are skipped since there are no configured
+        # column defs to sum over.
+        assert {t["total_kind"] for t in totals} == {"row", "grand"}
 
 
 @pytest.mark.unit

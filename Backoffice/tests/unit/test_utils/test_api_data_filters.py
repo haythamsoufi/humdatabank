@@ -13,6 +13,7 @@ from app.utils.api_data_filters import (
     parse_assignment_id_filters,
     parse_data_item_filters,
     parse_version_scope,
+    resolve_assignment_entity_status_fallback,
     resolve_assignment_scope,
     resolve_template_id_from_assignment_ids,
     resolve_template_published_version_id,
@@ -202,6 +203,70 @@ class TestResolveAssignmentScope:
         template_id, error = resolve_template_id_from_assignment_ids([4])
         assert error is None
         assert template_id == 33
+
+    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.utils.api_data_filters.AssignedForm')
+    def test_not_found_error_hints_at_submission_id(self, mock_assigned_form, _mock_joinedload):
+        """Regression: assignment_id=1610 (an AssignmentEntityStatus/submission id, not an
+        AssignedForm id) used to 404 with a bare 'not found' message."""
+        mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = []
+        template_id, template_ids, error = resolve_assignment_scope([1610])
+        assert template_id is None
+        assert template_ids == []
+        assert error['status'] == 404
+        assert '1610' in error['message']
+        assert 'submission_id' in error['message']
+
+    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.utils.api_data_filters.AssignedForm')
+    def test_not_found_error_lists_all_missing_ids(self, mock_assigned_form, _mock_joinedload):
+        mock_assigned_form.query.options.return_value.filter.return_value.all.return_value = [
+            self._row(4, 33, 'Unified Country Report'),
+        ]
+        _, _, error = resolve_assignment_scope([4, 999])
+        assert error['status'] == 404
+        assert '999' in error['message']
+
+
+@pytest.mark.unit
+class TestResolveAssignmentEntityStatusFallback:
+    def test_none_when_no_ids(self):
+        assert resolve_assignment_entity_status_fallback(None) is None
+        assert resolve_assignment_entity_status_fallback([]) is None
+
+    def test_none_for_multiple_ids(self):
+        """Mixing AssignedForm and AssignmentEntityStatus ids in one request is
+        inherently ambiguous, so the fallback only handles the single-id case."""
+        assert resolve_assignment_entity_status_fallback([1610, 1611]) is None
+
+    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.models.assignments.AssignmentEntityStatus')
+    def test_none_when_submission_not_found(self, mock_aes_cls, _mock_joinedload):
+        mock_aes_cls.query.options.return_value.filter.return_value.first.return_value = None
+        assert resolve_assignment_entity_status_fallback([1610]) is None
+
+    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.models.assignments.AssignmentEntityStatus')
+    def test_resolves_submission_id_and_template_id(self, mock_aes_cls, _mock_joinedload):
+        aes = MagicMock()
+        aes.id = 1610
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.template_id = 21
+        mock_aes_cls.query.options.return_value.filter.return_value.first.return_value = aes
+
+        result = resolve_assignment_entity_status_fallback([1610])
+        assert result == (1610, 21)
+
+    @patch('app.utils.api_data_filters.joinedload')
+    @patch('app.models.assignments.AssignmentEntityStatus')
+    def test_resolves_submission_id_without_assigned_form(self, mock_aes_cls, _mock_joinedload):
+        aes = MagicMock()
+        aes.id = 1610
+        aes.assigned_form = None
+        mock_aes_cls.query.options.return_value.filter.return_value.first.return_value = aes
+
+        result = resolve_assignment_entity_status_fallback([1610])
+        assert result == (1610, None)
 
 
 @pytest.mark.unit

@@ -726,7 +726,15 @@ def test_resolve_indicator_import_value_yes_no():
 
 def test_reporting_funding_matrix_column_matches_form_item(app):
     with app.app_context():
-        assert _reporting_funding_matrix_column() == "tot_fn"
+        from import_upr_excel_data import (
+            ITEM_REPORTING_COUNTRY_FUNDING,
+            _matrix_column_name_from_form_item,
+        )
+        from app.models import FormItem
+
+        item = FormItem.query.get(ITEM_REPORTING_COUNTRY_FUNDING)
+        expected = _matrix_column_name_from_form_item(item) or "ns_fun"
+        assert _reporting_funding_matrix_column() == expected
 
 
 def test_validate_upr_country_reporting_import_file_accepts_current_template(

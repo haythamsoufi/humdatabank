@@ -45,7 +45,8 @@ class TemplateExcelMatrixMixin(TemplateExcelBase):
 
     _MATRIX_CONFIG_KEYS = frozenset({
         'type', 'columns', 'column_groups', 'rows', 'row_mode', 'show_row_totals',
-        'show_column_totals', 'auto_load_entities', 'highlight_manual_rows',
+        'show_column_totals', 'include_calculated_totals_in_api', 'row_total_manual_enabled',
+        'row_total_validation', 'auto_load_entities', 'highlight_manual_rows',
         'legend_text', 'legend_text_translations', 'legend_hide', 'lookup_list_id',
         'list_display_column', 'list_filters', 'group_by_column', 'group_dropdown_enabled',
         'group_table_enabled', 'search_placeholder', 'search_placeholder_translations',

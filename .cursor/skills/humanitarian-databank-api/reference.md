@@ -27,7 +27,7 @@ switch to the user-paste workflow.
 
 1. Print the exact curl command from [reference.md §5](reference.md) or SKILL.md.
 2. Ask the user to paste the JSON response or upload an export file.
-3. Parse and analyze using §1–§2 schemas below.
+3. Parse and analyze using §1–§3 schemas below.
 
 See **§5** for ready-to-copy curl commands.
 
@@ -98,7 +98,163 @@ Single indicator object (same shape, not wrapped in `"indicators"`).
 
 ---
 
-## §2 Public Data (`GET /api/v1/data`)
+## §2 Compact public endpoints (prefer over raw `/data`)
+
+No authentication. Purpose-built for AI assistants (Custom GPT Actions, MCP) —
+each returns a small, already-aggregated payload instead of raw paginated rows.
+Same privacy enforcement as `/data`: only `privacy=public` form items and
+`is_public=True` documents are ever visible. See also the MCP tool table in
+[SKILL.md](SKILL.md#mcp-connector-preferred-when-available) (`databank_*` tool
+names map 1:1 to these paths).
+
+### `GET /public/global-trend`
+
+Deduplicated global totals by reporting period. Dedupe keeps the latest
+`submission_id` per `(country_id, period_name)` and only counts
+`data_status="available"` rows — use this instead of paginating `/data` and
+summing manually.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `query` | string | Metric name, e.g. `volunteers` (resolved server-side) |
+| `indicator_bank_id` | int | Indicator id — use instead of `query` if known |
+| `period_name` | string | e.g. `Annual 2023`; omit for every period |
+| `max_pages` | int | Internal pagination cap, default/max `20` |
+
+```json
+{
+  "indicator": {"id": 724, "name": "Number of people volunteering."},
+  "indicator_bank_id": 724,
+  "dedupe_strategy": "latest_submission_per_country_period",
+  "raw_rows_fetched": 812,
+  "rows_after_dedupe": 190,
+  "by_period": [
+    {"period_name": "Annual 2023", "total": 4520000, "countries_reporting": 178}
+  ],
+  "notes": ["..."],
+  "truncated": false
+}
+```
+
+### `GET /public/indicators/resolve`
+
+Maps a metric name or numeric id to an indicator bank id.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `query` | string | **Required.** Metric name or numeric id |
+| `limit` | int | Alternatives to return, default `5`, max `20` |
+
+Response: `{"query", "best_match": {"id", "name", "match_reason", ...}, "alternatives": [...]}`.
+
+### `GET /public/submissions/coverage`
+
+Counts **distinct countries with at least one public submitted value**
+(`data_status="available"` on a `privacy=public` form item), grouped by
+period. Answers "how many countries submitted FDRS/UPR data for `<period>`,
+or across all years?" without paginating `/data` and counting by hand. This
+is **public data coverage**, never internal assignment/workflow status
+(submitted/pending/approved) — that is not exposed to unauthenticated callers.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `template_id` | int | Questionnaire template, e.g. `21` FDRS, `22`/`24` UPR |
+| `indicator_bank_id` | int | Scope to one indicator instead of a whole template |
+| `query` | string | Metric name; resolved to `indicator_bank_id` server-side |
+| `period_name` | string | e.g. `Annual 2024`; omit for a `by_period[]` breakdown across all years |
+| `country_id` | int | Narrow to one country |
+| `max_pages` | int | Internal pagination cap, default/max `20` |
+
+At least one of `template_id`, `indicator_bank_id`, or `query` is required.
+
+```json
+{
+  "template_id": 21,
+  "programme": "FDRS",
+  "period_name_filter": null,
+  "countries_submitted_total": 183,
+  "by_period": [
+    {"period_name": "Annual 2024", "countries_submitted": 176}
+  ],
+  "notes": ["..."],
+  "truncated": false
+}
+```
+
+### `GET /public/countries/resolve`
+
+Maps a country name, ISO2/ISO3 code, or numeric id to reference fields —
+avoids paginating a full countries dimension table to look up one country.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `query` | string | **Required.** Name, ISO2/ISO3, or numeric id |
+| `limit` | int | Alternatives to return, default `5`, max `20` |
+
+Response: `{"query", "best_match": {"id", "name", "iso2", "iso3", "region", "match_reason"}, "alternatives": [...]}`.
+
+### `GET /public/documents/search`
+
+Public AI Knowledge Base document **chunks** for narrative Q&A (Unified
+Plans/Reports, annual reports marked public). Only `is_public=True`,
+`searchable=True`, `processing_status=completed` documents are ever
+returned.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `query` | string | **Required.** User question; include country/year for best results |
+| `full_coverage` | bool | Search every in-scope document; return all chunks ≥ `min_score` (paginated) |
+| `page`, `per_page` | int | Pagination for `full_coverage` (default `per_page=80`) |
+| `latest_per_country` | bool | Omit for auto (newest doc per country/type for snapshot queries) |
+| `top_k` | int | Chunks to return without `full_coverage`, default `8`, max `12` |
+| `min_score` | float | Relevance floor, default `0.25` |
+| `country_name`, `country_id` | — | Narrow to one country |
+| `file_type` | string | e.g. `pdf` |
+| `search_mode` | string | `hybrid` (default) or `vector` |
+
+Chunk shape: `chunk_id`, `document_id`, `document_title`, `document_date`,
+`countries[]`, `page_number`, `section_title`, `content`, `score`,
+`source_url`, `download_url`, `document_url`. With `full_coverage=true`, the
+response also includes a `coverage{}` block (`documents_in_scope`,
+`without_hits[]`, `has_more_pages`, `latest_per_country{}`).
+
+### `GET /public/documents/catalog`
+
+Inventories public documents by **type / year / country** — counts from
+document metadata, not semantic search. Answers "how many countries
+submitted an annual report / Unified Plan for `<year>`, or across all
+years?" much more cheaply than paginating `/public/documents/search`. Same
+visibility scope as document search.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `document_type` | string | `annual_report`, `unified_plan`, `midyear_report`, `other`; omit for all |
+| `year` | int | Omit for a `by_year[]` breakdown across all years |
+| `country_id`, `country_name` | — | Narrow to one country |
+| `file_type` | string | e.g. `pdf` |
+| `include_documents` | bool | Default `true`; set `false` for counts only (smaller response) |
+
+```json
+{
+  "filters_applied": {"document_type": "annual_report", "year": null, ...},
+  "total_documents": 340,
+  "countries_count": 145,
+  "by_type": {"annual_report": 340},
+  "by_year": [{"year": 2024, "document_count": 110, "countries_count": 108}],
+  "by_country": [{"country": "Kenya", "documents": [...]}],
+  "notes": ["..."]
+}
+```
+
+### `GET /public/documents/<id>` and `GET /public/documents/<id>/download`
+
+Single public document's metadata (`document_id`, `document_title`,
+`countries[]`, `source_url`, `download_url`, `document_url`) or a file
+stream/redirect (`200`/`302`/`404`). 404 if the document is not public.
+
+---
+
+## §3 Public Data (`GET /api/v1/data`)
 
 Submitted form values plus dimension tables. **No API key** when scoped filters
 are provided. Returns only form items marked `privacy=public`.
@@ -214,7 +370,7 @@ GET /api/v1/data?indicator_bank_ids=42,729&period_name=Annual%202023
 
 ---
 
-## §3 Authenticated-only endpoints
+## §4 Authenticated-only endpoints
 
 These return **401** without an API key:
 
@@ -248,13 +404,22 @@ curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=42&period_name=
 
 # With country + full form item context
 curl -s "https://databank.ifrc.org/api/v1/data?indicator_bank_id=42&country_iso3=BGD&period_name=Annual%202023&related=all"
+
+# Global trend (compact, deduped — prefer over paginating /data for totals)
+curl -s "https://databank.ifrc.org/api/v1/public/global-trend?query=volunteers"
+
+# How many countries submitted FDRS data (§2) — one page, no pagination needed
+curl -s "https://databank.ifrc.org/api/v1/public/submissions/coverage?template_id=21&period_name=Annual%202024"
+
+# How many countries submitted an annual report / Unified Plan document
+curl -s "https://databank.ifrc.org/api/v1/public/documents/catalog?document_type=annual_report&year=2024"
 ```
 
 Browser alternative: paste the same URL (without `curl -s`) into the address bar.
 
 ---
 
-## §4 Error responses
+## §6 Error responses
 
 ```json
 { "error": "Authentication required for unscoped data requests...", "status": 401 }

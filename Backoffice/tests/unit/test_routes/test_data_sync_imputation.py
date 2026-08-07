@@ -1037,23 +1037,6 @@ class TestInternalHelpers:
         _cleanup_data_sync_jobs_locked(time.time())
         assert AIJob.query.get(job_id) is not None
 
-    def test_get_data_sync_cancel_event_creates_event(self):
-        from app.routes.admin.data_sync_imputation import _get_data_sync_cancel_event
-        import threading
-        job_id = uuid.uuid4().hex
-        event = _get_data_sync_cancel_event(job_id)
-        assert isinstance(event, threading.Event)
-        from app.routes.admin.data_sync_imputation import _clear_data_sync_cancel_event
-        _clear_data_sync_cancel_event(job_id)
-
-    def test_get_data_sync_cancel_event_returns_same_event(self):
-        from app.routes.admin.data_sync_imputation import _get_data_sync_cancel_event, _clear_data_sync_cancel_event
-        job_id = uuid.uuid4().hex
-        e1 = _get_data_sync_cancel_event(job_id)
-        e2 = _get_data_sync_cancel_event(job_id)
-        assert e1 is e2
-        _clear_data_sync_cancel_event(job_id)
-
     def test_parse_reported_import_states_none_key(self):
         from app.routes.admin.data_sync_imputation import _parse_reported_import_states
         result = _parse_reported_import_states({})

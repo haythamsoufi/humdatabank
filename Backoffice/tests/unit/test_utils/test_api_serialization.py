@@ -37,6 +37,13 @@ from app.utils.api_serialization import (
     format_matrix_disagg_as_long_rows,
     _wrap_disagg_dict,
     _resolve_matrix_cell,
+    prune_stale_matrix_cell_keys,
+    _lookup_matrix_column_label,
+    resolve_matrix_join_metadata,
+    resolve_assignment_year_placeholders,
+    form_items_need_assignment_year_resolution,
+    filter_calculated_totals,
+    strip_calculated_totals_from_fact_rows,
 )
 
 
@@ -1261,6 +1268,146 @@ class TestResolveMatrixCell:
 
 
 # ---------------------------------------------------------------------------
+# prune_stale_matrix_cell_keys
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestPruneStaleMatrixCellKeys:
+    FUNDING_CONFIG = {'columns': [{'name': 'ns_fun', 'label': 'National Society Total Funding'}]}
+
+    def test_drops_key_with_old_column_name(self):
+        """Regression: item 1403's funding column was renamed NS 2025 Total Funding -> ns_fun."""
+        data = {
+            'HNS other sources_NS 2025 Total Funding': 0,
+            'IFRC Secretariat_ns_fun': 815093,
+            'PNSs_ns_fun': 454397,
+            'HNS other sources_ns_fun': 336805,
+        }
+        pruned = prune_stale_matrix_cell_keys(data, self.FUNDING_CONFIG)
+        assert pruned == {
+            'IFRC Secretariat_ns_fun': 815093,
+            'PNSs_ns_fun': 454397,
+            'HNS other sources_ns_fun': 336805,
+        }
+
+    def test_no_stale_keys_returns_equivalent_dict(self):
+        data = {'IFRC Secretariat_ns_fun': 100, 'PNSs_ns_fun': 200}
+        assert prune_stale_matrix_cell_keys(data, self.FUNDING_CONFIG) == data
+
+    def test_row_total_suffix_kept_when_enabled(self):
+        config = {**self.FUNDING_CONFIG, 'show_row_totals': True}
+        data = {'IFRC Secretariat_ns_fun': 100, 'IFRC Secretariat_Total': 100}
+        assert prune_stale_matrix_cell_keys(data, config) == data
+
+    def test_row_total_suffix_dropped_when_disabled(self):
+        config = {**self.FUNDING_CONFIG, 'show_row_totals': False}
+        data = {'IFRC Secretariat_ns_fun': 100, 'IFRC Secretariat_Total': 100}
+        assert prune_stale_matrix_cell_keys(data, config) == {'IFRC Secretariat_ns_fun': 100}
+
+    def test_metadata_keys_are_preserved(self):
+        data = {'_matrix_change': True, 'IFRC Secretariat_ns_fun': 100}
+        assert prune_stale_matrix_cell_keys(data, self.FUNDING_CONFIG) == data
+
+    def test_matrix_without_column_defs_is_left_untouched(self):
+        """No columns configured means we can't validate suffixes, so skip pruning entirely."""
+        data = {'IFRC Secretariat_anything_goes_here': 100}
+        assert prune_stale_matrix_cell_keys(data, {}) == data
+        assert prune_stale_matrix_cell_keys(data, None) == data
+
+    def test_empty_or_non_dict_input_returned_unchanged(self):
+        assert prune_stale_matrix_cell_keys({}, self.FUNDING_CONFIG) == {}
+        assert prune_stale_matrix_cell_keys(None, self.FUNDING_CONFIG) is None
+
+
+# ---------------------------------------------------------------------------
+# _lookup_matrix_column_label
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestLookupMatrixColumnLabel:
+    def test_explicit_label_wins(self):
+        config = {'columns': [{'name': 'ns_fun', 'label': 'NS Funding', 'name_translations': {'en': 'Other'}}]}
+        assert _lookup_matrix_column_label(config, 'ns_fun') == 'NS Funding'
+
+    def test_falls_back_to_name_translations_when_no_label(self):
+        """Regression: item 1403's funding column has no `label`, only name_translations."""
+        config = {'columns': [{
+            'name': 'ns_fun',
+            'name_translations': {'en': 'National Society Total Funding', 'fr': 'Financement total'},
+        }]}
+        assert _lookup_matrix_column_label(config, 'ns_fun') == 'National Society Total Funding'
+
+    def test_falls_back_to_any_translation_when_requested_language_missing(self):
+        config = {'columns': [{'name': 'ns_fun', 'name_translations': {'fr': 'Financement total'}}]}
+        assert _lookup_matrix_column_label(config, 'ns_fun', language='en') == 'Financement total'
+
+    def test_falls_back_to_name_when_no_label_or_translations(self):
+        config = {'columns': [{'name': 'ns_fun'}]}
+        assert _lookup_matrix_column_label(config, 'ns_fun') == 'ns_fun'
+
+    def test_falls_back_to_raw_key_when_column_not_found(self):
+        assert _lookup_matrix_column_label({'columns': []}, 'ns_fun') == 'ns_fun'
+        assert _lookup_matrix_column_label(None, 'ns_fun') == 'ns_fun'
+
+    def test_none_column_key_returns_none(self):
+        assert _lookup_matrix_column_label({'columns': []}, None) is None
+
+    def test_empty_string_translation_skipped(self):
+        config = {'columns': [{'name': 'ns_fun', 'name_translations': {'en': '', 'fr': 'Financement'}}]}
+        assert _lookup_matrix_column_label(config, 'ns_fun') == 'Financement'
+
+
+# ---------------------------------------------------------------------------
+# resolve_matrix_join_metadata — totals-visibility flags
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestResolveMatrixJoinMetadataTotalsFlags:
+    def test_preserves_explicit_totals_flags(self):
+        meta = resolve_matrix_join_metadata({
+            'row_mode': 'manual',
+            'rows': [{'id': 1, 'label': 'Row'}],
+            'columns': [{'name': 'c1'}],
+            'show_row_totals': False,
+            'show_column_totals': False,
+            'row_total_manual_enabled': True,
+        })
+        assert meta['show_row_totals'] is False
+        assert meta['show_column_totals'] is False
+        assert meta['row_total_manual_enabled'] is True
+
+    def test_preserves_include_calculated_totals_in_api_flag(self):
+        """The API-only decoupling flag must survive the same trimming pass as its
+        show_row_totals/show_column_totals siblings, since it's this trimmed-down
+        meta dict (not the raw matrix_config) that flows into form_items[] and is
+        later read by _compute_matrix_calculated_total_rows."""
+        meta = resolve_matrix_join_metadata({
+            'row_mode': 'manual',
+            'columns': [{'name': 'c1'}],
+            'show_row_totals': True,
+            'show_column_totals': True,
+            'include_calculated_totals_in_api': False,
+        })
+        assert meta['include_calculated_totals_in_api'] is False
+
+    def test_omits_flags_when_not_configured(self):
+        """No flags in the source config means downstream total computation uses its own defaults."""
+        meta = resolve_matrix_join_metadata({'row_mode': 'manual', 'columns': [{'name': 'c1'}]})
+        assert 'show_row_totals' not in meta
+        assert 'show_column_totals' not in meta
+        assert 'row_total_manual_enabled' not in meta
+        assert 'include_calculated_totals_in_api' not in meta
+
+    def test_existing_country_map_assertions_unaffected(self):
+        meta = resolve_matrix_join_metadata({
+            'row_mode': 'list_library',
+            'lookup_list_id': 'country_map',
+        })
+        assert meta['join_dimension'] == 'countries'
+        assert meta['row_entity_type'] == 'country'
+
+
+# ---------------------------------------------------------------------------
 # enrich_matrix_cells
 # ---------------------------------------------------------------------------
 
@@ -1374,6 +1521,92 @@ class TestFormatBridgeDisaggRows:
         rows = format_bridge_disagg_rows(1, payload)
         assert rows[0]['source'] == 'reported'
 
+    # -- matrix mode: consistent with disaggregation_data, not a raw composite key ------
+
+    def test_matrix_mode_expands_row_entity_id_and_column_key(self):
+        """Regression: matrix rows used to be a single row keyed by the raw composite
+        string (e.g. "10_SP2"), disagreeing with fact_form_values[].disaggregation_data,
+        which already parses row_entity_id/column_key. This locks in the fixed, consistent
+        shape (also verified end-to-end in test_indicator_bank_service.py)."""
+        payload = {'mode': 'matrix', 'values': {'10_SP2': 100, '_meta': 'x'}}
+        rows = format_bridge_disagg_rows(1, payload, source='reported')
+        raw = [r for r in rows if not r.get('is_calculated_total')]
+        assert len(raw) == 1
+        assert raw[0]['row_entity_id'] == 10
+        assert raw[0]['column_key'] == 'SP2'
+        assert raw[0]['value'] == 100
+        assert raw[0]['form_data_id'] == 1
+        assert raw[0]['mode'] == 'matrix'
+        assert 'key' not in raw[0]
+
+    def test_matrix_mode_includes_calculated_totals_flagged(self):
+        payload = {'mode': 'matrix', 'values': {'10_SP2': 100}}
+        rows = format_bridge_disagg_rows(1, payload)
+        totals = [r for r in rows if r.get('is_calculated_total')]
+        assert totals  # default show_row_totals/show_column_totals apply with no matrix_config
+        assert all('total_kind' in r for r in totals)
+
+    def test_matrix_mode_resolves_column_label_from_form_items_index(self):
+        form_items_index = {
+            9: {'matrix_config': {'columns': [{'name': 'SP2', 'label': 'Strategic Priority 2'}]}},
+        }
+        payload = {'mode': 'matrix', 'values': {'10_SP2': 100}}
+        rows = format_bridge_disagg_rows(
+            1, payload, form_item_id=9, form_items_index=form_items_index,
+        )
+        raw = [r for r in rows if not r.get('is_calculated_total')]
+        assert raw[0]['column_label'] == 'Strategic Priority 2'
+
+    def test_matrix_mode_respects_configured_totals_visibility(self):
+        form_items_index = {
+            9: {'matrix_config': {
+                'columns': [{'name': 'SP2'}],
+                'show_row_totals': False,
+                'show_column_totals': False,
+            }},
+        }
+        payload = {'mode': 'matrix', 'values': {'10_SP2': 100}}
+        rows = format_bridge_disagg_rows(
+            1, payload, form_item_id=9, form_items_index=form_items_index,
+        )
+        assert not any(r.get('is_calculated_total') for r in rows)
+
+    def test_matrix_mode_include_calculated_totals_in_api_false_suppresses_totals(self):
+        """Decoupled API-exposure flag: totals stay on for the form (show_row_totals/
+        show_column_totals both True) but are excluded from this API-facing array."""
+        form_items_index = {
+            9: {'matrix_config': {
+                'columns': [{'name': 'SP2'}],
+                'show_row_totals': True,
+                'show_column_totals': True,
+                'include_calculated_totals_in_api': False,
+            }},
+        }
+        payload = {'mode': 'matrix', 'values': {'10_SP2': 100}}
+        rows = format_bridge_disagg_rows(
+            1, payload, form_item_id=9, form_items_index=form_items_index,
+        )
+        assert not any(r.get('is_calculated_total') for r in rows)
+        raw = [r for r in rows if not r.get('is_calculated_total')]
+        assert len(raw) == 1
+        assert raw[0]['value'] == 100
+
+    def test_matrix_mode_include_calculated_totals_in_api_true_keeps_totals(self):
+        """Explicit True behaves the same as the (default) absent case."""
+        form_items_index = {
+            9: {'matrix_config': {
+                'columns': [{'name': 'SP2'}],
+                'show_row_totals': True,
+                'show_column_totals': True,
+                'include_calculated_totals_in_api': True,
+            }},
+        }
+        payload = {'mode': 'matrix', 'values': {'10_SP2': 100}}
+        rows = format_bridge_disagg_rows(
+            1, payload, form_item_id=9, form_items_index=form_items_index,
+        )
+        assert any(r.get('is_calculated_total') for r in rows)
+
 
 # ---------------------------------------------------------------------------
 # build_bridge_disagg_from_flat_rows
@@ -1422,6 +1655,88 @@ class TestBuildBridgeDisaggFromFlatRows:
         result = build_bridge_disagg_from_flat_rows(rows)
         sources = {r['source'] for r in result}
         assert sources == {'reported', 'prefilled', 'imputed'}
+
+    def test_threads_form_items_index_for_matrix_column_labels(self):
+        rows = [{
+            'id': 1,
+            'form_item_id': 9,
+            'disaggregation_data': {'mode': 'matrix', 'values': {'10_SP2': 100}},
+            'prefilled_disaggregation_data': None,
+            'imputed_disaggregation_data': None,
+        }]
+        form_items_index = {
+            9: {'matrix_config': {
+                'columns': [{'name': 'SP2', 'label': 'Strategic Priority 2'}],
+                'show_row_totals': False,
+                'show_column_totals': False,
+            }},
+        }
+        result = build_bridge_disagg_from_flat_rows(rows, form_items_index=form_items_index)
+        assert len(result) == 1
+        assert result[0]['row_entity_id'] == 10
+        assert result[0]['column_key'] == 'SP2'
+        assert result[0]['column_label'] == 'Strategic Priority 2'
+
+
+# ---------------------------------------------------------------------------
+# filter_calculated_totals / strip_calculated_totals_from_fact_rows
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestFilterCalculatedTotals:
+    def test_drops_rows_flagged_is_calculated_total(self):
+        rows = [
+            {'row_entity_id': 10, 'column_key': 'SP2', 'value': 100},
+            {'row_entity_id': 10, 'column_key': 'Total', 'value': 100, 'is_calculated_total': True, 'total_kind': 'row'},
+            {'row_entity_id': None, 'column_key': 'SP2', 'value': 100, 'is_calculated_total': True, 'total_kind': 'column'},
+        ]
+        result = filter_calculated_totals(rows)
+        assert len(result) == 1
+        assert result[0]['column_key'] == 'SP2'
+        assert 'is_calculated_total' not in result[0]
+
+    def test_keeps_rows_without_the_flag_key_at_all(self):
+        """Non-matrix rows (sex/age/total modes) never carry is_calculated_total."""
+        rows = [{'mode': 'sex', 'key': 'male', 'value': 5}]
+        assert filter_calculated_totals(rows) == rows
+
+    def test_empty_or_none_returns_empty_list(self):
+        assert filter_calculated_totals([]) == []
+        assert filter_calculated_totals(None) == []
+
+    def test_ignores_non_dict_entries_by_keeping_them(self):
+        assert filter_calculated_totals(['not-a-dict']) == ['not-a-dict']
+
+
+@pytest.mark.unit
+class TestStripCalculatedTotalsFromFactRows:
+    def test_filters_matrix_long_array_fields_in_place(self):
+        fact_rows = [{
+            'id': 1,
+            'disaggregation_data': [
+                {'row_entity_id': 10, 'column_key': 'SP2', 'value': 100},
+                {'row_entity_id': 10, 'column_key': 'Total', 'value': 100, 'is_calculated_total': True, 'total_kind': 'row'},
+            ],
+            'prefilled_disaggregation_data': None,
+            'imputed_disaggregation_data': [
+                {'row_entity_id': None, 'column_key': 'SP2', 'value': 5, 'is_calculated_total': True, 'total_kind': 'column'},
+            ],
+        }]
+        result = strip_calculated_totals_from_fact_rows(fact_rows)
+        assert result is fact_rows  # mutated in place, same list returned
+        assert len(fact_rows[0]['disaggregation_data']) == 1
+        assert fact_rows[0]['imputed_disaggregation_data'] == []
+        assert fact_rows[0]['prefilled_disaggregation_data'] is None
+
+    def test_non_matrix_dict_payload_left_untouched(self):
+        """Non-matrix disaggregation_data is a dict ({mode, values}), not a list — skip it."""
+        fact_rows = [{'id': 1, 'disaggregation_data': {'mode': 'sex', 'values': {'male': 5}}}]
+        strip_calculated_totals_from_fact_rows(fact_rows)
+        assert fact_rows[0]['disaggregation_data'] == {'mode': 'sex', 'values': {'male': 5}}
+
+    def test_empty_or_none_rows_do_not_raise(self):
+        assert strip_calculated_totals_from_fact_rows([]) == []
+        assert strip_calculated_totals_from_fact_rows(None) is None
 
 
 # ---------------------------------------------------------------------------
@@ -1735,3 +2050,81 @@ class TestBuildStarSchemaTables:
                 result = build_star_schema_tables(rows, [], [])
             assert len(result['dim_template']) == 1
             assert result['dim_template'][0]['name'] == 'T5'
+
+
+# ---------------------------------------------------------------------------
+# form_items_need_assignment_year_resolution / resolve_assignment_year_placeholders
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestFormItemsNeedAssignmentYearResolution:
+    def test_false_for_empty_or_none(self):
+        assert form_items_need_assignment_year_resolution([]) is False
+        assert form_items_need_assignment_year_resolution(None) is False
+
+    def test_false_when_no_placeholder_present(self):
+        items = [{'id': 1, 'label': 'Total funding'}]
+        assert form_items_need_assignment_year_resolution(items) is False
+
+    def test_true_when_label_has_placeholder(self):
+        items = [{'id': 1, 'label': 'Funding received in [assignment_year]'}]
+        assert form_items_need_assignment_year_resolution(items) is True
+
+    def test_true_when_matrix_column_label_has_placeholder(self):
+        items = [{
+            'id': 1, 'label': 'Matrix item',
+            'matrix_config': {'columns': [{'name': 'c1', 'label': '[assignment_year] total'}]},
+        }]
+        assert form_items_need_assignment_year_resolution(items) is True
+
+    def test_true_when_matrix_column_translation_has_placeholder(self):
+        items = [{
+            'id': 1, 'label': 'Matrix item',
+            'matrix_config': {'columns': [{
+                'name': 'c1', 'name_translations': {'fr': 'Total pour [assignment_year]'},
+            }]},
+        }]
+        assert form_items_need_assignment_year_resolution(items) is True
+
+    def test_ignores_non_dict_items(self):
+        assert form_items_need_assignment_year_resolution(['not-a-dict', None]) is False
+
+
+@pytest.mark.unit
+class TestResolveAssignmentYearPlaceholders:
+    def test_returns_unchanged_when_no_assignment_year(self):
+        items = [{'id': 1, 'label': 'Funding in [assignment_year]'}]
+        assert resolve_assignment_year_placeholders(items, None) is items
+
+    def test_returns_unchanged_when_no_form_items(self):
+        assert resolve_assignment_year_placeholders([], 2024) == []
+        assert resolve_assignment_year_placeholders(None, 2024) is None
+
+    def test_substitutes_label_placeholder(self):
+        items = [{'id': 1, 'label': 'Funding received in [assignment_year]'}]
+        result = resolve_assignment_year_placeholders(items, 2024)
+        assert result[0]['label'] == 'Funding received in 2024'
+
+    def test_substitutes_matrix_column_label_and_translations(self):
+        items = [{
+            'id': 1, 'label': 'Matrix item',
+            'matrix_config': {'columns': [{
+                'name': 'c1',
+                'label': '[assignment_year] total',
+                'name_translations': {'en': 'Total [assignment_year]', 'fr': 'Total [assignment_year]'},
+            }]},
+        }]
+        result = resolve_assignment_year_placeholders(items, 2024)
+        col = result[0]['matrix_config']['columns'][0]
+        assert col['label'] == '2024 total'
+        assert col['name_translations'] == {'en': 'Total 2024', 'fr': 'Total 2024'}
+
+    def test_leaves_items_without_placeholder_untouched(self):
+        items = [{'id': 1, 'label': 'Total funding'}]
+        result = resolve_assignment_year_placeholders(items, 2024)
+        assert result[0]['label'] == 'Total funding'
+
+    def test_ignores_non_dict_items_without_raising(self):
+        items = ['not-a-dict', {'id': 1, 'label': '[assignment_year]'}]
+        result = resolve_assignment_year_placeholders(items, 2024)
+        assert result[1]['label'] == '2024'

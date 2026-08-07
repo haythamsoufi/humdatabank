@@ -141,6 +141,7 @@ export const MatrixItem = {
         const searchPlaceholderTranslationsInput = modalElement.querySelector('#matrix-search-placeholder-translations');
         const rowTotalsCheckbox = modalElement.querySelector('#matrix-show-row-totals');
         const columnTotalsCheckbox = modalElement.querySelector('#matrix-show-column-totals');
+        const includeTotalsInApiCheckbox = modalElement.querySelector('#matrix-include-totals-in-api');
         const autoLoadCheckbox = modalElement.querySelector('#matrix-auto-load-entities');
         const highlightManualRowsCheckbox = modalElement.querySelector('#matrix-highlight-manual-rows');
         const legendTextInput = modalElement.querySelector('#matrix-legend-text');
@@ -180,11 +181,13 @@ export const MatrixItem = {
         if (searchPlaceholderTranslationsInput) searchPlaceholderTranslationsInput.value = '{}';
         if (rowTotalsCheckbox) rowTotalsCheckbox.checked = true;
         if (columnTotalsCheckbox) columnTotalsCheckbox.checked = true;
+        if (includeTotalsInApiCheckbox) includeTotalsInApiCheckbox.checked = true;
         const rowTotalManualCheckbox = modalElement.querySelector('#matrix-row-total-manual-enabled');
         const rowTotalValidationSelect = modalElement.querySelector('#matrix-row-total-validation');
         if (rowTotalManualCheckbox) rowTotalManualCheckbox.checked = false;
         if (rowTotalValidationSelect) rowTotalValidationSelect.value = 'none';
         this.updateRowTotalOptionsVisibility(modalElement);
+        this.updateIncludeTotalsInApiVisibility(modalElement);
         if (autoLoadCheckbox) autoLoadCheckbox.checked = false;
         if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = false;
         if (legendTextInput) {
@@ -871,6 +874,7 @@ export const MatrixItem = {
     setupDisplayOptions(modalElement) {
         const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
         const columnTotalsCheckbox = Utils.getElementById('matrix-show-column-totals');
+        const includeTotalsInApiCheckbox = Utils.getElementById('matrix-include-totals-in-api');
         const rowTotalManualCheckbox = Utils.getElementById('matrix-row-total-manual-enabled');
         const rowTotalValidationSelect = Utils.getElementById('matrix-row-total-validation');
         const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
@@ -885,6 +889,7 @@ export const MatrixItem = {
             if (!rowTotalsCheckbox._matrixConfigListenerAdded) {
                 rowTotalsCheckbox.addEventListener('change', () => {
                     this.updateRowTotalOptionsVisibility(modalElement);
+                    this.updateIncludeTotalsInApiVisibility(modalElement);
                     this.updateConfig(modalElement);
                 });
                 rowTotalsCheckbox._matrixConfigListenerAdded = true;
@@ -907,8 +912,17 @@ export const MatrixItem = {
         }
         if (columnTotalsCheckbox) {
             if (!columnTotalsCheckbox._matrixConfigListenerAdded) {
-                columnTotalsCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                columnTotalsCheckbox.addEventListener('change', () => {
+                    this.updateIncludeTotalsInApiVisibility(modalElement);
+                    this.updateConfig(modalElement);
+                });
                 columnTotalsCheckbox._matrixConfigListenerAdded = true;
+            }
+        }
+        if (includeTotalsInApiCheckbox) {
+            if (!includeTotalsInApiCheckbox._matrixConfigListenerAdded) {
+                includeTotalsInApiCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+                includeTotalsInApiCheckbox._matrixConfigListenerAdded = true;
             }
         }
         if (autoLoadCheckbox) {
@@ -952,6 +966,7 @@ export const MatrixItem = {
         // Initialize legend hide button state
         this.initializeLegendHideButton(modalElement);
         this.updateRowTotalOptionsVisibility(modalElement);
+        this.updateIncludeTotalsInApiVisibility(modalElement);
     },
 
     /**
@@ -979,6 +994,26 @@ export const MatrixItem = {
             } else {
                 validationWrapper.classList.add('hidden');
             }
+        }
+    },
+
+    /**
+     * Hide the "Include Calculated Totals in API" toggle when neither Show Row Totals
+     * nor Show Column Totals is enabled — with no totals shown at all, there is
+     * nothing for the API-inclusion flag to control.
+     */
+    updateIncludeTotalsInApiVisibility(modalElement) {
+        const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
+        const columnTotalsCheckbox = Utils.getElementById('matrix-show-column-totals');
+        const wrapper = Utils.getElementById('matrix-include-totals-in-api-wrapper');
+        if (!wrapper) return;
+        const showRowTotals = rowTotalsCheckbox ? rowTotalsCheckbox.checked : true;
+        const showColumnTotals = columnTotalsCheckbox ? columnTotalsCheckbox.checked : true;
+
+        if (showRowTotals || showColumnTotals) {
+            wrapper.classList.remove('hidden');
+        } else {
+            wrapper.classList.add('hidden');
         }
     },
 
@@ -1528,6 +1563,7 @@ export const MatrixItem = {
         });
         const showRowTotals = Utils.getElementById('matrix-show-row-totals')?.checked !== false;
         const showColumnTotals = Utils.getElementById('matrix-show-column-totals')?.checked !== false;
+        const includeTotalsInApi = Utils.getElementById('matrix-include-totals-in-api')?.checked !== false;
         const rowTotalManualEnabled = Utils.getElementById('matrix-row-total-manual-enabled')?.checked === true;
         const rowTotalValidation = Utils.getElementById('matrix-row-total-validation')?.value || 'none';
         const autoLoadEntities = Utils.getElementById('matrix-auto-load-entities')?.checked === true;
@@ -1542,6 +1578,7 @@ export const MatrixItem = {
             columns: columns,
             show_row_totals: showRowTotals,
             show_column_totals: showColumnTotals,
+            include_calculated_totals_in_api: includeTotalsInApi,
             row_mode: selectedMode,
             highlight_manual_rows: highlightManualRows
         };
@@ -1896,6 +1933,7 @@ export const MatrixItem = {
                 }
                 const rowTotalsCheckbox = Utils.getElementById('matrix-show-row-totals');
                 const columnTotalsCheckbox = Utils.getElementById('matrix-show-column-totals');
+                const includeTotalsInApiCheckbox = Utils.getElementById('matrix-include-totals-in-api');
                 const autoLoadCheckbox = Utils.getElementById('matrix-auto-load-entities');
                 const highlightManualRowsCheckbox = Utils.getElementById('matrix-highlight-manual-rows');
                 const legendTextInput = Utils.getElementById('matrix-legend-text');
@@ -1913,6 +1951,8 @@ export const MatrixItem = {
                 }
                 this.updateRowTotalOptionsVisibility(modalElement);
                 if (columnTotalsCheckbox) columnTotalsCheckbox.checked = matrixConfig.show_column_totals !== false;
+                if (includeTotalsInApiCheckbox) includeTotalsInApiCheckbox.checked = matrixConfig.include_calculated_totals_in_api !== false;
+                this.updateIncludeTotalsInApiVisibility(modalElement);
                 if (autoLoadCheckbox) autoLoadCheckbox.checked = matrixConfig.auto_load_entities === true;
                 if (highlightManualRowsCheckbox) highlightManualRowsCheckbox.checked = matrixConfig.highlight_manual_rows === true;
                 if (legendTextInput) {

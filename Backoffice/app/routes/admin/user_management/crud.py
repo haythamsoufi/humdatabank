@@ -21,6 +21,8 @@ from app.forms.system import UserForm
 from app.routes.admin.shared import permission_required, permission_required_any
 from app.utils.form_localization import get_localized_country_name
 from app.services.platform.user_analytics_service import log_admin_action
+from app.services.platform.user_analytics_query_service import get_user_management_overview_stats
+from app.services.organization.authorization_service import AuthorizationService
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_forbidden, json_ok
 from app.utils.error_handling import handle_json_view_exception
@@ -160,6 +162,14 @@ def manage_users():
 
     pending_requests_count = count_pending_country_access_requests_needing_action()
 
+    can_view_analytics = (
+        AuthorizationService.is_system_manager(current_user)
+        or AuthorizationService.has_rbac_permission(current_user, 'admin.analytics.view')
+    )
+    user_overview_stats = get_user_management_overview_stats(
+        include_analytics=can_view_analytics,
+    )
+
     return render_template("admin/user_management/users.html",
                            users=users,
                            title="Manage Users",
@@ -167,6 +177,8 @@ def manage_users():
                            countries_by_region=countries_by_region,
                            get_localized_country_name=get_localized_country_name,
                            pending_requests_count=pending_requests_count,
+                           user_overview_stats=user_overview_stats,
+                           can_view_analytics=can_view_analytics,
                            rbac_roles_by_user_id=rbac_roles_by_user_id,
                            entity_counts_by_user_id=entity_counts_by_user_id,
                            user_countries_by_id=user_countries_by_id,

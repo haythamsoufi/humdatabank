@@ -18,6 +18,7 @@ Shareable exports of the IFRC Network Databank **Backoffice** PostgreSQL schema 
 | [`database-schema.md`](database-schema.md) | Human review — domain overview, design patterns, per-table column/FK reference. Export to PDF via Word, Pandoc, or GitHub print. |
 | [`database-schema-catalog.csv`](database-schema-catalog.csv) | Excel / Power BI — filter and pivot by domain, table, or column. |
 | [`database-schema-ddl.sql`](database-schema-ddl.sql) | DBAs and tooling — approximate `CREATE TABLE` DDL from SQLAlchemy models. |
+| [`background-jobs-and-progress-ui.md`](background-jobs-and-progress-ui.md) | **Reusable pattern** — server-side batch/single-entity jobs, cross-worker locks, progress banner UI, agent migration checklist (reference: AI Documents). |
 
 ## Regenerate
 

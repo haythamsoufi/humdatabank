@@ -7,8 +7,14 @@ import uuid
 from flask import current_app, request
 
 from app.routes.api import api_bp
-from app.services.public_analytics_service import aggregate_global_trend, resolve_indicator_query
+from app.services.public_analytics_service import (
+    aggregate_global_trend,
+    aggregate_submission_coverage,
+    resolve_country_query,
+    resolve_indicator_query,
+)
 from app.services.public_document_service import (
+    catalog_public_documents,
     get_public_document_metadata,
     search_public_documents,
     stream_public_ai_document_download,
@@ -76,6 +82,74 @@ def public_resolve_indicator():
             exc_info=True,
         )
         return api_error("Could not resolve indicator", 500, error_id, None)
+
+
+@api_bp.route("/public/submissions/coverage", methods=["GET"])
+@api_rate_limit()
+def public_submission_coverage():
+    """
+    Count countries with a public submitted value for a template/indicator, by period.
+
+    Answers "how many countries submitted FDRS/UPR data for <period>, or across all
+    years?" — pass ``template_id=21`` for FDRS or ``22``/``24`` for UPR. Counts **public
+    data coverage** only (rows with data_status='available' on privacy=public form
+    items) — never internal assignment/workflow status, which requires an API key.
+    """
+    try:
+        template_id = request.args.get("template_id", type=int)
+        indicator_bank_id = request.args.get("indicator_bank_id", type=int)
+        query = request.args.get("query", default="", type=str).strip()
+        period_name = request.args.get("period_name", default="", type=str).strip()
+        country_id = request.args.get("country_id", type=int)
+        max_pages = request.args.get("max_pages", default=20, type=int)
+
+        payload = aggregate_submission_coverage(
+            template_id=template_id,
+            indicator_bank_id=indicator_bank_id,
+            query=query,
+            period_name=period_name,
+            country_id=country_id,
+            max_pages=max_pages,
+        )
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 400)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/submissions/coverage failed [ID: %s]: %s",
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not compute submission coverage", 500, error_id, None)
+
+
+@api_bp.route("/public/countries/resolve", methods=["GET"])
+@api_rate_limit()
+def public_resolve_country():
+    """Map a country name, ISO2/ISO3 code, or numeric id to Country reference fields."""
+    try:
+        query = request.args.get("query", default="", type=str).strip()
+        limit = request.args.get("limit", default=5, type=int)
+        if not query:
+            return api_error("query is required", 400)
+        payload = resolve_country_query(query, limit=max(1, min(limit, 20)))
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+        return response
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/countries/resolve failed [ID: %s]: %s",
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not resolve country", 500, error_id, None)
 
 
 @api_bp.route("/public/documents/search", methods=["GET"])
@@ -183,3 +257,47 @@ def public_download_ai_document(document_id: int):
             exc_info=True,
         )
         return api_error("Could not download public document", 500, error_id, None)
+
+
+@api_bp.route("/public/documents/catalog", methods=["GET"])
+@api_rate_limit()
+def public_documents_catalog():
+    """
+    Inventory public documents by type / year / country — counts, not semantic search.
+
+    Answers "how many countries submitted an annual report (FDRS) or a Unified Plan
+    (UPR) for 2024, or across all years?" directly from document metadata. Use
+    ``/public/documents/search`` instead for narrative Q&A over document content.
+    """
+    try:
+        document_type = request.args.get("document_type", default="", type=str).strip()
+        year = request.args.get("year", type=int)
+        country_id = request.args.get("country_id", type=int)
+        country_name = request.args.get("country_name", default="", type=str).strip() or None
+        file_type = request.args.get("file_type", default="", type=str).strip()
+        include_documents_raw = request.args.get("include_documents", default="true", type=str).strip().lower()
+        include_documents = include_documents_raw not in {"0", "false", "no"}
+
+        payload = catalog_public_documents(
+            document_type=document_type,
+            year=year,
+            country_id=country_id,
+            country_name=country_name,
+            file_type=file_type,
+            include_documents=include_documents,
+        )
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 400)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/documents/catalog failed [ID: %s]: %s",
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not build document catalog", 500, error_id, None)

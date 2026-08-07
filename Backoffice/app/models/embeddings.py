@@ -80,6 +80,8 @@ class AIDocument(db.Model):
     # Status values: pending, processing, completed, failed
 
     processing_error = Column(Text, nullable=True)  # Error message if failed
+    processing_stage = Column(String(64), nullable=True)  # Cross-worker granular stage
+    processing_heartbeat_at = Column(DateTime, nullable=True)  # Last stage update (any worker)
     processed_at = Column(DateTime, nullable=True)
 
     # Statistics

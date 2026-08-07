@@ -8,53 +8,12 @@
   var TERMINAL_JOB_STATUSES = ['completed', 'failed', 'cancelled'];
   var POLL_MS = 2000;
 
-  var JOB_SPECS = {
-    ifrc_api_bulk: {
-      storageKey: 'ai_docs_external_api_import_job',
-      statusUrl: function (jobId) {
-        return '/api/ai/documents/ifrc-api/import-bulk/' + encodeURIComponent(jobId) + '/status';
-      },
-      cancelUrl: function (jobId) {
-        return '/api/ai/documents/ifrc-api/import-bulk/' + encodeURIComponent(jobId) + '/cancel';
-      },
-      titleImport: true,
-    },
-    docs_b_bulk_import_system: {
-      storageKey: 'ai_docs_system_import_job',
-      statusUrl: function (jobId, urls) {
-        var tpl = urls && urls.importSystemBulkStatus;
-        if (tpl) return String(tpl).replace('__JOB__', encodeURIComponent(jobId));
-        return '/admin/ai/documents/import-system-bulk/' + encodeURIComponent(jobId) + '/status';
-      },
-      cancelUrl: function (jobId, urls) {
-        var tpl = urls && urls.importSystemBulkCancel;
-        if (tpl) return String(tpl).replace('__JOB__', encodeURIComponent(jobId));
-        return '/admin/ai/documents/import-system-bulk/' + encodeURIComponent(jobId) + '/cancel';
-      },
-      titleImport: true,
-    },
-    docs_bulk_reprocess: {
-      storageKey: 'ai_docs_bulk_reprocess_job',
-      statusUrl: function (jobId) {
-        return '/admin/ai/documents/bulk-reprocess/' + encodeURIComponent(jobId) + '/status';
-      },
-      cancelUrl: function (jobId) {
-        return '/admin/ai/documents/bulk-reprocess/' + encodeURIComponent(jobId) + '/cancel';
-      },
-      titleImport: false,
-    },
-    docs_bulk_reprocess_metadata: {
-      storageKey: 'ai_docs_bulk_reprocess_metadata_job',
-      statusUrl: function (jobId) {
-        return '/admin/ai/documents/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/status';
-      },
-      cancelUrl: function (jobId) {
-        return '/admin/ai/documents/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/cancel';
-      },
-      titleImport: false,
-      metadataOnly: true,
-    },
-  };
+  var JOB_SPECS = {};
+
+  function registerJobSpec(key, spec) {
+    if (!key || !spec) return;
+    JOB_SPECS[String(key)] = spec;
+  }
 
   function normalizeJobType(jobType) {
     var raw = String(jobType || '').trim();
@@ -424,6 +383,7 @@
       trackDoc(id, { silent: true });
       updateDocEntry(id, {
         silent: true,
+        resetProgress: true,
         status: 'pending',
         stage: state.t.pending_2d13df6f || 'Queued',
         progress: 0,
@@ -521,6 +481,7 @@
     var docListHtml = showDocList && docListExpanded ? renderDocListHtml(docRows) : '';
     var t = state.t;
 
+    var showCancel = !!opts.showCancel;
     if (state.bannerUI && state.bannerUI.exists && state.bannerUI.exists()) {
       state.bannerUI.update({
         title: title,
@@ -529,8 +490,7 @@
         showPercent: true,
         percentText: pct + '%',
       });
-      if (opts.showCancel) state.bannerUI.setCancelVisible(true);
-      if (opts.hideCancel) state.bannerUI.setCancelVisible(false);
+      state.bannerUI.setCancelVisible(showCancel);
       if (typeof opts.showSpinner === 'boolean') {
         state.bannerUI.setSpinnerVisible(opts.showSpinner);
       } else if (isJobTerminalDisplay() || opts.terminalComplete) {
@@ -566,8 +526,7 @@
       showSpinner = !(isJobTerminalDisplay() || opts.terminalComplete);
     }
     if (b.spinner) b.spinner.classList.toggle('hidden', !showSpinner);
-    if (opts.showCancel && b.cancelWrap) b.cancelWrap.classList.remove('hidden');
-    if (opts.hideCancel && b.cancelWrap) b.cancelWrap.classList.add('hidden');
+    if (b.cancelWrap) b.cancelWrap.classList.toggle('hidden', !showCancel);
 
     var toggleEl = state.bannerEls.docListToggle;
     if (toggleEl) {
@@ -707,7 +666,7 @@
           percent: 100,
           docRows: docRows,
           docListExpanded: state.docListExpanded,
-          hideCancel: true,
+          showCancel: false,
           terminalComplete: true,
           showSpinner: false,
         });
@@ -755,7 +714,7 @@
         percent: 100,
         docRows: docRows,
         docListExpanded: state.docListExpanded,
-        hideCancel: true,
+        showCancel: false,
         terminalComplete: true,
         showSpinner: false,
       });
@@ -925,7 +884,14 @@
     if (!Number.isFinite(id)) return;
     var prev = state.trackedDocs.get(id) || {};
     var next = Object.assign({}, prev, patch || {}, { updatedAt: Date.now() });
-    if (typeof next.progress === 'number') next.progress = clampPercent(next.progress);
+    if (typeof next.progress === 'number') {
+      next.progress = clampPercent(next.progress);
+      if (!patch || !patch.resetProgress) {
+        if (typeof prev.progress === 'number') {
+          next.progress = Math.max(prev.progress, next.progress);
+        }
+      }
+    }
     state.trackedDocs.set(id, next);
     if (!patch || !patch.silent) renderFromState();
   }
@@ -1102,7 +1068,7 @@
     if (!job) return;
     var spec = getSpec(job.jobType);
     if (!spec) return;
-    showBanner(state.t.cancelling_ef5ba1f8, '', 0, { hideCancel: true });
+    showBanner(state.t.cancelling_ef5ba1f8, '', 0, { showCancel: false });
     try {
       var url = spec.cancelUrl(job.jobId, state.urls);
       var fetchImpl = state.csrfFetchFn || fetch;
@@ -1182,6 +1148,7 @@
 
   window.AiDocsJobProgress = {
     init: init,
+    registerJobSpec: registerJobSpec,
     startJob: startJob,
     beginOptimisticJob: beginOptimisticJob,
     activateJob: activateJob,

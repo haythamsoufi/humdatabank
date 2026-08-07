@@ -180,7 +180,7 @@ async function initializeEntryForm() {
         safeInit('initAjaxSave', () => initAjaxSave());
 
         // Keep session alive while the user is actively filling the form.
-        // The keepalive fires every 20 min (well within the 30-min inactivity
+        // The keepalive fires every 60 min (well within the 2-hour inactivity
         // window) and also refreshes the CSRF token before the 1-hour limit.
         safeInit('initSessionKeepalive', () => initSessionKeepalive());
 

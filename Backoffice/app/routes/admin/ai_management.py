@@ -9,8 +9,6 @@ import os
 import logging
 import uuid
 import zipfile
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, current_app, send_file, after_this_request, redirect, abort
 from flask_login import current_user
@@ -31,29 +29,15 @@ from app.services.platform import storage_service as _storage
 from app.services.ai.ai_job_runner import (
     ensure_ai_job_running,
     get_active_ai_document_jobs_for_user,
+    job_cancel_requested,
+    run_ai_job,
+    signal_job_cancel,
     start_ai_job_thread,
 )
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("ai_management", __name__, url_prefix="/admin/ai")
-
-_REPROCESS_JOB_CANCEL_EVENTS: dict[str, threading.Event] = {}
-_REPROCESS_JOB_CANCEL_LOCK = threading.Lock()
-
-
-def _get_reprocess_job_cancel_event(job_id: str) -> threading.Event:
-    with _REPROCESS_JOB_CANCEL_LOCK:
-        ev = _REPROCESS_JOB_CANCEL_EVENTS.get(job_id)
-        if ev is None:
-            ev = threading.Event()
-            _REPROCESS_JOB_CANCEL_EVENTS[job_id] = ev
-        return ev
-
-
-def _clear_reprocess_job_cancel_event(job_id: str) -> None:
-    with _REPROCESS_JOB_CANCEL_LOCK:
-        _REPROCESS_JOB_CANCEL_EVENTS.pop(job_id, None)
 
 
 def _job_item_ai_document_id(item) -> int | None:
@@ -106,12 +90,12 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
         )
         from app.routes.ai_documents.upload import _process_document_sync
 
-        cancel_ev = _get_reprocess_job_cancel_event(job_id)
+        cancel_requested = job_cancel_requested(job_id)
         item = AIJobItem.query.get(int(item_id))
         if not item:
             return
 
-        if cancel_ev.is_set():
+        if cancel_requested:
             item.status = "cancelled"
             item.error = None
             db.session.commit()
@@ -142,7 +126,7 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
 
             file_path, temp_path, filename, from_url = _resolve_ai_doc_file_for_processing(doc)
 
-            if cancel_ev.is_set():
+            if job_cancel_requested(job_id):
                 item = AIJobItem.query.get(int(item_id))
                 if item:
                     item.status = "cancelled"
@@ -171,7 +155,7 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
             doc = AIDocument.query.get(int(doc.id))
             item = AIJobItem.query.get(int(item_id))
             if item:
-                if cancel_ev.is_set():
+                if job_cancel_requested(job_id):
                     item.status = "cancelled"
                     item.error = None
                 elif doc and doc.processing_status == "completed":
@@ -223,75 +207,13 @@ def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
 
 def _run_bulk_reprocess_job(app, job_id: str) -> None:
     """Background runner for bulk reprocess jobs."""
-    with app.app_context():
-        from app.models import AIJob
-
-        job = AIJob.query.get(str(job_id))
-        if not job:
-            return
-        if job.status in ("completed", "failed", "cancelled"):
-            return
-        job.status = "running"
-        job.started_at = utcnow()
-        db.session.commit()
-
-    cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
-    try:
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            concurrency = int((job.meta or {}).get("concurrency") or current_app.config.get("AI_DOCS_REPROCESS_CONCURRENCY", 1))
-            concurrency = max(1, min(concurrency, 4))
-            item_ids = [it.id for it in (job.items or []) if (it.status or "queued") == "queued"]
-
-        with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            futures = []
-            for item_id in item_ids:
-                if cancel_ev.is_set():
-                    break
-                futures.append(pool.submit(_process_reprocess_job_item_sync, app, job_id=str(job_id), item_id=int(item_id)))
-            for _f in as_completed(futures):
-                if cancel_ev.is_set():
-                    continue
-
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            if cancel_ev.is_set() or job.status == "cancel_requested":
-                try:
-                    for it in (job.items or []):
-                        if it.status == "queued":
-                            it.status = "cancelled"
-                    db.session.commit()
-                except Exception as e:
-                    current_app.logger.debug("AI job cancel commit failed: %s", e)
-                    db.session.rollback()
-                job.status = "cancelled"
-            else:
-                terminal = {"completed", "failed", "cancelled"}
-                all_terminal = all((it.status in terminal) for it in (job.items or []))
-                job.status = "completed" if all_terminal else "failed"
-            job.finished_at = utcnow()
-            db.session.commit()
-    except Exception as e:
-        logger.error("Bulk reprocess job failed: job=%s err=%s", job_id, e, exc_info=True)
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if job:
-                job.status = "failed"
-                job.error = "Processing failed."
-                job.finished_at = utcnow()
-                db.session.commit()
-    finally:
-        _clear_reprocess_job_cancel_event(str(job_id))
+    run_ai_job(
+        app,
+        job_id,
+        _process_reprocess_job_item_sync,
+        concurrency_config_keys=("AI_DOCS_REPROCESS_CONCURRENCY",),
+        default_concurrency=1,
+    )
 
 
 def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> None:
@@ -301,12 +223,11 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
         from app.routes.ai_documents.upload import _process_document_sync
         from app.services.ai.documents.ingest import _prepare_submitted_document_ai_import
 
-        cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
         item = AIJobItem.query.get(int(item_id))
         if not item:
             return
 
-        if cancel_ev.is_set():
+        if job_cancel_requested(job_id):
             item.status = "cancelled"
             item.error = None
             db.session.commit()
@@ -365,7 +286,7 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
         db.session.remove()
 
         try:
-            if cancel_ev.is_set():
+            if job_cancel_requested(job_id):
                 item = AIJobItem.query.get(int(item_id))
                 if item:
                     item.status = "cancelled"
@@ -382,7 +303,7 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
             if not item:
                 return
 
-            if cancel_ev.is_set():
+            if job_cancel_requested(job_id):
                 item.status = "cancelled"
                 item.error = None
             elif doc and doc.processing_status == "completed":
@@ -425,96 +346,17 @@ def _process_system_import_job_item_sync(app, *, job_id: str, item_id: int) -> N
 
 def _run_system_bulk_import_job(app, job_id: str) -> None:
     """Background runner for system-document bulk import jobs."""
-    with app.app_context():
-        from app.models import AIJob
-
-        job = AIJob.query.get(str(job_id))
-        if not job:
-            return
-        if job.status in ("completed", "failed", "cancelled"):
-            return
-        job.status = "running"
-        job.started_at = utcnow()
-        db.session.commit()
-        logger.info(
-            "Bulk system import job running: job=%s total_items=%s",
-            job_id,
-            int(job.total_items or 0),
-        )
-
-    cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
-    try:
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            concurrency = int(
-                (job.meta or {}).get("concurrency")
-                or current_app.config.get("AI_DOCS_SYSTEM_IMPORT_CONCURRENCY")
-                or current_app.config.get("AI_DOCS_IFRC_IMPORT_CONCURRENCY", 2)
-            )
-            concurrency = max(1, min(concurrency, 4))
-            item_ids = [it.id for it in (job.items or []) if (it.status or "queued") == "queued"]
-
-        with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            futures = []
-            for item_id in item_ids:
-                if cancel_ev.is_set():
-                    break
-                futures.append(
-                    pool.submit(
-                        _process_system_import_job_item_sync,
-                        app,
-                        job_id=str(job_id),
-                        item_id=int(item_id),
-                    )
-                )
-                import time as _time_job
-
-                _time_job.sleep(0.5)
-            for _f in as_completed(futures):
-                if cancel_ev.is_set():
-                    continue
-
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            if cancel_ev.is_set() or job.status == "cancel_requested":
-                try:
-                    for it in (job.items or []):
-                        if it.status == "queued":
-                            it.status = "cancelled"
-                            it.error = None
-                    db.session.commit()
-                except Exception as e:
-                    current_app.logger.debug("System import job cancel commit failed: %s", e)
-                    db.session.rollback()
-                job.status = "cancelled"
-            else:
-                terminal = {"completed", "failed", "cancelled"}
-                all_terminal = all((it.status in terminal) for it in (job.items or []))
-                job.status = "completed" if all_terminal else "failed"
-            job.finished_at = utcnow()
-            db.session.commit()
-            logger.info("Bulk system import job finished: job=%s status=%s", job_id, job.status)
-    except Exception as e:
-        logger.error("Bulk system import job failed: job=%s err=%s", job_id, e, exc_info=True)
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if job:
-                job.status = "failed"
-                job.error = "Processing failed."
-                job.finished_at = utcnow()
-                db.session.commit()
-    finally:
-        _clear_reprocess_job_cancel_event(str(job_id))
+    run_ai_job(
+        app,
+        job_id,
+        _process_system_import_job_item_sync,
+        concurrency_config_keys=(
+            "AI_DOCS_SYSTEM_IMPORT_CONCURRENCY",
+            "AI_DOCS_IFRC_IMPORT_CONCURRENCY",
+        ),
+        default_concurrency=2,
+        stagger_seconds=0.5,
+    )
 
 
 def _check_ai_tables_exist():
@@ -613,6 +455,27 @@ def _auto_recover_stale_processing_documents() -> int:
             candidate_ids = [doc_id for doc_id in candidate_ids if not get_document_processing_stage(int(doc_id))]
         except Exception as e:
             current_app.logger.debug("Document processing stage filter failed: %s", e)
+        if not candidate_ids:
+            return 0
+
+        # Keep docs with a recent cross-worker heartbeat.
+        try:
+            heartbeat_cutoff = utcnow() - timedelta(seconds=timeout_seconds)
+            fresh_ids = {
+                int(r[0])
+                for r in (
+                    db.session.query(AIDocument.id)
+                    .filter(AIDocument.id.in_(candidate_ids))
+                    .filter(AIDocument.processing_heartbeat_at.isnot(None))
+                    .filter(AIDocument.processing_heartbeat_at > heartbeat_cutoff)
+                    .all()
+                )
+                if r and r[0] is not None
+            }
+            if fresh_ids:
+                candidate_ids = [doc_id for doc_id in candidate_ids if int(doc_id) not in fresh_ids]
+        except Exception as e:
+            current_app.logger.debug("Processing heartbeat filter failed: %s", e)
         if not candidate_ids:
             return 0
 
@@ -872,49 +735,39 @@ def delete_document(document_id):
 def reprocess_document(document_id):
     """Reprocess a document (re-chunk and re-embed). Uses source_url for IFRC API docs when no local file."""
     try:
-        from app.models import AIDocument, AIDocumentChunk, AIEmbedding
-        from app.routes.ai_documents.upload import _process_document_sync
+        from app.models import AIDocument
+        from app.routes.ai_documents.upload import start_single_document_processing
 
         doc = AIDocument.query.get_or_404(document_id)
         doc.processing_status = 'pending'
         doc.processing_error = None
         db.session.commit()
 
-        # Capture before processing — _process_document_sync commits
-        # internally and may detach current_user from the session.
         admin_email = current_user.email
 
-        temp_path = None
-        from_url = False
+        def resolve_file():
+            # Deferred onto the background thread: resolving the source (which may
+            # download a source_url over the network) can be slow and must not block
+            # this request's 202 response.
+            fresh_doc = AIDocument.query.get(int(document_id))
+            if not fresh_doc:
+                raise FileNotFoundError("Document not found")
+            return _resolve_ai_doc_file_for_processing(fresh_doc)
 
-        file_path, temp_path, filename, from_url = _resolve_ai_doc_file_for_processing(doc)
+        start_single_document_processing(
+            current_app._get_current_object(),
+            document_id,
+            resolve_file=resolve_file,
+            pre_clear_chunks=True,
+        )
 
-        # Clear old chunks and embeddings before reprocessing
-        AIDocumentChunk.query.filter_by(document_id=document_id).delete()
-        AIEmbedding.query.filter_by(document_id=document_id).delete()
-        doc.total_chunks = 0
-        doc.total_embeddings = 0
-        db.session.commit()
+        logger.info(f"Admin {admin_email} started reprocess for AI document {document_id}")
+        return json_accepted(
+            document_id=document_id,
+            status='processing',
+            message='Reprocess started; poll document status for progress.',
+        )
 
-        try:
-            _process_document_sync(document_id, file_path, filename)
-        finally:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError as e:
-                    logger.warning(f"Could not remove temp file {temp_path}: {e}")
-            if from_url:
-                fresh_doc = db.session.get(AIDocument, document_id)
-                if fresh_doc:
-                    fresh_doc.storage_path = None
-                    db.session.commit()
-
-        logger.info(f"Admin {admin_email} reprocessed AI document {document_id}")
-        return json_ok(message='Document reprocessed successfully')
-
-    except FileNotFoundError as e:
-        return json_not_found(str(e))
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1242,7 +1095,7 @@ def bulk_reprocess_cancel(job_id: str):
             db.session.rollback()
         db.session.commit()
 
-        _get_reprocess_job_cancel_event(str(job_id)).set()
+        signal_job_cancel(str(job_id))
         return json_ok(status="cancel_requested")
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -1253,12 +1106,12 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
         from app.models import AIDocument, AIJobItem
         from app.services.ai.documents.processor import AIDocumentProcessor
 
-        cancel_ev = _get_reprocess_job_cancel_event(job_id)
+        cancel_requested = job_cancel_requested(job_id)
         item = AIJobItem.query.get(int(item_id))
         if not item:
             return
 
-        if cancel_ev.is_set():
+        if cancel_requested:
             item.status = "cancelled"
             db.session.commit()
             return
@@ -1282,7 +1135,7 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
             file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
             effective_source_url = (getattr(doc, "source_url", None) or "").strip() or None
 
-            if cancel_ev.is_set():
+            if job_cancel_requested(job_id):
                 item = AIJobItem.query.get(int(item_id))
                 if item:
                     item.status = "cancelled"
@@ -1322,7 +1175,7 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
 
             item = AIJobItem.query.get(int(item_id))
             if item:
-                item.status = "cancelled" if cancel_ev.is_set() else "completed"
+                item.status = "cancelled" if job_cancel_requested(job_id) else "completed"
                 db.session.commit()
 
         except Exception as e:
@@ -1345,69 +1198,13 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
 
 def _run_bulk_metadata_reprocess_job(app, job_id: str) -> None:
     """Background runner for bulk metadata reprocess jobs."""
-    with app.app_context():
-        from app.models import AIJob
-
-        job = AIJob.query.get(str(job_id))
-        if not job or job.status in ("completed", "failed", "cancelled"):
-            return
-        job.status = "running"
-        job.started_at = utcnow()
-        db.session.commit()
-
-    cancel_ev = _get_reprocess_job_cancel_event(str(job_id))
-    try:
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            concurrency = max(1, min(int((job.meta or {}).get("concurrency") or 2), 4))
-            item_ids = [it.id for it in (job.items or []) if (it.status or "queued") == "queued"]
-
-        with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            futures = []
-            for item_id in item_ids:
-                if cancel_ev.is_set():
-                    break
-                futures.append(pool.submit(_process_metadata_reprocess_job_item_sync, app, str(job_id), int(item_id)))
-            for _f in as_completed(futures):
-                pass  # errors handled inside item worker
-
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if not job:
-                return
-            if cancel_ev.is_set() or job.status == "cancel_requested":
-                try:
-                    for it in (job.items or []):
-                        if it.status == "queued":
-                            it.status = "cancelled"
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
-                job.status = "cancelled"
-            else:
-                terminal = {"completed", "failed", "cancelled"}
-                job.status = "completed" if all((it.status in terminal) for it in (job.items or [])) else "failed"
-            job.finished_at = utcnow()
-            db.session.commit()
-    except Exception as e:
-        logger.error("Bulk metadata reprocess job failed: job=%s err=%s", job_id, e, exc_info=True)
-        with app.app_context():
-            from app.models import AIJob
-
-            job = AIJob.query.get(str(job_id))
-            if job:
-                job.status = "failed"
-                job.error = "Processing failed."
-                job.finished_at = utcnow()
-                db.session.commit()
-    finally:
-        _clear_reprocess_job_cancel_event(str(job_id))
+    run_ai_job(
+        app,
+        job_id,
+        _process_metadata_reprocess_job_item_sync,
+        concurrency_config_keys=(),
+        default_concurrency=2,
+    )
 
 
 @bp.route("/documents/bulk-reprocess-metadata", methods=["POST"])
@@ -1553,7 +1350,7 @@ def bulk_reprocess_metadata_cancel(job_id: str):
         except Exception:
             db.session.rollback()
         db.session.commit()
-        _get_reprocess_job_cancel_event(str(job_id)).set()
+        signal_job_cancel(str(job_id))
         return json_ok(status="cancel_requested")
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -1774,7 +1571,7 @@ def import_system_bulk_cancel(job_id: str):
         except Exception:
             db.session.rollback()
         db.session.commit()
-        _get_reprocess_job_cancel_event(str(job_id)).set()
+        signal_job_cancel(str(job_id))
         return json_ok(status="cancel_requested")
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -1961,21 +1758,34 @@ def document_processing_status(document_id):
             )
 
         # In-memory step (set during _process_document_sync) for accurate banner during process
-        from app.routes.ai_documents.upload import get_document_processing_stage
+        from app.routes.ai_documents.upload import (
+            get_document_processing_stage,
+            get_document_processing_stage_from_db,
+        )
         current_stage = get_document_processing_stage(document_id)
+        if not current_stage:
+            current_stage = get_document_processing_stage_from_db(document_id)
 
         # Stuck detection:
-        # If DB says 'processing' but there's no active in-memory stage in THIS process, the work may be:
+        # If DB says 'processing' but there's no active stage in THIS process, the work may be:
         # - interrupted (server restart), OR
         # - running in another worker/process (stage is in-memory and not shared).
         #
-        # To avoid false-failing valid jobs (multi-worker) and to avoid duplicate logs (concurrent polls),
-        # only mark as failed after a configurable grace period, and do it with an atomic UPDATE.
-        #
+        # Use whichever timestamp is most recent (not just the first non-null one) —
+        # processing_heartbeat_at is never cleared between runs, so a document reprocessed
+        # after finishing hours/days ago would otherwise have its stale old heartbeat beat
+        # out a fresh updated_at/created_at from the current run.
         if doc.processing_status == 'processing' and current_stage is None:
             timeout_seconds = int(current_app.config.get("AI_DOCS_STUCK_NO_STAGE_TIMEOUT_SECONDS", 3600))
-            # Prefer updated_at; it changes on commits during processing. Fall back to created_at.
-            last_touched = ensure_utc(doc.updated_at or doc.created_at or utcnow())
+            touch_candidates = [
+                ts for ts in (
+                    ensure_utc(doc.processing_heartbeat_at),
+                    ensure_utc(doc.updated_at),
+                    ensure_utc(doc.created_at),
+                )
+                if ts is not None
+            ]
+            last_touched = max(touch_candidates) if touch_candidates else utcnow()
             age_seconds = (utcnow() - last_touched).total_seconds()
 
             if age_seconds >= timeout_seconds:
@@ -2054,6 +1864,7 @@ def document_processing_status(document_id):
                     doc = AIDocument.query.get(document_id)
 
         _STAGE_PROGRESS = {
+            'resetting': ('Resetting', 10),
             'extracting': ('Extracting text', 15),
             'chunking': ('Chunking', 35),
             'creating_chunks': ('Creating chunks', 50),

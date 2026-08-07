@@ -15,11 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from pb_figures.render_docx import (  # noqa: E402
+    _DOCX_CONTENT_WIDTH_IN,
     _DOCX_LABEL_COL_IN,
     _DOCX_PAGE_MARGIN,
     _add_donut_pair_block,
+    _chart_area_width,
     _configure_page_margins,
     _cumulative_table_widths,
+    _donut_pair_widths,
     _set_cell_text,
     _set_table_inner_borders,
 )
@@ -66,6 +69,16 @@ class TableInnerBorderTests(unittest.TestCase):
         widths = _cumulative_table_widths(5)
         self.assertEqual(widths[0], _DOCX_LABEL_COL_IN)
         self.assertGreater(widths[0], 2.05)
+
+    def test_cumulative_table_widths_span_content_area(self) -> None:
+        widths = _cumulative_table_widths(5)
+        self.assertAlmostEqual(sum(widths), _DOCX_CONTENT_WIDTH_IN, places=5)
+        self.assertAlmostEqual(_chart_area_width(5), _DOCX_CONTENT_WIDTH_IN - _DOCX_LABEL_COL_IN, places=5)
+        self.assertGreater(widths[1], 0.9)
+
+    def test_donut_pair_widths_span_content_area(self) -> None:
+        widths = _donut_pair_widths()
+        self.assertAlmostEqual(sum(widths), _DOCX_CONTENT_WIDTH_IN, places=5)
 
 
 class DonutPairTableTests(unittest.TestCase):

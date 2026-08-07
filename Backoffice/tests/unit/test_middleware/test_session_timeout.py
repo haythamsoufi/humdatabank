@@ -31,10 +31,10 @@ class TestSessionConfig:
             "Update this test only if you intentionally changed the lifetime."
         )
 
-    def test_inactivity_timeout_default_is_30_minutes(self):
-        """Default SESSION_INACTIVITY_TIMEOUT must be 30 minutes."""
+    def test_inactivity_timeout_default_is_two_hours(self):
+        """Default SESSION_INACTIVITY_TIMEOUT must be 2 hours."""
         from config import Config
-        assert Config.SESSION_INACTIVITY_TIMEOUT == timedelta(minutes=30)
+        assert Config.SESSION_INACTIVITY_TIMEOUT == timedelta(hours=2)
 
     def test_permanent_session_lifetime_propagated_to_flask_app(self, app):
         """The Flask app config must carry the 10-hour lifetime from Config."""

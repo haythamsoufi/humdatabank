@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from contextlib import suppress
 from flask import current_app
-from sqlalchemy import and_, desc, inspect, or_
+from sqlalchemy import and_, desc, exists, func, inspect, or_
 from sqlalchemy.orm import Query, joinedload
 
 from app import db
@@ -24,9 +24,12 @@ from app.models import (
     PublicSubmissionStatus,
     SecurityEvent,
     User,
+    UserActivityLog,
+    UserEntityPermission,
     UserLoginLog,
     UserSessionLog,
 )
+from app.models.system import AdminActionLog
 from app.services import get_platform_stats
 from app.services.audit.trail_session_query import (
     count_audit_visible_entries_for_session,
@@ -505,6 +508,137 @@ def get_admin_dashboard_stats() -> Dict[str, Any]:
         'overdue_assignments': overdue_assignments,
         'pending_public_submissions_count': pending_public_submissions_count,
     }
+
+
+def get_user_management_overview_stats(*, include_analytics: bool = True) -> Dict[str, Any]:
+    """Summary metrics for the Manage Users admin page."""
+    total_users = 0
+    with suppress(Exception):
+        total_users = User.query.count()
+
+    users_without_entity_access = _count_active_users_without_entity_access()
+    never_logged_in = _count_active_users_never_logged_in()
+    stale_accounts_90d = _count_stale_active_accounts(days=90)
+
+    week_ago = utcnow() - timedelta(days=7)
+    new_users_this_week = _count_new_users_this_week(week_ago)
+
+    today_logins = 0
+    active_sessions = 0
+    if include_analytics:
+        today_start = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        with suppress(Exception):
+            if has_table(UserLoginLog.__tablename__):
+                today_logins = UserLoginLog.query.filter(
+                    and_(
+                        UserLoginLog.timestamp >= today_start,
+                        UserLoginLog.event_type == 'login_success',
+                    )
+                ).count()
+
+        with suppress(Exception):
+            if has_table(UserSessionLog.__tablename__):
+                active_sessions = UserSessionLog.query.filter(
+                    or_(UserSessionLog.is_active.is_(True), UserSessionLog.session_end.is_(None))
+                ).count()
+
+    return {
+        'total_users': total_users,
+        'users_without_entity_access': users_without_entity_access,
+        'never_logged_in': never_logged_in,
+        'stale_accounts_90d': stale_accounts_90d,
+        'today_logins': today_logins,
+        'active_sessions': active_sessions,
+        'new_users_this_week': new_users_this_week,
+    }
+
+
+def _count_active_users_without_entity_access() -> int:
+    """Active users with no entity permissions assigned."""
+    with suppress(Exception):
+        has_entity_permission = exists().where(
+            UserEntityPermission.user_id == User.id
+        )
+        return (
+            User.query.filter(User.active.is_(True), ~has_entity_permission).count()
+        )
+    return 0
+
+
+def _count_active_users_never_logged_in() -> int:
+    """Active users with no recorded successful login."""
+    with suppress(Exception):
+        if not has_table(UserLoginLog.__tablename__):
+            return 0
+
+        has_successful_login = exists().where(
+            and_(
+                UserLoginLog.user_id == User.id,
+                UserLoginLog.event_type == 'login_success',
+            )
+        )
+        return User.query.filter(User.active.is_(True), ~has_successful_login).count()
+    return 0
+
+
+def _count_stale_active_accounts(*, days: int = 90) -> int:
+    """Active users whose last successful login was more than ``days`` ago."""
+    with suppress(Exception):
+        if not has_table(UserLoginLog.__tablename__):
+            return 0
+
+        cutoff = utcnow() - timedelta(days=days)
+        last_login_subq = (
+            db.session.query(
+                UserLoginLog.user_id.label('user_id'),
+                func.max(UserLoginLog.timestamp).label('last_login'),
+            )
+            .filter(UserLoginLog.event_type == 'login_success')
+            .group_by(UserLoginLog.user_id)
+            .subquery()
+        )
+        return (
+            db.session.query(func.count(User.id))
+            .join(last_login_subq, User.id == last_login_subq.c.user_id)
+            .filter(
+                User.active.is_(True),
+                last_login_subq.c.last_login < cutoff,
+            )
+            .scalar()
+            or 0
+        )
+    return 0
+
+
+def _count_new_users_this_week(since: datetime) -> int:
+    """Distinct users created since ``since`` (admin, self-service, or SSO)."""
+    user_ids = set()
+    with suppress(Exception):
+        if has_table(AdminActionLog.__tablename__):
+            admin_rows = (
+                AdminActionLog.query.filter(
+                    AdminActionLog.action_type == 'user_create',
+                    AdminActionLog.timestamp >= since,
+                    AdminActionLog.target_id.isnot(None),
+                )
+                .with_entities(AdminActionLog.target_id)
+                .all()
+            )
+            user_ids.update(int(row[0]) for row in admin_rows if row[0] is not None)
+
+    with suppress(Exception):
+        if has_table(UserActivityLog.__tablename__):
+            activity_rows = (
+                UserActivityLog.query.filter(
+                    UserActivityLog.activity_type == 'account_created',
+                    UserActivityLog.timestamp >= since,
+                )
+                .with_entities(UserActivityLog.user_id)
+                .all()
+            )
+            user_ids.update(int(row[0]) for row in activity_rows if row[0] is not None)
+
+    return len(user_ids)
 
 
 @dataclass

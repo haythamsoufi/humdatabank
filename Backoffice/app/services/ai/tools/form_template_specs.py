@@ -151,7 +151,9 @@ _ITEM_SCHEMA: Dict[str, Any] = {
                 "name_translations: {en: 'Column label', ...}, optional group}], "
                 "rows: [{text, name_translations?}] (manual mode), "
                 "lookup_list_id + list_display_column (list_library mode), "
-                "show_row_totals, show_column_totals}."
+                "show_row_totals, show_column_totals, include_calculated_totals_in_api "
+                "(default true; set false to keep calculated totals visible on-screen "
+                "but excluded from API/export output for this matrix)}."
             ),
         },
         "relevance": {**_RULE_SCHEMA, "description": "Skip logic: show this field only when the rule passes."},

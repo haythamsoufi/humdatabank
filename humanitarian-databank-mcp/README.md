@@ -11,7 +11,11 @@ It proxies the **public** IFRC Humanitarian Databank API for Claude, Cursor, and
 |------|-------------------|---------|
 | `databank_aggregate_global_trend` | `getGlobalTrend` | **Preferred** — deduped global totals by period |
 | `databank_resolve_indicator` | `resolveIndicator` | Map natural-language metric names to indicator IDs |
+| `databank_get_submission_coverage` | `getSubmissionCoverage` | **Preferred** — count countries with public data by template/period |
+| `databank_resolve_country` | `resolveCountry` | Map a country name / ISO2/ISO3 / id to reference fields |
 | `databank_search_public_documents` | `searchPublicDocuments` | Public UPR/FDRS document chunks (cited Q&A) |
+| `databank_get_documents_catalog` | `getPublicDocumentsCatalog` | **Preferred** — count/list public documents by type, year, country |
+| `databank_get_public_document` | `getPublicDocument` | One document's metadata (title, countries, shareable link) |
 | `databank_search_indicators` | `getIndicatorBank` | Search indicator bank (ranked, slim, capped) |
 | `databank_get_indicator` | `getIndicatorById` | One indicator's metadata |
 | `databank_get_public_data` | `getPublicData` | One page of scoped public `/data` |
@@ -42,8 +46,25 @@ databank_search_public_documents(
 )
 ```
 
+**"How many countries submitted FDRS data for 2024?" (numeric):**
+```text
+databank_get_submission_coverage(template_id=21, period_name="Annual 2024")
+  → countries_submitted_total, by_period[]
+```
+
+**"How many countries submitted an annual report / Unified Plan, all years?" (documents):**
+```text
+databank_get_documents_catalog(document_type="annual_report")
+  → countries_count, by_year[], by_country[]
+```
+
 **Do not** sum raw `/data` rows for network-wide totals — use `databank_aggregate_global_trend`.
+**Do not** paginate `/data` or `searchPublicDocuments` just to count countries — use
+`databank_get_submission_coverage` / `databank_get_documents_catalog` instead.
 **Do not** set `include_dimensions=true` unless explicitly needed (matches Custom GPT).
+
+Both counting tools report **public data/document coverage only** — never internal
+assignment or workflow status (submitted/pending/approved), which requires an API key.
 
 ## Quick start (local)
 

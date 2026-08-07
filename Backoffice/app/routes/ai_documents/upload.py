@@ -6,8 +6,7 @@ import os
 import logging
 import threading
 import time
-import requests
-from typing import Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional
 
 from flask import request, current_app
 from flask_login import login_required, current_user
@@ -51,6 +50,49 @@ _document_processing_stage: Dict[int, str] = {}
 def get_document_processing_stage(document_id: int) -> Optional[str]:
     """Return current processing step for document_id if processing in this process."""
     return _document_processing_stage.get(document_id)
+
+
+def get_document_processing_stage_from_db(document_id: int) -> Optional[str]:
+    """Return persisted processing stage from the database (cross-worker safe)."""
+    try:
+        doc = AIDocument.query.get(int(document_id))
+        if doc and getattr(doc, "processing_stage", None):
+            return str(doc.processing_stage)
+    except Exception as e:
+        logger.debug("get_document_processing_stage_from_db failed: %s", e)
+    return None
+
+
+def _mark_processing_stage(document_id: int, stage: str) -> None:
+    """Persist granular stage in-memory (same worker) and in the DB (any worker)."""
+    _document_processing_stage[int(document_id)] = stage
+    try:
+        doc = AIDocument.query.get(int(document_id))
+        if doc:
+            doc.processing_stage = stage
+            doc.processing_heartbeat_at = utcnow()
+            db.session.commit()
+    except Exception as e:
+        logger.debug("_mark_processing_stage failed for doc %s: %s", document_id, e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+
+def _clear_processing_stage(document_id: int) -> None:
+    _document_processing_stage.pop(int(document_id), None)
+    try:
+        doc = AIDocument.query.get(int(document_id))
+        if doc:
+            doc.processing_stage = None
+            db.session.commit()
+    except Exception as e:
+        logger.debug("_clear_processing_stage failed for doc %s: %s", document_id, e)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
 
 
 @ai_docs_bp.route('/upload', methods=['POST'])
@@ -219,17 +261,25 @@ def reprocess_document(document_id: int):
         filename = doc.filename or 'document'
 
         temp_from_submitted = None
+        resolve_file = None
         if doc.source_url:
-            try:
-                temp_path, filename, file_size, content_hash, file_type = _download_ifrc_document(doc.source_url)
-                file_path = temp_path
-                doc.file_size_bytes = file_size
-                doc.content_hash = content_hash
-                doc.file_type = file_type
-                doc.filename = filename
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Failed to download URL for reprocess: {e}", exc_info=True)
-                return json_server_error('Failed to download document.')
+            source_url = doc.source_url
+
+            def resolve_file():
+                # Runs on the background thread — the network download is the slow part
+                # this route should not block on, so it's deferred here instead of running
+                # inline before the 202 response.
+                downloaded_temp_path, downloaded_filename, file_size, content_hash, file_type = (
+                    _download_ifrc_document(source_url)
+                )
+                fresh_doc = AIDocument.query.get(int(document_id))
+                if fresh_doc:
+                    fresh_doc.file_size_bytes = file_size
+                    fresh_doc.content_hash = content_hash
+                    fresh_doc.file_type = file_type
+                    fresh_doc.filename = downloaded_filename
+                    db.session.commit()
+                return downloaded_temp_path, downloaded_temp_path, downloaded_filename, True
         else:
             if not doc.storage_path or not _ai_doc_source_ready(doc):
                 return json_not_found('Source file not found')
@@ -246,23 +296,34 @@ def reprocess_document(document_id: int):
                 file_path = _storage.get_absolute_path(_storage.AI_DOCUMENTS, doc.storage_path)
 
         try:
-            _process_document_sync(document_id, file_path, filename)
-        finally:
+            start_single_document_processing(
+                current_app._get_current_object(),
+                document_id,
+                file_path=file_path,
+                filename=filename,
+                temp_path=temp_path,
+                temp_from_submitted=temp_from_submitted,
+                clear_storage_path=False,
+                resolve_file=resolve_file,
+            )
+        except Exception:
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
-                except OSError as e:
-                    logger.warning(f"Could not remove temp file {temp_path}: {e}")
+                except OSError:
+                    pass
             if temp_from_submitted and os.path.exists(temp_from_submitted):
                 try:
                     os.remove(temp_from_submitted)
-                except OSError as e:
-                    logger.warning(f"Could not remove temp file {temp_from_submitted}: {e}")
-            if doc.source_url:
-                doc.storage_path = None
-                db.session.commit()
+                except OSError:
+                    pass
+            raise
 
-        return json_ok(message='Document reprocessed successfully', status='completed')
+        return json_accepted(
+            document_id=document_id,
+            status='processing',
+            message='Reprocess started; poll document status for progress.',
+        )
 
     except Exception as e:
         logger.error(f"Reprocess document error: {e}", exc_info=True)
@@ -326,7 +387,108 @@ def _run_import_process_in_thread(
                     except Exception as e:
                         logger.error(f"Cleanup error: {e}", exc_info=True)
 
-    t = threading.Thread(target=run, daemon=True)
+    t = threading.Thread(target=run, daemon=False, name=f"ai-doc-upload-{document_id}")
+    t.start()
+
+
+def start_single_document_processing(
+    app,
+    document_id: int,
+    *,
+    file_path: Optional[str] = None,
+    filename: Optional[str] = None,
+    temp_path: Optional[str] = None,
+    temp_from_submitted: Optional[str] = None,
+    clear_storage_path: bool = False,
+    pre_clear_chunks: bool = False,
+    resolve_file: Optional[Callable[[], tuple]] = None,
+) -> None:
+    """
+    Run document reprocessing in a background thread (non-blocking HTTP response).
+
+    Pass file_path/filename directly when the source is already resolved (a local
+    file). Pass resolve_file instead to defer resolution onto the background thread
+    too — e.g. a source_url network download — so the request returns immediately
+    either way. resolve_file is a zero-arg callable, invoked inside this thread's own
+    app context, that must return (file_path, temp_path, filename, clear_storage_path);
+    those four override whatever was passed in the matching keyword arguments above.
+    """
+    ctx = {
+        "file_path": file_path,
+        "filename": filename,
+        "temp_path": temp_path,
+        "clear_storage_path": clear_storage_path,
+    }
+
+    def run():
+        with app.app_context():
+            try:
+                if resolve_file is not None:
+                    try:
+                        resolved_path, resolved_temp, resolved_name, resolved_clear = resolve_file()
+                    except Exception as resolve_err:
+                        logger.error(
+                            "Background file resolution failed for doc %s: %s",
+                            document_id, resolve_err, exc_info=True,
+                        )
+                        try:
+                            doc2 = AIDocument.query.get(int(document_id))
+                            if doc2:
+                                doc2.processing_status = "failed"
+                                doc2.processing_error = _summarize_processing_error(resolve_err)
+                                db.session.commit()
+                        except Exception as update_e:
+                            logger.debug("Status update after resolve failure: %s", update_e)
+                            db.session.rollback()
+                        return
+                    ctx["file_path"] = resolved_path
+                    ctx["temp_path"] = resolved_temp
+                    ctx["filename"] = resolved_name or ctx["filename"]
+                    ctx["clear_storage_path"] = resolved_clear
+
+                if pre_clear_chunks:
+                    from app.models import AIDocumentChunk, AIEmbedding
+
+                    AIDocumentChunk.query.filter_by(document_id=int(document_id)).delete()
+                    AIEmbedding.query.filter_by(document_id=int(document_id)).delete()
+                    doc = AIDocument.query.get(int(document_id))
+                    if doc:
+                        doc.total_chunks = 0
+                        doc.total_embeddings = 0
+                        db.session.commit()
+                _process_document_sync(int(document_id), ctx["file_path"], ctx["filename"])
+            except Exception as e:
+                logger.error("Background reprocess failed: %s", e, exc_info=True)
+                try:
+                    db.session.rollback()
+                except Exception as rb_e:
+                    logger.debug("Rollback after reprocess failure: %s", rb_e)
+                try:
+                    doc2 = AIDocument.query.get(int(document_id))
+                    if doc2:
+                        doc2.processing_status = "failed"
+                        doc2.processing_error = GENERIC_ERROR_MESSAGE
+                        db.session.commit()
+                except Exception as update_e:
+                    logger.debug("Status update after reprocess failure: %s", update_e)
+                    db.session.rollback()
+            finally:
+                for path in (ctx["temp_path"], temp_from_submitted):
+                    if path and os.path.exists(path):
+                        try:
+                            os.remove(path)
+                        except OSError as e:
+                            logger.warning("Could not remove temp file %s: %s", path, e)
+                if ctx["clear_storage_path"]:
+                    try:
+                        doc = AIDocument.query.get(int(document_id))
+                        if doc:
+                            doc.storage_path = None
+                            db.session.commit()
+                    except Exception as e:
+                        logger.debug("Clear storage_path after reprocess failed: %s", e)
+
+    t = threading.Thread(target=run, daemon=False, name=f"ai-doc-reprocess-{document_id}")
     t.start()
 
 
@@ -561,7 +723,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
 
         doc = AIDocument.query.get(document_id)
 
-        _document_processing_stage[document_id] = 'resetting'
+        _mark_processing_stage(document_id, 'resetting')
         AIDocumentChunk.query.filter_by(document_id=document_id).delete()
         AIEmbedding.query.filter_by(document_id=document_id).delete()
         doc.total_chunks = 0
@@ -570,7 +732,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
         doc.total_pages = None
         db.session.commit()
 
-        _document_processing_stage[document_id] = 'extracting'
+        _mark_processing_stage(document_id, 'extracting')
         logger.info(f"Processing document {document_id}: {filename}")
         processor = AIDocumentProcessor()
 
@@ -606,7 +768,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
         except Exception as _meta_err:
             logger.warning("Metadata enrichment failed for doc %s: %s", document_id, _meta_err)
 
-        _document_processing_stage[document_id] = 'chunking'
+        _mark_processing_stage(document_id, 'chunking')
 
         logger.info(f"Chunking document {document_id}")
         chunker = AIChunkingService()
@@ -636,7 +798,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
         doc.total_chunks = len(chunks)
         doc.total_tokens = sum(c.token_count for c in chunks)
         doc.total_pages = extracted['metadata'].get('total_pages')
-        _document_processing_stage[document_id] = 'creating_chunks'
+        _mark_processing_stage(document_id, 'creating_chunks')
         db.session.commit()
 
         logger.info(f"Creating {len(chunks)} chunk records for document {document_id}")
@@ -678,7 +840,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
         _time_inner.sleep(0)
 
         if _doc_searchable:
-            _document_processing_stage[document_id] = 'embedding'
+            _mark_processing_stage(document_id, 'embedding')
             logger.info(f"Generating embeddings for document {document_id}")
             embedder = AIEmbeddingService()
 
@@ -691,7 +853,7 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
 
             doc.embedding_model = embedder.model
             doc.embedding_dimensions = embedder.dimensions
-            _document_processing_stage[document_id] = 'storing_embeddings'
+            _mark_processing_stage(document_id, 'storing_embeddings')
 
             logger.info(f"Storing {len(embeddings)} embeddings for document {document_id}")
             vector_store = AIVectorStore()
@@ -765,5 +927,5 @@ def _process_document_sync(document_id: int, file_path: str, filename: str):
         raise
 
     finally:
-        _document_processing_stage.pop(document_id, None)
+        _clear_processing_stage(document_id)
         _release_inflight_document(int(document_id))

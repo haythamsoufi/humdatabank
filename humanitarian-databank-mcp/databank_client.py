@@ -152,6 +152,73 @@ def search_public_documents(
     return _get("/public/documents/search", params)
 
 
+def get_public_document(document_id: int) -> Dict[str, Any]:
+    """Public metadata for one AI document via GET /public/documents/<id>."""
+    return _get(f"/public/documents/{int(document_id)}")
+
+
+def get_public_documents_catalog(
+    *,
+    document_type: str = "",
+    year: Optional[int] = None,
+    country_id: Optional[int] = None,
+    country_name: str = "",
+    file_type: str = "",
+    include_documents: bool = True,
+) -> Dict[str, Any]:
+    """Inventory public documents by type/year/country via GET /public/documents/catalog."""
+    params: Dict[str, Any] = {"include_documents": "true" if include_documents else "false"}
+    if document_type.strip():
+        params["document_type"] = document_type.strip()
+    if year is not None:
+        params["year"] = int(year)
+    if country_id is not None:
+        params["country_id"] = int(country_id)
+    if country_name.strip():
+        params["country_name"] = country_name.strip()
+    if file_type.strip():
+        params["file_type"] = file_type.strip()
+    return _get("/public/documents/catalog", params)
+
+
+def get_submission_coverage(
+    *,
+    template_id: Optional[int] = None,
+    indicator_bank_id: Optional[int] = None,
+    query: str = "",
+    period_name: str = "",
+    country_id: Optional[int] = None,
+    max_pages: int = 20,
+) -> Dict[str, Any]:
+    """Count countries with public submitted data via GET /public/submissions/coverage."""
+    if template_id is None and indicator_bank_id is None and not query.strip():
+        raise DatabankAPIError("Provide template_id, indicator_bank_id, or query for submission coverage.")
+
+    params: Dict[str, Any] = {"max_pages": max(1, min(int(max_pages), 20))}
+    if template_id is not None:
+        params["template_id"] = int(template_id)
+    if indicator_bank_id is not None:
+        params["indicator_bank_id"] = int(indicator_bank_id)
+    if query.strip():
+        params["query"] = query.strip()
+    if period_name.strip():
+        params["period_name"] = period_name.strip()
+    if country_id is not None:
+        params["country_id"] = int(country_id)
+    return _get("/public/submissions/coverage", params)
+
+
+def resolve_public_country(query: str, *, limit: int = 5) -> Dict[str, Any]:
+    """Map a country name/ISO code/id to Country reference fields via GET /public/countries/resolve."""
+    raw = (query or "").strip()
+    if not raw:
+        raise DatabankAPIError("query is required")
+    return _get(
+        "/public/countries/resolve",
+        {"query": raw, "limit": max(1, min(int(limit), 20))},
+    )
+
+
 def get_public_data_page(
     *,
     indicator_bank_id: Optional[int] = None,

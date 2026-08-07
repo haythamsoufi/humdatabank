@@ -183,9 +183,34 @@ def password_reset_rate_limit():
         methods=['POST'],
     )
 
-def api_rate_limit():
-    """Rate limiting for API endpoints."""
-    return rate_limit(requests_per_minute=60, key_func=lambda: f"api_{get_client_ip()}")
+def _api_rate_limit_identity_key() -> str:
+    """
+    Bucket API rate limits by API key when present, falling back to client IP.
+
+    Runs before ``authenticate_api_request()`` (that happens inside the view), so
+    this only peeks at the raw ``Authorization`` header — no DB lookup — to avoid
+    duplicating auth work on every request, including ones that get rejected.
+    The key itself is never stored: only a truncated SHA-256 hash is kept in the
+    in-memory rate-limit buckets.
+
+    Without this, every request sharing a NAT/proxy IP (or a request without a
+    forwarded-for header at all) shares one bucket regardless of which API key —
+    if any — it authenticates with, letting one noisy caller throttle unrelated
+    integrators, while a trusted key gets no benefit from being a distinct, known
+    caller.
+    """
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[len('Bearer '):].strip()
+        if token:
+            import hashlib
+            return f"key_{hashlib.sha256(token.encode('utf-8')).hexdigest()[:16]}"
+    return f"api_{get_client_ip()}"
+
+
+def api_rate_limit(requests_per_minute=60):
+    """Rate limiting for API endpoints. Keys by API key when authenticated, else client IP."""
+    return rate_limit(requests_per_minute=requests_per_minute, key_func=_api_rate_limit_identity_key)
 
 
 def mobile_rate_limit(requests_per_minute=30):

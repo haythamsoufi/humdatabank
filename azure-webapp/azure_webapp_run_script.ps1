@@ -102,7 +102,9 @@ if ($uploadPairs.Count -gt 0) {
 Write-Host "Command      : $remoteCmd"
 Write-Host ""
 
-$exitCode = Use-AzureWebAppTunnel `
+# Called bare (not `$exitCode = ...`) so the remote command's output reaches the real
+# console instead of being captured. See Use-AzureWebAppTunnel for why.
+Use-AzureWebAppTunnel `
     -WebApp $target.WebApp `
     -ResourceGroup $target.ResourceGroup `
     -Port $target.Port `
@@ -116,10 +118,7 @@ $exitCode = Use-AzureWebAppTunnel `
             Send-AzureWebAppRemoteFile `
                 -LocalPath $localScriptPath `
                 -RemotePath $remoteScriptPath `
-                -PlinkPath $Ctx.PlinkPath `
-                -PscpPath $Ctx.PscpPath `
-                -LocalPort $Ctx.Port `
-                -HostKey $Ctx.HostKey
+                -LocalPort $Ctx.Port
         }
 
         foreach ($pair in $uploadList) {
@@ -127,18 +126,11 @@ $exitCode = Use-AzureWebAppTunnel `
             Send-AzureWebAppRemoteFile `
                 -LocalPath $pair.Local `
                 -RemotePath $pair.Remote `
-                -PlinkPath $Ctx.PlinkPath `
-                -PscpPath $Ctx.PscpPath `
-                -LocalPort $Ctx.Port `
-                -HostKey $Ctx.HostKey
+                -LocalPort $Ctx.Port
         }
 
         Write-Host "Running on container..."
-        return Invoke-AzureWebAppPlinkCommand `
-            -PlinkPath $Ctx.PlinkPath `
-            -LocalPort $Ctx.Port `
-            -HostKey $Ctx.HostKey `
-            -RemoteCommand $remoteCmd
+        Invoke-AzureWebAppSshCommand -LocalPort $Ctx.Port -RemoteCommand $remoteCmd
     }
 
-exit $exitCode
+exit $LASTEXITCODE

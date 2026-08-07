@@ -1943,6 +1943,27 @@ class TestNormalizeMatrixItemConfig:
         assert mc['column_groups']['Funding']['fr'] == 'Financement'
         assert mc['columns'][0]['group'] == 'Funding'
 
+    def test_wraps_flat_matrix_config_preserves_totals_flags(self):
+        """Regression: row_total_manual_enabled/row_total_validation/
+        include_calculated_totals_in_api must survive the legacy flat-config
+        normalization (_MATRIX_CONFIG_KEYS whitelist), not just the modern
+        already-nested matrix_config path."""
+        flat = {
+            'type': 'matrix',
+            'columns': [{'name': 'SP1', 'type': 'number'}],
+            'rows': [{'text': 'Row 1'}],
+            'show_row_totals': True,
+            'show_column_totals': True,
+            'row_total_manual_enabled': True,
+            'row_total_validation': 'strict',
+            'include_calculated_totals_in_api': False,
+        }
+        normalized = TemplateExcelService._normalize_matrix_item_config('matrix', flat)
+        mc = normalized['matrix_config']
+        assert mc['row_total_manual_enabled'] is True
+        assert mc['row_total_validation'] == 'strict'
+        assert mc['include_calculated_totals_in_api'] is False
+
     def test_hoists_root_column_groups_into_matrix_config(self):
         config = {
             'matrix_config': {

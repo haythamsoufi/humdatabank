@@ -69,6 +69,7 @@ from import_upr_excel_data import (  # noqa: E402
     round_to_period,
     upsert_upr_discussion_comments,
     upsert_dynamic_indicator_entries,
+    _matrix_column_name_from_item_id,
     _queue_other_dynamic_indicator,
 )
 
@@ -1545,18 +1546,7 @@ def _funding_column_name(wb) -> str:
 
 def _reporting_funding_matrix_column() -> str:
     """Return the matrix column ``name`` for item 1403 (cell keys: ``{row}_{name}``)."""
-    from app.models.form_items import FormItem
-
-    item = FormItem.query.get(ITEM_REPORTING_COUNTRY_FUNDING)
-    if item and isinstance(item.config, dict):
-        matrix_cfg = item.config.get("matrix_config") or {}
-        columns = matrix_cfg.get("columns") or []
-        if columns:
-            first = columns[0]
-            name = first.get("name") if isinstance(first, dict) else first
-            if name:
-                return str(name)
-    return REPORTING_FUNDING_MATRIX_COLUMN
+    return _matrix_column_name_from_item_id(ITEM_REPORTING_COUNTRY_FUNDING)
 
 
 def parse_ns_key_data(wb) -> Dict[str, Optional[float]]:
@@ -2930,7 +2920,7 @@ def transform_upr_country_reporting_to_import_rows(
             if built:
                 import_rows.append(built)
 
-    # Funding (IFRC / PNS / HNS rows → item 1403 matrix column tot_fn)
+    # Funding (IFRC / PNS / HNS rows → item 1403 matrix column from published FormItem config)
     funding = parse_funding(wb)
     funding_matrix_col = reporting_funding_matrix_column(ctx)
     for row_name, amount in funding.get("sources", {}).items():

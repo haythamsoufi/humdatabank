@@ -319,6 +319,58 @@ class TestCreateTemplate:
         with pytest.raises(FormTemplateAIError, match="at least one column"):
             service.create_template(schema, user)
 
+    def test_matrix_include_calculated_totals_in_api_defaults_true(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """Unlike show_row_totals/show_column_totals (which default False when the AI
+        omits them), include_calculated_totals_in_api defaults True so AI-generated
+        matrices keep exposing calculated totals via the API unless told otherwise."""
+        schema = {
+            "name": "Matrix API totals default",
+            "sections": [
+                {"name": "S", "items": [
+                    {
+                        "item_type": "matrix",
+                        "label": "M",
+                        "matrix_config": {
+                            "row_mode": "manual",
+                            "rows": ["North"],
+                            "columns": [{"name": "Staff", "type": "number"}],
+                        },
+                    }
+                ]}
+            ],
+        }
+        result = service.create_template(schema, user)
+        item = FormItem.query.filter_by(version_id=result["version_id"]).first()
+        assert item.config["matrix_config"]["include_calculated_totals_in_api"] is True
+
+    def test_matrix_include_calculated_totals_in_api_explicit_false(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        schema = {
+            "name": "Matrix API totals disabled",
+            "sections": [
+                {"name": "S", "items": [
+                    {
+                        "item_type": "matrix",
+                        "label": "M",
+                        "matrix_config": {
+                            "row_mode": "manual",
+                            "rows": ["North"],
+                            "columns": [{"name": "Staff", "type": "number"}],
+                            "show_row_totals": True,
+                            "show_column_totals": True,
+                            "include_calculated_totals_in_api": False,
+                        },
+                    }
+                ]}
+            ],
+        }
+        result = service.create_template(schema, user)
+        item = FormItem.query.filter_by(version_id=result["version_id"]).first()
+        assert item.config["matrix_config"]["include_calculated_totals_in_api"] is False
+
 
 # ---------------------------------------------------------------------------
 # apply_edits

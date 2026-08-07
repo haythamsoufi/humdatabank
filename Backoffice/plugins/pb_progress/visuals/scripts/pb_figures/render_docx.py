@@ -29,9 +29,9 @@ _DOCX_PAGE_MARGIN = Inches(0.5)
 _DOCX_PAGE_WIDTH_IN = 8.5
 _DOCX_CONTENT_WIDTH_IN = _DOCX_PAGE_WIDTH_IN - (2 * 0.5)
 _DOCX_LABEL_COL_IN = 2.85
-_DOCX_YEAR_COL_IN = 0.55
 _DOCX_DONUT_COL_IN = 0.55
 _DOCX_TABLE_FONT = 9
+_DOCX_CHART_DPI = 175  # PNG resolution for embedded line charts (~481px @ 2.75in)
 
 
 def _set_rfonts(r_pr, font_name: str) -> None:
@@ -108,11 +108,17 @@ def _configure_page_margins(doc: Document) -> None:
 
 
 def _cumulative_table_widths(n_years: int) -> list[float]:
-    return [_DOCX_LABEL_COL_IN] + [_DOCX_YEAR_COL_IN] * n_years
+    chart_area = _DOCX_CONTENT_WIDTH_IN - _DOCX_LABEL_COL_IN
+    year_col = chart_area / n_years
+    return [_DOCX_LABEL_COL_IN] + [year_col] * n_years
 
 
 def _chart_area_width(n_years: int) -> float:
-    return n_years * _DOCX_YEAR_COL_IN
+    return _DOCX_CONTENT_WIDTH_IN - _DOCX_LABEL_COL_IN
+
+
+def _chart_render_width_px(n_years: int) -> int:
+    return int(_chart_area_width(n_years) * _DOCX_CHART_DPI)
 
 
 def _unavailable_row_widths() -> list[float]:
@@ -127,7 +133,8 @@ def _donut_row_widths(*, has_target: bool) -> list[float]:
 
 
 def _donut_pair_widths() -> list[float]:
-    return [_DOCX_LABEL_COL_IN, _DOCX_DONUT_COL_IN, _DOCX_LABEL_COL_IN, _DOCX_DONUT_COL_IN]
+    label_col = (_DOCX_CONTENT_WIDTH_IN - (2 * _DOCX_DONUT_COL_IN)) / 2
+    return [label_col, _DOCX_DONUT_COL_IN, label_col, _DOCX_DONUT_COL_IN]
 
 
 def _set_cell_vertical_alignment(
@@ -252,7 +259,18 @@ def _set_cell_text(
     _set_cell_vertical_alignment(cell)
 
 
+def _set_table_preferred_width(table, width_in: float) -> None:
+    tbl_pr = table._tbl.tblPr
+    tbl_w = tbl_pr.find(qn("w:tblW"))
+    if tbl_w is None:
+        tbl_w = OxmlElement("w:tblW")
+        tbl_pr.append(tbl_w)
+    tbl_w.set(qn("w:w"), str(int(width_in * 1440)))
+    tbl_w.set(qn("w:type"), "dxa")
+
+
 def _set_column_widths(table, widths: list[float]) -> None:
+    _set_table_preferred_width(table, sum(widths))
     for row in table.rows:
         for idx, width in enumerate(widths):
             if idx < len(row.cells):
@@ -313,7 +331,15 @@ def _add_cumulative_block(
         return
 
     chart_path = assets_dir / f"{block_id}_line.png"
-    render_line_chart_asset(item, target_label, chart_path, language=language, session=session)
+    chart_width_px = _chart_render_width_px(n_years)
+    render_line_chart_asset(
+        item,
+        target_label,
+        chart_path,
+        width=chart_width_px,
+        language=language,
+        session=session,
+    )
 
     n_years = len(item["years"])
     show_reporting, show_implementing = cumulative_table_rows(item)

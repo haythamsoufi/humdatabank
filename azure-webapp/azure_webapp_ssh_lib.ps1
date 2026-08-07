@@ -1,5 +1,24 @@
 # Shared SSH tunnel helpers for Azure App Service containers.
-# Dot-source from azure_webapp_ssh.ps1, azure_webapp_run.ps1, azure_webapp_run_script.ps1
+# Dot-source from azure_webapp_ssh.ps1, azure_webapp_run.ps1, azure_webapp_run_script.ps1,
+# azure_webapp_download.ps1
+#
+# Connects over the tunnel opened by `az webapp create-remote-connection` using the OpenSSH
+# client that ships with Windows 10/11 (ssh.exe / scp.exe under System32\OpenSSH) -- the same
+# client Microsoft's own docs use for this feature:
+# https://learn.microsoft.com/en-us/azure/app-service/configure-linux-open-ssh-session
+#
+# Host key checking is disabled (-o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=NUL)
+# because every session gets a fresh local port; there is no prior host key to pin trust to,
+# and the container's SSH password ("Docker!") is the same publicly-documented value for every
+# Linux App Service container, so there's nothing meaningful to verify against.
+#
+# This previously shelled out to PuTTY's plink for password automation, but plink writes
+# prompts and host-key confirmations directly to the Win32 console instead of through
+# stdio/stderr. Under ConPTY-based terminals (Windows Terminal, VS Code/Cursor) and whenever
+# its output is captured or piped, that write blocks for 30-90+ seconds (sometimes
+# indefinitely) instead of returning -- which made every operation in this file painfully slow
+# or made it look completely hung. OpenSSH doesn't have this problem, so it's the only
+# supported client now.
 
 $script:AzureWebAppSshPassword = 'Docker!'
 
@@ -67,44 +86,6 @@ function Get-AzureWebAppAvailableLocalPort {
     throw "Could not find an available, non-Windows-reserved local port starting from $PreferredPort."
 }
 
-function Find-AzureWebAppPlink {
-    @(
-        (Get-Command plink -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
-        "${env:ProgramFiles}\PuTTY\plink.exe",
-        "${env:ProgramFiles(x86)}\PuTTY\plink.exe",
-        "${env:ProgramFiles}\Git\usr\bin\plink.exe"
-    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-}
-
-function Find-AzureWebAppPscp {
-    @(
-        (Get-Command pscp -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
-        "${env:ProgramFiles}\PuTTY\pscp.exe",
-        "${env:ProgramFiles(x86)}\PuTTY\pscp.exe"
-    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
-}
-
-function Ensure-AzureWebAppPlink {
-    $found = Find-AzureWebAppPlink
-    if ($found) { return $found }
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return $null }
-    Write-Host "PuTTY plink not found. Installing PuTTY (one-time)..."
-    & winget install --id PuTTY.PuTTY -e --accept-package-agreements --accept-source-agreements --source winget
-    return Find-AzureWebAppPlink
-}
-
-function Clear-AzureWebAppPlinkHostKeyCache {
-    param([int]$LocalPort)
-    $regPath = 'HKCU:\Software\SimonTatham\PuTTY\SshHostKeys'
-    if (-not (Test-Path $regPath)) { return }
-    $props = Get-ItemProperty -Path $regPath
-    foreach ($name in $props.PSObject.Properties.Name) {
-        if ($name -match '127\.0\.0\.1' -and $name -match "@${LocalPort}:") {
-            Remove-ItemProperty -Path $regPath -Name $name -ErrorAction SilentlyContinue
-        }
-    }
-}
-
 function Start-AzureWebAppTunnelJob {
     param(
         [string]$WebAppName,
@@ -157,30 +138,6 @@ function Test-AzureWebAppTunnelAlive {
     return (Test-AzureWebAppPortListening -LocalPort $LocalPort)
 }
 
-function Get-AzureWebAppPlinkHostKeys {
-    param(
-        [string]$PlinkPath,
-        [int]$LocalPort,
-        [string]$Password = $script:AzureWebAppSshPassword
-    )
-    $prev = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $output = & $PlinkPath -batch -legacy-stdio-prompts -ssh "root@127.0.0.1" -P $LocalPort -pw $Password 2>&1 | Out-String
-    } finally {
-        $ErrorActionPreference = $prev
-    }
-    $keys = @()
-    if ($output -match 'ssh-ed25519 255 (SHA256:[A-Za-z0-9+/=]+)') {
-        $keys += "ssh-ed25519 255 $($Matches[1])"
-        $keys += $Matches[1]
-    } elseif ($output -match '(SHA256:[A-Za-z0-9+/=]+)') {
-        $keys += $Matches[1]
-        $keys += "ssh-ed25519 255 $($Matches[1])"
-    }
-    return $keys | Select-Object -Unique
-}
-
 function Show-AzureWebAppTunnelDiagnostics {
     param([string]$LogPath, $Job)
     Write-Host ""
@@ -210,64 +167,104 @@ function Show-AzureWebAppTunnelDiagnostics {
     }
 }
 
-function Invoke-AzureWebAppOpenSshSession {
-    param([int]$LocalPort)
-    $askPassCmd = Join-Path $env:TEMP 'azure_ssh_askpass.cmd'
-    if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) { return 1 }
-    @('@echo off', 'echo Docker!') | Set-Content -Path $askPassCmd -Encoding ASCII
+function Get-AzureWebAppSshOptions {
+    # Shared -o options for both ssh and scp. Note: ssh's port flag is -p, scp's is -P;
+    # callers add that themselves so this list stays usable by both.
+    return @(
+        '-o', 'StrictHostKeyChecking=accept-new',
+        '-o', 'UserKnownHostsFile=NUL',
+        '-o', 'PubkeyAuthentication=no',
+        '-o', 'PreferredAuthentications=password',
+        '-o', 'MACs=hmac-sha1,hmac-sha1-96',
+        '-o', 'ConnectTimeout=20'
+    )
+}
+
+function Invoke-AzureWebAppWithAskPass {
+    # Wraps a scriptblock with SSH_ASKPASS so ssh/scp authenticate non-interactively
+    # instead of prompting on a tty. SSH_ASKPASS_REQUIRE=force (OpenSSH 8.4+) makes this
+    # work even when a real console is attached, which is always true here.
+    #
+    # IMPORTANT: this must be called *bare* (no `$x = ...`, no `| ...`) by every caller,
+    # all the way up to the top-level script. Capturing a PowerShell function's output
+    # anywhere in the call chain forces PowerShell to redirect every native command's
+    # stdout underneath it (ssh/scp included) into that capture instead of the real
+    # console -- silently discarding output instead of streaming it live. Exit codes are
+    # read from $LASTEXITCODE by the caller instead, since that side-channel isn't
+    # subject to this capturing.
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$ScriptBlock,
+        [string]$Password = $script:AzureWebAppSshPassword
+    )
+    $askPassCmd = Join-Path $env:TEMP "azure_ssh_askpass_$PID.cmd"
+    @('@echo off', "echo $Password") | Set-Content -Path $askPassCmd -Encoding ASCII
+    $prevAskPass = $env:SSH_ASKPASS
+    $prevAskPassRequire = $env:SSH_ASKPASS_REQUIRE
+    $prevDisplay = $env:DISPLAY
     $env:SSH_ASKPASS = $askPassCmd
     $env:SSH_ASKPASS_REQUIRE = 'force'
     $env:DISPLAY = '1'
-    & ssh -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=NUL `
-        -o PubkeyAuthentication=no -o PreferredAuthentications=password `
-        -o MACs=hmac-sha1,hmac-sha1-96 `
-        "root@127.0.0.1" -p $LocalPort
-    $rc = $LASTEXITCODE
-    Remove-Item Env:SSH_ASKPASS -ErrorAction SilentlyContinue
-    Remove-Item Env:SSH_ASKPASS_REQUIRE -ErrorAction SilentlyContinue
-    Remove-Item Env:DISPLAY -ErrorAction SilentlyContinue
-    Remove-Item $askPassCmd -Force -ErrorAction SilentlyContinue
-    return $rc
+    try {
+        & $ScriptBlock
+    } finally {
+        if ($null -ne $prevAskPass) { $env:SSH_ASKPASS = $prevAskPass } else { Remove-Item Env:SSH_ASKPASS -ErrorAction SilentlyContinue }
+        if ($null -ne $prevAskPassRequire) { $env:SSH_ASKPASS_REQUIRE = $prevAskPassRequire } else { Remove-Item Env:SSH_ASKPASS_REQUIRE -ErrorAction SilentlyContinue }
+        if ($null -ne $prevDisplay) { $env:DISPLAY = $prevDisplay } else { Remove-Item Env:DISPLAY -ErrorAction SilentlyContinue }
+        Remove-Item $askPassCmd -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-AzureWebAppSshInteractive {
+    # Call bare; check $LASTEXITCODE afterwards. See Invoke-AzureWebAppWithAskPass.
+    param([Parameter(Mandatory = $true)][int]$LocalPort)
+    Invoke-AzureWebAppWithAskPass -ScriptBlock {
+        & ssh @(Get-AzureWebAppSshOptions) -p $LocalPort 'root@127.0.0.1'
+    }
+}
+
+function Invoke-AzureWebAppSshCommand {
+    # Call bare; check $LASTEXITCODE afterwards. See Invoke-AzureWebAppWithAskPass.
+    param(
+        [Parameter(Mandatory = $true)][int]$LocalPort,
+        [Parameter(Mandatory = $true)][string]$RemoteCommand
+    )
+    Invoke-AzureWebAppWithAskPass -ScriptBlock {
+        & ssh @(Get-AzureWebAppSshOptions) -p $LocalPort 'root@127.0.0.1' $RemoteCommand
+    }
 }
 
 function Send-AzureWebAppRemoteFile {
     param(
-        [string]$LocalPath,
-        [string]$RemotePath,
-        [string]$PlinkPath,
-        [string]$PscpPath,
-        [int]$LocalPort,
-        [string]$HostKey,
-        [string]$Password = $script:AzureWebAppSshPassword
+        [Parameter(Mandatory = $true)][string]$LocalPath,
+        [Parameter(Mandatory = $true)][string]$RemotePath,
+        [Parameter(Mandatory = $true)][int]$LocalPort
     )
     if (-not (Test-Path $LocalPath)) {
         throw "Local file not found: $LocalPath"
     }
-    if ($PscpPath) {
-        & $PscpPath -batch -hostkey $HostKey -P $LocalPort -pw $Password $LocalPath "root@127.0.0.1:$RemotePath"
-        if ($LASTEXITCODE -ne 0) { throw "pscp failed for $LocalPath" }
-        return
+    Invoke-AzureWebAppWithAskPass -ScriptBlock {
+        & scp @(Get-AzureWebAppSshOptions) -P $LocalPort $LocalPath "root@127.0.0.1:$RemotePath"
     }
-    Get-Content -Raw -Path $LocalPath | & $PlinkPath -batch -legacy-stdio-prompts -hostkey $HostKey -ssh "root@127.0.0.1" -P $LocalPort -pw $Password "cat > $RemotePath"
-    if ($LASTEXITCODE -ne 0) { throw "Upload failed for $LocalPath" }
+    if ($LASTEXITCODE -ne 0) { throw "Upload failed for $LocalPath (scp exit $LASTEXITCODE)" }
 }
 
-function Invoke-AzureWebAppPlinkCommand {
+function Receive-AzureWebAppRemoteFile {
     param(
-        [string]$PlinkPath,
-        [int]$LocalPort,
-        [string]$HostKey,
-        [string]$RemoteCommand,
-        [switch]$Interactive,
-        [string]$Password = $script:AzureWebAppSshPassword
+        [Parameter(Mandatory = $true)][string]$RemotePath,
+        [Parameter(Mandatory = $true)][string]$LocalPath,
+        [Parameter(Mandatory = $true)][int]$LocalPort
     )
-    $args = @('-batch', '-legacy-stdio-prompts', '-hostkey', $HostKey, '-ssh', 'root@127.0.0.1', '-P', "$LocalPort", '-pw', $Password)
-    if ($Interactive) { $args += '-t' }
-    & $PlinkPath @args $RemoteCommand
-    return $LASTEXITCODE
+    Invoke-AzureWebAppWithAskPass -ScriptBlock {
+        & scp @(Get-AzureWebAppSshOptions) -P $LocalPort "root@127.0.0.1:$RemotePath" $LocalPath
+    }
+    if ($LASTEXITCODE -ne 0) { throw "Download failed for $RemotePath (scp exit $LASTEXITCODE)" }
 }
 
 function Use-AzureWebAppTunnel {
+    # IMPORTANT: call this *bare* (no `$exitCode = ...`, no `| ...`) from the top-level
+    # script, then read $LASTEXITCODE for the result. See Invoke-AzureWebAppWithAskPass
+    # for why -- the short version is that capturing this call's output would silently
+    # swallow the ssh/scp session's live console output several frames down.
     param(
         [Parameter(Mandatory = $true)][string]$WebApp,
         [Parameter(Mandatory = $true)][string]$ResourceGroup,
@@ -280,10 +277,8 @@ function Use-AzureWebAppTunnel {
     if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
         throw 'Azure CLI (az) not found in PATH.'
     }
-
-    $plink = Ensure-AzureWebAppPlink
-    if (-not $plink -and -not (Get-Command ssh -ErrorAction SilentlyContinue)) {
-        throw 'Neither plink nor ssh found. Install PuTTY: winget install PuTTY.PuTTY'
+    if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) {
+        throw "OpenSSH client (ssh.exe) not found in PATH.`nEnable it via Settings > Apps > Optional features > Add a feature > OpenSSH Client,`nor from an admin PowerShell: Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0"
     }
 
     $resolvedPort = Get-AzureWebAppAvailableLocalPort -PreferredPort $Port
@@ -294,7 +289,6 @@ function Use-AzureWebAppTunnel {
 
     $tunnelLog = Join-Path $env:TEMP "${LogPrefix}_${Port}.log"
     Stop-AzureWebAppTunnelPort -LocalPort $Port
-    Clear-AzureWebAppPlinkHostKeyCache -LocalPort $Port
 
     Write-Host "Starting tunnel for ${Label} on 127.0.0.1:$Port..."
     $tunnelJob = Start-AzureWebAppTunnelJob -WebAppName $WebApp -ResourceGroupName $ResourceGroup -LocalPort $Port -LogPath $tunnelLog
@@ -305,46 +299,31 @@ function Use-AzureWebAppTunnel {
         throw 'Tunnel did not become ready in time.'
     }
 
-    $exitCode = 1
+    $global:LASTEXITCODE = 1
     try {
         if (-not (Test-AzureWebAppTunnelAlive -Job $tunnelJob -LocalPort $Port)) {
             throw 'Tunnel closed before SSH could start.'
         }
 
-        $hostKeys = @()
-        if ($plink) {
-            Write-Host 'Discovering SSH host key...'
-            $hostKeys = Get-AzureWebAppPlinkHostKeys -PlinkPath $plink -LocalPort $Port
-        }
-        if ($hostKeys.Count -eq 0) {
-            throw 'Could not discover SSH host key from tunnel.'
-        }
-
         $ctx = [PSCustomObject]@{
-            Label      = $Label
-            WebApp     = $WebApp
-            Port       = $Port
-            PlinkPath  = $plink
-            PscpPath   = Find-AzureWebAppPscp
-            HostKeys   = $hostKeys
-            HostKey    = $hostKeys[0]
-            Password   = $script:AzureWebAppSshPassword
-            TunnelJob  = $tunnelJob
-            TunnelLog  = $tunnelLog
+            Label     = $Label
+            WebApp    = $WebApp
+            Port      = $Port
+            Password  = $script:AzureWebAppSshPassword
+            TunnelJob = $tunnelJob
+            TunnelLog = $tunnelLog
         }
 
-        $result = & $Action $ctx
-        if ($null -eq $result) {
-            $exitCode = 0
-        } elseif ($result -is [System.Array]) {
-            $exitCode = [int]($result | Select-Object -Last 1)
-        } else {
-            $exitCode = [int]$result
-        }
+        & $Action $ctx
+        $exitCode = $LASTEXITCODE
+    } catch {
+        Write-Host ""
+        Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        $exitCode = 1
     } finally {
         Write-Host 'Closing tunnel...'
         Stop-AzureWebAppTunnelJob -Job $tunnelJob -LocalPort $Port
     }
 
-    return [int]$exitCode
+    $global:LASTEXITCODE = $exitCode
 }

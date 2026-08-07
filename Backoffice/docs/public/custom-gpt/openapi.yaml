@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: IFRC Humanitarian Databank Public API
-  version: 1.1.0
+  version: 1.2.0
   description: Public FDRS stats and UPR data plus Unified Plan/report documents. Prefer /public/* routes. No auth. Privacy https://databank.ifrc.org/privacy
 
 servers:
@@ -65,6 +65,74 @@ paths:
       responses:
         "200":
           description: best_match and alternatives with id and name
+
+  /public/submissions/coverage:
+    get:
+      operationId: getSubmissionCoverage
+      summary: Count countries with public submitted data
+      description: Counts countries with a public value by template/indicator, per period. Use for "how many countries submitted FDRS/UPR data" instead of paginating getPublicData. Public data coverage only, not workflow status.
+      parameters:
+        - name: template_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: 21 for FDRS, 22 or 24 for UPR
+        - name: indicator_bank_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Metric name if scoping to one indicator instead of a whole template
+        - name: period_name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: e.g. Annual 2024. Omit for a breakdown across all years
+        - name: country_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: max_pages
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 20
+      responses:
+        "200":
+          description: countries_submitted_total and by_period with period_name, countries_submitted
+
+  /public/countries/resolve:
+    get:
+      operationId: resolveCountry
+      summary: Resolve country name/ISO code to reference fields
+      description: Maps a country name, ISO2/ISO3 code, or numeric id to id, name, iso2, iso3, region. Avoids paginating the full countries dimension table just to look up one country.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Country name, ISO2/ISO3 code, or numeric id
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 5
+            maximum: 20
+      responses:
+        "200":
+          description: best_match and alternatives with id, name, iso2, iso3, region
 
   /public/documents/search:
     get:
@@ -135,6 +203,55 @@ paths:
       responses:
         "200":
           description: chunks with content, document_title, page_number, score, document_url
+
+  /public/documents/catalog:
+    get:
+      operationId: getPublicDocumentsCatalog
+      summary: Count/list public documents by type, year, country
+      description: Inventories public documents (counts, not text search). Use for "how many countries submitted an annual report or Unified Plan" instead of searchPublicDocuments. Omit year for a breakdown across all years.
+      parameters:
+        - name: document_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - annual_report
+              - unified_plan
+              - midyear_report
+              - other
+          description: Omit for all types
+        - name: year
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Omit for a by_year breakdown across all years
+        - name: country_id
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: country_name
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: file_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: include_documents
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+          description: Set false for counts only (smaller response, no per-document listing)
+      responses:
+        "200":
+          description: total_documents, countries_count, by_type, by_year, by_country
 
   /public/documents/{document_id}:
     get:

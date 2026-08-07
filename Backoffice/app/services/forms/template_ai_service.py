@@ -1448,6 +1448,7 @@ class FormTemplateAIService:
             "columns": columns,
             "show_row_totals": _as_bool(value.get("show_row_totals")),
             "show_column_totals": _as_bool(value.get("show_column_totals")),
+            "include_calculated_totals_in_api": _as_bool(value.get("include_calculated_totals_in_api"), True),
         }
 
         if row_mode == "manual":

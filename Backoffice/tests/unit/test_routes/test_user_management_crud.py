@@ -79,6 +79,46 @@ class TestManageUsers:
         resp = logged_in_client.get("/admin/users")
         assert resp.status_code == 200
 
+    def test_page_shows_overview_stats(self, logged_in_client, db_session):
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        assert "Total Users" in resp.text
+        assert "Users Without Entity Access" in resp.text
+        assert "Never Logged In" in resp.text
+        assert "Stale Accounts (90+ days)" in resp.text
+        assert "New Users This Week" in resp.text
+
+    def test_page_new_users_this_week_reflects_recent_admin_create(
+        self, logged_in_client, db_session, admin_user, app
+    ):
+        from app.models.system import AdminActionLog
+        from app.services.platform.user_analytics_query_service import get_user_management_overview_stats
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            baseline = get_user_management_overview_stats(include_analytics=False)['new_users_this_week']
+
+        created = create_test_user(db_session, email="overview_new_user@example.com")
+        db_session.add(
+            AdminActionLog(
+                admin_user_id=admin_user.id,
+                action_type='user_create',
+                action_description=f'Created new user: {created.email}',
+                target_type='user',
+                target_id=created.id,
+                ip_address='127.0.0.1',
+            )
+        )
+        db_session.commit()
+
+        with app.app_context():
+            updated = get_user_management_overview_stats(include_analytics=False)['new_users_this_week']
+        assert updated == baseline + 1
+
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        assert f'text-purple-600 tabular-nums">{updated}<' in resp.text
+
     def test_page_lists_users(self, logged_in_client, db_session):
         create_test_user(db_session, email="extra1@example.com")
         resp = logged_in_client.get("/admin/users")

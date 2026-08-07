@@ -27,6 +27,13 @@
             <input type="checkbox" id="matrix-show-column-totals" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
             <span class="ml-2 text-sm text-gray-700">{{ _('Show Column Totals') }}</span>
         </label>
+        <div id="matrix-include-totals-in-api-wrapper">
+            <label class="inline-flex items-center">
+                <input type="checkbox" id="matrix-include-totals-in-api" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500" checked>
+                <span class="ml-2 text-sm text-gray-700">{{ _('Include Calculated Totals in API') }}</span>
+                {{ field_help(_('Controls only the API/export output, independent of the on-screen totals above. Disable this to let users see totals while filling in the form but keep row/column/grand totals out of API responses, data exports, and BI feeds for this item — raw cell values are always included either way.')) }}
+            </label>
+        </div>
         <label class="inline-flex items-center hidden" id="matrix-auto-load-entities-wrapper">
             <input type="checkbox" id="matrix-auto-load-entities" class="form-checkbox h-4 w-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500">
             <span class="ml-2 text-sm text-gray-700">{{ _('Auto Load Entities') }}</span>

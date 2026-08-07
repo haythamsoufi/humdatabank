@@ -1,11 +1,13 @@
 """Tests for app.services.platform.user_analytics_query_service."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.models import UserActivityLog, UserLoginLog
 from app.services.platform import user_analytics_query_service as query_svc
+from app.utils.datetime_helpers import utcnow
 
 
 pytestmark = [pytest.mark.unit]
@@ -301,3 +303,172 @@ class TestRequestArgHelpers:
         filters = query_svc.session_logs_filters_from_request_args(args)
         assert filters.session_id == 'sess-x'
         assert filters.min_duration == 15
+
+
+class TestGetUserManagementOverviewStats:
+    def test_counts_users_and_skips_analytics_when_disabled(self, app):
+        with app.app_context():
+            with patch.object(query_svc, 'has_table', return_value=False), \
+                 patch.object(query_svc.User, 'query') as mock_user_query, \
+                 patch.object(query_svc, '_count_new_users_this_week', return_value=0), \
+                 patch.object(query_svc, '_count_active_users_without_entity_access', return_value=2), \
+                 patch.object(query_svc, '_count_active_users_never_logged_in', return_value=3), \
+                 patch.object(query_svc, '_count_stale_active_accounts', return_value=1):
+                mock_user_query.count.return_value = 10
+
+                stats = query_svc.get_user_management_overview_stats(include_analytics=False)
+
+                assert stats['total_users'] == 10
+                assert stats['users_without_entity_access'] == 2
+                assert stats['never_logged_in'] == 3
+                assert stats['stale_accounts_90d'] == 1
+                assert stats['today_logins'] == 0
+                assert stats['active_sessions'] == 0
+                assert stats['new_users_this_week'] == 0
+
+    def test_includes_analytics_counts_when_enabled(self, app):
+        with app.app_context():
+            with patch.object(query_svc, 'has_table', return_value=True), \
+                 patch.object(query_svc.User, 'query') as mock_user_query, \
+                 patch.object(query_svc.UserLoginLog, 'query') as mock_login_query, \
+                 patch.object(query_svc.UserSessionLog, 'query') as mock_session_query, \
+                 patch.object(query_svc, '_count_new_users_this_week', return_value=1), \
+                 patch.object(query_svc, '_count_active_users_without_entity_access', return_value=0), \
+                 patch.object(query_svc, '_count_active_users_never_logged_in', return_value=0), \
+                 patch.object(query_svc, '_count_stale_active_accounts', return_value=0):
+                mock_user_query.count.return_value = 3
+                mock_login_query.filter.return_value.count.return_value = 5
+                mock_session_query.filter.return_value.count.return_value = 2
+
+                stats = query_svc.get_user_management_overview_stats(include_analytics=True)
+
+                assert stats['today_logins'] == 5
+                assert stats['active_sessions'] == 2
+                assert stats['new_users_this_week'] == 1
+
+
+class TestUserManagementAccessHealthStats:
+    def test_users_without_entity_access(self, app, db_session):
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            create_test_user(db_session, email="no_entities@example.com")
+            assert query_svc._count_active_users_without_entity_access() >= 1
+
+    def test_never_logged_in(self, app, db_session):
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            create_test_user(db_session, email="never_logged@example.com")
+            assert query_svc._count_active_users_never_logged_in() >= 1
+
+    def test_stale_accounts_excludes_never_logged_in(self, app, db_session):
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            baseline_never = query_svc._count_active_users_never_logged_in()
+            baseline_stale = query_svc._count_stale_active_accounts(days=90)
+
+        user = create_test_user(db_session, email="stale_user@example.com")
+        db_session.add(
+            UserLoginLog(
+                user_id=user.id,
+                email_attempted=user.email,
+                event_type='login_success',
+                timestamp=utcnow() - timedelta(days=120),
+                ip_address='127.0.0.1',
+            )
+        )
+        db_session.commit()
+
+        with app.app_context():
+            assert query_svc._count_active_users_never_logged_in() == baseline_never
+            assert query_svc._count_stale_active_accounts(days=90) == baseline_stale + 1
+
+
+class TestCountNewUsersThisWeek:
+    def test_counts_admin_created_users(self, app, db_session):
+        from app.models.system import AdminActionLog
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            admin = create_test_user(db_session, email="admin_new_count@example.com")
+            created = create_test_user(db_session, email="created_via_admin@example.com")
+            db_session.add(
+                AdminActionLog(
+                    admin_user_id=admin.id,
+                    action_type='user_create',
+                    action_description=f'Created new user: {created.email}',
+                    target_type='user',
+                    target_id=created.id,
+                    ip_address='127.0.0.1',
+                )
+            )
+            db_session.commit()
+
+            assert query_svc._count_new_users_this_week(utcnow() - timedelta(days=7)) == 1
+
+    def test_counts_self_service_account_created(self, app, db_session):
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            user = create_test_user(db_session, email="self_service_new@example.com")
+            db_session.add(
+                UserActivityLog(
+                    user_id=user.id,
+                    activity_type='account_created',
+                    activity_description='User created account via email/password registration',
+                    ip_address='127.0.0.1',
+                )
+            )
+            db_session.commit()
+
+            assert query_svc._count_new_users_this_week(utcnow() - timedelta(days=7)) == 1
+
+    def test_deduplicates_when_both_sources_exist_for_same_user(self, app, db_session):
+        from app.models.system import AdminActionLog
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            admin = create_test_user(db_session, email="admin_dedupe@example.com")
+            created = create_test_user(db_session, email="dedupe_user@example.com")
+            db_session.add_all([
+                AdminActionLog(
+                    admin_user_id=admin.id,
+                    action_type='user_create',
+                    action_description=f'Created new user: {created.email}',
+                    target_type='user',
+                    target_id=created.id,
+                    ip_address='127.0.0.1',
+                ),
+                UserActivityLog(
+                    user_id=created.id,
+                    activity_type='account_created',
+                    activity_description='User created account via email/password registration',
+                    ip_address='127.0.0.1',
+                ),
+            ])
+            db_session.commit()
+
+            assert query_svc._count_new_users_this_week(utcnow() - timedelta(days=7)) == 1
+
+    def test_ignores_events_older_than_window(self, app, db_session):
+        from app.models.system import AdminActionLog
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            admin = create_test_user(db_session, email="admin_old@example.com")
+            created = create_test_user(db_session, email="old_user@example.com")
+            log = AdminActionLog(
+                admin_user_id=admin.id,
+                action_type='user_create',
+                action_description=f'Created new user: {created.email}',
+                target_type='user',
+                target_id=created.id,
+                ip_address='127.0.0.1',
+            )
+            log.timestamp = utcnow() - timedelta(days=10)
+            db_session.add(log)
+            db_session.commit()
+
+            assert query_svc._count_new_users_this_week(utcnow() - timedelta(days=7)) == 0

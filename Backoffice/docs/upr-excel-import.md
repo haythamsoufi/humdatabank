@@ -165,6 +165,8 @@ The `Country Value` and `PNS Value` columns are processed **independently** — 
 
 **Zero / blank values:** Matrix imports skip falsy numeric values (`0`, empty) when writing cells — only non-zero amounts are stored. Scalar NS Data still allows zero KPIs.
 
+**Legacy Funding `Area` codes (skipped):** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO`, `EA1`, `EA2`, `EA3` — alongside the current `SP1`–`SP5` / `EFs` codes. The import **does not write** these to matrix items 967 / 970 / 1303 (they would produce cell keys like `IFRC Secretariat_EO` that do not match the form). Only `SP1`–`SP5` and `EFs` breakdown rows are imported for planning funding. Mapping rules for the legacy codes are a known gap (see §13).
+
 #### Country Value → Template 24
 
 | Entity | Target item | Row key |
@@ -599,6 +601,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 | 2 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
 | 3 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
 | 4 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
+| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, `EA1`, …)** | UPR Master still has ~400 Funding rows using pre-SP1/EFs area codes (`E1`, `E2`, `E3`, `EO`, `EA1`–`EA3`). These are **skipped** on import (items 967 / 970 / 1303) until an explicit Excel → matrix column mapping is agreed (e.g. `E1`→`SP1`, `EO`→`EFs`, and whether `EA*` belongs on the planning funding matrix or emergency appeals). Re-import after mapping is implemented. |
 
 ---
 

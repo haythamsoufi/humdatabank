@@ -1010,6 +1010,21 @@ class MatrixHandler {
                 }
             });
 
+            // Drop cell keys whose column suffix no longer matches any configured
+            // column (e.g. leftovers from a column rename in the form builder, like
+            // the old "..._NS 2025 Total Funding" keys after item 1403 was renamed
+            // to "ns_fun"). Skipped for matrices without explicit columns, since a
+            // key's suffix can't be validated reliably in that case.
+            if (columns.length) {
+                Object.keys(dataToSave).forEach(cellKey => {
+                    if (cellKey.startsWith('_')) return;
+                    if (!__parseMatrixCellKey(cellKey, config)) {
+                        delete dataToSave[cellKey];
+                        debugLog('matrix-handler', `Dropped stale matrix cell key (no matching column): ${cellKey}`);
+                    }
+                });
+            }
+
             // Refresh hidden field reference (may have changed)
             matrix.hiddenField = matrix.container.querySelector('input[type="hidden"]');
 

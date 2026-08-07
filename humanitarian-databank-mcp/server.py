@@ -34,7 +34,11 @@ from databank_client import (
     get_indicator,
     get_public_data_all_pages,
     get_public_data_page,
+    get_public_document,
+    get_public_documents_catalog,
     get_public_global_trend,
+    get_submission_coverage,
+    resolve_public_country,
     resolve_public_indicator,
     search_public_documents,
 )
@@ -113,6 +117,52 @@ def databank_aggregate_global_trend(
 
 
 @mcp.tool()
+def databank_get_submission_coverage(
+    template_id: Optional[int] = None,
+    indicator_bank_id: Optional[int] = None,
+    query: str = "",
+    period_name: str = "",
+    country_id: Optional[int] = None,
+    max_pages: int = 20,
+) -> str:
+    """Count countries with a public submitted value, grouped by reporting period.
+
+    Answers "how many countries submitted FDRS/UPR data for <period>, or across all
+    years?" — pass template_id=21 for FDRS or template_id=22/24 for UPR (or an
+    indicator_bank_id / query to scope to one indicator). Prefer this over paginating
+    databank_get_public_data_all_pages and counting distinct countries yourself.
+    Counts **public data coverage** only (data_status='available' on privacy=public
+    form items) — this is not the same as internal assignment/workflow status, which
+    is never exposed without an API key. See countries_submitted_total and by_period[].
+    """
+    try:
+        result = get_submission_coverage(
+            template_id=template_id,
+            indicator_bank_id=indicator_bank_id,
+            query=query.strip(),
+            period_name=period_name.strip(),
+            country_id=country_id,
+            max_pages=max_pages,
+        )
+        return _json_text(result)
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
+def databank_resolve_country(query: str, limit: int = 5) -> str:
+    """Resolve a country name, ISO2/ISO3 code, or numeric id to Country reference fields.
+
+    Returns id, name, iso2, iso3, region. Use this instead of paginating the full
+    countries[] dimension table just to look up one country's id.
+    """
+    try:
+        return _json_text(resolve_public_country(query, limit=limit))
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
 def databank_search_public_documents(
     query: str,
     full_coverage: bool = False,
@@ -148,6 +198,51 @@ def databank_search_public_documents(
             search_mode=search_mode.strip() or "hybrid",
         )
         return _json_text(result)
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
+def databank_get_documents_catalog(
+    document_type: str = "",
+    year: Optional[int] = None,
+    country_id: Optional[int] = None,
+    country_name: str = "",
+    file_type: str = "",
+    include_documents: bool = True,
+) -> str:
+    """Inventory public documents by type/year/country — counts, not semantic search.
+
+    Answers "how many countries submitted an annual report (FDRS) or a Unified Plan
+    (UPR) for 2024, or across all years?" directly from document metadata — much
+    cheaper than databank_search_public_documents for counting questions.
+    document_type is one of annual_report, unified_plan, midyear_report, other
+    (omit for all types). Set include_documents=false for counts only (by_type,
+    by_year, countries_count) without the per-country document listing.
+    """
+    try:
+        result = get_public_documents_catalog(
+            document_type=document_type.strip(),
+            year=year,
+            country_id=country_id,
+            country_name=country_name.strip(),
+            file_type=file_type.strip(),
+            include_documents=include_documents,
+        )
+        return _json_text(result)
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
+def databank_get_public_document(document_id: int) -> str:
+    """Get public metadata for one AI document (title, countries, source_url, links).
+
+    Use when a databank_search_public_documents chunk lacks document_url and the
+    user needs a shareable link, or to confirm a document's countries/date/category.
+    """
+    try:
+        return _json_text(get_public_document(document_id))
     except Exception as exc:
         return _tool_error(exc)
 
@@ -288,7 +383,12 @@ def databank_api_info() -> str:
             "public_endpoints": [
                 "GET /public/global-trend",
                 "GET /public/indicators/resolve",
+                "GET /public/submissions/coverage",
+                "GET /public/countries/resolve",
                 "GET /public/documents/search",
+                "GET /public/documents/catalog",
+                "GET /public/documents/<id>",
+                "GET /public/documents/<id>/download",
                 "GET /indicator-bank",
                 "GET /indicator-bank/<id>",
                 "GET /data (scoped, public privacy only)",
@@ -296,12 +396,19 @@ def databank_api_info() -> str:
             "recommended_tools": {
                 "global_trends": "databank_aggregate_global_trend(query='volunteers')",
                 "find_indicator": "databank_resolve_indicator(query='total volunteers')",
+                "find_country": "databank_resolve_country(query='Kenya')",
+                "count_submissions": "databank_get_submission_coverage(template_id=21, period_name='Annual 2024')",
+                "count_documents": "databank_get_documents_catalog(document_type='annual_report', year=2024)",
                 "upr_documents": "databank_search_public_documents(query='Syria unified plan 2026')",
+                "one_document": "databank_get_public_document(document_id=ID)",
                 "raw_rows": "databank_get_public_data(indicator_bank_id=ID, include_dimensions=false)",
             },
             "notes": (
                 "Unscoped /data returns 401. Multiple submissions per country+period "
-                "require dedupe — use databank_aggregate_global_trend for network totals. "
+                "require dedupe — use databank_aggregate_global_trend for network totals, or "
+                "databank_get_submission_coverage to count countries that submitted (not sum values). "
+                "Use databank_get_documents_catalog to count/list public documents by type/year/country "
+                "instead of paginating databank_search_public_documents. "
                 "Document answers must cite chunks from databank_search_public_documents only."
             ),
         }

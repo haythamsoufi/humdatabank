@@ -422,6 +422,172 @@ def list_public_documents_in_scope(filters: Dict[str, Any] | None) -> List[AIDoc
     return query.order_by(AIDocument.title).all()
 
 
+DOCUMENT_TYPE_CHOICES = ("annual_report", "unified_plan", "midyear_report", "other")
+PUBLIC_DOC_CATALOG_MAX_DOCS = 2000
+
+
+def _catalog_scope_filters(
+    *,
+    country_id: Optional[int] = None,
+    country_name: Optional[str] = None,
+    file_type: Optional[str] = None,
+) -> Dict[str, Any] | None:
+    filters: Dict[str, Any] = {}
+    if country_id:
+        filters["country_id"] = int(country_id)
+    elif country_name:
+        filters["country_name"] = country_name.strip()
+    if file_type:
+        filters["file_type"] = file_type.strip().lower()
+    return filters or None
+
+
+def _catalog_document_entry(document: AIDocument, *, type_key: str, year: int) -> Dict[str, Any]:
+    doc_id = int(document.id)
+    entry: Dict[str, Any] = {
+        "document_id": doc_id,
+        "document_title": document.title,
+        "document_type": type_key,
+        "year": year or None,
+        "countries": _document_country_names(document),
+    }
+    entry.update(
+        _public_document_link_fields(
+            doc_id,
+            source_url=_document_source_url(document),
+            has_local_file=_ai_document_has_local_file(document),
+        )
+    )
+    return entry
+
+
+def catalog_public_documents(
+    *,
+    document_type: str = "",
+    year: Optional[int] = None,
+    country_id: Optional[int] = None,
+    country_name: Optional[str] = None,
+    file_type: str = "",
+    include_documents: bool = True,
+) -> Dict[str, Any]:
+    """
+    Inventory public documents by type / year / country — counts, not semantic search.
+
+    Answers questions like "how many countries submitted an annual report (FDRS) or a
+    Unified Plan (UPR) for 2024, or across all years?" directly from document metadata,
+    without running vector search. Scope is identical to :func:`search_public_documents`:
+    only documents with ``is_public=True``, ``searchable=True`` and
+    ``processing_status=completed`` are counted (see :func:`list_public_documents_in_scope`).
+    Use :func:`search_public_documents` instead for narrative Q&A over document content.
+    """
+    normalized_type = (document_type or "").strip().lower()
+    if normalized_type in ("", "all"):
+        normalized_type = ""
+    elif normalized_type not in DOCUMENT_TYPE_CHOICES:
+        raise ValueError(
+            f"Unknown document_type {document_type!r}. "
+            f"Use one of: {', '.join(DOCUMENT_TYPE_CHOICES)}, or omit for all types."
+        )
+
+    filters = _catalog_scope_filters(country_id=country_id, country_name=country_name, file_type=file_type)
+    documents = list_public_documents_in_scope(filters)
+
+    if len(documents) > PUBLIC_DOC_CATALOG_MAX_DOCS:
+        raise ValueError(
+            f"Too many public documents in scope ({len(documents)}). "
+            "Narrow with country_id, country_name, or document_type."
+        )
+
+    entries: List[Dict[str, Any]] = []
+    for doc in documents:
+        type_key = _document_type_key(doc, "")
+        if normalized_type and type_key != normalized_type:
+            continue
+        doc_year = _document_year(doc)
+        if year and doc_year != int(year):
+            continue
+        entries.append(_catalog_document_entry(doc, type_key=type_key, year=doc_year))
+
+    by_type: Dict[str, int] = {}
+    by_year_buckets: Dict[int, Dict[str, Any]] = {}
+    by_country_buckets: Dict[str, Dict[str, Any]] = {}
+    all_country_names: set[str] = set()
+
+    for entry in entries:
+        by_type[entry["document_type"]] = by_type.get(entry["document_type"], 0) + 1
+
+        entry_year = entry["year"] or 0
+        year_bucket = by_year_buckets.setdefault(
+            entry_year, {"year": entry["year"], "document_count": 0, "_countries": set()}
+        )
+        year_bucket["document_count"] += 1
+
+        countries = entry["countries"] or ["Unknown / regional"]
+        for country in countries:
+            year_bucket["_countries"].add(country)
+            all_country_names.add(country)
+            country_bucket = by_country_buckets.setdefault(country, {"country": country, "documents": []})
+            country_bucket["documents"].append(entry)
+
+    by_year = [
+        {
+            "year": bucket["year"],
+            "document_count": bucket["document_count"],
+            "countries_count": len(bucket["_countries"]),
+        }
+        for bucket in by_year_buckets.values()
+    ]
+    by_year.sort(key=lambda bucket: (bucket["year"] is not None, bucket["year"] or 0), reverse=True)
+
+    by_country = sorted(by_country_buckets.values(), key=lambda bucket: bucket["country"].lower())
+
+    notes = [
+        "Counts only documents marked public in the AI Knowledge Base "
+        "(is_public=True, searchable=True, processing_status=completed).",
+        "document_type is inferred from title/filename/category — use searchPublicDocuments "
+        "to verify ambiguous cases from the document text itself.",
+        "A country is counted once per year it has a matching public document, even if it "
+        "also appears in other years (see by_year for the yearly breakdown).",
+    ]
+    if not include_documents:
+        for bucket in by_country:
+            bucket["documents"] = []
+        notes.append("include_documents=false: per-document listings omitted; counts are still complete.")
+
+    payload: Dict[str, Any] = {
+        "filters_applied": {
+            "document_type": normalized_type or "all",
+            "year": year,
+            "country_id": country_id,
+            "country_name": country_name,
+            "file_type": file_type or None,
+        },
+        "visibility": "public_only",
+        "total_documents": len(entries),
+        "countries_count": len(all_country_names),
+        "by_type": by_type,
+        "by_year": by_year,
+        "by_country": by_country,
+        "notes": notes,
+    }
+
+    # Trim per-country document listings (not the counts) if the response would exceed the
+    # Custom GPT Actions response-size limit — mirrors the full_coverage trimming above.
+    trimmed = False
+    while include_documents and any(b["documents"] for b in by_country) and _estimate_json_chars(payload) > PUBLIC_DOC_ACTION_MAX_RESPONSE_CHARS:
+        trimmed = True
+        for bucket in by_country:
+            if bucket["documents"]:
+                bucket["documents"] = bucket["documents"][:-1]
+
+    if trimmed:
+        payload["notes"] = notes + [
+            "Document listings truncated to fit the response size limit; counts above remain accurate."
+        ]
+
+    return payload
+
+
 def filter_rows_to_public_documents(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Defense-in-depth: drop any chunk whose parent document is not public/searchable.

@@ -132,6 +132,9 @@ ITEM_FUNDING_REQUIREMENTS_T22 = 1303  # Template 22 – Funding Requirements (ro
 T22_ROW_TOTAL_COLUMN = "Total"  # matrix row-total cell suffix (row_total_manual_enabled)
 # Item 1303 variable columns (Excel Area names) — overridden when PNS reports totals only.
 T22_BREAKDOWN_AREAS: Tuple[str, ...] = ("SP1", "SP2", "SP3", "SP4", "SP5", "EFs")
+# Legacy UPR Master ``Area`` codes on Funding rows (pre-SP1/EFs workbook naming).
+# Import skips these until an explicit Excel → matrix column mapping is defined (see docs §13).
+SKIPPED_LEGACY_FUNDING_AREAS = frozenset({"E1", "E2", "E3", "EO", "EA1", "EA2", "EA3"})
 EMERGENCY_APPEALS_COLUMN = "Total People to be reached"
 
 # ── Reporting country template (T33) ───────────────────────────────────────────
@@ -158,10 +161,9 @@ ITEM_REPORTING_PNS_FUNDING = 952
 REPORTING_FUNDING_ROW_IFRC = "IFRC Secretariat"
 REPORTING_FUNDING_ROW_PNS = "PNSs"
 REPORTING_FUNDING_ROW_OTHER = "HNS other sources"
-# Legacy/display label — not used as the matrix cell-key suffix.
-REPORTING_FUNDING_COLUMN = "NS 2025 Total Funding"
-# Matrix column ``name`` from item 1403 config (cell keys are ``{row}_{column_name}``).
-REPORTING_FUNDING_MATRIX_COLUMN = "tot_fn"
+# Fallback matrix column ``name`` for item 1403 when published config cannot be read.
+# Cell keys are ``{row}_{column_name}`` — must match FormItem matrix_config.columns[0].name.
+REPORTING_FUNDING_MATRIX_COLUMN = "ns_fun"
 
 # SP/EF breakdown matrix: Excel Area → manual matrix row label
 REPORTING_SP_BREAKDOWN_AREA_TO_ROW: Dict[str, str] = {
@@ -295,6 +297,11 @@ def normalize_indicator_id(raw: Any) -> Optional[int]:
         return int(str(raw).strip())
     except (ValueError, TypeError):
         return None
+
+
+def is_skipped_legacy_funding_area(area: Any) -> bool:
+    """True when UPR Master uses a legacy Funding ``Area`` code we do not map yet."""
+    return str(area or "").strip() in SKIPPED_LEGACY_FUNDING_AREAS
 
 
 def is_planning_funding_requirement_row(row: Dict[str, Any]) -> bool:
@@ -1326,19 +1333,59 @@ def _load_assignment_map(template_ids: List[int]) -> Dict[int, Dict[Tuple[str, s
     return by_template
 
 
+def _matrix_column_name_from_form_item(item) -> Optional[str]:
+    """Return the first matrix column ``name`` from a FormItem config, if defined."""
+    if not item or not isinstance(getattr(item, "config", None), dict):
+        return None
+    matrix_cfg = item.config.get("matrix_config") or item.config
+    if not isinstance(matrix_cfg, dict):
+        return None
+    columns = matrix_cfg.get("columns") or []
+    if not columns:
+        return None
+    first = columns[0]
+    name = first.get("name") if isinstance(first, dict) else first
+    return str(name) if name else None
+
+
+def _published_funding_matrix_item(template_id: int):
+    """Resolve the published-version funding matrix item for a reporting template."""
+    from app.models.form_items import FormItem
+    from app.models.forms import FormTemplate
+
+    template = FormTemplate.query.get(int(template_id))
+    pub_vid = getattr(template, "published_version_id", None) if template else None
+    if not pub_vid:
+        return None
+    labels = REPORTING_SPECIAL_ITEM_LABELS.get("funding") or ()
+    query = FormItem.query.filter(
+        FormItem.template_id == int(template_id),
+        FormItem.version_id == int(pub_vid),
+        FormItem.item_type == "matrix",
+        FormItem.archived == False,
+    )
+    for needle in labels:
+        item = query.filter(FormItem.label.ilike(f"%{needle}%")).first()
+        if item:
+            return item
+    return query.first()
+
+
 def _matrix_column_name_from_item_id(item_id: int) -> str:
     from app.models.form_items import FormItem
 
     item = FormItem.query.get(item_id)
-    if item and isinstance(item.config, dict):
-        matrix_cfg = item.config.get("matrix_config") or item.config
-        if isinstance(matrix_cfg, dict):
-            columns = matrix_cfg.get("columns") or []
-            if columns:
-                first = columns[0]
-                name = first.get("name") if isinstance(first, dict) else first
-                if name:
-                    return str(name)
+    name = _matrix_column_name_from_form_item(item)
+    if name:
+        return name
+
+    template_id = getattr(item, "template_id", None) if item else None
+    if template_id:
+        pub_item = _published_funding_matrix_item(int(template_id))
+        name = _matrix_column_name_from_form_item(pub_item)
+        if name:
+            return name
+
     return REPORTING_FUNDING_MATRIX_COLUMN
 
 
@@ -2294,6 +2341,9 @@ def transform_to_import_rows(
             if not area:
                 continue
 
+            if is_skipped_legacy_funding_area(area):
+                continue
+
             # ── HNS / IFRC Secretariat → country-reported → template 24 ──
             if 24 in tids and ent_upper in ("HNS", "IFRC SECRETARIAT"):
                 hns_country_val = country_val
@@ -2699,11 +2749,11 @@ def transform_to_import_rows(
                 if breakdown_cell is not None:
                     item_cells[f"{host_cid}_{area}"] = breakdown_cell
 
-    # ── Post-loop: reporting country funding staging → NS Total Funding matrix cells ──
+    # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
+    reporting_funding_col = reporting_funding_matrix_column(ctx)
     for (aes_id, funding_item_id, row_name), total in reporting_funding_staging.items():
         if total:
-            col_name = _matrix_column_name_from_item_id(funding_item_id)
-            cell_key = f"{row_name}_{col_name}"
+            cell_key = f"{row_name}_{reporting_funding_col}"
             matrix_cells[(aes_id, funding_item_id)][cell_key] = total
 
     # Build reverse map: aes_id → (iso3, period) across ALL templates.

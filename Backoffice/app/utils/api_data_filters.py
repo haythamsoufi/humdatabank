@@ -115,7 +115,11 @@ def resolve_assignment_scope(
     if missing:
         label = missing[0] if len(missing) == 1 else ', '.join(str(x) for x in missing)
         return None, [], {
-            'message': f'Assignment not found: {label}',
+            'message': (
+                f'Assignment not found: {label}. assignment_id expects an AssignedForm id. '
+                'If this id came from assignment_statuses[] or a workflow/status view, it is '
+                'likely an AssignmentEntityStatus id instead — pass it as submission_id.'
+            ),
             'status': 404,
         }
 
@@ -141,6 +145,44 @@ def resolve_assignment_scope(
     if len(template_ids) == 1:
         return template_ids[0], template_ids, None
     return None, template_ids, None
+
+
+def resolve_assignment_entity_status_fallback(
+    assignment_ids: Optional[List[int]],
+) -> Optional[Tuple[int, Optional[int]]]:
+    """
+    Check whether a single, otherwise-unresolved ``assignment_id`` is actually an
+    ``AssignmentEntityStatus`` id (a common mix-up: assignment_statuses[] / workflow
+    and status views are keyed by AssignmentEntityStatus.id, not AssignedForm.id —
+    e.g. a request like ``assignment_id=1610`` where 1610 is really a submission_id).
+
+    Only handles the unambiguous single-id case; multi-id requests where one or more
+    ids fail to resolve as AssignedForm keep the normal 404 (mixing AssignedForm and
+    AssignmentEntityStatus ids in one call is inherently ambiguous to auto-resolve).
+
+    Returns ``(submission_id, template_id)`` on a match — callers should then treat
+    the request as if ``submission_id`` had been passed instead of ``assignment_id``
+    — or ``None`` when there is no match (caller should fall back to the normal
+    "not found" error).
+    """
+    if not assignment_ids or len(assignment_ids) != 1:
+        return None
+    from app.models.assignments import AssignmentEntityStatus
+
+    aes = (
+        AssignmentEntityStatus.query
+        .options(joinedload(AssignmentEntityStatus.assigned_form))
+        .filter(AssignmentEntityStatus.id == int(assignment_ids[0]))
+        .first()
+    )
+    if not aes:
+        return None
+    template_id = (
+        int(aes.assigned_form.template_id)
+        if aes.assigned_form and aes.assigned_form.template_id is not None
+        else None
+    )
+    return int(aes.id), template_id
 
 
 def resolve_template_id_from_assignment_ids(

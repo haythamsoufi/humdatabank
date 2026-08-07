@@ -1653,8 +1653,8 @@ def api_session_keepalive():
     """Refresh session activity for users actively editing an entry form.
 
     Intentionally NOT listed in SKIP_ACTIVITY_ENDPOINTS so every successful
-    call resets ``session['last_activity']`` and restarts the 30-minute
-    inactivity clock.  The client sends this only when genuine user
+    call resets ``session['last_activity']`` and restarts the inactivity
+    clock (default 2 hours).  The client sends this only when genuine user
     interaction (keystrokes / clicks) was detected, so silent background tabs
     let the clock expire naturally.
 

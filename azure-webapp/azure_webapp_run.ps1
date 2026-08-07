@@ -13,7 +13,9 @@ Write-Host "$Label remote command via tunnel on port $Port"
 Write-Host "Command: $Command"
 Write-Host ""
 
-$exitCode = Use-AzureWebAppTunnel `
+# Called bare (not `$exitCode = ...`) so the remote command's output reaches the real
+# console instead of being captured. See Use-AzureWebAppTunnel for why.
+Use-AzureWebAppTunnel `
     -WebApp $WebApp `
     -ResourceGroup $ResourceGroup `
     -Port $Port `
@@ -21,11 +23,7 @@ $exitCode = Use-AzureWebAppTunnel `
     -LogPrefix 'azure_webapp_run' `
     -Action {
         param($Ctx)
-        return Invoke-AzureWebAppPlinkCommand `
-            -PlinkPath $Ctx.PlinkPath `
-            -LocalPort $Ctx.Port `
-            -HostKey $Ctx.HostKey `
-            -RemoteCommand $Command
+        Invoke-AzureWebAppSshCommand -LocalPort $Ctx.Port -RemoteCommand $Command
     }
 
-exit $exitCode
+exit $LASTEXITCODE

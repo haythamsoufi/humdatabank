@@ -350,6 +350,64 @@ class TestFactoryHelpers:
         from app.utils.rate_limiting import mobile_destructive_rate_limit
         assert callable(mobile_destructive_rate_limit())
 
+    def test_api_rate_limit_accepts_custom_requests_per_minute(self):
+        from app.utils.rate_limiting import api_rate_limit
+        assert callable(api_rate_limit(requests_per_minute=120))
+
+
+# ---------------------------------------------------------------------------
+# _api_rate_limit_identity_key
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestApiRateLimitIdentityKey:
+    def test_falls_back_to_ip_without_authorization_header(self, app):
+        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        with app.test_request_context("/test"):
+            with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+                assert _api_rate_limit_identity_key() == "api_1.2.3.4"
+
+    def test_falls_back_to_ip_for_non_bearer_authorization(self, app):
+        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        with app.test_request_context("/test", headers={"Authorization": "Basic abc123"}):
+            with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+                assert _api_rate_limit_identity_key() == "api_1.2.3.4"
+
+    def test_falls_back_to_ip_for_empty_bearer_token(self, app):
+        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        with app.test_request_context("/test", headers={"Authorization": "Bearer "}):
+            with patch("app.utils.rate_limiting.get_client_ip", return_value="1.2.3.4"):
+                assert _api_rate_limit_identity_key() == "api_1.2.3.4"
+
+    def test_bearer_token_produces_stable_hashed_key(self, app):
+        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        with app.test_request_context("/test", headers={"Authorization": "Bearer my-secret-key"}):
+            key1 = _api_rate_limit_identity_key()
+        with app.test_request_context("/test", headers={"Authorization": "Bearer my-secret-key"}):
+            key2 = _api_rate_limit_identity_key()
+        assert key1 == key2
+        assert key1.startswith("key_")
+        assert "my-secret-key" not in key1
+
+    def test_different_bearer_tokens_produce_different_keys(self, app):
+        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        with app.test_request_context("/test", headers={"Authorization": "Bearer key-one"}):
+            key1 = _api_rate_limit_identity_key()
+        with app.test_request_context("/test", headers={"Authorization": "Bearer key-two"}):
+            key2 = _api_rate_limit_identity_key()
+        assert key1 != key2
+
+    def test_bearer_token_key_independent_of_client_ip(self, app):
+        """Two integrators behind the same NAT/proxy IP get separate buckets."""
+        from app.utils.rate_limiting import _api_rate_limit_identity_key
+        with app.test_request_context("/test", headers={"Authorization": "Bearer key-one"}):
+            with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.0.1"):
+                key1 = _api_rate_limit_identity_key()
+        with app.test_request_context("/test", headers={"Authorization": "Bearer key-two"}):
+            with patch("app.utils.rate_limiting.get_client_ip", return_value="10.0.0.1"):
+                key2 = _api_rate_limit_identity_key()
+        assert key1 != key2
+
 
 # ---------------------------------------------------------------------------
 # mobile_rate_limit decorator

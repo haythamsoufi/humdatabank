@@ -705,6 +705,35 @@ class TestDataHelpers:
         assert cells[0]['matrix']['row']['label'] == 'Kenya'
         assert cells[0]['matrix']['entity']['iso2'] == 'KE'
 
+    def test_build_matrix_cells_from_data_rows_respects_include_totals_in_api_flag(self, app):
+        """A matrix item can show totals on-screen (show_row_totals/show_column_totals)
+        while excluding calculated totals from matrix_cells[] via the decoupled
+        include_calculated_totals_in_api flag."""
+        from app.utils.api_serialization import build_matrix_cells_from_data_rows
+
+        form_items = [{
+            'id': 9,
+            'matrix_config': {
+                'columns': [{'name': 'SP2'}, {'name': 'SP3'}],
+                'show_row_totals': True,
+                'show_column_totals': True,
+                'include_calculated_totals_in_api': False,
+            },
+        }]
+        data_rows = [{
+            'id': 100,
+            'form_item_id': 9,
+            'submission_type': 'assigned',
+            'submission_id': 1,
+            'disaggregation_data': {
+                'mode': 'matrix',
+                'values': {'10_SP2': 100, '10_SP3': 50},
+            },
+        }]
+        cells = build_matrix_cells_from_data_rows(data_rows, form_items)
+        assert len(cells) == 2
+        assert not any(c.get('is_calculated_total') for c in cells)
+
     def test_strip_matrix_values_from_data_rows(self, app):
         from app.utils.api_serialization import strip_matrix_values_from_data_rows
         rows = [{
@@ -783,6 +812,40 @@ class TestDataHelpers:
         })
         assert include_dynamic is True
         assert include_repeat is True
+
+    def test_resolve_include_dimensions_authenticated_defaults_true(self, app):
+        from app.routes.api.data import _resolve_include_dimensions
+        assert _resolve_include_dimensions({}, public_data_access=False) is True
+
+    def test_resolve_include_dimensions_authenticated_explicit_false(self, app):
+        from app.routes.api.data import _resolve_include_dimensions
+        assert _resolve_include_dimensions(
+            {'include_dimensions': 'false'}, public_data_access=False,
+        ) is False
+
+    def test_resolve_include_dimensions_public_defaults_false(self, app):
+        """Public callers get the compact shape unless they opt in — opposite
+        polarity from authenticated callers so existing integrations don't change."""
+        from app.routes.api.data import _resolve_include_dimensions
+        assert _resolve_include_dimensions({}, public_data_access=True) is False
+
+    def test_resolve_include_dimensions_public_explicit_true(self, app):
+        from app.routes.api.data import _resolve_include_dimensions
+        assert _resolve_include_dimensions(
+            {'include_dimensions': 'true'}, public_data_access=True,
+        ) is True
+
+    def test_resolve_include_calculated_totals_defaults_true(self, app):
+        from app.routes.api.data import _resolve_include_calculated_totals
+        assert _resolve_include_calculated_totals({}) is True
+
+    def test_resolve_include_calculated_totals_explicit_false(self, app):
+        from app.routes.api.data import _resolve_include_calculated_totals
+        assert _resolve_include_calculated_totals({'include_calculated_totals': 'false'}) is False
+
+    def test_resolve_include_calculated_totals_explicit_true(self, app):
+        from app.routes.api.data import _resolve_include_calculated_totals
+        assert _resolve_include_calculated_totals({'include_calculated_totals': 'yes'}) is True
 
     def test_collect_assigned_submission_ids(self, app):
         from app.routes.api.data import _collect_assigned_submission_ids

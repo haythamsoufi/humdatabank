@@ -65,6 +65,15 @@ ChatGPT allows up to **4** starters. The **recommended set** gives **two FDRS** 
 | 3 | **FDRS** | FDRS trend for people reached — by reporting year |
 | 4 | **Both** | How do FDRS and UPR definitions differ for volunteers and staff? |
 
+### Alternative — coverage / counting emphasis
+
+| # | Domain | Starter |
+|---|--------|---------|
+| 1 | **FDRS documents** | How many countries submitted an annual report through FDRS in 2024? |
+| 2 | **FDRS data** | How many National Societies submitted FDRS data, across all years? |
+| 3 | **UPR documents** | How many countries have a public Unified Plan for 2026? |
+| 4 | **FDRS** | Top 10 countries by number of volunteers in Annual 2023 |
+
 Use literal country/year in the editor (e.g. Syria, 2026) if placeholders are not allowed.
 
 ---

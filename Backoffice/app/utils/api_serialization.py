@@ -185,6 +185,20 @@ def resolve_matrix_join_metadata(matrix_config):
     columns = matrix_config.get('columns') or []
     if isinstance(columns, list) and columns:
         meta['columns'] = columns
+    # Preserve totals-visibility flags so downstream total computation (matrix_cells[]
+    # calculated totals, star-layout disaggregation_data, bridge_disagg_values) matches
+    # what the form author actually configured, instead of silently defaulting to "on".
+    # include_calculated_totals_in_api is a separate, API-only gate layered on top:
+    # it lets a form author keep totals visible on-screen (show_row_totals/
+    # show_column_totals) while still excluding them from API/export output.
+    for flag in (
+        'show_row_totals',
+        'show_column_totals',
+        'row_total_manual_enabled',
+        'include_calculated_totals_in_api',
+    ):
+        if flag in matrix_config:
+            meta[flag] = matrix_config[flag]
     return meta
 
 
@@ -197,16 +211,33 @@ def _index_dimension_table(table):
     }
 
 
-def _lookup_matrix_column_label(matrix_config, column_key):
-    """Resolve a matrix column display label from form item matrix_config."""
+def _lookup_matrix_column_label(matrix_config, column_key, *, language='en'):
+    """Resolve a matrix column display label from form item matrix_config.
+
+    Priority: explicit ``label`` -> ``name_translations[language]`` (or any other
+    available translation) -> raw ``name`` -> the column key itself. Falling
+    straight to the internal key (e.g. ``ns_fun``) skips a human-readable name
+    that is often already sitting right next to it in ``name_translations``.
+    """
     if not column_key:
         return None
     for col in (matrix_config or {}).get('columns') or []:
         if not isinstance(col, dict):
             continue
         name = col.get('name') if col.get('name') is not None else col.get('key')
-        if str(name) == str(column_key):
-            return col.get('label') or col.get('name') or str(column_key)
+        if str(name) != str(column_key):
+            continue
+        label = col.get('label')
+        if label:
+            return label
+        translations = col.get('name_translations')
+        if isinstance(translations, dict):
+            translated = translations.get(language) or next(
+                (v for v in translations.values() if v), None
+            )
+            if translated:
+                return translated
+        return col.get('name') or str(column_key)
     return str(column_key)
 
 
@@ -490,6 +521,38 @@ def _parse_matrix_cell_key(key, matrix_config=None):
     return parse_matrix_disagg_key(key)
 
 
+def prune_stale_matrix_cell_keys(matrix_data, matrix_config):
+    """Drop matrix cell keys whose column suffix no longer matches a configured column.
+
+    Column ``name`` values are occasionally renamed in the form builder after
+    data has already been saved (e.g. item 1403's funding column went from
+    ``NS 2025 Total Funding`` to ``ns_fun``). Old cell keys like
+    ``HNS other sources_NS 2025 Total Funding`` then linger in ``disagg_data``
+    forever: they don't match any current row/column pairing, so they're
+    invisible in the UI and excluded from totals, but they stay in the JSON.
+
+    Only prunes when the matrix has explicit ``columns`` defined — matrices
+    without column definitions fall back to a naive last-underscore split in
+    ``_parse_matrix_cell_key`` that would treat every key as "valid", so we
+    leave those untouched rather than risk deleting legitimate data.
+    """
+    if not isinstance(matrix_data, dict) or not matrix_data:
+        return matrix_data
+    if not _matrix_column_defs(matrix_config):
+        return matrix_data
+
+    pruned = {}
+    for key, value in matrix_data.items():
+        if not isinstance(key, str) or key.startswith('_'):
+            pruned[key] = value
+            continue
+        _, column_key = _parse_matrix_cell_key(key, matrix_config)
+        if column_key is None:
+            continue
+        pruned[key] = value
+    return pruned
+
+
 def _iter_matrix_data_cells(values, matrix_config):
     column_names = {col['name'] for col in _matrix_column_defs(matrix_config)}
     for key, raw in (values or {}).items():
@@ -517,6 +580,12 @@ def _compute_matrix_calculated_total_rows(values, matrix_config):
     if not isinstance(values, dict) or not values:
         return []
     matrix_config = matrix_config or {}
+    # Decoupled from show_row_totals/show_column_totals: a form author may want
+    # totals visible to people filling in the form but excluded from API/export
+    # output (e.g. to avoid integrators double-counting aggregates). Defaults to
+    # True so existing matrices keep exposing totals via the API unchanged.
+    if not _matrix_config_flag(matrix_config, 'include_calculated_totals_in_api', True):
+        return []
     show_row_totals = _matrix_config_flag(matrix_config, 'show_row_totals', True)
     show_column_totals = _matrix_config_flag(matrix_config, 'show_column_totals', True)
     if not show_row_totals and not show_column_totals:
@@ -791,6 +860,75 @@ def _country_for_aes(aes, aes_countries=None):
     return None
 
 
+_ASSIGNMENT_YEAR_TOKEN = '[assignment_year]'
+
+
+def form_items_need_assignment_year_resolution(form_items_table) -> bool:
+    """Cheap in-memory check for whether any label / matrix column carries ``[assignment_year]``.
+
+    Used to skip the extra DB lookup (see ``_resolve_single_assignment_year`` in
+    ``app.routes.api.data``) on the overwhelmingly common case where no field uses
+    the placeholder at all.
+    """
+    for item in form_items_table or []:
+        if not isinstance(item, dict):
+            continue
+        if _ASSIGNMENT_YEAR_TOKEN in (item.get('label') or ''):
+            return True
+        matrix_config = item.get('matrix_config')
+        if not isinstance(matrix_config, dict):
+            continue
+        for col in matrix_config.get('columns') or []:
+            if not isinstance(col, dict):
+                continue
+            if _ASSIGNMENT_YEAR_TOKEN in (col.get('label') or ''):
+                return True
+            translations = col.get('name_translations')
+            if isinstance(translations, dict) and any(
+                _ASSIGNMENT_YEAR_TOKEN in (v or '') for v in translations.values()
+            ):
+                return True
+    return False
+
+
+def _substitute_assignment_year(text, assignment_year):
+    if not isinstance(text, str) or _ASSIGNMENT_YEAR_TOKEN not in text:
+        return text
+    return text.replace(_ASSIGNMENT_YEAR_TOKEN, str(assignment_year))
+
+
+def resolve_assignment_year_placeholders(form_items_table, assignment_year):
+    """
+    Substitute ``[assignment_year]`` in form item labels and matrix column display text.
+
+    Best-effort and in place: only called once the caller (``get_all_data``) has
+    determined the request is scoped to a single assignment, so the year is
+    unambiguous. Deliberately leaves the ``name``/join-key fields untouched — those
+    are matched against persisted disagg_data keys and substituting them could break
+    that matching for legacy rows saved under the raw (un-substituted) key.
+    """
+    if not assignment_year or not form_items_table:
+        return form_items_table
+    for item in form_items_table:
+        if not isinstance(item, dict):
+            continue
+        if item.get('label'):
+            item['label'] = _substitute_assignment_year(item['label'], assignment_year)
+        matrix_config = item.get('matrix_config')
+        if not isinstance(matrix_config, dict):
+            continue
+        for col in matrix_config.get('columns') or []:
+            if not isinstance(col, dict):
+                continue
+            if col.get('label'):
+                col['label'] = _substitute_assignment_year(col['label'], assignment_year)
+            translations = col.get('name_translations')
+            if isinstance(translations, dict):
+                for lang, val in list(translations.items()):
+                    translations[lang] = _substitute_assignment_year(val, assignment_year)
+    return form_items_table
+
+
 def format_form_item_info(form_item, section=None, template=None, assignment=None, public_assignment=None):
     """Helper function to format comprehensive form item information, including section, template, and assignment info."""
     if not form_item:
@@ -828,6 +966,11 @@ def format_form_item_info(form_item, section=None, template=None, assignment=Non
             'created_at': public_assignment.created_at.isoformat() if hasattr(public_assignment, 'created_at') and public_assignment.created_at else None
         }
     # Base form item information
+    # NOTE on duplicate fields (canonical vs. deprecated alias — kept for backward
+    # compatibility, do not remove without a major version bump):
+    #   - 'type' is canonical; 'form_item_type' is a deprecated alias with the same value.
+    #   - See serialize_*_data_item() below: '*_disaggregation_data' (normalized: {mode, values})
+    #     is canonical; raw '*_disagg_data' (on-disk shape) is a deprecated alias.
     form_item_info = {
         'id': form_item.id,
         'stable_key': form_item.stable_key,
@@ -838,7 +981,7 @@ def format_form_item_info(form_item, section=None, template=None, assignment=Non
         'order': form_item.order,
         'display_order': form_item.display_order,
         'is_required': form_item.is_required,
-        'form_item_type': form_item.item_type,  # Ensure form_item_type is inside
+        'form_item_type': form_item.item_type,  # deprecated alias of 'type', see NOTE above
         'layout_column_width': form_item.layout_column_width,
         'layout_break_after': form_item.layout_break_after,
         'section': section_info,
@@ -1701,8 +1844,12 @@ def serialize_repeat_data_item(
 # Star-schema dimensional tables (GET /api/v1/data/tables?layout=star)
 # ---------------------------------------------------------------------------
 
-STAR_SCHEMA_VERSION = '1.1'
-STAR_SCHEMA_GRAIN = 'one row per submission field value (static, dynamic, repeat); matrix cells are a long array on disaggregation_data'
+STAR_SCHEMA_VERSION = '1.2'
+STAR_SCHEMA_GRAIN = (
+    'one row per submission field value (static, dynamic, repeat); matrix cells are a long '
+    'array on disaggregation_data (raw values plus calculated row/column/grand totals, '
+    'flagged via is_calculated_total/total_kind) and mirrored in bridge_disagg_values'
+)
 
 
 def format_dim_template(template):
@@ -1787,62 +1934,17 @@ def format_dim_submission_public(public_submission):
     }
 
 
-def format_fact_matrix_cell_row(cell):
-    """Map a normalized matrix cell to a unified fact_form_values row."""
-    if not cell or not isinstance(cell, dict):
-        return None
-    matrix = cell.get('matrix')
-    if not matrix:
-        matrix = build_matrix_context(
-            row_entity_id=cell.get('row_entity_id'),
-            row_entity_type=cell.get('row_entity_type'),
-            row_entity_label=cell.get('row_entity_label'),
-            join_dimension=cell.get('join_dimension'),
-            column_key=cell.get('column_key'),
-            column_label=cell.get('column_label'),
-            source=cell.get('source') or 'reported',
-            entity_id=cell.get('entity_id'),
-            entity_name=cell.get('entity_name'),
-            entity_iso2=cell.get('entity_iso2'),
-            entity_iso3=cell.get('entity_iso3'),
-            entity_code=cell.get('entity_code'),
-            entity_country_id=cell.get('entity_country_id'),
-            entity_country_name=cell.get('entity_country_name'),
-        )
-    form_data_id = cell.get('form_data_id')
-    row = matrix.get('row') or {}
-    column = matrix.get('column') or {}
-    row_entity_id = row.get('entity_id')
-    column_key = column.get('key')
-    if form_data_id is None or row_entity_id is None or not column_key:
-        return None
-    value = cell.get('value')
-    return {
-        'id': None,
-        'field_type': 'matrix',
-        'data_type': 'static',
-        'form_item_id': cell.get('form_item_id'),
-        'indicator_bank_id': None,
-        'country_id': cell.get('country_id'),
-        'template_id': cell.get('template_id'),
-        'period_name': cell.get('period_name'),
-        'submission_id': cell.get('submission_id'),
-        'submission_type': cell.get('submission_type'),
-        'section_id': None,
-        'section_stable_key': None,
-        'repeat_instance_id': None,
-        'repeat_instance_number': None,
-        'matrix': matrix,
-        'value': value,
-        'num_value': extract_numeric_value(value),
-        'data_status': 'available',
-        'submitted_at': None,
-        'is_missing': False,
-    }
-
-
 def format_fact_submission_value_row(flat_row):
-    """Map a flat fact row (static, dynamic, or repeat) to a star-schema fact row."""
+    """Map a flat fact row (static, dynamic, or repeat) to a star-schema fact row.
+
+    ``matrix`` is always ``None`` here by design: matrix cell values are not
+    broken out into separate fact rows in the star layout. Instead they are
+    carried as a long array directly on this row's ``disaggregation_data``
+    (see ``format_matrix_disagg_as_long_rows`` / ``_apply_star_schema_disagg_format``)
+    and mirrored in ``bridge_disagg_values`` for BI tools that prefer a
+    dedicated bridge table. The field is kept (rather than omitted) purely for
+    a stable, predictable row shape across ``field_type`` values.
+    """
     if not flat_row:
         return None
     return {
@@ -1915,11 +2017,28 @@ def _apply_star_schema_disagg_format(fact_row, *, form_items_index=None):
     return fact_row
 
 
-def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
+def format_bridge_disagg_rows(
+    form_data_id,
+    disagg_payload,
+    source='reported',
+    *,
+    form_item_id=None,
+    form_items_index=None,
+):
     """
     Flatten a normalized disaggregation payload into bridge rows.
 
-    Each row: ``form_data_id, source, mode, key, value``.
+    Matrix-mode payloads (``mode: "matrix"``) are expanded the same way as
+    ``fact_form_values[].disaggregation_data`` in the star layout and
+    ``matrix_cells[]`` in the flat layout: parsed ``row_entity_id`` /
+    ``column_key`` / resolved ``column_label``, including calculated
+    row/column/grand totals flagged via ``is_calculated_total`` / ``total_kind``.
+    This keeps ``bridge_disagg_values`` a complete, consistent mirror of
+    ``disaggregation_data`` instead of a partial view keyed by an unparsed
+    composite string (e.g. ``"IFRC Secretariat_ns_fun"``).
+
+    Other modes (sex/age/total/plugin) keep the original generic
+    ``form_data_id, source, mode, key, value`` shape.
     """
     if not disagg_payload or not isinstance(disagg_payload, dict):
         return []
@@ -1927,6 +2046,28 @@ def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
     values = disagg_payload.get('values')
     if not isinstance(values, dict) or not values:
         return []
+
+    if mode == 'matrix':
+        form_item = (form_items_index or {}).get(form_item_id) or {}
+        matrix_config = form_item.get('matrix_config') or {}
+        rows = []
+        for cell in _build_matrix_long_rows_from_values(values, matrix_config):
+            rows.append({
+                'form_data_id': form_data_id,
+                'source': source,
+                'mode': mode,
+                'row_entity_id': cell.get('row_entity_id'),
+                'column_key': cell.get('column_key'),
+                'column_label': cell.get('column_label'),
+                'value': cell.get('value'),
+                **({
+                    k: cell[k]
+                    for k in ('is_calculated_total', 'total_kind')
+                    if k in cell
+                }),
+            })
+        return rows
+
     rows = []
     for key, val in values.items():
         if key is None or (isinstance(key, str) and key.startswith('_')):
@@ -1941,7 +2082,7 @@ def format_bridge_disagg_rows(form_data_id, disagg_payload, source='reported'):
     return rows
 
 
-def build_bridge_disagg_from_flat_rows(data_rows):
+def build_bridge_disagg_from_flat_rows(data_rows, *, form_items_index=None):
     """Build bridge_disagg_values from flat /data/tables rows."""
     bridge = []
     for row in data_rows or []:
@@ -1950,15 +2091,54 @@ def build_bridge_disagg_from_flat_rows(data_rows):
         form_data_id = row.get('id')
         if form_data_id is None:
             continue
+        form_item_id = row.get('form_item_id')
         for source, field in (
             ('reported', 'disaggregation_data'),
             ('prefilled', 'prefilled_disaggregation_data'),
             ('imputed', 'imputed_disaggregation_data'),
         ):
             bridge.extend(
-                format_bridge_disagg_rows(form_data_id, row.get(field), source=source)
+                format_bridge_disagg_rows(
+                    form_data_id, row.get(field), source=source,
+                    form_item_id=form_item_id, form_items_index=form_items_index,
+                )
             )
     return bridge
+
+
+def filter_calculated_totals(rows):
+    """
+    Drop matrix rows/cells flagged ``is_calculated_total`` (row/column/grand totals),
+    keeping only raw reported/prefilled/imputed cells.
+
+    Used for ``matrix_cells[]`` (flat layout) and ``bridge_disagg_values[]`` (star
+    layout) when a caller passes ``include_calculated_totals=false`` — e.g. because
+    they sum ``value`` themselves and want to avoid double- (or quadruple-) counting
+    totals that are already computable from the raw cells. Rows without an
+    ``is_calculated_total`` key (non-matrix rows) always pass through unchanged.
+    """
+    return [
+        row for row in (rows or [])
+        if not (isinstance(row, dict) and row.get('is_calculated_total'))
+    ]
+
+
+def strip_calculated_totals_from_fact_rows(fact_rows):
+    """
+    In-place drop calculated-total entries from fact_form_values[]'s long-array
+    disaggregation_data / prefilled_disaggregation_data / imputed_disaggregation_data
+    (star-layout matrix rows), mirroring ``filter_calculated_totals`` so
+    ``include_calculated_totals=false`` behaves consistently everywhere calculated
+    totals appear.
+    """
+    for row in fact_rows or []:
+        if not isinstance(row, dict):
+            continue
+        for field in _MATRIX_DISAGG_FIELDS:
+            value = row.get(field)
+            if isinstance(value, list):
+                row[field] = filter_calculated_totals(value)
+    return fact_rows
 
 
 def build_star_schema_tables(
@@ -1968,7 +2148,6 @@ def build_star_schema_tables(
     *,
     dynamic_data=None,
     repeat_data=None,
-    matrix_cells=None,
     national_societies_table=None,
     indicator_bank_table=None,
     dynamic_context=None,
@@ -1978,7 +2157,9 @@ def build_star_schema_tables(
     Assemble star-schema table dicts from unified flat fact sources.
 
     ``fact_form_values`` includes static, dynamic, and repeat rows. Matrix cell
-    values are returned as a long array on ``disaggregation_data`` (no mode wrapper).
+    values are returned as a long array on ``disaggregation_data`` (no mode wrapper),
+    and mirrored (with the same parsed row/column fields and calculated totals)
+    in ``bridge_disagg_values`` — see ``format_bridge_disagg_rows``.
 
     When ``assignment_statuses`` is provided (pre-scoped AES rows, including pending
     with no FormData), it replaces fact-derived assigned ``dim_submission`` rows.
@@ -2089,5 +2270,7 @@ def build_star_schema_tables(
         'dim_template': dim_template,
         'dim_period': dim_period,
         'dim_submission': dim_submission,
-        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(value_rows),
+        'bridge_disagg_values': build_bridge_disagg_from_flat_rows(
+            value_rows, form_items_index=form_items_index,
+        ),
     }

@@ -602,6 +602,8 @@ class TestCatalogPublicDocuments:
         status=None,
         country_name=None,
         document_date=None,
+        storage_path=None,
+        source_url=None,
     ):
         doc = AIDocument(
             title=title,
@@ -612,6 +614,8 @@ class TestCatalogPublicDocuments:
             processing_status=status or AIDocumentProcessingStatusValue.completed.value,
             country_name=country_name,
             document_date=document_date,
+            storage_path=storage_path,
+            source_url=source_url,
         )
         db_session.add(doc)
         db_session.commit()
@@ -752,6 +756,52 @@ class TestCatalogPublicDocuments:
         assert out["total_documents"] == 1
         assert out["by_country"][0]["documents"] == []
         assert any("include_documents=false" in note for note in out["notes"])
+
+    def test_include_documents_false_skips_blob_existence_checks(self, app, db_session):
+        """Counts-only catalog must not HEAD-check Azure/local storage per document."""
+        from unittest.mock import patch
+
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 1, 1),
+                storage_path="kenya_ar_2024.pdf",
+            )
+
+            with patch(
+                "app.services.public_document_service._ai_document_has_local_file",
+                side_effect=AssertionError("blob check should not run when include_documents=false"),
+            ) as mock_has_local:
+                out = catalog_public_documents(document_type="annual_report", include_documents=False)
+
+        mock_has_local.assert_not_called()
+        assert out["total_documents"] == 1
+
+    def test_include_documents_true_skips_blob_check_when_source_url_present(self, app, db_session):
+        from unittest.mock import patch
+
+        with app.app_context():
+            self._doc(
+                db_session,
+                title="Kenya Annual Report 2024",
+                filename="kenya_ar_2024.pdf",
+                country_name="Kenya",
+                document_date=datetime.date(2024, 1, 1),
+                storage_path="kenya_ar_2024.pdf",
+                source_url="https://example.org/kenya-ar-2024.pdf",
+            )
+
+            with patch(
+                "app.services.public_document_service._ai_document_has_local_file",
+                side_effect=AssertionError("blob check not needed when source_url is set"),
+            ) as mock_has_local:
+                out = catalog_public_documents(document_type="annual_report", include_documents=True)
+
+        mock_has_local.assert_not_called()
+        assert out["by_country"][0]["documents"][0]["document_url"] == "https://example.org/kenya-ar-2024.pdf"
 
     def test_document_type_key_detects_annual_report_and_unified_plan(self, app, db_session):
         with app.app_context():

@@ -779,6 +779,238 @@ class AIVectorStore:
         # Return top_k results
         return combined_results[:top_k]
 
+    @staticmethod
+    def _apply_generic_document_filters(query, filters: Optional[Dict[str, Any]]):
+        """
+        Apply document-level filters shared by the batched per-document search queries.
+
+        Mirrors the filter handling in :meth:`_search_similar_with_embedding` /
+        :meth:`_keyword_search`, factored out so batched queries (which scope by
+        ``AIDocument.id.in_(...)`` instead of a single ``document_id``) apply identical
+        semantics. Kept separate from the single-document methods to avoid touching their
+        already-verified code paths.
+        """
+        if not filters:
+            return query
+        if filters.get("country_id"):
+            query = query.filter(AIVectorStore._country_id_filter(int(filters["country_id"])))
+        if filters.get("country_name"):
+            query = query.filter(AIVectorStore._country_name_filter(filters["country_name"]))
+        if filters.get("file_type"):
+            query = query.filter(AIDocument.file_type == filters["file_type"])
+        if filters.get("user_id"):
+            query = query.filter(AIDocument.user_id == filters["user_id"])
+        if "is_api_import" in filters:
+            if filters.get("is_api_import") is True:
+                query = query.filter(AIDocument.source_url.isnot(None))
+            elif filters.get("is_api_import") is False:
+                query = query.filter(AIDocument.source_url.is_(None))
+        if "is_system_document" in filters:
+            if filters.get("is_system_document") is True:
+                query = query.filter(AIDocument.submitted_document_id.isnot(None))
+            elif filters.get("is_system_document") is False:
+                query = query.filter(AIDocument.submitted_document_id.is_(None))
+        if filters.get("workflow_role"):
+            role_val = str(filters["workflow_role"]).strip()
+            role_json = json.dumps([role_val])
+            query = query.filter(
+                text(
+                    "(ai_documents.extra_metadata->'roles')::jsonb @> CAST(:workflow_role_json AS jsonb)"
+                ).bindparams(workflow_role_json=role_json)
+            )
+        if filters.get("date_range"):
+            dr = filters["date_range"]
+            min_d, max_d = None, None
+            if isinstance(dr, (list, tuple)) and len(dr) >= 2:
+                min_d, max_d = dr[0], dr[1]
+            elif isinstance(dr, dict):
+                min_d, max_d = dr.get("min"), dr.get("max")
+            if min_d is not None:
+                d = min_d if isinstance(min_d, date) else date.fromisoformat(str(min_d)[:10])
+                query = query.filter(AIDocument.document_date >= d)
+            if max_d is not None:
+                d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
+                query = query.filter(AIDocument.document_date <= d)
+        return query
+
+    def _search_similar_per_document_with_embedding(
+        self,
+        query_embedding: List[float],
+        document_ids: List[int],
+        chunks_per_doc: int,
+        filters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        user_role: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Top-``chunks_per_doc`` similar chunks for EACH document, in a single query.
+
+        Uses a ``ROW_NUMBER() OVER (PARTITION BY document_id ORDER BY similarity DESC)``
+        window function instead of issuing one query per document_id (see
+        :meth:`hybrid_search_per_document`).
+        """
+        similarity_expr = 1 - AIEmbedding.embedding.cosine_distance(query_embedding)
+        rn = func.row_number().over(
+            partition_by=AIDocument.id,
+            order_by=similarity_expr.desc(),
+        ).label("rn")
+
+        ranked = (
+            db.session.query(
+                AIEmbedding.id.label("embedding_id"),
+                AIDocumentChunk.id.label("chunk_id"),
+                AIDocument.id.label("doc_id"),
+                similarity_expr.label("similarity"),
+                rn,
+            )
+            .join(AIDocumentChunk, AIEmbedding.chunk_id == AIDocumentChunk.id)
+            .join(AIDocument, AIEmbedding.document_id == AIDocument.id)
+            .filter(
+                AIDocument.id.in_(document_ids),
+                AIDocument.searchable == True,
+                AIDocument.processing_status == 'completed',
+            )
+        )
+        ranked = self._apply_document_permission_filters(ranked, user_id, user_role)
+        ranked = self._apply_generic_document_filters(ranked, filters)
+        ranked_subq = ranked.subquery()
+
+        rows = (
+            db.session.query(AIEmbedding, AIDocumentChunk, AIDocument, ranked_subq.c.similarity)
+            .join(ranked_subq, AIEmbedding.id == ranked_subq.c.embedding_id)
+            .join(AIDocumentChunk, AIDocumentChunk.id == ranked_subq.c.chunk_id)
+            .join(AIDocument, AIDocument.id == ranked_subq.c.doc_id)
+            .options(joinedload(AIDocument.country))
+            .filter(ranked_subq.c.rn <= max(1, int(chunks_per_doc)))
+            .all()
+        )
+
+        return [
+            self._format_chunk_result(chunk, document, similarity_score=float(similarity), embedding=embedding)
+            for embedding, chunk, document, similarity in rows
+        ]
+
+    def _keyword_search_per_document(
+        self,
+        query_text: str,
+        document_ids: List[int],
+        chunks_per_doc: int,
+        filters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        user_role: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Top-``chunks_per_doc`` keyword matches for EACH document, in a single query.
+
+        Same window-function approach as :meth:`_search_similar_per_document_with_embedding`.
+        Keyword score is normalized per-document (against that document's own max rank in the
+        result set) rather than globally, matching the intent of the single-document
+        ``_keyword_search`` normalization applied per call.
+        """
+        ts_query = func.websearch_to_tsquery('simple', query_text)
+        ts_vector = func.to_tsvector('simple', AIDocumentChunk.content)
+        rank_expr = func.ts_rank_cd(ts_vector, ts_query)
+        rn = func.row_number().over(
+            partition_by=AIDocument.id,
+            order_by=rank_expr.desc(),
+        ).label("rn")
+
+        ranked = (
+            db.session.query(
+                AIDocumentChunk.id.label("chunk_id"),
+                AIDocument.id.label("doc_id"),
+                rank_expr.label("rank"),
+                rn,
+            )
+            .join(AIDocument, AIDocumentChunk.document_id == AIDocument.id)
+            .filter(
+                AIDocument.id.in_(document_ids),
+                AIDocument.searchable == True,
+                AIDocument.processing_status == 'completed',
+                ts_vector.op('@@')(ts_query),
+            )
+        )
+        ranked = self._apply_document_permission_filters(ranked, user_id, user_role)
+        ranked = self._apply_generic_document_filters(ranked, filters)
+        ranked_subq = ranked.subquery()
+
+        rows = (
+            db.session.query(AIDocumentChunk, AIDocument, ranked_subq.c.rank)
+            .join(ranked_subq, AIDocumentChunk.id == ranked_subq.c.chunk_id)
+            .join(AIDocument, AIDocument.id == ranked_subq.c.doc_id)
+            .options(joinedload(AIDocument.country))
+            .filter(ranked_subq.c.rn <= max(1, int(chunks_per_doc)))
+            .all()
+        )
+
+        max_rank_by_doc: Dict[int, float] = {}
+        for _chunk, document, rnk in rows:
+            try:
+                r = float(rnk or 0.0)
+            except (TypeError, ValueError):
+                r = 0.0
+            doc_id = int(document.id)
+            if r > max_rank_by_doc.get(doc_id, 0.0):
+                max_rank_by_doc[doc_id] = r
+
+        formatted_results = []
+        for chunk, document, rnk in rows:
+            doc_id = int(document.id)
+            max_rank = max_rank_by_doc.get(doc_id, 0.0)
+            try:
+                keyword_score = float(rnk or 0.0) / max_rank if max_rank > 0 else 0.0
+            except (TypeError, ValueError):
+                keyword_score = 0.0
+            formatted_results.append(
+                self._format_chunk_result(chunk, document, keyword_score=keyword_score)
+            )
+        return formatted_results
+
+    def _hybrid_search_per_document_looped(
+        self,
+        vq: str,
+        document_ids: List[int],
+        *,
+        chunks_per_doc: int,
+        keyword_weight: float,
+        vector_weight: float,
+        filters: Optional[Dict[str, Any]],
+        user_id: Optional[int],
+        user_role: Optional[str],
+        query_embedding: List[float],
+    ) -> List[Dict[str, Any]]:
+        """One-query-per-document fallback, used only if the batched window-function
+        queries fail (e.g. Postgres feature unavailable). Kept as a safety net; prefer the
+        batched path in :meth:`hybrid_search_per_document`."""
+        all_results: List[Dict[str, Any]] = []
+        for doc_id in document_ids:
+            doc_filters = dict(filters or {})
+            doc_filters["document_id"] = int(doc_id)
+
+            vector_results = self._search_similar_with_embedding(
+                query_embedding=query_embedding,
+                query_text=vq,
+                top_k=chunks_per_doc,
+                filters=doc_filters,
+                user_id=user_id,
+                user_role=user_role,
+            )
+            keyword_results = self._keyword_search(
+                query_text=vq,
+                top_k=chunks_per_doc,
+                filters=doc_filters,
+                user_id=user_id,
+                user_role=user_role,
+            )
+            combined = self._combine_search_results(
+                vector_results=vector_results,
+                keyword_results=keyword_results,
+                vector_weight=vector_weight,
+                keyword_weight=keyword_weight,
+            )
+            all_results.extend(combined[:chunks_per_doc])
+        return all_results
+
     def hybrid_search_per_document(
         self,
         query_text: str,
@@ -794,8 +1026,12 @@ class AIVectorStore:
         """
         Return all top matching chunks for each document_id (up to chunks_per_doc each).
 
-        Computes the query embedding once, then runs scoped vector + keyword search per document.
-        Caller filters by min_score for relevance.
+        Computes the query embedding once, then runs a single batched vector query and a
+        single batched keyword query (each using a per-document ranking window function)
+        instead of 2 queries per document — avoids an N+1 that made full_coverage document
+        search take one DB round-trip pair per document in scope (up to
+        PUBLIC_DOC_FULL_COVERAGE_MAX_DOCS = 250, i.e. up to 500 sequential queries).
+        Falls back to the previous per-document loop if the batched queries raise.
         """
         if not document_ids:
             return []
@@ -806,30 +1042,59 @@ class AIVectorStore:
 
         per_doc = max(1, int(chunks_per_doc))
         query_embedding, _ = self._get_cached_embedding(vq)
-        all_results: List[Dict[str, Any]] = []
+        unique_doc_ids = sorted({int(d) for d in document_ids})
 
-        for doc_id in document_ids:
-            doc_filters = dict(filters or {})
-            doc_filters["document_id"] = int(doc_id)
-
-            vector_results = self._search_similar_with_embedding(
+        try:
+            vector_results = self._search_similar_per_document_with_embedding(
                 query_embedding=query_embedding,
-                query_text=vq,
-                top_k=per_doc,
-                filters=doc_filters,
+                document_ids=unique_doc_ids,
+                chunks_per_doc=per_doc,
+                filters=filters,
                 user_id=user_id,
                 user_role=user_role,
             )
-            keyword_results = self._keyword_search(
+            keyword_results = self._keyword_search_per_document(
                 query_text=vq,
-                top_k=per_doc,
-                filters=doc_filters,
+                document_ids=unique_doc_ids,
+                chunks_per_doc=per_doc,
+                filters=filters,
                 user_id=user_id,
                 user_role=user_role,
             )
+        except Exception as e:
+            logger.warning(
+                "Batched hybrid_search_per_document failed, falling back to per-document loop: %s",
+                e,
+                exc_info=True,
+            )
+            try:
+                db.session.rollback()
+            except Exception as rb_err:
+                logger.debug("hybrid_search_per_document: rollback after fallback failed: %s", rb_err)
+            return self._hybrid_search_per_document_looped(
+                vq,
+                unique_doc_ids,
+                chunks_per_doc=per_doc,
+                keyword_weight=keyword_weight,
+                vector_weight=vector_weight,
+                filters=filters,
+                user_id=user_id,
+                user_role=user_role,
+                query_embedding=query_embedding,
+            )
+
+        vector_by_doc: Dict[int, List[Dict[str, Any]]] = {}
+        for row in vector_results:
+            vector_by_doc.setdefault(int(row["document_id"]), []).append(row)
+        keyword_by_doc: Dict[int, List[Dict[str, Any]]] = {}
+        for row in keyword_results:
+            keyword_by_doc.setdefault(int(row["document_id"]), []).append(row)
+
+        all_results: List[Dict[str, Any]] = []
+        for doc_id in unique_doc_ids:
             combined = self._combine_search_results(
-                vector_results=vector_results,
-                keyword_results=keyword_results,
+                vector_results=vector_by_doc.get(doc_id, []),
+                keyword_results=keyword_by_doc.get(doc_id, []),
                 vector_weight=vector_weight,
                 keyword_weight=keyword_weight,
             )

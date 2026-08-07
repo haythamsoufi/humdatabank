@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import current_app
 from sqlalchemy import text
+from sqlalchemy.orm import joinedload
 
 from app.models import AIDocument
 from app.models.enums import AIDocumentProcessingStatusValue
@@ -115,11 +116,14 @@ def _document_scope_entry(document: AIDocument) -> Dict[str, Any]:
         "document_title": document.title,
         "countries": _document_country_names(document),
     }
+    # Skip the local-file/blob existence check entirely when an external source_url is
+    # already available — it's sufficient for document_url and avoids a storage round-trip.
+    has_local_file = False if source_url else _ai_document_has_local_file(document)
     entry.update(
         _public_document_link_fields(
             doc_id,
             source_url=source_url,
-            has_local_file=_ai_document_has_local_file(document),
+            has_local_file=has_local_file,
         )
     )
     return entry
@@ -418,6 +422,11 @@ def list_public_documents_in_scope(filters: Dict[str, Any] | None) -> List[AIDoc
         AIDocument.searchable.is_(True),
         AIDocument.processing_status == completed,
     )
+    # Eager-load the singular `country` relation (default lazy='select'): without this,
+    # _document_country_names()/_document_scope_entry() trigger one extra SELECT per
+    # document that lacks a legacy country_name (N+1 across up to PUBLIC_DOC_CATALOG_MAX_DOCS
+    # documents). `countries` (M2M) is already lazy='selectin' on the model and batches fine.
+    query = query.options(joinedload(AIDocument.country))
     query = _apply_scope_filters_to_query(query, filters)
     return query.order_by(AIDocument.title).all()
 
@@ -683,10 +692,11 @@ def _search_public_documents_full_coverage(
         )
 
     doc_ids = [int(doc.id) for doc in documents]
-    scope_without_hits = {
-        int(doc.id): _document_scope_entry(doc)
-        for doc in documents
-    }
+    # Defer _document_scope_entry() (which may HEAD-check blob/local storage per document)
+    # until after hits are known: most documents in scope typically DO have a hit, so
+    # building the full entry (with link resolution) for every document up front wastes
+    # a storage check for every document that ends up discarded below.
+    documents_by_id = {int(doc.id): doc for doc in documents}
 
     try:
         if mode == "vector":
@@ -728,9 +738,12 @@ def _search_public_documents_full_coverage(
         doc_id = int(doc_id)
         hits.append(slim_public_document_chunk(row, max_content_chars=max_content_chars))
         docs_with_hits.add(doc_id)
-        scope_without_hits.pop(doc_id, None)
 
-    without_hits = list(scope_without_hits.values())
+    without_hits = [
+        _document_scope_entry(doc)
+        for doc_id, doc in documents_by_id.items()
+        if doc_id not in docs_with_hits
+    ]
     hits.sort(key=lambda chunk: chunk.get("score") or 0.0, reverse=True)
     without_hits.sort(key=lambda item: (item.get("document_title") or "").lower())
 

@@ -129,7 +129,7 @@ class TestGetPublicDocument:
 
 
 class TestGetPublicDocumentsCatalog:
-    def test_default_call_sets_include_documents_true(self):
+    def test_default_call_sets_include_documents_false(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"total_documents": 0}
@@ -140,7 +140,7 @@ class TestGetPublicDocumentsCatalog:
             get_public_documents_catalog()
             assert "/public/documents/catalog" in mock_get.call_args[0][0]
             params = mock_get.call_args[1]["params"]
-            assert params["include_documents"] == "true"
+            assert params["include_documents"] == "false"
             # Optional filters are omitted entirely when unset.
             assert "document_type" not in params
             assert "year" not in params

@@ -442,7 +442,13 @@ def _catalog_scope_filters(
     return filters or None
 
 
-def _catalog_document_entry(document: AIDocument, *, type_key: str, year: int) -> Dict[str, Any]:
+def _catalog_document_entry(
+    document: AIDocument,
+    *,
+    type_key: str,
+    year: int,
+    include_links: bool = True,
+) -> Dict[str, Any]:
     doc_id = int(document.id)
     entry: Dict[str, Any] = {
         "document_id": doc_id,
@@ -451,13 +457,18 @@ def _catalog_document_entry(document: AIDocument, *, type_key: str, year: int) -
         "year": year or None,
         "countries": _document_country_names(document),
     }
-    entry.update(
-        _public_document_link_fields(
-            doc_id,
-            source_url=_document_source_url(document),
-            has_local_file=_ai_document_has_local_file(document),
+    if include_links:
+        source_url = _document_source_url(document)
+        has_local_file = False
+        if not source_url:
+            has_local_file = _ai_document_has_local_file(document)
+        entry.update(
+            _public_document_link_fields(
+                doc_id,
+                source_url=source_url,
+                has_local_file=has_local_file,
+            )
         )
-    )
     return entry
 
 
@@ -506,7 +517,14 @@ def catalog_public_documents(
         doc_year = _document_year(doc)
         if year and doc_year != int(year):
             continue
-        entries.append(_catalog_document_entry(doc, type_key=type_key, year=doc_year))
+        entries.append(
+            _catalog_document_entry(
+                doc,
+                type_key=type_key,
+                year=doc_year,
+                include_links=include_documents,
+            )
+        )
 
     by_type: Dict[str, int] = {}
     by_year_buckets: Dict[int, Dict[str, Any]] = {}

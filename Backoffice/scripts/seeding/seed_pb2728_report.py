@@ -1,10 +1,6 @@
 #!/usr/bin/env python
-"""Seed an example PB27-28 progress report using the core Report Builder.
+"""Seed an example PB27-28 progress report using the core Report Builder v2."""
 
-Run from Backoffice/:
-    python scripts/seeding/seed_pb2728_report.py --dry-run
-    python scripts/seeding/seed_pb2728_report.py
-"""
 from __future__ import annotations
 
 import argparse
@@ -19,42 +15,50 @@ from app import create_app
 from app.extensions import db
 from app.models import ReportDefinition, User
 from app.services.reports.definition_service import ReportDefinitionService
-from app.services.reports.schema import validate_report_definition
+from app.services.reports.schema import default_definition, default_section_grid, default_widget_layout, validate_report_definition
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
 EXAMPLE_SLUG = "pb27-28-progress-example"
 
 
 def pb2728_report_definition(*, template_id: int) -> dict:
-    return {
-        "schema_version": 1,
-        "filters": {
-            "template_ids": [template_id],
-            "period_names": [],
-            "assignment_statuses": ["submitted", "approved"],
-        },
-        "sections": [
-            {
-                "id": "sec-pb2728",
-                "title": "PB 2027-2028 Progress",
-                "order": 0,
-                "widgets": [],
-                "dynamic_indicators": {
-                    "enabled": True,
-                    "rule": {"related_programs_any": ["PB27-28"]},
-                    "widget_type": "indicator_dashboard",
-                    "data_source_kind": "indicator_dashboard",
-                    "group_by": "spef_section",
-                    "metric": "sum",
-                },
-            }
-        ],
+    base = default_definition(languages=["en", "fr", "es", "ar"])
+    base["filters"] = {
+        "template_ids": [template_id],
+        "period_names": [],
+        "assignment_statuses": ["submitted", "approved"],
+        "country_ids": [],
+        "include_public_submissions": False,
     }
+    base["sections"] = [
+        {
+            "id": "sec-pb2728",
+            "title_translations": {
+                "en": "PB 2027-2028 Progress",
+                "fr": "Progrès PB 2027-2028",
+                "es": "Progreso PB 2027-2028",
+                "ar": "تقدم PB 2027-2028",
+            },
+            "order": 0,
+            "grid": default_section_grid(),
+            "widgets": [],
+            "dynamic_indicators": {
+                "enabled": True,
+                "rule": {"related_programs_any": ["PB27-28"]},
+                "widget_type": "indicator_dashboard",
+                "data_source_kind": "indicator_dashboard",
+                "group_by": "spef_section",
+                "metric": "sum",
+                "default_widget_layout": default_widget_layout(w=12, h=6),
+            },
+        }
+    ]
+    validate_report_definition(base)
+    return base
 
 
 def seed_pb2728_report(*, dry_run: bool = False, template_id: int = FDRS_TEMPLATE_ID) -> dict[str, str | int]:
     definition = pb2728_report_definition(template_id=template_id)
-    validate_report_definition(definition)
 
     owner = User.query.filter(User.email.ilike("test_sys@%")).order_by(User.id.asc()).first()
     if owner is None:
@@ -79,7 +83,7 @@ def seed_pb2728_report(*, dry_run: bool = False, template_id: int = FDRS_TEMPLAT
             "SPEF sections with line charts (year on x-axis) and NS breakdown tables."
         )
         existing.definition_json = definition
-        existing.schema_version = 1
+        existing.schema_version = 2
         existing.updated_by_id = owner.id
         db.session.commit()
         return {"action": "updated", "report_id": existing.id, "slug": EXAMPLE_SLUG}
@@ -99,17 +103,18 @@ def seed_pb2728_report(*, dry_run: bool = False, template_id: int = FDRS_TEMPLAT
     return {"action": "created", "report_id": report.id, "slug": EXAMPLE_SLUG}
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Seed PB27-28 example report definition")
-    parser.add_argument("--dry-run", action="store_true", help="Validate only; do not write")
-    parser.add_argument("--template-id", type=int, default=FDRS_TEMPLATE_ID, help="FDRS template id")
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Seed PB27-28 example report (v2 schema)")
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--template-id", type=int, default=FDRS_TEMPLATE_ID)
     args = parser.parse_args()
 
     app = create_app()
     with app.app_context():
         result = seed_pb2728_report(dry_run=args.dry_run, template_id=args.template_id)
         print(result)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

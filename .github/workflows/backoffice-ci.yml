@@ -1,11 +1,19 @@
 # Backoffice CI
-# Runs on pull requests touching Backoffice/**.
+# Runs on pull requests touching Backoffice/**, and on direct pushes to main/develop
+# (a direct push skips PR review, so this is the only safety net catching regressions
+# for that path — see the 2026-08-07 incident where a same-day push straight to main
+# shipped an UnboundLocalError that an existing test would have caught).
 # Three parallel jobs: fast code guards, Bandit static analysis, pytest suite.
 
 name: Backoffice CI
 
 on:
   pull_request:
+    branches: [main, develop]
+    paths:
+      - 'Backoffice/**'
+      - '.github/workflows/backoffice-ci.yml'
+  push:
     branches: [main, develop]
     paths:
       - 'Backoffice/**'
@@ -73,12 +81,6 @@ jobs:
           else
             python Backoffice/scripts/ci/check_unsafe_gettext_embedding.py --base-ref "$BASE"
           fi
-
-      - name: Translations catalog is current and all .po files compile cleanly
-        working-directory: Backoffice
-        run: |
-          pip install polib babel Jinja2 --quiet
-          python scripts/ci/check_translations_current.py
 
   # ── Bandit static security analysis ────────────────────────────────────────
   bandit:

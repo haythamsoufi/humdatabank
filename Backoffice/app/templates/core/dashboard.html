@@ -1773,67 +1773,82 @@ function initLoadMoreActivities() {
         }
 
         // Fetch more activities
-        ((window.getFetch && window.getFetch()) || fetch)('{{ url_for("main.load_more_activities") }}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.error('Error loading more activities:', data.error);
-                this.disabled = false;
-                this.innerHTML = originalText;
-                return;
-            }
-
-            // Append new activities to container
-            const container = document.getElementById('recent-activities-container');
-            const loadMoreContainer = loadMoreBtn.parentElement;
-
-            if (container && data.html && data.count > 0) {
-                // Create a temporary div to parse the HTML
-                // XSS fix: sanitize server-provided HTML for defense-in-depth
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = sanitizeActivityHtml(data.html);
-
-                // Move all child nodes to the container (before the load more button)
-                while (tempDiv.firstChild) {
-                    container.insertBefore(tempDiv.firstChild, loadMoreContainer);
-                }
-
-                // Update offset for next load
-                this.dataset.offset = offset + data.count;
-            }
-
-            // Hide button and show message if no more activities
-            if (!data.has_more || data.count === 0) {
-                this.style.display = 'none';
-                const noMoreMsg = document.getElementById('no-more-activities-message');
-                if (noMoreMsg) {
-                    noMoreMsg.classList.remove('hidden');
+        (async () => {
+            try {
+                const fetchFn = (window.getFetch && window.getFetch()) || fetch;
+                const response = await fetchFn('{{ url_for("main.load_more_activities") }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                let data;
+                if (window.responseAsResult) {
+                    const result = await window.responseAsResult(response);
+                    if (!result.ok) {
+                        throw new Error(result.data?.error || `HTTP ${result.status}`);
+                    }
+                    data = result.data;
                 } else {
-                    // Create message if it doesn't exist
-                    const msg = document.createElement('div');
-                    msg.id = 'no-more-activities-message';
-                    msg.className = 'text-sm text-gray-500 pt-2';
-                    const translationsEl = document.getElementById('translations-data');
-                    msg.textContent = translationsEl ? translationsEl.dataset.thatsAll : "That's all";
-                    loadMoreContainer.appendChild(msg);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const ct = response.headers.get('Content-Type') || '';
+                    if (!ct.includes('application/json')) {
+                        throw new Error(`HTTP ${response.status}: non-JSON response`);
+                    }
+                    data = await response.json();
                 }
-            } else {
-                // Re-enable button
-                this.disabled = false;
-                this.innerHTML = originalText;
+
+                if (data.error) {
+                    console.error('Error loading more activities:', data.error);
+                    if (window.showAlert) window.showAlert(data.error, 'error');
+                    loadMoreBtn.disabled = false;
+                    loadMoreBtn.innerHTML = originalText;
+                    return;
+                }
+
+                const container = document.getElementById('recent-activities-container');
+                const loadMoreContainer = loadMoreBtn.parentElement;
+
+                if (container && data.html && data.count > 0) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = sanitizeActivityHtml(data.html);
+
+                    while (tempDiv.firstChild) {
+                        container.insertBefore(tempDiv.firstChild, loadMoreContainer);
+                    }
+
+                    loadMoreBtn.dataset.offset = offset + data.count;
+                }
+
+                if (!data.has_more || data.count === 0) {
+                    loadMoreBtn.style.display = 'none';
+                    const noMoreMsg = document.getElementById('no-more-activities-message');
+                    if (noMoreMsg) {
+                        noMoreMsg.classList.remove('hidden');
+                    } else {
+                        const msg = document.createElement('div');
+                        msg.id = 'no-more-activities-message';
+                        msg.className = 'text-sm text-gray-500 pt-2';
+                        const translationsEl = document.getElementById('translations-data');
+                        msg.textContent = translationsEl ? translationsEl.dataset.thatsAll : "That's all";
+                        loadMoreContainer.appendChild(msg);
+                    }
+                } else {
+                    loadMoreBtn.disabled = false;
+                    loadMoreBtn.innerHTML = originalText;
+                }
+            } catch (error) {
+                console.error('Error loading more activities:', error);
+                if (window.showAlert) {
+                    window.showAlert('Could not load more activities. Please try again.', 'error');
+                }
+                loadMoreBtn.disabled = false;
+                loadMoreBtn.innerHTML = originalText;
             }
-        })
-        .catch(error => {
-            console.error('Error loading more activities:', error);
-            this.disabled = false;
-            this.innerHTML = originalText;
-        });
+        })();
     });
 }
 

@@ -525,7 +525,10 @@ class PBProgressService:
         if not text:
             return ""
         text = re.sub(r"[A-Za-z]:\\[^\s\"']+", "<path>", text)
-        text = re.sub(r"/(?:home|app|Users|tmp|var)[^\s\"']*", "<path>", text)
+        # Matches any absolute Unix path with at least one nested segment (e.g. /usr/lib/...,
+        # /opt/venv/..., /etc/quarto/...) rather than a fixed prefix list, so paths under
+        # less-common roots aren't leaked into server logs.
+        text = re.sub(r"/[A-Za-z][^\s\"':]*(?:/[^\s\"':]*)+", "<path>", text)
         return text[:500]
 
     @classmethod
@@ -1068,7 +1071,13 @@ class PBProgressService:
         status["excel"] = cls.get_excel_info(version)
         if status.get("data_source") == "system":
             status["mapping_ready"] = bool(PBProgressDataStore.get_mapping_config(version))
-        status["outputs"] = cls._build_output_manifest(version)
+        # _run_build persists a fresh manifest under "outputs" the moment a build
+        # finishes, so polling clients (every 1-2s while a build runs) can reuse it
+        # instead of re-hitting storage_service.exists/get_size for every output file
+        # on every single poll. Only recompute when the cache is genuinely absent
+        # (e.g. a transient read failure in _reload_status_from_storage).
+        if status.get("outputs") is None:
+            status["outputs"] = cls._build_output_manifest(version)
         return cls._attach_build_progress(status)
 
     @classmethod
@@ -1188,6 +1197,79 @@ class PBProgressService:
         return upload_root / STORAGE_CATEGORY / version_storage_prefix(version) / BUILD_LOG_NAME
 
     @classmethod
+    def _patch_report_html(cls, html: str) -> str:
+        """Apply legacy toolbar/TOC compatibility fixes to generated report HTML.
+
+        Idempotent: each fix is only injected if its marker id isn't already
+        present, so calling this twice on the same content is a no-op for
+        already-patched HTML. Called once per build from
+        _copy_outputs_to_storage; NOT called from serve_output, since the
+        patched result is static for a given build.
+        """
+        for old_toc_fix in (
+            "pb-report-toc-pin-fix-v2",
+            "pb-report-toc-pin-fix-v3",
+            "pb-report-toc-pin-fix-v4",
+            "pb-report-toc-pin-fix-v5",
+            "pb-report-toc-pin-fix-v6",
+            "pb-report-toc-pin-fix-v7",
+            "pb-report-toc-pin-script-v2",
+            "pb-report-toc-pin-script-v3",
+            "pb-report-toc-pin-script-v4",
+            "pb-report-toc-pin-script-v5",
+            "pb-report-toc-pin-script-v6",
+            "pb-report-toc-pin-script-v7",
+        ):
+            html = re.sub(
+                rf'<style id="{old_toc_fix}"[^>]*>.*?</style>',
+                "",
+                html,
+                count=1,
+                flags=re.DOTALL,
+            )
+            html = re.sub(
+                rf'<script id="{old_toc_fix}"[^>]*>.*?</script>',
+                "",
+                html,
+                count=1,
+                flags=re.DOTALL,
+            )
+        if ("pb-report-toolbar" in html or "report-tools" in html) and 'id="pb-toolbar-fa-fix"' not in html:
+            if "</head>" in html:
+                html = html.replace("</head>", _PB_REPORT_FA_FIX + "</head>", 1)
+            else:
+                html = _PB_REPORT_FA_FIX + html
+        if 'id="pb-report-toc-pin-fix-v8"' not in html and (
+            "pb-language-panels" in html or "rebuildToc" in html
+        ):
+            if "</head>" in html:
+                html = html.replace("</head>", _PB_REPORT_TOC_PIN_FIX + "</head>", 1)
+            else:
+                html = _PB_REPORT_TOC_PIN_FIX + html
+        if 'id="pb-report-toc-host-fix"' not in html and (
+            "pb-language-panels" in html or "rebuildToc" in html
+        ):
+            if "</body>" in html:
+                html = html.replace("</body>", _PB_REPORT_TOC_HOST_FIX + "</body>", 1)
+            else:
+                html = html + _PB_REPORT_TOC_HOST_FIX
+        if "pb-report-toolbar" in html and 'id="pb-toolbar-full-width-fix"' not in html:
+            if "</head>" in html:
+                html = html.replace("</head>", _PB_REPORT_TOOLBAR_WIDTH_FIX + "</head>", 1)
+            else:
+                html = _PB_REPORT_TOOLBAR_WIDTH_FIX + html
+        if (
+            "pb-report-toolbar" in html
+            and 'id="pb-toolbar-title-fix"' not in html
+            and "Interactive report" in html
+        ):
+            if "</head>" in html:
+                html = html.replace("</head>", _PB_REPORT_TOOLBAR_TITLE_FIX + "</head>", 1)
+            else:
+                html = _PB_REPORT_TOOLBAR_TITLE_FIX + html
+        return html
+
+    @classmethod
     def _copy_outputs_to_storage(cls, version: str) -> list[str]:
         """Upload publishable build artifacts from the local workspace to blob/filesystem storage."""
         copied: list[str] = []
@@ -1204,7 +1286,15 @@ class PBProgressService:
                 continue
             rel_name = cls._output_rel(version, path.name)
             with open(path, "rb") as handle:
-                storage_service.upload(STORAGE_CATEGORY, rel_name, handle.read())
+                data = handle.read()
+            if path.suffix.lower() in {".html", ".htm"}:
+                # Patch once here (build time) rather than on every serve_output
+                # request — the result is identical every time for a given build,
+                # so re-running these regex substitutions per download was pure
+                # wasted CPU on every page view/refresh.
+                patched = cls._patch_report_html(data.decode("utf-8", errors="replace"))
+                data = patched.encode("utf-8")
+            storage_service.upload(STORAGE_CATEGORY, rel_name, data)
             if not storage_service.exists(STORAGE_CATEGORY, rel_name):
                 raise RuntimeError(f"Output file was not persisted to storage: {path.name}")
             size = storage_service.get_size(STORAGE_CATEGORY, rel_name)
@@ -1244,6 +1334,12 @@ class PBProgressService:
         env["PB_REPORT_YEAR"] = REPORT_VERSIONS[version]["report_year"]
         env["PB_REPORT_LABEL"] = REPORT_VERSIONS[version]["label"]
         env["PB_FIGURES_RENDERER"] = "html"
+        # Lets calculations.py tell a genuine reported zero (system/DB path, where
+        # FormData.numeric_value and data_not_available are stored separately) apart
+        # from the legacy ambiguous Excel zero (hand-maintained workbooks, where
+        # preparers have historically typed 0 for "not entered" too). See
+        # pb_figures/config.py's treat_zero_as_missing().
+        env["PB_REPORT_DATA_SOURCE"] = PBProgressDataStore.get_data_source(version)
         env["PB_BUILD_WORKERS"] = cls._build_worker_cap()
         env["PB_VISUALS_BUILD_ROOT"] = str(cls._build_workspace_dir(version))
         env["PYTHONUNBUFFERED"] = "1"
@@ -1539,27 +1635,35 @@ class PBProgressService:
 
     @classmethod
     def serve_system_dataset(cls, version: str):
-        from flask import send_file
-
         version = validate_version(version)
         rel = cls._version_rel(version, SYSTEM_GENERATED_NAME)
         if not storage_service.exists(STORAGE_CATEGORY, rel):
             raise NotFound()
-        path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
-        return send_file(path, as_attachment=True, download_name="system_generated.xlsx")
+        # stream_response never materializes a temp file on Azure (unlike
+        # get_absolute_path, which would leak one on every download).
+        return storage_service.stream_response(
+            STORAGE_CATEGORY,
+            rel,
+            filename="system_generated.xlsx",
+            as_attachment=True,
+        )
 
     @classmethod
     def serve_workbook(cls, version: str):
-        from flask import send_file
-
         version = validate_version(version)
         rel = cls._excel_rel(version)
         if not storage_service.exists(STORAGE_CATEGORY, rel):
             raise NotFound()
         info = cls.get_excel_info(version) or {}
         download_name = info.get("filename") or "SG_Report.xlsx"
-        path = storage_service.get_absolute_path(STORAGE_CATEGORY, rel)
-        return send_file(path, as_attachment=True, download_name=download_name)
+        # stream_response never materializes a temp file on Azure (unlike
+        # get_absolute_path, which would leak one on every download).
+        return storage_service.stream_response(
+            STORAGE_CATEGORY,
+            rel,
+            filename=download_name,
+            as_attachment=True,
+        )
 
     @classmethod
     def serve_output(cls, version: str, filename: str):
@@ -1586,69 +1690,13 @@ class PBProgressService:
             mimetype = "application/zip"
 
         if inline:
-            html = storage_service.download(STORAGE_CATEGORY, rel_path).decode("utf-8", errors="replace")
-            for old_toc_fix in (
-                "pb-report-toc-pin-fix-v2",
-                "pb-report-toc-pin-fix-v3",
-                "pb-report-toc-pin-fix-v4",
-                "pb-report-toc-pin-fix-v5",
-                "pb-report-toc-pin-fix-v6",
-                "pb-report-toc-pin-fix-v7",
-                "pb-report-toc-pin-script-v2",
-                "pb-report-toc-pin-script-v3",
-                "pb-report-toc-pin-script-v4",
-                "pb-report-toc-pin-script-v5",
-                "pb-report-toc-pin-script-v6",
-                "pb-report-toc-pin-script-v7",
-            ):
-                html = re.sub(
-                    rf'<style id="{old_toc_fix}"[^>]*>.*?</style>',
-                    "",
-                    html,
-                    count=1,
-                    flags=re.DOTALL,
-                )
-                html = re.sub(
-                    rf'<script id="{old_toc_fix}"[^>]*>.*?</script>',
-                    "",
-                    html,
-                    count=1,
-                    flags=re.DOTALL,
-                )
-            if ("pb-report-toolbar" in html or "report-tools" in html) and 'id="pb-toolbar-fa-fix"' not in html:
-                if "</head>" in html:
-                    html = html.replace("</head>", _PB_REPORT_FA_FIX + "</head>", 1)
-                else:
-                    html = _PB_REPORT_FA_FIX + html
-            if 'id="pb-report-toc-pin-fix-v8"' not in html and (
-                "pb-language-panels" in html or "rebuildToc" in html
-            ):
-                if "</head>" in html:
-                    html = html.replace("</head>", _PB_REPORT_TOC_PIN_FIX + "</head>", 1)
-                else:
-                    html = _PB_REPORT_TOC_PIN_FIX + html
-            if 'id="pb-report-toc-host-fix"' not in html and (
-                "pb-language-panels" in html or "rebuildToc" in html
-            ):
-                if "</body>" in html:
-                    html = html.replace("</body>", _PB_REPORT_TOC_HOST_FIX + "</body>", 1)
-                else:
-                    html = html + _PB_REPORT_TOC_HOST_FIX
-            if "pb-report-toolbar" in html and 'id="pb-toolbar-full-width-fix"' not in html:
-                if "</head>" in html:
-                    html = html.replace("</head>", _PB_REPORT_TOOLBAR_WIDTH_FIX + "</head>", 1)
-                else:
-                    html = _PB_REPORT_TOOLBAR_WIDTH_FIX + html
-            if (
-                "pb-report-toolbar" in html
-                and 'id="pb-toolbar-title-fix"' not in html
-                and "Interactive report" in html
-            ):
-                if "</head>" in html:
-                    html = html.replace("</head>", _PB_REPORT_TOOLBAR_TITLE_FIX + "</head>", 1)
-                else:
-                    html = _PB_REPORT_TOOLBAR_TITLE_FIX + html
-            response = Response(html, mimetype="text/html")
+            # Toolbar/TOC compatibility fixes are baked in at build time by
+            # _copy_outputs_to_storage (see _patch_report_html), so this just
+            # serves the stored bytes as-is. Reports copied to storage by an
+            # older build (before that build-time patch existed) won't have
+            # these cosmetic fixes until the next regeneration.
+            html_bytes = storage_service.download(STORAGE_CATEGORY, rel_path)
+            response = Response(html_bytes, mimetype="text/html")
             response.cache_control.private = True
             response.cache_control.max_age = 300
             response.cache_control.no_transform = True

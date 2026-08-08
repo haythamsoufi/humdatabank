@@ -67,6 +67,29 @@ def visuals_build_root() -> Path | None:
     return Path(raw) if raw else None
 
 
+def treat_zero_as_missing() -> bool:
+    """Whether a Final-sheet Value of exactly 0 should be treated as "no data".
+
+    True (the legacy default) for hand-maintained Excel workbooks: preparers have
+    historically typed a bare 0 both for "not entered" and for a genuine zero, and
+    the two are indistinguishable once the value reaches this package — see the
+    docstring on calculations.chartable_value() for the full history.
+
+    False for system-generated workbooks: db_source.py's
+    _aggregate_indicator_years_for_template sums FormData.numeric_value directly
+    (SQL SUM skips NULLs), and a preparer marking "applicable but data not
+    available" clears numeric_value to NULL rather than storing 0 — see
+    FormData.set_data_availability(). So a 0 that reaches this package via the
+    system path is always a real reported zero, never a placeholder.
+
+    service.py sets PB_REPORT_DATA_SOURCE from PBProgressDataStore.get_data_source()
+    before launching the build subprocess. Defaults to the legacy Excel-safe
+    behaviour when unset (e.g. running pb_figures scripts standalone against a
+    hand-provided workbook, outside service.py's orchestration).
+    """
+    return (os.environ.get("PB_REPORT_DATA_SOURCE") or "excel").strip().lower() != "system"
+
+
 def resolve_report_dir() -> Path:
     """Writable report project root (_body.qmd, figures/, output/)."""
     root = visuals_build_root()

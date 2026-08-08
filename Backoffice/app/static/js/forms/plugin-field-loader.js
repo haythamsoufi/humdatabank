@@ -703,10 +703,27 @@ class PluginFieldLoader {
 
     async fetchPluginConfig(pluginType) {
         try {
+            const apiFn = (window.getApiFetch && window.getApiFetch()) || window.apiFetch;
+            if (apiFn) {
+                return await apiFn(`/admin/api/plugins/field-types/${pluginType}`);
+            }
             const fn = (window.getFetch && window.getFetch()) || fetch;
             const response = await fn(`/admin/api/plugins/field-types/${pluginType}`);
+            const result = window.responseAsResult
+                ? await window.responseAsResult(response)
+                : null;
+            if (result) {
+                if (!result.ok) {
+                    throw new Error(result.data?.error || `HTTP ${result.status}`);
+                }
+                return result.data;
+            }
             if (!response.ok) {
                 throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            const ct = response.headers.get('Content-Type') || '';
+            if (!ct.includes('application/json')) {
+                throw new Error(`HTTP ${response.status}: non-JSON response`);
             }
             return await response.json();
         } catch (error) {

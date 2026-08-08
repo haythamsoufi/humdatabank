@@ -491,37 +491,45 @@ export class InteractiveMapField {
 
     async loadPluginSettings() {
         try {
-            const response = await fetch('/admin/plugins/interactive_map/api/config/field');
-            if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.config) {
-                    // Override field config with plugin settings where appropriate
-                    const pluginSettings = data.config;
-
-                    // Use plugin settings as defaults if not explicitly set in field config
-                    if (pluginSettings.default_map_provider && !this.config.map_type_override) {
-                        this.config.map_type = pluginSettings.default_map_provider;
-                    }
-                    // IMPORTANT: do not overwrite per-field builder zoom if it was explicitly configured
-                    if (pluginSettings.default_zoom_level && !this.config.zoom_override && !this._hasExplicitDefaultZoom) {
-                        this.config.default_zoom = pluginSettings.default_zoom_level;
-                    }
-                    if (pluginSettings.max_markers_per_field && !this.config.max_markers_override) {
-                        this.config.max_markers = pluginSettings.max_markers_per_field;
-                    }
-                    if (pluginSettings.allow_marker_editing !== undefined && !this.config.marker_editing_override) {
-                        this.config.allow_marker_editing = pluginSettings.allow_marker_editing;
-                    }
-
-                    if (pluginSettings.mapbox_configured) {
-                        this.config.mapbox_configured = true;
-                        if (pluginSettings.mapbox_tile_url) {
-                            this.config.mapbox_tile_url = pluginSettings.mapbox_tile_url;
-                        }
-                    }
-
-                    debugPluginLog(this.pluginName, 'Plugin settings applied:', pluginSettings);
+            const apiFn = (window.getApiFetch && window.getApiFetch()) || window.apiFetch;
+            let data = null;
+            if (apiFn) {
+                data = await apiFn('/admin/plugins/interactive_map/api/config/field');
+            } else {
+                const response = await fetch('/admin/plugins/interactive_map/api/config/field');
+                const result = window.responseAsResult
+                    ? await window.responseAsResult(response)
+                    : null;
+                if (result && !result.ok) {
+                    debugPluginWarn(this.pluginName, 'Failed to load plugin settings, using defaults');
+                    return;
                 }
+                data = result ? result.data : (response.ok ? await response.json() : null);
+            }
+            if (data && data.success && data.config) {
+                const pluginSettings = data.config;
+
+                if (pluginSettings.default_map_provider && !this.config.map_type_override) {
+                    this.config.map_type = pluginSettings.default_map_provider;
+                }
+                if (pluginSettings.default_zoom_level && !this.config.zoom_override && !this._hasExplicitDefaultZoom) {
+                    this.config.default_zoom = pluginSettings.default_zoom_level;
+                }
+                if (pluginSettings.max_markers_per_field && !this.config.max_markers_override) {
+                    this.config.max_markers = pluginSettings.max_markers_per_field;
+                }
+                if (pluginSettings.allow_marker_editing !== undefined && !this.config.marker_editing_override) {
+                    this.config.allow_marker_editing = pluginSettings.allow_marker_editing;
+                }
+
+                if (pluginSettings.mapbox_configured) {
+                    this.config.mapbox_configured = true;
+                    if (pluginSettings.mapbox_tile_url) {
+                        this.config.mapbox_tile_url = pluginSettings.mapbox_tile_url;
+                    }
+                }
+
+                debugPluginLog(this.pluginName, 'Plugin settings applied:', pluginSettings);
             } else {
                 debugPluginWarn(this.pluginName, 'Failed to load plugin settings, using defaults');
             }

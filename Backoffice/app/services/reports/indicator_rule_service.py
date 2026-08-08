@@ -8,7 +8,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
-from app.models import IndicatorBank
+from app.models import Country, IndicatorBank
 
 
 def _normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
@@ -19,6 +19,12 @@ def _normalize_rule(rule: dict[str, Any] | None) -> dict[str, Any]:
         "spef_codes_any": [str(v).strip().upper() for v in (rule.get("spef_codes_any") or []) if str(v).strip()],
         "emergency": rule.get("emergency") if rule.get("emergency") is not None else None,
         "search_text": (rule.get("search_text") or "").strip(),
+        "sort_by": (rule.get("sort_by") or "name").strip(),
+        "sort_direction": (rule.get("sort_direction") or "asc").strip().lower(),
+        "limit": rule.get("limit"),
+        "any": rule.get("any") or [],
+        "all": rule.get("all") or [],
+        "none": rule.get("none") or [],
     }
 
 
@@ -72,7 +78,16 @@ def build_indicator_rule_query(rule: dict[str, Any] | None):
     elif tag_clause is not None:
         query = query.filter(tag_clause)
 
-    return query.options(joinedload(IndicatorBank.spef_area)).order_by(IndicatorBank.name.asc())
+    sort_by = normalized["sort_by"]
+    direction = normalized["sort_direction"]
+    if sort_by == "updated_at":
+        col = IndicatorBank.updated_at
+    elif sort_by == "spef_code":
+        col = IndicatorBank.area
+    else:
+        col = IndicatorBank.name
+    query = query.order_by(col.desc() if direction == "desc" else col.asc())
+    return query.options(joinedload(IndicatorBank.spef_area))
 
 
 def _python_filter_rows(rows: list[IndicatorBank], rule: dict[str, Any] | None) -> list[IndicatorBank]:
@@ -112,25 +127,55 @@ def _python_filter_rows(rows: list[IndicatorBank], rule: dict[str, Any] | None) 
     return [row for row in rows if matches(row)]
 
 
+def _row_matches_leaf_rule(row: IndicatorBank, rule: dict[str, Any] | None) -> bool:
+    return row in _python_filter_rows([row], rule)
+
+
+def _row_matches_rule(row: IndicatorBank, rule: dict[str, Any] | None) -> bool:
+    normalized = _normalize_rule(rule)
+    if normalized["any"]:
+        return any(_row_matches_rule(row, child) for child in normalized["any"])
+    if normalized["all"]:
+        return all(_row_matches_rule(row, child) for child in normalized["all"])
+    if normalized["none"]:
+        return not any(_row_matches_rule(row, child) for child in normalized["none"])
+    return _row_matches_leaf_rule(row, rule)
+
+
+def _rule_has_criteria(rule: dict[str, Any] | None) -> bool:
+    normalized = _normalize_rule(rule)
+    if normalized["any"] or normalized["all"] or normalized["none"]:
+        return True
+    return bool(
+        normalized["related_programs_any"]
+        or normalized["tags_any"]
+        or normalized["spef_codes_any"]
+        or normalized["search_text"]
+        or normalized["emergency"] is not None
+    )
+
+
 def resolve_indicator_bank_rows(rule: dict[str, Any] | None, *, limit: int | None = None) -> list[IndicatorBank]:
     normalized = _normalize_rule(rule)
-    if not any([normalized["related_programs_any"], normalized["tags_any"], normalized["spef_codes_any"], normalized["search_text"], normalized["emergency"] is not None]):
+    effective_limit = limit if limit is not None else normalized.get("limit")
+    if not _rule_has_criteria(rule):
         return []
 
-    query = build_indicator_rule_query(rule)
-    dialect = db.session.bind.dialect.name if db.session.bind else ""
-    needs_python_filter = dialect != "postgresql" and (normalized["related_programs_any"] or normalized["tags_any"])
+    if normalized["any"] or normalized["all"] or normalized["none"]:
+        base = IndicatorBank.query.filter(IndicatorBank.archived.isnot(True)).options(joinedload(IndicatorBank.spef_area)).all()
+        rows = [row for row in base if _row_matches_rule(row, rule)]
+    else:
+        query = build_indicator_rule_query(rule)
+        dialect = db.session.bind.dialect.name if db.session.bind else ""
+        needs_python_filter = dialect != "postgresql" and (normalized["related_programs_any"] or normalized["tags_any"])
+        if needs_python_filter:
+            rows = _python_filter_rows(query.all(), rule)
+        else:
+            rows = query.all()
 
-    if needs_python_filter:
-        rows = query.all()
-        rows = _python_filter_rows(rows, rule)
-        if limit is not None:
-            rows = rows[:limit]
-        return rows
-
-    if limit is not None:
-        query = query.limit(limit)
-    return query.all()
+    if effective_limit is not None:
+        rows = rows[: int(effective_limit)]
+    return rows
 
 
 def resolve_indicator_bank_ids(rule: dict[str, Any] | None, *, limit: int | None = None) -> list[int]:
@@ -160,7 +205,13 @@ def serialize_indicator_rule_match(row: IndicatorBank) -> dict[str, Any]:
     }
 
 
-def preview_indicator_rule(rule: dict[str, Any] | None, *, sample_limit: int = 8, full_list: bool = False) -> dict[str, Any]:
+def preview_indicator_rule(
+    rule: dict[str, Any] | None,
+    *,
+    sample_limit: int = 8,
+    full_list: bool = False,
+    group_by: str | None = None,
+) -> dict[str, Any]:
     rows = resolve_indicator_bank_rows(rule)
     limit = len(rows) if full_list else sample_limit
     limit = min(limit, 250)
@@ -171,6 +222,16 @@ def preview_indicator_rule(rule: dict[str, Any] | None, *, sample_limit: int = 8
     }
     if full_list:
         result["matches"] = serialized
+    if group_by == "spef_section":
+        result["groups"] = [
+            {"code": code, "count": len(items), "title": spef_section_title(items, code)}
+            for code, items in resolve_indicators_grouped_by_spef(rule)
+        ]
+    elif group_by == "country":
+        result["groups"] = [
+            {"code": str(country_id), "count": len(items), "title": title}
+            for country_id, title, items in resolve_indicators_grouped_by_country(rule)
+        ]
     return result
 
 
@@ -227,15 +288,32 @@ def resolve_indicators_grouped_by_spef(rule: dict[str, Any] | None) -> list[tupl
     return [(code, grouped[code]) for code in ordered_codes]
 
 
-def spef_section_title(indicators: list[IndicatorBank], spef_code: str) -> str:
+def resolve_indicators_grouped_by_country(rule: dict[str, Any] | None) -> list[tuple[int, str, list[IndicatorBank]]]:
+    """Return (country_id, country_name, indicators) tuples for repeat-by-country layouts."""
+    rows = resolve_indicator_bank_rows(rule)
+    if not rows:
+        return []
+    countries = Country.query.order_by(Country.name.asc()).all()
+    return [(country.id, country.name or f"Country {country.id}", rows) for country in countries]
+
+
+def spef_section_title(indicators: list[IndicatorBank], spef_code: str, *, language: str = "en") -> str:
     for row in indicators:
-        if row.spef_area is not None and (row.spef_area.name or "").strip():
-            return row.spef_area.name.strip()
+        if row.spef_area is not None:
+            translated = row.spef_area.get_name_translation(language)
+            if translated:
+                return translated
+            if (row.spef_area.name or "").strip():
+                return row.spef_area.name.strip()
     from app.models.indicator_bank import IndicatorBankSpef
 
     spef = IndicatorBankSpef.query.filter(func.upper(IndicatorBankSpef.code) == spef_code.upper()).first()
-    if spef and (spef.name or "").strip():
-        return spef.name.strip()
+    if spef:
+        translated = spef.get_name_translation(language)
+        if translated:
+            return translated
+        if (spef.name or "").strip():
+            return spef.name.strip()
     return spef_code
 
 

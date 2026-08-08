@@ -167,4 +167,5 @@ window.PBProgressConfig = {
     },
 };
 </script>
+<script src="{{ url_for('pb_progress.static', filename='js/pb-progress-shared.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script src="{{ url_for('pb_progress.static', filename='js/pb-progress.js') }}" nonce="{{ csp_nonce() }}"></script>

@@ -255,5 +255,6 @@ window.PBProgressConfig = {
 };
 </script>
 <script src="{{ static_url('js/components/multiselect-dropdown.js') }}" nonce="{{ csp_nonce() }}"></script>
+<script src="{{ url_for('pb_progress.static', filename='js/pb-progress-shared.js') }}" nonce="{{ csp_nonce() }}"></script>
 <script src="{{ url_for('pb_progress.static', filename='js/pb-progress-admin.js') }}" nonce="{{ csp_nonce() }}"></script>
 {% endblock %}

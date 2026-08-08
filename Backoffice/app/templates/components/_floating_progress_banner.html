@@ -34,22 +34,27 @@
     buttons=None,
     overall_id=None,
     doc_list_id=None,
+    minimize_button_id=None,
+    restore_button_id=None,
+    minimize_button_aria_label=None,
+    restore_button_aria_label=None,
+    minimize_button_title=None,
     width='22rem'
 ) -%}
 <div id="{{ banner_id }}"
-     class="hidden fixed top-4 right-4 max-w-[calc(100vw-2rem)] rounded-lg shadow-xl"
+     class="floating-progress-banner hidden fixed top-4 right-4 max-w-[calc(100vw-2rem)] rounded-lg shadow-xl"
      style="z-index: 11050; width: {{ width }}; background: rgba(0,0,0,0.92); color: #ffffff; border: 1px solid rgba(255,255,255,0.10);"
      role="status"
      aria-live="polite">
     <div class="px-3 py-2">
-        <div class="flex items-start justify-between gap-2">
+        <div class="floating-progress-banner-header flex items-start justify-between gap-2">
             <div class="flex items-start gap-2 min-w-0">
                 {% if spinner_id %}
                 <div id="{{ spinner_id }}"
-                     class="{{ spinner_classes }}"
+                     class="floating-progress-banner-spinner {{ spinner_classes }}"
                      style="{{ spinner_style }}"></div>
                 {% else %}
-                <div class="{{ spinner_classes }}"
+                <div class="floating-progress-banner-spinner {{ spinner_classes }}"
                      style="{{ spinner_style }}"></div>
                 {% endif %}
                 <div class="min-w-0 leading-tight">
@@ -60,13 +65,34 @@
                     <p class="{{ detail_classes }}{% if overall_id %} hidden{% endif %}" style="{{ detail_style }}" id="{{ detail_id }}">{{ detail_default }}</p>
                 </div>
             </div>
-            {% if show_percent %}
-            <div class="{{ percent_classes }}" style="{{ percent_style }}" id="{{ percent_id }}">{{ percent_default }}</div>
-            {% endif %}
+            <div class="floating-progress-banner-header-actions flex items-center gap-1.5 flex-shrink-0">
+                {% if show_percent %}
+                <div class="{{ percent_classes }}" style="{{ percent_style }}" id="{{ percent_id }}">{{ percent_default }}</div>
+                {% endif %}
+                {% if minimize_button_id and restore_button_id %}
+                <button type="button"
+                        id="{{ minimize_button_id }}"
+                        class="floating-progress-banner-minimize-btn inline-flex items-center justify-center rounded border-0 bg-transparent p-0 leading-none transition-colors"
+                        style="color: rgba(255,255,255,0.72); width: 1.125rem; height: 1.125rem;"
+                        aria-label="{{ minimize_button_aria_label or 'Minimize' }}"
+                        title="{{ minimize_button_title or minimize_button_aria_label or 'Minimize' }}">
+                    <i class="fas fa-minus" style="font-size: 0.65rem;" aria-hidden="true"></i>
+                </button>
+                <button type="button"
+                        id="{{ restore_button_id }}"
+                        class="floating-progress-banner-restore-btn hidden inline-flex items-center justify-center rounded border-0 bg-transparent p-0 leading-none transition-colors"
+                        style="color: rgba(255,255,255,0.72); width: 1.125rem; height: 1.125rem;"
+                        aria-label="{{ restore_button_aria_label or 'Restore' }}"
+                        title="{{ restore_button_aria_label or 'Restore' }}">
+                    <i class="fas fa-expand-alt" style="font-size: 0.65rem;" aria-hidden="true"></i>
+                </button>
+                {% endif %}
+            </div>
         </div>
 
+        <div class="floating-progress-banner-body">
         {% if show_progress %}
-        <div class="mt-1.5 w-full rounded-full h-1" style="background: rgba(255,255,255,0.18);">
+        <div class="floating-progress-banner-progress mt-1.5 w-full rounded-full h-1" style="background: rgba(255,255,255,0.18);">
             <div id="{{ bar_id }}" class="h-1 rounded-full transition-all duration-300" style="width: 0%; background: rgba(255,255,255,0.95);"></div>
         </div>
         {% endif %}
@@ -111,6 +137,7 @@
             {% endfor %}
         </div>
         {% endif %}
+        </div>
     </div>
 </div>
 {%- endmacro %}

@@ -20,6 +20,8 @@ It proxies the **public** IFRC Humanitarian Databank API for Claude, Cursor, and
 | `databank_get_indicator` | `getIndicatorById` | One indicator's metadata |
 | `databank_get_public_data` | `getPublicData` | One page of scoped public `/data` |
 | `databank_get_public_data_all_pages` | — | Auto-paginate public `/data` (raw rows; not deduped) |
+| `databank_build_country_report` | — | **One-pager builder** — headline KPIs + trend + cited narrative for one country/period |
+| `databank_get_report_template` | — | HTML/CSS layout skeleton + design tokens for the one-pager |
 | `databank_api_info` | — | Configured base URL and endpoint summary |
 
 Server instructions mirror [`instructions-core.md`](../Backoffice/docs/public/custom-gpt/instructions-core.md).
@@ -46,6 +48,20 @@ databank_search_public_documents(
 )
 ```
 
+**Country one-pager report** ("build a report for Syria using 2026 midyear data"):
+```text
+databank_build_country_report(country="Syria", period_hint="2026 midyear", template_style="default")
+  → country, period (resolved + available_periods), coverage, headline_kpis, trend,
+    narrative (cited theme chunks), design_template (layout/colors/fonts to follow)
+```
+Render the JSON as an actual visual one-pager (KPI cards + trend chart + narrative bullets) —
+the tool never returns HTML or images itself. Omit `template_style` for a freeform render, or
+call `databank_get_report_template(style="default")` separately to fetch the same layout
+skeleton on its own. `report_type` narrows to `"fdrs"` (numbers only) or `"upr"` (narrative
+Unified Plan/Report themes only); default `"combined"` returns both. When
+`coverage.fdrs_data_available` or `coverage.narrative_available` is `false`, or
+`coverage.period_match_note` is set, say so explicitly instead of implying full reporting.
+
 **"How many countries submitted FDRS data for 2024?" (numeric):**
 ```text
 databank_get_submission_coverage(template_id=21, period_name="Annual 2024")
@@ -65,6 +81,17 @@ databank_get_documents_catalog(document_type="annual_report")
 
 Both counting tools report **public data/document coverage only** — never internal
 assignment or workflow status (submitted/pending/approved), which requires an API key.
+
+## Report design templates
+
+`databank_build_country_report` and `databank_get_report_template` are thin proxies over
+Backoffice's `GET /public/reports/country` and `GET /public/reports/template` — all
+orchestration (period resolution, KPI fetch, narrative search) and the template skeletons
+themselves live server-side in `Backoffice/app/services/public_report_service.py` and
+`Backoffice/app/report_styles/<style>.html` (+ `<style>.tokens.json`), shared with the
+Custom GPT's `getCountryReport` / `getReportTemplate` Actions. Add a new style by dropping
+files in that Backoffice folder — no MCP code changes or redeploy needed, the endpoint lists
+`available_styles` from the directory contents.
 
 ## Quick start (local)
 
@@ -109,7 +136,7 @@ Connector name: **IFRC Network Databank**. Icon:
 
 **Staging:** App Service `ifrc-databank-mcp-staging` in resource group `ifrctgo001rg`.  
 **Image:** `ifrcimage.azurecr.io/databank_mcp:<tag>`  
-**CI:** [`.github/workflows/deploy-mcp.yml`](../.github/workflows/deploy-mcp.yml)
+**CI:** [`.github/workflows/deploy-mcp.yml`](../.github/workflows/deploy-mcp.yml) — manual **Run workflow** only (Actions tab).
 
 ### Backoffice proxy
 

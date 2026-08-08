@@ -35,7 +35,7 @@ def list_documents():
     List all AI-processed documents accessible to the user.
 
     Query parameters:
-    - page, per_page: Server-side pagination (default page=1, per_page=50, max 200)
+    - page, per_page: Server-side pagination (default page=1, per_page=50, max 10000)
     - limit, offset: Legacy offset pagination (used when offset is supplied without page)
     - status, file_type, category, language, q: Same filters as the admin Knowledge Base page
 
@@ -53,7 +53,7 @@ def list_documents():
             per_page = limit
         else:
             page, per_page = validate_pagination_params(
-                request.args, default_per_page=50, max_per_page=200
+                request.args, default_per_page=50, max_per_page=10000
             )
             offset = (page - 1) * per_page
             limit = per_page

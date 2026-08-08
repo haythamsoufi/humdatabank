@@ -1,58 +1,49 @@
 /**
- * WYSIWYG report editor canvas — dotted slots, insert menus, dynamic indicator previews.
+ * WYSIWYG report editor canvas — GridStack layout + live previews.
  */
 import { renderWidget, appendSectionFootnote } from '../widget-renderer.js';
+import { GridEngine } from './grid-engine.js';
+import { localizedWidget, resolveTranslation } from './v2-compat.js';
 
 const INSERT_TYPES = [
     { type: 'indicator_dashboard', label: 'Dashboard', icon: 'fa-chart-area' },
     { type: 'kpi', label: 'KPI', icon: 'fa-hashtag' },
     { type: 'line', label: 'Line chart', icon: 'fa-chart-line' },
+    { type: 'area', label: 'Area chart', icon: 'fa-chart-area' },
     { type: 'bar', label: 'Bar chart', icon: 'fa-chart-bar' },
+    { type: 'map', label: 'Map', icon: 'fa-map' },
     { type: 'pie', label: 'Pie chart', icon: 'fa-chart-pie' },
+    { type: 'gauge', label: 'Gauge', icon: 'fa-tachometer-alt' },
     { type: 'table', label: 'Table', icon: 'fa-table' },
-    { type: 'text', label: 'Text block', icon: 'fa-align-left' }
+    { type: 'text', label: 'Text block', icon: 'fa-align-left' },
+    { type: 'image', label: 'Image', icon: 'fa-image' },
+    { type: 'embed', label: 'Embed', icon: 'fa-code' },
+    { type: 'divider', label: 'Divider', icon: 'fa-minus' }
 ];
-
-const TYPE_LABELS = {
-    indicator_dashboard: 'Dashboard',
-    kpi: 'KPI',
-    line: 'Line chart',
-    bar: 'Bar chart',
-    pie: 'Pie chart',
-    table: 'Table',
-    text: 'Text'
-};
 
 function groupIndicatorsBySpef(indicators) {
     const groups = new Map();
     (indicators || []).forEach(function (row) {
         const code = (row.spef_code || 'UNASSIGNED').toUpperCase();
-        if (!groups.has(code)) {
-            groups.set(code, {
-                code: code,
-                name: row.spef_name || code,
-                indicators: []
-            });
-        }
+        if (!groups.has(code)) groups.set(code, { code: code, name: row.spef_name || code, indicators: [] });
         groups.get(code).indicators.push(row);
     });
     return Array.from(groups.values());
 }
 
-function dynamicWidgetId(sectionId, indicatorId) {
+export function dynamicWidgetId(sectionId, indicatorId) {
     return sectionId + '-dyn-' + indicatorId;
 }
 
 export class EditorCanvas {
     constructor(builder) {
         this.builder = builder;
+        this.gridEngine = new GridEngine({ rtl: builder.activeLanguage === 'ar' });
         this._openMenu = null;
         this._loadingWidgets = new Set();
         this._slotPayloadCache = {};
         document.addEventListener('click', (e) => {
-            if (this._openMenu && !e.target.closest('.rb-editor-insert-menu')) {
-                this.closeMenus();
-            }
+            if (this._openMenu && !e.target.closest('.rb-editor-insert-menu')) this.closeMenus();
         });
     }
 
@@ -76,6 +67,7 @@ export class EditorCanvas {
         const host = this.host;
         if (!host) return;
         this.closeMenus();
+        this.gridEngine.destroyAll();
         host.innerHTML = '';
         const sections = this.builder.definition.sections || [];
         if (!sections.length) {
@@ -98,11 +90,7 @@ export class EditorCanvas {
             const widgetId = slot.dataset.widgetId;
             const preview = slot.querySelector('.rb-editor-slot-preview');
             if (!widgetId || !preview) return;
-            jobs.push({
-                widgetId: widgetId,
-                preview: preview,
-                titleEl: slot.querySelector('.report-widget-card-title') || null
-            });
+            jobs.push({ widgetId: widgetId, preview: preview, titleEl: slot.querySelector('.report-widget-card-title') || null });
         });
         return jobs;
     }
@@ -112,11 +100,6 @@ export class EditorCanvas {
             return !this._slotPayloadCache[job.widgetId] && !this._loadingWidgets.has(job.widgetId);
         }.bind(this));
         if (!jobs.length) return;
-        try {
-            await this.builder.ensureSaved();
-        } catch (_) {
-            return;
-        }
         await this.runPreviewPool(jobs, 4);
     }
 
@@ -130,404 +113,211 @@ export class EditorCanvas {
             }
         }.bind(this);
         const workers = [];
-        for (let i = 0; i < Math.min(concurrency, jobs.length); i += 1) {
-            workers.push(worker());
-        }
+        for (let i = 0; i < Math.min(concurrency, jobs.length); i += 1) workers.push(worker());
         await Promise.all(workers);
     }
 
     createEmptyState() {
         const wrap = document.createElement('div');
         wrap.className = 'rb-editor-empty';
-        wrap.innerHTML = '<i class="fas fa-file-alt" aria-hidden="true"></i><p>Your report is empty. Add a section to begin building.</p>';
+        wrap.innerHTML = '<i class="fas fa-file-alt" aria-hidden="true"></i><p>Your report is empty. Add a section or choose a template to begin.</p>';
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'btn btn-secondary rb-editor-add-section-btn';
         btn.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i> Add section';
         btn.addEventListener('click', () => this.builder.addSection());
         wrap.appendChild(btn);
+        const galleryBtn = document.createElement('button');
+        galleryBtn.type = 'button';
+        galleryBtn.className = 'btn btn-secondary rb-editor-add-section-btn mt-2';
+        galleryBtn.textContent = 'Browse templates';
+        galleryBtn.addEventListener('click', () => this.builder.openTemplateGallery());
+        wrap.appendChild(galleryBtn);
         return wrap;
     }
 
     createAddSectionSlot() {
-        const slot = document.createElement('button');
-        slot.type = 'button';
-        slot.className = 'rb-editor-add-section-slot';
-        slot.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i><span>Add section</span>';
-        slot.addEventListener('click', () => this.builder.addSection());
-        return slot;
-    }
-
-    isSectionSelected(sectionId) {
-        return this.builder.selectedSectionId === sectionId && !this.builder.selectedWidgetId && !this.builder.selectedDynamicIndicatorId;
-    }
-
-    isWidgetSelected(widgetId) {
-        return this.builder.selectedWidgetId === widgetId;
-    }
-
-    isDynamicSelected(sectionId, indicatorId) {
-        return this.builder.selectedSectionId === sectionId
-            && this.builder.selectedDynamicIndicatorId === indicatorId;
-    }
-
-    selectSection(sectionId) {
-        this.builder.selectedSectionId = sectionId;
-        this.builder.selectedWidgetId = null;
-        this.builder.selectedDynamicIndicatorId = null;
-        this.builder.renderEditor();
-        this.builder.renderPropertiesPanel();
-    }
-
-    selectWidget(sectionId, widgetId) {
-        this.builder.selectedSectionId = sectionId;
-        this.builder.selectedWidgetId = widgetId;
-        this.builder.selectedDynamicIndicatorId = null;
-        this.builder.renderEditor();
-        this.builder.renderPropertiesPanel();
-    }
-
-    selectDynamicIndicator(sectionId, indicatorId) {
-        this.builder.selectedSectionId = sectionId;
-        this.builder.selectedWidgetId = null;
-        this.builder.selectedDynamicIndicatorId = indicatorId;
-        this.builder.renderEditor();
-        this.builder.renderPropertiesPanel();
-        this.builder.focusDynamicIndicatorFootnote(indicatorId);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'rb-editor-add-section-slot';
+        btn.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i> Add section';
+        btn.addEventListener('click', () => this.builder.addSection());
+        return btn;
     }
 
     async renderSectionBlock(section, index) {
-        const block = document.createElement('section');
-        block.className = 'report-section rb-editor-section'
-            + (this.isSectionSelected(section.id) ? ' is-selected' : '');
+        const lang = this.builder.activeLanguage || 'en';
+        const title = resolveTranslation(section.title_translations, lang, section.title || 'Untitled section');
+        const block = document.createElement('article');
+        block.className = 'rb-editor-section' + (this.builder.selectedSectionId === section.id ? ' is-selected' : '');
         block.dataset.sectionId = section.id;
 
-        block.appendChild(this.createSectionHeader(section, index));
+        const header = document.createElement('div');
+        header.className = 'rb-editor-section-header';
+        header.innerHTML = '<div class="rb-editor-section-title">' + title + '</div><div class="rb-editor-section-meta">' + this.builder.describeSection(section) + '</div>';
+        header.addEventListener('click', (e) => {
+            if (e.target.closest('.rb-editor-slot')) return;
+            this.builder.selectSection(section.id);
+        });
+        block.appendChild(header);
 
         const body = document.createElement('div');
         body.className = 'rb-editor-section-body';
 
-        const dyn = section.dynamic_indicators || {};
-        if (dyn.enabled) {
-            await this.renderDynamicSection(section, body);
+        if (section.dynamic_indicators?.enabled) {
+            body.appendChild(await this.renderDynamicSection(section));
         } else {
-            this.renderManualSection(section, body);
-        }
-
-        if (section.footnote) {
-            body.appendChild(this.createFootnotePreview(section.footnote, 'section'));
-        } else {
-            body.appendChild(this.createFootnotePlaceholder(section));
+            const gridHost = document.createElement('div');
+            gridHost.className = 'rb-section-grid';
+            gridHost.dataset.sectionId = section.id;
+            body.appendChild(gridHost);
+            body.appendChild(this.createInsertSlot(section.id, (section.widgets || []).length));
+            await this.gridEngine.mount(gridHost, section, {
+                renderSlotContent: (container, widget, sec) => this.renderSlotShell(container, widget, sec),
+                onLayoutChange: (sectionId, items) => this.builder.applyGridLayout(sectionId, items)
+            });
         }
 
         block.appendChild(body);
-        block.addEventListener('click', (e) => {
-            if (e.target.closest('.rb-editor-slot, .rb-editor-insert-slot, .rb-editor-insert-menu, .rb-editor-section-title, button')) return;
-            this.selectSection(section.id);
-        });
+        appendSectionFootnote(block, resolveTranslation(section.footnote_translations, lang, section.footnote));
         return block;
     }
 
-    createSectionHeader(section, index) {
-        const head = document.createElement('div');
-        head.className = 'rb-editor-section-header';
+    renderSlotShell(container, widget, section) {
+        const lang = this.builder.activeLanguage || 'en';
+        const localized = localizedWidget(widget, lang, this.builder.definition.default_language || 'en');
+        container.innerHTML = '';
+        const slot = document.createElement('div');
+        slot.className = 'rb-editor-slot' + (this.builder.selectedWidgetId === widget.id ? ' is-selected' : '');
+        slot.dataset.widgetId = widget.id;
+        slot.dataset.sectionId = section.id;
 
-        const title = document.createElement('input');
-        title.type = 'text';
-        title.className = 'rb-editor-section-title';
-        title.value = section.title || 'Untitled section';
-        title.placeholder = 'Section title';
-        title.addEventListener('click', (e) => e.stopPropagation());
-        title.addEventListener('input', () => {
-            section.title = title.value;
-            const inspectorTitle = document.getElementById('rb-section-title');
-            if (inspectorTitle && inspectorTitle.value !== title.value) inspectorTitle.value = title.value;
+        const toolbar = document.createElement('div');
+        toolbar.className = 'rb-editor-slot-toolbar';
+        toolbar.innerHTML = '<span class="rb-editor-slot-type">' + (localized.type || 'widget') + '</span><button type="button" class="rb-editor-slot-action" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>';
+        toolbar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (e.target.closest('[data-action="delete"]')) this.builder.deleteWidgetById(widget.id);
         });
-        title.addEventListener('focus', () => this.selectSection(section.id));
+        slot.appendChild(toolbar);
 
-        const meta = document.createElement('span');
-        meta.className = 'rb-editor-section-meta';
-        meta.textContent = this.builder.describeSection(section);
+        const preview = document.createElement('div');
+        preview.className = 'rb-editor-slot-preview rb-editor-slot-content';
+        slot.appendChild(preview);
 
-        head.appendChild(title);
-        head.appendChild(meta);
-        return head;
+        slot.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.builder.selectWidget(section.id, widget.id);
+        });
+
+        container.appendChild(slot);
+        const cached = this._slotPayloadCache[widget.id];
+        if (cached) {
+            void renderWidget(preview, cached);
+        }
     }
 
-    async renderDynamicSection(section, body) {
+    async renderDynamicSection(section) {
+        const wrap = document.createElement('div');
+        wrap.className = 'rb-editor-dynamic-wrap';
+        const matches = this.builder._sectionRuleMatches[section.id] || [];
         const dyn = section.dynamic_indicators || {};
-        const rule = dyn.rule || {};
-        const hasRule = (rule.related_programs_any || []).length || (rule.tags_any || []).length;
-
-        if (!hasRule) {
-            body.appendChild(this.createConfigPrompt(
-                'Configure programmes or tags in the Section panel to list matching indicators here.'
-            ));
-            return;
-        }
-
-        let matches = this.builder._sectionRuleMatches[section.id];
-        if (!matches) {
-            body.appendChild(this.createLoadingRow('Loading indicators…'));
-            const preview = await this.builder.previewRule(rule, null, { full_list: true, silent: true });
-            matches = preview.matches || preview.sample || [];
-            this.builder._sectionRuleMatches[section.id] = matches;
-            this.builder._sectionRuleCounts[section.id] = preview.count || matches.length;
-            body.innerHTML = '';
-        }
-
         if (!matches.length) {
-            body.appendChild(this.createConfigPrompt('No indicators match the current rule.'));
-            return;
+            wrap.innerHTML = '<div class="rb-editor-config-prompt">Configure programmes or tags in the Section panel to preview indicators here.</div>';
+            return wrap;
         }
-
-        const widgetType = dyn.widget_type || 'indicator_dashboard';
-        const badge = document.createElement('div');
-        badge.className = 'rb-editor-dynamic-badge';
-        badge.innerHTML = '<i class="fas fa-magic" aria-hidden="true"></i> Auto-generated · '
-            + matches.length + ' indicator' + (matches.length === 1 ? '' : 's')
-            + ' · ' + (TYPE_LABELS[widgetType] || widgetType);
-        body.appendChild(badge);
-
-        if (dyn.group_by === 'spef_section') {
-            const groups = groupIndicatorsBySpef(matches);
-            groups.forEach((group) => {
-                const sub = document.createElement('div');
-                sub.className = 'rb-editor-spef-group';
-                const subTitle = document.createElement('h3');
-                subTitle.className = 'rb-editor-spef-title';
-                subTitle.textContent = group.name || group.code;
-                sub.appendChild(subTitle);
-                group.indicators.forEach((indicator) => {
-                    sub.appendChild(this.createDynamicSlot(section, indicator, widgetType));
-                });
-                body.appendChild(sub);
-            });
-        } else {
-            matches.forEach((indicator) => {
-                body.appendChild(this.createDynamicSlot(section, indicator, widgetType));
-            });
+        const grouped = dyn.group_by === 'spef_section' ? groupIndicatorsBySpef(matches) : [{ code: 'all', name: '', indicators: matches }];
+        for (const group of grouped) {
+            if (group.name) {
+                const h = document.createElement('div');
+                h.className = 'rb-editor-spef-title';
+                h.textContent = group.name;
+                wrap.appendChild(h);
+            }
+            for (const row of group.indicators) {
+                const widgetId = dynamicWidgetId(section.id, row.id);
+                const slot = document.createElement('div');
+                slot.className = 'rb-editor-slot rb-editor-dynamic-slot' + (this.builder.selectedDynamicIndicatorId === row.id ? ' is-selected' : '');
+                slot.dataset.widgetId = widgetId;
+                slot.dataset.skipPreview = 'false';
+                slot.innerHTML = '<div class="rb-editor-slot-toolbar"><span class="rb-editor-slot-type">Dashboard</span><span class="rb-editor-slot-auto">auto</span></div><div class="rb-editor-slot-preview"></div>';
+                slot.addEventListener('click', () => this.builder.selectDynamicIndicator(section.id, row.id));
+                wrap.appendChild(slot);
+            }
         }
+        return wrap;
     }
 
-    renderManualSection(section, body) {
-        const widgets = section.widgets || [];
-        widgets.forEach((widget, index) => {
-            body.appendChild(this.createWidgetSlot(section, widget));
-            body.appendChild(this.createInsertSlot(section, index));
-        });
-        if (!widgets.length) {
-            body.appendChild(this.createInsertSlot(section, -1));
-        }
-    }
-
-    createConfigPrompt(message) {
-        const el = document.createElement('div');
-        el.className = 'rb-editor-config-prompt';
-        el.textContent = message;
-        return el;
-    }
-
-    createLoadingRow(message) {
-        const el = document.createElement('div');
-        el.className = 'rb-editor-loading';
-        el.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> ' + message;
-        return el;
-    }
-
-    createInsertSlot(section, afterIndex) {
+    createInsertSlot(sectionId, index) {
         const slot = document.createElement('button');
         slot.type = 'button';
         slot.className = 'rb-editor-insert-slot';
-        slot.title = 'Add element';
-        slot.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i>';
+        slot.innerHTML = '<i class="fas fa-plus" aria-hidden="true"></i> Add widget';
         slot.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.showInsertMenu(slot, section, afterIndex);
+            this.openInsertMenu(slot, sectionId, index);
         });
         return slot;
     }
 
-    showInsertMenu(anchor, section, afterIndex) {
+    openInsertMenu(anchor, sectionId, index) {
         this.closeMenus();
         const menu = document.createElement('div');
         menu.className = 'rb-editor-insert-menu';
-        menu.setAttribute('role', 'menu');
-        INSERT_TYPES.forEach((item) => {
+        INSERT_TYPES.forEach(function (item) {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'rb-editor-insert-option';
-            btn.setAttribute('role', 'menuitem');
-            btn.innerHTML = '<i class="fas ' + item.icon + '" aria-hidden="true"></i><span>' + item.label + '</span>';
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
+            btn.innerHTML = '<i class="fas ' + item.icon + '" aria-hidden="true"></i> ' + item.label;
+            btn.addEventListener('click', () => {
                 this.closeMenus();
-                this.builder.insertWidgetAt(section.id, item.type, afterIndex + 1);
+                this.builder.insertWidgetAt(sectionId, item.type, index);
             });
             menu.appendChild(btn);
-        });
-        anchor.appendChild(menu);
+        }.bind(this));
+        anchor.parentNode.appendChild(menu);
         this._openMenu = menu;
-    }
-
-    createWidgetSlot(section, widget) {
-        const slot = document.createElement('article');
-        slot.className = 'rb-editor-slot rb-editor-slot-widget'
-            + (this.isWidgetSelected(widget.id) ? ' is-selected' : '');
-        slot.dataset.widgetId = widget.id;
-
-        const toolbar = document.createElement('div');
-        toolbar.className = 'rb-editor-slot-toolbar';
-        toolbar.innerHTML = '<span class="rb-editor-slot-type">' + (TYPE_LABELS[widget.type] || widget.type) + '</span>'
-            + '<button type="button" class="rb-editor-slot-action" title="Delete" data-action="delete"><i class="fas fa-trash" aria-hidden="true"></i></button>';
-
-        const content = document.createElement('div');
-        content.className = 'rb-editor-slot-content';
-
-        const preview = document.createElement('div');
-        preview.className = 'rb-editor-slot-preview';
-
-        if (widget.type === 'text') {
-            slot.dataset.skipPreview = 'true';
-            preview.className = 'rb-editor-slot-preview rb-editor-text-preview';
-            preview.textContent = widget.content || '';
-        } else if (this._slotPayloadCache[widget.id]) {
-            renderWidget(preview, this._slotPayloadCache[widget.id]);
-        } else {
-            preview.appendChild(this.createLoadingRow('Loading…'));
-        }
-        content.appendChild(preview);
-
-        if (widget.footnote) {
-            content.appendChild(this.createFootnotePreview(widget.footnote, 'widget'));
-        }
-
-        slot.appendChild(toolbar);
-        slot.appendChild(content);
-
-        slot.addEventListener('click', (e) => {
-            if (e.target.closest('[data-action]')) return;
-            this.selectWidget(section.id, widget.id);
-        });
-
-        toolbar.querySelector('[data-action="delete"]')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!window.confirm('Delete this widget?')) return;
-            this.builder.deleteWidgetById(widget.id);
-        });
-
-        return slot;
-    }
-
-    createDynamicSlot(section, indicator, widgetType) {
-        const widgetId = dynamicWidgetId(section.id, indicator.id);
-        const slot = document.createElement('article');
-        slot.className = 'rb-editor-slot rb-editor-slot-dynamic'
-            + (this.isDynamicSelected(section.id, indicator.id) ? ' is-selected' : '');
-        slot.dataset.indicatorId = String(indicator.id);
-        slot.dataset.widgetId = widgetId;
-
-        const toolbar = document.createElement('div');
-        toolbar.className = 'rb-editor-slot-toolbar';
-        toolbar.innerHTML = '<span class="rb-editor-slot-type">' + (TYPE_LABELS[widgetType] || widgetType) + '</span>'
-            + '<span class="rb-editor-slot-auto"><i class="fas fa-magic" aria-hidden="true"></i> Auto</span>';
-
-        const content = document.createElement('div');
-        content.className = 'rb-editor-slot-content';
-
-        const title = document.createElement('h3');
-        title.className = 'report-widget-card-title';
-        title.textContent = indicator.name || ('Indicator ' + indicator.id);
-        content.appendChild(title);
-
-        const preview = document.createElement('div');
-        preview.className = 'rb-editor-slot-preview';
-
-        if (this._slotPayloadCache[widgetId]) {
-            renderWidget(preview, this._slotPayloadCache[widgetId]);
-        } else {
-            preview.appendChild(this.createLoadingRow('Loading…'));
-        }
-        content.appendChild(preview);
-
-        const dyn = section.dynamic_indicators || {};
-        const footnote = (dyn.indicator_footnotes || {})[String(indicator.id)]
-            || (dyn.include_bank_guidance_footnotes && indicator.disaggregation_guidance ? indicator.disaggregation_guidance : '');
-        if (footnote) {
-            content.appendChild(this.createFootnotePreview(footnote, 'widget'));
-        }
-
-        slot.appendChild(toolbar);
-        slot.appendChild(content);
-
-        slot.addEventListener('click', (e) => {
-            if (e.target.closest('[data-action]')) return;
-            this.selectDynamicIndicator(section.id, indicator.id);
-        });
-
-        return slot;
-    }
-
-    createFootnotePreview(text, kind) {
-        const el = document.createElement('div');
-        el.className = kind === 'section' ? 'report-section-footnote rb-editor-footnote-preview' : 'report-widget-footnote rb-editor-footnote-preview';
-        el.textContent = text;
-        return el;
-    }
-
-    createFootnotePlaceholder(section) {
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'rb-editor-footnote-slot';
-        el.innerHTML = '<i class="fas fa-sticky-note" aria-hidden="true"></i> Add section footnote';
-        el.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.selectSection(section.id);
-            this.builder.setInspectorTab('section');
-            document.getElementById('rb-section-footnote')?.focus();
-        });
-        return el;
     }
 
     async loadWidgetPreview(widgetId, previewHost, titleEl) {
         if (this._loadingWidgets.has(widgetId)) return;
-        if (this._slotPayloadCache[widgetId]) {
-            previewHost.innerHTML = '';
-            if (titleEl) titleEl.remove();
-            await renderWidget(previewHost, this._slotPayloadCache[widgetId]);
-            return;
-        }
         this._loadingWidgets.add(widgetId);
-        previewHost.innerHTML = '';
-        previewHost.appendChild(this.createLoadingRow('Loading…'));
+        previewHost.innerHTML = '<div class="rb-editor-loading">Loading preview…</div>';
         try {
-            const reportId = await this.builder.ensureSaved();
-            if (!reportId) return;
-            const res = await fetch(this.builder.config.apiBase + '/' + reportId + '/widgets/' + encodeURIComponent(widgetId) + '/run', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.builder.config.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({})
-            });
-            const data = await res.json().catch(function () { return {}; });
-            if (!res.ok) throw new Error(data.error || data.message || 'Preview failed');
-            const payload = data.widget || data;
+            const payload = await this.fetchPreviewPayload(widgetId);
             this._slotPayloadCache[widgetId] = payload;
             previewHost.innerHTML = '';
-            if (titleEl) titleEl.remove();
             await renderWidget(previewHost, payload);
+            if (titleEl && payload.title) titleEl.textContent = payload.title;
         } catch (err) {
-            previewHost.innerHTML = '';
-            const error = document.createElement('div');
-            error.className = 'rb-editor-slot-error';
-            error.textContent = err.message || 'Preview failed';
-            previewHost.appendChild(error);
+            previewHost.innerHTML = '<div class="rb-editor-slot-error">' + (err.message || 'Preview failed') + '</div>';
         } finally {
             this._loadingWidgets.delete(widgetId);
         }
+    }
+
+    async fetchPreviewPayload(widgetId) {
+        const widget = this.builder.findWidgetById(widgetId);
+        if (!widget) throw new Error('Widget not found');
+        const lang = this.builder.activeLanguage || 'en';
+        const res = await fetch(this.builder.config.apiBase.replace(/\/api\/?$/, '') + '/api/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': this.builder.config.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                definition: this.builder.definition,
+                widget: widget,
+                language: lang,
+                report_id: this.builder.config.reportId || null,
+                filters: this.builder.definition.filters
+            })
+        });
+        const data = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(data.message || data.error || 'Preview failed');
+        return data.widget || (data.widgets || {})[widgetId] || data;
     }
 
     async refreshAllPreviews() {
@@ -535,5 +325,3 @@ export class EditorCanvas {
         await this.render();
     }
 }
-
-export { INSERT_TYPES, TYPE_LABELS, dynamicWidgetId, groupIndicatorsBySpef };

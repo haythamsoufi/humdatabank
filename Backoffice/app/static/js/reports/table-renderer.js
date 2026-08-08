@@ -1,6 +1,8 @@
 /**
  * Simple HTML table renderer for report table widgets.
  */
+import { rowCellStyle } from './conditional-formatting.js';
+
 export function renderTable(container, payload) {
     container.innerHTML = '';
     if (payload.error) {
@@ -28,7 +30,10 @@ export function renderTable(container, payload) {
         const tr = document.createElement('tr');
         columns.forEach(function (col) {
             const td = document.createElement('td');
-            td.textContent = row && row[col] != null ? String(row[col]) : '';
+            const value = row && row[col] != null ? String(row[col]) : '';
+            td.textContent = value;
+            const style = rowCellStyle(row && row[col], payload.chart_options);
+            if (style) td.setAttribute('style', style);
             tr.appendChild(td);
         });
         tbody.appendChild(tr);

@@ -494,8 +494,9 @@ body.overflow-hidden { overflow: hidden; }
   transition-delay: calc(var(--fab-hover-stagger, 55ms) * 2);
 }
 
-/* Mobile overlay: tap opens sections list only — Save/Submit live in the sidebar */
-@media (max-width: 1099px) {
+/* Touch-only overlay: tap opens sections list — Save/Submit live in the sidebar.
+   Keep hover stack on viewports <1100px when the device supports hover (e.g. tablet + mouse). */
+@media (max-width: 1099px) and (hover: none), (max-width: 1099px) and (pointer: coarse) {
   #fab-menu {
     display: none !important;
     visibility: hidden !important;

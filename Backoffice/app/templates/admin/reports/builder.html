@@ -7,7 +7,9 @@
 {% block head %}
     {{ super() }}
     <link rel="stylesheet" href="{{ static_url('css/reports/report-builder.css') }}">
+    <link rel="stylesheet" href="{{ static_url('libs/gridstack/gridstack.min.css') }}">
     <script src="{{ static_url('libs/apexcharts.min.js') }}" defer></script>
+    <script src="{{ static_url('libs/gridstack/gridstack-all.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -29,9 +31,20 @@
                 <span class="sr-only">{{ _('Report title') }}</span>
                 <input type="text" id="rb-title" class="report-toolbar-title" value="{{ report.title if report else '' }}" placeholder="{{ _('Untitled report') }}">
             </label>
+            <label class="report-toolbar-language-field">
+                <span class="sr-only">{{ _('Editing language') }}</span>
+                <select id="rb-language" class="form-control">
+                    <option value="en">English</option>
+                    <option value="fr">French</option>
+                    <option value="es">Spanish</option>
+                    <option value="ar">Arabic</option>
+                </select>
+            </label>
             <span id="rb-save-status" class="report-builder-save-status" aria-live="polite"></span>
         </div>
         <div class="report-builder-toolbar-actions">
+            <button type="button" id="rb-undo" class="btn btn-secondary" title="{{ _('Undo') }}"><i class="fas fa-undo"></i></button>
+            <button type="button" id="rb-redo" class="btn btn-secondary" title="{{ _('Redo') }}"><i class="fas fa-redo"></i></button>
             <button type="button" id="rb-refresh-data-toolbar" class="btn btn-secondary">
                 <i class="fas fa-sync" aria-hidden="true"></i>{{ _('Refresh data') }}
             </button>
@@ -46,7 +59,7 @@
     <div class="report-builder-layout">
         <div class="report-builder-workspace report-builder-editor-workspace">
             <div class="report-editor-toolbar">
-                <p id="rb-editor-hint" class="report-editor-hint">{{ _('Live preview of your report. Click elements to configure them, or use + slots to add widgets.') }}</p>
+                <p id="rb-editor-hint" class="report-editor-hint">{{ _('Drag and resize widgets on the grid. Click elements to configure them.') }}</p>
                 <div class="report-editor-toolbar-actions">
                     <button type="button" id="rb-refresh-data" class="btn btn-sm btn-secondary">
                         <i class="fas fa-sync" aria-hidden="true"></i>{{ _('Refresh preview data') }}
@@ -64,6 +77,7 @@
                 <button type="button" class="report-inspector-tab is-active" data-inspector-tab="setup">{{ _('Setup') }}</button>
                 <button type="button" class="report-inspector-tab" data-inspector-tab="section">{{ _('Section') }}</button>
                 <button type="button" class="report-inspector-tab" data-inspector-tab="widget">{{ _('Widget') }}</button>
+                <button type="button" class="report-inspector-tab" data-inspector-tab="style">{{ _('Style') }}</button>
             </nav>
             <div class="report-inspector-body">
                 <div id="rb-inspector-setup" class="report-inspector-panel is-active">
@@ -74,6 +88,9 @@
                 </div>
                 <div id="rb-inspector-widget" class="report-inspector-panel">
                     {% include "admin/reports/partials/_widget_properties.html" %}
+                </div>
+                <div id="rb-inspector-style" class="report-inspector-panel">
+                    {% include "admin/reports/partials/_style_properties.html" %}
                 </div>
             </div>
         </aside>
@@ -86,7 +103,8 @@
     'definition': definition,
     'csrfToken': csrf_token(),
     'apiBase': url_for('reports.api_create_report').rsplit('/api', 1)[0] + '/api',
-    'viewUrl': url_for('reports.reports_view', report_id=report.id) if report else none
+    'viewUrl': url_for('reports.reports_view', report_id=report.id) if report else none,
+    'gridstackJs': static_url('libs/gridstack/gridstack-all.js')
 }|tojson }}
 </script>
 <script type="module" src="{{ static_url('js/reports/builder/main.js') }}"></script>

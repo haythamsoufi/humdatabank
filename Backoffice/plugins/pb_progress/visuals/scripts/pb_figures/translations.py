@@ -64,7 +64,20 @@ def _parse_section_order_rows(rows: list[dict[str, object]]) -> tuple[dict[str, 
         order = row.get("order")
         if not part or not section or order is None or (isinstance(order, float) and pd.isna(order)):
             continue
-        order_int = int(order)
+        try:
+            order_float = float(order)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Section order value {order!r} for section {section!r} in part {part!r} "
+                "is not a number."
+            ) from exc
+        if not order_float.is_integer():
+            raise ValueError(
+                f"Section order value {order!r} for section {section!r} in part {part!r} "
+                "must be a whole number, not a fraction — fix the source row instead of "
+                "silently truncating it."
+            )
+        order_int = int(order_float)
         parsed.setdefault(part, []).append((order_int, section))
         part_min_order[part] = min(part_min_order.get(part, order_int), order_int)
 

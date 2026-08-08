@@ -1,0 +1,22 @@
+<div id="rb-style-props-empty" class="report-props-empty">
+    <i class="fas fa-palette" aria-hidden="true"></i>
+    <p>{{ _('Select a widget to edit colors, number format, and conditional formatting.') }}</p>
+</div>
+
+<div id="rb-style-props-form" class="hidden">
+    <section class="report-panel-section">
+        <h4 class="report-panel-heading"><i class="fas fa-palette" aria-hidden="true"></i>{{ _('Visual style') }}</h4>
+        <label class="report-field">
+            <span>{{ _('Primary color') }}</span>
+            <input type="color" id="rb-widget-color" class="form-control" value="#0d9488">
+        </label>
+        <label class="report-field">
+            <span>{{ _('Number format') }}</span>
+            <input type="text" id="rb-widget-number-format" class="form-control" placeholder="{{ _('e.g. 0,0.00') }}">
+        </label>
+        <label class="report-field inline-flex items-center gap-2">
+            <input type="checkbox" id="rb-widget-show-legend">
+            <span>{{ _('Show legend') }}</span>
+        </label>
+    </section>
+</div>

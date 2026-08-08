@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request, send_file
+from flask import Blueprint, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 import io
 
@@ -117,7 +117,11 @@ def api_create_report():
     if csrf_error:
         return csrf_error
     payload = get_json_safe() or {}
+    from app.services.reports.sanitize_service import sanitize_definition
+
     try:
+        if payload.get("definition") is not None:
+            payload["definition"] = sanitize_definition(payload["definition"])
         report = ReportDefinitionService.create_report(
             current_user,
             title=payload.get("title") or "Untitled report",
@@ -153,7 +157,11 @@ def api_update_report(report_id: int):
     if csrf_error:
         return csrf_error
     payload = get_json_safe() or {}
+    from app.services.reports.sanitize_service import sanitize_definition
+
     try:
+        if payload.get("definition") is not None:
+            payload["definition"] = sanitize_definition(payload["definition"])
         report = ReportDefinitionService.update_report(
             report_id,
             current_user,
@@ -208,15 +216,158 @@ def api_run_report(report_id: int):
     if denied:
         return denied
     payload = get_json_safe() or {}
+    language = payload.get("language") or request.args.get("language")
     try:
         result = ReportDataService.execute_report(
             report_id,
             current_user,
             runtime_overrides=payload.get("filters"),
+            language=language,
         )
         return json_ok(**result)
     except ReportDefinitionError:
         return json_not_found("Report not found")
+
+
+@bp.route("/api/preview", methods=["POST"])
+@login_required
+@permission_required(REPORTS_EDIT)
+def api_preview_report():
+    csrf_error = _csrf_guard()
+    if csrf_error:
+        return csrf_error
+    from app.services.reports.sanitize_service import sanitize_definition
+
+    payload = get_json_safe() or {}
+    definition = sanitize_definition(payload.get("definition") or {})
+    try:
+        result = ReportDataService.execute_preview(
+            current_user,
+            definition=definition,
+            widget=payload.get("widget"),
+            section=payload.get("section"),
+            runtime_overrides=payload.get("filters"),
+            language=payload.get("language"),
+            report_id=payload.get("report_id"),
+        )
+        return json_ok(**result)
+    except ReportDefinitionError as exc:
+        return json_forbidden(str(exc))
+
+
+@bp.route("/api/<int:report_id>/assets", methods=["POST"])
+@login_required
+@permission_required(REPORTS_EDIT)
+def api_upload_asset(report_id: int):
+    csrf_error = _csrf_guard()
+    if csrf_error:
+        return csrf_error
+    from app.services.platform import storage_service
+
+    try:
+        ReportDefinitionService.get_report(report_id, current_user)
+    except ReportDefinitionError:
+        return json_not_found("Report not found")
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return json_bad_request("file is required")
+    asset_key = f"{report_id}/assets/{file.filename}"
+    storage_service.upload("reports", asset_key, file.read())
+    return json_ok(asset_key=asset_key, url=url_for("reports.api_serve_asset", report_id=report_id, asset_key=asset_key))
+
+
+@bp.route("/api/<int:report_id>/assets/<path:asset_key>", methods=["GET"])
+@login_required
+def api_serve_asset(report_id: int, asset_key: str):
+    from app.services.platform import storage_service
+
+    denied = _forbidden_if_no_view()
+    if denied:
+        return denied
+    try:
+        ReportDefinitionService.get_report(report_id, current_user)
+    except ReportDefinitionError:
+        return json_not_found("Report not found")
+    data, content_type = storage_service.download("reports", asset_key)
+    return send_file(io.BytesIO(data), mimetype=content_type or "application/octet-stream")
+
+
+@bp.route("/api/<int:report_id>/revisions", methods=["GET"])
+@login_required
+def api_list_revisions(report_id: int):
+    from app.models import ReportDefinitionRevision
+
+    denied = _forbidden_if_no_view()
+    if denied:
+        return denied
+    try:
+        report = ReportDefinitionService.get_report(report_id, current_user)
+    except ReportDefinitionError:
+        return json_not_found("Report not found")
+    revisions = (
+        ReportDefinitionRevision.query.filter_by(report_id=report.id)
+        .order_by(ReportDefinitionRevision.created_at.desc())
+        .limit(25)
+        .all()
+    )
+    return json_ok(
+        revisions=[
+            {
+                "id": rev.id,
+                "created_at": rev.created_at.isoformat() if rev.created_at else None,
+                "note": rev.note,
+                "schema_version": rev.schema_version,
+            }
+            for rev in revisions
+        ]
+    )
+
+
+@bp.route("/api/<int:report_id>/revisions/<int:revision_id>/restore", methods=["POST"])
+@login_required
+@permission_required(REPORTS_EDIT)
+def api_restore_revision(report_id: int, revision_id: int):
+    csrf_error = _csrf_guard()
+    if csrf_error:
+        return csrf_error
+    try:
+        report = ReportDefinitionService.restore_revision(report_id, revision_id, current_user)
+        return json_ok(report=ReportDefinitionService.serialize(report))
+    except ReportDefinitionError as exc:
+        return json_forbidden(str(exc))
+
+
+@bp.route("/api/templates/gallery", methods=["GET"])
+@login_required
+def api_template_gallery():
+    from app.services.reports.template_gallery import default_report_templates, list_section_templates
+
+    denied = _forbidden_if_no_view()
+    if denied:
+        return denied
+    return json_ok(
+        report_templates=default_report_templates(),
+        section_templates=list_section_templates(),
+    )
+
+
+@bp.route("/<int:report_id>/print", methods=["GET"])
+@login_required
+def reports_print(report_id: int):
+    denied = _forbidden_if_no_view()
+    if denied:
+        return denied
+    try:
+        report = ReportDefinitionService.get_report(report_id, current_user)
+    except ReportDefinitionError:
+        return json_not_found("Report not found"), 404
+    language = request.args.get("language")
+    return render_template(
+        "admin/reports/print.html",
+        report=report,
+        definition=report.definition_json or {},
+        language=language,
+    )
 
 
 @bp.route("/api/<int:report_id>/widgets/<widget_id>/run", methods=["POST"])
@@ -229,12 +380,14 @@ def api_run_widget(report_id: int, widget_id: str):
     if denied:
         return denied
     payload = get_json_safe() or {}
+    language = payload.get("language") or request.args.get("language")
     try:
         result = ReportDataService.execute_widget_by_id(
             report_id,
             widget_id,
             current_user,
             runtime_overrides=payload.get("filters"),
+            language=language,
         )
         return json_ok(widget=result)
     except ReportDefinitionError:
@@ -252,21 +405,34 @@ def api_export_report(report_id: int):
         return denied
     payload = get_json_safe() or {}
     fmt = (payload.get("format") or "excel").strip().lower()
+    language = payload.get("language") or request.args.get("language")
     try:
         report = ReportDefinitionService.get_report(report_id, current_user)
         result = ReportDataService.execute_report(
             report_id,
             current_user,
             runtime_overrides=payload.get("filters"),
+            language=language,
         )
         if fmt == "pdf":
             chart_images = payload.get("chart_images") or {}
-            pdf_bytes = ReportExportService.export_pdf(report, result, chart_images=chart_images)
+            pdf_bytes = ReportExportService.export_pdf(report, result, chart_images=chart_images, language=language or "en")
+            suffix = f"-{language}" if language else ""
             return send_file(
                 io.BytesIO(pdf_bytes),
                 mimetype="application/pdf",
                 as_attachment=True,
-                download_name=f"{report.slug}.pdf",
+                download_name=f"{report.slug}{suffix}.pdf",
+            )
+        if fmt == "docx":
+            chart_images = payload.get("chart_images") or {}
+            docx_bytes = ReportExportService.export_docx(report, result, chart_images=chart_images, language=language or "en")
+            suffix = f"-{language}" if language else ""
+            return send_file(
+                io.BytesIO(docx_bytes),
+                mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                as_attachment=True,
+                download_name=f"{report.slug}{suffix}.docx",
             )
         xlsx_bytes = ReportExportService.export_excel(report, result)
         return send_file(
@@ -476,4 +642,5 @@ def api_metadata_indicator_rule_preview():
     rule = payload.get("rule") or payload
     full_list = bool(payload.get("full_list"))
     sample_limit = int(payload.get("sample_limit") or 8)
-    return json_ok(preview=preview_indicator_rule(rule, sample_limit=sample_limit, full_list=full_list))
+    group_by = payload.get("group_by")
+    return json_ok(preview=preview_indicator_rule(rule, sample_limit=sample_limit, full_list=full_list, group_by=group_by))

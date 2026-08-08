@@ -23,7 +23,7 @@ class ReportDefinition(db.Model):
         nullable=False,
         default=dict,
     )
-    schema_version = db.Column(db.Integer, nullable=False, default=1)
+    schema_version = db.Column(db.Integer, nullable=False, default=2)
     status = db.Column(db.String(32), nullable=False, default="draft", index=True)
     # draft | published | archived
 
@@ -90,3 +90,32 @@ class ReportRun(db.Model):
 
     def __repr__(self) -> str:
         return f"<ReportRun {self.id!r} report={self.report_id} status={self.status!r}>"
+
+
+class ReportDefinitionRevision(db.Model):
+    """Point-in-time snapshot of a report definition for rollback."""
+
+    __tablename__ = "report_definition_revision"
+
+    id = db.Column(db.Integer, primary_key=True)
+    report_id = db.Column(
+        db.Integer,
+        db.ForeignKey("report_definition.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    definition_json = db.Column(
+        db.JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+    )
+    schema_version = db.Column(db.Integer, nullable=False, default=2)
+    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    note = db.Column(db.String(255), nullable=True)
+
+    report = db.relationship("ReportDefinition", backref=db.backref("revisions", lazy="dynamic"))
+    created_by = db.relationship("User", foreign_keys=[created_by_id])
+
+    def __repr__(self) -> str:
+        return f"<ReportDefinitionRevision report={self.report_id} id={self.id}>"

@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from .config import treat_zero_as_missing
 from .languages import excel_text
 from .translations import section_title_for, t
 
@@ -59,7 +60,19 @@ _MISSING_VALUE_TOKENS = frozenset({"", "n/a", "na", "-", "none", "null"})
 
 
 def chartable_value(raw: object) -> float | None:
-    """Return a numeric indicator Value when it can be plotted, else None."""
+    """Return a numeric indicator Value when it can be plotted, else None.
+
+    NOTE ON value == 0: ported as-is from the original Tableau calculated field,
+    which also treated 0 as "no data" rather than a genuine zero — a real
+    ambiguity for hand-maintained Excel workbooks (data_source == "excel"), where
+    preparers have historically used a bare 0 as a placeholder for "not entered"
+    as well as for an actual zero, indistinguishable once the value reaches this
+    function. System-generated workbooks (data_source == "system") do NOT have
+    this ambiguity: db_source.py's _aggregate_indicator_years_for_template sums
+    FormData.numeric_value directly, so a genuine zero comes through as 0.0 and
+    "nothing reported" comes through as None — see
+    config.treat_zero_as_missing() for how that distinction is preserved here.
+    """
     if raw is None or (isinstance(raw, float) and math.isnan(raw)):
         return None
     if isinstance(raw, str):
@@ -70,7 +83,9 @@ def chartable_value(raw: object) -> float | None:
         value = float(raw)
     except (TypeError, ValueError):
         return None
-    if math.isnan(value) or value == 0:
+    if math.isnan(value):
+        return None
+    if value == 0 and treat_zero_as_missing():
         return None
     return value
 
@@ -352,10 +367,15 @@ def _format_millions_arabic(value: float) -> str:
 
 
 def format_value(value: float | int | None, unit: str | None, language: str = "English") -> str | None:
-    """Tableau [Formatted] calculation."""
+    """Tableau [Formatted] calculation.
+
+    See the value == 0 note on chartable_value() above — same "0 means no data
+    for Excel, real zero for system-generated" rule, kept in sync with it
+    intentionally via treat_zero_as_missing().
+    """
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return None
-    if value == 0:
+    if value == 0 and treat_zero_as_missing():
         return None
     if is_percentage_unit(unit):
         return _format_percentage(float(value))
@@ -367,10 +387,15 @@ def format_value(value: float | int | None, unit: str | None, language: str = "E
 
 
 def format_donut_value(value: float | int | None, unit: str | None, language: str = "English") -> str | None:
-    """Tableau [Formatted2] — used for Katya01 donut centre labels."""
+    """Tableau [Formatted2] — used for Katya01 donut centre labels.
+
+    See the value == 0 note on chartable_value() above — same "0 means no data
+    for Excel, real zero for system-generated" rule, kept in sync with it
+    intentionally via treat_zero_as_missing().
+    """
     if value is None or (isinstance(value, float) and math.isnan(value)):
         return None
-    if value == 0:
+    if value == 0 and treat_zero_as_missing():
         return None
     if is_percentage_unit(unit):
         return _format_percentage(float(value))

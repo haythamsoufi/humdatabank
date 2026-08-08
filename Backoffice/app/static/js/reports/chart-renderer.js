@@ -110,10 +110,85 @@ export async function renderPieChart(container, payload) {
     const normalized = normalizePieChartPayload(payload);
     if (!normalized) return null;
     const ApexCharts = await ensureApexCharts();
+    const colors = payload.chart_options?.colors;
     const chart = new ApexCharts(container, {
         chart: { type: 'pie', height: 300 },
+        colors: colors,
         labels: normalized.slices.map(function (s) { return s.label; }),
-        series: normalized.slices.map(function (s) { return s.value; })
+        series: normalized.slices.map(function (s) { return s.value; }),
+        legend: { show: payload.chart_options?.show_legend !== false }
+    });
+    await chart.render();
+    return chart;
+}
+
+export async function renderAreaChart(container, payload) {
+    const normalized = normalizeChartPayload(payload);
+    if (!normalized) return null;
+    container.innerHTML = '';
+    container.className = 'report-line-chart-host';
+    const categories = normalized.series.map(function (p) { return String(p.x); });
+    const values = normalized.series.map(function (p) { return p.y; });
+    const ApexCharts = await ensureApexCharts();
+    const chart = new ApexCharts(container, {
+        chart: { type: 'area', height: 280, toolbar: { show: false } },
+        series: [{ name: normalized.metric || 'Value', data: values }],
+        colors: payload.chart_options?.colors || ['#0d9488'],
+        xaxis: { categories: categories },
+        stroke: { curve: 'smooth', width: 2 },
+        dataLabels: { enabled: false }
+    });
+    await chart.render();
+    return chart;
+}
+
+export async function renderScatterChart(container, payload) {
+    const chartPayload = payload.chart_payload || {};
+    const points = chartPayload.points || (chartPayload.series || []).map(function (p) { return { x: p.x, y: p.y }; });
+    if (!points.length) return null;
+    const ApexCharts = await ensureApexCharts();
+    const chart = new ApexCharts(container, {
+        chart: { type: 'scatter', height: 300, toolbar: { show: false } },
+        series: [{ name: chartPayload.metric || 'Value', data: points.map(function (p) { return [p.x, p.y]; }) }],
+        colors: payload.chart_options?.colors || ['#0d9488']
+    });
+    await chart.render();
+    return chart;
+}
+
+export async function renderComboChart(container, payload) {
+    const chartPayload = payload.chart_payload || {};
+    const bars = chartPayload.bars || chartPayload.categories || [];
+    const line = chartPayload.line || chartPayload.series || [];
+    if (!bars.length && !line.length) return renderBarChart(container, payload);
+    const ApexCharts = await ensureApexCharts();
+    const chart = new ApexCharts(container, {
+        chart: { height: 320, toolbar: { show: false } },
+        series: [
+            { name: 'Bars', type: 'column', data: bars.map(function (c) { return c.value; }) },
+            { name: 'Line', type: 'line', data: line.map(function (p) { return p.y; }) }
+        ],
+        labels: bars.map(function (c) { return c.label || c.x; }),
+        colors: payload.chart_options?.colors || ['#0d9488', '#6366f1'],
+        stroke: { width: [0, 3] }
+    });
+    await chart.render();
+    return chart;
+}
+
+export async function renderGaugeChart(container, payload) {
+    const value = Number(payload.value ?? payload.chart_payload?.value ?? 0);
+    const ApexCharts = await ensureApexCharts();
+    const chart = new ApexCharts(container, {
+        chart: { type: 'radialBar', height: 280 },
+        series: [Math.max(0, Math.min(100, value))],
+        plotOptions: {
+            radialBar: {
+                hollow: { size: '55%' },
+                dataLabels: { value: { formatter: function (v) { return Math.round(v) + '%'; } } }
+            }
+        },
+        colors: payload.chart_options?.colors || ['#0d9488']
     });
     await chart.render();
     return chart;

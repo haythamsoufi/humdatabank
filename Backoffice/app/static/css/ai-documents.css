@@ -663,6 +663,48 @@
     display: none;
 }
 
+#processingStatusBanner .floating-progress-banner-minimize-btn:hover,
+#processingStatusBanner .floating-progress-banner-minimize-btn:focus-visible,
+#processingStatusBanner .floating-progress-banner-restore-btn:hover,
+#processingStatusBanner .floating-progress-banner-restore-btn:focus-visible {
+    color: rgba(255, 255, 255, 0.95);
+    outline: none;
+}
+
+#processingStatusBanner.is-minimized {
+    top: auto;
+    right: auto;
+    bottom: 1.25rem;
+    left: 1.25rem;
+    width: 17rem !important;
+    max-width: calc(100vw - 2.5rem);
+}
+
+#processingStatusBanner.is-minimized .floating-progress-banner-spinner {
+    display: none;
+}
+
+#processingStatusBanner.is-minimized .ai-floating-progress-footer {
+    display: none;
+}
+
+#processingStatusBanner.is-minimized .floating-progress-banner-progress {
+    margin-top: 0.375rem;
+    height: 3px;
+}
+
+#processingStatusBanner.is-minimized .floating-progress-banner-progress > div[id] {
+    height: 3px;
+}
+
+@media (max-width: 480px) {
+    #processingStatusBanner.is-minimized {
+        left: 1rem;
+        bottom: 1rem;
+        width: calc(100vw - 2rem) !important;
+    }
+}
+
 /* Floating progress banner — per-document rows */
 .ai-docs-progress-doc-toggle {
     border: none;
@@ -679,6 +721,26 @@
 .ai-docs-progress-doc-list {
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     padding-top: 0.375rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.32) rgba(255, 255, 255, 0.08);
+}
+
+.ai-docs-progress-doc-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.ai-docs-progress-doc-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+}
+
+.ai-docs-progress-doc-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.28);
+    border-radius: 3px;
+}
+
+.ai-docs-progress-doc-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.42);
 }
 
 .ai-docs-progress-doc-list:not(.hidden) {

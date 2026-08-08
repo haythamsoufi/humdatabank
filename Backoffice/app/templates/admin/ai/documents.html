@@ -57,6 +57,11 @@
     cancel_button_id='processingStatusCancelBtn',
     cancel_button_label=_('Cancel'),
     cancel_button_aria_label=_('Cancel import'),
+    minimize_button_id='processingStatusMinimizeBtn',
+    restore_button_id='processingStatusRestoreBtn',
+    minimize_button_aria_label=_('Minimize'),
+    restore_button_aria_label=_('Restore'),
+    minimize_button_title=_('Minimize — processing keeps running in background'),
     width='20rem'
 ) }}
 
@@ -518,15 +523,6 @@
 
     <div class="p-3 sm:p-4 md:p-6 relative min-w-0 overflow-hidden">
         {{ ag_grid_container('documentsGrid', loading_text=_('Loading documents...'), show_placeholder=false, grid_height='600px', include_card=false, empty_message=_('No documents found. Upload a document to get started.')) }}
-        <div id="documentsGrid-pagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200 pt-4">
-            <button type="button" id="documentsGrid-page-prev" class="btn btn-secondary btn-sm order-2 sm:order-1">
-                <i class="fas fa-chevron-left mr-1"></i>{{ _('Previous') }}
-            </button>
-            <span id="documentsGrid-page-label" class="text-sm text-gray-600 order-1 sm:order-2 text-center"></span>
-            <button type="button" id="documentsGrid-page-next" class="btn btn-secondary btn-sm order-3">
-                {{ _('Next') }}<i class="fas fa-chevron-right ml-1"></i>
-            </button>
-        </div>
     </div>
 </div>
 
@@ -545,7 +541,6 @@
 <script nonce="{{ csp_nonce() }}">
 window.aiDocumentsConfig = window.aiDocumentsConfig || {};
 window.aiDocumentsConfig.debug = {{ config.DEBUG | default(false) | tojson }};
-window.aiDocumentsConfig.perPage = 50;
 window.aiDocumentsConfig.urls = {
   importSystemBulk: {{ url_for('ai_management.import_system_bulk')|tojson }},
   importSystemBulkStatus: {{ url_for('ai_management.import_system_bulk_status', job_id='__JOB__')|tojson }},

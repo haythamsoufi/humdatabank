@@ -7,10 +7,12 @@ import pytest
 
 from databank_client import (
     DatabankAPIError,
+    get_country_report,
     get_public_data_page,
     get_public_document,
     get_public_documents_catalog,
     get_public_global_trend,
+    get_report_template,
     get_submission_coverage,
     resolve_public_country,
     resolve_public_indicator,
@@ -236,3 +238,74 @@ class TestResolvePublicCountry:
             mock_get.return_value = mock_resp
             resolve_public_country("Kenya", limit=100)
             assert mock_get.call_args[1]["params"]["limit"] == 20
+
+
+class TestGetCountryReport:
+    def test_requires_country(self):
+        with pytest.raises(DatabankAPIError, match="country is required"):
+            get_country_report("   ")
+
+    def test_calls_public_endpoint_with_defaults(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True, "country": {"id": 1, "name": "Syria"}}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            out = get_country_report("Syria")
+            assert "/public/reports/country" in mock_get.call_args[0][0]
+            params = mock_get.call_args[1]["params"]
+            assert params["country"] == "Syria"
+            assert params["report_type"] == "combined"
+            assert params["include_prior_period"] == "true"
+            assert "period_hint" not in params
+            assert "template_style" not in params
+            assert out["country"]["name"] == "Syria"
+
+    def test_passes_optional_params(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            get_country_report(
+                "Syria",
+                period_hint="2026 midyear",
+                report_type="fdrs",
+                include_prior_period=False,
+                template_style="default",
+            )
+            params = mock_get.call_args[1]["params"]
+            assert params["period_hint"] == "2026 midyear"
+            assert params["report_type"] == "fdrs"
+            assert params["include_prior_period"] == "false"
+            assert params["template_style"] == "default"
+
+
+class TestGetReportTemplate:
+    def test_calls_public_endpoint_with_default_style(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": True, "style": "default"}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            out = get_report_template()
+            assert "/public/reports/template" in mock_get.call_args[0][0]
+            assert mock_get.call_args[1]["params"]["style"] == "default"
+            assert out["style"] == "default"
+
+    def test_passes_custom_style(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"ok": False, "available_styles": ["default"]}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            get_report_template("fancy")
+            assert mock_get.call_args[1]["params"]["style"] == "fancy"

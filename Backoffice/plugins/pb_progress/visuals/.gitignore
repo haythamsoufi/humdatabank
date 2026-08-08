@@ -13,6 +13,9 @@ report/_body.qmd
 report/_freeze/
 report/.quarto/
 
+# Local debugging output (never intended for version control)
+_debug_figures/
+
 # Excel temp / lock copies
 ~$*.xlsx
 *_build.xlsx

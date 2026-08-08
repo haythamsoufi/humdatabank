@@ -6,7 +6,10 @@ import base64
 from functools import lru_cache
 from pathlib import Path
 
-FONTS_DIR = Path(__file__).resolve().parents[2] / "report" / "fonts"
+FONTS_DIR = Path(__file__).resolve().parents[5] / "app" / "static" / "fonts"
+_LEGACY_FONTS_DIR = Path(__file__).resolve().parents[2] / "report" / "fonts"
+if not FONTS_DIR.exists():
+    FONTS_DIR = _LEGACY_FONTS_DIR
 _FONT_SPECS: dict[str, dict[int, Path]] = {
     "Tajawal": {
         400: FONTS_DIR / "Tajawal-Regular.ttf",

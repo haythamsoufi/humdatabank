@@ -43,6 +43,15 @@ class AccountNotificationPreferences {
             }
         } catch (error) {
             console.error('Error loading notification preferences:', error);
+            const banner = document.getElementById('notification-preferences-load-error');
+            if (banner) {
+                banner.textContent = 'Could not load notification preferences. Refresh the page and try again.';
+                banner.classList.remove('hidden');
+            } else if (window.showAlert) {
+                window.showAlert('Could not load notification preferences. Refresh the page and try again.', 'error');
+            }
+            const saveBtn = document.getElementById('save-preferences');
+            if (saveBtn) saveBtn.disabled = true;
         }
     }
 

@@ -1,4 +1,4 @@
-"""Background publish jobs for static report artifacts."""
+"""Background publish jobs for static report artifacts (multilingual)."""
 
 from __future__ import annotations
 
@@ -14,12 +14,13 @@ from app.models import ReportDefinition, ReportRun, User
 from app.services.platform import storage_service
 from app.services.reports.data_service import ReportDataService
 from app.services.reports.export_service import ReportExportService
+from app.services.reports.schema import migrate_v1_to_v2
 from app.utils.datetime_helpers import utcnow
 
 logger = logging.getLogger(__name__)
 
 STORAGE_CATEGORY = "reports"
-BUILD_STAGES = ("preparing", "rendering_widgets", "html", "pdf", "saving")
+BUILD_STAGES = ("preparing", "rendering_widgets", "rasterizing", "html", "pdf", "docx", "saving")
 
 
 class ReportBuildService:
@@ -82,30 +83,59 @@ class ReportBuildService:
                 db.session.commit()
 
                 user = db.session.get(User, user_id)
-                run.build_stage = BUILD_STAGES[1]
-                db.session.commit()
-                result = ReportDataService.execute_report(report_id, user)
-
-                run.build_stage = BUILD_STAGES[2]
-                db.session.commit()
                 report = db.session.get(ReportDefinition, report_id)
-                html_key = f"{report_id}/{run_id}/report.html"
-                pdf_key = f"{report_id}/{run_id}/report.pdf"
+                definition = migrate_v1_to_v2(report.definition_json or {})
+                languages = definition.get("languages") or ["en"]
+                output_paths: dict[str, dict[str, str]] = {}
 
-                run.build_stage = BUILD_STAGES[3]
+                for lang in languages:
+                    run.build_stage = BUILD_STAGES[1]
+                    db.session.commit()
+                    result = ReportDataService.execute_report(report_id, user, language=lang)
+
+                    run.build_stage = BUILD_STAGES[2]
+                    db.session.commit()
+                    chart_images = ReportExportService.rasterize_charts_headless(report_id, lang, user)
+
+                    run.build_stage = BUILD_STAGES[4]
+                    db.session.commit()
+                    pdf_bytes = ReportExportService.export_pdf(
+                        report,
+                        result,
+                        chart_images=chart_images,
+                        language=lang,
+                    )
+                    pdf_key = f"{report_id}/{run_id}/{lang}/report.pdf"
+                    storage_service.upload(STORAGE_CATEGORY, pdf_key, pdf_bytes)
+
+                    run.build_stage = BUILD_STAGES[5]
+                    db.session.commit()
+                    docx_bytes = ReportExportService.export_docx(report, result, chart_images=chart_images, language=lang)
+                    docx_key = f"{report_id}/{run_id}/{lang}/report.docx"
+                    storage_service.upload(STORAGE_CATEGORY, docx_key, docx_bytes)
+
+                    run.build_stage = BUILD_STAGES[3]
+                    db.session.commit()
+                    html_bytes = ReportExportService.export_html(report, result, chart_images=chart_images, language=lang)
+                    html_key = f"{report_id}/{run_id}/{lang}/report.html"
+                    storage_service.upload(STORAGE_CATEGORY, html_key, html_bytes)
+
+                    excel_bytes = ReportExportService.export_excel(report, result)
+                    xlsx_key = f"{report_id}/{run_id}/{lang}/report.xlsx"
+                    storage_service.upload(STORAGE_CATEGORY, xlsx_key, excel_bytes)
+
+                    output_paths[lang] = {
+                        "pdf": pdf_key,
+                        "docx": docx_key,
+                        "html": html_key,
+                        "excel": xlsx_key,
+                    }
+
+                run.build_stage = BUILD_STAGES[6]
                 db.session.commit()
-                pdf_bytes = ReportExportService.export_pdf(report, result)
-
-                run.build_stage = BUILD_STAGES[4]
-                db.session.commit()
-                storage_service.upload(STORAGE_CATEGORY, pdf_key, pdf_bytes)
-                excel_bytes = ReportExportService.export_excel(report, result)
-                xlsx_key = f"{report_id}/{run_id}/report.xlsx"
-                storage_service.upload(STORAGE_CATEGORY, xlsx_key, excel_bytes)
-
                 run.status = "completed"
                 run.build_stage = "done"
-                run.output_paths = {"pdf": pdf_key, "excel": xlsx_key, "html": html_key}
+                run.output_paths = output_paths
                 run.finished_at = utcnow()
                 db.session.commit()
             except Exception as exc:

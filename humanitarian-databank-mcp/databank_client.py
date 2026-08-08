@@ -310,3 +310,37 @@ def get_public_data_all_pages(
             f"(max_pages={cap}). Narrow filters or increase max_pages."
         )
     return out
+
+
+def get_country_report(
+    country: str,
+    *,
+    period_hint: str = "",
+    report_type: str = "combined",
+    include_prior_period: bool = True,
+    template_style: str = "",
+) -> Dict[str, Any]:
+    """One-country report spec (headline KPIs + trend + cited narrative) via GET /public/reports/country.
+
+    Thin proxy — all orchestration (period resolution, KPI fetch, narrative search) lives
+    server-side in Backoffice's ``public_report_service`` so the MCP and Custom GPT Actions
+    share one implementation instead of two independently maintained copies.
+    """
+    raw = (country or "").strip()
+    if not raw:
+        raise DatabankAPIError("country is required")
+    params: Dict[str, Any] = {
+        "country": raw,
+        "report_type": (report_type or "combined").strip() or "combined",
+        "include_prior_period": "true" if include_prior_period else "false",
+    }
+    if period_hint.strip():
+        params["period_hint"] = period_hint.strip()
+    if template_style.strip():
+        params["template_style"] = template_style.strip()
+    return _get("/public/reports/country", params)
+
+
+def get_report_template(style: str = "default") -> Dict[str, Any]:
+    """HTML/CSS one-pager skeleton plus design tokens via GET /public/reports/template."""
+    return _get("/public/reports/template", {"style": (style or "default").strip() or "default"})

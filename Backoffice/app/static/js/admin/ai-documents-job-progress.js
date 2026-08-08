@@ -64,6 +64,7 @@
     hideTimer: null,
     standaloneMode: false,
     docListExpanded: false,
+    bannerMinimized: false,
     optimisticJob: false,
   };
 
@@ -465,6 +466,23 @@
     }).join('');
   }
 
+  function applyBannerMinimizedUI(opts) {
+    opts = opts || {};
+    var b = state.bannerEls;
+    if (opts.terminalComplete && state.bannerMinimized) {
+      state.bannerMinimized = false;
+    }
+    if (b.banner) {
+      b.banner.classList.toggle('is-minimized', !!state.bannerMinimized);
+    }
+    if (b.minimizeBtn) {
+      b.minimizeBtn.classList.toggle('hidden', !!opts.terminalComplete || !!state.bannerMinimized);
+    }
+    if (b.restoreBtn) {
+      b.restoreBtn.classList.toggle('hidden', !state.bannerMinimized);
+    }
+  }
+
   function renderBannerState(opts) {
     opts = opts || {};
     if (!opts.preserveHideTimer && !isJobTerminalDisplay() && !opts.terminalComplete) {
@@ -549,6 +567,7 @@
         listEl.classList.add('hidden');
       }
     }
+    applyBannerMinimizedUI(opts);
   }
 
   function showBanner(title, detail, progress, opts) {
@@ -567,6 +586,16 @@
     if (state.hideTimer) {
       clearTimeout(state.hideTimer);
       state.hideTimer = null;
+    }
+    state.bannerMinimized = false;
+    if (state.bannerEls.banner) {
+      state.bannerEls.banner.classList.remove('is-minimized');
+    }
+    if (state.bannerEls.restoreBtn) {
+      state.bannerEls.restoreBtn.classList.add('hidden');
+    }
+    if (state.bannerEls.minimizeBtn) {
+      state.bannerEls.minimizeBtn.classList.remove('hidden');
     }
     if (state.bannerEls.docList) {
       state.bannerEls.docList.innerHTML = '';
@@ -1114,6 +1143,8 @@
       spinner: document.getElementById('processingStatusSpinner'),
       cancelWrap: document.getElementById('processingStatusCancelWrap'),
       cancelBtn: document.getElementById('processingStatusCancelBtn'),
+      minimizeBtn: document.getElementById('processingStatusMinimizeBtn'),
+      restoreBtn: document.getElementById('processingStatusRestoreBtn'),
     };
 
     var cancelBtn = state.bannerEls.cancelBtn;
@@ -1129,6 +1160,27 @@
       docListToggle.dataset.aiDocsProgressBound = '1';
       docListToggle.addEventListener('click', function () {
         state.docListExpanded = !state.docListExpanded;
+        renderFromState();
+      });
+    }
+
+    var minimizeBtn = state.bannerEls.minimizeBtn;
+    if (minimizeBtn && !minimizeBtn.dataset.aiDocsProgressBound) {
+      minimizeBtn.dataset.aiDocsProgressBound = '1';
+      minimizeBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        state.bannerMinimized = true;
+        state.docListExpanded = false;
+        renderFromState();
+      });
+    }
+
+    var restoreBtn = state.bannerEls.restoreBtn;
+    if (restoreBtn && !restoreBtn.dataset.aiDocsProgressBound) {
+      restoreBtn.dataset.aiDocsProgressBound = '1';
+      restoreBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        state.bannerMinimized = false;
         renderFromState();
       });
     }

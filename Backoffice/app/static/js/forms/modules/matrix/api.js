@@ -18,6 +18,68 @@ export function mhFetch(url, opts = {}) {
     return fn(url, opts);
 }
 
+const GATEWAY_FAILURE_STATUSES = new Set([403, 502, 503, 504]);
+
+export function isGatewayClassFailure(status) {
+    return GATEWAY_FAILURE_STATUSES.has(Number(status));
+}
+
+export function isGatewayClassError(error) {
+    if (!error) return false;
+    if (isGatewayClassFailure(error.status)) return true;
+    const msg = String(error.message || '');
+    return /Unexpected token '<'/i.test(msg) || /non-JSON response/i.test(msg) || /Invalid JSON response/i.test(msg);
+}
+
+export function gatewayFailureMessage(status) {
+    const code = Number(status);
+    if (code === 403) return _t('Request was rejected. Refresh the page and try again.');
+    if (code === 502 || code === 503) return _t('Server is temporarily unavailable. Please try again in a moment.');
+    if (code === 504) return _t('Request timed out. Please try again.');
+    return _t('Network error. Please refresh and try again.');
+}
+
+export async function mhResponseAsResult(response) {
+    if (typeof window !== 'undefined' && typeof window.responseAsResult === 'function') {
+        return window.responseAsResult(response);
+    }
+    if (!response.ok) {
+        const msg = `HTTP ${response.status}: ${response.statusText || 'Unknown error'}`;
+        const errBody = { error: msg };
+        return { ok: false, status: response.status, data: errBody, payload: errBody };
+    }
+    const ct = response.headers.get('Content-Type') || '';
+    if (!ct.includes('application/json')) {
+        const errBody = { error: 'Non-JSON response' };
+        return { ok: false, status: response.status, data: errBody, payload: errBody };
+    }
+    try {
+        const body = await response.json();
+        return { ok: true, status: response.status, data: body, payload: body };
+    } catch (_) {
+        const errBody = { error: 'Invalid JSON response' };
+        return { ok: false, status: response.status, data: errBody, payload: errBody };
+    }
+}
+
+function mhHttpError(result) {
+    const message = (result.data && result.data.error) || gatewayFailureMessage(result.status);
+    const err = new Error(message);
+    err.status = result.status;
+    err.response = result.response;
+    return err;
+}
+
+/** mhFetch + safe JSON parse (Content-Type guard, bounded gateway errors). */
+export async function mhFetchJson(url, opts = {}) {
+    const response = await mhFetch(url, opts);
+    const result = await mhResponseAsResult(response);
+    if (!result.ok) {
+        throw mhHttpError(result);
+    }
+    return result.data;
+}
+
 export const MATRIX_SEARCH_OPTIONS_FETCH_LIMIT = 5000;
 // Cap on how many matching rows we render in the dropdown at once (mirrors the
 // server's previous default limit so very large lookup lists don't flood the DOM).
@@ -77,7 +139,7 @@ async _fetchMatrixSearchOptionsCached(lookupListId, displayColumn, filters, plug
             requestBody.plugin_config = pluginConfig;
         }
 
-        const response = await mhFetch('/forms/matrix/search-rows', {
+        const data = await mhFetchJson('/forms/matrix/search-rows', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -85,12 +147,6 @@ async _fetchMatrixSearchOptionsCached(lookupListId, displayColumn, filters, plug
             },
             body: JSON.stringify(requestBody)
         });
-
-        if (!response.ok) {
-            throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
         if (!data.success) {
             throw new Error(data.message || _t('Error loading options'));
         }
@@ -386,14 +442,14 @@ async resolveRowIdsToNames(rowInfoMap, lookupListId, displayColumn) {
 
     try {
         // Fetch all options from the lookup list to resolve IDs to names
-        const response = await mhFetch(`/api/forms/lookup-lists/${lookupListId}/options?filters=[]`, {
+        const result = await mhResponseAsResult(await mhFetch(`/api/forms/lookup-lists/${lookupListId}/options?filters=[]`, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
             }
-        });
+        }));
 
-        if (response.ok) {
-            const json = await response.json();
+        if (result.ok) {
+            const json = result.data;
             if (json.success && json.rows) {
                 // Create a map of ID -> name and full row data
                 const idToNameMap = new Map();
@@ -570,7 +626,7 @@ async resolveVariablesForAllRows(fieldId) {
             requestBody.row_entity_ids = rowEntityIds;
 
             // Call batch API
-            const response = await mhFetch('/api/v1/variables/resolve', {
+            const data = await mhFetchJson('/api/v1/variables/resolve', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -578,17 +634,6 @@ async resolveVariablesForAllRows(fieldId) {
                 },
                 body: JSON.stringify(requestBody)
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                debugError('matrix-handler', '[BATCH VARIABLE RESOLUTION] API error', {
-                    status: response.status,
-                    errorText
-                });
-                throw (window.httpErrorSync && window.httpErrorSync(response, `API error: ${response.status} ${response.statusText} - ${errorText}`)) || new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            const data = await response.json();
             batchResults = data.results || {};
         }
 
@@ -608,7 +653,16 @@ async resolveVariablesForAllRows(fieldId) {
             error,
             message: error.message
         });
-        // Fallback to individual resolution if batch fails
+        if (isGatewayClassError(error)) {
+            const msg = gatewayFailureMessage(error.status) || error.message;
+            if (typeof this.showMatrixError === 'function') {
+                this.showMatrixError(fieldId, msg);
+            } else if (window.showAlert) {
+                window.showAlert(msg, 'error');
+            }
+            return;
+        }
+        // Fallback to individual resolution only for non-gateway failures
         for (const rowInfo of rowsToResolve) {
             await this.resolveVariablesForRow(fieldId, rowInfo.rowId, null);
         }
@@ -755,25 +809,13 @@ async resolveVariablesForRow(fieldId, rowEntityId, rowData = null) {
         });
 
         // Call API to resolve variables
-        const response = await mhFetch('/api/v1/variables/resolve', {
+        const data = await mhFetchJson('/api/v1/variables/resolve', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestBody)
         });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            debugError('matrix-handler', '[VARIABLE RESOLUTION] API error response', {
-                status: response.status,
-                statusText: response.statusText,
-                errorText
-            });
-            throw (window.httpErrorSync && window.httpErrorSync(response, `API error: ${response.status} ${response.statusText} - ${errorText}`)) || new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
-        }
-
-        const data = await response.json();
         const resolvedVariables = data.variables || {};
 
         this._applyResolvedVariablesToRow(fieldId, rowEntityId, rowElement, variableInputs, resolvedVariables);

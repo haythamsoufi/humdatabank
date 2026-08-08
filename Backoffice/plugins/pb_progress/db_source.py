@@ -863,9 +863,21 @@ def _years_for_template(template_id: int) -> list[str]:
     return sorted(years)
 
 
-def _aggregate_indicator_year(template_id: int, indicator_bank_id: int, year: str) -> dict[str, Any]:
-    """Per-indicator/year NS counts.
+def _aggregate_indicator_years_for_template(
+    template_id: int,
+) -> dict[int, list[tuple[str, dict[str, Any]]]]:
+    """Per-(indicator, period_name) NS counts for every indicator under one template.
 
+    Single grouped query for the whole template, instead of one query per
+    (indicator, year) pair — ``_build_final_rows`` used to call a per-pair
+    query in a nested loop, which meant hundreds of round trips for a full
+    mapping (indicators x years). Keyed by the raw ``period_name`` (not the
+    canonical year) because a "year" like ``"2023"`` can match several
+    distinct period_name values (e.g. ``"2023"``, ``"FY2023"``); callers use
+    ``_sum_matching_periods`` to reproduce the original per-call ``==`` /
+    ``ILIKE '%year%'`` matching against those raw values.
+
+    Per-row semantics (unchanged from the old per-pair query):
     ``implementing`` = NSs that reported into this data-collection round for this
     indicator: a real value (incl. 0) OR an explicit "applicable, data not available"
     flag. Mirrors the legacy Excel/Power Query semantics, where data-not-available
@@ -874,8 +886,10 @@ def _aggregate_indicator_year(template_id: int, indicator_bank_id: int, year: st
     ``reported_count`` (-> Final "Count") = the narrower subset that reported an
     actual value greater than zero.
     """
-    base = (
+    rows = (
         db.session.query(
+            FormItem.indicator_bank_id,
+            AssignedForm.period_name,
             func.sum(FormData.numeric_value).label("total_value"),
             func.count(FormData.id)
             .filter(
@@ -893,24 +907,44 @@ def _aggregate_indicator_year(template_id: int, indicator_bank_id: int, year: st
         .join(AssignmentEntityStatus, AssignmentEntityStatus.id == FormData.assignment_entity_status_id)
         .join(AssignedForm, AssignedForm.id == AssignmentEntityStatus.assigned_form_id)
         .filter(
-            FormItem.indicator_bank_id == indicator_bank_id,
             FormItem.template_id == template_id,
             AssignedForm.template_id == template_id,
             AssignmentEntityStatus.entity_type == "country",
-            or_(
-                AssignedForm.period_name == year,
-                AssignedForm.period_name.ilike(f"%{year}%"),
-            ),
             FormData.not_applicable.isnot(True),
         )
+        .group_by(FormItem.indicator_bank_id, AssignedForm.period_name)
+        .all()
     )
-    row = base.one()
-    total_value = row.total_value
-    return {
-        "value": float(total_value) if total_value is not None else None,
-        "implementing": int(row.implementing or 0),
-        "count": int(row.reported_count or 0),
-    }
+    by_indicator: dict[int, list[tuple[str, dict[str, Any]]]] = {}
+    for bank_id, period_name, total_value, implementing, reported_count in rows:
+        stats = {
+            "value": float(total_value) if total_value is not None else None,
+            "implementing": int(implementing or 0),
+            "count": int(reported_count or 0),
+        }
+        by_indicator.setdefault(bank_id, []).append((period_name or "", stats))
+    return by_indicator
+
+
+def _sum_matching_periods(periods: list[tuple[str, dict[str, Any]]], year: str) -> dict[str, Any]:
+    """Collapse per-period_name stats down to one (indicator, year) result.
+
+    Reproduces the original single-pair query's year filter
+    (``period_name == year OR period_name ILIKE '%year%'``) so a "year" like
+    ``"2023"`` still picks up every period_name that contains it.
+    """
+    total_value: float | None = None
+    implementing = 0
+    reported_count = 0
+    year_lower = year.lower()
+    for period_name, stats in periods:
+        if period_name != year and year_lower not in period_name.lower():
+            continue
+        if stats["value"] is not None:
+            total_value = (total_value or 0.0) + stats["value"]
+        implementing += stats["implementing"]
+        reported_count += stats["count"]
+    return {"value": total_value, "implementing": implementing, "count": reported_count}
 
 
 def _build_final_rows(mapping_config: list[dict[str, Any]], *, version: str) -> list[dict[str, Any]]:
@@ -923,6 +957,15 @@ def _build_final_rows(mapping_config: list[dict[str, Any]], *, version: str) -> 
         "UPR": set(_years_for_template(_upr_template_id())) & allowed_years,
         "Manual": set(),
     }
+
+    # Lazily fetched (and memoized) per template so a mapping made entirely of
+    # one source, or entirely Manual, doesn't pay for a query it never uses.
+    period_stats_by_template: dict[int, dict[int, list[tuple[str, dict[str, Any]]]]] = {}
+
+    def _period_stats(template_id: int) -> dict[int, list[tuple[str, dict[str, Any]]]]:
+        if template_id not in period_stats_by_template:
+            period_stats_by_template[template_id] = _aggregate_indicator_years_for_template(template_id)
+        return period_stats_by_template[template_id]
 
     for row in mapping_config:
         indicator_id = _normalize_id(row.get("id"))
@@ -960,8 +1003,9 @@ def _build_final_rows(mapping_config: list[dict[str, Any]], *, version: str) -> 
         bank_id = int(indicator_id) if indicator_id.isdigit() else None
         if bank_id is None:
             continue
+        indicator_periods = _period_stats(template_id).get(bank_id, [])
         for year in sorted(years_by_source.get(source, set())):
-            stats = _aggregate_indicator_year(template_id, bank_id, year)
+            stats = _sum_matching_periods(indicator_periods, year)
             if stats["value"] is None and stats["implementing"] == 0 and stats["count"] == 0:
                 continue
             final_rows.append(

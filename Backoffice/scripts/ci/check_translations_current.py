@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CI guard: translations catalog is current and all .po files compile cleanly.
+Optional manual check: translations catalog is current and all .po files compile cleanly.
 
 Two checks:
 

@@ -6,6 +6,7 @@
     "build:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --minify -c ./assets/tailwind.config.js",
     "watch:css": "npx tailwindcss -i ./app/static/css/input.css -o ./app/static/css/output.css --watch -c ./assets/tailwind.config.js",
     "vendor:tinymce": "node ./scripts/assets/vendor-tinymce.cjs",
+    "vendor:gridstack": "node ./scripts/assets/vendor-gridstack.cjs",
     "test:js": "vitest run",
     "test:js:watch": "vitest",
     "test:js:coverage": "vitest run --coverage"
@@ -13,6 +14,7 @@
   "dependencies": {
     "ag-grid-community": "^34.3.1",
     "exceljs": "^4.4.0",
+    "gridstack": "^11.3.0",
     "html2pdf.js": "^0.14.0",
     "jspdf": "^4.2.1",
     "postcss-cli": "^11.0.0"

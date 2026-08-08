@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 
 import pytest
 
@@ -347,6 +348,172 @@ class TestSearchPublicDocuments:
         assert out["chunks"] == []
         assert out["visibility"] == "public_only"
 
+    def test_country_filter_uses_scoped_per_document_search(self, app):
+        from unittest.mock import MagicMock, patch
+
+        public_doc = MagicMock()
+        public_doc.id = 16701
+
+        sample_rows = [
+            {
+                "chunk_id": 10,
+                "document_id": 16701,
+                "document_title": "Syria Unified Plan 2026",
+                "content": "Health, WASH, and shelter are priority focus areas.",
+                "combined_score": 0.91,
+            }
+        ]
+        calls: dict[str, Any] = {"hybrid_search": 0, "hybrid_search_per_document": 0}
+
+        class FakeStore:
+            def hybrid_search(self, **kwargs):
+                calls["hybrid_search"] += 1
+                return []
+
+            def hybrid_search_per_document(self, query_text, document_ids, **kwargs):
+                calls["hybrid_search_per_document"] += 1
+                assert document_ids == [16701]
+                assert kwargs["user_role"] == "public"
+                return sample_rows
+
+        with app.app_context():
+            from app.services import public_document_service as svc
+
+            original = svc.AIVectorStore
+            svc.AIVectorStore = FakeStore
+            try:
+                with patch.object(svc, "list_public_documents_in_scope", return_value=[public_doc]):
+                    with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda rows: rows):
+                        out = search_public_documents(
+                            "Syrian Arab Republic unified plan focus areas",
+                            country_id=167,
+                            top_k=5,
+                            min_score=0.25,
+                        )
+            finally:
+                svc.AIVectorStore = original
+
+        assert calls["hybrid_search"] == 0
+        assert calls["hybrid_search_per_document"] == 1
+        assert out["count"] == 1
+        assert out["chunks"][0]["content"].startswith("Health")
+
+    def test_country_scoped_search_returns_globally_top_scored_chunks(self, app):
+        """
+        Regression guard: hybrid_search_per_document returns chunks grouped/concatenated
+        per document (each group already sorted by score internally), NOT globally sorted
+        by score across documents. search_public_documents must re-sort before slicing to
+        top_k, otherwise it would silently return low-score chunks from a low-document-id
+        doc while dropping a much higher-scoring chunk from another in-scope document.
+        """
+        from unittest.mock import MagicMock, patch
+
+        doc_low_id = MagicMock()
+        doc_low_id.id = 101
+        doc_high_id = MagicMock()
+        doc_high_id.id = 205
+
+        # Concatenated in document_id order (as hybrid_search_per_document produces),
+        # NOT in score order: the best chunk (0.95) is second because doc 205 > doc 101.
+        per_document_rows = [
+            {
+                "chunk_id": 1,
+                "document_id": 101,
+                "document_title": "Low-relevance doc",
+                "content": "Only marginally related content.",
+                "combined_score": 0.30,
+            },
+            {
+                "chunk_id": 2,
+                "document_id": 205,
+                "document_title": "Highly relevant doc",
+                "content": "Exact answer to the query.",
+                "combined_score": 0.95,
+            },
+        ]
+
+        class FakeStore:
+            def hybrid_search(self, **kwargs):
+                return []
+
+            def hybrid_search_per_document(self, query_text, document_ids, **kwargs):
+                assert document_ids == [101, 205]
+                return per_document_rows
+
+        with app.app_context():
+            from app.services import public_document_service as svc
+
+            original = svc.AIVectorStore
+            svc.AIVectorStore = FakeStore
+            try:
+                with patch.object(
+                    svc, "list_public_documents_in_scope", return_value=[doc_low_id, doc_high_id]
+                ):
+                    with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda rows: rows):
+                        out = search_public_documents(
+                            "test query",
+                            country_id=167,
+                            top_k=1,
+                            min_score=0.25,
+                        )
+            finally:
+                svc.AIVectorStore = original
+
+        assert out["count"] == 1
+        assert out["chunks"][0]["document_id"] == 205
+        assert out["chunks"][0]["score"] == 0.95
+
+    def test_min_score_rejects_chunk_relying_only_on_source_boost(self, app):
+        """
+        A system-uploaded document gets a +0.25 source_boost in combined_score
+        (AIVectorStore._combine_search_results), independent of actual text relevance.
+        A chunk with ~zero vector/keyword similarity must not pass the public min_score
+        filter purely on that boost — otherwise near-irrelevant system-doc chunks leak
+        into results whenever min_score is at or below the boost size (the default
+        min_score=0.25 equals the boost exactly).
+        """
+        boost_only_row = {
+            "chunk_id": 1,
+            "document_id": 501,
+            "document_title": "Unrelated system upload",
+            "content": "Completely unrelated content that barely matched a stray keyword.",
+            "vector_score": 0.0,
+            "keyword_score": 0.02,
+            "source_boost": 0.25,
+            "combined_score": 0.0 * 0.7 + 0.02 * 0.3 + 0.25,  # 0.256 — clears min_score=0.25
+        }
+        genuine_row = {
+            "chunk_id": 2,
+            "document_id": 502,
+            "document_title": "Genuinely relevant doc",
+            "content": "This directly answers the query.",
+            "vector_score": 0.6,
+            "keyword_score": 0.5,
+            "source_boost": 0.0,
+            "combined_score": 0.6 * 0.7 + 0.5 * 0.3,  # 0.57
+        }
+
+        class FakeStore:
+            def hybrid_search(self, **kwargs):
+                return [boost_only_row, genuine_row]
+
+        with app.app_context():
+            from unittest.mock import patch
+
+            from app.services import public_document_service as svc
+
+            original = svc.AIVectorStore
+            svc.AIVectorStore = FakeStore
+            try:
+                with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda rows: rows):
+                    out = search_public_documents("unrelated query", top_k=5, min_score=0.25)
+            finally:
+                svc.AIVectorStore = original
+
+        returned_doc_ids = {c["document_id"] for c in out["chunks"]}
+        assert 502 in returned_doc_ids
+        assert 501 not in returned_doc_ids
+
     def test_api_route_returns_chunks(self, client, app):
         payload = {
             "query": "summarize focus areas in syria unified plan 2026",
@@ -463,6 +630,66 @@ class TestSearchPublicDocuments:
         assert out["chunks"][0]["document_title"] == "Kenya Unified Plan 2026"
         assert len(out["chunks"][0]["content"]) <= PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS + 1
         assert out["coverage"]["without_hits"][0]["document_title"] == "Nepal Unified Plan 2026"
+
+    def test_full_coverage_without_hits_checks_local_file_per_document(self, app, db_session):
+        """
+        Regression guard: for every in-scope document that has NO matching chunk
+        (without_hits), _document_scope_entry() must NOT call
+        _ai_document_has_local_file() (a storage existence check — a network round-trip
+        on Azure Blob) since that link is never used for uncited documents.
+        """
+        from unittest.mock import patch
+
+        with app.app_context():
+            # Distinct country_name per doc: prioritize_latest_documents_per_country
+            # groups by (country, document_type) and would otherwise collapse same-country
+            # docs down to the newest one, undercounting without_hits for this repro.
+            countries = ["Kenya", "Nepal", "Peru"]
+            docs = [
+                AIDocument(
+                    title=f"No-hit doc {i}",
+                    filename=f"nohit_{i}.pdf",
+                    file_type="pdf",
+                    is_public=True,
+                    searchable=True,
+                    processing_status=AIDocumentProcessingStatusValue.completed.value,
+                    country_name=countries[i],
+                    document_date=datetime.date(2026, 1, 1),
+                    storage_path=f"nohit_{i}.pdf",
+                )
+                for i in range(3)
+            ]
+            db_session.add_all(docs)
+            db_session.commit()
+            for d in docs:
+                db_session.refresh(d)
+
+        class FakeStore:
+            def hybrid_search_per_document(self, query_text, document_ids, **kwargs):
+                return []  # no hits for any in-scope document
+
+        with app.app_context():
+            from app.services import public_document_service as svc
+
+            original = svc.AIVectorStore
+            svc.AIVectorStore = FakeStore
+            try:
+                with patch.object(
+                    svc, "_ai_document_has_local_file", return_value=True
+                ) as mock_has_local:
+                    out = svc.search_public_documents(
+                        "migration",
+                        full_coverage=True,
+                        min_score=0.25,
+                    )
+            finally:
+                svc.AIVectorStore = original
+
+        assert out["coverage"]["documents_without_hits"] == 3
+        # without_hits documents are never cited, so resolving a download link for them
+        # (a storage/blob existence check — a network round-trip on Azure Blob) is wasted
+        # work. Must not be called at all for these entries.
+        mock_has_local.assert_not_called()
 
     def test_full_coverage_returns_all_relevant_chunks_per_document(self, app, db_session):
         with app.app_context():

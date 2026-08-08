@@ -1011,6 +1011,44 @@ class AIVectorStore:
             all_results.extend(combined[:chunks_per_doc])
         return all_results
 
+    def search_similar_per_document(
+        self,
+        query_text: str,
+        document_ids: List[int],
+        *,
+        chunks_per_doc: int = 20,
+        filters: Optional[Dict[str, Any]] = None,
+        user_id: Optional[int] = None,
+        user_role: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Vector-only counterpart to :meth:`hybrid_search_per_document`: top
+        ``chunks_per_doc`` similar chunks for EACH document, via a single batched
+        window-function query instead of one ``search_similar`` call per document_id.
+
+        Public wrapper around :meth:`_search_similar_per_document_with_embedding` so
+        callers needing ``search_mode="vector"`` semantics (no keyword blend) can avoid
+        the same N+1 pattern that :meth:`hybrid_search_per_document` was built to fix.
+        """
+        if not document_ids:
+            return []
+
+        vq = (query_text or "").strip()
+        if not vq:
+            return []
+
+        query_embedding, _ = self._get_cached_embedding(vq)
+        unique_doc_ids = sorted({int(d) for d in document_ids})
+
+        return self._search_similar_per_document_with_embedding(
+            query_embedding=query_embedding,
+            document_ids=unique_doc_ids,
+            chunks_per_doc=max(1, int(chunks_per_doc)),
+            filters=filters,
+            user_id=user_id,
+            user_role=user_role,
+        )
+
     def hybrid_search_per_document(
         self,
         query_text: str,

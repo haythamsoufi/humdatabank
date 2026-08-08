@@ -734,80 +734,35 @@ const columnDefs = [
     }
 ];
 
-const documentsGridPageState = {
-    currentPage: 1,
-    totalPages: 0,
-    totalRows: 0,
+const documentsGridState = {
     gridInitialized: false,
-    perPage: Number(cfg.perPage) > 0 ? Number(cfg.perPage) : 50,
 };
+
+/** Matches AgGridHelper paginationPageSizeSelector max; fetch all rows for client-side pagination. */
+const DOCUMENTS_GRID_FETCH_PER_PAGE = 10000;
 
 function getDocumentsGridListUrl() {
     return (cfg.urls && cfg.urls.documentsList) || '/api/ai/documents/';
 }
 
-function getDocumentsGridInitialPage() {
-    const sp = new URLSearchParams(window.location.search);
-    const p = parseInt(sp.get('page') || '1', 10);
-    return (isNaN(p) || p < 1) ? 1 : p;
+function getDocumentsGridFetchHeaders() {
+    return {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+    };
 }
 
-function replaceDocumentsGridUrlPage(page) {
-    try {
-        const u = new URL(window.location.href);
-        if (page <= 1) {
-            u.searchParams.delete('page');
-        } else {
-            u.searchParams.set('page', String(page));
-        }
-        window.history.replaceState({}, '', u.pathname + u.search + u.hash);
-    } catch (e) {
-        if (window.__clientWarn) window.__clientWarn('documents grid replaceState failed', e);
-    }
-}
-
-function updateDocumentsGridPaginationUi() {
-    const prev = document.getElementById('documentsGrid-page-prev');
-    const next = document.getElementById('documentsGrid-page-next');
-    const label = document.getElementById('documentsGrid-page-label');
-    const total = documentsGridPageState.totalRows != null ? documentsGridPageState.totalRows : 0;
-    const pages = documentsGridPageState.totalPages != null ? documentsGridPageState.totalPages : 0;
-    const page = documentsGridPageState.currentPage != null ? documentsGridPageState.currentPage : 1;
-
-    if (label) {
-        if (total === 0) {
-            label.textContent = cfg.t.no_documents_rows_9a1c3e7f || 'No documents';
-        } else {
-            label.textContent = (cfg.t.page_of_total_4b2e8c1d || 'Page {page} of {pages} ({total} total)')
-                .replace('{page}', String(page))
-                .replace('{pages}', String(Math.max(pages, 1)))
-                .replace('{total}', String(total));
-        }
-    }
-    if (prev) {
-        prev.disabled = page <= 1 || total === 0;
-        prev.classList.toggle('opacity-50', page <= 1 || total === 0);
-    }
-    if (next) {
-        next.disabled = total === 0 || pages <= 0 || page >= pages;
-        next.classList.toggle('opacity-50', total === 0 || pages <= 0 || page >= pages);
-    }
-}
-
-async function fetchDocumentsGridPage(page) {
+async function fetchDocumentsGridPageFromApi(page, perPage) {
     const sp = getDocumentsPageFilterParams();
     sp.set('page', String(page));
-    sp.set('per_page', String(documentsGridPageState.perPage));
+    sp.set('per_page', String(perPage));
     let base = getDocumentsGridListUrl();
     if (base.indexOf('?') !== -1) {
         base = base.split('?')[0];
     }
     const response = await ((window.getFetch && window.getFetch()) || fetch)(base + '?' + sp.toString(), {
         credentials: 'same-origin',
-        headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
+        headers: getDocumentsGridFetchHeaders()
     });
     const data = await response.json();
     if (!data || data.success !== true || !Array.isArray(data.documents)) {
@@ -816,56 +771,69 @@ async function fetchDocumentsGridPage(page) {
     return data;
 }
 
-async function loadDocumentsGridPage(page) {
+async function fetchAllDocumentsForGrid() {
+    const first = await fetchDocumentsGridPageFromApi(1, DOCUMENTS_GRID_FETCH_PER_PAGE);
+    let documents = (first.documents || []).slice();
+    const total = first.total != null ? first.total : documents.length;
+    const pages = first.pages != null ? first.pages : 1;
+    for (let page = 2; page <= pages; page++) {
+        const next = await fetchDocumentsGridPageFromApi(page, DOCUMENTS_GRID_FETCH_PER_PAGE);
+        documents = documents.concat(next.documents || []);
+    }
+    if (total > documents.length) {
+        console.warn('documents grid: fetched', documents.length, 'of', total, 'rows');
+    }
+    return documents.map(mapDocToGridRow);
+}
+
+function getDocumentsGridOptions() {
+    return {
+        tooltipShowDelay: 200,
+        tooltipHideDelay: 12000,
+        components: {
+            countryScopeTooltip: CountryScopeTooltip
+        }
+    };
+}
+
+function ensureDocumentsGrid(rows) {
+    if (documentsGridState.gridInitialized && documentsGridHelper) {
+        documentsGridHelper.setRowData(rows);
+        if (documentsGridApi && typeof documentsGridApi.setGridOption === 'function') {
+            documentsGridApi.setGridOption('rowData', rows);
+        }
+        if (documentsGridApi && typeof documentsGridApi.paginationGoToFirstPage === 'function') {
+            documentsGridApi.paginationGoToFirstPage();
+        }
+        return;
+    }
+
+    documentsGridState.gridInitialized = true;
+    documentsGridHelper = new AgGridHelper({
+        containerId: 'documentsGrid',
+        templateId: 'ai-documents',
+        columnDefs: columnDefs,
+        rowData: rows,
+        options: getDocumentsGridOptions(),
+        columnVisibilityOptions: {
+            enableExport: false,
+            enableReset: true
+        }
+    });
+    documentsGridApi = documentsGridHelper.initialize();
+    window.documentsGridApi = documentsGridApi;
+    window.documentsGridHelper = documentsGridHelper;
+}
+
+async function loadDocumentsGrid() {
     const loadingEl = document.getElementById('documentsGrid-loading');
     const emptyEl = document.getElementById('documentsGrid-empty');
     const containerEl = document.getElementById('documentsGrid-container');
     if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
-        const payload = await fetchDocumentsGridPage(page);
-        const rows = (payload.documents || []).map(mapDocToGridRow);
-        documentsGridPageState.currentPage = payload.page != null ? payload.page : page;
-        documentsGridPageState.totalPages = payload.pages != null ? payload.pages : 0;
-        documentsGridPageState.totalRows = payload.total != null ? payload.total : rows.length;
-        replaceDocumentsGridUrlPage(documentsGridPageState.currentPage);
-
-        if (documentsGridPageState.gridInitialized && documentsGridHelper) {
-            documentsGridHelper.setRowData(rows);
-            if (documentsGridApi && typeof documentsGridApi.setGridOption === 'function') {
-                documentsGridApi.setGridOption('rowData', rows);
-            }
-            if (typeof documentsGridHelper.setResultCountTotal === 'function') {
-                documentsGridHelper.setResultCountTotal(documentsGridPageState.totalRows);
-            }
-        } else {
-            documentsGridPageState.gridInitialized = true;
-            documentsGridHelper = new AgGridHelper({
-                containerId: 'documentsGrid',
-                templateId: 'ai-documents',
-                columnDefs: columnDefs,
-                rowData: rows,
-                options: {
-                    pagination: false,
-                    suppressPaginationPanel: true,
-                    tooltipShowDelay: 200,
-                    tooltipHideDelay: 12000,
-                    components: {
-                        countryScopeTooltip: CountryScopeTooltip
-                    }
-                },
-                columnVisibilityOptions: {
-                    enableExport: false,
-                    enableReset: true
-                }
-            });
-            documentsGridApi = documentsGridHelper.initialize();
-            window.documentsGridApi = documentsGridApi;
-            window.documentsGridHelper = documentsGridHelper;
-            if (typeof documentsGridHelper.setResultCountTotal === 'function') {
-                documentsGridHelper.setResultCountTotal(documentsGridPageState.totalRows);
-            }
-        }
+        const rows = await fetchAllDocumentsForGrid();
+        ensureDocumentsGrid(rows);
 
         if (loadingEl) loadingEl.style.display = 'none';
         if (rows.length > 0) {
@@ -875,9 +843,8 @@ async function loadDocumentsGridPage(page) {
             if (containerEl) containerEl.style.display = 'none';
             if (emptyEl) emptyEl.style.display = 'block';
         }
-        updateDocumentsGridPaginationUi();
     } catch (err) {
-        console.error('loadDocumentsGridPage failed:', err);
+        console.error('loadDocumentsGrid failed:', err);
         if (loadingEl) loadingEl.style.display = 'none';
         if (containerEl) containerEl.style.display = 'none';
         if (emptyEl) {
@@ -886,38 +853,15 @@ async function loadDocumentsGridPage(page) {
                 escapeHtml(cfg.t.error_3d9f514d || 'Error:') + '</p><p class="text-sm text-gray-500">' + safeErrorMsg + '</p>';
             emptyEl.style.display = 'block';
         }
-        updateDocumentsGridPaginationUi();
     }
 }
 
 async function reloadDocumentsGrid() {
-    documentsGridPageState.currentPage = 1;
-    replaceDocumentsGridUrlPage(1);
-    return loadDocumentsGridPage(1);
+    return loadDocumentsGrid();
 }
 
-// Initialize grid (server-side pagination; one page fetched at a time)
 function initializeDocumentsGrid() {
-    documentsGridPageState.currentPage = getDocumentsGridInitialPage();
-
-    const prevBtn = document.getElementById('documentsGrid-page-prev');
-    const nextBtn = document.getElementById('documentsGrid-page-next');
-    if (prevBtn) {
-        prevBtn.addEventListener('click', function() {
-            const n = documentsGridPageState.currentPage - 1;
-            if (n < 1) return;
-            loadDocumentsGridPage(n);
-        });
-    }
-    if (nextBtn) {
-        nextBtn.addEventListener('click', function() {
-            const n = documentsGridPageState.currentPage + 1;
-            if (documentsGridPageState.totalPages > 0 && n > documentsGridPageState.totalPages) return;
-            loadDocumentsGridPage(n);
-        });
-    }
-
-    loadDocumentsGridPage(documentsGridPageState.currentPage);
+    loadDocumentsGrid();
 }
 
 // Initialize when DOM is ready

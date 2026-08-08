@@ -1,0 +1,22 @@
+{% extends "core/layout.html" %}
+{% block title %}{{ report.title }} — print{% endblock %}
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ static_url('css/reports/report-builder.css') }}">
+    <script src="{{ static_url('libs/apexcharts.min.js') }}" defer></script>
+{% endblock %}
+{% block content %}
+<div id="report-runtime-app" class="report-runtime" data-print-mode="true">
+    <div id="report-runtime-sections"></div>
+</div>
+<script type="application/json" id="report-runtime-bootstrap">
+{{ {
+    'reportId': report.id,
+    'definition': definition,
+    'language': language or (definition.default_language if definition else 'en'),
+    'csrfToken': csrf_token(),
+    'apiBase': url_for('reports.api_get_report', report_id=report.id).rsplit('/api/', 1)[0] + '/api/' + report.id|string
+}|tojson }}
+</script>
+<script type="module" src="{{ static_url('js/reports/report-runtime.js') }}"></script>
+{% endblock %}

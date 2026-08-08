@@ -228,6 +228,46 @@ class TestPBProgressCopyOutputsToStorage:
                     PBProgressService._copy_outputs_to_storage(DEFAULT_VERSION)
 
 
+class TestPBProgressPatchReportHtml:
+    """_patch_report_html now runs once at build time (_copy_outputs_to_storage)
+    instead of on every serve_output request, so a regression here would
+    silently affect every future report view until the next rebuild."""
+
+    def test_patch_report_html_injects_fixes_and_strips_legacy_markers(self) -> None:
+        html = (
+            "<html><head></head><body>"
+            '<div id="pb-report-toolbar">Interactive report</div>'
+            '<div class="pb-language-panels"></div>'
+            '<style id="pb-report-toc-pin-fix-v3">old</style>'
+            '<script id="pb-report-toc-pin-script-v3">old()</script>'
+            "</body></html>"
+        )
+        patched = PBProgressService._patch_report_html(html)
+
+        assert "pb-report-toc-pin-fix-v3" not in patched
+        assert "pb-report-toc-pin-script-v3" not in patched
+        assert 'id="pb-toolbar-fa-fix"' in patched
+        assert 'id="pb-report-toc-pin-fix-v8"' in patched
+        assert 'id="pb-report-toc-host-fix"' in patched
+        assert 'id="pb-toolbar-full-width-fix"' in patched
+        assert 'id="pb-toolbar-title-fix"' in patched
+
+    def test_patch_report_html_is_idempotent(self) -> None:
+        html = (
+            "<html><head></head><body>"
+            '<div id="pb-report-toolbar">Interactive report</div>'
+            '<div class="pb-language-panels"></div>'
+            "</body></html>"
+        )
+        once = PBProgressService._patch_report_html(html)
+        twice = PBProgressService._patch_report_html(once)
+        assert once == twice
+
+    def test_patch_report_html_leaves_plain_html_untouched(self) -> None:
+        html = "<html><body>No toolbar or TOC markers here.</body></html>"
+        assert PBProgressService._patch_report_html(html) == html
+
+
 class TestPBProgressOutputRetention:
     def setup_method(self) -> None:
         _reset_service_state()

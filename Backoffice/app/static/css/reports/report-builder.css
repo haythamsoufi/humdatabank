@@ -1,5 +1,55 @@
 /* Report builder & viewer — scoped under #report-builder-app / .report-runtime */
 
+#report-builder-app .rb-section-grid,
+.report-runtime-grid {
+    width: 100%;
+}
+
+#report-builder-app .grid-stack-item-content,
+#report-builder-app .rb-editor-slot-content {
+    background: var(--rb-bg);
+    border: 1px solid var(--rb-border);
+    border-radius: var(--rb-radius-sm);
+    overflow: hidden;
+}
+
+#report-builder-app .report-toolbar-language-field select {
+    min-width: 7rem;
+}
+
+.report-runtime-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+}
+
+.report-runtime-grid .report-widget-card {
+    height: 100%;
+}
+
+.report-widget-divider {
+    border: 0;
+    border-top: 2px solid var(--rb-border-strong, #d1d5db);
+    margin: 0.5rem 0;
+}
+
+.report-widget-image {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.report-widget-embed {
+    width: 100%;
+    min-height: 240px;
+    border: 0;
+}
+
+.report-map-host,
+.report-map-fallback {
+    font-size: 0.875rem;
+}
+
 #report-builder-app {
     --rb-border: #e5e7eb;
     --rb-border-strong: #d1d5db;

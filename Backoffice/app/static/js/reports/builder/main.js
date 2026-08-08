@@ -2,46 +2,31 @@
  * Report builder — WYSIWYG editor canvas + inspector panels.
  */
 import { EditorCanvas, dynamicWidgetId } from './editor-canvas.js';
-
-const WIDGET_KINDS = {
-    kpi: ['assignment_status_counts', 'indicator_aggregate'],
-    line: ['indicator_timeseries'],
-    indicator_dashboard: ['indicator_dashboard'],
-    bar: ['indicator_by_country', 'indicator_by_dimension'],
-    pie: ['assignment_status_counts', 'categorical_counts'],
-    table: ['indicator_values', 'indicator_set_aggregate', 'assignment_list', 'raw_data'],
-    text: []
-};
-
-const DATA_SOURCE_LABELS = {
-    assignment_status_counts: 'Assignment status counts',
-    indicator_aggregate: 'Single-period indicator total',
-    indicator_timeseries: 'Indicator values over time',
-    indicator_dashboard: 'Progress dashboard (chart + table)',
-    indicator_by_country: 'Breakdown by country',
-    indicator_by_dimension: 'Breakdown by dimension',
-    indicator_values: 'Raw indicator values',
-    indicator_set_aggregate: 'Multiple indicators summary',
-    assignment_list: 'Assignment list',
-    raw_data: 'Raw form data',
-    categorical_counts: 'Category counts'
-};
+import { HistoryStack } from './history.js';
+import {
+    WIDGET_KINDS,
+    DATA_SOURCE_LABELS,
+    WIDGET_TYPE_LABELS,
+    DEFAULT_LANGUAGES,
+    DEFAULT_GRID,
+    ensureV2Definition,
+    normalizeLanguage,
+    resolveTranslation,
+    setTranslation,
+    defaultWidgetLayout
+} from './v2-compat.js';
 
 const DYNAMIC_KIND_BY_TYPE = {
     indicator_dashboard: 'indicator_dashboard',
     line: 'indicator_timeseries',
+    area: 'indicator_timeseries',
+    combo: 'indicator_timeseries',
+    scatter: 'indicator_timeseries',
+    gauge: 'indicator_aggregate',
+    bar: 'indicator_by_country',
+    map: 'indicator_by_country',
     kpi: 'indicator_aggregate',
     table: 'indicator_set_aggregate'
-};
-
-const WIDGET_TYPE_LABELS = {
-    kpi: 'KPI',
-    line: 'Line chart',
-    indicator_dashboard: 'Dashboard',
-    bar: 'Bar chart',
-    pie: 'Pie chart',
-    table: 'Table',
-    text: 'Text'
 };
 
 const INDICATOR_DATA_SOURCE_KINDS = new Set([
@@ -176,7 +161,10 @@ class ChipPicker {
 class ReportBuilder {
     constructor(config) {
         this.config = config;
-        this.definition = JSON.parse(JSON.stringify(config.definition || { schema_version: 1, filters: {}, sections: [] }));
+        this.definition = ensureV2Definition(config.definition || {});
+        this.activeLanguage = normalizeLanguage(this.definition.default_language || 'en');
+        this.history = new HistoryStack();
+        this.history.push(this.definition);
         if (!this.definition.filters) this.definition.filters = {};
         if (!this.definition.sections) this.definition.sections = [];
         this.selectedSectionId = this.definition.sections[0]?.id || null;
@@ -185,7 +173,10 @@ class ReportBuilder {
         this.activeInspectorTab = 'setup';
         this._sectionRuleCounts = {};
         this._sectionRuleMatches = {};
+        this._sectionTemplates = [];
         this.editorCanvas = new EditorCanvas(this);
+        this.gridstackScript = config.gridstackJs || '/static/libs/gridstack/gridstack-all.js';
+        this.editorCanvas.gridEngine.options.scriptSrc = this.gridstackScript;
         this.metadataBase = (config.apiBase || '').replace(/\/api\/?$/, '') + '/api/metadata';
         this._indicatorCatalog = [];
         this._indicatorCatalogTemplateId = null;
@@ -195,6 +186,7 @@ class ReportBuilder {
         this.bindUi();
         this.initChipPickers();
         this.loadTemplates();
+        this.loadTemplateGallery();
         this.loadRuleFieldOptions().then(async () => {
             for (const section of this.definition.sections) {
                 if (section.dynamic_indicators?.enabled) {
@@ -245,6 +237,22 @@ class ReportBuilder {
         document.querySelectorAll('[data-inspector-tab]').forEach(function (btn) {
             btn.addEventListener('click', () => this.setInspectorTab(btn.dataset.inspectorTab));
         }.bind(this));
+        document.getElementById('rb-undo')?.addEventListener('click', () => this.undo());
+        document.getElementById('rb-redo')?.addEventListener('click', () => this.redo());
+        document.getElementById('rb-language')?.addEventListener('change', (e) => this.setActiveLanguage(e.target.value));
+        document.getElementById('rb-widget-color')?.addEventListener('input', () => this.syncStyleFromForm());
+        document.getElementById('rb-widget-number-format')?.addEventListener('input', () => this.syncStyleFromForm());
+        document.getElementById('rb-widget-show-legend')?.addEventListener('change', () => this.syncStyleFromForm());
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+            }
+            if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+                e.preventDefault();
+                this.redo();
+            }
+        });
         document.getElementById('rb-section-title')?.addEventListener('input', () => this.syncSectionFromForm(false));
         document.querySelectorAll('input[name="rb-section-mode"]').forEach(function (radio) {
             radio.addEventListener('change', () => {
@@ -302,6 +310,7 @@ class ReportBuilder {
             this.editorCanvas.invalidateCache();
             this.renderEditor();
         });
+        document.getElementById('rb-languages')?.addEventListener('change', () => this.syncLanguagesFromForm());
     }
 
     setInspectorTab(tab) {
@@ -312,6 +321,133 @@ class ReportBuilder {
         document.getElementById('rb-inspector-setup')?.classList.toggle('is-active', tab === 'setup');
         document.getElementById('rb-inspector-section')?.classList.toggle('is-active', tab === 'section');
         document.getElementById('rb-inspector-widget')?.classList.toggle('is-active', tab === 'widget');
+        document.getElementById('rb-inspector-style')?.classList.toggle('is-active', tab === 'style');
+    }
+
+    recordHistory() {
+        this.history.push(this.definition);
+    }
+
+    undo() {
+        const restored = this.history.undo(this.definition);
+        if (!restored) return;
+        this.definition = ensureV2Definition(restored);
+        this.renderEditor();
+        this.renderPropertiesPanel();
+    }
+
+    redo() {
+        const restored = this.history.redo();
+        if (!restored) return;
+        this.definition = ensureV2Definition(restored);
+        this.renderEditor();
+        this.renderPropertiesPanel();
+    }
+
+    setActiveLanguage(language) {
+        this.activeLanguage = normalizeLanguage(language);
+        this.editorCanvas.gridEngine.options.rtl = this.activeLanguage === 'ar';
+        document.documentElement.dir = this.activeLanguage === 'ar' ? 'rtl' : 'ltr';
+        this.renderEditor();
+        this.renderPropertiesPanel();
+    }
+
+    async loadTemplateGallery() {
+        const res = await fetch(this.config.apiBase.replace(/\/api\/?$/, '') + '/api/templates/gallery');
+        const data = await res.json().catch(function () { return {}; });
+        this._sectionTemplates = data.section_templates || [];
+        this._reportTemplates = data.report_templates || [];
+    }
+
+    openTemplateGallery() {
+        if (!this._sectionTemplates?.length) return;
+        const choice = window.prompt('Template id: ' + this._sectionTemplates.map(function (t) { return t.id; }).join(', '));
+        const template = this._sectionTemplates.find(function (t) { return t.id === choice; });
+        if (!template) return;
+        const section = JSON.parse(JSON.stringify(template.section));
+        section.id = uid('sec');
+        section.order = this.definition.sections.length;
+        this.definition.sections.push(section);
+        this.selectedSectionId = section.id;
+        this.recordHistory();
+        this.renderEditor();
+        this.renderPropertiesPanel();
+    }
+
+    selectSection(sectionId) {
+        this.selectedSectionId = sectionId;
+        this.selectedWidgetId = null;
+        this.selectedDynamicIndicatorId = null;
+        this.renderEditor();
+        this.renderPropertiesPanel();
+    }
+
+    selectWidget(sectionId, widgetId) {
+        this.selectedSectionId = sectionId;
+        this.selectedWidgetId = widgetId;
+        this.selectedDynamicIndicatorId = null;
+        this.renderEditor();
+        this.renderPropertiesPanel();
+    }
+
+    selectDynamicIndicator(sectionId, indicatorId) {
+        this.selectedSectionId = sectionId;
+        this.selectedDynamicIndicatorId = indicatorId;
+        this.selectedWidgetId = null;
+        this.renderEditor();
+        this.renderPropertiesPanel();
+        this.focusDynamicIndicatorFootnote(indicatorId);
+    }
+
+    findWidgetById(widgetId) {
+        for (const section of this.definition.sections) {
+            const widget = (section.widgets || []).find(function (w) { return w.id === widgetId; });
+            if (widget) return widget;
+            const dyn = section.dynamic_indicators;
+            if (dyn?.enabled && widgetId.startsWith(section.id + '-dyn-')) {
+                const indicatorId = widgetId.split('-dyn-')[1];
+                const matches = this._sectionRuleMatches[section.id] || [];
+                const row = matches.find(function (m) { return String(m.id) === String(indicatorId); });
+                if (row) {
+                    return {
+                        id: widgetId,
+                        type: dyn.widget_type || 'indicator_dashboard',
+                        title_translations: { [this.activeLanguage]: row.name },
+                        layout: dyn.default_widget_layout || defaultWidgetLayout(12, 0, dyn.widget_type),
+                        data_source: {
+                            kind: dyn.data_source_kind || 'indicator_dashboard',
+                            indicator_bank_id: Number(row.id),
+                            metric: dyn.metric || 'sum'
+                        }
+                    };
+                }
+            }
+        }
+        return null;
+    }
+
+    applyGridLayout(sectionId, items) {
+        const section = this.definition.sections.find(function (s) { return s.id === sectionId; });
+        if (!section) return;
+        items.forEach(function (item) {
+            const widget = (section.widgets || []).find(function (w) { return w.id === item.id; });
+            if (!widget) return;
+            widget.layout = { x: item.x, y: item.y, w: item.w, h: item.h };
+        });
+        this.recordHistory();
+    }
+
+    syncStyleFromForm() {
+        const widget = this.getSelectedWidget();
+        if (!widget) return;
+        widget.chart_options = widget.chart_options || {};
+        const color = document.getElementById('rb-widget-color')?.value;
+        if (color) widget.chart_options.colors = [color];
+        widget.chart_options.number_format = document.getElementById('rb-widget-number-format')?.value || '';
+        widget.chart_options.show_legend = !!document.getElementById('rb-widget-show-legend')?.checked;
+        this.recordHistory();
+        this.editorCanvas.invalidateCache(widget.id);
+        this.renderEditor();
     }
 
     renderEditor() {
@@ -338,6 +474,7 @@ class ReportBuilder {
             select.value = String(tpl);
             await this.onTemplateChange(String(tpl));
             this.restoreFilterSelections();
+            this.restoreLanguageSelections();
         }
     }
 
@@ -658,13 +795,31 @@ class ReportBuilder {
         if (this.selectedWidgetId) {
             this.setInspectorTab('widget');
             this.renderWidgetForm();
+            this.renderStyleForm();
             return;
         }
         if (this.selectedSectionId || this.selectedDynamicIndicatorId) {
             this.setInspectorTab('section');
         }
         this.renderSectionForm();
+        this.renderStyleForm();
         this.updateEditorHints();
+    }
+
+    renderStyleForm() {
+        const empty = document.getElementById('rb-style-props-empty');
+        const form = document.getElementById('rb-style-props-form');
+        const widget = this.getSelectedWidget();
+        if (!widget) {
+            empty?.classList.remove('hidden');
+            form?.classList.add('hidden');
+            return;
+        }
+        empty?.classList.add('hidden');
+        form?.classList.remove('hidden');
+        document.getElementById('rb-widget-color').value = (widget.chart_options?.colors || [])[0] || '#0d9488';
+        document.getElementById('rb-widget-number-format').value = widget.chart_options?.number_format || '';
+        document.getElementById('rb-widget-show-legend').checked = widget.chart_options?.show_legend !== false;
     }
 
     renderSectionForm() {
@@ -679,7 +834,7 @@ class ReportBuilder {
         empty?.classList.add('hidden');
         form?.classList.remove('hidden');
         const dyn = this.ensureSectionDynamic(section);
-        document.getElementById('rb-section-title').value = section.title || '';
+        document.getElementById('rb-section-title').value = resolveTranslation(section.title_translations, this.activeLanguage, section.title || '');
         const isDynamic = !!dyn.enabled;
         document.querySelectorAll('input[name="rb-section-mode"]').forEach(function (radio) {
             radio.checked = (radio.value === 'dynamic') === isDynamic;
@@ -689,7 +844,7 @@ class ReportBuilder {
         document.getElementById('rb-section-dynamic-footnotes')?.classList.toggle('hidden', !isDynamic);
         document.getElementById('rb-section-dynamic-widget-type').value = dyn.widget_type || 'indicator_dashboard';
         document.getElementById('rb-section-dynamic-group-by').checked = dyn.group_by === 'spef_section';
-        document.getElementById('rb-section-footnote').value = section.footnote || '';
+        document.getElementById('rb-section-footnote').value = resolveTranslation(section.footnote_translations, this.activeLanguage, section.footnote || '');
         document.getElementById('rb-section-include-bank-guidance').checked = !!dyn.include_bank_guidance_footnotes;
         this._chipPickers.sectionProgrammes?.setValues(dyn.rule?.related_programs_any || []);
         this._chipPickers.sectionTags?.setValues(dyn.rule?.tags_any || []);
@@ -699,8 +854,10 @@ class ReportBuilder {
         if (rerender === undefined) rerender = true;
         const section = this.getSelectedSection();
         if (!section) return;
-        section.title = document.getElementById('rb-section-title')?.value || section.title;
-        section.footnote = document.getElementById('rb-section-footnote')?.value || '';
+        setTranslation(section, 'title', this.activeLanguage, document.getElementById('rb-section-title')?.value || '');
+        setTranslation(section, 'footnote', this.activeLanguage, document.getElementById('rb-section-footnote')?.value || '');
+        section.title = resolveTranslation(section.title_translations, this.activeLanguage);
+        section.footnote = resolveTranslation(section.footnote_translations, this.activeLanguage);
         if (!section.footnote) delete section.footnote;
         const dyn = this.ensureSectionDynamic(section);
         const mode = document.querySelector('input[name="rb-section-mode"]:checked')?.value || 'manual';
@@ -716,7 +873,29 @@ class ReportBuilder {
             delete dyn.indicator_footnotes;
         }
         document.getElementById('rb-section-dynamic-enabled').checked = dyn.enabled;
-        if (rerender) this.renderEditor();
+        if (rerender) {
+            this.recordHistory();
+            this.renderEditor();
+        }
+    }
+
+    syncLanguagesFromForm() {
+        const select = document.getElementById('rb-languages');
+        const langs = select ? Array.from(select.selectedOptions).map(function (o) { return o.value; }) : [];
+        this.definition.languages = langs.length ? langs : ['en'];
+        if (!this.definition.languages.includes(this.activeLanguage)) {
+            this.activeLanguage = this.definition.languages[0];
+        }
+        this.definition.default_language = this.definition.default_language || this.definition.languages[0];
+    }
+
+    restoreLanguageSelections() {
+        const select = document.getElementById('rb-languages');
+        if (!select) return;
+        const langs = this.definition.languages || ['en'];
+        Array.from(select.options).forEach(function (opt) {
+            opt.selected = langs.includes(opt.value);
+        });
     }
 
     syncFiltersFromForm() {
@@ -733,14 +912,16 @@ class ReportBuilder {
     addSection() {
         const section = {
             id: uid('sec'),
-            title: 'New section',
+            title_translations: { [this.activeLanguage]: 'New section' },
             order: this.definition.sections.length,
+            grid: { ...DEFAULT_GRID },
             widgets: []
         };
         this.definition.sections.push(section);
         this.selectedSectionId = section.id;
         this.selectedWidgetId = null;
         this.selectedDynamicIndicatorId = null;
+        this.recordHistory();
         this.renderEditor();
         this.renderPropertiesPanel();
     }
@@ -771,12 +952,20 @@ class ReportBuilder {
         const widget = {
             id: uid('w'),
             type: type,
-            title: (WIDGET_TYPE_LABELS[type] || type) + ' widget',
+            title_translations: { [this.activeLanguage]: (WIDGET_TYPE_LABELS[type] || type) + ' widget' },
+            layout: defaultWidgetLayout(section.grid?.columns || 12, (section.widgets || []).length * 4, type),
             chart_options: {}
         };
         if (type === 'text') {
-            widget.content = '';
+            widget.content_translations = { [this.activeLanguage]: '' };
+        } else if (type === 'image') {
+            widget.asset_key = '';
+        } else if (type === 'embed') {
+            widget.embed_url = '';
+        } else if (type === 'divider') {
+            widget.data_source = undefined;
         } else {
+            const kinds = WIDGET_KINDS[type] || [];
             widget.data_source = { kind: kinds[0] || 'assignment_status_counts' };
         }
         if (!section.widgets) section.widgets = [];
@@ -785,6 +974,7 @@ class ReportBuilder {
         this.selectedSectionId = section.id;
         this.selectedWidgetId = widget.id;
         this.selectedDynamicIndicatorId = null;
+        this.recordHistory();
         this.renderEditor();
         this.renderPropertiesPanel();
     }
@@ -857,8 +1047,11 @@ class ReportBuilder {
         }
         empty?.classList.add('hidden');
         form?.classList.remove('hidden');
-        document.getElementById('rb-widget-title').value = widget.title || '';
-        document.getElementById('rb-widget-footnote').value = widget.footnote || '';
+        document.getElementById('rb-widget-title').value = resolveTranslation(widget.title_translations, this.activeLanguage, widget.title || '');
+        document.getElementById('rb-widget-footnote').value = resolveTranslation(widget.footnote_translations, this.activeLanguage, widget.footnote || '');
+        document.getElementById('rb-widget-color').value = (widget.chart_options?.colors || [])[0] || '#0d9488';
+        document.getElementById('rb-widget-number-format').value = widget.chart_options?.number_format || '';
+        document.getElementById('rb-widget-show-legend').checked = widget.chart_options?.show_legend !== false;
         const kindSelect = document.getElementById('rb-widget-kind');
         kindSelect.innerHTML = '';
         const kinds = WIDGET_KINDS[widget.type] || ['assignment_status_counts'];
@@ -870,7 +1063,7 @@ class ReportBuilder {
             kindSelect.appendChild(opt);
         });
         document.getElementById('rb-widget-metric').value = widget.data_source?.metric || 'sum';
-        document.getElementById('rb-widget-content').value = widget.content || '';
+        document.getElementById('rb-widget-content').value = resolveTranslation(widget.content_translations, this.activeLanguage, widget.content || '');
         document.querySelector('.rb-text-field')?.classList.toggle('hidden', widget.type !== 'text');
         const needsIndicator = this.widgetNeedsIndicator(widget);
         document.querySelector('.rb-indicator-field')?.classList.toggle('hidden', !needsIndicator);
@@ -895,12 +1088,18 @@ class ReportBuilder {
         if (rerender === undefined) rerender = true;
         const widget = this.getSelectedWidget();
         if (!widget) return;
-        widget.title = document.getElementById('rb-widget-title').value;
-        widget.footnote = document.getElementById('rb-widget-footnote')?.value || '';
+        setTranslation(widget, 'title', this.activeLanguage, document.getElementById('rb-widget-title').value);
+        setTranslation(widget, 'footnote', this.activeLanguage, document.getElementById('rb-widget-footnote')?.value || '');
+        widget.title = resolveTranslation(widget.title_translations, this.activeLanguage);
+        widget.footnote = resolveTranslation(widget.footnote_translations, this.activeLanguage);
         if (!widget.footnote) delete widget.footnote;
         if (widget.type === 'text') {
-            widget.content = document.getElementById('rb-widget-content').value;
-            if (rerender) this.renderEditor();
+            setTranslation(widget, 'content', this.activeLanguage, document.getElementById('rb-widget-content').value);
+            widget.content = resolveTranslation(widget.content_translations, this.activeLanguage);
+            if (rerender) {
+                this.recordHistory();
+                this.renderEditor();
+            }
             return;
         }
         if (!widget.data_source) widget.data_source = {};
@@ -926,6 +1125,7 @@ class ReportBuilder {
             delete widget.data_source.indicator_selection;
         }
         if (rerender) {
+            this.recordHistory();
             this.editorCanvas.invalidateCache(widget.id);
             this.renderEditor();
         }
@@ -978,40 +1178,34 @@ class ReportBuilder {
 
     normalizeDefinitionBeforeSave() {
         this.syncFiltersFromForm();
+        this.syncLanguagesFromForm();
         this.syncSectionFromForm(false);
         this.syncWidgetFromForm(false);
-        if (!this.definition.schema_version) this.definition.schema_version = 1;
+        this.definition = ensureV2Definition(this.definition);
         const f = this.definition.filters || (this.definition.filters = {});
         if (!Array.isArray(f.template_ids)) f.template_ids = [];
         if (!Array.isArray(f.period_names)) f.period_names = [];
         if (!Array.isArray(f.country_ids)) f.country_ids = [];
         if (!Array.isArray(f.assignment_statuses)) f.assignment_statuses = ['submitted', 'approved'];
         if (f.include_public_submissions == null) f.include_public_submissions = false;
+        if (!this.definition.languages?.length) this.definition.languages = DEFAULT_LANGUAGES.slice(0, 1);
         (this.definition.sections || []).forEach(function (section, idx) {
             section.order = idx;
+            section.grid = section.grid || { ...DEFAULT_GRID };
             if (section.dynamic_indicators && !section.dynamic_indicators.enabled) {
                 delete section.dynamic_indicators;
             } else if (section.dynamic_indicators?.enabled) {
                 const dyn = section.dynamic_indicators;
                 if (!dyn.include_bank_guidance_footnotes) delete dyn.include_bank_guidance_footnotes;
-                if (!dyn.indicator_footnotes || !Object.keys(dyn.indicator_footnotes).length) {
-                    delete dyn.indicator_footnotes;
-                }
+                if (!dyn.indicator_footnotes || !Object.keys(dyn.indicator_footnotes).length) delete dyn.indicator_footnotes;
+                if (!dyn.default_widget_layout) dyn.default_widget_layout = defaultWidgetLayout(section.grid.columns, 0, dyn.widget_type);
             }
-            if (!section.footnote) delete section.footnote;
             (section.widgets || []).forEach(function (widget) {
-                if (widget.type !== 'text') {
+                if (!widget.layout) widget.layout = defaultWidgetLayout(section.grid.columns, 0, widget.type);
+                if (widget.type !== 'text' && widget.type !== 'divider' && widget.type !== 'image' && widget.type !== 'embed') {
                     widget.data_source = widget.data_source || { kind: 'assignment_status_counts' };
-                    const selection = widget.data_source.indicator_selection;
-                    if (selection?.mode === 'rule') {
-                        delete widget.data_source.indicator_bank_id;
-                        delete widget.data_source.indicator_bank_ids;
-                    } else if (widget.data_source.indicator_bank_id == null) {
-                        delete widget.data_source.indicator_bank_id;
-                    }
                     widget.chart_options = widget.chart_options || {};
                 }
-                if (!widget.footnote) delete widget.footnote;
             });
         });
     }

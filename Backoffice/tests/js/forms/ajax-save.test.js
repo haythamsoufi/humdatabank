@@ -121,4 +121,19 @@ describe('ajax-save', () => {
 
     expect(saveNow).not.toHaveBeenCalled();
   });
+
+  it('shows friendly error when ok response body is HTML not JSON', async () => {
+    fetch.mockResolvedValue(mockFetchResponse({
+      ok: true,
+      status: 200,
+      contentType: 'text/html',
+      body: '<!DOCTYPE html><html><body>502 Bad Gateway</body></html>',
+    }));
+
+    const mod = await loadAjaxSave();
+    mod.initAjaxSave();
+    await expect(
+      mod.saveFormBeforeSubmit({ toast: false, buttonState: false }),
+    ).rejects.toThrow(/Save failed/);
+  });
 });

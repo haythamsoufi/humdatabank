@@ -1,0 +1,370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "report_definition_v2",
+  "type": "object",
+  "required": ["schema_version", "languages", "default_language", "filters", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 2
+    },
+    "languages": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 2 }
+    },
+    "default_language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primary_color": { "type": "string" },
+        "font_family": { "type": "string" },
+        "logo_asset_key": { "type": "string" }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "template_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "period_names": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "country_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "assignment_statuses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "requires_revision",
+              "sent_for_review",
+              "submitted",
+              "approved",
+              "cancelled"
+            ]
+          }
+        },
+        "include_public_submissions": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/section" }
+    }
+  },
+  "definitions": {
+    "translations": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "grid_layout": {
+      "type": "object",
+      "required": ["columns", "row_height"],
+      "additionalProperties": false,
+      "properties": {
+        "columns": { "type": "integer", "minimum": 1, "maximum": 24 },
+        "row_height": { "type": "integer", "minimum": 20, "maximum": 200 }
+      }
+    },
+    "widget_layout": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "integer", "minimum": 0 },
+        "y": { "type": "integer", "minimum": 0 },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "threshold": {
+      "type": "object",
+      "required": ["operator", "value", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "type": "string",
+          "enum": ["lt", "lte", "gt", "gte", "eq", "neq"]
+        },
+        "value": { "type": "number" },
+        "color": { "type": "string" }
+      }
+    },
+    "chart_options": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "colors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "show_legend": { "type": "boolean" },
+        "number_format": { "type": "string" },
+        "axis_title_x": { "type": "string" },
+        "axis_title_y": { "type": "string" },
+        "thresholds": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/threshold" }
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "required": ["id", "order", "widgets", "grid"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title_translations": { "$ref": "#/definitions/translations" },
+        "order": { "type": "integer", "minimum": 0 },
+        "footnote_translations": { "$ref": "#/definitions/translations" },
+        "grid": { "$ref": "#/definitions/grid_layout" },
+        "widgets": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/widget" }
+        },
+        "dynamic_indicators": { "$ref": "#/definitions/dynamic_indicators" },
+        "interactions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/interaction" }
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "required": ["source_widget_id", "target_widget_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "source_widget_id": { "type": "string" },
+        "target_widget_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "widget": {
+      "type": "object",
+      "required": ["id", "type", "layout"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": [
+            "table",
+            "kpi",
+            "line",
+            "bar",
+            "pie",
+            "area",
+            "combo",
+            "scatter",
+            "gauge",
+            "map",
+            "text",
+            "indicator_dashboard",
+            "image",
+            "embed",
+            "divider"
+          ]
+        },
+        "title_translations": { "$ref": "#/definitions/translations" },
+        "layout": { "$ref": "#/definitions/widget_layout" },
+        "data_source": { "$ref": "#/definitions/data_source" },
+        "chart_options": { "$ref": "#/definitions/chart_options" },
+        "content_translations": { "$ref": "#/definitions/translations" },
+        "footnote_translations": { "$ref": "#/definitions/translations" },
+        "asset_key": { "type": "string" },
+        "embed_url": { "type": "string" },
+        "embed_html": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "text" } } },
+          "then": {}
+        },
+        {
+          "if": { "properties": { "type": { "const": "image" } } },
+          "then": { "required": ["asset_key"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "embed" } } },
+          "then": {}
+        },
+        {
+          "if": { "properties": { "type": { "const": "divider" } } },
+          "then": {}
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "table",
+                  "kpi",
+                  "line",
+                  "bar",
+                  "pie",
+                  "area",
+                  "combo",
+                  "scatter",
+                  "gauge",
+                  "map",
+                  "indicator_dashboard"
+                ]
+              }
+            }
+          },
+          "then": { "required": ["data_source"] }
+        }
+      ]
+    },
+    "data_source": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "indicator_values",
+            "indicator_aggregate",
+            "indicator_timeseries",
+            "indicator_by_country",
+            "indicator_by_dimension",
+            "assignment_status_counts",
+            "assignment_list",
+            "categorical_counts",
+            "raw_data",
+            "indicator_set_aggregate",
+            "indicator_dashboard"
+          ]
+        },
+        "manual_payload": {
+          "type": "object",
+          "description": "Hand-entered values for manual data source"
+        },
+        "indicator_bank_ids": {
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "indicator_bank_id": { "type": ["integer", "null"] },
+        "metric": {
+          "type": "string",
+          "enum": ["sum", "count", "avg", "implementing_count", "reported_count"]
+        },
+        "group_by": { "type": "string" },
+        "disaggregation_mode": {
+          "type": "string",
+          "enum": ["none", "sex", "age", "sex_age"]
+        },
+        "columns": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "layout": {
+          "type": "string",
+          "enum": ["flat", "star"]
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 5000 },
+        "indicator_selection": { "$ref": "#/definitions/indicator_selection" }
+      }
+    },
+    "indicator_rule": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "related_programs_any": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tags_any": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "spef_codes_any": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "emergency": { "type": ["boolean", "null"] },
+        "search_text": { "type": "string" },
+        "sort_by": {
+          "type": "string",
+          "enum": ["name", "spef_code", "updated_at"]
+        },
+        "sort_direction": {
+          "type": "string",
+          "enum": ["asc", "desc"]
+        },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "any": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/indicator_rule" }
+        },
+        "all": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/indicator_rule" }
+        },
+        "none": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/indicator_rule" }
+        }
+      }
+    },
+    "indicator_selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["manual", "rule"]
+        },
+        "rule": { "$ref": "#/definitions/indicator_rule" }
+      }
+    },
+    "dynamic_indicators": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "rule": { "$ref": "#/definitions/indicator_rule" },
+        "widget_type": {
+          "type": "string",
+          "enum": ["kpi", "table", "line", "indicator_dashboard", "bar", "map"]
+        },
+        "data_source_kind": { "type": "string" },
+        "metric": { "type": "string" },
+        "group_by": {
+          "type": "string",
+          "enum": ["spef_section", "country", "dimension"]
+        },
+        "group_dimension": { "type": "string" },
+        "default_widget_layout": { "$ref": "#/definitions/widget_layout" },
+        "include_bank_guidance_footnotes": { "type": "boolean" },
+        "indicator_footnotes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
+import copy
 import re
-import uuid
 from typing import Any
 
-from flask_login import current_user
-
 from app import db
-from app.models import ReportDefinition, User
+from app.models import ReportDefinition, ReportDefinitionRevision, User
 from app.services.organization.authorization_service import AuthorizationService
-from app.services.reports.schema import default_definition, validate_report_definition
+from app.services.reports.schema import default_definition, migrate_v1_to_v2, validate_report_definition
 from app.services.security.api_authentication import (
     _get_user_allowed_country_ids,
     get_user_allowed_template_ids,
@@ -93,6 +91,12 @@ def narrow_id_list(requested: list[int] | None, allowed: list[int] | None) -> tu
     return narrowed, warnings
 
 
+def _normalize_definition(definition: dict[str, Any] | None) -> dict[str, Any]:
+    definition = migrate_v1_to_v2(definition or {})
+    validate_report_definition(definition)
+    return definition
+
+
 class ReportDefinitionService:
     @staticmethod
     def list_reports(user: User) -> list[ReportDefinition]:
@@ -116,6 +120,18 @@ class ReportDefinitionService:
         return report
 
     @staticmethod
+    def create_revision(report: ReportDefinition, user: User | None, *, note: str | None = None) -> ReportDefinitionRevision:
+        revision = ReportDefinitionRevision(
+            report_id=report.id,
+            definition_json=copy.deepcopy(report.definition_json or {}),
+            schema_version=int(report.schema_version or 2),
+            created_by_id=user.id if user else None,
+            note=note,
+        )
+        db.session.add(revision)
+        return revision
+
+    @staticmethod
     def create_report(
         user: User,
         *,
@@ -127,8 +143,7 @@ class ReportDefinitionService:
         if not AuthorizationService.has_rbac_permission(user, REPORTS_EDIT) and not user_can_manage_all(user):
             raise ReportDefinitionError("Access denied")
 
-        definition = definition or default_definition()
-        validate_report_definition(definition)
+        definition = _normalize_definition(definition or default_definition())
         scope_json = scope_json or {}
         user_scope = resolve_user_scope(user)
 
@@ -141,7 +156,7 @@ class ReportDefinitionService:
             title=title.strip() or "Untitled report",
             description=(description or "").strip() or None,
             definition_json=definition,
-            schema_version=definition.get("schema_version", 1),
+            schema_version=definition.get("schema_version", 2),
             status="draft",
             owner_user_id=user.id,
             scope_json=scope_json,
@@ -162,6 +177,8 @@ class ReportDefinitionService:
         definition: dict[str, Any] | None = None,
         scope_json: dict[str, Any] | None = None,
         status: str | None = None,
+        create_revision: bool = False,
+        revision_note: str | None = None,
     ) -> ReportDefinition:
         report = ReportDefinitionService.get_report(report_id, user)
         if not user_can_edit_report(user, report):
@@ -172,9 +189,9 @@ class ReportDefinitionService:
         if description is not None:
             report.description = (description or "").strip() or None
         if definition is not None:
-            validate_report_definition(definition)
+            definition = _normalize_definition(definition)
             report.definition_json = definition
-            report.schema_version = definition.get("schema_version", 1)
+            report.schema_version = definition.get("schema_version", 2)
         if scope_json is not None:
             user_scope = resolve_user_scope(user)
             template_ids, _ = narrow_id_list(scope_json.get("template_ids"), user_scope["template_ids"])
@@ -184,10 +201,29 @@ class ReportDefinitionService:
             status = status.strip().lower()
             if status not in {"draft", "published", "archived"}:
                 raise ReportDefinitionError("Invalid status")
+            if status == "published":
+                ReportDefinitionService.create_revision(report, user, note="pre-publish snapshot")
             report.status = status
             if status == "published":
                 report.published_at = utcnow()
+        elif create_revision:
+            ReportDefinitionService.create_revision(report, user, note=revision_note)
 
+        report.updated_by_id = user.id
+        db.session.commit()
+        return report
+
+    @staticmethod
+    def restore_revision(report_id: int, revision_id: int, user: User) -> ReportDefinition:
+        report = ReportDefinitionService.get_report(report_id, user)
+        if not user_can_edit_report(user, report):
+            raise ReportDefinitionError("Access denied")
+        revision = db.session.get(ReportDefinitionRevision, revision_id)
+        if not revision or revision.report_id != report.id:
+            raise ReportDefinitionError("Revision not found")
+        definition = _normalize_definition(copy.deepcopy(revision.definition_json or {}))
+        report.definition_json = definition
+        report.schema_version = definition.get("schema_version", 2)
         report.updated_by_id = user.id
         db.session.commit()
         return report
@@ -209,18 +245,19 @@ class ReportDefinitionService:
             user,
             title=f"{source.title} (copy)",
             description=source.description,
-            definition=dict(source.definition_json or {}),
+            definition=copy.deepcopy(source.definition_json or {}),
             scope_json=dict(source.scope_json or {}),
         )
 
     @staticmethod
     def serialize(report: ReportDefinition) -> dict[str, Any]:
+        definition = migrate_v1_to_v2(report.definition_json or {})
         return {
             "id": report.id,
             "slug": report.slug,
             "title": report.title,
             "description": report.description,
-            "definition": report.definition_json,
+            "definition": definition,
             "schema_version": report.schema_version,
             "status": report.status,
             "owner_user_id": report.owner_user_id,

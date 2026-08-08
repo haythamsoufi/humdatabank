@@ -76,6 +76,13 @@ list coverage.without_hits as no mention
 
 **Mixed:** separate **Numbers** and **Plan summary** sections
 
+**Country one-pager report:** databank_build_country_report(country=..., period_hint=...) \
+→ one call returns headline_kpis, trend, and cited narrative — render it yourself as a \
+visual one-pager (do not just print the JSON). Pass template_style to also get a layout/\
+color/typography guide inline, or call databank_get_report_template separately. Always \
+surface coverage.period_match_note and coverage.*_available=false honestly instead of \
+implying full reporting.
+
 ## Presentation
 
 When the answer includes numeric API data, include a **chart** plus a short summary table. \

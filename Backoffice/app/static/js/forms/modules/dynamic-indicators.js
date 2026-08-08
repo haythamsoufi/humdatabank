@@ -21,6 +21,27 @@ import { applyLayoutToSection } from './layout.js';
 
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
 
+async function parseDynamicIndicatorResponse(response) {
+    if (window.responseAsResult) {
+        const result = await window.responseAsResult(response);
+        if (!result.ok) {
+            throw Object.assign(new Error(result.data?.error || `HTTP ${result.status}`), { status: result.status });
+        }
+        return result.data;
+    }
+    if (!response.ok) {
+        if (window.parseHttpError) {
+            throw await window.parseHttpError(response);
+        }
+        throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
+    }
+    const ct = response.headers.get('Content-Type') || '';
+    if (!ct.includes('application/json')) {
+        throw Object.assign(new Error(`HTTP ${response.status}: non-JSON response`), { status: response.status });
+    }
+    return response.json();
+}
+
 let isInitialized = false;
 
 function toString(value) {
@@ -329,17 +350,7 @@ function deleteDynamicIndicator(assignmentId, indicatorName) {
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => {
-        if (!response.ok) {
-            if (window.parseHttpError) {
-                return window.parseHttpError(response).then(err => { throw err; });
-            }
-            const err = new Error(`HTTP ${response.status}`);
-            err.status = response.status;
-            throw err;
-        }
-        return response.json();
-    })
+    .then(parseDynamicIndicatorResponse)
     .then(data => {
         if (data.success) {
             // Remove the indicator from the page
@@ -907,17 +918,7 @@ function addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance = nul
             'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(response => {
-        if (!response.ok) {
-            if (window.parseHttpError) {
-                return window.parseHttpError(response).then(err => { throw err; });
-            }
-            const err = new Error(`HTTP ${response.status}`);
-            err.status = response.status;
-            throw err;
-        }
-        return response.json();
-    })
+    .then(parseDynamicIndicatorResponse)
     .then(data => {
         if (!data.success || !data.html) {
             throw new Error(data.error || 'Failed to render indicator');
@@ -1052,17 +1053,7 @@ export function addPendingDynamicIndicatorForImport(sectionId, indicatorBankId, 
             'X-Requested-With': 'XMLHttpRequest',
         },
     })
-        .then((response) => {
-            if (!response.ok) {
-                if (window.parseHttpError) {
-                    return window.parseHttpError(response).then(err => { throw err; });
-                }
-                const err = new Error(`HTTP ${response.status}`);
-                err.status = response.status;
-                throw err;
-            }
-            return response.json();
-        })
+        .then(parseDynamicIndicatorResponse)
         .then((data) => {
             if (!data.success || !data.html) {
                 throw new Error(data.error || 'Failed to render indicator');

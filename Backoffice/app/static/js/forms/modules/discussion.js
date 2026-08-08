@@ -16,6 +16,36 @@ function escapeHtml(text) {
 
 }
 
+async function parseDiscussionJsonResponse(response) {
+    if (window.responseAsResult) {
+        const result = await window.responseAsResult(response);
+        if (!result.ok) {
+            const msg = (result.data && (result.data.error || result.data.message))
+                || `HTTP ${result.status}`;
+            return { ok: false, error: msg };
+        }
+        return { ok: true, data: result.data };
+    }
+    const ct = response.headers.get('Content-Type') || '';
+    if (!response.ok) {
+        let errMsg = `HTTP ${response.status}`;
+        if (ct.includes('application/json')) {
+            const data = await response.json().catch(() => ({}));
+            errMsg = data.error || data.message || errMsg;
+        }
+        return { ok: false, error: errMsg };
+    }
+    if (!ct.includes('application/json')) {
+        return { ok: false, error: `HTTP ${response.status}: non-JSON response` };
+    }
+    try {
+        const data = await response.json();
+        return { ok: true, data };
+    } catch (_) {
+        return { ok: false, error: 'Invalid JSON response' };
+    }
+}
+
 
 
 function formatCommentTimestamp(isoString) {
@@ -262,10 +292,11 @@ async function patchDiscussionComment(commentId, body, maxLength) {
         credentials: 'same-origin',
         body: JSON.stringify({ body: trimmed }),
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        return { ok: false, error: data.error || data.message || 'Failed to update comment' };
+    const parsed = await parseDiscussionJsonResponse(response);
+    if (!parsed.ok) {
+        return { ok: false, error: parsed.error || 'Failed to update comment' };
     }
+    const data = parsed.data;
     return { ok: true, comment: data.comment || data.data?.comment };
 }
 
@@ -279,9 +310,9 @@ async function deleteDiscussionComment(commentId) {
         },
         credentials: 'same-origin',
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        return { ok: false, error: data.error || data.message || 'Failed to delete comment' };
+    const parsed = await parseDiscussionJsonResponse(response);
+    if (!parsed.ok) {
+        return { ok: false, error: parsed.error || 'Failed to delete comment' };
     }
     return { ok: true };
 }
@@ -365,6 +396,9 @@ async function handleDeleteComment(commentEl) {
     confirmDeleteComment(async () => {
         const result = await deleteDiscussionComment(commentId);
         if (!result.ok) {
+            if (window.showAlert) {
+                window.showAlert(result.error || 'Failed to delete comment', 'error');
+            }
             return;
         }
         removeCommentFromAllViews(commentId);
@@ -608,24 +642,16 @@ async function postDiscussionComment({ aesId, body, maxLength, errorEl, onSucces
 
 
 
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-
+    const parsed = await parseDiscussionJsonResponse(response);
+    if (!parsed.ok) {
         if (errorEl) {
-
-            errorEl.textContent = data.error || data.message || 'Failed to post comment';
-
+            errorEl.textContent = parsed.error || 'Failed to post comment';
             errorEl.classList.remove('hidden');
-
         }
-
         return false;
-
     }
 
-
-
+    const data = parsed.data;
     const comment = data.comment || data.data?.comment;
 
     if (comment) {
@@ -707,6 +733,8 @@ function setDiscussionExpanded(expanded) {
 }
 
 
+
+export { parseDiscussionJsonResponse };
 
 export function collapseDiscussionSidebar() {
 

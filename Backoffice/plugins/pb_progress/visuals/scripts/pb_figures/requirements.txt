@@ -1,5 +1,8 @@
 # Production uses Python SVG + WeasyPrint (PB_FIGURES_RENDERER=html).
 # Matplotlib is a legacy fallback for debugging only.
+#
+# weasyprint and beautifulsoup4 versions should track Backoffice/requirements.txt
+# (kept in lockstep there for CVE fixes) — this file is a subset for standalone use.
 pandas>=2.0
 openpyxl>=3.1
 matplotlib>=3.8
@@ -7,3 +10,5 @@ numpy>=1.26
 quarto>=0.2.0
 cairosvg>=2.7.0
 python-docx>=1.1.0
+weasyprint==69.0
+beautifulsoup4==4.14.3

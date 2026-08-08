@@ -49,24 +49,51 @@ async function initializeEntryForm() {
         applyCompletionRate(parseFloat(gapBtnEarly.dataset.completionRate));
     }
     if (bootstrapAesId && !window.__entryBootstrapPromise) {
-        const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
-        window.__entryBootstrapPromise = fetchFn(
-            `/api/forms/assignment/${bootstrapAesId}/entry-bootstrap`,
-            {
+        window.__entryBootstrapPromise = (async () => {
+            const url = `/api/forms/assignment/${bootstrapAesId}/entry-bootstrap`;
+            const opts = {
                 headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
                 credentials: 'same-origin',
+            };
+            const apiFn = (window.getApiFetch && window.getApiFetch()) || null;
+            if (apiFn) {
+                return apiFn(url, opts);
             }
-        )
-            .then((r) => (r.ok ? r.json() : null))
+            const fetchFn = (window.getCsrfAwareFetch && window.getCsrfAwareFetch()) || fetch;
+            const response = await fetchFn(url, opts);
+            if (window.responseAsResult) {
+                const result = await window.responseAsResult(response);
+                if (!result.ok) {
+                    throw Object.assign(new Error(result.data?.error || `HTTP ${result.status}`), { status: result.status });
+                }
+                return result.data;
+            }
+            if (!response.ok) {
+                throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
+            }
+            const ct = response.headers.get('Content-Type') || '';
+            if (!ct.includes('application/json')) {
+                throw new Error('Non-JSON response');
+            }
+            return response.json();
+        })()
             .then((data) => {
-                window.__entryBootstrap = data || null;
+                window.__entryBootstrap = (data && typeof data === 'object') ? data : null;
                 if (typeof data?.completion_rate === 'number') {
                     applyCompletionRate(data.completion_rate);
                 }
                 return data;
             })
-            .catch(() => {
+            .catch((err) => {
+                debugWarn('forms/main', 'entry-bootstrap fetch failed', err);
                 window.__entryBootstrap = null;
+                if (window.showAlert) {
+                    window.showAlert(
+                        (window.t && window.t('Could not load form data. Some features may be unavailable until you refresh.'))
+                            || 'Could not load form data. Some features may be unavailable until you refresh.',
+                        'warning'
+                    );
+                }
                 return null;
             });
     }

@@ -1,5 +1,7 @@
 # Build and deploy humanitarian-databank-mcp to Azure App Service (staging).
 #
+# Manual only — run from Actions → "Deploy MCP to Azure" → Run workflow.
+#
 # Staging app: ifrc-databank-mcp-staging (resource group ifrctgo001rg)
 # Image:       ifrcimage.azurecr.io/databank_mcp:<tag>
 #
@@ -25,15 +27,11 @@ on:
         required: true
         default: v1.1
         type: string
-  push:
-    branches: [main]
-    paths:
-      - humanitarian-databank-mcp/**
 
 env:
   ACR_REGISTRY: ifrcimage.azurecr.io
   IMAGE_NAME: databank_mcp
-  EFFECTIVE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.sha }}
+  EFFECTIVE_VERSION: ${{ inputs.version }}
 
 jobs:
   build:

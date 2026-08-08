@@ -31,12 +31,14 @@ from databank_analytics import search_indicators_ranked, slim_public_data_respon
 from databank_client import (
     DatabankAPIError,
     api_base,
+    get_country_report,
     get_indicator,
     get_public_data_all_pages,
     get_public_data_page,
     get_public_document,
     get_public_documents_catalog,
     get_public_global_trend,
+    get_report_template,
     get_submission_coverage,
     resolve_public_country,
     resolve_public_indicator,
@@ -375,6 +377,69 @@ def databank_get_public_data_all_pages(
 
 
 @mcp.tool()
+def databank_build_country_report(
+    country: str,
+    period_hint: str = "",
+    report_type: str = "combined",
+    include_prior_period: bool = True,
+    template_style: str = "",
+) -> str:
+    """Assemble a one-country report spec (headline KPIs + trend + cited narrative themes).
+
+    Use for "build/generate a report/one-pager for <country> using <period> data" — this
+    single call resolves the country and reporting period, fetches a curated FDRS headline
+    KPI bundle (volunteers, staff, branches, local units, governing board, income,
+    expenditure, blood donations, first-aid trained) for the resolved period plus the prior
+    one, a multi-period volunteers trend, and cited themes from public Unified
+    Plan/Report/Midyear Report documents. Render the actual visual one-pager yourself from
+    the returned JSON (chart + KPI cards + narrative bullets) — this tool never returns
+    HTML or images.
+
+    period_hint accepts free text like '2026 midyear', '2026', 'Jan-Jun 2026', or '' (latest
+    available). There is no exact period_name catalog, so the resolver matches against real
+    periods discovered for this country; read period.available_periods and
+    coverage.period_match_note when the requested year/cycle has no public data yet — say so
+    explicitly rather than substituting unrelated numbers.
+
+    report_type: 'fdrs' (numbers only), 'upr' (narrative Unified Plan/Report themes only —
+    not UPR-specific numeric indicators), or 'combined' (default, both).
+
+    Set template_style (e.g. 'default') to also embed a design template (layout/colors/
+    fonts) inline under design_template, saving a follow-up databank_get_report_template
+    call — leave empty to skip it and render freeform.
+    """
+    try:
+        result = get_country_report(
+            country,
+            period_hint=period_hint,
+            report_type=report_type,
+            include_prior_period=include_prior_period,
+            template_style=template_style,
+        )
+        return _json_text(result)
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
+def databank_get_report_template(style: str = "default") -> str:
+    """Return an HTML/CSS one-pager skeleton plus design tokens for country reports.
+
+    Use alongside databank_build_country_report when the user wants the one-pager to
+    follow a specific layout/palette instead of a freeform render: fill the returned
+    html_template's {{PLACEHOLDER}} tokens with the report spec's data (repeat the
+    KPI_CARD and THEME_ITEM blocks per entry), and apply design_tokens (colors, fonts,
+    spacing) even if you ultimately render as markdown, a canvas component, or an
+    image-generation prompt rather than raw HTML. Call with no arguments (style='default')
+    to see the only bundled style; pass an unrecognized style to list available_styles.
+    """
+    try:
+        return _json_text(get_report_template(style))
+    except Exception as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
 def databank_api_info() -> str:
     """Return configured API base URL and public endpoint summary."""
     return _json_text(
@@ -392,6 +457,8 @@ def databank_api_info() -> str:
                 "GET /indicator-bank",
                 "GET /indicator-bank/<id>",
                 "GET /data (scoped, public privacy only)",
+                "GET /public/reports/country",
+                "GET /public/reports/template",
             ],
             "recommended_tools": {
                 "global_trends": "databank_aggregate_global_trend(query='volunteers')",
@@ -402,6 +469,8 @@ def databank_api_info() -> str:
                 "upr_documents": "databank_search_public_documents(query='Syria unified plan 2026')",
                 "one_document": "databank_get_public_document(document_id=ID)",
                 "raw_rows": "databank_get_public_data(indicator_bank_id=ID, include_dimensions=false)",
+                "country_report": "databank_build_country_report(country='Syria', period_hint='2026 midyear')",
+                "report_template": "databank_get_report_template(style='default')",
             },
             "notes": (
                 "Unscoped /data returns 401. Multiple submissions per country+period "
@@ -409,7 +478,9 @@ def databank_api_info() -> str:
                 "databank_get_submission_coverage to count countries that submitted (not sum values). "
                 "Use databank_get_documents_catalog to count/list public documents by type/year/country "
                 "instead of paginating databank_search_public_documents. "
-                "Document answers must cite chunks from databank_search_public_documents only."
+                "Document answers must cite chunks from databank_search_public_documents only. "
+                "For a country one-pager, prefer databank_build_country_report over chaining the "
+                "tools above by hand — pass template_style to also get a layout/style guide."
             ),
         }
     )

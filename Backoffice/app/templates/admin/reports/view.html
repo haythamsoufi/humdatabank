@@ -7,6 +7,8 @@
     {{ super() }}
     <link rel="stylesheet" href="{{ static_url('css/reports/report-builder.css') }}">
     <script src="{{ static_url('libs/apexcharts.min.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ static_url('vendor/leaflet/leaflet.css') }}">
+    <script src="{{ static_url('vendor/leaflet/leaflet.js') }}" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -34,6 +36,13 @@
     'classes': 'professional-action-btn',
     'attributes': {'id': 'report-export-pdf'}
 }) %}
+{% set __ = header_actions.items.append({
+    'type': 'button',
+    'text': _('Export Word'),
+    'icon': 'fas fa-file-word',
+    'classes': 'professional-action-btn',
+    'attributes': {'id': 'report-export-docx'}
+}) %}
 
 {{ page_header(
     title=report.title,
@@ -47,6 +56,8 @@
     actions=header_actions.items
 ) }}
 
+<div id="report-runtime-toolbar" class="report-runtime-toolbar"></div>
+<div id="report-publish-status" class="report-publish-status hidden"></div>
 <div id="report-runtime-app" class="report-runtime">
     <div id="report-runtime-sections"></div>
 </div>

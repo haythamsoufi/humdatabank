@@ -107,6 +107,7 @@ If you explain FDRS/UPR from memory of this guide, state it plainly — do **not
 | Country breakdown, one period | **`getPublicData`** (scoped + paginated) | `include_dimensions=true` |
 | Resolve a country name/ISO code/id | **`resolveCountry`** | Paginating a countries dimension table |
 | Indicator definition, unit, sector | **`getIndicatorById`** or **`getIndicatorBank`** with `search` + `limit` | — |
+| One-country one-pager (headline KPIs + trend + cited narrative) | **`getCountryReport`** | Chaining `resolveCountry` + `getSubmissionCoverage` + `getPublicData` (×9 KPIs) + `searchPublicDocuments` by hand |
 
 **Response size:** Public `/data` returns **slim** payloads by default (fact rows in `data[]` only). Do **not** pass `include_dimensions=true` unless the user explicitly needs full dimension tables — it causes huge responses and Action failures.
 
@@ -188,6 +189,16 @@ First decide whether the user means **submitted data** (numeric form values) or 
 3. Report **`countries_count`** (distinct countries with at least one matching public document in scope) and **`total_documents`**; use **`by_year[]`** for a year-by-year table and **`by_country[]`** only if the user wants the country list, not just a number. Set `include_documents=false` if you only need counts (smaller, faster response).
 
 **Both:** these counts reflect **public coverage only** (a public value or a document marked public in the Knowledge Base) — never internal assignment, workflow, or validation status (e.g. “submitted for review”, “approved”), which is not exposed by any public endpoint. Do not present the count as a fraction of all 192 National Societies unless the user asks for that framing, and then only alongside the actual `countries_submitted_total` / `countries_count`.
+
+### H. Country one-pager report (e.g. “Build a report for Syria using 2026 midyear data”)
+
+1. **`getCountryReport`** with `country` (name/ISO/id) and `period_hint` as free text (e.g. `2026 midyear`, `Annual 2024`, or omit for the latest period). One call replaces the whole B + G(data) + E workflow above — do **not** chain `resolveCountry` → `getSubmissionCoverage` → `getPublicData` ×9 → `searchPublicDocuments` by hand when this exists.
+2. `report_type` scopes the call: `fdrs` (numbers only), `upr` (narrative only), or `combined` (default, both). `include_prior_period=false` drops the prior-period comparison from `headline_kpis`.
+3. Response shape: `country` (resolved id/name/iso/region), `period` (`requested`/`resolved`/`prior`/`available_periods`), `coverage` (`fdrs_data_available`, `narrative_available`, `period_match_note`), `headline_kpis[]` (code, label, value, prior_value, change_pct), `trend` (multi-period volunteers series), `narrative` (`included`, `themes[]` with `content`/`document_title`/`page_number`/`document_url`).
+4. If `best_match` for the country was ambiguous, the response is `{"ok": false, "error": ..., "alternatives": [...]}` instead — confirm the right country with the user rather than guessing.
+5. **Render an actual one-pager** (headline KPI cards, a trend line/sparkline, and a short cited narrative section) — never just print the raw JSON back at the user. Optionally call **`getReportTemplate`** (or pass `template_style=default` directly on `getCountryReport` to get it embedded as `design_template`) for an HTML/CSS skeleton with colors, fonts, and layout to follow; apply its `design_tokens` even if you render as markdown or an image/canvas instead of raw HTML.
+6. **Honesty:** if `coverage.fdrs_data_available` or `coverage.narrative_available` is `false`, say so plainly in the one-pager (e.g. “no public FDRS data for this period” / “no public Unified Plan/Report found”) rather than implying complete reporting. Surface `coverage.period_match_note` when present (e.g. the requested year/period wasn’t available and a nearby one was used instead).
+7. `narrative.themes[]` follows the same citation rule as **`searchPublicDocuments`**: cite `document_title` + `page_number` per claim, and hyperlink the country name to `document_url` when present.
 
 ---
 

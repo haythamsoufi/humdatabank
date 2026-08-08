@@ -255,6 +255,13 @@ async function saveFormOnce(options = {}) {
             throw (window.httpErrorSync && window.httpErrorSync(response, errorMessage)) || new Error(errorMessage);
         }
 
+        if (response.ok && result == null) {
+            const proxyErr = _t('Save failed (%(status)s). Refresh the page and try again, or contact support if it persists.').replace('%(status)s', response.status);
+            debugLog(MODULE_NAME, '❌ Save failed:', proxyErr);
+            showSaveMessage('❌ ' + _t('Save failed') + ': ' + proxyErr, 'error');
+            throw new Error(proxyErr);
+        }
+
         if (result.success) {
             debugLog(MODULE_NAME, 'Form saved successfully');
             const toastOpt = (options && Object.prototype.hasOwnProperty.call(options, 'toast')) ? options.toast : undefined;

@@ -9,8 +9,7 @@
     const versionUi = {};
 
     function apiUrl(path, versionId) {
-        const version = versionId || activeVersion;
-        return API_BASE + '/' + encodeURIComponent(version) + path;
+        return PBProgressShared.buildApiUrl(API_BASE, path, versionId || activeVersion);
     }
 
     function initVersionUi() {
@@ -59,25 +58,11 @@
     let wasBuildRunning = false;
 
     function currentStageLabel(stageList, status) {
-        if (status && status.build_stage_label) return status.build_stage_label;
-        if (!stageList || !stageList.length) {
-            return (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
-        }
-        let active = null;
-        stageList.forEach(function(stage) {
-            if (stage.state === 'active') active = stage;
-        });
-        if (active && active.label) return active.label;
-        return (cfg.i18n && cfg.i18n.generatingReport) || 'Generating report...';
+        return PBProgressShared.currentStageLabel(stageList, status, cfg.i18n);
     }
 
     function updateStagesToggle(expanded, visible) {
-        if (!els.stagesToggle) return;
-        els.stagesToggle.classList.toggle('hidden', !visible);
-        els.stagesToggle.textContent = expanded
-            ? ((cfg.i18n && cfg.i18n.hideBuildSteps) || 'Hide steps')
-            : ((cfg.i18n && cfg.i18n.showBuildSteps) || 'Show steps');
-        els.stagesToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        PBProgressShared.updateStagesToggle(els.stagesToggle, expanded, visible, cfg.i18n);
     }
 
     function getVersionFromUrl() {
@@ -135,73 +120,19 @@
     }
 
     function setMessage(el, text, tone) {
-        if (!el) return;
-        el.textContent = text || '';
-        el.classList.remove('hidden', 'text-red-600', 'text-green-700', 'text-gray-600');
-        if (!text) {
-            el.classList.add('hidden');
-            return;
-        }
-        if (tone === 'error') el.classList.add('text-red-600');
-        else if (tone === 'success') el.classList.add('text-green-700');
-        else el.classList.add('text-gray-600');
+        PBProgressShared.setMessage(el, text, tone);
     }
 
     function formatUploadedAt(value) {
-        if (!value) return '';
-        try {
-            return new Date(value).toLocaleString();
-        } catch (e) {
-            return value;
-        }
+        return PBProgressShared.formatUploadedAt(value);
     }
 
     function renderBuildStages(stageList, status) {
-        if (!els.stages) return;
-        const list = stageList || [];
-        const running = status && status.status === 'running';
-        if (!running || !list.length) {
-            els.stages.classList.add('hidden');
-            els.stages.innerHTML = '';
-            updateStagesToggle(false, false);
-            return;
-        }
-        updateStagesToggle(stagesExpanded, true);
-        if (!stagesExpanded) {
-            els.stages.classList.add('hidden');
-            els.stages.innerHTML = '';
-            return;
-        }
-        els.stages.classList.remove('hidden');
-        els.stages.innerHTML = '';
-        list.forEach(function(stage) {
-            const item = document.createElement('li');
-            item.className = 'flex items-center gap-2';
-            let iconClass = 'far fa-circle text-gray-400';
-            let textClass = 'text-gray-500';
-            if (stage.state === 'done') {
-                iconClass = 'fas fa-check-circle text-green-600';
-                textClass = 'text-gray-700';
-            } else if (stage.state === 'active') {
-                iconClass = 'fas fa-spinner fa-spin text-blue-600';
-                textClass = 'text-blue-800 font-medium';
-            }
-            item.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i><span class="' + textClass + '">' + stage.label + '</span>';
-            els.stages.appendChild(item);
-        });
+        PBProgressShared.renderBuildStages(els.stages, els.stagesToggle, stageList, status, stagesExpanded, cfg.i18n);
     }
 
     function stageProgressPercent(stageList) {
-        if (!stageList || !stageList.length) return 15;
-        let completed = 0;
-        let hasActive = false;
-        stageList.forEach(function(stage) {
-            if (stage.state === 'done') completed += 1;
-            if (stage.state === 'active') hasActive = true;
-        });
-        const total = stageList.length;
-        const value = hasActive ? completed + 0.5 : completed;
-        return Math.min(95, Math.max(15, Math.round((value / total) * 100)));
+        return PBProgressShared.stageProgressPercent(stageList);
     }
 
     const DOWNLOAD_LANG_ORDER = ['English', 'French', 'Spanish', 'Arabic'];
@@ -459,16 +390,7 @@
 
     function updateCancelButton(running, cancelling) {
         if (!els.cancelBtn || !cfg.canManage) return;
-        els.cancelBtn.classList.toggle('hidden', !running);
-        els.cancelBtn.disabled = !!cancelling;
-        els.cancelBtn.title = (cfg.i18n && cfg.i18n.cancelGeneration) || 'Cancel generation';
-        if (cancelling) {
-            els.cancelBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1" aria-hidden="true"></i>'
-                + ((cfg.i18n && cfg.i18n.cancellingGeneration) || 'Cancelling…');
-        } else {
-            els.cancelBtn.innerHTML = '<i class="fas fa-stop mr-1" aria-hidden="true"></i>'
-                + ((cfg.i18n && cfg.i18n.cancelGeneration) || 'Cancel');
-        }
+        PBProgressShared.updateCancelButton(els.cancelBtn, running, cancelling, cfg.i18n);
     }
 
     function updateBuildProgress(status) {
@@ -548,33 +470,15 @@
     }
 
     function getCsrfToken() {
-        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+        return PBProgressShared.getCsrfToken();
     }
 
     async function fetchJson(url, options) {
-        const opts = Object.assign({ credentials: 'same-origin' }, options || {});
-        const method = (opts.method || 'GET').toUpperCase();
-        if (method !== 'GET' && method !== 'HEAD') {
-            const headers = Object.assign({}, opts.headers || {});
-            const token = getCsrfToken();
-            if (token) {
-                headers['X-CSRFToken'] = token;
-            }
-            opts.headers = headers;
-        }
-        const response = await fetch(url, opts);
-        const payload = await response.json().catch(function() { return {}; });
-        if (!response.ok) {
-            throw new Error(payload.message || payload.error || (cfg.i18n && cfg.i18n.requestFailed) || 'Request failed.');
-        }
-        return payload;
+        return PBProgressShared.fetchJson(url, options, cfg.i18n && cfg.i18n.requestFailed);
     }
 
     function anyVersionRunning() {
-        return VERSION_ORDER.some(function(versionId) {
-            const cached = versionUi[versionId].statusCache;
-            return cached && cached.status === 'running';
-        });
+        return PBProgressShared.anyVersionRunning(versionUi, VERSION_ORDER);
     }
 
     async function refreshAllStatuses() {

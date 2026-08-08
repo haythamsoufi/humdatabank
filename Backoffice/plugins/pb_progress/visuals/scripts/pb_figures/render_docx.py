@@ -330,6 +330,7 @@ def _add_cumulative_block(
         doc.add_paragraph("")
         return
 
+    n_years = len(item["years"])
     chart_path = assets_dir / f"{block_id}_line.png"
     chart_width_px = _chart_render_width_px(n_years)
     render_line_chart_asset(
@@ -341,7 +342,6 @@ def _add_cumulative_block(
         session=session,
     )
 
-    n_years = len(item["years"])
     show_reporting, show_implementing = cumulative_table_rows(item)
     n_rows = 2 + int(show_reporting) + int(show_implementing)
     table = doc.add_table(rows=n_rows, cols=n_years + 1)

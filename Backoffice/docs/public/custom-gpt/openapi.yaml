@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: IFRC Humanitarian Databank Public API
-  version: 1.2.0
+  version: 1.3.0
   description: Public FDRS stats and UPR data plus Unified Plan/report documents. Prefer /public/* routes. No auth. Privacy https://databank.ifrc.org/privacy
 
 servers:
@@ -423,3 +423,63 @@ paths:
       responses:
         "200":
           description: Paginated data rows with num_value and data_status
+
+  /public/reports/country:
+    get:
+      operationId: getCountryReport
+      summary: One-country report spec — headline KPIs, trend, cited narrative
+      description: Single-call equivalent of chaining resolveCountry, getSubmissionCoverage, getPublicData, and searchPublicDocuments. Render the JSON as a one-pager yourself; never dump raw JSON to the user.
+      parameters:
+        - name: country
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Country name, ISO2/ISO3 code, or numeric id
+        - name: period_hint
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Free text e.g. "2026 midyear" or "Annual 2024"; omit for latest
+        - name: report_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - fdrs
+              - upr
+              - combined
+            default: combined
+        - name: include_prior_period
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+        - name: template_style
+          in: query
+          required: false
+          schema:
+            type: string
+          description: e.g. "default" to embed design_template inline (same shape as getReportTemplate)
+      responses:
+        "200":
+          description: country, period, coverage, headline_kpis, trend, narrative. ok=false with alternatives if the country did not resolve.
+
+  /public/reports/template:
+    get:
+      operationId: getReportTemplate
+      summary: HTML/CSS one-pager skeleton plus design tokens for a report style
+      description: Use with getCountryReport to follow a specific layout/palette instead of a freeform render. Fill {{PLACEHOLDER}} tokens in html_template with report data; apply design_tokens even for non-HTML renders.
+      parameters:
+        - name: style
+          in: query
+          required: false
+          schema:
+            type: string
+            default: default
+      responses:
+        "200":
+          description: style, html_template, design_tokens, usage_notes, available_styles. ok=false with available_styles if style is unknown.

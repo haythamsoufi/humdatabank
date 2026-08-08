@@ -314,8 +314,19 @@ async function fetchCompletionGaps(aesId) {
         headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         credentials: 'same-origin',
     });
+    if (window.responseAsResult) {
+        const result = await window.responseAsResult(response);
+        if (!result.ok) {
+            throw new Error(result.data?.error || `HTTP ${result.status}`);
+        }
+        return result.data;
+    }
     if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
+    }
+    const ct = response.headers.get('Content-Type') || '';
+    if (!ct.includes('application/json')) {
+        throw new Error(`HTTP ${response.status}: non-JSON response`);
     }
     return response.json();
 }
@@ -409,10 +420,23 @@ export async function refreshVisibleCompletionRate(aesId) {
         headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         credentials: 'same-origin',
     });
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+    let data;
+    if (window.responseAsResult) {
+        const result = await window.responseAsResult(response);
+        if (!result.ok) {
+            throw new Error(result.data?.error || `HTTP ${result.status}`);
+        }
+        data = result.data;
+    } else {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const ct = response.headers.get('Content-Type') || '';
+        if (!ct.includes('application/json')) {
+            throw new Error(`HTTP ${response.status}: non-JSON response`);
+        }
+        data = await response.json();
     }
-    const data = await response.json();
     if (typeof data?.completion_rate === 'number') {
         applyCompletionRate(data.completion_rate);
     }

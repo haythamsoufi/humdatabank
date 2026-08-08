@@ -269,12 +269,29 @@ export class EmergencyOperationsField {
         const p = (async () => {
           const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
           debugPluginLog(this.pluginName, 'response status:', res.status, res.statusText);
-          if (!res.ok) {
-            let errText = '';
-            try { errText = await res.text(); } catch (_) {}
-            throw new Error(`HTTP ${res.status} ${res.statusText} ${errText ? '- ' + errText : ''}`);
+          let result;
+          if (typeof window !== 'undefined' && typeof window.responseAsResult === 'function') {
+            result = await window.responseAsResult(res);
+          } else if (!res.ok) {
+            result = { ok: false, status: res.status, data: { error: `HTTP ${res.status} ${res.statusText}` } };
+          } else {
+            const ct = res.headers.get('Content-Type') || '';
+            if (!ct.includes('application/json')) {
+              result = { ok: false, status: res.status, data: { error: 'Non-JSON response' } };
+            } else {
+              try {
+                const data = await res.json();
+                result = { ok: true, status: res.status, data };
+              } catch (_) {
+                result = { ok: false, status: res.status, data: { error: 'Invalid JSON response' } };
+              }
+            }
           }
-          const data = await res.json();
+          if (!result.ok) {
+            const msg = (result.data && result.data.error) || `HTTP ${result.status}`;
+            throw Object.assign(new Error(msg), { status: result.status });
+          }
+          const data = result.data;
           debugPluginLog(this.pluginName, 'payload keys:', Object.keys(data || {}));
           if (!data?.success) throw new Error(data?.error || 'Unknown error');
           return data;
@@ -353,13 +370,24 @@ export class EmergencyOperationsField {
         return;
       }
 
-      list.innerHTML = `
-        <div class="text-center py-4 text-red-600">
-          <i class="fas fa-exclamation-triangle"></i>
-          <span>Failed to load operations</span>
-          <div class="text-xs text-red-500 mt-1">${(e && e.message) ? e.message : 'Unknown error'}</div>
-        </div>
-      `;
+      list.replaceChildren();
+      const outer = document.createElement('div');
+      outer.className = 'text-center py-4 text-red-600';
+      const icon = document.createElement('i');
+      icon.className = 'fas fa-exclamation-triangle';
+      const title = document.createElement('span');
+      title.textContent = 'Failed to load operations';
+      const detail = document.createElement('div');
+      detail.className = 'text-xs text-red-500 mt-1';
+      let msg = (e && e.message) ? String(e.message) : 'Unknown error';
+      if (msg.trimStart().startsWith('<')) {
+        msg = 'Request failed. Please refresh and try again.';
+      } else if (msg.length > 200) {
+        msg = msg.slice(0, 200) + '…';
+      }
+      detail.textContent = msg;
+      outer.append(icon, document.createTextNode(' '), title, detail);
+      list.append(outer);
       this.updateOperationsVariables([]);
       this.markPluginDataReady();
       this.updateOperationsCount(0);

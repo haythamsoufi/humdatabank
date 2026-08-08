@@ -125,6 +125,7 @@ from .plugin_data import (
 
 from .reports import (
     ReportDefinition,
+    ReportDefinitionRevision,
     ReportRun,
 )
 
@@ -312,6 +313,7 @@ __all__ = [
 
     # Report builder
     'ReportDefinition',
+    'ReportDefinitionRevision',
     'ReportRun',
 
     # AI Embeddings models

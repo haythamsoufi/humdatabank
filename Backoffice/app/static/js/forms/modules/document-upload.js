@@ -1107,11 +1107,22 @@ export function initDocumentUpload() {
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     })
       .then((response) => {
-        if (response.redirected || !response.ok) return null;
+        if (response.redirected || !response.ok) {
+          if (window.showAlert) {
+            window.showAlert('Could not refresh document list. Please reload the page.', 'warning');
+          }
+          return null;
+        }
         return response.text();
       })
       .then((html) => {
         if (!html) return null;
+        if (html.trimStart().startsWith('<!DOCTYPE') && !html.includes('document-upload-btn')) {
+          if (window.showAlert) {
+            window.showAlert('Could not refresh document list. Please reload the page.', 'warning');
+          }
+          return null;
+        }
         const parser = new DOMParser();
         const parsed = parser.parseFromString(html, 'text/html');
         const fetchedUpload = parsed.querySelector(`.document-upload-btn[data-field-id="${fieldId}"]`);

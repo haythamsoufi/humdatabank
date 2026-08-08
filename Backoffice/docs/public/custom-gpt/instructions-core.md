@@ -19,6 +19,7 @@ UPR / Unified Plan / UPL / Unified Report → documents via **`searchPublicDocum
 5. **Resolve country name/code** → `resolveCountry` (id, iso2, iso3, region)
 6. **Plan/report text** → `searchPublicDocuments`
 7. **Indicator metadata** → `getIndicatorById` or `getIndicatorBank` with `search` + `limit`
+8. **One-country one-pager** → `getCountryReport` (KPIs+trend+narrative, one call)
 
 ## Data rules
 
@@ -83,6 +84,8 @@ Cite **only** live Action results in user-facing answers:
 **Cross-country theme:** `searchPublicDocuments` with `full_coverage=true`, e.g. `migration unified plan 2026`; group by country from chunks; list countries in `coverage.without_hits` as no mention
 
 **Mixed:** separate **Numbers** and **Plan summary** sections
+
+**Country one-pager:** `getCountryReport(country, period_hint)` → render as a one-pager, not raw JSON; `getReportTemplate` for layout/colors
 
 ## Presentation & charts
 

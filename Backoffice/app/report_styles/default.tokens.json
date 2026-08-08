@@ -1,0 +1,35 @@
+{
+  "style": "default",
+  "description": "IFRC-inspired one-pager: red header band, white KPI cards, clean sans-serif. Colors are drawn from the MCP connector icon (assets/ifrc_icon.svg), not an official brand kit — swap these tokens if the user supplies real IFRC/National Society brand guidelines.",
+  "colors": {
+    "primary": "#F5333F",
+    "primary_dark": "#C21F2A",
+    "ink": "#333132",
+    "text_muted": "#5B6470",
+    "background": "#FFFFFF",
+    "surface": "#F7F7F8",
+    "border": "#E4E6E8",
+    "positive": "#1E8E5A",
+    "negative": "#C0392B",
+    "chart_palette": ["#F5333F", "#2C6E9E", "#E8A33D", "#333132", "#1E8E5A"]
+  },
+  "typography": {
+    "font_family": "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    "heading_weight": 700,
+    "body_size_px": 14,
+    "kpi_label_size_px": 12,
+    "kpi_value_size_px": 30,
+    "title_size_px": 26,
+    "subtitle_size_px": 14
+  },
+  "spacing": {
+    "page_padding_px": 32,
+    "card_gap_px": 16,
+    "section_gap_px": 24,
+    "border_radius_px": 10
+  },
+  "layout": {
+    "page_max_width_px": 820,
+    "kpi_grid_columns": 3
+  }
+}

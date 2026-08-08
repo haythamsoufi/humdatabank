@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import struct
 import sys
 import tempfile
 import unittest
@@ -18,6 +19,7 @@ from pb_figures.render_docx import (  # noqa: E402
     _DOCX_CONTENT_WIDTH_IN,
     _DOCX_LABEL_COL_IN,
     _DOCX_PAGE_MARGIN,
+    _add_cumulative_block,
     _add_donut_pair_block,
     _chart_area_width,
     _configure_page_margins,
@@ -27,6 +29,24 @@ from pb_figures.render_docx import (  # noqa: E402
     _set_table_inner_borders,
 )
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+
+
+def _minimal_png_bytes(width: int = 4, height: int = 4) -> bytes:
+    """Build the smallest PNG that python-docx's ``add_picture`` can size.
+
+    ``docx.image.png`` only reads the IHDR chunk's width/height (and an
+    optional pHYs chunk for DPI, defaulting to 72 when absent); it never
+    decodes pixel data or validates chunk CRCs. So a signature + IHDR +
+    IEND with a dummy CRC is enough, without a real encoder/decoder
+    dependency in the test.
+    """
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + b"\x00\x00\x00\x00"
+
+    signature = b"\x89PNG\r\n\x1a\n"
+    ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return signature + chunk(b"IHDR", ihdr_data) + chunk(b"IEND", b"")
 
 
 class TableInnerBorderTests(unittest.TestCase):
@@ -113,6 +133,68 @@ class DonutPairTableTests(unittest.TestCase):
         tr_pr = table.rows[0]._tr.trPr
         self.assertIsNotNone(tr_pr)
         self.assertIsNotNone(tr_pr.find(qn("w:cantSplit")))
+
+
+class CumulativeBlockRegressionTests(unittest.TestCase):
+    """Regression test for a real production bug (fixed in this codebase's history):
+
+    _add_cumulative_block used to reference `n_years` in
+    `_chart_render_width_px(n_years)` several lines before `n_years` was
+    assigned, raising UnboundLocalError for every cumulative indicator. It
+    shipped to main and broke every DOCX build until caught by this kind of
+    test — CI only runs render_docx's *unit-level* helpers (table widths,
+    borders, etc.), never `_add_cumulative_block` itself, so the bug wasn't
+    caught until a real build hit it.
+    """
+
+    def test_add_cumulative_block_available_item_does_not_raise(self) -> None:
+        doc = Document()
+        item = {
+            "label": "Indicator label",
+            "years": ["2021", "2022", "2023"],
+            "reporting": ["10", "20", "30"],
+            "implementing": ["5", "15", "25"],
+        }
+        labels = {"year": "Year", "reporting": "Reporting", "implementing": "Implementing"}
+
+        def fake_render(item, target_label, output_path, **kwargs):
+            output_path.write_bytes(_minimal_png_bytes())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            assets_dir = Path(tmp)
+            with patch("pb_figures.render_docx.render_line_chart_asset", side_effect=fake_render):
+                _add_cumulative_block(doc, item, labels, "Target label", assets_dir, "SP1")
+
+        self.assertEqual(len(doc.tables), 1)
+        table = doc.tables[0]
+        self.assertEqual(len(table.columns), len(item["years"]) + 1)
+        # Year row (bold), reporting row, and implementing row are all present.
+        self.assertEqual(len(table.rows), 4)
+        self.assertEqual(table.cell(0, 0).text, item["label"])
+
+    def test_add_cumulative_block_respects_ns_table_mode(self) -> None:
+        """Same bug path, hit via the ns_table_mode branch that hides the implementing row."""
+        doc = Document()
+        item = {
+            "label": "Indicator label",
+            "years": ["2022", "2023"],
+            "reporting": ["1", "2"],
+            "implementing": ["1", "2"],
+            "ns_table_mode": "ns_unit",
+        }
+        labels = {"year": "Year", "reporting": "Reporting", "implementing": "Implementing"}
+
+        def fake_render(item, target_label, output_path, **kwargs):
+            output_path.write_bytes(_minimal_png_bytes())
+
+        with tempfile.TemporaryDirectory() as tmp:
+            assets_dir = Path(tmp)
+            with patch("pb_figures.render_docx.render_line_chart_asset", side_effect=fake_render):
+                _add_cumulative_block(doc, item, labels, "Target label", assets_dir, "SP2")
+
+        table = doc.tables[0]
+        # Chart row + year row + reporting row only (no implementing row).
+        self.assertEqual(len(table.rows), 3)
 
 
 if __name__ == "__main__":

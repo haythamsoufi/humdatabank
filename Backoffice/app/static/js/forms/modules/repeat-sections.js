@@ -948,21 +948,39 @@ function _formatFetchError(err) {
 
 async function _fetchRepeatIndicatorHtml(fetchFn, assignmentId, attempt = 1) {
     const maxAttempts = 2;
+    const gatewayStatuses = new Set([403, 502, 503, 504]);
     try {
         const res = await fetchFn(`/api/forms/dynamic-indicators/${assignmentId}/render`, {
             method: 'GET',
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         });
+        if (window.responseAsResult) {
+            const result = await window.responseAsResult(res);
+            if (!result.ok) {
+                throw Object.assign(new Error(result.data?.error || `HTTP ${result.status}`), { status: result.status });
+            }
+            if (!result.data || !result.data.html) {
+                throw new Error('Render API returned no html');
+            }
+            return result.data.html;
+        }
         if (!res.ok) {
             let detail = `HTTP ${res.status}`;
             try {
-                const body = await res.json();
-                if (body && body.error) detail = `${detail}: ${body.error}`;
+                const ct = res.headers.get('Content-Type') || '';
+                if (ct.includes('application/json')) {
+                    const body = await res.json();
+                    if (body && body.error) detail = `${detail}: ${body.error}`;
+                }
             } catch (_e) {
                 // ignore non-JSON error bodies
             }
-            throw new Error(detail);
+            throw Object.assign(new Error(detail), { status: res.status });
+        }
+        const ct = res.headers.get('Content-Type') || '';
+        if (!ct.includes('application/json')) {
+            throw Object.assign(new Error(`HTTP ${res.status}: non-JSON response`), { status: res.status });
         }
         const data = await res.json();
         if (!data || !data.html) {
@@ -970,6 +988,10 @@ async function _fetchRepeatIndicatorHtml(fetchFn, assignmentId, attempt = 1) {
         }
         return data.html;
     } catch (err) {
+        const status = err && err.status;
+        if (gatewayStatuses.has(Number(status)) || /non-JSON response/i.test(String(err.message || ''))) {
+            throw err;
+        }
         if (attempt < maxAttempts) {
             await new Promise(resolve => setTimeout(resolve, 500 * attempt));
             return _fetchRepeatIndicatorHtml(fetchFn, assignmentId, attempt + 1);

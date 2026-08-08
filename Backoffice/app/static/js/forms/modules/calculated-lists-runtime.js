@@ -85,12 +85,29 @@ function cachedFetch(urlString) {
         return inFlight;
     }
 
-    const fetchFn = (window.getFetch && window.getFetch()) || fetch;
-    const promise = fetchFn(urlString, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return response.json();
-        })
+    const promise = (async () => {
+        const apiFn = (window.getApiFetch && window.getApiFetch()) || null;
+        if (apiFn) {
+            return apiFn(urlString, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        }
+        const fetchFn = (window.getFetch && window.getFetch()) || fetch;
+        const response = await fetchFn(urlString, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (window.responseAsResult) {
+            const result = await window.responseAsResult(response);
+            if (!result.ok) {
+                throw Object.assign(new Error(result.data?.error || `HTTP ${result.status}`), { status: result.status });
+            }
+            return result.data;
+        }
+        if (!response.ok) {
+            throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
+        }
+        const ct = response.headers.get('Content-Type') || '';
+        if (!ct.includes('application/json')) {
+            throw Object.assign(new Error(`HTTP ${response.status}: non-JSON response`), { status: response.status });
+        }
+        return response.json();
+    })()
         .then(json => {
             _responseCache.set(urlString, { json, ts: Date.now() });
             _pendingFetches.delete(urlString);

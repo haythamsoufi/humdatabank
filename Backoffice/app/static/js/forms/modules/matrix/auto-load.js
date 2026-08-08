@@ -1,7 +1,7 @@
 /** Auto-load matrix rows from variable entity resolution. */
 import { debugLog, debugError, debugWarn } from '../debug.js';
 import { __configFlag } from './formatting.js';
-import { mhFetch } from './api.js';
+import { mhFetch, mhFetchJson, mhResponseAsResult, isGatewayClassFailure, gatewayFailureMessage } from './api.js';
 
 export const matrixAutoLoadMixin = {
 
@@ -193,24 +193,13 @@ async autoLoadEntities(fieldId) {
             // For reverse lookup (entities_containing), use variable resolution once and collect entities from ALL variable columns
             debugLog('matrix-handler', '[AUTO-LOAD] Using reverse lookup via variable resolution (all variable columns)');
 
-            const response = await mhFetch('/api/v1/variables/resolve', {
+            const data = await mhFetchJson('/api/v1/variables/resolve', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(_mkVarsBody({ template_id: templateId }))
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                debugError('matrix-handler', `[AUTO-LOAD] Variable resolution failed: ${response.status}`, {
-                    status: response.status,
-                    errorText
-                });
-                return;
-            }
-
-            const data = await response.json();
             const resolvedVariables = data.variables || {};
             const entityMapById = new Map(); // entity_id -> { entity_id, entity_type } for deduplication
 
@@ -276,19 +265,22 @@ async autoLoadEntities(fieldId) {
             }
 
             if (subRequests.length > 0) {
-                const batchResponse = await mhFetch('/api/v1/matrix/auto-load-entities/batch', {
+                const batchResult = await mhResponseAsResult(await mhFetch('/api/v1/matrix/auto-load-entities/batch', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': this.getCsrfToken()
                     },
                     body: JSON.stringify({ requests: subRequests })
-                });
+                }));
 
-                if (!batchResponse.ok) {
-                    debugWarn('matrix-handler', `[AUTO-LOAD] Batch request failed: ${batchResponse.status}`);
+                if (!batchResult.ok) {
+                    debugWarn('matrix-handler', `[AUTO-LOAD] Batch request failed: ${batchResult.status}`);
+                    if (isGatewayClassFailure(batchResult.status) && typeof this.showMatrixError === 'function') {
+                        this.showMatrixError(fieldId, gatewayFailureMessage(batchResult.status));
+                    }
                 } else {
-                    const batchData = await batchResponse.json();
+                    const batchData = batchResult.data;
                     const results = batchData.results || [];
                     for (let i = 0; i < results.length; i++) {
                         const colVarName = subRequestColumnNames[i] || `col_${i}`;
@@ -334,7 +326,7 @@ async autoLoadEntities(fieldId) {
 
             let resultsByEntityId = {};
             try {
-                const resolveResponse = await mhFetch('/api/v1/variables/resolve', {
+                const resolveResult = await mhResponseAsResult(await mhFetch('/api/v1/variables/resolve', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -343,13 +335,12 @@ async autoLoadEntities(fieldId) {
                         template_id: templateId,
                         row_entity_ids: rowEntityIds
                     }))
-                });
+                }));
 
-                if (resolveResponse.ok) {
-                    const resolveData = await resolveResponse.json();
-                    resultsByEntityId = resolveData.results || {};
+                if (resolveResult.ok) {
+                    resultsByEntityId = resolveResult.data.results || {};
                 } else {
-                    debugWarn('matrix-handler', `[AUTO-LOAD] Batch tick resolve failed: ${resolveResponse.status}`);
+                    debugWarn('matrix-handler', `[AUTO-LOAD] Batch tick resolve failed: ${resolveResult.status}`);
                 }
             } catch (error) {
                 debugError('matrix-handler', '[AUTO-LOAD] Error batch-checking tick status for entities:', error);
@@ -425,7 +416,7 @@ async autoLoadEntities(fieldId) {
         try {
             // Call search endpoint to get entity data with names
             // Request up to 200 options to reduce chance of missing entities
-            const response = await mhFetch('/forms/matrix/search-rows', {
+            const lookupResult = await mhResponseAsResult(await mhFetch('/forms/matrix/search-rows', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -435,14 +426,14 @@ async autoLoadEntities(fieldId) {
                     lookup_list_id: lookupListId,
                     display_column: displayColumn,
                     filters: filters,
-                    search_term: '', // Empty search to get all
+                    search_term: '',
                     existing_rows: [],
-                    limit: 200 // Request up to 200 options
+                    limit: 200
                 })
-            });
+            }));
 
-            if (response.ok) {
-                const data = await response.json();
+            if (lookupResult.ok) {
+                const data = lookupResult.data;
                 debugLog('matrix-handler', '[AUTO-LOAD] Lookup API response', {
                     success: data.success,
                     optionCount: data.options ? data.options.length : 0,
@@ -548,7 +539,7 @@ async autoLoadEntities(fieldId) {
                                     }
                                 });
 
-                                const searchResponse = await mhFetch('/forms/matrix/search-rows', {
+                                const searchResult = await mhResponseAsResult(await mhFetch('/forms/matrix/search-rows', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
@@ -558,19 +549,19 @@ async autoLoadEntities(fieldId) {
                                         lookup_list_id: lookupListId,
                                         display_column: displayColumn,
                                         filters: idFilter,
-                                        search_term: '', // Empty search, rely on filter
+                                        search_term: '',
                                         existing_rows: [],
-                                        limit: 10  // Small limit since we're filtering by ID
+                                        limit: 10
                                     })
-                                });
+                                }));
 
                                 debugLog('matrix-handler', `[AUTO-LOAD] Fallback API response for ${missingId}:`, {
-                                    status: searchResponse.status,
-                                    ok: searchResponse.ok
+                                    status: searchResult.status,
+                                    ok: searchResult.ok
                                 });
 
-                                if (searchResponse.ok) {
-                                    const searchData = await searchResponse.json();
+                                if (searchResult.ok) {
+                                    const searchData = searchResult.data;
                                     debugLog('matrix-handler', `[AUTO-LOAD] Fallback API data for ${missingId}:`, {
                                         success: searchData.success,
                                         optionCount: searchData.options ? searchData.options.length : 0,
@@ -618,7 +609,7 @@ async autoLoadEntities(fieldId) {
                                                 value: String(missingId)  // Backoffice does string comparison
                                             });
 
-                                            const altResponse = await mhFetch('/forms/matrix/search-rows', {
+                                            const altResult = await mhResponseAsResult(await mhFetch('/forms/matrix/search-rows', {
                                                 method: 'POST',
                                                 headers: {
                                                     'Content-Type': 'application/json',
@@ -632,10 +623,10 @@ async autoLoadEntities(fieldId) {
                                                     existing_rows: [],
                                                     limit: 10
                                                 })
-                                            });
+                                            }));
 
-                                            if (altResponse.ok) {
-                                                const altData = await altResponse.json();
+                                            if (altResult.ok) {
+                                                const altData = altResult.data;
                                                 debugLog('matrix-handler', `[AUTO-LOAD] Alternative filter response for ${missingId}:`, {
                                                     success: altData.success,
                                                     optionCount: altData.options ? altData.options.length : 0,
@@ -664,8 +655,8 @@ async autoLoadEntities(fieldId) {
                                                 }
                                             } else {
                                                 debugWarn('matrix-handler', `[AUTO-LOAD] Alternative filter request failed for ${missingId}:`, {
-                                                    status: altResponse.status,
-                                                    statusText: altResponse.statusText
+                                                    status: altResult.status,
+                                                    error: altResult.data && altResult.data.error
                                                 });
                                             }
                                         }
@@ -678,8 +669,8 @@ async autoLoadEntities(fieldId) {
                                     }
                                 } else {
                                     debugWarn('matrix-handler', `[AUTO-LOAD] Fallback API request failed for ${missingId}:`, {
-                                        status: searchResponse.status,
-                                        statusText: searchResponse.statusText
+                                        status: searchResult.status,
+                                        error: searchResult.data && searchResult.data.error
                                     });
                                 }
                             } catch (error) {
@@ -696,9 +687,12 @@ async autoLoadEntities(fieldId) {
                 }
             } else {
                 debugError('matrix-handler', '[AUTO-LOAD] Lookup API request failed', {
-                    status: response.status,
-                    statusText: response.statusText
+                    status: lookupResult.status,
+                    error: lookupResult.data && lookupResult.data.error
                 });
+                if (isGatewayClassFailure(lookupResult.status) && typeof this.showMatrixError === 'function') {
+                    this.showMatrixError(fieldId, gatewayFailureMessage(lookupResult.status));
+                }
             }
         } catch (error) {
             debugError('matrix-handler', 'Error fetching entity names for auto-load:', error);

@@ -19,6 +19,7 @@ from app.services.public_document_service import (
     search_public_documents,
     stream_public_ai_document_download,
 )
+from app.services.public_report_service import build_country_report, get_report_template
 from app.utils.api_helpers import api_error, json_response
 from app.utils.rate_limiting import api_rate_limit
 
@@ -301,3 +302,90 @@ def public_documents_catalog():
             exc_info=True,
         )
         return api_error("Could not build document catalog", 500, error_id, None)
+
+
+@api_bp.route("/public/reports/country", methods=["GET"])
+@api_rate_limit()
+def public_country_report():
+    """
+    Assemble a one-country report spec: headline FDRS KPIs, a trend, and cited
+    narrative themes — the single-call equivalent of chaining resolveCountry,
+    getSubmissionCoverage, getPublicData, and searchPublicDocuments by hand.
+
+    Resolves the country and reporting period from free text (``period_hint``,
+    e.g. "2026 midyear"), fetches a curated FDRS headline KPI bundle (volunteers,
+    staff, branches, local units, governing board, income, expenditure, blood
+    donations, first-aid trained) for the resolved period plus the prior one, a
+    multi-period volunteers trend, and cited themes from public Unified
+    Plan/Report/Midyear Report documents. Render the actual visual one-pager
+    yourself from the returned JSON — this endpoint never returns HTML or images.
+    An unresolved country returns HTTP 200 with ``ok=false`` and ``alternatives``
+    (same soft-failure shape as ``resolveCountry``), not an HTTP error.
+    """
+    try:
+        country = request.args.get("country", default="", type=str).strip()
+        if not country:
+            return api_error("country is required", 400)
+
+        period_hint = request.args.get("period_hint", default="", type=str).strip()
+        report_type = request.args.get("report_type", default="combined", type=str).strip()
+        include_prior_raw = request.args.get("include_prior_period", default="true", type=str).strip().lower()
+        include_prior_period = include_prior_raw not in {"0", "false", "no"}
+        template_style = request.args.get("template_style", default="", type=str).strip()
+
+        payload = build_country_report(
+            country=country,
+            period_hint=period_hint,
+            report_type=report_type,
+            include_prior_period=include_prior_period,
+        )
+        if template_style and payload.get("ok"):
+            payload["design_template"] = get_report_template(template_style)
+
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 400)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/reports/country failed [ID: %s]: %s",
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not build country report", 500, error_id, None)
+
+
+@api_bp.route("/public/reports/template", methods=["GET"])
+@api_rate_limit()
+def public_report_template():
+    """
+    Return an HTML/CSS one-pager skeleton plus design tokens for a report style.
+
+    Use alongside ``getCountryReport`` when the one-pager should follow a specific
+    layout/palette instead of a freeform render: fill the returned
+    ``html_template``'s ``{{PLACEHOLDER}}`` tokens with the report data (repeating
+    the ``KPI_CARD`` and ``THEME_ITEM`` blocks per entry) and apply
+    ``design_tokens`` (colors, fonts, spacing) even when rendering as markdown or
+    an image-generation prompt instead of raw HTML. An unrecognized ``style``
+    returns HTTP 200 with ``ok=false`` and ``available_styles``.
+    """
+    try:
+        style = request.args.get("style", default="default", type=str).strip()
+        payload = get_report_template(style)
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=60"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/reports/template failed [ID: %s]: %s",
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not load report template", 500, error_id, None)

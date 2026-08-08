@@ -1465,18 +1465,27 @@ document.addEventListener('DOMContentLoaded', function() {
             credentials: 'same-origin',
             cache: 'no-cache'
         })
-        .then(response => {
+        .then(async (response) => {
             if (response.status === 401 || response.status === 403) {
-                // Session expired or user logged out — stop polling to avoid
-                // continuous 401 noise in the server logs.
                 if (pollingInterval !== null) {
                     clearInterval(pollingInterval);
                     pollingInterval = null;
                 }
                 return null;
             }
+            if (window.responseAsResult) {
+                const result = await window.responseAsResult(response);
+                if (!result.ok) {
+                    throw new Error(result.data?.error || `HTTP ${result.status}`);
+                }
+                return result.data;
+            }
             if (!response.ok) {
                 throw (window.httpErrorSync && window.httpErrorSync(response)) || new Error(`HTTP ${response.status}`);
+            }
+            const ct = response.headers.get('Content-Type') || '';
+            if (!ct.includes('application/json')) {
+                throw new Error(`HTTP ${response.status}: non-JSON response`);
             }
             return response.json();
         })
@@ -1489,7 +1498,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 const count = parseInt(data.unread_count) || 0;
 
-                // Play sound if count increased (only if not from WebSocket)
                 if (count > lastBadgeCount && lastBadgeCount > 0 && !wsConnection) {
                     playNotificationSound();
                 }

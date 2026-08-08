@@ -29,6 +29,15 @@ PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS = 800
 PUBLIC_DOC_FULL_COVERAGE_CHUNKS_PER_DOC = 20
 PUBLIC_DOC_ACTION_MAX_RESPONSE_CHARS = 95_000
 PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE = 80
+# When a country filter narrows scope to this many documents or fewer, search per
+# document (batched) instead of one global vector query. The global path uses
+# _country_id_filter's geographic_scope='global' OR, which prevents pgvector from
+# using the HNSW index efficiently and has timed out at the 18s statement_timeout
+# on production for single-country MCP/report requests.
+PUBLIC_DOC_SCOPED_SEARCH_MAX_DOCS = 80
+# Minimum boost-free (vector/keyword) relevance a chunk must have, even if a source_boost
+# (see _passes_relevance_floor) would otherwise let it clear min_score on its own.
+PUBLIC_DOC_MIN_RAW_RELEVANCE = 0.05
 
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
 
@@ -49,6 +58,31 @@ def _chunk_score(row: Dict[str, Any]) -> float:
             except (TypeError, ValueError):
                 continue
     return 0.0
+
+
+def _passes_relevance_floor(row: Dict[str, Any], min_score: float) -> bool:
+    """
+    Return True when *row* clears ``min_score`` on genuine text relevance, not only
+    on a non-relevance ranking boost.
+
+    ``combined_score`` (see ``AIVectorStore._combine_search_results``) can include a
+    fixed ``source_boost`` (e.g. +0.25 for system-uploaded documents) that has nothing
+    to do with how well the chunk matches the query. A chunk with ~zero vector/keyword
+    similarity can still clear a low ``min_score`` on that boost alone, which is exactly
+    the kind of near-irrelevant hit this filter should be dropping. Require the
+    boost-free portion of the score to also clear a small floor.
+    """
+    score = _chunk_score(row)
+    if score < min_score:
+        return False
+    source_boost = row.get("source_boost")
+    if not source_boost:
+        return True
+    try:
+        raw_relevance = score - float(source_boost)
+    except (TypeError, ValueError):
+        return True
+    return raw_relevance >= PUBLIC_DOC_MIN_RAW_RELEVANCE
 
 
 def _document_source_url(document: AIDocument | Dict[str, Any] | None) -> str | None:
@@ -108,7 +142,7 @@ def _load_public_ai_document(document_id: int) -> AIDocument:
     return doc
 
 
-def _document_scope_entry(document: AIDocument) -> Dict[str, Any]:
+def _document_scope_entry(document: AIDocument, *, check_local_file: bool = True) -> Dict[str, Any]:
     doc_id = int(document.id)
     source_url = _document_source_url(document)
     entry = {
@@ -116,9 +150,11 @@ def _document_scope_entry(document: AIDocument) -> Dict[str, Any]:
         "document_title": document.title,
         "countries": _document_country_names(document),
     }
-    # Skip the local-file/blob existence check entirely when an external source_url is
-    # already available — it's sufficient for document_url and avoids a storage round-trip.
-    has_local_file = False if source_url else _ai_document_has_local_file(document)
+    # Skip the local-file/blob existence check (a storage round-trip — a network call on
+    # Azure Blob) when an external source_url is already available, or when the caller
+    # passes check_local_file=False because a resolved download link isn't needed (e.g. a
+    # document with no matching chunk in full-coverage search — see without_hits below).
+    has_local_file = False if (source_url or not check_local_file) else _ai_document_has_local_file(document)
     entry.update(
         _public_document_link_fields(
             doc_id,
@@ -700,19 +736,14 @@ def _search_public_documents_full_coverage(
 
     try:
         if mode == "vector":
-            rows: List[Dict[str, Any]] = []
-            for doc_id in doc_ids:
-                doc_filters = dict(filters or {})
-                doc_filters["document_id"] = doc_id
-                rows.extend(
-                    vector_store.search_similar(
-                        query_text=raw_query,
-                        top_k=PUBLIC_DOC_FULL_COVERAGE_CHUNKS_PER_DOC,
-                        filters=doc_filters,
-                        user_id=None,
-                        user_role="public",
-                    )
-                )
+            rows = vector_store.search_similar_per_document(
+                raw_query,
+                doc_ids,
+                chunks_per_doc=PUBLIC_DOC_FULL_COVERAGE_CHUNKS_PER_DOC,
+                filters=filters,
+                user_id=None,
+                user_role="public",
+            )
         else:
             rows = vector_store.hybrid_search_per_document(
                 raw_query,
@@ -731,16 +762,17 @@ def _search_public_documents_full_coverage(
     docs_with_hits: set[int] = set()
 
     for row in rows:
-        score = _chunk_score(row)
         doc_id = row.get("document_id")
-        if doc_id is None or score < min_score:
+        if doc_id is None or not _passes_relevance_floor(row, min_score):
             continue
         doc_id = int(doc_id)
         hits.append(slim_public_document_chunk(row, max_content_chars=max_content_chars))
         docs_with_hits.add(doc_id)
 
+    # check_local_file=False: these documents have no matching chunk (nothing to cite), so
+    # skip the per-document blob/local-file existence check — free source_url is still kept.
     without_hits = [
-        _document_scope_entry(doc)
+        _document_scope_entry(doc, check_local_file=False)
         for doc_id, doc in documents_by_id.items()
         if doc_id not in docs_with_hits
     ]
@@ -779,6 +811,50 @@ def _search_public_documents_full_coverage(
         "coverage_mode": "full",
         "coverage": coverage,
     }
+
+
+def _should_use_country_scoped_search(filters: Dict[str, Any] | None) -> bool:
+    return bool(filters and (filters.get("country_id") or filters.get("country_name")))
+
+
+def _try_country_scoped_search_rows(
+    vector_store: AIVectorStore,
+    raw_query: str,
+    *,
+    filters: Dict[str, Any] | None,
+    top_k: int,
+    mode: str,
+) -> List[Dict[str, Any]] | None:
+    """Search within country-scoped documents only; None => fall back to global search."""
+    if not _should_use_country_scoped_search(filters):
+        return None
+
+    documents = list_public_documents_in_scope(filters)
+    if not documents:
+        return []
+    if len(documents) > PUBLIC_DOC_SCOPED_SEARCH_MAX_DOCS:
+        return None
+
+    doc_ids = [int(doc.id) for doc in documents]
+    chunks_per_doc = max(top_k, 8)
+    if mode == "vector":
+        return vector_store.search_similar_per_document(
+            raw_query,
+            doc_ids,
+            chunks_per_doc=chunks_per_doc,
+            filters=filters,
+            user_id=None,
+            user_role="public",
+        )
+
+    return vector_store.hybrid_search_per_document(
+        raw_query,
+        doc_ids,
+        chunks_per_doc=chunks_per_doc,
+        filters=filters,
+        user_id=None,
+        user_role="public",
+    )
 
 
 def search_public_documents(
@@ -839,28 +915,41 @@ def search_public_documents(
         coverage_mode = coverage_payload["coverage_mode"]
     else:
         try:
-            if mode == "vector":
-                rows = vector_store.search_similar(
-                    query_text=raw_query,
-                    top_k=top_k * 2,
-                    filters=filters,
-                    user_id=None,
-                    user_role="public",
-                )
-            else:
-                rows = vector_store.hybrid_search(
-                    query_text=raw_query,
-                    top_k=top_k * 2,
-                    filters=filters,
-                    user_id=None,
-                    user_role="public",
-                )
+            rows = _try_country_scoped_search_rows(
+                vector_store,
+                raw_query,
+                filters=filters,
+                top_k=top_k,
+                mode=mode,
+            )
+            if rows is None:
+                if mode == "vector":
+                    rows = vector_store.search_similar(
+                        query_text=raw_query,
+                        top_k=top_k * 2,
+                        filters=filters,
+                        user_id=None,
+                        user_role="public",
+                    )
+                else:
+                    rows = vector_store.hybrid_search(
+                        query_text=raw_query,
+                        top_k=top_k * 2,
+                        filters=filters,
+                        user_id=None,
+                        user_role="public",
+                    )
         except VectorStoreError as exc:
             current_app.logger.error("Public document search failed: %s", exc)
             raise ValueError("Document search is temporarily unavailable") from exc
 
         rows = filter_rows_to_public_documents(rows)
-        filtered = [row for row in rows if _chunk_score(row) >= min_score]
+        filtered = [row for row in rows if _passes_relevance_floor(row, min_score)]
+        # Country-scoped rows come back concatenated per document (each document's own
+        # chunks already ranked, but not interleaved across documents — see
+        # hybrid_search_per_document), so re-sort globally before truncating to top_k.
+        # This is a no-op for the already-sorted global (non-scoped) path.
+        filtered.sort(key=_chunk_score, reverse=True)
         slimmed = [
             slim_public_document_chunk(row, max_content_chars=max_content_chars)
             for row in filtered[:top_k]

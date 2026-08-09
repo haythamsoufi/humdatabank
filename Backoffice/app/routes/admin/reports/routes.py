@@ -8,7 +8,7 @@ import io
 
 from app.models import FormItem, FormTemplate, IndicatorBank
 from app import db
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import permission_required, permission_required_any
 from app.services.data_quality.helpers import list_exploration_period_names
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.reports.build_service import ReportBuildService
@@ -42,6 +42,7 @@ def _forbidden_if_no_view():
 
 @bp.route("", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def reports_list():
     denied = _forbidden_if_no_view()
     if denied:
@@ -69,6 +70,7 @@ def reports_new():
 
 @bp.route("/<int:report_id>", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def reports_view(report_id: int):
     denied = _forbidden_if_no_view()
     if denied:
@@ -138,6 +140,7 @@ def api_create_report():
 
 @bp.route("/api/<int:report_id>", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_get_report(report_id: int):
     denied = _forbidden_if_no_view()
     if denied:
@@ -208,6 +211,7 @@ def api_clone_report(report_id: int):
 
 @bp.route("/api/<int:report_id>/run", methods=["POST"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_run_report(report_id: int):
     csrf_error = _csrf_guard()
     if csrf_error:
@@ -278,6 +282,7 @@ def api_upload_asset(report_id: int):
 
 @bp.route("/api/<int:report_id>/assets/<path:asset_key>", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_serve_asset(report_id: int, asset_key: str):
     from app.services.platform import storage_service
 
@@ -294,6 +299,7 @@ def api_serve_asset(report_id: int, asset_key: str):
 
 @bp.route("/api/<int:report_id>/revisions", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_list_revisions(report_id: int):
     from app.models import ReportDefinitionRevision
 
@@ -339,6 +345,7 @@ def api_restore_revision(report_id: int, revision_id: int):
 
 @bp.route("/api/templates/gallery", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_template_gallery():
     from app.services.reports.template_gallery import default_report_templates, list_section_templates
 
@@ -353,6 +360,7 @@ def api_template_gallery():
 
 @bp.route("/<int:report_id>/print", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def reports_print(report_id: int):
     denied = _forbidden_if_no_view()
     if denied:
@@ -372,6 +380,7 @@ def reports_print(report_id: int):
 
 @bp.route("/api/<int:report_id>/widgets/<widget_id>/run", methods=["POST"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_run_widget(report_id: int, widget_id: str):
     csrf_error = _csrf_guard()
     if csrf_error:
@@ -396,6 +405,7 @@ def api_run_widget(report_id: int, widget_id: str):
 
 @bp.route("/api/<int:report_id>/export", methods=["POST"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_export_report(report_id: int):
     csrf_error = _csrf_guard()
     if csrf_error:
@@ -464,6 +474,7 @@ def api_publish_report(report_id: int):
 
 @bp.route("/api/runs/<run_id>", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_get_run(run_id: str):
     denied = _forbidden_if_no_view()
     if denied:
@@ -476,6 +487,7 @@ def api_get_run(run_id: str):
 
 @bp.route("/api/metadata/templates", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_metadata_templates():
     denied = _forbidden_if_no_view()
     if denied:
@@ -492,6 +504,7 @@ def api_metadata_templates():
 
 @bp.route("/api/metadata/periods", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_metadata_periods():
     denied = _forbidden_if_no_view()
     if denied:
@@ -503,6 +516,7 @@ def api_metadata_periods():
 
 @bp.route("/api/metadata/indicators", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_metadata_indicators():
     denied = _forbidden_if_no_view()
     if denied:
@@ -578,6 +592,7 @@ def api_metadata_indicators():
 
 @bp.route("/api/metadata/form-items", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_metadata_form_items():
     denied = _forbidden_if_no_view()
     if denied:
@@ -615,6 +630,7 @@ def api_metadata_form_items():
 
 @bp.route("/api/metadata/indicator-rule/fields", methods=["GET"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_metadata_indicator_rule_fields():
     denied = _forbidden_if_no_view()
     if denied:
@@ -629,6 +645,7 @@ def api_metadata_indicator_rule_fields():
 
 @bp.route("/api/metadata/indicator-rule/preview", methods=["POST"])
 @login_required
+@permission_required_any(REPORTS_VIEW, REPORTS_EDIT)
 def api_metadata_indicator_rule_preview():
     denied = _forbidden_if_no_view()
     if denied:

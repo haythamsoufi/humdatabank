@@ -13,6 +13,10 @@ Env:
   PORT / MCP_PORT       default 8000
   MCP_PATH              default /mcp
   MCP_PUBLIC_BASE_URL   public origin for connector icon (default https://databank.ifrc.org)
+  MCP_MAX_CONCURRENT_DOCUMENT_SEARCHES   max simultaneous databank_search_public_documents
+                        calls to the upstream API (default 1 — serialized, see notes below)
+  DATABANK_DOCUMENT_SEARCH_MAX_RETRIES          retries on a transient 5xx (default 1)
+  DATABANK_DOCUMENT_SEARCH_RETRY_DELAY_SECONDS  delay before that retry (default 2.0)
 
 Parallel document-search calls (investigation notes, 2026-08):
   - Production Application Gateway backend timeout is ~30s (see Backoffice/docs/runbooks/incidents/gateway-504-worker-saturation.md).
@@ -27,6 +31,23 @@ Parallel document-search calls (investigation notes, 2026-08):
     timeout — callers should still prefer country_ids batched search over parallel broad queries.
     Confirm root cause (timeout vs. cancellation vs. something else) via App Service / AGW logs at
     failure timestamps if "request was cancelled" errors recur.
+  - 2026-08-09 prod incident review: an LLM client fired several databank_search_public_documents
+    calls back-to-back/concurrently; overlapping requests landed on the same Gunicorn worker and
+    contended for its DB pool, tripping the 18s statement_timeout (-> 503 PublicDocumentSearchUnavailable)
+    on some calls while others ran ~22-30s (near the 30s AGW cutoff). One call's failure was
+    misdiagnosed as a "response mismatch" (a later call's success apparently echoing an earlier
+    query) — server-side logs and code show each response is built purely from its own request
+    params with no shared/global state, so a swapped response is very unlikely to be a Backoffice
+    bug. FIXED (defense in depth, since root cause is unconfirmed):
+      1. databank_search_public_documents calls are now serialized through a bounded semaphore
+         (_DOCUMENT_SEARCH_SEMAPHORE, default 1 concurrent call — see MCP_MAX_CONCURRENT_DOCUMENT_SEARCHES)
+         so parallel tool calls from one client no longer stack concurrent load on the same
+         upstream endpoint; they queue in-process instead, which is cheap.
+      2. databank_client._get() now verifies the response's echoed `query` field (documents/search,
+         indicators/resolve, countries/resolve all echo it) matches what was sent, and raises a
+         loud DatabankAPIError on mismatch instead of silently returning the wrong content.
+      3. search_public_documents retries once (short delay) on a retryable 5xx (500/502/503/504)
+         before giving up — see databank_client.RETRYABLE_STATUS_CODES.
 """
 
 from __future__ import annotations
@@ -34,6 +55,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any, Optional
 
@@ -86,6 +108,15 @@ async def mcp_icon(_request: Request) -> Response:
 
 def _json_text(payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+# Caps concurrent upstream calls from databank_search_public_documents (see "Parallel
+# document-search calls" notes above). FastMCP dispatches @mcp.tool sync handlers to a
+# thread pool, so an LLM client's parallel tool calls would otherwise stack concurrent
+# load on the same slow endpoint; extra calls now queue here (cheap) instead of
+# contending for the upstream Gunicorn worker's DB pool.
+_DOCUMENT_SEARCH_MAX_CONCURRENT = max(1, int(os.environ.get("MCP_MAX_CONCURRENT_DOCUMENT_SEARCHES", "1")))
+_DOCUMENT_SEARCH_SEMAPHORE = threading.Semaphore(_DOCUMENT_SEARCH_MAX_CONCURRENT)
 
 
 def _tool_error(exc: BaseException) -> str:
@@ -214,24 +245,27 @@ def databank_search_public_documents(
 
     Multi-country: pass country_ids as comma-separated numeric ids (e.g. "153,167") or
     "all" for one batched search with by_country grouping in the response.
-    Avoid firing multiple parallel broad searches — production gateway timeout is ~30s.
+    Calls to this tool are serialized server-side (one in-flight request at a time) to
+    avoid overloading the upstream search endpoint, so prefer country_ids batched search
+    over manually firing several of these one after another when scope allows it.
     """
     try:
-        result = search_public_documents(
-            query,
-            full_coverage=full_coverage,
-            page=page,
-            per_page=per_page,
-            latest_per_country=latest_per_country,
-            top_k=top_k,
-            min_score=min_score,
-            country_name=country_name.strip(),
-            country_id=country_id,
-            country_ids=country_ids.strip(),
-            file_type=file_type.strip(),
-            search_mode=search_mode.strip() or "hybrid",
-            require_phrase=require_phrase.strip(),
-        )
+        with _DOCUMENT_SEARCH_SEMAPHORE:
+            result = search_public_documents(
+                query,
+                full_coverage=full_coverage,
+                page=page,
+                per_page=per_page,
+                latest_per_country=latest_per_country,
+                top_k=top_k,
+                min_score=min_score,
+                country_name=country_name.strip(),
+                country_id=country_id,
+                country_ids=country_ids.strip(),
+                file_type=file_type.strip(),
+                search_mode=search_mode.strip() or "hybrid",
+                require_phrase=require_phrase.strip(),
+            )
         return _json_text(result)
     except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)

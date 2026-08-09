@@ -126,3 +126,108 @@ class TestResolveSubmittedDocumentForAiProcessing:
         imports_dir = os.path.abspath(ingest._fdrs_imports_dir())
         assert imports_dir.endswith(os.path.join("scripts", "imports"))
         assert os.path.isfile(os.path.join(imports_dir, "fdrs_documents_sync.py"))
+
+
+class TestSyncAiDocumentFromSubmitted:
+    def test_no_op_when_no_linked_ai_document(self, app):
+        submitted = MagicMock()
+        submitted.id = 99
+        with app.app_context():
+            with patch("app.models.AIDocument") as mock_ai:
+                mock_ai.query.filter_by.return_value.first.return_value = None
+                assert ingest.sync_ai_document_from_submitted(submitted) is False
+
+    def test_mirrors_is_public_and_metadata(self, app):
+        submitted = MagicMock()
+        submitted.id = 7
+        submitted.is_public = True
+        submitted.status = "approved"
+        submitted.document_type = "Annual Report"
+        submitted.language = "fr"
+        submitted.period = "2024"
+        submitted.filename = "report.pdf"
+        submitted.fdrs_import_key = None
+        submitted.document_country = None
+
+        ai_doc = MagicMock()
+        ai_doc.id = 3
+        ai_doc.is_public = False
+        ai_doc.searchable = True
+        ai_doc.processing_status = "completed"
+
+        with app.app_context():
+            with patch(
+                "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
+            ) as mock_apply:
+                assert ingest.sync_ai_document_from_submitted(submitted, ai_doc=ai_doc) is True
+
+        assert ai_doc.is_public is True
+        mock_apply.assert_called_once_with(ai_doc, submitted)
+
+    def test_searchable_false_when_status_leaves_approved(self, app):
+        submitted = MagicMock()
+        submitted.id = 8
+        submitted.is_public = True
+        submitted.status = "rejected"
+
+        ai_doc = MagicMock()
+        ai_doc.id = 4
+        ai_doc.is_public = True
+        ai_doc.searchable = True
+        ai_doc.processing_status = "completed"
+
+        with app.app_context():
+            with patch(
+                "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
+            ):
+                ingest.sync_ai_document_from_submitted(
+                    submitted,
+                    status_changed_from="approved",
+                    ai_doc=ai_doc,
+                )
+
+        assert ai_doc.searchable is False
+
+    def test_searchable_restored_on_reapproval(self, app):
+        submitted = MagicMock()
+        submitted.id = 9
+        submitted.is_public = False
+        submitted.status = "approved"
+
+        ai_doc = MagicMock()
+        ai_doc.id = 5
+        ai_doc.is_public = False
+        ai_doc.searchable = False
+        ai_doc.processing_status = "completed"
+
+        with app.app_context():
+            with patch(
+                "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
+            ):
+                ingest.sync_ai_document_from_submitted(
+                    submitted,
+                    status_changed_from="rejected",
+                    ai_doc=ai_doc,
+                )
+
+        assert ai_doc.searchable is True
+
+    def test_no_searchable_change_without_status_transition(self, app):
+        submitted = MagicMock()
+        submitted.id = 10
+        submitted.is_public = False
+        submitted.status = "pending"
+
+        ai_doc = MagicMock()
+        ai_doc.id = 6
+        ai_doc.is_public = False
+        ai_doc.searchable = True
+        ai_doc.processing_status = "completed"
+
+        with app.app_context():
+            with patch(
+                "app.services.ai.documents.submitted_metadata.apply_submitted_document_metadata_to_ai_doc"
+            ):
+                ingest.sync_ai_document_from_submitted(submitted, ai_doc=ai_doc)
+
+        assert ai_doc.searchable is True

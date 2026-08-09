@@ -13,6 +13,15 @@ Env:
   PORT / MCP_PORT       default 8000
   MCP_PATH              default /mcp
   MCP_PUBLIC_BASE_URL   public origin for connector icon (default https://databank.ifrc.org)
+
+Parallel document-search calls (investigation notes, 2026-08):
+  - Production Application Gateway backend timeout is ~30s (see Backoffice/docs/runbooks/incidents/gateway-504-worker-saturation.md).
+    GET /public/documents/search is not in the extended-timeout AI chat routes; two concurrent broad
+    searches can exceed 30s and return 504 with no JSON body to the MCP client.
+  - FastMCP @mcp.tool sync handlers run in a thread pool; client-side cancellation surfaces as
+    asyncio.CancelledError (BaseException), which is not caught by `except Exception` — symptom:
+    "no result, no error". Mitigation for callers: use country_ids batched search, avoid parallel
+    broad queries; confirm via App Service / AGW logs at failure timestamps before server-side fixes.
 """
 
 from __future__ import annotations
@@ -175,8 +184,10 @@ def databank_search_public_documents(
     min_score: float = 0.25,
     country_name: str = "",
     country_id: Optional[int] = None,
+    country_ids: str = "",
     file_type: str = "",
     search_mode: str = "hybrid",
+    require_phrase: str = "",
 ) -> str:
     """Search public Unified Plan/Report document chunks (UPR narrative Q&A).
 
@@ -184,6 +195,14 @@ def databank_search_public_documents(
     Answer only from chunks[].content; cite document_title + page_number per claim.
     Use full_coverage=true for cross-country themes (e.g. migration in 2026 Unified Plans).
     Paginate with page/per_page when coverage.has_more_pages is true.
+
+    Phrase search: wrap multi-word terms in double quotes in query (e.g. "Post Office")
+    to bias keyword ranking toward literal phrase matches (Postgres websearch_to_tsquery).
+    For a hard requirement that the phrase appear in every chunk, pass require_phrase.
+
+    Multi-country: pass country_ids as comma-separated numeric ids (e.g. "153,167") or
+    "all" for one batched search with by_country grouping in the response.
+    Avoid firing multiple parallel broad searches — production gateway timeout is ~30s.
     """
     try:
         result = search_public_documents(
@@ -196,8 +215,10 @@ def databank_search_public_documents(
             min_score=min_score,
             country_name=country_name.strip(),
             country_id=country_id,
+            country_ids=country_ids.strip(),
             file_type=file_type.strip(),
             search_mode=search_mode.strip() or "hybrid",
+            require_phrase=require_phrase.strip(),
         )
         return _json_text(result)
     except Exception as exc:
@@ -404,9 +425,17 @@ def databank_build_country_report(
     report_type: 'fdrs' (numbers only), 'upr' (narrative Unified Plan/Report themes only —
     not UPR-specific numeric indicators), or 'combined' (default, both).
 
-    Set template_style (e.g. 'default') to also embed a design template (layout/colors/
-    fonts) inline under design_template, saving a follow-up databank_get_report_template
-    call — leave empty to skip it and render freeform.
+    Set template_style='default' (recommended) to embed the IFRC Brand System-aligned
+    design_template inline — Montserrat/Open Sans, IFRC horizontal logo, red+navy layout.
+    Fill html_template placeholders; do not invent a generic card/dashboard layout.
+    Leave template_style empty only if the user explicitly asks for a freeform render.
+
+    This tool (and the underlying API) never generates or returns a PDF or HTML file — it
+    only returns data plus a style/layout spec. For the final deliverable, use your own
+    file-creation/code-execution capability (e.g. the pdf skill) to generate a real,
+    downloadable PDF one-pager from this JSON, following design_template. An inline
+    HTML/canvas render is fine only as a quick in-chat preview, not as the final artifact —
+    when the user wants something to keep, print, or share, produce an actual PDF file.
     """
     try:
         result = get_country_report(
@@ -432,6 +461,13 @@ def databank_get_report_template(style: str = "default") -> str:
     spacing) even if you ultimately render as markdown, a canvas component, or an
     image-generation prompt rather than raw HTML. Call with no arguments (style='default')
     to see the only bundled style; pass an unrecognized style to list available_styles.
+
+    For a final deliverable, use design_tokens to generate a real PDF file yourself (e.g.
+    via the pdf skill/code execution) rather than only returning HTML — this tool never
+    renders or converts anything server-side. Most code-execution sandboxes have no network
+    access: the IFRC logo is already inline as SVG in html_template, so don't fetch it; for
+    fonts, use Montserrat/Open Sans only if already available locally, otherwise fall back
+    to a built-in sans-serif (e.g. Helvetica) instead of failing the report.
     """
     try:
         return _json_text(get_report_template(style))

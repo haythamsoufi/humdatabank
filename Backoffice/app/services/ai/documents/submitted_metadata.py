@@ -231,6 +231,18 @@ def apply_submitted_document_metadata_to_ai_doc(ai_doc, submitted_doc) -> None:
     if hints.get("document_date"):
         ai_doc.document_date = hints["document_date"]
 
+    derived_country = None
+    try:
+        derived_country = getattr(submitted_doc, "document_country", None)
+    except Exception:
+        derived_country = None
+    if derived_country and getattr(derived_country, "id", None):
+        ai_doc.country_id = int(derived_country.id)
+        ai_doc.country_name = getattr(derived_country, "name", None)
+    else:
+        ai_doc.country_id = None
+        ai_doc.country_name = None
+
     extra = dict(getattr(ai_doc, "extra_metadata", None) or {})
     extra.update(hints.get("extra_metadata") or {})
     if extra:

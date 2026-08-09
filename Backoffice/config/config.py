@@ -768,6 +768,9 @@ class Config:
     AI_RERANK_TOP_K = int(os.environ.get('AI_RERANK_TOP_K', '20'))
     # Max chunks per document in hybrid results (0 = no cap). Default 2 avoids one long document filling the whole result set (e.g. top 8).
     AI_DOCUMENT_DIVERSITY_MAX_CHUNKS_PER_DOC = int(os.environ.get('AI_DOCUMENT_DIVERSITY_MAX_CHUNKS_PER_DOC', '2'))
+    # Minimum chunk token_count before keyword_match_boost or source_boost apply in hybrid scoring.
+    # Short headers/contact blocks can hit keyword_score≈1.0 on a single term via ts_rank_cd normalization.
+    AI_MIN_TOKENS_FOR_KEYWORD_BOOST = int(os.environ.get('AI_MIN_TOKENS_FOR_KEYWORD_BOOST', '22'))
     # Local cross-encoder model for reranking when AI_RERANK_PROVIDER=local (e.g. cross-encoder/ms-marco-MiniLM-L-6-v2).
     AI_RERANK_LOCAL_MODEL = os.environ.get('AI_RERANK_LOCAL_MODEL', 'cross-encoder/ms-marco-MiniLM-L-6-v2')
     # Cohere reranking (only used when AI_RERANK_PROVIDER=cohere)

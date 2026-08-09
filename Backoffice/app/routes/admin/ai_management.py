@@ -79,6 +79,23 @@ def _resolve_ai_doc_file_for_processing(doc):
     return file_path, temp_path, filename, bool(resolved.get("from_url"))
 
 
+def _get_text_from_chunks(doc_id: int) -> str:
+    """
+    Reassemble document text from stored chunks ordered by chunk_index.
+
+    Used as a fallback for metadata enrichment when the original source file
+    is no longer available on disk and there is no downloadable source_url.
+    """
+    from app.models import AIDocumentChunk
+    chunks = (
+        AIDocumentChunk.query
+        .filter_by(document_id=doc_id)
+        .order_by(AIDocumentChunk.chunk_index)
+        .all()
+    )
+    return "\n".join(c.content for c in chunks if c.content)
+
+
 def _process_reprocess_job_item_sync(app, *, job_id: str, item_id: int) -> None:
     """Process one bulk reprocess job item (download if needed, clear chunks, re-chunk + re-embed)."""
     with app.app_context():
@@ -835,55 +852,77 @@ def reprocess_document_metadata(document_id):
     try:
         from app.models import AIDocument
         from app.services.ai.documents.processor import AIDocumentProcessor
+        from app.services.ai.documents.submitted_metadata import (
+            apply_enriched_metadata_to_ai_doc,
+            enrich_ai_document_metadata_from_content,
+        )
 
         doc = AIDocument.query.get_or_404(document_id)
 
-        temp_path = None
-        file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
         effective_source_url = (getattr(doc, "source_url", None) or "").strip() or None
+        filename = doc.filename or "document"
+        temp_path = None
+        text = None
+        total_pages = None
+        pdf_metadata = None
+        has_tables = False
 
         try:
-            processor = AIDocumentProcessor()
-            extracted = processor.process_document(
-                file_path=file_path,
-                filename=filename,
-                extract_images=False,
-                ocr_enabled=current_app.config.get('AI_OCR_ENABLED', False),
+            file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
+            try:
+                processor = AIDocumentProcessor()
+                extracted = processor.process_document(
+                    file_path=file_path,
+                    filename=filename,
+                    extract_images=False,
+                    ocr_enabled=current_app.config.get('AI_OCR_ENABLED', False),
+                )
+                tables = extracted.get('tables') or []
+                text = extracted.get('text', '')
+                total_pages = extracted.get('metadata', {}).get('total_pages')
+                pdf_metadata = extracted.get('metadata')
+                has_tables = len(tables) > 0
+            finally:
+                if temp_path and os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except OSError as e:
+                        logger.warning("Could not remove temp file %s: %s", temp_path, e)
+        except FileNotFoundError:
+            # Source file gone — fall back to stored chunk text for heuristic enrichment.
+            chunk_text = _get_text_from_chunks(document_id)
+            if not chunk_text:
+                return json_not_found(
+                    "Source file not found and no stored chunk text available for this document."
+                )
+            logger.info(
+                "reprocess_document_metadata: source file unavailable for doc %s, "
+                "falling back to %d chars of stored chunk text",
+                document_id, len(chunk_text),
             )
-            tables = extracted.get('tables') or []
-            from app.services.ai.documents.submitted_metadata import (
-                apply_enriched_metadata_to_ai_doc,
-                enrich_ai_document_metadata_from_content,
-            )
-            enriched_meta = enrich_ai_document_metadata_from_content(
-                doc,
-                filename=filename,
-                text=extracted.get('text', ''),
-                total_pages=extracted.get('metadata', {}).get('total_pages'),
-                pdf_metadata=extracted.get('metadata'),
-                has_tables=len(tables) > 0,
-                table_extraction_success=len(tables) > 0,
-                source_url=effective_source_url,
-            )
-            apply_enriched_metadata_to_ai_doc(doc, enriched_meta)
-            db.session.commit()
-            return json_ok(
-                message='Metadata reprocessed successfully',
-                document_date=doc.document_date.isoformat() if doc.document_date else None,
-                document_language=doc.document_language,
-                document_category=doc.document_category,
-                quality_score=doc.quality_score,
-                source_organization=doc.source_organization,
-            )
-        finally:
-            if temp_path and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError as e:
-                    logger.warning("Could not remove temp file %s: %s", temp_path, e)
+            text = chunk_text
 
-    except FileNotFoundError as e:
-        return json_not_found(str(e))
+        enriched_meta = enrich_ai_document_metadata_from_content(
+            doc,
+            filename=filename,
+            text=text,
+            total_pages=total_pages,
+            pdf_metadata=pdf_metadata,
+            has_tables=has_tables,
+            table_extraction_success=has_tables,
+            source_url=effective_source_url,
+        )
+        apply_enriched_metadata_to_ai_doc(doc, enriched_meta)
+        db.session.commit()
+        return json_ok(
+            message='Metadata reprocessed successfully',
+            document_date=doc.document_date.isoformat() if doc.document_date else None,
+            document_language=doc.document_language,
+            document_category=doc.document_category,
+            quality_score=doc.quality_score,
+            source_organization=doc.source_organization,
+        )
+
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1132,8 +1171,47 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
             item.error = None
             db.session.commit()
 
-            file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
             effective_source_url = (getattr(doc, "source_url", None) or "").strip() or None
+            text = None
+            total_pages = None
+            pdf_metadata = None
+            has_tables = False
+
+            try:
+                file_path, temp_path, filename, _from_url = _resolve_ai_doc_file_for_processing(doc)
+                try:
+                    processor = AIDocumentProcessor()
+                    extracted = processor.process_document(
+                        file_path=file_path,
+                        filename=filename,
+                        extract_images=False,
+                        ocr_enabled=current_app.config.get("AI_OCR_ENABLED", False),
+                    )
+                    tables = extracted.get("tables") or []
+                    text = extracted.get("text", "")
+                    total_pages = extracted.get("metadata", {}).get("total_pages")
+                    pdf_metadata = extracted.get("metadata")
+                    has_tables = len(tables) > 0
+                finally:
+                    if temp_path and os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except OSError:
+                            pass
+                    temp_path = None
+            except FileNotFoundError:
+                # Source file gone — fall back to stored chunk text for heuristic enrichment.
+                chunk_text = _get_text_from_chunks(doc_id)
+                if not chunk_text:
+                    raise FileNotFoundError(
+                        "Source file not found and no stored chunk text available."
+                    )
+                logger.info(
+                    "_process_metadata_reprocess_job_item_sync: source file unavailable for "
+                    "doc %s, falling back to %d chars of stored chunk text",
+                    doc_id, len(chunk_text),
+                )
+                text = chunk_text
 
             if job_cancel_requested(job_id):
                 item = AIJobItem.query.get(int(item_id))
@@ -1147,14 +1225,6 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
                 item.status = "processing"
                 db.session.commit()
 
-            processor = AIDocumentProcessor()
-            extracted = processor.process_document(
-                file_path=file_path,
-                filename=filename,
-                extract_images=False,
-                ocr_enabled=current_app.config.get("AI_OCR_ENABLED", False),
-            )
-            tables = extracted.get("tables") or []
             from app.services.ai.documents.submitted_metadata import (
                 apply_enriched_metadata_to_ai_doc,
                 enrich_ai_document_metadata_from_content,
@@ -1162,11 +1232,11 @@ def _process_metadata_reprocess_job_item_sync(app, job_id: str, item_id: int) ->
             enriched_meta = enrich_ai_document_metadata_from_content(
                 doc,
                 filename=filename,
-                text=extracted.get("text", ""),
-                total_pages=extracted.get("metadata", {}).get("total_pages"),
-                pdf_metadata=extracted.get("metadata"),
-                has_tables=len(tables) > 0,
-                table_extraction_success=len(tables) > 0,
+                text=text,
+                total_pages=total_pages,
+                pdf_metadata=pdf_metadata,
+                has_tables=has_tables,
+                table_extraction_success=has_tables,
                 source_url=effective_source_url,
             )
             doc = AIDocument.query.get(doc_id)

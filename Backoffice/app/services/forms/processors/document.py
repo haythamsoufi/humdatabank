@@ -421,14 +421,6 @@ class DocumentProcessorMixin:
 
                 if edit_public_key in request.form:
                     doc_to_edit.is_public = request.form[edit_public_key] in ['1', 'true', 'True']
-                    try:
-                        from app.services.ai.documents.ingest import (
-                            sync_ai_document_is_public_from_submitted,
-                        )
-
-                        sync_ai_document_is_public_from_submitted(doc_to_edit)
-                    except Exception as e:
-                        logger.debug("sync_ai_document_is_public_from_submitted: %s", e, exc_info=True)
 
                 # Handle file replacement if provided
                 if edit_file_key in request.files and request.files[edit_file_key].filename:

@@ -122,8 +122,10 @@ def search_public_documents(
     min_score: float = 0.25,
     country_name: str = "",
     country_id: Optional[int] = None,
+    country_ids: str = "",
     file_type: str = "",
     search_mode: str = "hybrid",
+    require_phrase: str = "",
 ) -> Dict[str, Any]:
     """Search public AI document chunks via GET /public/documents/search."""
     raw = (query or "").strip()
@@ -147,8 +149,12 @@ def search_public_documents(
         params["country_name"] = country_name.strip()
     if country_id is not None:
         params["country_id"] = int(country_id)
+    if country_ids.strip():
+        params["country_ids"] = country_ids.strip()
     if file_type.strip():
         params["file_type"] = file_type.strip()
+    if require_phrase.strip():
+        params["require_phrase"] = require_phrase.strip()
     return _get("/public/documents/search", params)
 
 
@@ -323,7 +329,7 @@ def get_country_report(
     """One-country report spec (headline KPIs + trend + cited narrative) via GET /public/reports/country.
 
     Thin proxy — all orchestration (period resolution, KPI fetch, narrative search) lives
-    server-side in Backoffice's ``public_report_service`` so the MCP and Custom GPT Actions
+    server-side in Backoffice's ``public.report_service`` so the MCP and Custom GPT Actions
     share one implementation instead of two independently maintained copies.
     """
     raw = (country or "").strip()

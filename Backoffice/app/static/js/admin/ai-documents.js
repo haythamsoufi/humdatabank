@@ -416,6 +416,23 @@ CountryScopeTooltip.prototype.getGui = function() {
 // Column definitions for ag-grid
 const columnDefs = [
     {
+        field: 'id',
+        headerName: cfg.t.document_id_7f3a2b1c,
+        width: 100,
+        minWidth: 80,
+        maxWidth: 130,
+        filter: 'agNumberColumnFilter',
+        sortable: true,
+        cellRenderer: function(params) {
+            const id = params.value;
+            if (id === null || id === undefined || id === '') {
+                return '<span class="text-xs text-gray-400">—</span>';
+            }
+            return '<span class="text-sm font-mono text-gray-700">' + escapeHtml(String(id)) + '</span>';
+        },
+        cellStyle: { 'text-align': 'center', 'white-space': 'nowrap' }
+    },
+    {
         field: 'title',
         headerName: cfg.t.document_09453598,
         width: 350,

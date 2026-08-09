@@ -5,7 +5,7 @@ import pytest
 
 from app.models import AIDocument
 from app.models.enums import AIDocumentProcessingStatusValue
-from app.services.public_document_service import (
+from app.services.public.document_service import (
     PUBLIC_DOC_FULL_COVERAGE_CONTENT_CHARS,
     PUBLIC_DOC_MAX_CONTENT_CHARS,
     _build_search_filters,
@@ -288,7 +288,7 @@ class TestSearchPublicDocuments:
                 return sample_rows
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -335,7 +335,7 @@ class TestSearchPublicDocuments:
                 return leaked_rows
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -377,7 +377,7 @@ class TestSearchPublicDocuments:
                 return sample_rows
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -441,7 +441,7 @@ class TestSearchPublicDocuments:
                 return per_document_rows
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -500,7 +500,7 @@ class TestSearchPublicDocuments:
         with app.app_context():
             from unittest.mock import patch
 
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -609,7 +609,7 @@ class TestSearchPublicDocuments:
                 return [per_doc_rows[doc_id] for doc_id in document_ids if doc_id in per_doc_rows]
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -669,7 +669,7 @@ class TestSearchPublicDocuments:
                 return []  # no hits for any in-scope document
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -739,7 +739,7 @@ class TestSearchPublicDocuments:
                 ]
 
         with app.app_context():
-            from app.services import public_document_service as svc
+            from app.services.public import document_service as svc
 
             original = svc.AIVectorStore
             svc.AIVectorStore = FakeStore
@@ -999,7 +999,7 @@ class TestCatalogPublicDocuments:
             )
 
             with patch(
-                "app.services.public_document_service._ai_document_has_local_file",
+                "app.services.public.document_service._ai_document_has_local_file",
                 side_effect=AssertionError("blob check should not run when include_documents=false"),
             ) as mock_has_local:
                 out = catalog_public_documents(document_type="annual_report", include_documents=False)
@@ -1022,7 +1022,7 @@ class TestCatalogPublicDocuments:
             )
 
             with patch(
-                "app.services.public_document_service._ai_document_has_local_file",
+                "app.services.public.document_service._ai_document_has_local_file",
                 side_effect=AssertionError("blob check not needed when source_url is set"),
             ) as mock_has_local:
                 out = catalog_public_documents(document_type="annual_report", include_documents=True)
@@ -1039,3 +1039,120 @@ class TestCatalogPublicDocuments:
         assert _document_type_key(ar, "") == "annual_report"
         assert _document_type_key(upl, "") == "unified_plan"
         assert _document_type_key(other, "") == "other"
+
+
+class TestPublicDocumentSearchFixes:
+    def test_dedupe_rows_by_chunk_id_keeps_highest_score(self):
+        from app.services.public.document_service import _dedupe_rows_by_chunk_id
+
+        rows = [
+            {"chunk_id": 1, "combined_score": 0.4, "content": "a"},
+            {"chunk_id": 1, "combined_score": 0.9, "content": "b"},
+            {"chunk_id": 2, "combined_score": 0.5, "content": "c"},
+        ]
+        out = _dedupe_rows_by_chunk_id(rows)
+        assert len(out) == 2
+        assert out[0]["combined_score"] == 0.9
+        assert out[1]["chunk_id"] == 2
+
+    def test_build_search_filters_require_phrase(self):
+        filters = _build_search_filters("postal partnerships", require_phrase="post office")
+        assert filters is not None
+        assert filters["require_phrase"] == "post office"
+
+    def test_parse_country_ids_all_and_list(self):
+        from app.services.public.document_service import _parse_country_ids_param
+
+        assert _parse_country_ids_param("all") == (None, True)
+        assert _parse_country_ids_param("153,167,153") == ([153, 167], False)
+
+    def test_api_route_service_unavailable_returns_503(self, client, app):
+        from unittest.mock import patch
+
+        from app.services.public.document_service import PublicDocumentSearchUnavailable
+
+        with app.app_context():
+            with patch(
+                "app.routes.api.public_integrations.search_public_documents",
+                side_effect=PublicDocumentSearchUnavailable("Document search is temporarily unavailable"),
+            ):
+                resp = client.get("/api/v1/public/documents/search?query=postal")
+
+        assert resp.status_code == 503
+        body = resp.get_json()
+        assert body["error_type"] == "service_unavailable"
+
+    def test_api_route_scope_too_large_returns_400_with_error_type(self, client, app):
+        from unittest.mock import patch
+
+        from app.services.public.document_service import PublicDocumentScopeTooLarge
+
+        with app.app_context():
+            with patch(
+                "app.routes.api.public_integrations.search_public_documents",
+                side_effect=PublicDocumentScopeTooLarge("Too many documents in scope (448)."),
+            ):
+                resp = client.get("/api/v1/public/documents/search?query=postal&full_coverage=true")
+
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body["error_type"] == "scope_too_large"
+
+    def test_multi_country_search_adds_by_country(self, app):
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        rows = [
+            {
+                "chunk_id": 1,
+                "document_id": 10,
+                "document_title": "Doc A",
+                "document_country_name": "Kenya",
+                "document_countries": [{"name": "Kenya"}],
+                "content": "Kenya postal content with enough relevance here.",
+                "combined_score": 0.8,
+            },
+            {
+                "chunk_id": 2,
+                "document_id": 11,
+                "document_title": "Doc B",
+                "document_country_name": "Syria",
+                "document_countries": [{"name": "Syria"}],
+                "content": "Syria postal content with enough relevance here.",
+                "combined_score": 0.7,
+            },
+        ]
+
+        class FakeStore:
+            def hybrid_search_per_document(self, *args, **kwargs):
+                return rows
+
+        class FakeDoc:
+            def __init__(self, doc_id: int):
+                self.id = doc_id
+
+        original = svc.AIVectorStore
+        svc.AIVectorStore = FakeStore
+        try:
+            with app.app_context():
+                with patch.object(
+                    svc,
+                    "list_public_documents_in_scope",
+                    return_value=[FakeDoc(10), FakeDoc(11)],
+                ):
+                    with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda r: r):
+                        out = search_public_documents(
+                            "postal partnerships",
+                            country_ids="1,2",
+                            top_k=8,
+                            min_score=0.25,
+                        )
+        finally:
+            svc.AIVectorStore = original
+
+        assert "by_country" in out
+        assert len(out["by_country"]) == 2
+        country_names = {entry["country"] for entry in out["by_country"]}
+        assert country_names == {"Kenya", "Syria"}
+

@@ -126,6 +126,42 @@ class AIVectorStore:
         )
 
     @staticmethod
+    def _chunk_has_boostable_content(result: Dict[str, Any]) -> bool:
+        """Return True when the chunk is long enough to earn non-relevance ranking boosts."""
+        try:
+            min_tokens = int(current_app.config.get("AI_MIN_TOKENS_FOR_KEYWORD_BOOST", 22))
+        except Exception:
+            min_tokens = 22
+        token_count = result.get("token_count")
+        if token_count is None:
+            content = (result.get("content") or "").strip()
+            token_count = max(1, len(content) // 4) if content else 0
+        try:
+            return int(token_count) >= max(1, min_tokens)
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _apply_require_phrase_filter(query, phrase: str | None):
+        """Hard AND filter: chunk content must contain the literal phrase (FTS phraseto_tsquery)."""
+        raw = (phrase or "").strip()
+        if not raw:
+            return query
+        phrase_ts = func.phraseto_tsquery("simple", raw)
+        ts_vector = func.to_tsvector("simple", AIDocumentChunk.content)
+        return query.filter(ts_vector.op("@@")(phrase_ts))
+
+    @staticmethod
+    def _country_ids_filter(country_ids: List[int]):
+        """Match documents related to any of the given country IDs (OR)."""
+        unique_ids = sorted({int(cid) for cid in country_ids if cid is not None})
+        if not unique_ids:
+            return AIDocument.id == -1
+        if len(unique_ids) == 1:
+            return AIVectorStore._country_id_filter(unique_ids[0])
+        return db.or_(*[AIVectorStore._country_id_filter(cid) for cid in unique_ids])
+
+    @staticmethod
     def _country_name_filter(country_name: str):
         """
         Build a filter condition that matches documents by country name.
@@ -512,7 +548,11 @@ class AIVectorStore:
 
             # Apply custom filters
             if filters:
-                if "country_id" in filters and filters.get("country_id"):
+                if filters.get("country_ids"):
+                    similarity_query = similarity_query.filter(
+                        self._country_ids_filter(list(filters["country_ids"]))
+                    )
+                elif "country_id" in filters and filters.get("country_id"):
                     similarity_query = similarity_query.filter(self._country_id_filter(int(filters["country_id"])))
                 if "document_id" in filters:
                     similarity_query = similarity_query.filter(AIDocument.id == filters["document_id"])
@@ -555,6 +595,10 @@ class AIVectorStore:
                     if max_d is not None:
                         d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
                         similarity_query = similarity_query.filter(AIDocument.document_date <= d)
+                if filters.get("require_phrase"):
+                    similarity_query = self._apply_require_phrase_filter(
+                        similarity_query, filters["require_phrase"]
+                    )
 
             # Order by similarity and limit (text() for label consistency with search_similar)
             results = similarity_query.order_by(text("similarity DESC")).limit(top_k).all()
@@ -792,7 +836,10 @@ class AIVectorStore:
         """
         if not filters:
             return query
-        if filters.get("country_id"):
+        country_ids = filters.get("country_ids")
+        if country_ids:
+            query = query.filter(AIVectorStore._country_ids_filter(list(country_ids)))
+        elif filters.get("country_id"):
             query = query.filter(AIVectorStore._country_id_filter(int(filters["country_id"])))
         if filters.get("country_name"):
             query = query.filter(AIVectorStore._country_name_filter(filters["country_name"]))
@@ -831,6 +878,8 @@ class AIVectorStore:
             if max_d is not None:
                 d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
                 query = query.filter(AIDocument.document_date <= d)
+        if filters.get("require_phrase"):
+            query = AIVectorStore._apply_require_phrase_filter(query, filters["require_phrase"])
         return query
 
     def _search_similar_per_document_with_embedding(
@@ -1219,7 +1268,9 @@ class AIVectorStore:
                     query = query.filter(AIDocument.id == filters['document_id'])
                 if 'file_type' in filters:
                     query = query.filter(AIDocument.file_type == filters['file_type'])
-                if 'country_id' in filters and filters.get('country_id'):
+                if filters.get("country_ids"):
+                    query = query.filter(self._country_ids_filter(list(filters["country_ids"])))
+                elif 'country_id' in filters and filters.get('country_id'):
                     query = query.filter(self._country_id_filter(int(filters['country_id'])))
                 # Source filters (optional):
                 # - is_api_import: True => documents imported from external API (AIDocument.source_url IS NOT NULL)
@@ -1249,6 +1300,8 @@ class AIVectorStore:
                     if max_d is not None:
                         d = max_d if isinstance(max_d, date) else date.fromisoformat(str(max_d)[:10])
                         query = query.filter(AIDocument.document_date <= d)
+                if filters.get("require_phrase"):
+                    query = self._apply_require_phrase_filter(query, filters["require_phrase"])
 
             results = query.order_by(text("rank DESC")).limit(top_k).all()
 
@@ -1450,19 +1503,18 @@ class AIVectorStore:
             keyword_score = result.get('keyword_score', 0.0)
             base_score = (vector_score * vector_weight) + (keyword_score * keyword_weight)
 
-            # Apply source priority boost
-            # System documents (uploaded via forms/document management) get priority
+            # Apply source priority boost (skipped for tiny boilerplate/contact chunks).
             source_boost = 0.0
-            if result.get('is_system_document', False):
-                source_boost = system_document_boost
-            elif result.get('is_api_import', False):
-                source_boost = 0.0  # No boost for API imports
+            if self._chunk_has_boostable_content(result):
+                if result.get('is_system_document', False):
+                    source_boost = system_document_boost
+                elif result.get('is_api_import', False):
+                    source_boost = 0.0  # No boost for API imports
 
-            # Strong keyword match boost: exact factual matches (e.g. "10,000 volunteers")
-            # should not be outranked by many vector-similar chunks. Prevents queries like
-            # "countries with 10,000 volunteers" from losing the right chunk after merge.
+            # Strong keyword match boost for substantive chunks only — ts_rank_cd normalization
+            # favors short term-dense text (headers, postal addresses) which can hit 0.9+ spuriously.
             keyword_match_boost = 0.0
-            if keyword_score >= 0.9:
+            if keyword_score >= 0.9 and self._chunk_has_boostable_content(result):
                 keyword_match_boost = 0.2
 
             result['combined_score'] = base_score + source_boost + keyword_match_boost

@@ -2,7 +2,7 @@
 
 Mirrors humanitarian-databank-mcp/tests/test_databank_report.py, adapted for
 in-process service calls: dependencies are patched at the
-app.services.public_report_service module boundary (aggregate_submission_coverage,
+app.services.public.report_service module boundary (aggregate_submission_coverage,
 fetch_public_scoped_rows, resolve_country_query, search_public_documents) instead
 of an HTTP client, and headline KPI resolution is a direct IndicatorBank query
 instead of a whole-catalog fetch.
@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-import app.services.public_report_service as public_report_service
-from app.services.public_report_service import (
+import app.services.public.report_service as public_report_service
+from app.services.public.report_service import (
     FDRS_TEMPLATE_ID,
     _build_narrative,
     _build_trend,
@@ -60,7 +60,7 @@ class TestResolvePeriodForCountry:
     def test_no_public_data_at_all(self, app):
         with app.app_context():
             with patch(
-                "app.services.public_report_service.aggregate_submission_coverage",
+                "app.services.public.report_service.aggregate_submission_coverage",
                 return_value={"by_period": []},
             ):
                 out = resolve_period_for_country(country_id=1, period_hint="2026 midyear")
@@ -75,7 +75,7 @@ class TestResolvePeriodForCountry:
         ]
         with app.app_context():
             with patch(
-                "app.services.public_report_service.aggregate_submission_coverage",
+                "app.services.public.report_service.aggregate_submission_coverage",
                 return_value={"by_period": by_period},
             ):
                 out = resolve_period_for_country(country_id=1, period_hint="2026 midyear")
@@ -91,7 +91,7 @@ class TestResolvePeriodForCountry:
         ]
         with app.app_context():
             with patch(
-                "app.services.public_report_service.aggregate_submission_coverage",
+                "app.services.public.report_service.aggregate_submission_coverage",
                 return_value={"by_period": by_period},
             ):
                 out = resolve_period_for_country(country_id=1, period_hint="2026 midyear")
@@ -102,7 +102,7 @@ class TestResolvePeriodForCountry:
         by_period = [{"period_name": "Annual 2023", "countries_submitted": 1}]
         with app.app_context():
             with patch(
-                "app.services.public_report_service.aggregate_submission_coverage",
+                "app.services.public.report_service.aggregate_submission_coverage",
                 return_value={"by_period": by_period},
             ):
                 out = resolve_period_for_country(country_id=1, period_hint="2026")
@@ -116,7 +116,7 @@ class TestResolvePeriodForCountry:
         ]
         with app.app_context():
             with patch(
-                "app.services.public_report_service.aggregate_submission_coverage",
+                "app.services.public.report_service.aggregate_submission_coverage",
                 return_value={"by_period": by_period},
             ):
                 out = resolve_period_for_country(country_id=1, period_hint="")
@@ -126,7 +126,7 @@ class TestResolvePeriodForCountry:
     def test_coverage_error_is_non_fatal(self, app):
         with app.app_context():
             with patch(
-                "app.services.public_report_service.aggregate_submission_coverage",
+                "app.services.public.report_service.aggregate_submission_coverage",
                 side_effect=RuntimeError("boom"),
             ):
                 out = resolve_period_for_country(country_id=1, period_hint="2026")
@@ -173,7 +173,7 @@ class TestFetchKpiSeries:
         ]
         with app.app_context():
             with patch(
-                "app.services.public_report_service.fetch_public_scoped_rows",
+                "app.services.public.report_service.fetch_public_scoped_rows",
                 return_value=(rows, False),
             ) as mock_fetch:
                 values, truncated = _fetch_kpi_series(1, 724)
@@ -187,7 +187,7 @@ class TestFetchKpiSeries:
     def test_error_returns_empty(self, app):
         with app.app_context():
             with patch(
-                "app.services.public_report_service.fetch_public_scoped_rows",
+                "app.services.public.report_service.fetch_public_scoped_rows",
                 side_effect=RuntimeError("down"),
             ):
                 values, truncated = _fetch_kpi_series(1, 724)
@@ -217,7 +217,7 @@ class TestBuildNarrative:
         current_year = _dt.datetime.now(_dt.timezone.utc).year
         with app.app_context():
             with patch(
-                "app.services.public_report_service.search_public_documents",
+                "app.services.public.report_service.search_public_documents",
                 return_value={"chunks": []},
             ) as mock_search:
                 out = _build_narrative(167, "Syria", current_year, True)
@@ -237,7 +237,7 @@ class TestBuildNarrative:
         ]
         with app.app_context():
             with patch(
-                "app.services.public_report_service.search_public_documents",
+                "app.services.public.report_service.search_public_documents",
                 return_value={"chunks": chunks},
             ) as mock_search:
                 out = _build_narrative(167, "Syria", 2026, True)
@@ -250,7 +250,7 @@ class TestBuildNarrative:
     def test_historical_year_retries_with_year_in_query_when_snapshot_misses(self, app):
         with app.app_context():
             with patch(
-                "app.services.public_report_service.search_public_documents",
+                "app.services.public.report_service.search_public_documents",
                 side_effect=[
                     {"chunks": []},
                     {"chunks": [{"content": "2019 highlights.", "document_title": "Syria 2019 Annual Report", "page_number": 1}]},
@@ -264,7 +264,7 @@ class TestBuildNarrative:
     def test_search_error_is_non_fatal(self, app):
         with app.app_context():
             with patch(
-                "app.services.public_report_service.search_public_documents",
+                "app.services.public.report_service.search_public_documents",
                 side_effect=RuntimeError("down"),
             ):
                 out = _build_narrative(167, "Syria", 2026, False)
@@ -276,7 +276,7 @@ class TestBuildCountryReport:
     def test_unresolvable_country_returns_error_shape(self, app):
         with app.app_context():
             with patch(
-                "app.services.public_report_service.resolve_country_query",
+                "app.services.public.report_service.resolve_country_query",
                 return_value={"best_match": None, "alternatives": [{"name": "Syrian Arab Republic"}]},
             ):
                 out = build_country_report(country="Syriaaa")
@@ -308,17 +308,17 @@ class TestBuildCountryReport:
 
         with app.app_context():
             with patch(
-                "app.services.public_report_service.resolve_country_query", return_value=country_payload
+                "app.services.public.report_service.resolve_country_query", return_value=country_payload
             ), patch(
-                "app.services.public_report_service.aggregate_submission_coverage", return_value=coverage_payload
+                "app.services.public.report_service.aggregate_submission_coverage", return_value=coverage_payload
             ), patch(
-                "app.services.public_report_service._resolve_headline_kpi_ids",
+                "app.services.public.report_service._resolve_headline_kpi_ids",
                 return_value={"KPI_PeopleVol": 724},
             ), patch(
-                "app.services.public_report_service.fetch_public_scoped_rows",
+                "app.services.public.report_service.fetch_public_scoped_rows",
                 return_value=(kpi_rows, False),
             ) as mock_fetch, patch(
-                "app.services.public_report_service.search_public_documents", return_value=search_payload
+                "app.services.public.report_service.search_public_documents", return_value=search_payload
             ):
                 out = build_country_report(country="Syria", period_hint="2026 midyear")
 
@@ -339,11 +339,11 @@ class TestBuildCountryReport:
         country_payload = {"best_match": {"id": 1, "name": "Kenya", "iso3": "KEN"}, "alternatives": []}
         with app.app_context():
             with patch(
-                "app.services.public_report_service.resolve_country_query", return_value=country_payload
+                "app.services.public.report_service.resolve_country_query", return_value=country_payload
             ), patch(
-                "app.services.public_report_service.aggregate_submission_coverage", return_value={"by_period": []}
+                "app.services.public.report_service.aggregate_submission_coverage", return_value={"by_period": []}
             ), patch(
-                "app.services.public_report_service.search_public_documents"
+                "app.services.public.report_service.search_public_documents"
             ) as mock_search:
                 out = build_country_report(country="Kenya", report_type="fdrs")
         assert out["narrative"] == {"included": False}
@@ -353,11 +353,11 @@ class TestBuildCountryReport:
         country_payload = {"best_match": {"id": 1, "name": "Kenya", "iso3": "KEN"}, "alternatives": []}
         with app.app_context():
             with patch(
-                "app.services.public_report_service.resolve_country_query", return_value=country_payload
+                "app.services.public.report_service.resolve_country_query", return_value=country_payload
             ), patch(
-                "app.services.public_report_service.aggregate_submission_coverage"
+                "app.services.public.report_service.aggregate_submission_coverage"
             ) as mock_coverage, patch(
-                "app.services.public_report_service.search_public_documents", return_value={"chunks": []}
+                "app.services.public.report_service.search_public_documents", return_value={"chunks": []}
             ):
                 out = build_country_report(country="Kenya", report_type="upr")
         assert out["headline_kpis"] == []

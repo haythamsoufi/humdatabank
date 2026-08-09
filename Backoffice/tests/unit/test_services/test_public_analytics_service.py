@@ -4,7 +4,7 @@ import pytest
 
 from app.models import AssignmentEntityStatus, FormData
 from app.models.enums import EntityType
-from app.services.public_analytics_service import (
+from app.services.public.analytics_service import (
     aggregate_submission_coverage,
     resolve_country_query,
     resolve_indicator_query,
@@ -181,7 +181,7 @@ class TestAggregateSubmissionCoverageAggregationLogic:
 
     def _run(self, rows, truncated=False, **kwargs):
         with patch(
-            "app.services.public_analytics_service.fetch_public_scoped_rows",
+            "app.services.public.analytics_service.fetch_public_scoped_rows",
             return_value=(rows, truncated),
         ):
             return aggregate_submission_coverage(**kwargs)

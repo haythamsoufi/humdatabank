@@ -1,13 +1,16 @@
 """
 Document-related models for file uploads and resource management.
 """
+import logging
 from datetime import datetime
-from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, Date, Table, func
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import Column, Integer, ForeignKey, String, Text, DateTime, Boolean, Date, Table, func, event
+from sqlalchemy.orm import relationship, backref, Session, attributes
 from ..extensions import db
 from app.utils.datetime_helpers import utcnow
 from app.models.enums import DocumentStatus, DocumentStatusValue
 from app.models.enum_columns import pg_str_enum_column
+
+logger = logging.getLogger(__name__)
 
 
 submitted_document_countries = Table(
@@ -282,3 +285,47 @@ class ResourceTranslation(db.Model):
 
     def __repr__(self):
         return f'<ResourceTranslation {self.title} ({self.language_code})>'
+
+
+def _submitted_document_status_history_value(submitted: SubmittedDocument):
+    """Previous ``status`` before flush, or None if unchanged."""
+    try:
+        hist = attributes.get_history(submitted, "status")
+    except Exception:
+        return None
+    if not hist.has_changes() or not hist.deleted:
+        return None
+    prev = hist.deleted[0]
+    if hasattr(prev, "value"):
+        return prev.value
+    return prev
+
+
+def _sync_linked_ai_documents_before_flush(session, flush_context, instances) -> None:
+    """Keep linked AIDocument rows in sync when SubmittedDocument rows are flushed."""
+    dirty_docs = [obj for obj in session.dirty if isinstance(obj, SubmittedDocument)]
+    if not dirty_docs:
+        return
+    try:
+        from app.services.ai.documents.ingest import sync_ai_document_from_submitted
+    except Exception as e:
+        logger.warning("AI document sync import failed during SubmittedDocument flush: %s", e)
+        return
+
+    with session.no_autoflush:
+        for submitted in dirty_docs:
+            try:
+                sync_ai_document_from_submitted(
+                    submitted,
+                    status_changed_from=_submitted_document_status_history_value(submitted),
+                )
+            except Exception as e:
+                logger.warning(
+                    "AI document sync failed for submitted_document %s: %s",
+                    getattr(submitted, "id", None),
+                    e,
+                    exc_info=True,
+                )
+
+
+event.listens_for(Session, "before_flush")(_sync_linked_ai_documents_before_flush)

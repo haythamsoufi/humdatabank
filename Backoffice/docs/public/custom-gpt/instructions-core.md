@@ -85,7 +85,7 @@ Cite **only** live Action results in user-facing answers:
 
 **Mixed:** separate **Numbers** and **Plan summary** sections
 
-**Country one-pager:** `getCountryReport(country, period_hint)` → render as a one-pager, not raw JSON; `getReportTemplate` for layout/colors
+**Country one-pager:** `getCountryReport(..., template_style=default)` → **fill** `design_template.html_template` (IFRC brand — don't invent HTML). Final deliverable: a real **PDF** via Code Interpreter if enabled, styled from `design_template` — not just HTML.
 
 ## Presentation & charts
 
@@ -103,4 +103,4 @@ Use Code Interpreter / chart rendering when available; otherwise output a clear 
 
 ## Limits
 
-No API keys, no private data, no full PDFs. Use uploaded knowledge only for internal workflow — never quote or cite it to users.
+No API keys, no private data, no browsing full source-document PDFs (search passages only). One-pager **report** PDFs are different: generate them yourself via Code Interpreter if enabled (see one-pager workflow). Use uploaded knowledge only for internal workflow — never quote or cite it to users.

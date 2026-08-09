@@ -43,6 +43,7 @@
     height: 100%;
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     overflow: hidden;
     background:
       radial-gradient(58% 58% at 10% 14%, rgba(62,123,250,.24), transparent 62%),
@@ -89,63 +90,102 @@
   .grain{ position:absolute; inset:0; z-index:3; pointer-events:none; opacity:.04; mix-blend-mode: overlay; background-repeat: repeat; background-size: 128px 128px; }
 
   .hero-content{
-    position: relative; z-index:4; width:100%; max-width:600px;
-    padding-inline: 7vw 4vw;
+    position: relative; z-index:4; width:100%;
+    padding: clamp(32px, 5vh, 48px) clamp(28px, 5vw, 64px) clamp(32px, 5vh, 48px) clamp(28px, 6vw, 72px);
     will-change: transform;
   }
 
-  /* brand mark */
-  .brand-mark{ position:relative; width:104px; height:104px; margin:0 0 36px 0; opacity:0; transform: translateY(14px) scale(.92); filter: blur(6px); }
-  .brand-mark.in{ animation: markIn .7s var(--ease-expo) forwards, breathe 4.8s ease-in-out .7s infinite; }
-  @keyframes markIn{ to{ opacity:1; transform: translateY(0) scale(1); filter: blur(0); } }
-  @keyframes breathe{ 0%,100%{ transform: scale(1); } 50%{ transform: scale(1.025); } }
-
-  .brand-glow{
-    position:absolute; inset:-34px; border-radius:50%;
-    background: radial-gradient(circle, rgba(200,16,46,.38) 0%, rgba(62,123,250,.16) 55%, transparent 72%);
-    filter: blur(18px); opacity:.5;
-    animation: glowPulse 5s var(--ease-quad) .8s infinite;
+  /* row 1: logo | stat+headline — row 2: subcopy full width */
+  .hero-grid{
+    display:grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: clamp(24px, 3vw, 40px);
+    row-gap: clamp(20px, 2.5vh, 28px);
+    align-items:center;
+    width:100%; max-width:720px;
   }
-  @keyframes glowPulse{ 0%,100%{ opacity:.4; transform: scale(1); } 50%{ opacity:.72; transform: scale(1.08); } }
 
-  .brand-flash{
-    position:absolute; inset:-4px; border-radius:50%;
-    border:1.5px solid rgba(255,255,255,.6); opacity:0; transform: scale(.6);
+  .brand-mark{ grid-column:1; grid-row:1; }
+
+  .hero-copy-col{
+    grid-column:2; grid-row:1;
+    min-width:0; text-align:start;
+    opacity:0; transform: translateX(12px);
   }
-  .brand-mark.in .brand-flash{ animation: flashPing .9s var(--ease-quad) .12s 1; }
-  @keyframes flashPing{ 0%{ opacity:.85; transform: scale(.6); } 100%{ opacity:0; transform: scale(2.7); } }
+  .hero-copy-col.in{ animation: copySide .65s var(--ease-expo) .12s forwards; }
+  @keyframes copySide{ to{ opacity:1; transform: translateX(0); } }
 
-  .brand-ring{
-    position:absolute; inset:-10px; border-radius:50%;
-    background: conic-gradient(from 0deg, rgba(200,16,46,.65), rgba(62,123,250,.5), rgba(200,16,46,.65));
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
-    mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 2px));
-    opacity:.7;
-    animation: ringSpin 26s linear infinite;
+  .hero-copy-col h1.headline{
+    font-size: clamp(1.55rem, 2.4vw, 2.2rem);
+    margin-bottom:0;
   }
-  @keyframes ringSpin{ to{ transform: rotate(360deg); } }
+  .hero-copy-col .hero-stat{ margin-bottom:16px; }
 
-  .brand-badge{
-    position:relative; width:100%; height:100%; border-radius:50%; background:#fff;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 14px 40px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.06);
+  .hero-subcopy-row{
+    grid-column:1 / -1; grid-row:2;
+    max-width:none;
+    font-size: clamp(.9rem, 1.1vw, 1rem);
   }
-  .brand-badge svg{ width:60%; height:60%; }
 
-  /* eyebrow chip */
-  .eyebrow{
-    display: inline-flex; align-items:center; gap:9px;
-    margin:0 0 20px 0; padding:7px 16px 7px 12px; border-radius:999px;
-    background: rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16);
-    color: rgba(255,255,255,.92); font-size:.8rem; font-weight:600; letter-spacing:.01em;
+  /* brand mark — sharp white box with staged intro */
+  .brand-mark{
+    position:relative; flex-shrink:0; width:168px; margin:0;
+  }
+
+  .brand-logo-wrap{
+    position:relative;
+    background:#fff;
+    border-radius:0;
+    padding:18px 16px 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.28);
+    clip-path: inset(0 0 100% 0);
+    overflow:hidden;
+  }
+  .brand-mark.in .brand-logo-wrap{ animation: boxReveal .75s var(--ease-expo) forwards; }
+  @keyframes boxReveal{ to{ clip-path: inset(0 0 0 0); } }
+
+  .brand-logo-wrap::before{
+    content:''; position:absolute; inset-inline-start:0; top:0; bottom:0; width:4px;
+    background: linear-gradient(180deg, var(--blue), var(--navy) 45%, var(--red));
+    transform: scaleY(0); transform-origin: top;
+  }
+  .brand-mark.in .brand-logo-wrap::before{ animation: barGrowV .6s var(--ease-expo) .45s forwards; }
+
+  .brand-logo{
+    display:block; width:100%; height:auto;
     opacity:0; transform: translateY(10px);
-    backdrop-filter: blur(6px);
   }
-  .eyebrow.in{ animation: fadeUp .55s var(--ease-expo) forwards; }
-  .eyebrow .dot{ position:relative; width:7px; height:7px; border-radius:50%; background: var(--red); flex-shrink:0; }
-  .eyebrow .dot::after{ content:''; position:absolute; inset:-5px; border-radius:50%; border:1.5px solid var(--red); opacity:0; }
-  .eyebrow.in .dot::after{ animation: dotPing 2.6s ease-out .6s infinite; }
-  @keyframes dotPing{ 0%{ opacity:.65; transform: scale(.6); } 70%{ opacity:0; transform: scale(1.9); } 100%{ opacity:0; } }
+  .brand-mark.in .brand-logo{ animation: logoIn .55s var(--ease-expo) .38s forwards; }
+  @keyframes logoIn{ to{ opacity:1; transform: translateY(0); } }
+
+  /* hero stat — editorial figure + label, not a pill chip */
+  .hero-stat{
+    display:flex; align-items:center; gap:18px;
+    margin:0 0 26px 0;
+    opacity:0; transform: translateY(10px);
+  }
+  .hero-stat.in{ animation: fadeUp .55s var(--ease-expo) forwards; }
+
+  .hero-stat-num{
+    flex-shrink:0;
+    font-size: clamp(2.1rem, 3.2vw, 2.75rem);
+    font-weight:800; letter-spacing:-.03em; line-height:1;
+    color:#fff; font-variant-numeric: tabular-nums;
+  }
+  .hero-stat-plus{ color: var(--red-light); font-weight:700; margin-inline-start:1px; }
+
+  .hero-stat-copy{
+    display:flex; flex-direction:column; gap:3px;
+  }
+  .hero-stat-label{
+    font-size:.78rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase;
+    color: rgba(255,255,255,.92);
+  }
+  .hero-stat-caption{
+    font-size:.76rem; font-weight:400; letter-spacing:.01em;
+    color: rgba(255,255,255,.5);
+  }
 
   h1.headline{
     color:#fff; font-weight:800; letter-spacing:-.01em;
@@ -164,10 +204,11 @@
 
   p.subcopy{
     color: rgba(255,255,255,.82); font-weight:400; font-size: clamp(.98rem, 1.25vw, 1.1rem);
-    line-height:1.65; max-width:46ch; margin:0;
+    line-height:1.65; max-width:52ch; margin:0;
     opacity:0; transform: translateY(14px);
   }
   p.subcopy.in{ animation: fadeUp .55s var(--ease-expo) forwards; }
+  p.subcopy.hero-subcopy-row{ max-width:none; }
   @keyframes fadeUp{ to{ opacity:1; transform: translateY(0); } }
 
   .hero-footer{
@@ -195,36 +236,36 @@
   @keyframes barGrowV{ to{ transform: scaleY(1); } }
 
   /* staggered reveal of the panel's own content, layered on top of the panel slide-in */
-  .lang-switch, .panel-brand, .panel-title, .panel-lead, .btn-sso, .panel-hint, .panel-trust, .panel-footer{
+  .lang-nav, .panel-brand, .panel-title, .panel-lead, .btn-sso, .panel-hint, .panel-footer{
     opacity:0; transform: translateY(12px);
   }
-  .login-panel.in .lang-switch{ animation: fadeUp .5s var(--ease-expo) .18s forwards; }
-  .login-panel.in .panel-brand{ animation: fadeUp .5s var(--ease-expo) .26s forwards; }
-  .login-panel.in .panel-title{ animation: fadeUp .5s var(--ease-expo) .32s forwards; }
-  .login-panel.in .panel-lead{ animation: fadeUp .5s var(--ease-expo) .38s forwards; }
-  .login-panel.in .btn-sso{ animation: fadeUp .5s var(--ease-expo) .46s forwards; }
-  .login-panel.in .panel-hint{ animation: fadeUp .5s var(--ease-expo) .54s forwards; }
-  .login-panel.in .panel-trust{ animation: fadeUp .5s var(--ease-expo) .60s forwards; }
-  .login-panel.in .panel-footer{ animation: fadeUp .5s var(--ease-expo) .66s forwards; }
+  .login-panel.in .lang-nav{ animation: fadeUp .5s var(--ease-expo) .18s forwards; }
+  .login-panel.in .panel-brand{ animation: fadeUp .5s var(--ease-expo) .24s forwards; }
+  .login-panel.in .panel-title{ animation: fadeUp .5s var(--ease-expo) .30s forwards; }
+  .login-panel.in .panel-lead{ animation: fadeUp .5s var(--ease-expo) .36s forwards; }
+  .login-panel.in .btn-sso{ animation: fadeUp .5s var(--ease-expo) .44s forwards; }
+  .login-panel.in .panel-hint{ animation: fadeUp .5s var(--ease-expo) .52s forwards; }
+  .login-panel.in .panel-footer{ animation: fadeUp .5s var(--ease-expo) .60s forwards; }
 
-  .lang-switch{
+  .lang-nav{
     position:absolute; top:24px; inset-inline-end:26px; z-index:6;
-    display:flex; align-items:center; gap:2px; padding:3px;
-    background:#f2f3f5; border-radius:999px;
+    display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap;
+    gap:4px 0; margin:0; max-width:calc(100% - 52px);
   }
-  .lang-thumb{
-    position:absolute; top:3px; left:3px; height:calc(100% - 6px); width:34px;
-    background:#fff; border-radius:999px; box-shadow:0 1px 4px rgba(0,0,0,.12);
-    transition: transform .32s var(--ease-expo), width .32s var(--ease-expo);
-    z-index:0; will-change: transform;
+  .lang-nav button{
+    background:none; border:none; cursor:pointer; padding:2px 0;
+    font-family:inherit; font-size:.74rem; font-weight:500; color:#9ca3af;
+    transition: color .15s ease; white-space:nowrap;
   }
-  .lang-switch button{
-    position:relative; z-index:1;
-    background:none; border:none; cursor:pointer; padding:5px 11px; border-radius:999px;
-    font-family:inherit; font-size:.72rem; font-weight:600; color:#8f98a6; transition: color .2s;
+  .lang-nav button:hover:not(.active){ color:#5b6472; }
+  .lang-nav button.active{
+    color: var(--navy); font-weight:600;
+    text-decoration:underline; text-underline-offset:3px; text-decoration-color:rgba(1,30,65,.35);
   }
-  .lang-switch button.active{ color: var(--navy); }
-  .lang-switch button:hover:not(.active){ color:#5b6472; }
+  .lang-sep{
+    display:inline-block; width:1px; height:11px; margin:0 10px;
+    background:#e5e7eb; flex-shrink:0;
+  }
 
   .panel-brand{ font-size:.76rem; font-weight:700; letter-spacing:.09em; color: var(--red); text-transform:uppercase; margin:0 0 16px 0; }
   .panel-title{ margin:0 0 8px 0; font-size:1.5rem; font-weight:800; color: var(--navy); letter-spacing:-.01em; }
@@ -253,30 +294,39 @@
 
   .panel-hint{ margin:14px 0 0 0; font-size:.8rem; color:#9ca3af; text-align:center; line-height:1.5; }
 
-  .panel-trust{
-    display:flex; align-items:center; gap:8px; margin-top:26px; padding-top:22px;
-    border-top:1px solid #eef0f3; color:#9ca3af; font-size:.76rem;
+  .panel-footer{
+    margin-top:26px; padding-top:22px;
+    border-top:1px solid #eef0f3;
+    text-align:center;
   }
-  .panel-trust svg{ flex-shrink:0; opacity:.8; }
-
-  .panel-footer{ margin-top:16px; text-align:center; }
   .panel-footer a{ color:#6b7280; font-size:.8rem; text-decoration:none; border-bottom:1px solid transparent; transition: color .15s, border-color .15s; cursor:pointer; }
   .panel-footer a:hover{ color: var(--navy); border-color: currentColor; }
 
   @media (max-width: 1200px){
     .login-panel{ flex-basis:400px; padding:48px 40px; }
+    .hero-grid{ max-width:680px; }
+    .brand-mark{ width:156px; }
   }
   @media (max-width: 880px){
     html,body{ height:auto; }
     body{ overflow:visible; }
     .scene{ flex-direction:column; height:auto; min-height:100vh; }
     .hero-visual{ min-height:54vh; padding:7vh 0 5vh; }
-    .hero-content{ padding-inline:7vw; max-width:100%; }
+    .hero-content{ padding:7vh 7vw 5vh; }
+    .hero-grid{
+      grid-template-columns:1fr;
+      grid-template-rows:auto auto auto;
+      row-gap:24px; max-width:100%;
+    }
+    .brand-mark{ grid-column:1; grid-row:1; width:min(280px, 100%); }
+    .hero-copy-col{ grid-column:1; grid-row:2; }
+    .hero-subcopy-row{ grid-column:1; grid-row:3; }
+    .hero-copy-col h1.headline{ font-size: clamp(1.85rem, 5vw, 2.35rem); }
     .hero-footer{ display:none; }
     .login-panel{ flex-basis:auto; width:100%; padding:44px 8vw 48px; box-shadow: 0 -20px 50px rgba(0,0,0,.15); }
     .login-panel::before{ inset-inline-start:0; top:0; bottom:auto; width:100%; height:4px; background: linear-gradient(90deg, var(--blue), var(--navy) 45%, var(--red)); transform-origin:left; }
     .login-panel.in::before{ animation-name: barGrowH; }
-    .lang-switch{ top:18px; inset-inline-end:18px; }
+    .lang-nav{ top:18px; inset-inline-end:18px; max-width:calc(100% - 36px); }
   }
   @keyframes barGrowH{ to{ transform: scaleX(1); } }
 
@@ -284,15 +334,17 @@
     .scene, .scene.in{ opacity:1 !important; transform:none !important; animation:none !important; }
     canvas#network{ display:none; }
     .aurora span{ animation:none !important; }
-    .brand-ring{ animation:none !important; }
-    .brand-mark.in .brand-flash{ animation:none !important; opacity:0 !important; }
-    .eyebrow .dot::after{ animation:none !important; }
-    .brand-glow{ animation:none !important; opacity:.5; }
+    .brand-mark.in .brand-logo-wrap, .brand-mark.in .brand-logo-wrap::before, .brand-mark.in .brand-logo{
+      animation:none !important; clip-path:none !important; opacity:1 !important; transform:none !important;
+    }
+    .hero-copy-col.in{
+      animation:none !important; opacity:1 !important; transform:none !important;
+    }
     .login-panel.in::before, .login-panel::before{ animation:none !important; transform:none !important; }
-    .brand-mark, .eyebrow, h1.headline .w, p.subcopy, .login-panel, .hero-footer,
-    .login-panel.in .lang-switch, .login-panel.in .panel-brand, .login-panel.in .panel-title,
+    .brand-mark, .hero-copy-col, .hero-stat, h1.headline .w, p.subcopy, .login-panel, .hero-footer,
+    .login-panel.in .lang-nav, .login-panel.in .panel-brand, .login-panel.in .panel-title,
     .login-panel.in .panel-lead, .login-panel.in .btn-sso, .login-panel.in .panel-hint,
-    .login-panel.in .panel-trust, .login-panel.in .panel-footer{
+    .login-panel.in .panel-footer{
       opacity:1 !important; transform:none !important; filter:none !important; animation:none !important;
     }
   }
@@ -310,39 +362,46 @@
     <div class="grain" id="grain"></div>
 
     <main class="hero-content" id="heroContent">
-      <div class="brand-mark" id="brandMark">
-        <span class="brand-glow"></span>
-        <span class="brand-flash"></span>
-        <span class="brand-ring"></span>
-        <div class="brand-badge">
-          <svg viewBox="0 0 369.08 352.26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Humanitarian Databank">
-            <polygon fill="#C8102E" points="103.34,103.35 103.34,61.14 139.51,61.14 139.51,103.35 139.50,103.37 181.71,103.37 181.71,139.54 139.50,139.54 139.51,139.53 139.51,181.73 103.34,181.73 103.34,139.53 103.34,139.55 61.14,139.55 61.14,103.37 103.34,103.37"/>
-            <path fill="#C8102E" d="m 237.67,120.8 c 0,-28.109997 22.79,-50.889997 50.89,-50.889997 6.26,0 12.25,1.13 17.79,3.2 -10.41,-8.24 -23.56,-13.16 -37.87,-13.16 -33.73,0 -61.07,27.35 -61.07,61.069997 0,33.73 27.34,61.07 61.07,61.07 14.78,0 28.34,-5.25 38.91,-13.99 -5.83,2.32 -12.18,3.6 -18.82,3.6 -28.11,-0.01 -50.9,-22.8 -50.9,-50.9"/>
-            <path fill="#333132" d="m 277.93,292.31 c 6.3,0 12.01,-1.11 17.14,-3.32 5.12,-2.21 9.42,-5.44 12.88,-9.66 l -10.8,-9.97 c -4.92,5.75 -11.01,8.62 -18.28,8.62 -4.5,0 -8.52,-0.99 -12.05,-2.96 -3.53,-1.97 -6.28,-4.73 -8.26,-8.26 -1.97,-3.53 -2.96,-7.55 -2.96,-12.05 0,-4.5 0.99,-8.52 2.96,-12.05 1.97,-3.53 4.73,-6.28 8.26,-8.26 3.53,-1.97 7.55,-2.96 12.05,-2.96 7.27,0 13.36,2.84 18.28,8.52 l 10.8,-9.97 c -3.46,-4.16 -7.74,-7.34 -12.83,-9.56 -5.09,-2.21 -10.79,-3.32 -17.09,-3.32 -7.48,0 -14.22,1.61 -20.2,4.83 -5.99,3.22 -10.7,7.69 -14.13,13.4 -3.43,5.71 -5.14,12.17 -5.14,19.37 0,7.2 1.72,13.66 5.14,19.37 3.43,5.71 8.14,10.18 14.13,13.4 5.99,3.22 12.69,4.83 20.1,4.83 m -67.21,-47.57 c 0,4.02 -1.32,7.13 -3.95,9.35 -2.63,2.22 -6.48,3.32 -11.53,3.32 h -13.71 v -25.35 h 13.71 c 5.06,0 8.9,1.09 11.53,3.27 2.63,2.19 3.95,5.32 3.95,9.41 m 18.39,46.32 -16.31,-23.37 c 4.78,-2.08 8.47,-5.07 11.06,-8.99 2.6,-3.91 3.89,-8.57 3.89,-13.97 0,-5.4 -1.28,-10.08 -3.84,-14.03 -2.56,-3.95 -6.22,-6.99 -10.96,-9.14 -4.74,-2.15 -10.34,-3.22 -16.78,-3.22 h -31.48 v 72.72 h 16.83 V 270.8 h 14.65 0.83 l 14.02,20.26 z m -78.95,-59.21 v -13.5 H 95.209997 v 72.72 H 112.04 v -26.49 h 33.66 v -13.5 h -33.66 v -19.22 h 38.12 z m -89.020003,59.21 h 16.83 v -72.72 h -16.83 z"/>
-          </svg>
+      <div class="hero-grid">
+        <div class="brand-mark" id="brandMark">
+          <div class="brand-logo-wrap">
+            <svg class="brand-logo" viewBox="0 0 369.08 352.26" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Humanitarian Databank">
+              <polygon fill="#C8102E" points="103.34,103.35 103.34,61.14 139.51,61.14 139.51,103.35 139.50,103.37 181.71,103.37 181.71,139.54 139.50,139.54 139.51,139.53 139.51,181.73 103.34,181.73 103.34,139.53 103.34,139.55 61.14,139.55 61.14,103.37 103.34,103.37"/>
+              <path fill="#C8102E" d="m 237.67,120.8 c 0,-28.109997 22.79,-50.889997 50.89,-50.889997 6.26,0 12.25,1.13 17.79,3.2 -10.41,-8.24 -23.56,-13.16 -37.87,-13.16 -33.73,0 -61.07,27.35 -61.07,61.069997 0,33.73 27.34,61.07 61.07,61.07 14.78,0 28.34,-5.25 38.91,-13.99 -5.83,2.32 -12.18,3.6 -18.82,3.6 -28.11,-0.01 -50.9,-22.8 -50.9,-50.9"/>
+              <path fill="#333132" d="m 277.93,292.31 c 6.3,0 12.01,-1.11 17.14,-3.32 5.12,-2.21 9.42,-5.44 12.88,-9.66 l -10.8,-9.97 c -4.92,5.75 -11.01,8.62 -18.28,8.62 -4.5,0 -8.52,-0.99 -12.05,-2.96 -3.53,-1.97 -6.28,-4.73 -8.26,-8.26 -1.97,-3.53 -2.96,-7.55 -2.96,-12.05 0,-4.5 0.99,-8.52 2.96,-12.05 1.97,-3.53 4.73,-6.28 8.26,-8.26 3.53,-1.97 7.55,-2.96 12.05,-2.96 7.27,0 13.36,2.84 18.28,8.52 l 10.8,-9.97 c -3.46,-4.16 -7.74,-7.34 -12.83,-9.56 -5.09,-2.21 -10.79,-3.32 -17.09,-3.32 -7.48,0 -14.22,1.61 -20.2,4.83 -5.99,3.22 -10.7,7.69 -14.13,13.4 -3.43,5.71 -5.14,12.17 -5.14,19.37 0,7.2 1.72,13.66 5.14,19.37 3.43,5.71 8.14,10.18 14.13,13.4 5.99,3.22 12.69,4.83 20.1,4.83 m -67.21,-47.57 c 0,4.02 -1.32,7.13 -3.95,9.35 -2.63,2.22 -6.48,3.32 -11.53,3.32 h -13.71 v -25.35 h 13.71 c 5.06,0 8.9,1.09 11.53,3.27 2.63,2.19 3.95,5.32 3.95,9.41 m 18.39,46.32 -16.31,-23.37 c 4.78,-2.08 8.47,-5.07 11.06,-8.99 2.6,-3.91 3.89,-8.57 3.89,-13.97 0,-5.4 -1.28,-10.08 -3.84,-14.03 -2.56,-3.95 -6.22,-6.99 -10.96,-9.14 -4.74,-2.15 -10.34,-3.22 -16.78,-3.22 h -31.48 v 72.72 h 16.83 V 270.8 h 14.65 0.83 l 14.02,20.26 z m -78.95,-59.21 v -13.5 H 95.209997 v 72.72 H 112.04 v -26.49 h 33.66 v -13.5 h -33.66 v -19.22 h 38.12 z m -89.020003,59.21 h 16.83 v -72.72 h -16.83 z"/>
+            </svg>
+          </div>
         </div>
+
+        <div class="hero-copy-col" id="heroCopyCol">
+          <div class="hero-stat" id="eyebrow">
+            <div class="hero-stat-num"><span id="statNum">0</span><span class="hero-stat-plus">+</span></div>
+            <div class="hero-stat-copy">
+              <span class="hero-stat-label" id="statLabel">National Societies</span>
+              <span class="hero-stat-caption" id="statCaption">One connected network</span>
+            </div>
+          </div>
+
+          <h1 class="headline" id="headline"></h1>
+        </div>
+
+        <p class="subcopy hero-subcopy-row" id="subcopy"></p>
       </div>
-
-      <div class="eyebrow" id="eyebrow">
-        <span class="dot"></span><span class="eyebrow-text"><strong id="statNum">0</strong>+ <span id="statSuffix"></span></span>
-      </div>
-
-      <h1 class="headline" id="headline"></h1>
-
-      <p class="subcopy" id="subcopy"></p>
     </main>
 
     <div class="hero-footer" id="heroFooter"></div>
   </section>
 
   <aside class="login-panel" id="loginPanel">
-    <div class="lang-switch" id="langSwitch">
-      <span class="lang-thumb" id="langThumb" aria-hidden="true"></span>
-      <button data-lang="en" class="active" aria-pressed="true" title="English">EN</button>
-      <button data-lang="fr" aria-pressed="false" title="Français">FR</button>
-      <button data-lang="es" aria-pressed="false" title="Español">ES</button>
-      <button data-lang="ar" aria-pressed="false" title="العربية">AR</button>
-    </div>
+    <nav class="lang-nav" id="langSwitch" aria-label="Language">
+      <button type="button" data-lang="en" class="active" aria-pressed="true">English</button>
+      <span class="lang-sep" aria-hidden="true"></span>
+      <button type="button" data-lang="fr" aria-pressed="false">Français</button>
+      <span class="lang-sep" aria-hidden="true"></span>
+      <button type="button" data-lang="es" aria-pressed="false">Español</button>
+      <span class="lang-sep" aria-hidden="true"></span>
+      <button type="button" data-lang="ar" aria-pressed="false">العربية</button>
+    </nav>
 
     <div class="panel-brand" id="panelMark">IFRC Humanitarian Databank</div>
     <h2 class="panel-title" id="panelTitle">Sign in</h2>
@@ -358,11 +417,6 @@
       </span>
     </button>
     <p class="panel-hint" id="panelHint">New here? You can create your account in the same step.</p>
-
-    <div class="panel-trust">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-      <span id="trustLabel">Protected by your organization's identity provider</span>
-    </div>
 
     <div class="panel-footer">
       <a id="helpLink" role="button" tabindex="0">Need help signing in?</a>
@@ -387,52 +441,52 @@
     en:{
       headline:[{t:'Welcome to the', a:false},{t:'Humanitarian Databank', a:true}],
       subcopy:'The single, secure home for planning and reporting across the IFRC network — replacing scattered spreadsheets and disconnected tools with one connected platform.',
-      statSuffix:'National Societies, one connected network',
+      statLabel:'National Societies',
+      statCaption:'One connected network',
       mark:'IFRC Humanitarian Databank',
       title:'Sign in',
       lead:'Use your National Society or IFRC single sign-on account to continue.',
       button:'Continue with single sign-on',
       hint:'New here? You can create your account in the same step.',
-      trust:'Protected by your organization\u2019s identity provider',
       help:'Need help signing in?',
       footer:'\u00A9 2026 IFRC \u2014 Humanitarian Databank'
     },
     fr:{
       headline:[{t:'Bienvenue sur la', a:false},{t:'Banque de donn\u00e9es humanitaires', a:true}],
       subcopy:'L\u2019espace unique et s\u00e9curis\u00e9 pour la planification et le reporting au sein du r\u00e9seau de la FICR \u2014 remplaçant fichiers dispers\u00e9s et outils d\u00e9connect\u00e9s par une seule plateforme connect\u00e9e.',
-      statSuffix:'Soci\u00e9t\u00e9s nationales, un seul r\u00e9seau connect\u00e9',
+      statLabel:'Soci\u00e9t\u00e9s nationales',
+      statCaption:'Un r\u00e9seau connect\u00e9',
       mark:'Banque de donn\u00e9es humanitaires FICR',
       title:'Connexion',
       lead:'Utilisez votre compte de connexion unique de la Soci\u00e9t\u00e9 nationale ou de la FICR pour continuer.',
       button:'Continuer avec l\u2019authentification unique',
       hint:'Nouveau ici\u00a0? Vous pouvez cr\u00e9er votre compte \u00e0 la m\u00eame \u00e9tape.',
-      trust:'Prot\u00e9g\u00e9 par le fournisseur d\u2019identit\u00e9 de votre organisation',
       help:'Besoin d\u2019aide pour vous connecter\u00a0?',
       footer:'\u00A9 2026 FICR \u2014 Banque de donn\u00e9es humanitaires'
     },
     es:{
       headline:[{t:'Bienvenido al', a:false},{t:'Banco de Datos Humanitarios', a:true}],
       subcopy:'El espacio \u00fanico y seguro para la planificaci\u00f3n y los informes en toda la red de la FICR, sustituyendo hojas dispersas y herramientas desconectadas por una sola plataforma conectada.',
-      statSuffix:'Sociedades Nacionales, una sola red conectada',
+      statLabel:'Sociedades Nacionales',
+      statCaption:'Una red conectada',
       mark:'Banco de Datos Humanitarios FICR',
       title:'Iniciar sesi\u00f3n',
       lead:'Usa tu cuenta de inicio de sesi\u00f3n \u00fanico de la Sociedad Nacional o la FICR para continuar.',
       button:'Continuar con el inicio de sesi\u00f3n \u00fanico',
       hint:'\u00bfPrimera vez aqu\u00ed? Puedes crear tu cuenta en el mismo paso.',
-      trust:'Protegido por el proveedor de identidad de tu organizaci\u00f3n',
       help:'\u00bfNecesitas ayuda para iniciar sesi\u00f3n?',
       footer:'\u00A9 2026 FICR \u2014 Banco de Datos Humanitarios'
     },
     ar:{
       headline:[{t:'\u0645\u0631\u062d\u0628\u064b\u0627 \u0628\u0643\u0645 \u0641\u064a', a:false},{t:'\u0628\u0646\u0643 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0625\u0646\u0633\u0627\u0646\u064a\u0629', a:true}],
       subcopy:'\u0627\u0644\u0645\u0633\u0627\u062d\u0629 \u0627\u0644\u0622\u0645\u0646\u0629 \u0627\u0644\u0645\u0648\u062d\u062f\u0629 \u0644\u0644\u062a\u062e\u0637\u064a\u0637 \u0648\u0631\u0641\u0639 \u0627\u0644\u062a\u0642\u0627\u0631\u064a\u0631 \u0639\u0628\u0631 \u0634\u0628\u0643\u0629 \u0627\u0644\u0627\u062a\u062d\u0627\u062f \u0627\u0644\u062f\u0648\u0644\u064a\u060c \u0644\u062a\u062d\u0644 \u0645\u062d\u0644 \u0627\u0644\u0645\u0644\u0641\u0627\u062a \u0627\u0644\u0645\u062a\u0646\u0627\u062b\u0631\u0629 \u0648\u0627\u0644\u0623\u062f\u0648\u0627\u062a \u0627\u0644\u0645\u0646\u0641\u0635\u0644\u0629 \u0628\u0645\u0646\u0635\u0629 \u0648\u0627\u062d\u062f\u0629 \u0645\u062a\u0635\u0644\u0629.',
-      statSuffix:'\u062c\u0645\u0639\u064a\u0629 \u0648\u0637\u0646\u064a\u0629\u060c \u0634\u0628\u0643\u0629 \u0648\u0627\u062d\u062f\u0629 \u0645\u062a\u0635\u0644\u0629',
+      statLabel:'\u062c\u0645\u0639\u064a\u0629 \u0648\u0637\u0646\u064a\u0629',
+      statCaption:'\u0634\u0628\u0643\u0629 \u0648\u0627\u062d\u062f\u0629 \u0645\u062a\u0635\u0644\u0629',
       mark:'\u0628\u0646\u0643 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0625\u0646\u0633\u0627\u0646\u064a\u0629 \u0644\u0644\u0627\u062a\u062d\u0627\u062f \u0627\u0644\u062f\u0648\u0644\u064a',
       title:'\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644',
       lead:'\u0627\u0633\u062a\u062e\u062f\u0645 \u062d\u0633\u0627\u0628 \u0627\u0644\u062f\u062e\u0648\u0644 \u0627\u0644\u0645\u0648\u062c\u062f \u0627\u0644\u062e\u0627\u0635 \u0628\u062c\u0645\u0639\u064a\u062a\u0643 \u0627\u0644\u0648\u0637\u0646\u064a\u0629 \u0623\u0648 \u0627\u0644\u0627\u062a\u062d\u0627\u062f \u0627\u0644\u062f\u0648\u0644\u064a \u0644\u0644\u0645\u062a\u0627\u0628\u0639\u0629.',
       button:'\u0627\u0644\u0627\u0633\u062a\u0645\u0631\u0627\u0631 \u0639\u0628\u0631 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0627\u0644\u0645\u0648\u062d\u062f',
       hint:'\u0623\u0648\u0644 \u0645\u0631\u0629 \u0647\u0646\u0627\u061f \u064a\u0645\u0643\u0646\u0643 \u0625\u0646\u0634\u0627\u0621 \u062d\u0633\u0627\u0628\u0643 \u0641\u064a \u0646\u0641\u0633 \u0627\u0644\u062e\u0637\u0648\u0629.',
-      trust:'\u0645\u062d\u0645\u064a \u0628\u0648\u0627\u0633\u0637\u0629 \u0645\u0632\u0648\u0651\u062f \u0627\u0644\u0647\u0648\u064a\u0629 \u0627\u0644\u062e\u0627\u0635 \u0628\u0645\u0624\u0633\u0651\u0633\u062a\u0643',
       help:'\u0647\u0644 \u062a\u062d\u062a\u0627\u062c \u0625\u0644\u0649 \u0645\u0633\u0627\u0639\u062f\u0629 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644\u061f',
       footer:'\u00A9 2026 \u0627\u0644\u0627\u062a\u062d\u0627\u062f \u0627\u0644\u062f\u0648\u0644\u064a \u2014 \u0628\u0646\u0643 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0625\u0646\u0633\u0627\u0646\u064a\u0629'
     }
@@ -462,39 +516,24 @@
 
   function setStaticTexts(tr){
     document.getElementById('subcopy').textContent = tr.subcopy;
-    document.getElementById('statSuffix').textContent = tr.statSuffix;
+    document.getElementById('statLabel').textContent = tr.statLabel;
+    document.getElementById('statCaption').textContent = tr.statCaption;
     document.getElementById('panelMark').textContent = tr.mark;
     document.getElementById('panelTitle').textContent = tr.title;
     document.getElementById('panelLead').textContent = tr.lead;
     document.getElementById('btnLabel').textContent = tr.button;
     document.getElementById('panelHint').textContent = tr.hint;
-    document.getElementById('trustLabel').textContent = tr.trust;
     document.getElementById('helpLink').textContent = tr.help;
     document.getElementById('heroFooter').textContent = tr.footer;
   }
 
-  function moveThumb(btn, animate){
-    var thumb = document.getElementById('langThumb');
-    if(!btn || !thumb) return;
-    if(!animate){ thumb.style.transition = 'none'; }
-    thumb.style.width = btn.offsetWidth + 'px';
-    thumb.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
-    if(!animate){ void thumb.offsetWidth; thumb.style.transition = ''; }
-  }
-
-  function markActiveLangButton(lang, animateThumb){
-    var activeBtn = null;
-    document.querySelectorAll('.lang-switch button').forEach(function(b){
+  function markActiveLangButton(lang){
+    document.querySelectorAll('.lang-nav button').forEach(function(b){
       var active = b.dataset.lang === lang;
       b.classList.toggle('active', active);
       b.setAttribute('aria-pressed', active ? 'true' : 'false');
-      if(active) activeBtn = b;
     });
-    moveThumb(activeBtn, animateThumb);
   }
-  window.addEventListener('resize', function(){
-    moveThumb(document.querySelector('.lang-switch button.active'), false);
-  });
 
   function applyLanguage(lang, animateHeadline){
     var tr = translations[lang];
@@ -502,7 +541,7 @@
     document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
     setStaticTexts(tr);
     buildHeadline(tr.headline, animateHeadline);
-    markActiveLangButton(lang, true);
+    markActiveLangButton(lang);
   }
 
   function setLanguage(lang){
@@ -517,7 +556,7 @@
     }, 180);
   }
 
-  document.querySelectorAll('.lang-switch button').forEach(function(b){
+  document.querySelectorAll('.lang-nav button').forEach(function(b){
     b.addEventListener('click', function(){ setLanguage(b.dataset.lang); });
   });
 
@@ -535,7 +574,7 @@
   document.documentElement.lang = 'en';
   document.documentElement.dir = 'ltr';
   setStaticTexts(translations.en);
-  markActiveLangButton('en', false);
+  markActiveLangButton('en');
 
   function animateCount(el, to, dur){
     var t0 = performance.now();
@@ -553,6 +592,7 @@
   if(reduced){
     scene.classList.add('in');
     document.getElementById('brandMark').classList.add('in');
+    document.getElementById('heroCopyCol').classList.add('in');
     document.getElementById('eyebrow').classList.add('in');
     document.getElementById('subcopy').classList.add('in');
     document.getElementById('loginPanel').classList.add('in');
@@ -561,10 +601,13 @@
     buildHeadline(translations.en.headline, false);
   } else {
     // headline stays empty (as authored in markup) until its staged reveal below.
-    // the login panel's own contents (lang switch, title, button, hint, trust, footer)
+    // the login panel's own contents (lang switch, title, button, hint, footer)
     // stagger in on their own once .in lands on .login-panel — see the CSS rules above.
     scene.classList.add('in');
-    setTimeout(function(){ document.getElementById('brandMark').classList.add('in'); }, 60);
+    setTimeout(function(){
+      document.getElementById('brandMark').classList.add('in');
+      document.getElementById('heroCopyCol').classList.add('in');
+    }, 60);
     setTimeout(function(){ document.getElementById('loginPanel').classList.add('in'); }, 200);
     setTimeout(function(){
       document.getElementById('eyebrow').classList.add('in');

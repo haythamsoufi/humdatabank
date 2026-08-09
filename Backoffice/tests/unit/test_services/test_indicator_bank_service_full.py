@@ -385,10 +385,33 @@ class TestBuildIndicatorBankQueryFull:
             q = build_indicator_bank_query(IndicatorBankFilters(indicator_type="output"))
             assert q is not None
 
-    def test_emergency_filter(self, app):
-        with app.app_context():
-            q = build_indicator_bank_query(IndicatorBankFilters(emergency="flood"))
-            assert q is not None
+    def test_emergency_true_filter(self, app, db_session):
+        # Regression test: IndicatorBank.emergency is Boolean; must not raise
+        # psycopg2.errors.UndefinedFunction ("boolean ~~* unknown") on Postgres.
+        # See prod incident 2026-08-09: GET /api/v1/indicator-bank?emergency=true -> 500.
+        q = build_indicator_bank_query(IndicatorBankFilters(emergency="true"))
+        assert q is not None
+        assert q.all() == []
+
+    def test_emergency_false_filter(self, app, db_session):
+        q = build_indicator_bank_query(IndicatorBankFilters(emergency="false"))
+        assert q is not None
+        assert q.all() == []
+
+    def test_emergency_filter_case_and_whitespace_insensitive(self, app, db_session):
+        q = build_indicator_bank_query(IndicatorBankFilters(emergency=" True "))
+        assert q.all() == []
+
+    def test_emergency_filter_accepts_numeric_strings(self, app, db_session):
+        assert build_indicator_bank_query(IndicatorBankFilters(emergency="1")).all() == []
+        assert build_indicator_bank_query(IndicatorBankFilters(emergency="0")).all() == []
+
+    def test_emergency_unrecognized_value_no_filter(self, app, db_session):
+        # Unrecognized values are a silent no-op, consistent with the `archived` filter's
+        # own contract (see test_archived_other_value_no_filter above).
+        q = build_indicator_bank_query(IndicatorBankFilters(emergency="flood"))
+        assert q is not None
+        assert q.all() == []
 
     def test_sector_name_filter_no_match(self, app, db_session):
         # Sector doesn't exist in DB, so filter is a no-op (returns all)
@@ -404,18 +427,18 @@ class TestBuildIndicatorBankQueryFull:
             q = build_indicator_bank_query(IndicatorBankFilters(sector_id=1))
             assert q is not None
 
-    def test_combined_filters(self, app):
-        with app.app_context():
-            q = build_indicator_bank_query(
-                IndicatorBankFilters(
-                    search="water",
-                    indicator_type="output",
-                    emergency="flood",
-                    archived="false",
-                    sector_id=5,
-                )
+    def test_combined_filters(self, app, db_session):
+        q = build_indicator_bank_query(
+            IndicatorBankFilters(
+                search="water",
+                indicator_type="output",
+                emergency="true",
+                archived="false",
+                sector_id=5,
             )
-            assert q is not None
+        )
+        assert q is not None
+        assert q.all() == []
 
 
 # ---------------------------------------------------------------------------

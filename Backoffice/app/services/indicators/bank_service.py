@@ -413,9 +413,18 @@ def build_indicator_bank_query(filters: IndicatorBankFilters):
         )
 
     if filters.emergency:
-        query = query.filter(
-            IndicatorBank.emergency.ilike(safe_ilike_pattern(filters.emergency))
-        )
+        # IndicatorBank.emergency is a Boolean column — .ilike() (string pattern match)
+        # raises psycopg2.errors.UndefinedFunction on Postgres ("operator does not exist:
+        # boolean ~~* unknown"); it previously appeared to work only because SQLAlchemy
+        # builds the expression without validating operand types, and unit tests never
+        # executed the query against a real (type-strict) Postgres. Same true/false
+        # parsing convention as the `archived` filter above; unrecognized values are a
+        # silent no-op rather than an error, for consistency with that filter's contract.
+        emergency_val = filters.emergency.strip().lower()
+        if emergency_val in ('true', '1', 'yes'):
+            query = query.filter(IndicatorBank.emergency == True)  # noqa: E712
+        elif emergency_val in ('false', '0', 'no'):
+            query = query.filter(IndicatorBank.emergency == False)  # noqa: E712
 
     return query.order_by(IndicatorBank.name.asc())
 

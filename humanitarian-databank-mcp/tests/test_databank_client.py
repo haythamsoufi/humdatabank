@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import databank_client
 from databank_client import (
     DatabankAPIError,
     get_chunk_context,
@@ -86,6 +87,19 @@ class TestResolvePublicIndicator:
             assert "/public/indicators/resolve" in mock_get.call_args[0][0]
             assert out["best_match"]["id"] == 724
 
+    def test_raises_on_response_query_mismatch(self):
+        """The generic correlation check (see search_public_documents) also covers
+        this endpoint, which echoes ``query`` back in its response."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"query": "staff", "best_match": {"id": 1}}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            with pytest.raises(DatabankAPIError, match="mismatch"):
+                resolve_public_indicator("volunteers")
+
 
 class TestSearchPublicDocuments:
     def test_calls_public_endpoint(self):
@@ -135,6 +149,120 @@ class TestSearchPublicDocuments:
             params = mock_get.call_args[1]["params"]
             assert "country_ids" not in params
             assert "require_phrase" not in params
+
+    def test_raises_on_response_query_mismatch(self):
+        """Bug-report symptom: a response whose echoed query doesn't match the
+        request must fail loudly instead of silently returning the wrong content."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"query": "TESTQUERY_TWO", "chunks": [], "count": 0}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            with pytest.raises(DatabankAPIError, match="mismatch"):
+                search_public_documents("TESTQUERY_THREE")
+
+    def test_no_mismatch_when_echoed_query_matches(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"query": "Syria unified plan 2026", "chunks": [], "count": 0}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            out = search_public_documents("Syria unified plan 2026")
+            assert out["query"] == "Syria unified plan 2026"
+
+    def test_retries_once_on_503_then_succeeds(self):
+        """PublicDocumentSearchUnavailable (statement-timeout 503) is documented
+        server-side as retry-worthy; one transient blip should not fail the tool call."""
+        failure = MagicMock()
+        failure.status_code = 503
+        failure.text = "Document search is temporarily unavailable"
+        success = MagicMock()
+        success.status_code = 200
+        success.json.return_value = {"query": "health", "chunks": [], "count": 0}
+
+        with patch("databank_client.httpx.Client") as client_cls, patch(
+            "databank_client.time.sleep"
+        ) as mock_sleep:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.side_effect = [failure, success]
+            out = search_public_documents("health")
+
+        assert out["query"] == "health"
+        assert mock_get.call_count == 2
+        mock_sleep.assert_called_once()
+
+    def test_does_not_retry_on_400(self):
+        failure = MagicMock()
+        failure.status_code = 400
+        failure.text = "query is required"
+
+        with patch("databank_client.httpx.Client") as client_cls, patch(
+            "databank_client.time.sleep"
+        ) as mock_sleep:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = failure
+            with pytest.raises(DatabankAPIError, match="HTTP 400"):
+                search_public_documents("health")
+
+        assert mock_get.call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_gives_up_after_max_retries(self):
+        failure = MagicMock()
+        failure.status_code = 503
+        failure.text = "Document search is temporarily unavailable"
+
+        with patch("databank_client.httpx.Client") as client_cls, patch(
+            "databank_client.time.sleep"
+        ), patch("databank_client.DOCUMENT_SEARCH_MAX_RETRIES", 1):
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = failure
+            with pytest.raises(DatabankAPIError, match="HTTP 503"):
+                search_public_documents("health")
+
+        # 1 initial attempt + 1 retry = 2 calls, then it gives up.
+        assert mock_get.call_count == 2
+
+
+class TestGetWithRetry:
+    def test_no_retry_when_max_retries_is_zero(self):
+        failure = MagicMock()
+        failure.status_code = 503
+        failure.text = "boom"
+
+        with patch("databank_client.httpx.Client") as client_cls, patch(
+            "databank_client.time.sleep"
+        ) as mock_sleep:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = failure
+            with pytest.raises(DatabankAPIError, match="HTTP 503"):
+                databank_client._get_with_retry("/public/documents/search", {"query": "x"})
+
+        assert mock_get.call_count == 1
+        mock_sleep.assert_not_called()
+
+
+class TestCheckResponseQueryMatches:
+    def test_noop_when_no_query_sent(self):
+        # Should not raise: no "query" in sent params means nothing to correlate.
+        databank_client._check_response_query_matches("http://x", {}, {"query": "anything"})
+
+    def test_noop_when_response_has_no_query_field(self):
+        # Should not raise: endpoints that don't echo query are unaffected.
+        databank_client._check_response_query_matches("http://x", {"query": "a"}, {"chunks": []})
+
+    def test_noop_when_response_is_not_a_dict(self):
+        databank_client._check_response_query_matches("http://x", {"query": "a"}, ["not", "a", "dict"])
+
+    def test_raises_when_queries_differ(self):
+        with pytest.raises(DatabankAPIError, match="mismatch"):
+            databank_client._check_response_query_matches(
+                "http://x", {"query": "a"}, {"query": "b"}
+            )
 
 
 class TestGetChunkContext:
@@ -309,6 +437,17 @@ class TestResolvePublicCountry:
             mock_get.return_value = mock_resp
             resolve_public_country("Kenya", limit=100)
             assert mock_get.call_args[1]["params"]["limit"] == 20
+
+    def test_raises_on_response_query_mismatch(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"query": "Uganda", "best_match": {"iso3": "UGA"}}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            with pytest.raises(DatabankAPIError, match="mismatch"):
+                resolve_public_country("Kenya")
 
 
 class TestGetCountryReport:

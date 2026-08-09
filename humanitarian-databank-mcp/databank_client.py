@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
@@ -13,6 +14,13 @@ PUBLIC_DATA_MAX_PER_PAGE = 5000
 MAX_AUTO_PAGES = 20
 REQUEST_TIMEOUT = 60.0
 
+# Transient upstream failures worth one bounded retry (see search_public_documents):
+# 503 is PublicDocumentSearchUnavailable (Postgres statement_timeout under load —
+# explicitly documented server-side as "retry-worthy"); 502/504 are gateway-origin
+# timeouts from the ~30s Application Gateway backend limit. 500 is included since a
+# generic app crash is also plausibly a one-off worker issue, not a permanent failure.
+RETRYABLE_STATUS_CODES = frozenset({500, 502, 503, 504})
+
 
 class DatabankAPIError(Exception):
     def __init__(self, message: str, *, status_code: Optional[int] = None) -> None:
@@ -22,6 +30,32 @@ class DatabankAPIError(Exception):
 
 def api_base() -> str:
     return (os.environ.get("DATABANK_API_BASE") or DEFAULT_BASE).rstrip("/")
+
+
+def _check_response_query_matches(url: str, sent_params: Dict[str, Any], data: Any) -> None:
+    """
+    Defensive request/response correlation check.
+
+    Several public endpoints (documents/search, indicators/resolve,
+    countries/resolve) echo the ``query`` they processed back in the JSON body.
+    If a response's echoed query doesn't match what we just sent, the response
+    almost certainly belongs to a *different* request — surface a loud, distinct
+    error instead of silently handing an LLM caller content for the wrong query.
+    No-op when we didn't send a ``query`` param or the response doesn't echo one
+    (e.g. endpoints without this field), so this never false-positives elsewhere.
+    """
+    if not isinstance(data, dict):
+        return
+    sent_query = sent_params.get("query")
+    echoed_query = data.get("query")
+    if sent_query is None or echoed_query is None:
+        return
+    if str(sent_query) != str(echoed_query):
+        raise DatabankAPIError(
+            f"Response/request mismatch from {url}: sent query={sent_query!r} but "
+            f"response echoed query={echoed_query!r}. Discard this response and retry — "
+            "its content belongs to a different request."
+        )
 
 
 def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -40,9 +74,39 @@ def _get(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
             status_code=resp.status_code,
         )
     try:
-        return resp.json()
+        data = resp.json()
     except ValueError as exc:
         raise DatabankAPIError(f"Non-JSON response from {url}") from exc
+
+    _check_response_query_matches(url, clean, data)
+    return data
+
+
+def _get_with_retry(
+    path: str,
+    params: Optional[Dict[str, Any]] = None,
+    *,
+    max_retries: int = 0,
+    retry_delay: float = 0.0,
+) -> Any:
+    """Like _get, but retries a bounded number of times on RETRYABLE_STATUS_CODES.
+
+    Retries happen sequentially (with a fixed delay) inside this one call, so a
+    caller never issues a second request while the first might still be in
+    flight — unlike an LLM client simply re-invoking the tool, which risks
+    stacking a retry on top of a still-running slow request instead of replacing it.
+    """
+    attempts = max(1, max_retries + 1)
+    for attempt in range(attempts):
+        try:
+            return _get(path, params)
+        except DatabankAPIError as exc:
+            last_attempt = attempt == attempts - 1
+            if last_attempt or exc.status_code not in RETRYABLE_STATUS_CODES:
+                raise
+            if retry_delay > 0:
+                time.sleep(retry_delay)
+    raise AssertionError("unreachable")  # pragma: no cover
 
 
 def search_indicators(
@@ -111,6 +175,18 @@ def resolve_public_indicator(
     )
 
 
+# search_public_documents transient-failure retry (see RETRYABLE_STATUS_CODES): the
+# production endpoint has an ~18s DB statement_timeout under concurrent load and an
+# ~30s Application Gateway backend timeout, both of which surface here as a retry-worthy
+# 5xx (see PublicDocumentSearchUnavailable). One short-delay retry absorbs a transient
+# blip without the caller (or the LLM) needing to re-invoke the tool and risk stacking
+# a second concurrent request on top of a first one that may still be finishing.
+DOCUMENT_SEARCH_MAX_RETRIES = max(0, int(os.environ.get("DATABANK_DOCUMENT_SEARCH_MAX_RETRIES", "1")))
+DOCUMENT_SEARCH_RETRY_DELAY_SECONDS = max(
+    0.0, float(os.environ.get("DATABANK_DOCUMENT_SEARCH_RETRY_DELAY_SECONDS", "2.0"))
+)
+
+
 def search_public_documents(
     query: str,
     *,
@@ -155,7 +231,12 @@ def search_public_documents(
         params["file_type"] = file_type.strip()
     if require_phrase.strip():
         params["require_phrase"] = require_phrase.strip()
-    return _get("/public/documents/search", params)
+    return _get_with_retry(
+        "/public/documents/search",
+        params,
+        max_retries=DOCUMENT_SEARCH_MAX_RETRIES,
+        retry_delay=DOCUMENT_SEARCH_RETRY_DELAY_SECONDS,
+    )
 
 
 def get_public_document(document_id: int) -> Dict[str, Any]:

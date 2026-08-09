@@ -163,6 +163,9 @@ MCP_UPSTREAM_URL=https://ifrc-databank-mcp-staging.azurewebsites.net
 | `DATABANK_API_BASE` | `https://databank.ifrc.org/api/v1` |
 | `MCP_PUBLIC_BASE_URL` | `https://databank.ifrc.org` (connector icon URL base) |
 | `PORT` | `8000` |
+| `MCP_MAX_CONCURRENT_DOCUMENT_SEARCHES` | `1` — serializes `databank_search_public_documents` calls so parallel tool calls don't stack concurrent load on the upstream search endpoint |
+| `DATABANK_DOCUMENT_SEARCH_MAX_RETRIES` | `1` — retries once on a transient 5xx (statement-timeout 503, gateway 502/504) |
+| `DATABANK_DOCUMENT_SEARCH_RETRY_DELAY_SECONDS` | `2.0` — delay before that retry |
 
 ## Tests
 

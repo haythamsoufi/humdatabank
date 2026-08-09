@@ -683,6 +683,8 @@ def upsert_fdrs_document_metadata(
                 continue
 
             if existing:
+                # Field updates flush via ORM; linked AIDocument privacy/metadata/searchable
+                # sync automatically (SubmittedDocument before_flush hook in app.models.documents).
                 existing.filename = row["filename"]
                 existing.source_url = row.get("source_url")
                 existing.thumbnail_source_url = row.get("thumbnail_url")

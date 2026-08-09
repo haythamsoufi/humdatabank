@@ -30,14 +30,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from flask import current_app
 
-from app.services.public_analytics_service import (
+from app.services.public.analytics_service import (
     _dedupe_rows,
     _parse_num_value,
     aggregate_submission_coverage,
     fetch_public_scoped_rows,
     resolve_country_query,
 )
-from app.services.public_document_service import search_public_documents
+from app.services.public.document_service import search_public_documents
 from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
 
 # Curated FDRS headline bundle for country one-pagers — the same governance,
@@ -70,7 +70,7 @@ _MIDYEAR_HINT_RE = re.compile(r"jan-?jun|half|semi|\bh1\b|\bh2\b|mid|myr", re.IG
 # never change at runtime.
 _kpi_code_index_cache: Optional[Dict[str, int]] = None
 
-_REPORT_STYLES_DIR = Path(__file__).resolve().parent.parent / "report_styles"
+_REPORT_STYLES_DIR = Path(__file__).resolve().parent.parent.parent / "report_styles"
 
 
 def _extract_year(text: str) -> Optional[int]:
@@ -420,6 +420,10 @@ def build_country_report(
             "do not add outside knowledge; cite document_title + page_number per claim.",
             "If coverage.fdrs_data_available or coverage.narrative_available is false, say so "
             "explicitly in the one-pager rather than implying full reporting.",
+            "This API never renders or returns HTML/PDF itself. For a final, shareable deliverable, "
+            "use your own code-execution/file-creation capability (e.g. Claude's pdf skill, ChatGPT "
+            "Code Interpreter) to generate a real PDF file from this data plus getReportTemplate's "
+            "design_template — an inline HTML/canvas render is fine only as a quick preview.",
         ],
     }
 
@@ -464,14 +468,22 @@ def get_report_template(style: str = "default") -> Dict[str, Any]:
         "html_template": html_template,
         "design_tokens": design_tokens,
         "usage_notes": [
-            "Follow this skeleton's structure, colors, and typography when rendering the "
-            "one-pager (as an HTML/canvas artifact, or translated to another renderer).",
-            "Replace {{PLACEHOLDER}} tokens with real report data; keep section order and layout.",
+            "This template follows the IFRC Brand System (https://brand.ifrc.org/ifrc-brand-system): "
+            "Montserrat headings, Open Sans body, primary red + navy palette, horizontal IFRC logo.",
+            "Always render from this html_template — do not invent a generic dashboard/card layout.",
+            "Replace {{PLACEHOLDER}} tokens with real report data; keep section order and IFRC logo intact.",
             "Repeat the block between <!-- KPI_CARD:start --> and <!-- KPI_CARD:end --> once "
             "per entry in headline_kpis; omit cards whose value is null.",
             "Repeat the block between <!-- THEME_ITEM:start --> and <!-- THEME_ITEM:end --> once "
             "per entry in narrative.themes; omit the whole narrative section if not included.",
-            "design_tokens (colors/fonts/spacing) apply even if you render as markdown, React, "
-            "or an image-generation prompt instead of raw HTML.",
+            "Key National Society figures section mirrors UPR/FDRS country snapshot structure.",
+            "design_tokens apply even if you render as markdown, React, or an image prompt instead of HTML.",
+            "Prefer producing a real PDF file as the final deliverable (e.g. via Claude's pdf skill or "
+            "ChatGPT Code Interpreter running reportlab/fpdf2/weasyprint) — this endpoint only supplies "
+            "data/styles, it never generates or returns a PDF/HTML file itself.",
+            "Most code-execution sandboxes have no network access: do not fetch fonts or the logo over "
+            "HTTP. The IFRC logo is already inline as SVG in html_template. For typography, embed "
+            "Montserrat/Open Sans only if already available in your environment; otherwise fall back to "
+            "a clean built-in sans-serif (e.g. Helvetica) rather than failing the report.",
         ],
     }

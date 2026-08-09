@@ -159,15 +159,28 @@ class AIChunkingService:
             nonlocal current_chunk, current_tokens
             if not current_chunk:
                 return
-            chunks.append(
-                self._create_chunk(
-                    content="\n\n".join(current_chunk),
-                    chunk_index=len(chunks),
-                    page_number=current_page,
-                    section_title=current_section,
+            content = "\n\n".join(current_chunk)
+            token_count = self.count_tokens(content)
+            if token_count < self.min_chunk_size and chunks:
+                prev = chunks[-1]
+                merged_content = f"{prev.content}\n\n{content}".strip()
+                chunks[-1] = self._create_chunk(
+                    content=merged_content,
+                    chunk_index=prev.chunk_index,
+                    page_number=prev.page_number or current_page,
+                    section_title=prev.section_title or current_section,
                     chunk_type="semantic",
                 )
-            )
+            else:
+                chunks.append(
+                    self._create_chunk(
+                        content=content,
+                        chunk_index=len(chunks),
+                        page_number=current_page,
+                        section_title=current_section,
+                        chunk_type="semantic",
+                    )
+                )
             current_chunk = []
             current_tokens = 0
 

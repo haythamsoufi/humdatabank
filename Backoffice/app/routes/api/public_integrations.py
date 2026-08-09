@@ -7,19 +7,21 @@ import uuid
 from flask import current_app, request
 
 from app.routes.api import api_bp
-from app.services.public_analytics_service import (
+from app.services.public.analytics_service import (
     aggregate_global_trend,
     aggregate_submission_coverage,
     resolve_country_query,
     resolve_indicator_query,
 )
-from app.services.public_document_service import (
+from app.services.public.document_service import (
+    PublicDocumentScopeTooLarge,
+    PublicDocumentSearchUnavailable,
     catalog_public_documents,
     get_public_document_metadata,
     search_public_documents,
     stream_public_ai_document_download,
 )
-from app.services.public_report_service import build_country_report, get_report_template
+from app.services.public.report_service import build_country_report, get_report_template
 from app.utils.api_helpers import api_error, json_response
 from app.utils.rate_limiting import api_rate_limit
 
@@ -171,6 +173,8 @@ def public_search_documents():
         min_score = request.args.get("min_score", default=0.25, type=float)
         country_name = request.args.get("country_name", default="", type=str).strip() or None
         country_id = request.args.get("country_id", type=int)
+        country_ids = request.args.get("country_ids", default="", type=str).strip() or None
+        require_phrase = request.args.get("require_phrase", default="", type=str).strip() or None
         file_type = request.args.get("file_type", default="", type=str).strip() or None
         search_mode = request.args.get("search_mode", default="hybrid", type=str)
         full_coverage_raw = request.args.get("full_coverage", default="false", type=str).strip().lower()
@@ -190,17 +194,23 @@ def public_search_documents():
             min_score=min_score,
             country_name=country_name,
             country_id=country_id,
+            country_ids=country_ids,
             file_type=file_type,
             search_mode=search_mode,
             full_coverage=full_coverage,
             page=page,
             per_page=per_page,
             latest_per_country=latest_per_country,
+            require_phrase=require_phrase,
         )
         response = json_response(payload)
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Public-Data-Access"] = "true"
         return response
+    except PublicDocumentSearchUnavailable as exc:
+        return api_error(str(exc), 503, extra={"error_type": "service_unavailable"})
+    except PublicDocumentScopeTooLarge as exc:
+        return api_error(str(exc), 400, extra={"error_type": "scope_too_large"})
     except ValueError as exc:
         return api_error(str(exc), 400)
     except Exception as exc:

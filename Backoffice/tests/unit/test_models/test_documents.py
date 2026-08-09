@@ -13,7 +13,8 @@ from app.models.documents import (
     Resource,
     ResourceTranslation,
 )
-from app.models.enums import DocumentStatusValue
+from app.models.embeddings import AIDocument
+from app.models.enums import DocumentStatus, DocumentStatusValue
 from tests.factories import (
     create_test_user,
     create_test_country,
@@ -552,3 +553,151 @@ class TestResourceTranslation:
         with app.app_context():
             r, trans = self._create_resource_and_translation(db_session)
             assert trans.source_document_is_pdf is False
+
+
+@pytest.mark.unit
+class TestSubmittedDocumentAiSyncHook:
+    """Regression: before_flush hook syncs linked AIDocument without explicit helper calls."""
+
+    def _create_linked_pair(self, db_session, user, country=None, **submitted_kwargs):
+        defaults = {
+            "filename": "annual-report.pdf",
+            "uploaded_by_user_id": user.id,
+            "document_type": "Annual Report",
+            "language": "en",
+            "is_public": False,
+            "status": DocumentStatusValue.pending.value,
+        }
+        if country is not None:
+            defaults["country_id"] = country.id
+        defaults.update(submitted_kwargs)
+
+        submitted = SubmittedDocument(**defaults)
+        db_session.add(submitted)
+        db_session.flush()
+
+        ai_doc = AIDocument(
+            submitted_document_id=submitted.id,
+            title="Old title",
+            filename="annual-report.pdf",
+            file_type="pdf",
+            is_public=False,
+            searchable=True,
+            processing_status="completed",
+        )
+        db_session.add(ai_doc)
+        db_session.commit()
+        db_session.refresh(submitted)
+        db_session.refresh(ai_doc)
+        return submitted, ai_doc
+
+    def test_hook_syncs_is_public_on_commit_without_explicit_call(self, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session)
+            submitted, ai_doc = self._create_linked_pair(db_session, user, is_public=False)
+            assert ai_doc.is_public is False
+
+            submitted.is_public = True
+            db_session.commit()
+            db_session.refresh(ai_doc)
+
+            assert ai_doc.is_public is True
+
+    def test_hook_syncs_metadata_including_country(self, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session)
+            country = create_test_country(db_session, name="Testland", iso3="TST")
+            submitted, ai_doc = self._create_linked_pair(
+                db_session,
+                user,
+                country=country,
+                document_type="Annual Report",
+                language="fr",
+                period="2024",
+            )
+
+            submitted.language = "es"
+            db_session.commit()
+            db_session.refresh(ai_doc)
+
+            assert ai_doc.document_language == "es"
+            assert ai_doc.country_id == country.id
+            assert ai_doc.country_name == "Testland"
+            assert ai_doc.document_category == "report"
+
+    def test_hook_marks_non_searchable_on_rejection(self, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session)
+            submitted, ai_doc = self._create_linked_pair(
+                db_session,
+                user,
+                status=DocumentStatus.APPROVED,
+                is_public=True,
+            )
+            ai_doc.is_public = True
+            ai_doc.searchable = True
+            db_session.commit()
+
+            submitted.status = DocumentStatus.REJECTED
+            db_session.commit()
+            db_session.refresh(ai_doc)
+
+            assert ai_doc.searchable is False
+
+    def test_hook_restores_searchable_on_reapproval(self, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session)
+            submitted, ai_doc = self._create_linked_pair(
+                db_session,
+                user,
+                status=DocumentStatus.REJECTED,
+            )
+            ai_doc.searchable = False
+            ai_doc.processing_status = "completed"
+            db_session.commit()
+
+            submitted.status = DocumentStatus.APPROVED
+            db_session.commit()
+            db_session.refresh(ai_doc)
+
+            assert ai_doc.searchable is True
+
+    def test_pending_document_keeps_searchable_when_only_metadata_changes(self, db_session, app):
+        with app.app_context():
+            user = create_test_user(db_session)
+            submitted, ai_doc = self._create_linked_pair(
+                db_session,
+                user,
+                status=DocumentStatus.PENDING,
+            )
+            assert ai_doc.searchable is True
+
+            submitted.language = "de"
+            db_session.commit()
+            db_session.refresh(ai_doc)
+
+            assert ai_doc.searchable is True
+            assert ai_doc.document_language == "de"
+
+    def test_fdrs_style_assignment_triggers_sync(self, db_session, app):
+        """Mimic FDRS sync: plain attribute assignment + commit, no sync helper."""
+        with app.app_context():
+            user = create_test_user(db_session)
+            submitted, ai_doc = self._create_linked_pair(
+                db_session,
+                user,
+                is_public=False,
+                language="en",
+            )
+
+            submitted.is_public = True
+            submitted.language = "fr"
+            submitted.document_type = "Situation Report"
+            submitted.period = "2023"
+            db_session.add(submitted)
+            db_session.commit()
+            db_session.refresh(ai_doc)
+
+            assert ai_doc.is_public is True
+            assert ai_doc.document_language == "fr"
+            assert ai_doc.document_category == "sitrep"

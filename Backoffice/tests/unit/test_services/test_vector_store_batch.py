@@ -207,3 +207,169 @@ class TestHybridSearchPerDocumentBatching:
     def test_batched_returns_empty_for_no_documents(self, app, store):
         with app.app_context():
             assert store.hybrid_search_per_document("volunteers", [], chunks_per_doc=5) == []
+
+
+@pytest.mark.unit
+class TestSearchSimilarPerDocumentBatching:
+    """
+    search_similar_per_document is the vector-only counterpart to
+    hybrid_search_per_document, used by public_document_service for
+    search_mode="vector" so that path avoids the same one-query-per-document N+1
+    pattern hybrid_search_per_document was built to fix.
+    """
+
+    @pytest.fixture
+    def store(self, app):
+        with app.app_context():
+            from unittest.mock import MagicMock, patch
+
+            with patch("app.services.ai.documents.vector_store.AIEmbeddingService") as mock_emb:
+                mock_service = MagicMock()
+                mock_service.model = "test-model"
+                mock_service.dimensions = 1536
+                mock_emb.return_value = mock_service
+
+                from app.services.ai.documents.vector_store import AIVectorStore
+
+                return AIVectorStore()
+
+    def _seed_document(self, db_session, *, title, chunks_content, seeds, is_public=True):
+        doc = AIDocument(
+            title=title,
+            filename=f"{title.lower().replace(' ', '_')}.pdf",
+            file_type="pdf",
+            is_public=is_public,
+            searchable=True,
+            processing_status=AIDocumentProcessingStatusValue.completed.value,
+        )
+        db_session.add(doc)
+        db_session.flush()
+
+        chunk_ids = []
+        for idx, (content, seed) in enumerate(zip(chunks_content, seeds)):
+            chunk = AIDocumentChunk(
+                document_id=doc.id,
+                content=content,
+                content_length=len(content),
+                chunk_index=idx,
+                chunk_type="semantic",
+            )
+            db_session.add(chunk)
+            db_session.flush()
+
+            embedding = AIEmbedding(
+                document_id=doc.id,
+                chunk_id=chunk.id,
+                embedding=_make_vector(seed),
+                model="test-model",
+                dimensions=1536,
+            )
+            db_session.add(embedding)
+            chunk_ids.append(chunk.id)
+
+        db_session.commit()
+        db_session.refresh(doc)
+        return doc, chunk_ids
+
+    def test_matches_per_document_top_similarity(self, app, db_session, store):
+        """Returns the top-similarity chunk per document in a single batched query
+        (equivalent to what a per-document search_similar loop would return)."""
+        with app.app_context():
+            doc_a, chunks_a = self._seed_document(
+                db_session,
+                title="Kenya Annual Report 2024",
+                chunks_content=[
+                    "Kenya volunteers increased significantly this year.",
+                    "Kenya budget allocation details for programmes.",
+                ],
+                seeds=[0.95, 0.1],
+            )
+            doc_b, chunks_b = self._seed_document(
+                db_session,
+                title="Nepal Unified Plan 2026",
+                chunks_content=[
+                    "Nepal migration and displacement overview.",
+                    "Nepal volunteers and staff overview.",
+                ],
+                seeds=[0.4, 0.9],
+            )
+
+            doc_ids = [doc_a.id, doc_b.id]
+            query_embedding = _make_vector(1.0)
+
+            with patch.object(store, "_get_cached_embedding", return_value=(query_embedding, 0.0)):
+                results = store.search_similar_per_document(
+                    "volunteers",
+                    doc_ids,
+                    chunks_per_doc=1,
+                    user_id=None,
+                    user_role="public",
+                )
+
+            assert len(results) == 2
+            by_doc = {int(r["document_id"]): r for r in results}
+            assert by_doc[doc_a.id]["chunk_id"] == chunks_a[0]
+            assert by_doc[doc_b.id]["chunk_id"] == chunks_b[1]
+            # Vector-only results carry similarity_score, not a hybrid combined_score.
+            assert "similarity_score" in by_doc[doc_a.id]
+
+    def test_respects_chunks_per_doc_limit(self, app, db_session, store):
+        with app.app_context():
+            doc, chunk_ids = self._seed_document(
+                db_session,
+                title="Chad Annual Report 2024",
+                chunks_content=[f"Chad content chunk {i}." for i in range(5)],
+                seeds=[0.9, 0.8, 0.7, 0.6, 0.5],
+            )
+            query_embedding = _make_vector(1.0)
+
+            with patch.object(store, "_get_cached_embedding", return_value=(query_embedding, 0.0)):
+                results = store.search_similar_per_document(
+                    "content",
+                    [doc.id],
+                    chunks_per_doc=2,
+                    user_id=None,
+                    user_role="public",
+                )
+
+            assert len(results) == 2
+            returned_chunk_ids = {r["chunk_id"] for r in results}
+            assert returned_chunk_ids == {chunk_ids[0], chunk_ids[1]}
+
+    def test_excludes_non_public_documents(self, app, db_session, store):
+        with app.app_context():
+            public_doc, _ = self._seed_document(
+                db_session,
+                title="Public Doc Vec",
+                chunks_content=["Public volunteers content."],
+                seeds=[0.9],
+                is_public=True,
+            )
+            private_doc, _ = self._seed_document(
+                db_session,
+                title="Private Doc Vec",
+                chunks_content=["Private volunteers content."],
+                seeds=[0.95],
+                is_public=False,
+            )
+            query_embedding = _make_vector(1.0)
+
+            with patch.object(store, "_get_cached_embedding", return_value=(query_embedding, 0.0)):
+                results = store.search_similar_per_document(
+                    "volunteers",
+                    [public_doc.id, private_doc.id],
+                    chunks_per_doc=1,
+                    user_id=None,
+                    user_role="public",
+                )
+
+            result_doc_ids = {int(r["document_id"]) for r in results}
+            assert result_doc_ids == {public_doc.id}
+
+    def test_returns_empty_for_no_documents(self, app, store):
+        with app.app_context():
+            assert store.search_similar_per_document("volunteers", [], chunks_per_doc=5) == []
+
+    def test_returns_empty_for_blank_query(self, app, store):
+        with app.app_context():
+            assert store.search_similar_per_document("   ", [1, 2], chunks_per_doc=5) == []

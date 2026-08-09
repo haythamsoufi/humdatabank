@@ -53,8 +53,13 @@ assignment or workflow status, which requires an API key.
 - Do **not** invent plan content, web-search docs, or narrate fake extra searches
 - At most **one** follow-up databank_search_public_documents if chunks are thin (single-country only); \
 use full_coverage=true for cross-country themes
-- Cross-country themes → **full_coverage=true**. Snapshot questions keep newest document per country; \
+- Cross-country themes → **full_coverage=true** or **country_ids="all"** / comma-separated ids \
+(one batched query; read by_country[]). Snapshot questions keep newest document per country; \
 multi-year country questions keep all years automatically.
+- Wrap multi-word entity names in **double quotes** in query (e.g. `"Post Office"`) for phrase \
+keyword ranking; use **require_phrase** when the phrase must appear in every returned chunk
+- Do **not** fire multiple parallel broad document searches — gateway timeout is ~30s and \
+concurrent searches can abort with no error payload
 - Do **not** claim partial document coverage when coverage_mode is full
 - **top_k=12** (max) applies only without full_coverage
 - count=0 → no public document matched
@@ -76,12 +81,15 @@ list coverage.without_hits as no mention
 
 **Mixed:** separate **Numbers** and **Plan summary** sections
 
-**Country one-pager report:** databank_build_country_report(country=..., period_hint=...) \
-→ one call returns headline_kpis, trend, and cited narrative — render it yourself as a \
-visual one-pager (do not just print the JSON). Pass template_style to also get a layout/\
-color/typography guide inline, or call databank_get_report_template separately. Always \
-surface coverage.period_match_note and coverage.*_available=false honestly instead of \
-implying full reporting.
+**Country one-pager report:** databank_build_country_report(country=..., period_hint=..., template_style=default) \
+→ one call returns headline_kpis, trend, cited narrative, and design_template — **fill the html_template** \
+(do not invent a generic layout). Template follows IFRC Brand System (brand.ifrc.org): Montserrat/Open Sans, \
+IFRC horizontal logo, red+navy palette. Surface coverage.period_match_note and coverage.*_available=false \
+honestly instead of implying full reporting. **Final deliverable = a real PDF file**, generated yourself \
+with your file-creation/code-execution capability (e.g. the pdf skill) from this data + design_template — \
+neither this tool nor the API renders or returns HTML/PDF. Treat an inline HTML/canvas render as a quick \
+preview only, not the final artifact; when the user wants to keep, print, or share the report, hand them \
+an actual PDF.
 
 ## Presentation
 

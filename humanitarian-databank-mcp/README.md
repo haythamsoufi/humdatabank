@@ -54,13 +54,18 @@ databank_build_country_report(country="Syria", period_hint="2026 midyear", templ
   → country, period (resolved + available_periods), coverage, headline_kpis, trend,
     narrative (cited theme chunks), design_template (layout/colors/fonts to follow)
 ```
-Render the JSON as an actual visual one-pager (KPI cards + trend chart + narrative bullets) —
-the tool never returns HTML or images itself. Omit `template_style` for a freeform render, or
-call `databank_get_report_template(style="default")` separately to fetch the same layout
-skeleton on its own. `report_type` narrows to `"fdrs"` (numbers only) or `"upr"` (narrative
-Unified Plan/Report themes only); default `"combined"` returns both. When
+Render the JSON as an actual visual one-pager (KPI cards + trend chart + narrative bullets)
+by filling `design_template.html_template` — omit `template_style` only for a freeform
+render, or call `databank_get_report_template(style="default")` separately to fetch the same
+layout skeleton on its own. `report_type` narrows to `"fdrs"` (numbers only) or `"upr"`
+(narrative Unified Plan/Report themes only); default `"combined"` returns both. When
 `coverage.fdrs_data_available` or `coverage.narrative_available` is `false`, or
 `coverage.period_match_note` is set, say so explicitly instead of implying full reporting.
+
+Neither tool ever generates or returns a PDF/HTML file — they only return data plus a
+style/layout spec. Treat an inline HTML/canvas render as a quick preview; for the final
+deliverable, use your own file-creation capability (e.g. Claude's `pdf` skill) to generate a
+real, downloadable PDF one-pager from this JSON, following `design_template`.
 
 **"How many countries submitted FDRS data for 2024?" (numeric):**
 ```text
@@ -87,7 +92,7 @@ assignment or workflow status (submitted/pending/approved), which requires an AP
 `databank_build_country_report` and `databank_get_report_template` are thin proxies over
 Backoffice's `GET /public/reports/country` and `GET /public/reports/template` — all
 orchestration (period resolution, KPI fetch, narrative search) and the template skeletons
-themselves live server-side in `Backoffice/app/services/public_report_service.py` and
+themselves live server-side in `Backoffice/app/services/public/report_service.py` and
 `Backoffice/app/report_styles/<style>.html` (+ `<style>.tokens.json`), shared with the
 Custom GPT's `getCountryReport` / `getReportTemplate` Actions. Add a new style by dropping
 files in that Backoffice folder — no MCP code changes or redeploy needed, the endpoint lists

@@ -1,9 +1,11 @@
 {
   "style": "default",
-  "description": "IFRC-inspired one-pager: red header band, white KPI cards, clean sans-serif. Colors are drawn from the MCP connector icon (assets/ifrc_icon.svg), not an official brand kit — swap these tokens if the user supplies real IFRC/National Society brand guidelines.",
+  "description": "IFRC Network Databank country one-pager — aligned with the IFRC Brand System (https://brand.ifrc.org/ifrc-brand-system): primary red, navy, black and white palette; Montserrat headings; Open Sans body; horizontal IFRC logo. Layout mirrors Unified Plan/Report country snapshot structure (key figures, trend, cited narrative).",
+  "brand_reference": "https://brand.ifrc.org/ifrc-brand-system",
   "colors": {
     "primary": "#F5333F",
     "primary_dark": "#C21F2A",
+    "navy": "#011E41",
     "ink": "#333132",
     "text_muted": "#5B6470",
     "background": "#FFFFFF",
@@ -11,25 +13,44 @@
     "border": "#E4E6E8",
     "positive": "#1E8E5A",
     "negative": "#C0392B",
-    "chart_palette": ["#F5333F", "#2C6E9E", "#E8A33D", "#333132", "#1E8E5A"]
+    "accent_bar": "#F5333F",
+    "chart_palette": ["#F5333F", "#011E41", "#2C6E9E", "#E8A33D", "#1E8E5A", "#333132"]
   },
   "typography": {
-    "font_family": "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+    "heading_font_family": "'Montserrat', 'Helvetica Neue', Arial, sans-serif",
+    "body_font_family": "'Open Sans', Arial, sans-serif",
     "heading_weight": 700,
+    "body_weight": 400,
     "body_size_px": 14,
-    "kpi_label_size_px": 12,
-    "kpi_value_size_px": 30,
-    "title_size_px": 26,
-    "subtitle_size_px": 14
+    "kpi_label_size_px": 11,
+    "kpi_value_size_px": 28,
+    "title_size_px": 28,
+    "subtitle_size_px": 14,
+    "section_title_size_px": 13
   },
   "spacing": {
-    "page_padding_px": 32,
-    "card_gap_px": 16,
-    "section_gap_px": 24,
-    "border_radius_px": 10
+    "page_padding_px": 40,
+    "card_gap_px": 14,
+    "section_gap_px": 28,
+    "border_radius_px": 4
   },
   "layout": {
-    "page_max_width_px": 820,
-    "kpi_grid_columns": 3
-  }
+    "page_max_width_px": 794,
+    "kpi_grid_columns": 3,
+    "logo": "IFRC horizontal logo (inline SVG in html_template — do not substitute a generic red-cross icon)"
+  },
+  "pdf_page": {
+    "size": "A4",
+    "orientation": "portrait",
+    "margin_pt": 36,
+    "note": "If generating a PDF directly (e.g. Python reportlab/fpdf2) rather than converting the filled HTML, use your library's standard A4 page size (e.g. reportlab.lib.pagesizes.A4) with ~36pt (0.5in) margins. page_max_width_px above is the HTML/CSS reference, not a PDF unit."
+  },
+  "rendering_rules": [
+    "Always start from html_template — never invent a new layout when this style is requested.",
+    "Keep Montserrat for headings/titles and Open Sans for body, KPI labels, citations, and footer.",
+    "Use primary red sparingly (accent bar, KPI card tops, section markers) — not as a full-page gradient.",
+    "Place the IFRC horizontal logo in the header; wordmark must read IFRC exactly as in the template.",
+    "Section order: header → key figures → trend → narrative themes → footer/source note.",
+    "Cite narrative themes with document_title + page_number; hyperlink country names when document_url is present."
+  ]
 }

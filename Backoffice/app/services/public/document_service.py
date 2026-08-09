@@ -39,7 +39,88 @@ PUBLIC_DOC_SCOPED_SEARCH_MAX_DOCS = 80
 # (see _passes_relevance_floor) would otherwise let it clear min_score on its own.
 PUBLIC_DOC_MIN_RAW_RELEVANCE = 0.05
 
+
+class PublicDocumentSearchUnavailable(Exception):
+    """Transient embedding/DB failure during public document search (retry-worthy)."""
+
+
+class PublicDocumentScopeTooLarge(ValueError):
+    """Too many documents in scope for the requested search mode."""
+
+
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
+
+
+def _dedupe_rows_by_chunk_id(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Final safety net: keep the highest-scoring row per chunk_id."""
+    best_by_chunk: Dict[Any, Dict[str, Any]] = {}
+    for row in rows:
+        chunk_id = row.get("chunk_id")
+        if chunk_id is None:
+            continue
+        existing = best_by_chunk.get(chunk_id)
+        if existing is None or _chunk_score(row) > _chunk_score(existing):
+            best_by_chunk[chunk_id] = row
+    if not best_by_chunk:
+        return rows
+    seen: set[Any] = set()
+    deduped: List[Dict[str, Any]] = []
+    for row in rows:
+        chunk_id = row.get("chunk_id")
+        if chunk_id is None:
+            deduped.append(row)
+            continue
+        if chunk_id in seen:
+            continue
+        seen.add(chunk_id)
+        deduped.append(best_by_chunk[chunk_id])
+    return deduped
+
+
+def _parse_country_ids_param(country_ids: str | None) -> tuple[List[int] | None, bool]:
+    """
+    Parse country_ids query param.
+
+    Returns (ids, is_all). ``is_all`` is True when the caller requested every country.
+    """
+    raw = (country_ids or "").strip()
+    if not raw:
+        return None, False
+    if raw.lower() == "all":
+        return None, True
+    parsed: List[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            parsed.append(int(part))
+        except ValueError as exc:
+            raise ValueError(f"Invalid country_ids entry: {part!r}") from exc
+    if not parsed:
+        raise ValueError("country_ids must be a comma-separated list of ids or 'all'")
+    return sorted(set(parsed)), False
+
+
+def _group_slim_chunks_by_country(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Group slim chunks by primary country name for multi-country fan-out responses."""
+    grouped: Dict[str, List[Dict[str, Any]]] = {}
+    for chunk in chunks:
+        countries = chunk.get("countries") or []
+        label = countries[0] if countries else "Unknown"
+        grouped.setdefault(label, []).append(chunk)
+    out: List[Dict[str, Any]] = []
+    for country_name in sorted(grouped.keys(), key=str.lower):
+        country_chunks = grouped[country_name]
+        country_chunks.sort(key=lambda c: c.get("score") or 0.0, reverse=True)
+        out.append(
+            {
+                "country": country_name,
+                "count": len(country_chunks),
+                "chunks": country_chunks,
+            }
+        )
+    return out
 
 
 def _truncate(text: str | None, max_chars: int) -> str:
@@ -230,11 +311,17 @@ def _build_search_filters(
     *,
     country_name: str | None = None,
     country_id: int | None = None,
+    country_ids: List[int] | None = None,
+    country_ids_all: bool = False,
     file_type: str | None = None,
     year: int | None = None,
+    require_phrase: str | None = None,
 ) -> Dict[str, Any] | None:
     filters: Dict[str, Any] = {}
-    filters.update(_resolve_country_filter(query, country_name=country_name, country_id=country_id))
+    if country_ids:
+        filters["country_ids"] = country_ids
+    elif not country_ids_all:
+        filters.update(_resolve_country_filter(query, country_name=country_name, country_id=country_id))
 
     if file_type:
         filters["file_type"] = file_type.strip().lower()
@@ -245,6 +332,10 @@ def _build_search_filters(
 
     if year:
         filters["date_range"] = {"min": f"{year}-01-01", "max": f"{year}-12-31"}
+
+    phrase = (require_phrase or "").strip()
+    if phrase:
+        filters["require_phrase"] = phrase
 
     return filters or None
 
@@ -297,7 +388,9 @@ def _apply_scope_filters_to_query(query, filters: Dict[str, Any] | None):
     if not filters:
         return query
 
-    if filters.get("country_id"):
+    if filters.get("country_ids"):
+        query = query.filter(AIVectorStore._country_ids_filter(list(filters["country_ids"])))
+    elif filters.get("country_id"):
         query = query.filter(AIVectorStore._country_id_filter(int(filters["country_id"])))
     if filters.get("country_name"):
         query = query.filter(AIVectorStore._country_name_filter(filters["country_name"]))
@@ -722,7 +815,7 @@ def _search_public_documents_full_coverage(
         enabled=prioritize_latest,
     )
     if len(documents) > PUBLIC_DOC_FULL_COVERAGE_MAX_DOCS:
-        raise ValueError(
+        raise PublicDocumentScopeTooLarge(
             f"Too many documents in scope ({len(documents)}). "
             f"Narrow filters (year, country) or use full_coverage=false."
         )
@@ -755,9 +848,10 @@ def _search_public_documents_full_coverage(
             )
     except VectorStoreError as exc:
         current_app.logger.error("Public document full-coverage search failed: %s", exc)
-        raise ValueError("Document search is temporarily unavailable") from exc
+        raise PublicDocumentSearchUnavailable("Document search is temporarily unavailable") from exc
 
     rows = filter_rows_to_public_documents(rows)
+    rows = _dedupe_rows_by_chunk_id(rows)
     hits: List[Dict[str, Any]] = []
     docs_with_hits: set[int] = set()
 
@@ -814,7 +908,63 @@ def _search_public_documents_full_coverage(
 
 
 def _should_use_country_scoped_search(filters: Dict[str, Any] | None) -> bool:
-    return bool(filters and (filters.get("country_id") or filters.get("country_name")))
+    if not filters:
+        return False
+    if filters.get("country_ids"):
+        return len(filters["country_ids"]) == 1
+    return bool(filters.get("country_id") or filters.get("country_name"))
+
+
+def _should_use_multi_country_scoped_search(
+    filters: Dict[str, Any] | None,
+    *,
+    country_ids_all: bool,
+) -> bool:
+    if country_ids_all:
+        return True
+    country_ids = (filters or {}).get("country_ids") or []
+    return len(country_ids) > 1
+
+
+def _try_multi_country_scoped_search_rows(
+    vector_store: AIVectorStore,
+    raw_query: str,
+    *,
+    filters: Dict[str, Any] | None,
+    top_k: int,
+    mode: str,
+    country_ids_all: bool,
+) -> List[Dict[str, Any]]:
+    """Batched per-document search across multiple countries (one DB round trip)."""
+    documents = list_public_documents_in_scope(filters)
+    if not documents:
+        return []
+    if len(documents) > PUBLIC_DOC_FULL_COVERAGE_MAX_DOCS:
+        scope_hint = "all public countries" if country_ids_all else "requested countries"
+        raise PublicDocumentScopeTooLarge(
+            f"Too many documents in scope ({len(documents)}) for {scope_hint}. "
+            f"Narrow filters (year, country_ids) or use a single country_id."
+        )
+
+    doc_ids = [int(doc.id) for doc in documents]
+    chunks_per_doc = max(top_k, 8)
+    if mode == "vector":
+        return vector_store.search_similar_per_document(
+            raw_query,
+            doc_ids,
+            chunks_per_doc=chunks_per_doc,
+            filters=filters,
+            user_id=None,
+            user_role="public",
+        )
+    return vector_store.hybrid_search_per_document(
+        raw_query,
+        doc_ids,
+        chunks_per_doc=chunks_per_doc,
+        filters=filters,
+        user_id=None,
+        user_role="public",
+    )
 
 
 def _try_country_scoped_search_rows(
@@ -864,6 +1014,7 @@ def search_public_documents(
     min_score: float = PUBLIC_DOC_DEFAULT_MIN_SCORE,
     country_name: str | None = None,
     country_id: int | None = None,
+    country_ids: str | None = None,
     file_type: str | None = None,
     search_mode: str = "hybrid",
     max_content_chars: int = PUBLIC_DOC_MAX_CONTENT_CHARS,
@@ -871,6 +1022,7 @@ def search_public_documents(
     page: int = 1,
     per_page: int = PUBLIC_DOC_FULL_COVERAGE_DEFAULT_PER_PAGE,
     latest_per_country: bool | None = None,
+    require_phrase: str | None = None,
 ) -> Dict[str, Any]:
     """
     Search public AI document chunks (is_public=True only).
@@ -888,15 +1040,24 @@ def search_public_documents(
         mode = "hybrid"
 
     year = _extract_year(raw_query)
+    parsed_country_ids, country_ids_all = _parse_country_ids_param(country_ids)
+    if parsed_country_ids and len(parsed_country_ids) == 1 and country_id is None:
+        country_id = parsed_country_ids[0]
+        parsed_country_ids = None
+
     filters = _build_search_filters(
         raw_query,
         country_name=country_name,
         country_id=country_id,
+        country_ids=parsed_country_ids,
+        country_ids_all=country_ids_all,
         file_type=file_type,
         year=year,
+        require_phrase=require_phrase,
     )
 
     vector_store = AIVectorStore()
+    multi_country = _should_use_multi_country_scoped_search(filters, country_ids_all=country_ids_all)
 
     if full_coverage:
         coverage_payload = _search_public_documents_full_coverage(
@@ -915,13 +1076,23 @@ def search_public_documents(
         coverage_mode = coverage_payload["coverage_mode"]
     else:
         try:
-            rows = _try_country_scoped_search_rows(
-                vector_store,
-                raw_query,
-                filters=filters,
-                top_k=top_k,
-                mode=mode,
-            )
+            if multi_country:
+                rows = _try_multi_country_scoped_search_rows(
+                    vector_store,
+                    raw_query,
+                    filters=filters,
+                    top_k=top_k,
+                    mode=mode,
+                    country_ids_all=country_ids_all,
+                )
+            else:
+                rows = _try_country_scoped_search_rows(
+                    vector_store,
+                    raw_query,
+                    filters=filters,
+                    top_k=top_k,
+                    mode=mode,
+                )
             if rows is None:
                 if mode == "vector":
                     rows = vector_store.search_similar(
@@ -941,9 +1112,10 @@ def search_public_documents(
                     )
         except VectorStoreError as exc:
             current_app.logger.error("Public document search failed: %s", exc)
-            raise ValueError("Document search is temporarily unavailable") from exc
+            raise PublicDocumentSearchUnavailable("Document search is temporarily unavailable") from exc
 
         rows = filter_rows_to_public_documents(rows)
+        rows = _dedupe_rows_by_chunk_id(rows)
         filtered = [row for row in rows if _passes_relevance_floor(row, min_score)]
         # Country-scoped rows come back concatenated per document (each document's own
         # chunks already ranked, but not interleaved across documents — see
@@ -979,6 +1151,13 @@ def search_public_documents(
         notes.append("Query matched Unified Plan / UPR document scope.")
     if year:
         notes.append(f"Applied document year filter: {year}.")
+    phrase = (require_phrase or "").strip()
+    if phrase:
+        notes.append(f"Hard phrase filter applied: chunks must contain {phrase!r}.")
+    if multi_country:
+        notes.append(
+            "Multi-country search: results include by_country grouping from one batched query."
+        )
 
     payload: Dict[str, Any] = {
         "query": raw_query,
@@ -993,6 +1172,8 @@ def search_public_documents(
     }
     if coverage_block is not None:
         payload["coverage"] = coverage_block
+    if multi_country and slimmed:
+        payload["by_country"] = _group_slim_chunks_by_country(slimmed)
     return payload
 
 

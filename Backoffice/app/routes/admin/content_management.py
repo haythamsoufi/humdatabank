@@ -44,7 +44,6 @@ from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.transactions import request_transaction_rollback
 from app.services.ai.documents.ingest import (
     maybe_enqueue_submitted_document_ai_processing_after_approval,
-    sync_ai_document_is_public_from_submitted,
 )
 from app.services.content.thumbnail_service import ThumbnailService
 
@@ -1864,7 +1863,6 @@ def edit_document(doc_id):
                     current_app.logger.error(f"Error uploading thumbnail: {e}", exc_info=True)
                     flash("Error uploading thumbnail.", "warning")
 
-            sync_ai_document_is_public_from_submitted(document)
             db.session.commit()
             new_status = DocumentStatus.normalize(document.status)
             if new_status == DocumentStatus.APPROVED and prev_status != DocumentStatus.APPROVED:

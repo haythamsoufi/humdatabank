@@ -22,29 +22,92 @@ def ai_auto_process_approved_documents_enabled() -> bool:
         return True
 
 
-def sync_ai_document_is_public_from_submitted(submitted) -> None:
-    """Mirror ``SubmittedDocument.is_public`` onto the linked ``AIDocument`` (search visibility)."""
+def _normalize_document_status(raw) -> str:
+    from app.models.enums import DocumentStatus
+
+    if raw is None:
+        return DocumentStatus.PENDING
+    if hasattr(raw, "value"):
+        raw = raw.value
+    return DocumentStatus.normalize(str(raw))
+
+
+def sync_ai_document_from_submitted(
+    submitted,
+    *,
+    status_changed_from=None,
+    ai_doc=None,
+) -> bool:
+    """
+    Mirror ``SubmittedDocument`` privacy, metadata, and approval status onto linked ``AIDocument``.
+
+    When ``status_changed_from`` is set (from SQLAlchemy attribute history), toggles
+    ``searchable`` on approval transitions without affecting rows that never changed status.
+    """
     from app.models import AIDocument
+    from app.models.enums import DocumentStatus
+    from app.services.ai.documents.submitted_metadata import apply_submitted_document_metadata_to_ai_doc
 
     if not submitted or not getattr(submitted, "id", None):
-        return
+        return False
     try:
         sid = int(submitted.id)
     except (TypeError, ValueError):
-        return
-    ai_doc = AIDocument.query.filter_by(submitted_document_id=sid).first()
+        return False
+
+    if ai_doc is None:
+        ai_doc = AIDocument.query.filter_by(submitted_document_id=sid).first()
     if not ai_doc:
-        return
-    want = bool(getattr(submitted, "is_public", False))
-    if ai_doc.is_public is want:
-        return
-    ai_doc.is_public = want
-    logger.info(
-        "Synced AI document %s is_public=%s from submitted_document %s",
-        ai_doc.id,
-        want,
-        sid,
-    )
+        return False
+
+    changed = False
+    want_public = bool(getattr(submitted, "is_public", False))
+    if ai_doc.is_public is not want_public:
+        ai_doc.is_public = want_public
+        changed = True
+
+    apply_submitted_document_metadata_to_ai_doc(ai_doc, submitted)
+    changed = True
+
+    new_status = _normalize_document_status(getattr(submitted, "status", None))
+    if status_changed_from is not None:
+        prev_status = _normalize_document_status(status_changed_from)
+        if prev_status == DocumentStatus.APPROVED and new_status != DocumentStatus.APPROVED:
+            if ai_doc.searchable is not False:
+                ai_doc.searchable = False
+                changed = True
+                logger.info(
+                    "Set AI document %s searchable=False (submitted_document %s status %s -> %s)",
+                    ai_doc.id,
+                    sid,
+                    prev_status,
+                    new_status,
+                )
+        elif prev_status != DocumentStatus.APPROVED and new_status == DocumentStatus.APPROVED:
+            proc = (getattr(ai_doc, "processing_status", None) or "").strip().lower()
+            if proc == "completed" and ai_doc.searchable is not True:
+                ai_doc.searchable = True
+                changed = True
+                logger.info(
+                    "Restored AI document %s searchable=True (submitted_document %s re-approved)",
+                    ai_doc.id,
+                    sid,
+                )
+
+    if changed:
+        logger.info(
+            "Synced AI document %s from submitted_document %s (is_public=%s, status=%s)",
+            ai_doc.id,
+            sid,
+            want_public,
+            new_status,
+        )
+    return True
+
+
+def sync_ai_document_is_public_from_submitted(submitted) -> None:
+    """Backward-compatible wrapper; prefer ``sync_ai_document_from_submitted``."""
+    sync_ai_document_from_submitted(submitted)
 
 
 def _fdrs_imports_dir() -> str:
@@ -363,10 +426,7 @@ def _prepare_submitted_document_ai_import(
     if existing_ai_doc:
         existing_ai_doc.processing_status = "pending"
         existing_ai_doc.processing_error = None
-        existing_ai_doc.is_public = bool(submitted_doc.is_public)
-        from app.services.ai.documents.submitted_metadata import apply_submitted_document_metadata_to_ai_doc
-
-        apply_submitted_document_metadata_to_ai_doc(existing_ai_doc, submitted_doc)
+        sync_ai_document_from_submitted(submitted_doc, ai_doc=existing_ai_doc)
         if from_url:
             existing_ai_doc.source_url = source_url or existing_ai_doc.source_url
             existing_ai_doc.filename = filename

@@ -70,7 +70,7 @@ _MIDYEAR_HINT_RE = re.compile(r"jan-?jun|half|semi|\bh1\b|\bh2\b|mid|myr", re.IG
 # never change at runtime.
 _kpi_code_index_cache: Optional[Dict[str, int]] = None
 
-_REPORT_STYLES_DIR = Path(__file__).resolve().parent.parent.parent / "report_styles"
+_REPORT_STYLES_DIR = Path(__file__).resolve().parent / "report_styles"
 
 
 def _extract_year(text: str) -> Optional[int]:

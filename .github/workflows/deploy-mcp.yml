@@ -11,17 +11,11 @@
 
 name: Deploy MCP to Azure
 
-run-name: Deploy MCP — ${{ inputs.environment }} (${{ inputs.version }})
+run-name: Deploy MCP — staging (${{ inputs.version }})
 
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: Target environment
-        required: true
-        type: choice
-        options:
-          - Staging
       version:
         description: Container image tag in ACR (e.g. v1.1)
         required: true

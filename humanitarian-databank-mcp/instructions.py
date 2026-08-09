@@ -58,8 +58,11 @@ use full_coverage=true for cross-country themes
 multi-year country questions keep all years automatically.
 - Wrap multi-word entity names in **double quotes** in query (e.g. `"Post Office"`) for phrase \
 keyword ranking; use **require_phrase** when the phrase must appear in every returned chunk
-- Do **not** fire multiple parallel broad document searches — gateway timeout is ~30s and \
-concurrent searches can abort with no error payload
+- Chunk truncated ("…") or match reason unclear → **databank_get_chunk_context(chunk_id)** \
+for neighboring chunks, instead of re-searching the whole document
+- Do **not** fire multiple parallel broad document searches — gateway timeout is ~30s; a \
+cancelled/timed-out call now returns an explicit "request was cancelled" error (not a silent \
+abort), but still failed, so prefer country_ids batched search over parallel broad queries
 - Do **not** claim partial document coverage when coverage_mode is full
 - **top_k=12** (max) applies only without full_coverage
 - count=0 → no public document matched

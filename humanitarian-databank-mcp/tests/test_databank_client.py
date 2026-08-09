@@ -7,6 +7,7 @@ import pytest
 
 from databank_client import (
     DatabankAPIError,
+    get_chunk_context,
     get_country_report,
     get_public_data_page,
     get_public_document,
@@ -104,6 +105,76 @@ class TestSearchPublicDocuments:
     def test_requires_query(self):
         with pytest.raises(DatabankAPIError, match="query is required"):
             search_public_documents("  ")
+
+    def test_passes_country_ids_and_require_phrase(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"chunks": [], "count": 0}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            search_public_documents(
+                '"Post Office" partnership',
+                country_ids="153,167",
+                require_phrase="Post Office",
+            )
+            params = mock_get.call_args[1]["params"]
+            assert params["country_ids"] == "153,167"
+            assert params["require_phrase"] == "Post Office"
+
+    def test_omits_country_ids_and_require_phrase_when_unset(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"chunks": [], "count": 0}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            search_public_documents("Syria unified plan 2026")
+            params = mock_get.call_args[1]["params"]
+            assert "country_ids" not in params
+            assert "require_phrase" not in params
+
+
+class TestGetChunkContext:
+    def test_calls_chunk_context_endpoint(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"requested_chunk_id": 17842, "chunks": []}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            out = get_chunk_context(17842, before=1, after=2)
+            assert "/public/documents/chunks/17842/context" in mock_get.call_args[0][0]
+            params = mock_get.call_args[1]["params"]
+            assert params["before"] == 1
+            assert params["after"] == 2
+            assert out["requested_chunk_id"] == 17842
+
+    def test_clamps_before_after_to_5(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"chunks": []}
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            mock_get = client_cls.return_value.__enter__.return_value.get
+            mock_get.return_value = mock_resp
+            get_chunk_context(1, before=999, after=-3)
+            params = mock_get.call_args[1]["params"]
+            assert params["before"] == 5
+            assert params["after"] == 0
+
+    def test_raises_on_404(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.text = "Chunk not found, or its document is not public"
+
+        with patch("databank_client.httpx.Client") as client_cls:
+            client_cls.return_value.__enter__.return_value.get.return_value = mock_resp
+            with pytest.raises(DatabankAPIError, match="HTTP 404"):
+                get_chunk_context(999999999)
 
 
 class TestGetPublicDocument:

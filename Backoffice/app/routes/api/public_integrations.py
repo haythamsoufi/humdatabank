@@ -17,6 +17,7 @@ from app.services.public.document_service import (
     PublicDocumentScopeTooLarge,
     PublicDocumentSearchUnavailable,
     catalog_public_documents,
+    get_public_document_chunk_context,
     get_public_document_metadata,
     search_public_documents,
     stream_public_ai_document_download,
@@ -222,6 +223,35 @@ def public_search_documents():
             exc_info=True,
         )
         return api_error("Could not search public documents", 500, error_id, None)
+
+
+@api_bp.route("/public/documents/chunks/<int:chunk_id>/context", methods=["GET"])
+@api_rate_limit()
+def public_get_document_chunk_context(chunk_id: int):
+    """
+    Neighboring chunks (by chunk_index) around one search-result chunk, for verifying or
+    expanding a truncated/ambiguous match without re-running a broad document search.
+    """
+    try:
+        before = request.args.get("before", default=1, type=int)
+        after = request.args.get("after", default=1, type=int)
+        payload = get_public_document_chunk_context(chunk_id, before=before, after=after)
+        response = json_response(payload)
+        response.headers["Cache-Control"] = "private, no-store"
+        response.headers["X-Public-Data-Access"] = "true"
+        return response
+    except ValueError as exc:
+        return api_error(str(exc), 404)
+    except Exception as exc:
+        error_id = str(uuid.uuid4())
+        current_app.logger.error(
+            "public/documents/chunks/%s/context failed [ID: %s]: %s",
+            chunk_id,
+            error_id,
+            exc,
+            exc_info=True,
+        )
+        return api_error("Could not load chunk context", 500, error_id, None)
 
 
 @api_bp.route("/public/documents/<int:document_id>", methods=["GET"])

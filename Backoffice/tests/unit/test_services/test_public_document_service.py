@@ -234,6 +234,106 @@ class TestFilterRowsToPublicDocuments:
 
 
 @pytest.mark.unit
+class TestGetPublicDocumentChunkContext:
+    """
+    Regression coverage for outstanding item #2: databank_get_chunk_context — fetch chunks
+    immediately before/after a search result by chunk_index, to verify/expand a truncated or
+    ambiguous match without re-searching the whole document.
+    """
+
+    def _seed_document(self, db_session, *, is_public: bool = True, num_chunks: int = 5):
+        from app.models.embeddings import AIDocumentChunk
+
+        doc = AIDocument(
+            title="Test doc with chunks",
+            filename="test_chunks.pdf",
+            file_type="pdf",
+            is_public=is_public,
+            searchable=True,
+            processing_status=AIDocumentProcessingStatusValue.completed.value,
+        )
+        db_session.add(doc)
+        db_session.commit()
+
+        chunks = []
+        for idx in range(num_chunks):
+            chunk = AIDocumentChunk(
+                document_id=doc.id,
+                content=f"Chunk {idx} content.",
+                content_length=20,
+                chunk_index=idx,
+                page_number=idx // 2 + 1,
+                chunk_type="semantic",
+            )
+            db_session.add(chunk)
+            chunks.append(chunk)
+        db_session.commit()
+        for chunk in chunks:
+            db_session.refresh(chunk)
+        return doc, chunks
+
+    def test_returns_requested_chunk_with_neighbors_in_order(self, app, db_session):
+        from app.services.public.document_service import get_public_document_chunk_context
+
+        _doc, chunks = self._seed_document(db_session, num_chunks=5)
+        middle = chunks[2]
+
+        with app.app_context():
+            out = get_public_document_chunk_context(middle.id, before=1, after=1)
+
+        returned_ids = [c["chunk_id"] for c in out["chunks"]]
+        assert returned_ids == [chunks[1].id, chunks[2].id, chunks[3].id]
+        flags = {c["chunk_id"]: c["is_requested_chunk"] for c in out["chunks"]}
+        assert flags[chunks[2].id] is True
+        assert flags[chunks[1].id] is False
+        assert flags[chunks[3].id] is False
+        assert out["requested_chunk_id"] == middle.id
+
+    def test_clamps_to_available_chunks_at_document_start(self, app, db_session):
+        from app.services.public.document_service import get_public_document_chunk_context
+
+        _doc, chunks = self._seed_document(db_session, num_chunks=5)
+        first = chunks[0]
+
+        with app.app_context():
+            out = get_public_document_chunk_context(first.id, before=3, after=1)
+
+        # No chunk_index -3..-1 exists; only 0 and 1 should come back, not an error.
+        returned_ids = [c["chunk_id"] for c in out["chunks"]]
+        assert returned_ids == [chunks[0].id, chunks[1].id]
+
+    def test_clamps_before_after_to_max(self, app, db_session):
+        from app.services.public.document_service import (
+            PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER,
+            get_public_document_chunk_context,
+        )
+
+        _doc, chunks = self._seed_document(db_session, num_chunks=5)
+
+        with app.app_context():
+            out = get_public_document_chunk_context(chunks[2].id, before=999, after=999)
+
+        assert out["before"] == PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER
+        assert out["after"] == PUBLIC_DOC_CHUNK_CONTEXT_MAX_BEFORE_AFTER
+
+    def test_raises_for_non_public_document(self, app, db_session):
+        from app.services.public.document_service import get_public_document_chunk_context
+
+        _doc, chunks = self._seed_document(db_session, is_public=False, num_chunks=3)
+
+        with app.app_context():
+            with pytest.raises(ValueError, match="not public"):
+                get_public_document_chunk_context(chunks[0].id)
+
+    def test_raises_for_unknown_chunk_id(self, app, db_session):
+        from app.services.public.document_service import get_public_document_chunk_context
+
+        with app.app_context():
+            with pytest.raises(ValueError):
+                get_public_document_chunk_context(999_999_999)
+
+
+@pytest.mark.unit
 class TestSearchPublicDocuments:
     def test_requires_query(self, app):
         with app.app_context():
@@ -1098,6 +1198,48 @@ class TestPublicDocumentSearchFixes:
         body = resp.get_json()
         assert body["error_type"] == "scope_too_large"
 
+    def test_api_route_chunk_context_returns_payload(self, client, app):
+        from unittest.mock import patch
+
+        payload = {
+            "document_id": 244,
+            "document_title": "Lithuania Annual Report 2025",
+            "requested_chunk_id": 17842,
+            "requested_chunk_index": 40,
+            "before": 1,
+            "after": 1,
+            "count": 2,
+            "chunks": [
+                {"chunk_id": 17841, "chunk_index": 39, "is_requested_chunk": False},
+                {"chunk_id": 17842, "chunk_index": 40, "is_requested_chunk": True},
+            ],
+            "notes": [],
+        }
+        with app.app_context():
+            with patch(
+                "app.routes.api.public_integrations.get_public_document_chunk_context",
+                return_value=payload,
+            ) as mock_context:
+                resp = client.get(
+                    "/api/v1/public/documents/chunks/17842/context?before=1&after=1"
+                )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["requested_chunk_id"] == 17842
+        mock_context.assert_called_once_with(17842, before=1, after=1)
+
+    def test_api_route_chunk_context_returns_404_for_unknown_chunk(self, client, app):
+        from unittest.mock import patch
+
+        with app.app_context():
+            with patch(
+                "app.routes.api.public_integrations.get_public_document_chunk_context",
+                side_effect=ValueError("Chunk not found, or its document is not public"),
+            ):
+                resp = client.get("/api/v1/public/documents/chunks/999999999/context")
+
+        assert resp.status_code == 404
+
     def test_multi_country_search_adds_by_country(self, app):
         from unittest.mock import patch
 
@@ -1155,4 +1297,358 @@ class TestPublicDocumentSearchFixes:
         assert len(out["by_country"]) == 2
         country_names = {entry["country"] for entry in out["by_country"]}
         assert country_names == {"Kenya", "Syria"}
+
+
+class TestAutoBatchingForLargeScope:
+    """
+    Regression coverage for outstanding item #1: country_ids="all" (or any scope larger
+    than one batch) must auto-batch server-side instead of raising
+    PublicDocumentScopeTooLarge("Too many documents in scope (865)") and pushing the
+    batching logic (guessing sequential numeric id ranges) onto the caller.
+    """
+
+    def test_batched_per_document_search_rows_splits_into_groups(self):
+        from app.services.public.document_service import _batched_per_document_search_rows
+
+        calls = []
+
+        class FakeStore:
+            def hybrid_search_per_document(self, raw_query, doc_ids, **kwargs):
+                calls.append(list(doc_ids))
+                return [{"chunk_id": doc_id, "document_id": doc_id} for doc_id in doc_ids]
+
+        rows, batch_count = _batched_per_document_search_rows(
+            FakeStore(),
+            "query",
+            [1, 2, 3, 4, 5],
+            filters=None,
+            chunks_per_doc=8,
+            mode="hybrid",
+            batch_size=2,
+        )
+
+        assert batch_count == 3
+        assert calls == [[1, 2], [3, 4], [5]]
+        assert {row["chunk_id"] for row in rows} == {1, 2, 3, 4, 5}
+
+    def test_batched_per_document_search_rows_uses_vector_only_in_vector_mode(self):
+        from app.services.public.document_service import _batched_per_document_search_rows
+
+        vector_calls = []
+        hybrid_calls = []
+
+        class FakeStore:
+            def search_similar_per_document(self, raw_query, doc_ids, **kwargs):
+                vector_calls.append(list(doc_ids))
+                return []
+
+            def hybrid_search_per_document(self, raw_query, doc_ids, **kwargs):
+                hybrid_calls.append(list(doc_ids))
+                return []
+
+        _batched_per_document_search_rows(
+            FakeStore(), "query", [1, 2, 3], filters=None, chunks_per_doc=8, mode="vector", batch_size=2
+        )
+
+        assert vector_calls == [[1, 2], [3]]
+        assert hybrid_calls == []
+
+    def test_try_multi_country_scoped_search_rows_batches_instead_of_raising(self, app):
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        class FakeDoc:
+            def __init__(self, doc_id):
+                self.id = doc_id
+
+        # 5 fake documents, batch size patched to 2 => 3 batches instead of one big query.
+        docs = [FakeDoc(i) for i in range(1, 6)]
+        calls = []
+
+        class FakeStore:
+            def hybrid_search_per_document(self, raw_query, doc_ids, **kwargs):
+                calls.append(list(doc_ids))
+                return [
+                    {"chunk_id": doc_id, "document_id": doc_id, "content": "x"}
+                    for doc_id in doc_ids
+                ]
+
+        with app.app_context():
+            with patch.object(svc, "PUBLIC_DOC_MULTI_COUNTRY_BATCH_SIZE", 2):
+                with patch.object(svc, "list_public_documents_in_scope", return_value=docs):
+                    rows, batch_count = svc._try_multi_country_scoped_search_rows(
+                        FakeStore(),
+                        "query",
+                        filters=None,
+                        top_k=8,
+                        mode="hybrid",
+                        country_ids_all=True,
+                    )
+
+        assert batch_count == 3
+        assert len(calls) == 3
+        assert len(rows) == 5
+
+    def test_try_multi_country_scoped_search_rows_still_errors_past_absolute_ceiling(self, app):
+        from unittest.mock import patch
+
+        from app.services.public.document_service import PublicDocumentScopeTooLarge
+        from app.services.public import document_service as svc
+
+        class FakeDoc:
+            def __init__(self, doc_id):
+                self.id = doc_id
+
+        class FakeStore:
+            def hybrid_search_per_document(self, *args, **kwargs):
+                raise AssertionError("should not reach the DB query past the scope ceiling")
+
+        # 7 fake documents but batch_size=2 and max_batches=2 => absolute ceiling is 4 docs.
+        docs = [FakeDoc(i) for i in range(1, 8)]
+
+        with app.app_context():
+            with patch.object(svc, "PUBLIC_DOC_MULTI_COUNTRY_BATCH_SIZE", 2):
+                with patch.object(svc, "PUBLIC_DOC_MULTI_COUNTRY_MAX_BATCHES", 2):
+                    with patch.object(svc, "list_public_documents_in_scope", return_value=docs):
+                        with pytest.raises(PublicDocumentScopeTooLarge):
+                            svc._try_multi_country_scoped_search_rows(
+                                FakeStore(),
+                                "query",
+                                filters=None,
+                                top_k=8,
+                                mode="hybrid",
+                                country_ids_all=True,
+                            )
+
+    def test_search_public_documents_country_ids_all_auto_batches_end_to_end(self, app):
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        class FakeDoc:
+            def __init__(self, doc_id):
+                self.id = doc_id
+
+        docs = [FakeDoc(i) for i in range(1, 6)]  # 5 docs, batch size patched to 2 => 3 batches
+
+        class FakeStore:
+            def hybrid_search_per_document(self, raw_query, doc_ids, **kwargs):
+                return [
+                    {
+                        "chunk_id": doc_id,
+                        "document_id": doc_id,
+                        "document_title": f"Doc {doc_id}",
+                        "document_country_name": f"Country {doc_id}",
+                        "document_countries": [{"name": f"Country {doc_id}"}],
+                        "content": "Post Office partnership content with enough relevance.",
+                        "combined_score": 0.5,
+                    }
+                    for doc_id in doc_ids
+                ]
+
+        original = svc.AIVectorStore
+        svc.AIVectorStore = FakeStore
+        try:
+            with app.app_context():
+                with patch.object(svc, "PUBLIC_DOC_MULTI_COUNTRY_BATCH_SIZE", 2):
+                    with patch.object(svc, "list_public_documents_in_scope", return_value=docs):
+                        with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda r: r):
+                            out = svc.search_public_documents(
+                                "Post Office partnership",
+                                country_ids="all",
+                                top_k=8,
+                                min_score=0.05,
+                            )
+        finally:
+            svc.AIVectorStore = original
+
+        assert out["count"] == 5
+        assert any("auto-batched into 3" in note for note in out["notes"])
+        assert "by_country" in out
+
+    def test_duplicate_chunk_id_across_batches_still_deduped(self, app):
+        """
+        Regression coverage for the Round 1 "duplicate chunk_id within a single response"
+        bug, specifically in combination with auto-batching: if the same chunk_id were ever
+        returned by more than one batch (e.g. a future bug in how documents are partitioned),
+        the final dedupe pass must still collapse it to one row, keeping the highest score.
+        """
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        class FakeDoc:
+            def __init__(self, doc_id):
+                self.id = doc_id
+
+        docs = [FakeDoc(i) for i in range(1, 5)]  # 4 docs, batch size patched to 2 => 2 batches
+
+        class FakeStore:
+            def hybrid_search_per_document(self, raw_query, doc_ids, **kwargs):
+                # Simulate chunk_id=999 leaking into both batches with different scores.
+                return [
+                    {
+                        "chunk_id": 999,
+                        "document_id": doc_ids[0],
+                        "document_title": "Duplicate-prone doc",
+                        "content": "Post Office partnership content with enough relevance.",
+                        "combined_score": 0.3 + 0.1 * doc_ids[0],
+                    }
+                ]
+
+        original = svc.AIVectorStore
+        svc.AIVectorStore = FakeStore
+        try:
+            with app.app_context():
+                with patch.object(svc, "PUBLIC_DOC_MULTI_COUNTRY_BATCH_SIZE", 2):
+                    with patch.object(svc, "list_public_documents_in_scope", return_value=docs):
+                        with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda r: r):
+                            out = svc.search_public_documents(
+                                "Post Office partnership",
+                                country_ids="all",
+                                top_k=8,
+                                min_score=0.05,
+                            )
+        finally:
+            svc.AIVectorStore = original
+
+        chunk_ids = [c["chunk_id"] for c in out["chunks"]]
+        assert chunk_ids.count(999) == 1
+        assert out["count"] == 1
+
+
+class TestRequirePhraseLiteralSafetyNet:
+    """
+    Regression coverage for the Round-2 bug report: require_phrase="Post Office" false-matched
+    a Lithuania annual report chunk (document_id=244, chunk_id=17842) whose text never contains
+    the literal phrase — the closest text nearby was an unrelated "Post-employment benefits"
+    line. These tests use a synthetic chunk built from that same shape (a hyphenated compound
+    word near, but not forming, the required phrase) to prove it can never leak through
+    require_phrase again, regardless of how the DB-side FTS pre-filter behaves.
+    """
+
+    LITHUANIA_LIKE_CONTENT = (
+        "Note 24. Employee benefits. Post-employment benefit obligations are measured "
+        "using the projected unit credit method. The office of financial reporting "
+        "reviewed the discount rate assumptions used for post-employment benefits "
+        "during the reporting period covering the annual report."
+    )
+
+    def test_content_contains_literal_phrase_rejects_hyphenated_compound(self):
+        from app.services.public.document_service import _content_contains_literal_phrase
+
+        assert not _content_contains_literal_phrase(self.LITHUANIA_LIKE_CONTENT, "Post Office")
+
+    def test_content_contains_literal_phrase_accepts_genuine_match(self):
+        from app.services.public.document_service import _content_contains_literal_phrase
+
+        genuine = "The Red Cross ran blood drives with the Seychelles Post Office in 2025."
+        assert _content_contains_literal_phrase(genuine, "Post Office")
+
+    def test_content_contains_literal_phrase_is_whitespace_tolerant(self):
+        from app.services.public.document_service import _content_contains_literal_phrase
+
+        assert _content_contains_literal_phrase("...the Post   Office box...", "Post Office")
+        assert _content_contains_literal_phrase("...the Post\nOffice box...", "Post Office")
+
+    def test_filter_rows_by_literal_phrase_drops_false_positive_and_counts_it(self):
+        from app.services.public.document_service import _filter_rows_by_literal_phrase
+
+        false_positive_row = {
+            "chunk_id": 17842,
+            "document_id": 244,
+            "content": self.LITHUANIA_LIKE_CONTENT,
+        }
+        genuine_row = {
+            "chunk_id": 999,
+            "document_id": 501,
+            "content": "Blood drives with the Seychelles Post Office partnership continued.",
+        }
+
+        kept, dropped = _filter_rows_by_literal_phrase(
+            [false_positive_row, genuine_row], "Post Office"
+        )
+
+        kept_ids = {row["chunk_id"] for row in kept}
+        assert kept_ids == {999}
+        assert dropped == 1
+
+    def test_search_public_documents_never_returns_hyphenated_false_positive(self, app):
+        """End-to-end: even if the fake vector store returns the false-positive row (simulating
+        any DB-layer FTS edge case), search_public_documents must not surface it when
+        require_phrase is set."""
+        from unittest.mock import patch
+
+        from app.services.public import document_service as svc
+
+        false_positive_row = {
+            "chunk_id": 17842,
+            "document_id": 244,
+            "document_title": "Lithuania Annual Report 2025",
+            "content": self.LITHUANIA_LIKE_CONTENT,
+            "combined_score": 0.3857,
+        }
+        genuine_row = {
+            "chunk_id": 555,
+            "document_id": 153,
+            "document_title": "Seychelles Annual Report 2025",
+            "content": (
+                "The Red Cross Society of Seychelles ran blood drives in partnership with the "
+                "Seychelles Post Office, collecting donations at branch locations nationwide."
+            ),
+            "combined_score": 0.92,
+        }
+
+        class FakeStore:
+            def hybrid_search_per_document(self, *args, **kwargs):
+                return [false_positive_row, genuine_row]
+
+            def hybrid_search(self, **kwargs):
+                return [false_positive_row, genuine_row]
+
+        original = svc.AIVectorStore
+        svc.AIVectorStore = FakeStore
+        try:
+            with app.app_context():
+                with patch.object(svc, "list_public_documents_in_scope", return_value=[]):
+                    with patch.object(svc, "filter_rows_to_public_documents", side_effect=lambda r: r):
+                        out = svc.search_public_documents(
+                            "Post Office partnership",
+                            require_phrase="Post Office",
+                            top_k=8,
+                            min_score=0.05,
+                        )
+        finally:
+            svc.AIVectorStore = original
+
+        returned_chunk_ids = {c["chunk_id"] for c in out["chunks"]}
+        assert 17842 not in returned_chunk_ids
+        assert 555 in returned_chunk_ids
+        assert any("Dropped 1 chunk" in note for note in out["notes"])
+
+    def test_snippet_around_phrase_centers_on_match_instead_of_head(self):
+        from app.services.public.document_service import _snippet_around_phrase
+
+        long_prefix = "Background paragraph text. " * 20
+        content = f"{long_prefix}The Seychelles Post Office partnership began in 2025. " + (
+            "Trailing filler text. " * 20
+        )
+        snippet = _snippet_around_phrase(content, "Post Office", max_chars=80)
+
+        assert "Post Office" in snippet
+        assert len(snippet) <= 82  # small allowance for ellipsis chars
+
+    def test_slim_public_document_chunk_uses_phrase_centered_snippet(self):
+        long_prefix = "Background paragraph text. " * 20
+        content = f"{long_prefix}The Seychelles Post Office partnership began in 2025."
+        row = {
+            "chunk_id": 1,
+            "document_id": 153,
+            "content": content,
+            "combined_score": 0.9,
+        }
+
+        slim = slim_public_document_chunk(row, max_content_chars=60, require_phrase="Post Office")
+        assert "Post Office" in slim["content"]
 

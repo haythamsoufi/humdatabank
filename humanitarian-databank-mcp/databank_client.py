@@ -163,6 +163,15 @@ def get_public_document(document_id: int) -> Dict[str, Any]:
     return _get(f"/public/documents/{int(document_id)}")
 
 
+def get_chunk_context(chunk_id: int, *, before: int = 1, after: int = 1) -> Dict[str, Any]:
+    """Neighboring chunks around one search-result chunk via GET /public/documents/chunks/<id>/context."""
+    params: Dict[str, Any] = {
+        "before": max(0, min(int(before), 5)),
+        "after": max(0, min(int(after), 5)),
+    }
+    return _get(f"/public/documents/chunks/{int(chunk_id)}/context", params)
+
+
 def get_public_documents_catalog(
     *,
     document_type: str = "",

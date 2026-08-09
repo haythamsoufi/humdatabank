@@ -19,13 +19,19 @@ Parallel document-search calls (investigation notes, 2026-08):
     GET /public/documents/search is not in the extended-timeout AI chat routes; two concurrent broad
     searches can exceed 30s and return 504 with no JSON body to the MCP client.
   - FastMCP @mcp.tool sync handlers run in a thread pool; client-side cancellation surfaces as
-    asyncio.CancelledError (BaseException), which is not caught by `except Exception` — symptom:
-    "no result, no error". Mitigation for callers: use country_ids batched search, avoid parallel
-    broad queries; confirm via App Service / AGW logs at failure timestamps before server-side fixes.
+    asyncio.CancelledError, which is a BaseException (not Exception) — a bare `except Exception`
+    does not catch it, so a cancelled call previously returned "no result, no error" instead of an
+    error string. FIXED: every tool below catches `(Exception, asyncio.CancelledError)` explicitly
+    and _tool_error() returns a descriptive message for it. This surfaces cancellation as an
+    explicit error instead of a silent abort, but does not remove the underlying ~30s gateway
+    timeout — callers should still prefer country_ids batched search over parallel broad queries.
+    Confirm root cause (timeout vs. cancellation vs. something else) via App Service / AGW logs at
+    failure timestamps if "request was cancelled" errors recur.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -40,6 +46,7 @@ from databank_analytics import search_indicators_ranked, slim_public_data_respon
 from databank_client import (
     DatabankAPIError,
     api_base,
+    get_chunk_context,
     get_country_report,
     get_indicator,
     get_public_data_all_pages,
@@ -81,10 +88,15 @@ def _json_text(payload: Any) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-def _tool_error(exc: Exception) -> str:
+def _tool_error(exc: BaseException) -> str:
     if isinstance(exc, DatabankAPIError):
         code = f" (HTTP {exc.status_code})" if exc.status_code else ""
         return f"Databank API error{code}: {exc}"
+    if isinstance(exc, asyncio.CancelledError):
+        return (
+            "Error: request was cancelled before it completed (client timeout or "
+            "gateway limit) — retry, or narrow scope (country_ids) if it recurs."
+        )
     return f"Error: {exc}"
 
 
@@ -97,7 +109,7 @@ def databank_resolve_indicator(query: str, limit: int = 5) -> str:
     """
     try:
         return _json_text(resolve_public_indicator(query, limit=limit))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -123,7 +135,7 @@ def databank_aggregate_global_trend(
             max_pages=max_pages,
         )
         return _json_text(result)
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -156,7 +168,7 @@ def databank_get_submission_coverage(
             max_pages=max_pages,
         )
         return _json_text(result)
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -169,7 +181,7 @@ def databank_resolve_country(query: str, limit: int = 5) -> str:
     """
     try:
         return _json_text(resolve_public_country(query, limit=limit))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -221,7 +233,7 @@ def databank_search_public_documents(
             require_phrase=require_phrase.strip(),
         )
         return _json_text(result)
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -253,7 +265,7 @@ def databank_get_documents_catalog(
             include_documents=include_documents,
         )
         return _json_text(result)
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -266,7 +278,22 @@ def databank_get_public_document(document_id: int) -> str:
     """
     try:
         return _json_text(get_public_document(document_id))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
+        return _tool_error(exc)
+
+
+@mcp.tool()
+def databank_get_chunk_context(chunk_id: int, before: int = 1, after: int = 1) -> str:
+    """Fetch chunks immediately before/after a databank_search_public_documents result.
+
+    Use when a returned chunk is truncated ("…") or its match reason isn't visible in
+    the shown text — this verifies/expands a hit without re-searching the whole document.
+    Returns up to `before` + 1 + `after` chunks (each capped at 5) in document reading
+    order, with is_requested_chunk marking the original hit.
+    """
+    try:
+        return _json_text(get_chunk_context(chunk_id, before=before, after=after))
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -298,7 +325,7 @@ def databank_search_indicators(
             limit=limit,
         )
         return _json_text(result)
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -307,7 +334,7 @@ def databank_get_indicator(indicator_id: int) -> str:
     """Get full metadata for one indicator bank entry by numeric id."""
     try:
         return _json_text(get_indicator(indicator_id))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -351,7 +378,7 @@ def databank_get_public_data(
             per_page=per_page,
         )
         return _json_text(slim_public_data_response(result, include_dimensions=include_dimensions))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -393,7 +420,7 @@ def databank_get_public_data_all_pages(
             max_pages=max_pages,
         )
         return _json_text(slim_public_data_response(result, include_dimensions=include_dimensions))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -446,7 +473,7 @@ def databank_build_country_report(
             template_style=template_style,
         )
         return _json_text(result)
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 
@@ -471,7 +498,7 @@ def databank_get_report_template(style: str = "default") -> str:
     """
     try:
         return _json_text(get_report_template(style))
-    except Exception as exc:
+    except (Exception, asyncio.CancelledError) as exc:
         return _tool_error(exc)
 
 

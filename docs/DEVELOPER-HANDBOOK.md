@@ -509,6 +509,8 @@ Admins compose metadata-driven reports from Indicator Bank, templates, and assig
 
 **Relationship to pb_progress:** P&B remains a specialized offline publish pipeline; it may later consume `aggregation.py` for system dataset generation, but is unchanged by the report builder v1.
 
+**Not to be confused with the public country one-pager report** (`Backoffice/app/services/public/report_service.py`) — a separate, unauthenticated feature behind the Custom GPT `getCountryReport`/`getReportTemplate` Actions and the MCP connector's `databank_build_country_report`/`databank_get_report_template` tools. It has no `report_definition` row, no admin UI, and no widget model; it assembles a curated FDRS/UPR JSON spec plus an HTML/CSS design-template skeleton for an LLM to render (optionally as a PDF the LLM generates itself). Its style/layout assets live in `Backoffice/app/services/public/report_styles/<style>.html` (+ `<style>.tokens.json`), colocated with the one module that reads them — see [`humanitarian-databank-mcp/README.md`](../humanitarian-databank-mcp/README.md#report-design-templates) and [`Backoffice/docs/public/custom-gpt/README.md`](../Backoffice/docs/public/custom-gpt/README.md).
+
 ## Migration and Data Management
 
 ### Database Migrations

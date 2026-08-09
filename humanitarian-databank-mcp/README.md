@@ -14,6 +14,7 @@ It proxies the **public** IFRC Humanitarian Databank API for Claude, Cursor, and
 | `databank_get_submission_coverage` | `getSubmissionCoverage` | **Preferred** — count countries with public data by template/period |
 | `databank_resolve_country` | `resolveCountry` | Map a country name / ISO2/ISO3 / id to reference fields |
 | `databank_search_public_documents` | `searchPublicDocuments` | Public UPR/FDRS document chunks (cited Q&A) |
+| `databank_get_chunk_context` | — | Chunks immediately before/after a search result (verify/expand a truncated match) |
 | `databank_get_documents_catalog` | `getPublicDocumentsCatalog` | **Preferred** — count/list public documents by type, year, country |
 | `databank_get_public_document` | `getPublicDocument` | One document's metadata (title, countries, shareable link) |
 | `databank_search_indicators` | `getIndicatorBank` | Search indicator bank (ranked, slim, capped) |
@@ -46,6 +47,12 @@ databank_search_public_documents(
   query="migration unified plan 2026",
   full_coverage=true
 )
+```
+
+**Verify/expand a truncated or ambiguous match:**
+```text
+databank_get_chunk_context(chunk_id=17842, before=1, after=1)
+  → neighboring chunks from the same document, in reading order
 ```
 
 **Country one-pager report** ("build a report for Syria using 2026 midyear data"):
@@ -93,7 +100,7 @@ assignment or workflow status (submitted/pending/approved), which requires an AP
 Backoffice's `GET /public/reports/country` and `GET /public/reports/template` — all
 orchestration (period resolution, KPI fetch, narrative search) and the template skeletons
 themselves live server-side in `Backoffice/app/services/public/report_service.py` and
-`Backoffice/app/report_styles/<style>.html` (+ `<style>.tokens.json`), shared with the
+`Backoffice/app/services/public/report_styles/<style>.html` (+ `<style>.tokens.json`), shared with the
 Custom GPT's `getCountryReport` / `getReportTemplate` Actions. Add a new style by dropping
 files in that Backoffice folder — no MCP code changes or redeploy needed, the endpoint lists
 `available_styles` from the directory contents.

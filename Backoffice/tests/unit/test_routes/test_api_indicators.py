@@ -102,6 +102,43 @@ class TestGetIndicatorBank:
             resp = client.get(_api("/indicator-bank"))
         assert resp.status_code == 500
 
+    def test_emergency_true_filter_does_not_500(self, client, db_session):
+        """Regression: `emergency` is a Boolean column; the route previously forwarded
+        the raw query string to an `.ilike()` filter, which raises
+        psycopg2.errors.UndefinedFunction ("boolean ~~* unknown") on Postgres.
+        Prod incident 2026-08-09: GET /api/v1/indicator-bank?search=appeal&emergency=true -> 500."""
+        resp = client.get(_api("/indicator-bank?search=appeal&emergency=true"))
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data["indicators"], list)
+
+    def test_emergency_false_filter_does_not_500(self, client, db_session):
+        resp = client.get(_api("/indicator-bank?emergency=false"))
+        assert resp.status_code == 200
+
+    def test_emergency_true_filter_excludes_non_emergency_indicators(self, client, db_session, app):
+        with app.app_context():
+            emergency_ind = IndicatorBank(
+                name="Emergency Appeal Count",
+                type="number",
+                definition="test",
+                emergency=True,
+            )
+            non_emergency_ind = IndicatorBank(
+                name="Non-Emergency Appeal Count",
+                type="number",
+                definition="test",
+                emergency=False,
+            )
+            db_session.add_all([emergency_ind, non_emergency_ind])
+            db_session.commit()
+
+        resp = client.get(_api("/indicator-bank?emergency=true"))
+        assert resp.status_code == 200
+        names = {row["name"] for row in resp.get_json()["indicators"]}
+        assert "Emergency Appeal Count" in names
+        assert "Non-Emergency Appeal Count" not in names
+
 
 # ---------------------------------------------------------------------------
 # GET /api/v1/indicator-bank/<id>

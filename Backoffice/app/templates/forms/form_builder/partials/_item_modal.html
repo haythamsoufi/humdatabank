@@ -962,10 +962,19 @@
                                 </div>
                                 {# ── Selectable header config ── #}
                                 <div class="column-selectable-header-wrapper mt-1.5 pt-1.5 border-t border-gray-100 text-xs">
-                                    <label class="inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" class="column-selectable-header form-checkbox h-3 w-3 text-orange-600 border-gray-300 rounded focus:ring-orange-500 mr-1.5">
-                                        <span class="text-gray-700">{{ _('Selectable header (dropdown)') }}</span>
-                                    </label>
+                                    <div class="flex items-center justify-between gap-1">
+                                        <label class="inline-flex items-center cursor-pointer flex-1 min-w-0">
+                                            <input type="checkbox" class="column-selectable-header form-checkbox h-3 w-3 text-orange-600 border-gray-300 rounded focus:ring-orange-500 mr-1.5">
+                                            <span class="text-gray-700">{{ _('Selectable header (dropdown)') }}</span>
+                                        </label>
+                                        <button type="button"
+                                                class="column-selectable-header-toggle inline-flex items-center justify-center p-0.5 min-w-[1.25rem] min-h-[1.25rem] text-gray-500 hover:text-gray-700 rounded focus:outline-none focus-visible:ring-1 focus-visible:ring-orange-300 disabled:opacity-40 disabled:pointer-events-none"
+                                                aria-expanded="false"
+                                                aria-label="{{ _('Expand selectable header options')|forceescape }}"
+                                                disabled>
+                                            <i class="fas fa-chevron-down column-selectable-header-chevron text-[10px] transition-transform duration-200" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
                                     <div class="column-selectable-header-options hidden mt-2 p-2 bg-amber-50 rounded border border-amber-200 space-y-2">
                                         <div>
                                             <label class="block text-gray-600 mb-0.5">{{ _('Placeholder text') }}</label>

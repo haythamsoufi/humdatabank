@@ -11,8 +11,10 @@ if str(imports_dir) not in sys.path:
 from import_fdrs_form_data import COL_DISAGG, COL_ITEM  # noqa: E402
 from import_upr_excel_data import (  # noqa: E402
     ITEM_REPORTING_COUNTRY_FUNDING,
+    PLANNING_EA_FUNDING_AREAS,
     REPORTING_FUNDING_MATRIX_COLUMN,
     UprImportContext,
+    _ensure_funding_ea_col_header,
     _matrix_column_name_from_form_item,
     is_skipped_legacy_funding_area,
     transform_to_import_rows,
@@ -89,9 +91,10 @@ class TestT33FundingMatrixColumnKeys:
 class TestSkippedLegacyFundingAreas:
     def test_legacy_area_detector(self):
         assert is_skipped_legacy_funding_area("EO")
-        assert is_skipped_legacy_funding_area("EA1")
+        assert not is_skipped_legacy_funding_area("EA1")
         assert not is_skipped_legacy_funding_area("SP2")
         assert not is_skipped_legacy_funding_area("EFs")
+        assert "EA1" in PLANNING_EA_FUNDING_AREAS
 
     def test_planning_funding_skips_legacy_eo_area(self):
         ctx = UprImportContext(template_ids=[24])
@@ -108,3 +111,37 @@ class TestSkippedLegacyFundingAreas:
         assert len(import_rows) == 1
         cells = json.loads(import_rows[0][COL_DISAGG])
         assert cells == {"IFRC Secretariat_SP2": 5000000}
+
+    def test_planning_funding_imports_ea1_with_reach_ea_code_and_col_header(self):
+        ctx = UprImportContext(template_ids=[24])
+        ctx.assignment_by_template = {24: {("2026", "AFG"): 9001}}
+        ctx.emergency_ops_by_iso["AFG"] = {
+            "MDRAF018": {
+                "name": "Afghanistan - Earthquake",
+                "code": "MDRAF018",
+            }
+        }
+        ctx.emergency_ops_ordered_by_iso["AFG"] = [ctx.emergency_ops_by_iso["AFG"]["MDRAF018"]]
+        rows = [
+            {
+                "ISO3": "AFG",
+                "Round": "P26",
+                "Section": "Reach",
+                "Area": "EA1",
+                "Indicator": "People to be reached",
+                "ValueNum": 875000,
+                "EA Code": "MDRAF018",
+            },
+            _planning_funding_row(
+                Round="P26",
+                Year=2026,
+                Area="EA1",
+                **{"Country Value": 12000000},
+            ),
+        ]
+        import_rows = transform_to_import_rows(rows, ctx, template_ids=[24], rounds={"P26"})
+        funding_rows = [r for r in import_rows if r[COL_ITEM] == "967"]
+        assert len(funding_rows) == 1
+        cells = json.loads(funding_rows[0][COL_DISAGG])
+        assert cells["IFRC Secretariat_EA1"] == 12000000
+        assert cells["col_header|EA1"] == "Afghanistan - Earthquake (MDRAF018)"

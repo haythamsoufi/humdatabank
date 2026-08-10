@@ -723,7 +723,9 @@
     </nav>
     {% endif %}
 
-    {% include 'components/_flash_messages.html' with wrapper_class='flash-messages--in-panel' %}
+    {% with wrapper_class='flash-messages--in-panel' %}
+    {% include 'components/_flash_messages.html' %}
+    {% endwith %}
 
     <div class="panel-brand" id="panelMark">{{ ORG_NAME }}</div>
     <h2 class="panel-title" id="panelTitle">{{ _('Sign in') }}</h2>

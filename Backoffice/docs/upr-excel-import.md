@@ -165,7 +165,7 @@ The `Country Value` and `PNS Value` columns are processed **independently** — 
 
 **Zero / blank values:** Matrix imports skip falsy numeric values (`0`, empty) when writing cells — only non-zero amounts are stored. Scalar NS Data still allows zero KPIs.
 
-**Legacy Funding `Area` codes (skipped):** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO`, `EA1`, `EA2`, `EA3` — alongside the current `SP1`–`SP5` / `EFs` codes. The import **does not write** these to matrix items **967 / 968 / 974** (template 24 hybrid funding) or **1303** (template 22 PNS funding). They would produce cell keys like `IFRC Secretariat_EO` that do not match the form. Only `SP1`–`SP5` and `EFs` breakdown rows are imported for planning funding. Mapping rules for the legacy codes are a known gap (see §13).
+**Legacy Funding `Area` codes:** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO` — alongside the current `SP1`–`SP5` / `EFs` codes and emergency slots `EA1`–`EA3`. The import **does not write** `E1`/`E2`/`E3`/`EO` (legacy SP/EF naming and EO roll-up totals). **`EA1`–`EA3` are imported** to hybrid funding matrices **967 / 968 / 974** when those columns exist with selectable emergency-appeal headers: cell keys `{row}_{EA*}` plus `col_header|EA*` set to the resolved GO operation (`name_with_code`, same rules as Reach §6.3). When Funding rows lack `EA Code`, the importer falls back to the Reach row for the same country/round/slot, then to positional GO slot order.
 
 #### Country Value → Template 24 (hybrid funding matrix)
 
@@ -449,7 +449,7 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 | 954 Longer-term programmes | Calendar year | SP name | `2026_SP1` |
 | 955 Bilateral support | `NationalSociety.id` | SP/EFs | `49_SP2` |
 | 960 Emergency Appeals | `{name} ({code})` | `Total People to be reached` | `Afghanistan - Earthquake (MDRAF019)_Total People to be reached` |
-| 967/968/974 T24 planning funding (hybrid) | `HNS` / `IFRC Secretariat` (static row text) or `NationalSociety.id` (PNS) | SP/EFs | `HNS_SP1`, `IFRC Secretariat_EFs`, `140_SP3` |
+| 967/968/974 T24 planning funding (hybrid) | `HNS` / `IFRC Secretariat` (static row text) or `NationalSociety.id` (PNS) | SP/EFs or EA1–EA3 | `HNS_SP1`, `IFRC Secretariat_EFs`, `140_SP3`, `IFRC Secretariat_EA1` + `col_header\|EA1` |
 | 1303 PNS funding tpl22 | `Country.id` (host country) | SP/EFs | `184_SP2` — value is `{"original":616508,"modified":439311,"isModified":true}` |
 | 1367 Staff | host `NationalSociety.id` (HNS) | column name | `49_intl_delegates_hns` |
 | 956 Comments | — | — | plain text scalar |
@@ -578,7 +578,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 
 ### Planning (rounds P*)
 - [x] Template 24: NS Data scalars
-- [x] Template 24: Funding — HNS/IFRC and country-reported PNS → `Country Value` → hybrid items 967/968/974
+- [x] Template 24: Funding — HNS/IFRC and country-reported PNS → `Country Value` → hybrid items 967/968/974 (SP1–SP5/EFs + EA1–EA3 with `col_header|EA*` selectable headers)
 - [x] Template 22: Funding — `{original, modified, isModified}` structured cells on item 1303; per-cell `isModified`; zero-skip
 - [x] Template 24: Reach — SP1–SP5 → item 954; EA1–EA3 → item 960 via EA Code + GO API fallback
 - [x] Template 24: Support — bilateral tick marks → item 955
@@ -604,7 +604,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 | 2 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
 | 3 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
 | 4 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
-| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, `EA1`, …)** | UPR Master still has ~400 Funding rows using pre-SP1/EFs area codes (`E1`, `E2`, `E3`, `EO`, `EA1`–`EA3`). These are **skipped** on import (items **967 / 968 / 974**, **1303**) until an explicit Excel → matrix column mapping is agreed (e.g. `E1`→`SP1`, `EO`→`EFs`, and whether `EA*` belongs on the planning funding matrix or emergency appeals). Re-import after mapping is implemented. |
+| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, …)** | UPR Master still has ~360 Funding rows using pre-SP1/EFs codes (`E1`, `E2`, `E3`, `EO`). These remain **skipped** (`EO` is typically the EA1+EA2+EA3 roll-up). **`EA1`–`EA3` are covered** when the published template 24 funding matrix defines matching selectable-header columns (see §6.2). Re-import after form changes. |
 
 ---
 

@@ -464,6 +464,11 @@ html[dir="rtl"].sidebar-initially-collapsed body:has(#mainContent.content-with-s
     padding-top: 0;
 }
 
+/* Matrix column: selectable header config collapse chevron */
+.column-selectable-header-wrapper.is-expanded .column-selectable-header-chevron {
+    transform: rotate(180deg);
+}
+
 /* Properties section: use more of the available width with additional columns
    instead of a fixed 2-column grid. */
 @media (min-width: 900px) {

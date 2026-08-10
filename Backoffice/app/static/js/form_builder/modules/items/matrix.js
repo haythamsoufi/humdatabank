@@ -331,13 +331,14 @@ export const MatrixItem = {
                 // ── Selectable header controls ──────────────────────────────
                 if (e.target.classList.contains('column-selectable-header')) {
                     const columnDiv = e.target.closest('.matrix-column');
-                    const opts = columnDiv?.querySelector('.column-selectable-header-options');
-                    if (opts) {
-                        opts.classList.toggle('hidden', !e.target.checked);
-                    }
-                    if (e.target.checked && columnDiv) {
-                        const source = columnDiv.querySelector('.column-header-source:checked')?.value || 'manual';
-                        if (source === 'manual') this._ensureColumnHeaderOptionRow(columnDiv);
+                    if (columnDiv) {
+                        if (e.target.checked) {
+                            this._setColumnSelectableHeaderExpanded(columnDiv, true);
+                            const source = columnDiv.querySelector('.column-header-source:checked')?.value || 'manual';
+                            if (source === 'manual') this._ensureColumnHeaderOptionRow(columnDiv);
+                        } else {
+                            this._setColumnSelectableHeaderExpanded(columnDiv, false);
+                        }
                     }
                 }
                 if (e.target.classList.contains('column-header-source')) {
@@ -428,6 +429,14 @@ export const MatrixItem = {
                 const next = optionRow?.nextElementSibling;
                 if (next) next.after(optionRow);
                 this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-selectable-header-toggle')) {
+                e.preventDefault();
+                const columnDiv = target.closest('.matrix-column');
+                const checkbox = columnDiv?.querySelector('.column-selectable-header');
+                if (!columnDiv || !checkbox?.checked) return;
+                const wrapper = columnDiv.querySelector('.column-selectable-header-wrapper');
+                const isExpanded = wrapper?.classList.contains('is-expanded');
+                this._setColumnSelectableHeaderExpanded(columnDiv, !isExpanded);
             }
         };
 
@@ -483,6 +492,28 @@ export const MatrixItem = {
         if (!optionsList) return;
         if (!optionsList.querySelector('.column-header-option-row')) {
             this.addColumnHeaderOption(optionsList);
+        }
+    },
+
+    /**
+     * Expand or collapse a column's selectable-header config panel.
+     * Collapsed by default; checking "Selectable header" expands it immediately.
+     */
+    _setColumnSelectableHeaderExpanded(columnDiv, expanded) {
+        const wrapper = columnDiv?.querySelector('.column-selectable-header-wrapper');
+        const opts = columnDiv?.querySelector('.column-selectable-header-options');
+        const toggle = columnDiv?.querySelector('.column-selectable-header-toggle');
+        const checkbox = columnDiv?.querySelector('.column-selectable-header');
+        if (!wrapper || !opts) return;
+
+        const isEnabled = !!checkbox?.checked;
+        const show = expanded && isEnabled;
+
+        wrapper.classList.toggle('is-expanded', show);
+        opts.classList.toggle('hidden', !show);
+        if (toggle) {
+            toggle.disabled = !isEnabled;
+            toggle.setAttribute('aria-expanded', show ? 'true' : 'false');
         }
     },
 
@@ -655,10 +686,9 @@ export const MatrixItem = {
         if (selectableHeaderConfig && selectableHeaderConfig.header_type === 'selectable') {
             const shd = selectableHeaderConfig;
             const checkbox = clone.querySelector('.column-selectable-header');
-            const opts = clone.querySelector('.column-selectable-header-options');
             if (checkbox) {
                 checkbox.checked = true;
-                opts?.classList.remove('hidden');
+                this._setColumnSelectableHeaderExpanded(columnDiv, true);
             }
 
             const placeholderInput = clone.querySelector('.column-header-placeholder');

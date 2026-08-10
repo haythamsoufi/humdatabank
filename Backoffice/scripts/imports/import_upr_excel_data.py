@@ -134,8 +134,10 @@ T22_ROW_TOTAL_COLUMN = "Total"  # matrix row-total cell suffix (row_total_manual
 # Item 1303 variable columns (Excel Area names) — overridden when PNS reports totals only.
 T22_BREAKDOWN_AREAS: Tuple[str, ...] = ("SP1", "SP2", "SP3", "SP4", "SP5", "EFs")
 # Legacy UPR Master ``Area`` codes on Funding rows (pre-SP1/EFs workbook naming).
-# Import skips these until an explicit Excel → matrix column mapping is defined (see docs §13).
-SKIPPED_LEGACY_FUNDING_AREAS = frozenset({"E1", "E2", "E3", "EO", "EA1", "EA2", "EA3"})
+# E1/E2/E3/EO remain skipped; EA1–EA3 map to selectable-header columns on the hybrid
+# funding matrix (items 967/968/974) — see ``PLANNING_EA_FUNDING_AREAS``.
+SKIPPED_LEGACY_FUNDING_AREAS = frozenset({"E1", "E2", "E3", "EO"})
+PLANNING_EA_FUNDING_AREAS = frozenset({"EA1", "EA2", "EA3"})
 EMERGENCY_APPEALS_COLUMN = "Total People to be reached"
 
 # ── Reporting country template (T33) ───────────────────────────────────────────
@@ -1263,9 +1265,111 @@ def _resolve_emergency_operation_labels(
 
 def _parse_ea_slot(area: str) -> Optional[int]:
     area = (area or "").strip().upper()
-    if area in ("EA1", "EA2", "EA3"):
+    if area in PLANNING_EA_FUNDING_AREAS:
         return int(area[-1])
     return None
+
+
+def _build_reach_ea_code_index(
+    rows: List[Dict[str, Any]],
+    *,
+    rounds: Optional[Set[str]] = None,
+) -> Dict[Tuple[str, str, str], str]:
+    """Map (iso3, round, EA slot) → EA Code from Reach rows (Funding fallback)."""
+    index: Dict[Tuple[str, str, str], str] = {}
+    for row in rows:
+        rnd = str(row.get("Round") or "").strip().upper()
+        if rounds and rnd not in rounds:
+            continue
+        if str(row.get("Section") or "").strip() != "Reach":
+            continue
+        area = str(row.get("Area") or "").strip()
+        if area not in PLANNING_EA_FUNDING_AREAS:
+            continue
+        code = row.get("EA Code")
+        if code in (None, ""):
+            continue
+        iso3 = str(row.get("ISO3") or "").strip().upper()
+        if iso3 and rnd:
+            index[(iso3, rnd, area)] = str(code).strip().upper()
+    return index
+
+
+def _resolve_ea_operation(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    area: str,
+    ea_code: Any,
+    context: str = "Reach",
+) -> Optional[Dict[str, Any]]:
+    """Resolve a GO emergency operation for Excel EA1/EA2/EA3 slot or EA Code."""
+    ordered, by_code = _ensure_emergency_ops(ctx, iso3)
+    code = (str(ea_code).strip().upper() if ea_code not in (None, "") else "")
+    if code:
+        op = by_code.get(code)
+        if op is None:
+            ctx.warnings.append(f"Emergency appeal code {code!r} not found in GO API for {iso3}")
+            return None
+        return op
+
+    slot = _parse_ea_slot(area)
+    if slot is None:
+        return None
+    if slot < 1 or slot > len(ordered):
+        ctx.warnings.append(
+            f"No EA Code for {area} and only {len(ordered)} appeal(s) in GO API for {iso3} — skipped"
+        )
+        return None
+    op = ordered[slot - 1]
+    ctx.warnings.append(
+        f"{context} {area} for {iso3} missing EA Code — using GO slot {slot}: {_emergency_op_row_id(op)!r}"
+    )
+    return op
+
+
+def _resolve_ea_operation_display(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    area: str,
+    ea_code: Any,
+    context: str = "Reach",
+) -> Optional[str]:
+    """Display label for a selectable emergency-appeal column header (name_with_code)."""
+    op = _resolve_ea_operation(ctx, iso3=iso3, area=area, ea_code=ea_code, context=context)
+    if not op:
+        return None
+    return _emergency_op_row_id(op) or None
+
+
+def _ensure_funding_ea_col_header(
+    matrix_cells: Dict[Tuple[int, int], Dict[str, Any]],
+    ctx: UprImportContext,
+    *,
+    aes_id: int,
+    funding_item_id: int,
+    iso3: str,
+    rnd: str,
+    area: str,
+    ea_code_raw: Any,
+    reach_ea_codes: Dict[Tuple[str, str, str], str],
+) -> bool:
+    """Set ``col_header|EA*`` once per matrix item when importing planning funding."""
+    cells = matrix_cells[(aes_id, funding_item_id)]
+    header_key = f"col_header|{area}"
+    if header_key in cells:
+        return True
+    ea_code = ea_code_raw
+    if ea_code in (None, ""):
+        ea_code = reach_ea_codes.get((iso3, rnd, area))
+    display = _resolve_ea_operation_display(
+        ctx, iso3=iso3, area=area, ea_code=ea_code, context="Funding"
+    )
+    if not display:
+        return False
+    cells[header_key] = display
+    return True
 
 
 def _resolve_emergency_row_key(
@@ -1276,29 +1380,9 @@ def _resolve_emergency_row_key(
     ea_code: Any,
 ) -> Optional[str]:
     """Resolve Emergency Appeals matrix row key from Excel EA slot and/or EA Code."""
-    ordered, by_code = _ensure_emergency_ops(ctx, iso3)
-    code = (str(ea_code).strip().upper() if ea_code not in (None, "") else "")
-    op: Optional[Dict[str, Any]] = None
-
-    if code:
-        op = by_code.get(code)
-        if op is None:
-            ctx.warnings.append(f"Emergency appeal code {code!r} not found in GO API for {iso3}")
-            return None
-    else:
-        slot = _parse_ea_slot(area)
-        if slot is None:
-            return None
-        if slot < 1 or slot > len(ordered):
-            ctx.warnings.append(
-                f"No EA Code for {area} and only {len(ordered)} appeal(s) in GO API for {iso3} — skipped"
-            )
-            return None
-        op = ordered[slot - 1]
-        ctx.warnings.append(
-            f"Reach {area} for {iso3} missing EA Code — using GO slot {slot}: {_emergency_op_row_id(op)!r}"
-        )
-
+    op = _resolve_ea_operation(ctx, iso3=iso3, area=area, ea_code=ea_code, context="Reach")
+    if not op:
+        return None
     row_id = _emergency_op_row_id(op)
     if not row_id:
         return None
@@ -2188,6 +2272,7 @@ def transform_to_import_rows(
     """Transform UPR Excel rows into ready-to-import form_data rows."""
     tids = template_ids or ctx.template_ids
     filtered = _filter_rows(rows, template_ids=tids, rounds=rounds)
+    reach_ea_codes = _build_reach_ea_code_index(rows, rounds=rounds)
 
     pns_t22_reported_yes, pns_t23_reported_yes = _build_pns_reported_yes_sets(
         rows, ctx, tids, rounds=rounds
@@ -2358,6 +2443,19 @@ def transform_to_import_rows(
                 funding_item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
                 if not funding_item_id:
                     continue
+                if area in PLANNING_EA_FUNDING_AREAS:
+                    if not _ensure_funding_ea_col_header(
+                        matrix_cells,
+                        ctx,
+                        aes_id=aes_id,
+                        funding_item_id=funding_item_id,
+                        iso3=iso3,
+                        rnd=rnd,
+                        area=area,
+                        ea_code_raw=row.get("EA Code"),
+                        reach_ea_codes=reach_ea_codes,
+                    ):
+                        continue
                 row_key = "HNS" if ent_upper == "HNS" else "IFRC Secretariat"
                 matrix_cells[(aes_id, funding_item_id)][f"{row_key}_{area}"] = hns_country_val
                 continue
@@ -2373,7 +2471,24 @@ def transform_to_import_rows(
                 if t24_aes and funding_item_id:
                     ns_id = _resolve_ns_row_id(ctx, ns_name)
                     if ns_id is not None:
+                        if area in PLANNING_EA_FUNDING_AREAS:
+                            if not _ensure_funding_ea_col_header(
+                                matrix_cells,
+                                ctx,
+                                aes_id=t24_aes,
+                                funding_item_id=funding_item_id,
+                                iso3=iso3,
+                                rnd=rnd,
+                                area=area,
+                                ea_code_raw=row.get("EA Code"),
+                                reach_ea_codes=reach_ea_codes,
+                            ):
+                                continue
                         matrix_cells[(t24_aes, funding_item_id)][f"{ns_id}_{area}"] = country_val
+
+            # T22 item 1303 only has SP1–SP5/EFs columns (no EA* selectable headers).
+            if area in PLANNING_EA_FUNDING_AREAS:
+                continue
 
             # T22 item 1303 is the current planning year only (offset 0).
             if 22 in tids and offset == 0 and parse_pns_reported_yes(row) and (country_val or pns_val):

@@ -165,15 +165,19 @@ The `Country Value` and `PNS Value` columns are processed **independently** — 
 
 **Zero / blank values:** Matrix imports skip falsy numeric values (`0`, empty) when writing cells — only non-zero amounts are stored. Scalar NS Data still allows zero KPIs.
 
-**Legacy Funding `Area` codes (skipped):** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO`, `EA1`, `EA2`, `EA3` — alongside the current `SP1`–`SP5` / `EFs` codes. The import **does not write** these to matrix items 967 / 970 / 1303 (they would produce cell keys like `IFRC Secretariat_EO` that do not match the form). Only `SP1`–`SP5` and `EFs` breakdown rows are imported for planning funding. Mapping rules for the legacy codes are a known gap (see §13).
+**Legacy Funding `Area` codes (skipped):** UPR Master still contains older Funding breakdown areas — `E1`, `E2`, `E3`, `EO`, `EA1`, `EA2`, `EA3` — alongside the current `SP1`–`SP5` / `EFs` codes. The import **does not write** these to matrix items **967 / 968 / 974** (template 24 hybrid funding) or **1303** (template 22 PNS funding). They would produce cell keys like `IFRC Secretariat_EO` that do not match the form. Only `SP1`–`SP5` and `EFs` breakdown rows are imported for planning funding. Mapping rules for the legacy codes are a known gap (see §13).
 
-#### Country Value → Template 24
+#### Country Value → Template 24 (hybrid funding matrix)
 
-| Entity | Target item | Row key |
-|--------|-------------|---------|
-| `HNS` | 967 / 968 / 974 (year offset 0/1/2) | `HNS` |
+Template 24 planning funding uses **one hybrid matrix per year offset** (`row_mode = hybrid`): fixed rows for **HNS** and **IFRC Secretariat** at the top, plus dynamically added **PNS** rows (National Societies) from the list library. HNS/IFRC and country-reported PNS amounts from Excel all write to the **same item**.
+
+| Entity | Target item (year offset) | Row key |
+|--------|---------------------------|---------|
+| `HNS` | 967 (0) / 968 (1) / 974 (2) | `HNS` |
 | `IFRC Secretariat` | 967 / 968 / 974 | `IFRC Secretariat` |
-| `PNS` | 970 / 973 / 975 (year offset 0/1/2) | `NationalSociety.id` of the NS |
+| `PNS` | 967 / 968 / 974 (same matrix) | `NationalSociety.id` of the NS |
+
+> **Legacy split matrices:** Items **970 / 973 / 975** were separate PNS-only list-library matrices before the hybrid merge. Existing prod data is consolidated with `scripts/codemods/migrate_t24_hybrid_funding_matrix.py` (see §15). New imports always target **967 / 968 / 974** only.
 
 Year offset is computed from `Year - period`. Offsets outside 0–2 are skipped. Excel years stored as floats (e.g. `2026.0`) are handled via `int(float(...))`.
 
@@ -445,8 +449,7 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 | 954 Longer-term programmes | Calendar year | SP name | `2026_SP1` |
 | 955 Bilateral support | `NationalSociety.id` | SP/EFs | `49_SP2` |
 | 960 Emergency Appeals | `{name} ({code})` | `Total People to be reached` | `Afghanistan - Earthquake (MDRAF019)_Total People to be reached` |
-| 967/968/974 HNS+IFRC funding | Entity name string | SP/EFs | `HNS_SP1`, `IFRC Secretariat_EFs` |
-| 970/973/975 PNS funding tpl24 | `NationalSociety.id` | SP/EFs | `140_SP3` |
+| 967/968/974 T24 planning funding (hybrid) | `HNS` / `IFRC Secretariat` (static row text) or `NationalSociety.id` (PNS) | SP/EFs | `HNS_SP1`, `IFRC Secretariat_EFs`, `140_SP3` |
 | 1303 PNS funding tpl22 | `Country.id` (host country) | SP/EFs | `184_SP2` — value is `{"original":616508,"modified":439311,"isModified":true}` |
 | 1367 Staff | host `NationalSociety.id` (HNS) | column name | `49_intl_delegates_hns` |
 | 956 Comments | — | — | plain text scalar |
@@ -575,7 +578,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 
 ### Planning (rounds P*)
 - [x] Template 24: NS Data scalars
-- [x] Template 24: Funding — HNS/IFRC and Country-reported PNS → `Country Value` → items 967/968/974/970/973/975
+- [x] Template 24: Funding — HNS/IFRC and country-reported PNS → `Country Value` → hybrid items 967/968/974
 - [x] Template 22: Funding — `{original, modified, isModified}` structured cells on item 1303; per-cell `isModified`; zero-skip
 - [x] Template 24: Reach — SP1–SP5 → item 954; EA1–EA3 → item 960 via EA Code + GO API fallback
 - [x] Template 24: Support — bilateral tick marks → item 955
@@ -601,7 +604,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 | 2 | **Template 22-only import skips PNS funding** | `UPR_TEMPLATE_PROFILES[22]` lists only `Staff` for row filtering. PNS Funding is written from the `Funding` section when template 22 is also included — run with **both 24 and 22** (default in the wizard). |
 | 3 | **NS name exact matching** | Match is case-insensitive but exact. Names differing by punctuation or abbreviation (e.g. "The Netherlands Red Cross" vs "Netherlands Red Cross") produce a warning and are skipped. Fuzzy matching is intentionally not implemented. |
 | 4 | **File locking** | UPR Master.xlsx is locked when open in Excel. Users must copy the file first or close Excel. |
-| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, `EA1`, …)** | UPR Master still has ~400 Funding rows using pre-SP1/EFs area codes (`E1`, `E2`, `E3`, `EO`, `EA1`–`EA3`). These are **skipped** on import (items 967 / 970 / 1303) until an explicit Excel → matrix column mapping is agreed (e.g. `E1`→`SP1`, `EO`→`EFs`, and whether `EA*` belongs on the planning funding matrix or emergency appeals). Re-import after mapping is implemented. |
+| 5 | **Legacy Funding `Area` codes (`E1`, `EO`, `EA1`, …)** | UPR Master still has ~400 Funding rows using pre-SP1/EFs area codes (`E1`, `E2`, `E3`, `EO`, `EA1`–`EA3`). These are **skipped** on import (items **967 / 968 / 974**, **1303**) until an explicit Excel → matrix column mapping is agreed (e.g. `E1`→`SP1`, `EO`→`EFs`, and whether `EA*` belongs on the planning funding matrix or emergency appeals). Re-import after mapping is implemented. |
 
 ---
 
@@ -610,8 +613,11 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 ```
 Backoffice/
 ├── scripts/
-│   ├── import_upr_excel_data.py       ← main import script (this feature)
-│   └── import_fdrs_form_data.py       ← shared upsert helper + FDRS importer
+│   ├── imports/
+│   │   └── import_upr_excel_data.py       ← main import script (this feature)
+│   ├── codemods/
+│   │   └── migrate_t24_hybrid_funding_matrix.py  ← one-off: merge 970/973/975 → 967/968/974
+│   └── import_fdrs_form_data.py           ← shared upsert helper + FDRS importer
 ├── app/
 │   ├── static/js/forms/modules/
 │   │   └── matrix-handler.js            ← variable matrix {original, modified, isModified} display
@@ -687,3 +693,19 @@ python scripts/imports/import_upr_excel_data.py \
 ```
 
 All commands require the Flask app context (`FLASK_CONFIG=development` is set automatically by the script).
+
+### One-off prod migration (hybrid funding matrices)
+
+After deploying the hybrid matrix feature, merge legacy split-matrix data and form-item config on prod:
+
+```bash
+cd Backoffice
+
+# Preview
+python scripts/codemods/migrate_t24_hybrid_funding_matrix.py --dry-run
+
+# Apply (967←970, 968←973, 974←975; archives old PNS items)
+python scripts/codemods/migrate_t24_hybrid_funding_matrix.py
+```
+
+Safe to re-run: pairs already in `row_mode = hybrid` are skipped.

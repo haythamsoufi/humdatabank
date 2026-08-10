@@ -5,7 +5,7 @@ Import Unified Planning & Reporting (UPR) Excel data into form submissions.
 Reads the ``UPR Data`` sheet from UPR Master.xlsx and maps rows into form_data.
 
 Planning templates (rounds P*):
-    24  Unified Country Plan
+    24  Unified Country Plan — funding uses hybrid matrices (items 967/968/974)
     22  Annual Planning – International Bilateral Support
 
 Reporting templates:
@@ -13,11 +13,11 @@ Reporting templates:
     23  Reporting – PNS      (rounds AR*)
 
 Usage:
-    python scripts/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
-    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
-    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
-    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR26 --templates 33
-    python scripts/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
+    python scripts/imports/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
+    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
+    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
+    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR26 --templates 33
+    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
 """
 
 from __future__ import annotations
@@ -118,12 +118,11 @@ STAFF_INDICATOR_COLUMNS: Dict[str, str] = {
 
 STAFF_MATRIX_LABEL = "PNS staff contributions"
 
-FUNDING_MATRIX_BY_YEAR_OFFSET = {
-    # Keys per offset: hns_ifrc = merged hybrid item (HNS + IFRC Secretariat static rows + PNS dynamic rows)
-    # The "pns" key is kept for backward-compatibility references but points to the same item.
-    0: {"hns_ifrc": 967, "pns": 967},
-    1: {"hns_ifrc": 968, "pns": 968},
-    2: {"hns_ifrc": 974, "pns": 974},
+# Template 24 planning funding — one hybrid matrix per year offset (static HNS/IFRC rows + PNS list rows).
+FUNDING_MATRIX_BY_YEAR_OFFSET: Dict[int, int] = {
+    0: 967,
+    1: 968,
+    2: 974,
 }
 
 ITEM_LONGER_TERM_PROGRAMMES = 954
@@ -2356,25 +2355,25 @@ def transform_to_import_rows(
                 aes_id = ctx.assignment_by_template.get(24, {}).get((period, iso3))
                 if not aes_id:
                     continue
-                item_map = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
-                if not item_map:
+                funding_item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+                if not funding_item_id:
                     continue
                 row_key = "HNS" if ent_upper == "HNS" else "IFRC Secretariat"
-                matrix_cells[(aes_id, item_map["hns_ifrc"])][f"{row_key}_{area}"] = hns_country_val
+                matrix_cells[(aes_id, funding_item_id)][f"{row_key}_{area}"] = hns_country_val
                 continue
 
             # ── PNS — Country Value and PNS Value processed independently ──
             if ent_upper != "PNS":
                 continue
 
-            # Country Value → template 24 (now merged into the hybrid hns_ifrc item)
+            # Country Value → template 24 hybrid funding matrix (same item as HNS/IFRC above)
             if country_val and 24 in tids:
                 t24_aes = ctx.assignment_by_template.get(24, {}).get((period, iso3))
-                item_map = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
-                if t24_aes and item_map:
+                funding_item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+                if t24_aes and funding_item_id:
                     ns_id = _resolve_ns_row_id(ctx, ns_name)
                     if ns_id is not None:
-                        matrix_cells[(t24_aes, item_map["hns_ifrc"])][f"{ns_id}_{area}"] = country_val
+                        matrix_cells[(t24_aes, funding_item_id)][f"{ns_id}_{area}"] = country_val
 
             # T22 item 1303 is the current planning year only (offset 0).
             if 22 in tids and offset == 0 and parse_pns_reported_yes(row) and (country_val or pns_val):

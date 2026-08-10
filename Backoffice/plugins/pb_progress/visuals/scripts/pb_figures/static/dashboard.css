@@ -95,7 +95,10 @@
   display: block;
   width: 100%;
   max-width: 481px;
-  height: 110px;
+  height: auto;
+  max-height: 110px;
+  aspect-ratio: 481 / 110;
+  object-fit: contain;
 }
 
 .pb-dashboard .line-chart-img {
@@ -219,8 +222,8 @@
 }
 
 .pb-dashboard table.year-data-grid {
-  width: 481px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 481px;
   border-collapse: collapse;
   table-layout: fixed;
 }

@@ -388,6 +388,28 @@ renderSearchResults(fieldId, options) {
     } else {
         options.forEach(option => resultsContainer.appendChild(createOptionEl(option)));
     }
+
+    // Append "Other (please specify)..." when allow_other is enabled
+    const matrixForOther = this.matrices.get(fieldId);
+    const searchInputForOther = this._findSearchInput(fieldId);
+    if (matrixForOther?.config?.allow_other || searchInputForOther?.dataset?.allowOther === 'true') {
+        const separator = document.createElement('div');
+        separator.className = 'border-t border-gray-200';
+        resultsContainer.appendChild(separator);
+
+        const otherItem = document.createElement('div');
+        otherItem.className = 'p-3 hover:bg-blue-50 cursor-pointer matrix-other-option';
+        otherItem.dataset.fieldId = String(fieldId || '');
+
+        const title = document.createElement('div');
+        title.className = 'text-sm text-gray-500 italic flex items-center';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-plus-circle mr-2 text-gray-400';
+        title.appendChild(icon);
+        title.appendChild(document.createTextNode(_t('Other (please specify)...')));
+        otherItem.appendChild(title);
+        resultsContainer.appendChild(otherItem);
+    }
 },
 
 
@@ -418,11 +440,75 @@ showDropdownMessage(fieldId, message, isLoading = false) {
         wrap.appendChild(document.createTextNode(String(message || '')));
         resultsContainer.appendChild(wrap);
     }
-}
+},
+
+/**
+ * Handle "Other (please specify)" option click: replace the option
+ * with an inline text input so the user can type a custom row name.
+ */
+handleOtherRowOption(otherItem) {
+    const fieldId = otherItem.dataset.fieldId;
+    const container = document.querySelector(`.matrix-container[data-field-id="${fieldId}"]`);
+    if (container && !this._canEditMatrix(container)) return;
+
+    const inputWrapper = document.createElement('div');
+    inputWrapper.className = 'p-3 border-t border-gray-200';
+
+    const inputRow = document.createElement('div');
+    inputRow.className = 'flex items-center gap-2';
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'flex-1 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
+    textInput.placeholder = _t('Enter custom row name...');
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'px-2 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md shrink-0';
+    addBtn.textContent = _t('Add');
+
+    const addCustomRow = () => {
+        const label = textInput.value.trim();
+        if (!label) return;
+        this.addDynamicRow(fieldId, label, { _id: label, id: label }, label, false);
+        setTimeout(() => {
+            this.sortMatrixRows(fieldId);
+            this.applyManualRowHighlighting(fieldId);
+            this.updateLegendVisibility(fieldId);
+        }, 50);
+        const resultsContainer = this._findResultsContainer(fieldId);
+        const searchInput = this._findSearchInput(fieldId);
+        if (resultsContainer) resultsContainer.classList.add('hidden');
+        if (searchInput) searchInput.value = '';
+    };
+
+    addBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        addCustomRow();
+    });
+
+    textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            addCustomRow();
+        }
+        if (e.key === 'Escape') {
+            const resultsContainer = this._findResultsContainer(fieldId);
+            if (resultsContainer) resultsContainer.classList.add('hidden');
+        }
+    });
+
+    inputRow.appendChild(textInput);
+    inputRow.appendChild(addBtn);
+    inputWrapper.appendChild(inputRow);
+    otherItem.replaceWith(inputWrapper);
+    textInput.focus();
+},
 
 /**
  * Select row option from search results
- */,
+ */
 
 
 /**

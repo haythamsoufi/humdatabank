@@ -588,8 +588,8 @@ def _create_matrix_form_item(template, section, form_data, default_order):
     # Set the consolidated config
     form_item.config = config
 
-    # Handle list library configuration for advanced matrix mode
-    if matrix_config.get('row_mode') == 'list_library':
+    # Handle list library configuration for advanced matrix mode (list_library + hybrid)
+    if matrix_config.get('row_mode') in ('list_library', 'hybrid'):
         if 'lookup_list_id' in matrix_config:
             form_item.lookup_list_id = matrix_config['lookup_list_id']
         if 'list_display_column' in matrix_config:

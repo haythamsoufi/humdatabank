@@ -726,18 +726,14 @@ def azure_callback():
         current_app.logger.warning(
             "Azure B2C auth error: %s — %s", error, error_description or "(no description)"
         )
-        return render_template(
-            "errors/error.html",
-            error_code=None,
-            error_title=_("Sign-In Failed"),
-            error_message=_(
+        flash(
+            _(
                 "Oops, something went wrong! We weren't able to complete your sign-in. "
                 "Please try again or contact support if the problem continues."
             ),
-            error_details=None,
-            current_user=current_user,
-            style_nonce=get_style_nonce(),
-        ), 200
+            "danger",
+        )
+        return redirect(url_for("auth.login"))
 
     code = request.values.get("code")
     state = request.values.get("state")
@@ -1346,6 +1342,7 @@ def register():
                 ),
             )
     # Validation errors
+    flash(_('Please correct the highlighted fields and try again.'), 'warning')
     return render_template(
         'auth/login.html',
         **_login_page_context(
@@ -1408,6 +1405,7 @@ def forgot_password():
             'warning',
         )
         return redirect(url_for('auth.login'))
+    flash(_('Please correct the highlighted fields and try again.'), 'warning')
     return render_template(
         'auth/login.html',
         **_login_page_context(

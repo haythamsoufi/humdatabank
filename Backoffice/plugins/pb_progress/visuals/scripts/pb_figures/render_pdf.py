@@ -55,6 +55,38 @@ main, #quarto-document-content, .page-layout-full {
   padding-bottom: 0 !important;
   margin-bottom: 0 !important;
 }
+/* Dashboard is authored at full A4 width (8.27in) but @page margins narrow the
+   printable area — fit charts/tables to the content box and preserve aspect ratio. */
+body.pb-pdf-export .pb-dashboard {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  box-sizing: border-box !important;
+}
+body.pb-pdf-export .pb-dashboard .line-chart-inner {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 481 / 110;
+}
+body.pb-pdf-export .pb-dashboard .line-chart-inner > svg,
+body.pb-pdf-export .pb-dashboard .line-chart-inner > .line-chart-img {
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: 481 / 110;
+  object-fit: contain;
+}
+body.pb-pdf-export .pb-dashboard table.year-data-grid {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+body.pb-pdf-export .pb-dashboard .line-chart-wrap {
+  overflow: visible !important;
+}
 """
 
 PDF_PAGE_CSS = """

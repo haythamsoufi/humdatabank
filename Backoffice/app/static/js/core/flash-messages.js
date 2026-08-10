@@ -22,6 +22,9 @@
         if (!wrapper && flashContainer) {
             wrapper = document.createElement('div');
             wrapper.className = 'flash-messages';
+            if (document.body.classList.contains('login-page')) {
+                wrapper.classList.add('flash-messages--in-panel');
+            }
             // Check if offline banner is active and apply class accordingly
             const offlineBanner = document.getElementById('auth-offline-status-banner');
             if (offlineBanner && offlineBanner.style.display !== 'none') {
@@ -35,14 +38,24 @@
             wrapper = document.querySelector('.flash-messages');
         }
         if (!wrapper) {
+            const loginContainer = document.body.classList.contains('login-page')
+                ? document.getElementById('flashMessagesContainer')
+                : null;
             wrapper = document.createElement('div');
             wrapper.className = 'flash-messages';
+            if (document.body.classList.contains('login-page')) {
+                wrapper.classList.add('flash-messages--in-panel');
+            }
             // Check if offline banner is active and apply class accordingly
             const offlineBanner = document.getElementById('auth-offline-status-banner');
             if (offlineBanner && offlineBanner.style.display !== 'none') {
                 wrapper.classList.add('offline-banner-active');
             }
-            document.body.insertBefore(wrapper, document.body.firstChild);
+            if (loginContainer) {
+                loginContainer.appendChild(wrapper);
+            } else {
+                document.body.insertBefore(wrapper, document.body.firstChild);
+            }
         }
 
         return wrapper;

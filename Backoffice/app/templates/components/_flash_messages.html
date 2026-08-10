@@ -1,0 +1,33 @@
+{# Standard flash message mount — shared by layout.html and full-page templates (e.g. login).
+   Pass `messages` when the caller already called get_flashed_messages(with_categories=true).
+   Pass `wrapper_class` for optional modifiers (e.g. flash-messages--in-panel on login). #}
+{% from "components/_svg_icons.html" import svg_icon %}
+{% if messages is not defined %}
+  {% set messages = get_flashed_messages(with_categories=true) %}
+{% endif %}
+<div id="flashMessagesContainer" aria-live="polite" aria-atomic="false">
+  {% if messages %}
+  <div class="flash-messages{% if wrapper_class is defined and wrapper_class %} {{ wrapper_class }}{% endif %}">
+    {% for category, message in messages %}
+    {% set alert_category = 'danger' if category == 'error' else category %}
+    <div class="alert alert-{{ alert_category }}" role="alert">
+      <div class="alert-icon">
+        {% if alert_category == 'success' %}
+          {{ svg_icon('check-circle') }}
+        {% elif alert_category == 'warning' %}
+          {{ svg_icon('exclamation-triangle') }}
+        {% else %}
+          {{ svg_icon('info') }}
+        {% endif %}
+      </div>
+      <div class="alert-message">{{ message }}</div>
+      <button type="button" class="alert-close btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

@@ -7,11 +7,11 @@
 name: Deploy to Webapp
 
 # Shown in the Actions run list instead of the default "Manually run by …" title.
-# Manual runs: title uses the container image tag (version). Release runs use the published tag.
+# Manual runs: title uses the environment-scoped ACR tag. Release runs use the published tag.
 run-name: >-
   ${{ github.event_name == 'release'
     && format('Auto-deploy to Staging — {0}', github.event.release.tag_name)
-    || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.version) }}
+    || format('Deploy to Webapp — {0} (image:{1})', inputs.environment, inputs.environment == 'Production' && 'production' || 'staging') }}
 
 on:
   # Release auto-deploy to Staging is disabled — use workflow_dispatch to deploy.
@@ -24,8 +24,8 @@ on:
         options:
           - Staging
           - Production
-      version:
-        description: 'Container image tag in ACR (e.g., v1.1, v1.2)'
+      release_label:
+        description: 'Release label stamped in the app (APP_VERSION fallback, e.g. v1.7). Not the ACR image tag — that is staging or production per environment.'
         required: true
         default: 'v1.7'
         type: string
@@ -39,7 +39,10 @@ env:
   # When triggered by a release event, always deploy to Staging using the release tag.
   # When triggered manually, use the caller-supplied inputs.
   EFFECTIVE_ENV: ${{ github.event_name == 'release' && 'Staging' || inputs.environment }}
-  EFFECTIVE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.version }}
+  EFFECTIVE_RELEASE_LABEL: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_label }}
+  # Environment-scoped mutable tags in ACR. Never share one tag across prod and staging —
+  # prod DOCKER_ENABLE_CI (if enabled) auto-pulls when its tag is pushed.
+  IMAGE_TAG: ${{ (github.event_name == 'release' || inputs.environment != 'Production') && 'staging' || 'production' }}
 
 jobs:
   validate:
@@ -194,7 +197,7 @@ jobs:
         id: gh_release
         env:
           REPO: ${{ github.repository }}
-          FALLBACK_TAG: ${{ env.EFFECTIVE_VERSION }}
+          FALLBACK_TAG: ${{ env.EFFECTIVE_RELEASE_LABEL }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -228,7 +231,7 @@ jobs:
           file: ./Backoffice/Dockerfile
           push: true
           tags: |
-            ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}
+            ifrcimage.azurecr.io/databank_backend:${{ env.IMAGE_TAG }}
             ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
           cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
           platforms: linux/amd64
@@ -236,12 +239,12 @@ jobs:
           # `Backoffice/.dockerignore` keeps the build context small.
           # Used by Backoffice/app/__init__.py to generate static_url(...)?v=...
           # Make this change every deployment so clients always fetch updated JS/CSS.
-          # RELEASE_VERSION = registry/deploy image tag. APP_VERSION = latest release tag, or deploy tag if unavailable.
+          # RELEASE_VERSION = human release label. IMAGE_TAG = env-scoped ACR tag (staging|production).
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             ASSET_VERSION=${{ github.sha }}
             GIT_SHA=${{ github.sha }}
-            RELEASE_VERSION=${{ env.EFFECTIVE_VERSION }}
+            RELEASE_VERSION=${{ env.EFFECTIVE_RELEASE_LABEL }}
             LATEST_RELEASE_TAG=${{ steps.gh_release.outputs.tag_name }}
 
       - name: Build and push container image (update registry build cache)
@@ -252,19 +255,19 @@ jobs:
           file: ./Backoffice/Dockerfile
           push: true
           tags: |
-            ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}
+            ifrcimage.azurecr.io/databank_backend:${{ env.IMAGE_TAG }}
             ifrcimage.azurecr.io/databank_backend:${{ github.sha }}
           cache-from: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache
           # Full cache export is expensive (~2 minutes), so only do it when deps change.
           cache-to: type=registry,ref=ifrcimage.azurecr.io/databank_backend:buildcache,mode=max
           platforms: linux/amd64
           provenance: false
-          # RELEASE_VERSION = registry/deploy image tag. APP_VERSION = latest release tag, or deploy tag if unavailable.
+          # RELEASE_VERSION = human release label. IMAGE_TAG = env-scoped ACR tag (staging|production).
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             ASSET_VERSION=${{ github.sha }}
             GIT_SHA=${{ github.sha }}
-            RELEASE_VERSION=${{ env.EFFECTIVE_VERSION }}
+            RELEASE_VERSION=${{ env.EFFECTIVE_RELEASE_LABEL }}
             LATEST_RELEASE_TAG=${{ steps.gh_release.outputs.tag_name }}
 
       - name: Clean up Docker resources
@@ -340,7 +343,7 @@ jobs:
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ steps.config.outputs.app_name }}
-          images: 'ifrcimage.azurecr.io/databank_backend:${{ env.EFFECTIVE_VERSION }}'
+          images: 'ifrcimage.azurecr.io/databank_backend:${{ env.IMAGE_TAG }}'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
 
       - name: Set static blob target for environment

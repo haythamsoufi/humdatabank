@@ -361,33 +361,7 @@
             </nav>
 
             <main class="admin-scroll-main flex-1 min-w-0 overflow-x-hidden bg-gray-100">
-                <div id="flashMessagesContainer" aria-live="polite" aria-atomic="false">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            <div class="flash-messages">
-                                {% for category, message in messages %}
-                                    <div class="alert alert-{{ category }}" role="alert">
-                                        <div class="alert-icon">
-                                            {% if category == 'success' %}
-                                                {{ svg_icon('check-circle') }}
-                                            {% elif category == 'warning' %}
-                                                {{ svg_icon('exclamation-triangle') }}
-                                            {% else %}
-                                                {{ svg_icon('info') }}
-                                            {% endif %}
-                                        </div>
-                                        <div class="alert-message">{{ message }}</div>
-                                        <button type="button" class="alert-close btn btn-close-icon" aria-label="{{ _('Close')|forceescape }}">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                            </svg>
-                                        </button>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    {% endwith %}
-                </div>
+                {% include 'components/_flash_messages.html' %}
                 <div id="pageContentContainer" class="container mx-auto px-6 py-6 max-w-full min-w-0">
                     {# Before page inline scripts: AdminUnderlineTabs (class tokens match components/_scroll_tab_bar.html macros) #}
                     <script src="{{ static_url('js/admin/underline-tabs.js') }}"></script>

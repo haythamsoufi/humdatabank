@@ -5,7 +5,7 @@
 #   .\azure-webapp\azure_webapp_deploy.ps1 -EnvironmentLabel STAGING -WebApp ifrc-databank-staging-2 `
 #       -ResourceGroup ifrctgo001rg -Subscription f585c1c3-801b-4641-8d7f-145aa50ffb04
 #
-# Advanced: -ForceStaticUpload  -SkipBuild  -SkipStaticUpload  -Version v1.8
+# Advanced: -ForceStaticUpload  -SkipBuild  -SkipStaticUpload  -ReleaseLabel v1.8
 #
 # Optional: azure_webapp.local.env with AZURE_STORAGE_CONNECTION_STRING for static asset upload only.
 
@@ -26,7 +26,7 @@ param(
     # Subscription that hosts ACR ifrcimage (used briefly to obtain a push token).
     [string]$AcrSubscription = '3e33b4c1-ada7-4922-9113-b9e41eaf1797',
 
-    [string]$Version = '',
+    [string]$ReleaseLabel = '',
     [switch]$ForceStaticUpload,
     [switch]$SkipBuild,
     [switch]$SkipStaticUpload
@@ -77,7 +77,7 @@ $AcrRegistry = 'ifrcimage.azurecr.io'
 $AcrName = 'ifrcimage'
 $ImageRepo = 'databank_backend'
 $BuildCacheRef = "${AcrRegistry}/${ImageRepo}:buildcache"
-$DefaultVersion = 'v1.7'
+$DefaultReleaseLabel = 'v1.7'
 . (Join-Path $PSScriptRoot 'azure_webapp_config.ps1')
 $RepoRoot = Get-AzureWebAppRepoRoot
 $Dockerfile = Join-Path $RepoRoot 'Backoffice\Dockerfile'
@@ -129,6 +129,12 @@ function Assert-Command {
         Write-Err "$Name not found in PATH. $InstallHint"
         exit 1
     }
+}
+
+function Get-EnvironmentImageTag {
+    param([Parameter(Mandatory = $true)][string]$EnvironmentLabel)
+    if ($EnvironmentLabel -eq 'PROD') { return 'production' }
+    return 'staging'
 }
 
 function Get-GitOutput {
@@ -321,12 +327,15 @@ if (-not $gitSha) {
 }
 Write-Ok "Git SHA: $gitSha"
 
-if (-not $Version) {
-    $Version = Read-Host "Container image tag [$DefaultVersion]"
-    if ([string]::IsNullOrWhiteSpace($Version)) { $Version = $DefaultVersion }
+$imageTag = Get-EnvironmentImageTag -EnvironmentLabel $EnvironmentLabel
+
+if (-not $ReleaseLabel) {
+    $ReleaseLabel = Read-Host "Release label for APP_VERSION [$DefaultReleaseLabel]"
+    if ([string]::IsNullOrWhiteSpace($ReleaseLabel)) { $ReleaseLabel = $DefaultReleaseLabel }
 }
-$Version = $Version.Trim()
-Write-Ok "Deploy image tag: $Version"
+$ReleaseLabel = $ReleaseLabel.Trim()
+Write-Ok "ACR image tag: $imageTag (environment-scoped)"
+Write-Ok "Release label: $ReleaseLabel"
 
 if ($EnvironmentLabel -eq 'PROD') {
     Write-Host ''
@@ -339,9 +348,9 @@ if ($EnvironmentLabel -eq 'PROD') {
 }
 
 $staticContainer = if ($EnvironmentLabel -eq 'PROD') { 'static' } else { 'static-staging' }
-$imageTagVersion = "${AcrRegistry}/${ImageRepo}:$Version"
+$imageTagVersion = "${AcrRegistry}/${ImageRepo}:$imageTag"
 $imageTagSha = "${AcrRegistry}/${ImageRepo}:$gitSha"
-$latestReleaseTag = Get-LatestReleaseTag -FallbackTag $Version
+$latestReleaseTag = Get-LatestReleaseTag -FallbackTag $ReleaseLabel
 
 $depsChanged = Test-FilesChangedSincePreviousCommit -Paths @(
     'Backoffice/requirements.txt',
@@ -367,7 +376,7 @@ if (-not $SkipBuild) {
         '--tag', $imageTagSha,
         '--build-arg', "ASSET_VERSION=$gitSha",
         '--build-arg', "GIT_SHA=$gitSha",
-        '--build-arg', "RELEASE_VERSION=$Version",
+        '--build-arg', "RELEASE_VERSION=$ReleaseLabel",
         '--build-arg', "LATEST_RELEASE_TAG=$latestReleaseTag",
         '--build-arg', 'BUILDKIT_INLINE_CACHE=1',
         '--cache-from', "type=registry,ref=$BuildCacheRef",

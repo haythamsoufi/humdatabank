@@ -30,6 +30,13 @@ class TestDonutSvg(unittest.TestCase):
 
 
 class TestPrepareHtmlForPdf(unittest.TestCase):
+    def test_prepare_html_includes_pdf_dashboard_layout_css(self) -> None:
+        html = "<html><head></head><body><div class=\"pb-lang-panel\" data-lang=\"English\"></div></body></html>"
+        prepared = prepare_html_for_pdf(html, "English")
+        self.assertIn("pb-pdf-export", prepared)
+        self.assertIn("aspect-ratio: 481 / 110", prepared)
+        self.assertIn("table.year-data-grid", prepared)
+
     def test_prepare_html_shows_one_language_panel(self) -> None:
         html = """
         <html><head></head><body>

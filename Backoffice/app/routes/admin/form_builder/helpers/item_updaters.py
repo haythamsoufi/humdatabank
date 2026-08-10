@@ -544,8 +544,8 @@ def _update_matrix_fields(matrix_item, form, request_form):
             if matrix_item.config is None:
                 matrix_item.config = {}
 
-            # Handle list library configuration for advanced matrix mode
-            if matrix_config.get('row_mode') == 'list_library':
+            # Handle list library configuration for advanced matrix mode (list_library + hybrid)
+            if matrix_config.get('row_mode') in ('list_library', 'hybrid'):
                 # Set list library fields
                 if 'lookup_list_id' in matrix_config:
                     matrix_item.lookup_list_id = matrix_config['lookup_list_id']

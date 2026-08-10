@@ -365,6 +365,42 @@ $font-family-arabic: "Tajawal", "Segoe UI", system-ui, sans-serif;
     padding-bottom: 0 !important;
     margin-bottom: 0 !important;
   }
+
+  /* Match pb-pdf-export layout: printable area is narrower than 8.27in dashboard width. */
+  .pb-dashboard {
+    max-width: 100%;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+    box-sizing: border-box;
+  }
+
+  .pb-dashboard .line-chart-inner {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 481 / 110;
+  }
+
+  .pb-dashboard .line-chart-inner > svg,
+  .pb-dashboard .line-chart-inner > .line-chart-img {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    aspect-ratio: 481 / 110;
+    object-fit: contain;
+  }
+
+  .pb-dashboard table.year-data-grid {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .pb-dashboard .line-chart-wrap {
+    overflow: visible;
+  }
 }
 
 .report-meta {
@@ -602,7 +638,10 @@ html.pb-report-arabic #quarto-margin-sidebar {
   display: block;
   width: 100%;
   max-width: 481px;
-  height: 110px;
+  height: auto;
+  max-height: 110px;
+  aspect-ratio: 481 / 110;
+  object-fit: contain;
 }
 
 .pb-dashboard .line-chart-img {
@@ -734,8 +773,8 @@ html.pb-report-arabic #quarto-margin-sidebar {
 }
 
 .pb-dashboard table.year-data-grid {
-  width: 481px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 481px;
   border-collapse: collapse;
   table-layout: fixed;
 }

@@ -264,7 +264,14 @@ export const MatrixItem = {
                 e.target.classList.contains('column-variable-select') ||
                 e.target.classList.contains('column-is-variable') ||
                 e.target.classList.contains('column-variable-readonly') ||
-                e.target.classList.contains('column-variable-save-value')
+                e.target.classList.contains('column-variable-save-value') ||
+                e.target.classList.contains('column-selectable-header') ||
+                e.target.classList.contains('column-header-source') ||
+                e.target.classList.contains('column-header-list-select') ||
+                e.target.classList.contains('column-header-list-display-column') ||
+                e.target.classList.contains('column-header-placeholder') ||
+                e.target.classList.contains('column-header-option-text') ||
+                e.target.classList.contains('column-header-allow-other')
             ) {
                 // Show the "Decimals" input only for columns configured as Number (Decimal)
                 if (e.target.classList.contains('column-type')) {
@@ -321,6 +328,33 @@ export const MatrixItem = {
                         this.updateColumnVariableSaveValueState(columnDiv);
                     }
                 }
+                // ── Selectable header controls ──────────────────────────────
+                if (e.target.classList.contains('column-selectable-header')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    const opts = columnDiv?.querySelector('.column-selectable-header-options');
+                    if (opts) {
+                        opts.classList.toggle('hidden', !e.target.checked);
+                    }
+                    if (e.target.checked && columnDiv) {
+                        const source = columnDiv.querySelector('.column-header-source:checked')?.value || 'manual';
+                        if (source === 'manual') this._ensureColumnHeaderOptionRow(columnDiv);
+                    }
+                }
+                if (e.target.classList.contains('column-header-source')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    const manualSec = columnDiv?.querySelector('.column-header-manual-section');
+                    const listSec = columnDiv?.querySelector('.column-header-list-library-section');
+                    const isLib = e.target.value === 'list_library';
+                    manualSec?.classList.toggle('hidden', isLib);
+                    listSec?.classList.toggle('hidden', !isLib);
+                    if (!isLib && columnDiv) this._ensureColumnHeaderOptionRow(columnDiv);
+                }
+                if (e.target.classList.contains('column-header-list-select')) {
+                    const columnDiv = e.target.closest('.matrix-column');
+                    if (columnDiv) {
+                        this.handleColumnHeaderListSelection(modalElement, columnDiv, e.target.value);
+                    }
+                }
                 this.updateConfig(modalElement);
             }
         };
@@ -372,6 +406,28 @@ export const MatrixItem = {
                 e.preventDefault();
                 this.removeColumn(target);
                 this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-header-option-add-btn')) {
+                e.preventDefault();
+                const optionsList = target.closest('.column-header-option-row')?.parentElement;
+                const newRow = this.addColumnHeaderOption(optionsList);
+                newRow?.querySelector('.column-header-option-text')?.focus();
+                this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-header-option-remove-btn')) {
+                e.preventDefault();
+                target.closest('.column-header-option-row')?.remove();
+                this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-header-option-move-up-btn')) {
+                e.preventDefault();
+                const optionRow = target.closest('.column-header-option-row');
+                const prev = optionRow?.previousElementSibling;
+                if (prev) prev.before(optionRow);
+                this.updateConfig(modalElement);
+            } else if (target.classList.contains('column-header-option-move-down-btn')) {
+                e.preventDefault();
+                const optionRow = target.closest('.column-header-option-row');
+                const next = optionRow?.nextElementSibling;
+                if (next) next.after(optionRow);
+                this.updateConfig(modalElement);
             }
         };
 
@@ -399,6 +455,35 @@ export const MatrixItem = {
             }
         }
         rowsContainer.appendChild(clone);
+    },
+
+    /**
+     * Add one manual "selectable header" option row (text input + move/remove/add
+     * buttons) to a column's options list. Mirrors the single/multi choice question
+     * options UI, but scoped per-column since each matrix column keeps its own
+     * independent option list.
+     */
+    addColumnHeaderOption(optionsList, text = '') {
+        const template = Utils.getElementById('matrix-column-header-option-template');
+        if (!optionsList || !template) return null;
+        const clone = template.content.cloneNode(true);
+        const input = clone.querySelector('.column-header-option-text');
+        if (input) input.value = text || '';
+        optionsList.appendChild(clone);
+        return optionsList.lastElementChild;
+    },
+
+    /**
+     * Ensure a column's manual header-options list always has at least one row
+     * once the manual source becomes visible, so there's always an "Add" button
+     * to grow the list from (matching the question options UX).
+     */
+    _ensureColumnHeaderOptionRow(columnDiv) {
+        const optionsList = columnDiv?.querySelector('.column-header-manual-options-list');
+        if (!optionsList) return;
+        if (!optionsList.querySelector('.column-header-option-row')) {
+            this.addColumnHeaderOption(optionsList);
+        }
     },
 
     /**
@@ -446,7 +531,7 @@ export const MatrixItem = {
         return 'number_whole';
     },
 
-    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2) {
+    addColumn(modalElement, text = '', type = 'number_whole', isVariable = false, variableName = '', variableSaveValue = true, variableReadonly = true, nameTranslations = {}, targetContainer = null, decimals = 2, selectableHeaderConfig = null) {
         const columnsContainer = Utils.getElementById('matrix-columns-container');
         const template = Utils.getElementById('matrix-column-template');
         if (!template) {
@@ -465,6 +550,18 @@ export const MatrixItem = {
         const isVariableCheckbox = clone.querySelector('.column-is-variable');
         const saveValueCheckbox = clone.querySelector('.column-variable-save-value');
         const readonlyCheckbox = clone.querySelector('.column-variable-readonly');
+
+        // Every column clones the same <template>, so its two "Source" radios need a
+        // name unique to THIS column's clone -- otherwise all columns' radios end up
+        // sharing the template's literal name and become one giant mutually-exclusive
+        // group across the whole modal (selecting "List Library" on one column would
+        // silently uncheck it on another). Without any shared name at all, the browser
+        // does not enforce mutual exclusivity between the two radios in the first place,
+        // which is what let both "Manual" and "List Library" end up checked simultaneously.
+        const headerSourceGroupName = `column-header-source-${Utils.generateUniqueId()}`;
+        clone.querySelectorAll('.column-header-source').forEach(radio => {
+            radio.name = headerSourceGroupName;
+        });
 
         if (input) input.value = text || '';
         if (translationsInput) {
@@ -553,6 +650,64 @@ export const MatrixItem = {
         if (!appendTarget) {
             console.error('No container found to append column to');
             return;
+        }
+        // ── Restore selectable header config when populating from saved data ──
+        if (selectableHeaderConfig && selectableHeaderConfig.header_type === 'selectable') {
+            const shd = selectableHeaderConfig;
+            const checkbox = clone.querySelector('.column-selectable-header');
+            const opts = clone.querySelector('.column-selectable-header-options');
+            if (checkbox) {
+                checkbox.checked = true;
+                opts?.classList.remove('hidden');
+            }
+
+            const placeholderInput = clone.querySelector('.column-header-placeholder');
+            if (placeholderInput) placeholderInput.value = shd.header_placeholder || '';
+
+            const source = shd.header_source || 'manual';
+            const sourceRadio = clone.querySelector(`.column-header-source[value="${source}"]`);
+            if (sourceRadio) {
+                sourceRadio.checked = true;
+                const manualSec = clone.querySelector('.column-header-manual-section');
+                const listSec = clone.querySelector('.column-header-list-library-section');
+                manualSec?.classList.toggle('hidden', source === 'list_library');
+                listSec?.classList.toggle('hidden', source !== 'list_library');
+            }
+
+            if (source === 'manual') {
+                const optionsList = clone.querySelector('.column-header-manual-options-list');
+                const headerOptions = Array.isArray(shd.header_options) ? shd.header_options : [];
+                if (optionsList) {
+                    if (headerOptions.length) {
+                        headerOptions.forEach(opt => this.addColumnHeaderOption(optionsList, opt));
+                    } else {
+                        this.addColumnHeaderOption(optionsList);
+                    }
+                }
+            }
+
+            if (source === 'list_library') {
+                const listSelect = clone.querySelector('.column-header-list-select');
+                if (listSelect && shd.header_lookup_list_id) {
+                    listSelect.value = String(shd.header_lookup_list_id);
+                    // Populate display column options, then restore the saved value
+                    const colDiv = clone.querySelector('.matrix-column');
+                    if (colDiv) {
+                        this._populateColumnHeaderDisplayColumns(colDiv, listSelect.value);
+                        if (shd.header_list_display_column) {
+                            const displaySelect = colDiv.querySelector('.column-header-list-display-column');
+                            if (displaySelect) displaySelect.value = shd.header_list_display_column;
+                        }
+                        // Load any plugin-specific config UI (e.g. Emergency Operations) for
+                        // this column's header list, pre-filled with the saved values.
+                        colDiv._pendingHeaderPluginConfig = shd.header_plugin_config || {};
+                        this._loadColumnHeaderPluginConfig(modalElement, colDiv, listSelect.value);
+                    }
+                }
+            }
+
+            const allowOtherCb = clone.querySelector('.column-header-allow-other');
+            if (allowOtherCb) allowOtherCb.checked = !!shd.header_allow_other;
         }
         appendTarget.appendChild(clone);
         // Bind custom tooltips on newly added column (e.g. Save value ?)
@@ -647,7 +802,89 @@ export const MatrixItem = {
                 : (saveValueCheckbox ? saveValueCheckbox.checked : true);
         }
 
+        // ── Selectable header ──────────────────────────────────────────────
+        const selectableHdrCheckbox = columnDiv.querySelector('.column-selectable-header');
+        if (selectableHdrCheckbox?.checked) {
+            columnConfig.header_type = 'selectable';
+
+            const placeholderInput = columnDiv.querySelector('.column-header-placeholder');
+            const placeholder = placeholderInput?.value?.trim();
+            if (placeholder) columnConfig.header_placeholder = placeholder;
+
+            const sourceRadio = columnDiv.querySelector('.column-header-source:checked');
+            const source = sourceRadio?.value || 'manual';
+            columnConfig.header_source = source;
+
+            if (source === 'manual') {
+                const opts = Array.from(columnDiv.querySelectorAll('.column-header-option-text'))
+                    .map(input => input.value.trim())
+                    .filter(Boolean);
+                if (opts.length) columnConfig.header_options = opts;
+            } else {
+                const listId = columnDiv.querySelector('.column-header-list-select')?.value;
+                const displayCol = columnDiv.querySelector('.column-header-list-display-column')?.value;
+                if (listId) {
+                    const parsedId = parseInt(listId, 10);
+                    columnConfig.header_lookup_list_id = Number.isFinite(parsedId) ? parsedId : listId;
+                }
+                if (displayCol) columnConfig.header_list_display_column = displayCol;
+
+                // Plugin-specific configuration for this column's header list (e.g. Emergency Operations)
+                const pluginConfigContainer = columnDiv.querySelector('.column-header-plugin-config-container');
+                if (pluginConfigContainer && pluginConfigContainer.style.display !== 'none') {
+                    const pluginConfig = this._extractPluginConfigFromContainer(pluginConfigContainer);
+                    if (Object.keys(pluginConfig).length > 0) {
+                        columnConfig.header_plugin_config = pluginConfig;
+                    }
+                }
+            }
+
+            const allowOtherCheckbox = columnDiv.querySelector('.column-header-allow-other');
+            columnConfig.header_allow_other = !!allowOtherCheckbox?.checked;
+        }
+
         return columnConfig;
+    },
+
+    /**
+     * Populate the "Row Label Column" <select> for a selectable column header
+     * configured as list_library, based on the chosen list's column metadata.
+     */
+    _populateColumnHeaderDisplayColumns(columnDiv, listId) {
+        const displayColWrapper = columnDiv.querySelector('.column-header-display-col-wrapper');
+        const displayColSelect = columnDiv.querySelector('.column-header-list-display-column');
+        if (!displayColSelect) return;
+
+        if (!listId) {
+            displayColWrapper?.classList.add('hidden');
+            return;
+        }
+
+        // Read column config from the selected list option's data-columns attribute
+        const listSelect = columnDiv.querySelector('.column-header-list-select');
+        const selectedOpt = listSelect?.querySelector(`option[value="${listId}"]`);
+        let columns = [];
+        try {
+            columns = JSON.parse(selectedOpt?.dataset?.columns || '[]');
+        } catch (_) {}
+
+        displayColSelect.replaceChildren();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select Column...';
+        displayColSelect.appendChild(placeholder);
+
+        columns.forEach(col => {
+            const name = typeof col === 'string' ? col : (col.name || col.id || '');
+            const label = typeof col === 'string' ? col : (col.label || col.name || col.id || name);
+            if (!name) return;
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = label;
+            displayColSelect.appendChild(opt);
+        });
+
+        displayColWrapper?.classList.remove('hidden');
     },
 
     setupDragAndDrop(modalElement) {
@@ -1162,14 +1399,35 @@ export const MatrixItem = {
         const rowModeRadios = modalElement.querySelectorAll('input[name="matrix_row_mode"]');
         const manualSection = modalElement.querySelector('#matrix-manual-rows-section');
         const listLibrarySection = modalElement.querySelector('#matrix-list-library-section');
+        const hybridTabBar = modalElement.querySelector('#matrix-hybrid-tab-bar');
         const updateRowModeVisibility = () => {
             const selectedMode = modalElement.querySelector('input[name="matrix_row_mode"]:checked')?.value;
             if (selectedMode === 'manual') {
                 Utils.showElement(manualSection);
                 Utils.hideElement(listLibrarySection);
+                Utils.hideElement(hybridTabBar);
+                manualSection?.classList.remove('pt-4', 'border', 'border-t-0', 'border-gray-200', 'rounded-b-md', 'rounded-tr-md', 'p-4');
+                listLibrarySection?.classList.remove('pt-4', 'border', 'border-t-0', 'border-gray-200', 'rounded-b-md', 'rounded-tr-md', 'p-4');
+                manualSection?.classList.add('mb-4');
+                listLibrarySection?.classList.add('mb-4');
             } else if (selectedMode === 'list_library') {
                 Utils.hideElement(manualSection);
                 Utils.showElement(listLibrarySection);
+                Utils.hideElement(hybridTabBar);
+                manualSection?.classList.remove('pt-4', 'border', 'border-t-0', 'border-gray-200', 'rounded-b-md', 'rounded-tr-md', 'p-4');
+                listLibrarySection?.classList.remove('pt-4', 'border', 'border-t-0', 'border-gray-200', 'rounded-b-md', 'rounded-tr-md', 'p-4');
+                manualSection?.classList.add('mb-4');
+                listLibrarySection?.classList.add('mb-4');
+            } else if (selectedMode === 'hybrid') {
+                Utils.showElement(hybridTabBar);
+                // Style both panels as tabbed panes
+                [manualSection, listLibrarySection].forEach(sec => {
+                    sec?.classList.add('border', 'border-t-0', 'border-gray-200', 'rounded-b-md', 'rounded-tr-md', 'p-4');
+                    sec?.classList.remove('mb-4');
+                });
+                // Activate the Fixed Rows tab by default (unless list tab already active)
+                const activeTab = hybridTabBar.querySelector('.matrix-hybrid-tab.border-orange-500');
+                this._activateHybridTab(modalElement, activeTab?.dataset.target || 'matrix-manual-rows-section');
             }
             this.updateConfig(modalElement);
         };
@@ -1179,7 +1437,43 @@ export const MatrixItem = {
                 radio._matrixRowModeListenerAdded = true;
             }
         });
+        // Wire hybrid tab clicks
+        hybridTabBar?.querySelectorAll('.matrix-hybrid-tab').forEach(tab => {
+            if (!tab._hybridTabListenerAdded) {
+                tab.addEventListener('click', () => this._activateHybridTab(modalElement, tab.dataset.target));
+                tab._hybridTabListenerAdded = true;
+            }
+        });
         updateRowModeVisibility();
+    },
+
+    /** Switch the visible panel inside the hybrid tab layout. */
+    _activateHybridTab(modalElement, targetId) {
+        const manualSection = modalElement.querySelector('#matrix-manual-rows-section');
+        const listLibrarySection = modalElement.querySelector('#matrix-list-library-section');
+        const hybridTabBar = modalElement.querySelector('#matrix-hybrid-tab-bar');
+        if (!hybridTabBar) return;
+
+        // Panel visibility
+        [manualSection, listLibrarySection].forEach(sec => {
+            if (!sec) return;
+            if (sec.id === targetId) {
+                Utils.showElement(sec);
+            } else {
+                Utils.hideElement(sec);
+            }
+        });
+
+        // Tab active styling
+        hybridTabBar.querySelectorAll('.matrix-hybrid-tab').forEach(tab => {
+            const isActive = tab.dataset.target === targetId;
+            tab.classList.toggle('text-orange-600', isActive);
+            tab.classList.toggle('border-orange-500', isActive);
+            tab.classList.toggle('bg-white', isActive);
+            tab.classList.toggle('text-gray-500', !isActive);
+            tab.classList.toggle('border-transparent', !isActive);
+            tab.classList.toggle('bg-transparent', !isActive);
+        });
     },
 
     setupListLibrary(modalElement) {
@@ -1223,6 +1517,11 @@ export const MatrixItem = {
                 groupTableEnabled.addEventListener('change', () => this.updateConfig(modalElement));
                 groupTableEnabled._matrixConfigListenerAdded = true;
             }
+        }
+        const allowOtherCheckbox = modalElement.querySelector('#matrix-allow-other');
+        if (allowOtherCheckbox && !allowOtherCheckbox._matrixConfigListenerAdded) {
+            allowOtherCheckbox.addEventListener('change', () => this.updateConfig(modalElement));
+            allowOtherCheckbox._matrixConfigListenerAdded = true;
         }
         if (addFilterBtn) {
             if (!addFilterBtn._matrixAddFilterListenerAdded) {
@@ -1310,50 +1609,117 @@ export const MatrixItem = {
             this.updateGroupingControlsVisibility(modalElement);
         }
 
-        // Check if this lookup list has configuration UI
-        const hasConfigUI = selectedOption.dataset.hasConfigUi === 'true';
-        if (hasConfigUI && configContainer) {
+        // Get existing plugin config from matrix config if editing
+        const configInput = Utils.getElementById('item-matrix-config');
+        let existingConfig = {};
+        if (configInput && configInput.value) {
             try {
-                // Get existing config from matrix config if editing
-                const configInput = Utils.getElementById('item-matrix-config');
-                let existingConfig = {};
-                if (configInput && configInput.value) {
-                    try {
-                        const matrixConfig = JSON.parse(configInput.value);
-                        existingConfig = matrixConfig.plugin_config || {};
-                    } catch (e) {
-                        // Ignore parse errors
-                    }
-                }
+                const matrixConfig = JSON.parse(configInput.value);
+                existingConfig = matrixConfig.plugin_config || {};
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
 
-                // Fetch config UI from API
-                const fetchFn = (window.getApiFetch && window.getApiFetch()) || ((url, opts) => ((window.getFetch && window.getFetch()) || fetch)(url, opts).then(r => r.ok ? r.json() : Promise.reject((window.httpErrorSync && window.httpErrorSync(r)) || new Error(`HTTP ${r.status}`))));
-                const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(existingConfig))));
-                const data = await fetchFn(`/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config_b64=${encodeURIComponent(configB64)}`).catch(() => null);
+        await this._loadListPluginConfigUI({
+            configContainer,
+            selectedOption,
+            listId,
+            existingConfig,
+            onChange: () => this.updateConfig(modalElement),
+            isStale: () => {
                 const currentListSelect = modalElement.querySelector('#matrix-list-select');
-                if (this._listConfigVersion !== version || !currentListSelect || String(currentListSelect.value) !== String(listId)) {
-                    return;
-                }
+                return this._listConfigVersion !== version || !currentListSelect || String(currentListSelect.value) !== String(listId);
+            }
+        });
 
-                if (data && data.success && data.html) {
-                    this.setSanitizedHtml(configContainer, data.html);
-                    configContainer.style.display = 'block';
-                    this.setupPluginConfigListeners(modalElement, configContainer, listId);
-                } else {
-                    configContainer.replaceChildren();
-                    configContainer.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error loading plugin config UI:', error);
+        this.updateConfig(modalElement);
+    },
+
+    /**
+     * Handle a change to a column's "Selectable header" list-library <select>.
+     * Populates the row-label-column dropdown and loads any plugin-specific
+     * config UI (e.g. Emergency Operations) for the chosen list, mirroring the
+     * matrix-level "Table rows" list library flow above.
+     */
+    handleColumnHeaderListSelection(modalElement, columnDiv, listId) {
+        this._populateColumnHeaderDisplayColumns(columnDiv, listId);
+        this._loadColumnHeaderPluginConfig(modalElement, columnDiv, listId);
+    },
+
+    /**
+     * Load (or clear) the plugin config UI for a column's selectable-header list.
+     * Safe to call with an empty/falsy listId, which clears the panel.
+     */
+    async _loadColumnHeaderPluginConfig(modalElement, columnDiv, listId) {
+        const configContainer = columnDiv.querySelector('.column-header-plugin-config-container');
+        if (!configContainer) return;
+
+        const version = (columnDiv._headerConfigVersion = (columnDiv._headerConfigVersion || 0) + 1);
+        const listSelect = columnDiv.querySelector('.column-header-list-select');
+        const selectedOption = listId ? listSelect?.querySelector(`option[value="${listId}"]`) : null;
+
+        // Edit-mode restore stashes the saved plugin config on the column element
+        // (see addColumn) so the freshly-fetched panel opens pre-filled.
+        const existingConfig = columnDiv._pendingHeaderPluginConfig || {};
+        columnDiv._pendingHeaderPluginConfig = null;
+
+        await this._loadListPluginConfigUI({
+            configContainer,
+            selectedOption,
+            listId,
+            existingConfig,
+            onChange: () => this.updateConfig(modalElement),
+            isStale: () => columnDiv._headerConfigVersion !== version || String(listSelect?.value || '') !== String(listId || '')
+        });
+
+        this.updateConfig(modalElement);
+    },
+
+    /**
+     * Generic: fetch and render a plugin's config-ui HTML into a container, wiring
+     * up its exported JS handler (or falling back to basic change/input listeners).
+     * Shared by the matrix-level "rows" list selector and each column's
+     * "selectable header" list selector, since both resolve against the same
+     * lookup-list / plugin config-ui API.
+     *
+     * @param {Object} opts
+     * @param {HTMLElement} opts.configContainer - Where to render the fetched HTML
+     * @param {HTMLOptionElement|null} opts.selectedOption - The chosen list's <option> (for data-has-config-ui / data-config-js-handler)
+     * @param {string} opts.listId - The selected lookup list id
+     * @param {Object} [opts.existingConfig] - Previously saved plugin config (for edit-mode restore)
+     * @param {Function} opts.onChange - Called whenever a config value changes
+     * @param {Function} [opts.isStale] - Called after the fetch resolves; skip applying results if it returns true
+     */
+    async _loadListPluginConfigUI({ configContainer, selectedOption, listId, existingConfig, onChange, isStale }) {
+        if (!configContainer) return;
+
+        const hasConfigUI = selectedOption?.dataset.hasConfigUi === 'true';
+        if (!listId || !hasConfigUI) {
+            configContainer.replaceChildren();
+            configContainer.style.display = 'none';
+            return;
+        }
+
+        try {
+            const fetchFn = (window.getApiFetch && window.getApiFetch()) || ((url, opts) => ((window.getFetch && window.getFetch()) || fetch)(url, opts).then(r => r.ok ? r.json() : Promise.reject((window.httpErrorSync && window.httpErrorSync(r)) || new Error(`HTTP ${r.status}`))));
+            const configB64 = btoa(unescape(encodeURIComponent(JSON.stringify(existingConfig || {}))));
+            const data = await fetchFn(`/api/forms/lookup-lists/${encodeURIComponent(listId)}/config-ui?config_b64=${encodeURIComponent(configB64)}`).catch(() => null);
+            if (typeof isStale === 'function' && isStale()) return;
+
+            if (data && data.success && data.html) {
+                this.setSanitizedHtml(configContainer, data.html);
+                configContainer.style.display = 'block';
+                await this._setupPluginConfigListeners(configContainer, selectedOption, listId, onChange);
+            } else {
                 configContainer.replaceChildren();
                 configContainer.style.display = 'none';
             }
-        } else if (configContainer) {
+        } catch (error) {
+            console.error('Error loading plugin config UI:', error);
             configContainer.replaceChildren();
             configContainer.style.display = 'none';
         }
-
-        this.updateConfig(modalElement);
     },
 
     updateGroupingControlsVisibility(modalElement) {
@@ -1374,23 +1740,24 @@ export const MatrixItem = {
         if (tableCheckbox) tableCheckbox.disabled = !hasGroupingColumn;
     },
 
-    async setupPluginConfigListeners(modalElement, configContainer, listId) {
-        // Get the lookup list data to find the plugin's JavaScript handler
-        const listSelect = modalElement.querySelector(`#matrix-list-select`);
-        if (!listSelect) return;
-
-        const selectedOption = listSelect.querySelector(`option[value="${listId}"]`);
-        if (!selectedOption) return;
+    /**
+     * Wire up change/input listeners for a freshly-rendered plugin config panel:
+     * prefer the plugin's own exported JS handler (loaded from its static
+     * directory if not already on window), falling back to generic listeners
+     * that just call onChange for every input.
+     */
+    async _setupPluginConfigListeners(configContainer, selectedOption, listId, onChange) {
+        const fallback = () => {
+            configContainer.querySelectorAll('input, select, textarea').forEach(input => {
+                input.addEventListener('change', onChange);
+                input.addEventListener('input', onChange);
+            });
+        };
 
         // Check if the lookup list has a JavaScript handler specified
-        const jsHandlerName = selectedOption.dataset.configJsHandler;
+        const jsHandlerName = selectedOption?.dataset.configJsHandler;
         if (!jsHandlerName) {
-            // Fallback: setup basic listeners if no plugin handler is provided
-            const inputs = configContainer.querySelectorAll('input, select, textarea');
-            inputs.forEach(input => {
-                input.addEventListener('change', () => this.updateConfig(modalElement));
-                input.addEventListener('input', () => this.updateConfig(modalElement));
-            });
+            fallback();
             return;
         }
 
@@ -1420,24 +1787,14 @@ export const MatrixItem = {
 
             // Call the plugin handler if found
             if (handler && typeof handler === 'function') {
-                handler(configContainer, () => this.updateConfig(modalElement));
+                handler(configContainer, onChange);
             } else {
                 console.warn(`Plugin config UI handler "${jsHandlerName}" not found for list ${listId}`);
-                // Fallback to basic listeners
-                const inputs = configContainer.querySelectorAll('input, select, textarea');
-                inputs.forEach(input => {
-                    input.addEventListener('change', () => this.updateConfig(modalElement));
-                    input.addEventListener('input', () => this.updateConfig(modalElement));
-                });
+                fallback();
             }
         } catch (error) {
             console.error(`Error setting up plugin config listeners for ${listId}:`, error);
-            // Fallback to basic listeners on error
-            const inputs = configContainer.querySelectorAll('input, select, textarea');
-            inputs.forEach(input => {
-                input.addEventListener('change', () => this.updateConfig(modalElement));
-                input.addEventListener('input', () => this.updateConfig(modalElement));
-            });
+            fallback();
         }
     },
 
@@ -1451,6 +1808,50 @@ export const MatrixItem = {
             // Add more mappings as needed
         };
         return pluginMap[listId] || null;
+    },
+
+    /**
+     * Generically read all named inputs inside a plugin config panel into a
+     * plain object. Shared by the matrix-level "rows" plugin config panel and
+     * each column's "selectable header" plugin config panel.
+     */
+    _extractPluginConfigFromContainer(container) {
+        const pluginConfig = {};
+        if (!container) return pluginConfig;
+
+        const inputsByName = new Map();
+        container.querySelectorAll('input, select, textarea').forEach(input => {
+            const name = input.name;
+            if (!name) return;
+            if (!inputsByName.has(name)) {
+                inputsByName.set(name, []);
+            }
+            inputsByName.get(name).push(input);
+        });
+
+        inputsByName.forEach((inputs, name) => {
+            const sample = inputs[0];
+            if (sample.type === 'checkbox') {
+                if (inputs.length === 1) {
+                    pluginConfig[name] = inputs[0].checked;
+                } else {
+                    pluginConfig[name] = inputs
+                        .filter(inp => inp.checked)
+                        .map(inp => inp.value || true);
+                }
+            } else if (sample.type === 'radio') {
+                const checked = inputs.find(inp => inp.checked);
+                if (checked) {
+                    pluginConfig[name] = checked.value;
+                }
+            } else if (sample.tagName === 'SELECT' && sample.multiple) {
+                pluginConfig[name] = Array.from(sample.selectedOptions).map(opt => opt.value);
+            } else if (sample.value) {
+                pluginConfig[name] = sample.value;
+            }
+        });
+
+        return pluginConfig;
     },
 
     addListFilter(modalElement) {
@@ -1644,7 +2045,7 @@ export const MatrixItem = {
             } catch (_) {}
         }
 
-        if (selectedMode === 'manual') {
+        if (selectedMode === 'manual' || selectedMode === 'hybrid') {
             if (rowsContainer) {
                 const rows = [];
                 rowsContainer.querySelectorAll('.matrix-row').forEach(rowDiv => {
@@ -1668,7 +2069,8 @@ export const MatrixItem = {
                 });
                 config.rows = rows;
             }
-        } else if (selectedMode === 'list_library') {
+        }
+        if (selectedMode === 'list_library' || selectedMode === 'hybrid') {
             const listSelect = Utils.getElementById('matrix-list-select');
             const displayColumnSelect = Utils.getElementById('matrix-list-display-column');
             const filtersContainer = Utils.getElementById('matrix-list-filters-container');
@@ -1716,48 +2118,20 @@ export const MatrixItem = {
                 config.list_filters = filters;
             }
 
+            const allowOtherCheckbox = Utils.getElementById('matrix-allow-other');
+            config.allow_other = allowOtherCheckbox?.checked === true;
+
             // Collect plugin-specific configuration generically
             if (pluginConfigContainer && pluginConfigContainer.style.display !== 'none') {
-                const pluginConfig = {};
-
-                const inputsByName = new Map();
-                pluginConfigContainer.querySelectorAll('input, select, textarea').forEach(input => {
-                    const name = input.name;
-                    if (!name) return;
-                    if (!inputsByName.has(name)) {
-                        inputsByName.set(name, []);
-                    }
-                    inputsByName.get(name).push(input);
-                });
-
-                inputsByName.forEach((inputs, name) => {
-                    const sample = inputs[0];
-                    if (sample.type === 'checkbox') {
-                        if (inputs.length === 1) {
-                            pluginConfig[name] = inputs[0].checked;
-                        } else {
-                            pluginConfig[name] = inputs
-                                .filter(inp => inp.checked)
-                                .map(inp => inp.value || true);
-                        }
-                    } else if (sample.type === 'radio') {
-                        const checked = inputs.find(inp => inp.checked);
-                        if (checked) {
-                            pluginConfig[name] = checked.value;
-                        }
-                    } else if (sample.tagName === 'SELECT' && sample.multiple) {
-                        pluginConfig[name] = Array.from(sample.selectedOptions).map(opt => opt.value);
-                    } else if (sample.value) {
-                        pluginConfig[name] = sample.value;
-                    }
-                });
-
+                const pluginConfig = this._extractPluginConfigFromContainer(pluginConfigContainer);
                 if (Object.keys(pluginConfig).length > 0) {
                     config.plugin_config = pluginConfig;
                 }
             }
 
-            config.rows = [];
+            if (selectedMode !== 'hybrid') {
+                config.rows = [];
+            }
         }
         configInput.value = JSON.stringify(config);
         if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('matrix')) {
@@ -1801,7 +2175,17 @@ export const MatrixItem = {
                             }
                         });
                     }
-                } else if (rowMode === 'list_library') {
+                } else if (rowMode === 'list_library' || rowMode === 'hybrid') {
+                    // Restore static rows for hybrid
+                    if (rowMode === 'hybrid' && Array.isArray(matrixConfig.rows)) {
+                        matrixConfig.rows.forEach(row => {
+                            if (typeof row === 'string') {
+                                this.addRow(modalElement, row);
+                            } else if (row && typeof row === 'object') {
+                                this.addRow(modalElement, row.text || '', row.name_translations || {});
+                            }
+                        });
+                    }
                     if (matrixConfig.lookup_list_id) {
                         const listSelect = Utils.getElementById('matrix-list-select');
                         if (listSelect) {
@@ -1841,6 +2225,12 @@ export const MatrixItem = {
                                     groupTableEnabled.checked = matrixConfig.group_table_enabled !== false;
                                 }
                                 this.updateGroupingControlsVisibility(modalElement);
+
+                                // Restore allow_other flag
+                                const allowOtherCheckbox = Utils.getElementById('matrix-allow-other');
+                                if (allowOtherCheckbox) {
+                                    allowOtherCheckbox.checked = matrixConfig.allow_other === true;
+                                }
 
                                 // Restore plugin configuration generically if present
                                 if (matrixConfig.plugin_config) {
@@ -1918,7 +2308,7 @@ export const MatrixItem = {
                             item.columns.forEach(colData => {
                                 if (!colData || typeof colData !== 'object') return;
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer, colData.decimals);
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, groupColumnsContainer, colData.decimals, colData.header_type ? colData : null);
                             });
                         } else {
                             const colData = item.data;
@@ -1926,7 +2316,7 @@ export const MatrixItem = {
                                 this.addColumn(modalElement, colData, 'number_whole');
                             } else if (colData && typeof colData === 'object' && (colData.name || colData.is_variable || colData.type === 'variable')) {
                                 const isVariable = colData.is_variable || colData.type === 'variable';
-                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals);
+                                this.addColumn(modalElement, colData.name || '', colData.type, isVariable, colData.variable || colData.variable_name || '', colData.variable_save_value !== false, colData.variable_readonly !== false, colData.name_translations || {}, null, colData.decimals, colData.header_type ? colData : null);
                             }
                         }
                     });

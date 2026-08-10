@@ -9,7 +9,7 @@ import pytest
 
 from pb_figures.config import build_workers
 from pb_figures.data import load_mapping
-from pre_render import SectionJob, _generate_assets, _section_jobs
+from pre_render import SectionJob, _clean_build_workspace, _generate_assets, _section_jobs
 from workbook_fixtures import sp1_mapping_row, write_test_workbook
 
 
@@ -22,6 +22,24 @@ def staging_workbook(tmp_path):
         section_order={"cc": ["CC1"], "sp": ["SP1"], "ef": ["EF1"]},
     )
     return path
+
+
+@pytest.mark.unit
+def test_clean_build_workspace_removes_stale_section_pngs(tmp_path, monkeypatch) -> None:
+    figures = tmp_path / "Figures"
+    english = figures / "English"
+    english.mkdir(parents=True)
+    (english / "CC1.png").write_bytes(b"current")
+    stale = english / "Cross-cutting.png"
+    stale.write_bytes(b"stale")
+
+    monkeypatch.setattr("pre_render.resolve_figures_output", lambda: figures)
+    monkeypatch.setattr("pre_render.resolve_report_output", lambda: tmp_path / "output")
+
+    _clean_build_workspace(("English",), keep_sections={"CC1"})
+
+    assert (english / "CC1.png").is_file()
+    assert not stale.exists()
 
 
 @pytest.mark.unit

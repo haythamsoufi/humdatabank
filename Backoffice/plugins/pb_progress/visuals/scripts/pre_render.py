@@ -44,14 +44,32 @@ def _resolve_languages(excel: Path) -> tuple[str, ...]:
     return resolve_build_languages(excel)
 
 
-def _clean_build_workspace(languages: tuple[str, ...]) -> None:
+def _dashboard_sections(excel: Path, mapping) -> set[str]:
+    """Section codes that will receive a dashboard PNG this build."""
+    return {
+        section
+        for section in section_codes(excel)
+        if section_has_indicators(mapping, section)
+    }
+
+
+def _clean_build_workspace(
+    languages: tuple[str, ...],
+    *,
+    keep_sections: set[str] | None = None,
+) -> None:
     """Drop stale figure/output files from prior builds in the writable workspace."""
-    keep = set(languages)
+    keep_langs = set(languages)
     figures_dir = resolve_figures_output()
     if figures_dir.is_dir():
         for path in figures_dir.iterdir():
-            if path.is_dir() and path.name not in keep:
+            if path.is_dir() and path.name not in keep_langs:
                 shutil.rmtree(path, ignore_errors=True)
+                continue
+            if path.is_dir() and keep_sections is not None:
+                for png in path.glob("*.png"):
+                    if png.stem not in keep_sections:
+                        png.unlink(missing_ok=True)
     output_dir = resolve_report_output()
     if output_dir.is_dir():
         for path in output_dir.iterdir():
@@ -307,9 +325,9 @@ def main() -> None:
     clear_cache()
     excel = resolve_excel()
     languages = _resolve_languages(excel)
-    _clean_build_workspace(languages)
-    model = build_model(excel)
     mapping = load_mapping(excel)
+    _clean_build_workspace(languages, keep_sections=_dashboard_sections(excel, mapping))
+    model = build_model(excel)
 
     print(f"[pre_render] {excel.name} -> languages: {', '.join(languages)}", flush=True)
 

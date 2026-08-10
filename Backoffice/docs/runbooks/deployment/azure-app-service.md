@@ -102,6 +102,30 @@ Report generation is CPU- and memory-intensive; expect **5–15 minutes** per fu
 
 ---
 
+## 3d. Container image tags and continuous deployment
+
+Production and staging must **not** share the same mutable ACR tag (for example both pointing at `v1.7`). The GitHub workflow **Deploy to Webapp** and `azure-webapp/azure_webapp_deploy.ps1` push environment-scoped tags:
+
+| Environment | ACR tag | App Service |
+|-------------|---------|-------------|
+| Staging | `ifrcimage.azurecr.io/databank_backend:staging` | `ifrc-databank-staging-2` |
+| Production | `ifrcimage.azurecr.io/databank_backend:production` | `ifrc-databank-app` |
+
+Each build also pushes an immutable tag `ifrcimage.azurecr.io/databank_backend:<git-sha>` for traceability.
+
+**`DOCKER_ENABLE_CI` on production must be `false`.** When it is `true`, Azure registers an ACR webhook and auto-pulls whenever the configured tag is pushed. If staging and production both used the same tag, a staging deploy would update production without an explicit production workflow run.
+
+Recommended settings:
+
+| App | `DOCKER_ENABLE_CI` | Container image |
+|-----|-------------------|-----------------|
+| `ifrc-databank-app` (prod) | **`false`** | `…/databank_backend:production` |
+| `ifrc-databank-staging-2` | `false` (workflow deploys explicitly) or `true` with webhook scoped to **`staging`** only | `…/databank_backend:staging` |
+
+After merging the workflow change, run **Deploy to Webapp → Production** once so production pulls the `production` tag (prod may still be on legacy `v1.7` until then; disabling `DOCKER_ENABLE_CI` prevents further accidental cross-environment pulls).
+
+---
+
 ## 4. Deploy Sequence
 
 For every deployment that may include schema changes:

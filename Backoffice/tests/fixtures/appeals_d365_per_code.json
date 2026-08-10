@@ -1,0 +1,302 @@
+{
+  "fetched_at": "2026-08-10T13:06:03.984937+00:00",
+  "probes": [
+    {
+      "accept": "application/json",
+      "content_type": "application/json; charset=utf-8",
+      "bytes": 3333953,
+      "record_count": 1
+    },
+    {
+      "accept": "application/xml",
+      "content_type": "application/xml; charset=utf-8",
+      "bytes": 5100163,
+      "record_count": 2
+    }
+  ],
+  "bulk_list_note": "GET /AppealsD365 returns a single M000 row with ~11k Details rows (~3.3MB), not a full catalogue.",
+  "per_code": {
+    "MDRS2001": {
+      "APP_Id": 0,
+      "APP_code": "MDRS2001",
+      "APP_name": "Hurricane Beryl",
+      "APP_DisasterCategorisationNumeric": 2,
+      "APP_DisasterCategorisationName": "Orange",
+      "APP_startDate": "2024-07-04T00:00:00",
+      "APP_endDate": "2026-07-31T00:00:00",
+      "APP_status": "Active",
+      "ADT_name": "Hurricane Beryl 1",
+      "APP_modifyTime": "2026-05-08T10:49:02",
+      "OSR_name": null,
+      "OSS_name": null,
+      "OSC_name": null,
+      "GEC_code": "CAR",
+      "source": "D365 Bronze",
+      "Details": [
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 25000,
+          "APD_amountCHF": 4000000.0,
+          "APD_code": "MDRS2001_1",
+          "ContributionAmount": 2488549.458904,
+          "TriggeringAmount": 1786033790.0,
+          "OB": 0.0,
+          "APD_startDate": "2024-07-04T00:00:00",
+          "APD_endDate": "2025-07-07T00:00:00",
+          "APD_modifyTime": "2024-07-05T09:37:06"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 25000,
+          "APD_amountCHF": 4000000.0,
+          "APD_code": "MDRS2001_2",
+          "ContributionAmount": 2488549.458904,
+          "TriggeringAmount": 1786033790.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-07-08T00:00:00",
+          "APD_endDate": "2025-12-30T00:00:00",
+          "APD_modifyTime": "2025-08-04T13:13:21"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 25000,
+          "APD_amountCHF": 4000000.0,
+          "APD_code": "MDRS2001_3",
+          "ContributionAmount": 2488549.458904,
+          "TriggeringAmount": 1786033790.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-12-31T00:00:00",
+          "APD_endDate": "2026-07-31T00:00:00",
+          "APD_modifyTime": "2026-01-05T14:46:40"
+        }
+      ]
+    },
+    "MDRS1007": {
+      "APP_Id": 0,
+      "APP_code": "MDRS1007",
+      "APP_name": "EVD Regional Appeal",
+      "APP_DisasterCategorisationNumeric": 0,
+      "APP_DisasterCategorisationName": "",
+      "APP_startDate": "2026-05-19T00:00:00",
+      "APP_endDate": "2027-05-31T00:00:00",
+      "APP_status": "Active",
+      "ADT_name": "EVD Regional Appeal 1",
+      "APP_modifyTime": "2026-07-05T10:06:50",
+      "OSR_name": null,
+      "OSS_name": null,
+      "OSC_name": null,
+      "GEC_code": "CD;UG",
+      "source": "D365 Bronze (G)",
+      "Details": [
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 3000000,
+          "APD_amountCHF": 27500000.0,
+          "APD_code": "MDRS1007_1",
+          "ContributionAmount": 30141119.62,
+          "TriggeringAmount": 1786084504.0,
+          "OB": 0.0,
+          "APD_startDate": "2026-05-19T00:00:00",
+          "APD_endDate": "2027-05-31T00:00:00",
+          "APD_modifyTime": "2026-05-20T06:36:17"
+        }
+      ]
+    },
+    "MGR65002": {
+      "APP_Id": 0,
+      "APP_code": "MGR65002",
+      "APP_name": "Ukraine and impacted countries crisis",
+      "APP_DisasterCategorisationNumeric": 0,
+      "APP_DisasterCategorisationName": "",
+      "APP_startDate": "2022-02-05T00:00:00",
+      "APP_endDate": "2027-12-31T00:00:00",
+      "APP_status": "Active",
+      "ADT_name": "Ukraine and impacted countries crisis 1",
+      "APP_modifyTime": "2026-06-02T06:36:57",
+      "OSR_name": null,
+      "OSS_name": null,
+      "OSC_name": null,
+      "GEC_code": "EUR",
+      "source": "D365 Bronze (G)",
+      "Details": [
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 0,
+          "APD_amountCHF": 0.0,
+          "APD_code": "MGR65002_1",
+          "ContributionAmount": 567790877.42,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2022-02-05T00:00:00",
+          "APD_endDate": "2022-02-27T00:00:00",
+          "APD_modifyTime": "2023-01-03T10:15:39"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 2000000,
+          "APD_amountCHF": 100000000.0,
+          "APD_code": "MGR65002_2",
+          "ContributionAmount": 567790877.42,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2022-02-28T00:00:00",
+          "APD_endDate": "2022-04-11T00:00:00",
+          "APD_modifyTime": "2023-01-03T10:15:39"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 3600000,
+          "APD_amountCHF": 550000000.0,
+          "APD_code": "MGR65002_3",
+          "ContributionAmount": 567790877.42,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2022-04-12T00:00:00",
+          "APD_endDate": "2023-05-09T00:00:00",
+          "APD_modifyTime": "2023-01-03T10:15:39"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 22600000,
+          "APD_amountCHF": 800000000.0,
+          "APD_code": "MGR65002_4",
+          "ContributionAmount": 567790877.42,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2023-05-10T00:00:00",
+          "APD_endDate": "2025-05-21T00:00:00",
+          "APD_modifyTime": "2023-05-11T16:13:01"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 22650000,
+          "APD_amountCHF": 1000000000.0,
+          "APD_code": "MGR65002_5",
+          "ContributionAmount": 567790877.42,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-05-22T00:00:00",
+          "APD_endDate": "2025-11-18T00:00:00",
+          "APD_modifyTime": "2025-06-04T11:06:32"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 22650000,
+          "APD_amountCHF": 800000000.0,
+          "APD_code": "MGR65002_6",
+          "ContributionAmount": 567790877.42,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-11-19T00:00:00",
+          "APD_endDate": "2027-12-31T00:00:00",
+          "APD_modifyTime": "2025-12-15T14:12:50"
+        }
+      ]
+    },
+    "MDRMM023": {
+      "APP_Id": 0,
+      "APP_code": "MDRMM023",
+      "APP_name": "Myanmar - Earthquake",
+      "APP_DisasterCategorisationNumeric": 3,
+      "APP_DisasterCategorisationName": "Red",
+      "APP_startDate": "2025-03-29T00:00:00",
+      "APP_endDate": "2027-03-31T00:00:00",
+      "APP_status": "Active",
+      "ADT_name": "Myanmar - Earthquake 1",
+      "APP_modifyTime": "2026-04-08T17:48:15",
+      "OSR_name": "Asia Pacific",
+      "OSS_name": "Myanmar country office",
+      "OSC_name": "Myanmar",
+      "GEC_code": "MM",
+      "source": "D365 Bronze",
+      "Details": [
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 75000,
+          "APD_amountCHF": 80000000.0,
+          "APD_code": "MDRMM023_1",
+          "ContributionAmount": 20734877.588056,
+          "TriggeringAmount": 1786347303.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-03-29T00:00:00",
+          "APD_endDate": "2027-03-31T00:00:00",
+          "APD_modifyTime": "2025-03-30T07:19:59"
+        }
+      ]
+    },
+    "MDRJM005": {
+      "APP_Id": 0,
+      "APP_code": "MDRJM005",
+      "APP_name": "Jamaica - Hurricane",
+      "APP_DisasterCategorisationNumeric": 2,
+      "APP_DisasterCategorisationName": "Orange",
+      "APP_startDate": "2025-10-23T00:00:00",
+      "APP_endDate": "2027-10-31T00:00:00",
+      "APP_status": "Active",
+      "ADT_name": "Jamaica - Hurricane 2",
+      "APP_modifyTime": "2026-04-08T17:48:13",
+      "OSR_name": "Americas",
+      "OSS_name": "Caribbean country cluster",
+      "OSC_name": "Jamaica",
+      "GEC_code": "JM",
+      "source": "D365 Bronze",
+      "Details": [
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 180000,
+          "APD_amountCHF": 19000000.0,
+          "APD_code": "MDRJM005_2",
+          "ContributionAmount": 12146013.731029,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-10-29T00:00:00",
+          "APD_endDate": "2027-10-31T00:00:00",
+          "APD_modifyTime": "2025-10-29T22:27:55"
+        },
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 0,
+          "APD_amountCHF": 80000.0,
+          "APD_code": "MDRJM005_1",
+          "ContributionAmount": 12146013.731029,
+          "TriggeringAmount": 1786170903.0,
+          "OB": 0.0,
+          "APD_startDate": "2025-10-23T00:00:00",
+          "APD_endDate": "2025-10-28T00:00:00",
+          "APD_modifyTime": "2025-10-23T15:32:14"
+        }
+      ]
+    },
+    "MDRNG045": {
+      "APP_Id": 0,
+      "APP_code": "MDRNG045",
+      "APP_name": "Nigeria - Floods imminent",
+      "APP_DisasterCategorisationNumeric": 0,
+      "APP_DisasterCategorisationName": "",
+      "APP_startDate": "2026-07-24T00:00:00",
+      "APP_endDate": "2026-09-30T00:00:00",
+      "APP_status": "Active",
+      "ADT_name": "Nigeria Floods imminent DREF 1",
+      "APP_modifyTime": "2026-07-24T13:00:47",
+      "OSR_name": "Africa",
+      "OSS_name": "Country cluster for Nigeria, Benin, Ghana and Togo",
+      "OSC_name": "Nigeria",
+      "GEC_code": "NG",
+      "source": "D365 Bronze",
+      "Details": [
+        {
+          "APD_TYP_Id": 66,
+          "APD_noBeneficiaries": 0,
+          "APD_amountCHF": 80000.0,
+          "APD_code": "MDRNG045_1",
+          "ContributionAmount": 0.0,
+          "TriggeringAmount": 1786033790.0,
+          "OB": 0.0,
+          "APD_startDate": "2026-07-24T00:00:00",
+          "APD_endDate": "2026-09-30T00:00:00",
+          "APD_modifyTime": "2026-07-24T09:59:24"
+        }
+      ]
+    }
+  }
+}

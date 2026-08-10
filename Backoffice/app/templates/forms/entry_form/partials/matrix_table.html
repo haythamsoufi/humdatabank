@@ -1,4 +1,72 @@
 {% from "components/_status_label.html" import status_label_for_data_flag %}
+{# ── Macro: renders the content of a column <th> ──────────────────────────────
+   For columns with header_type="selectable" it renders a custom header picker
+   (multiline label + dropdown menu) and an optional Other text-input; for all
+   other columns it returns the plain translated label.
+────────────────────────────────────────────────────────────────────────────── #}
+{% macro col_header_content(column, field_id, existing_matrix_data, can_edit, col_display) %}
+  {%- if column is mapping and column.get('header_type') == 'selectable' -%}
+    {%- set _hkey = 'col_header|' ~ column.name -%}
+    {%- set _saved = existing_matrix_data.get(_hkey, '') if existing_matrix_data else '' -%}
+    {%- set _is_lib = column.get('header_source') == 'list_library' -%}
+    {%- set _opts = column.get('header_options', []) -%}
+    {%- set _allow_other = column.get('header_allow_other', false) -%}
+    {%- set _is_other = _saved and not _is_lib and _saved not in _opts -%}
+    {%- set _placeholder = column.get('header_placeholder') or _('Select...') -%}
+    {%- set _trigger_label = _placeholder -%}
+    {%- if _saved and not _is_other -%}
+      {%- set _trigger_label = _saved -%}
+    {%- elif _is_other -%}
+      {%- set _trigger_label = _('Other (please specify)...') -%}
+    {%- endif -%}
+    <div class="matrix-header-picker">
+        <button type="button"
+                class="matrix-header-picker-trigger"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                {% if not can_edit %}disabled{% endif %}>
+            <span class="matrix-header-picker-label{% if not _saved %} matrix-header-picker-label--placeholder{% endif %}">{{ _trigger_label }}</span>
+            <span class="matrix-header-picker-chevron" aria-hidden="true"><i class="fas fa-chevron-down"></i></span>
+        </button>
+        {# Native select kept for option population + persistence; visually hidden #}
+        <select class="matrix-header-select matrix-header-select-native"
+                data-col-name="{{ column.name }}"
+                data-field-id="{{ field_id }}"
+                data-header-source="{{ column.get('header_source', 'manual') }}"
+                data-header-placeholder="{{ column.get('header_placeholder', '')|e }}"
+                {% if _is_lib -%}
+                data-header-lookup-list-id="{{ column.get('header_lookup_list_id', '') }}"
+                data-header-list-display-column="{{ column.get('header_list_display_column', '') }}"
+                {%- endif %}
+                data-header-allow-other="{{ 'true' if _allow_other else 'false' }}"
+                tabindex="-1"
+                aria-hidden="true"
+                {% if not can_edit %}disabled{% endif %}>
+      <option value="">{{ _placeholder }}</option>
+      {% if not _is_lib %}
+        {% for opt in _opts %}
+          <option value="{{ opt }}"{% if _saved == opt %} selected{% endif %}>{{ opt }}</option>
+        {% endfor %}
+      {% endif %}
+      {% if _allow_other %}
+        <option value="__other__"{% if _is_other %} selected{% endif %}>{{ _('Other (please specify)...') }}</option>
+      {% endif %}
+    </select>
+        <ul class="matrix-header-picker-menu hidden" role="listbox" aria-label="{{ _placeholder|forceescape }}"></ul>
+    </div>
+    {% if _allow_other %}
+    <input type="text"
+           class="matrix-header-other-input{{ ' hidden' if not _is_other else '' }} w-full mt-1 px-1 py-0.5 text-xs border-0 border-b border-gray-300 bg-transparent rounded-none focus:outline-none focus:border-blue-500"
+           data-col-name="{{ column.name }}"
+           data-field-id="{{ field_id }}"
+           placeholder="{{ _('Please specify...')|forceescape }}"
+           value="{{ _saved if _is_other else '' }}"
+           {% if not can_edit %}disabled{% endif %}>
+    {% endif %}
+  {%- else -%}
+    {{ col_display }}
+  {%- endif -%}
+{% endmacro %}
 {# Matrix Table Template #}
 {# This template renders a matrix table for form fields #}
 
@@ -11,7 +79,9 @@
 {% set matrix_highlight_prefilled_cells = (matrix_is_prefilled or matrix_has_carry_forward_ref) and not matrix_is_imputed %}
 {% set _matrix_prefilled_title = _('This is a prefilled value')|forceescape %}
 {% set matrix_config = field.config.matrix_config if field.config and field.config.matrix_config else (field.config if field.config and field.config.get('rows') else {'type': 'matrix', 'rows': [], 'columns': []}) %}
-{% set is_advanced_mode = matrix_config.get('row_mode') == 'list_library' %}
+{% set _row_mode = matrix_config.get('row_mode', 'manual') %}
+{% set is_advanced_mode = _row_mode in ('list_library', 'hybrid') %}
+{% set is_hybrid_mode = _row_mode == 'hybrid' %}
 {# Use resolved matrix rows if available (with variables replaced), otherwise use original rows #}
 {% set matrix_rows = field._display_matrix_rows if hasattr(field, '_display_matrix_rows') and field._display_matrix_rows else matrix_config.get('rows', []) %}
 {% set matrix_columns = field._display_matrix_columns if hasattr(field, '_display_matrix_columns') and field._display_matrix_columns else matrix_config.get('columns', []) %}
@@ -111,7 +181,7 @@
                                     scope="col"
                                     rowspan="2"
                                     data-column-type="{{ column.type if column.type else 'number' }}">
-                                    {{ _col_display }}
+                                    {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                                 </th>
                             {% else %}
                                 {# Grouped column — only render the group header at the start of each run #}
@@ -168,7 +238,7 @@
                                     role="columnheader"
                                     scope="col"
                                     data-column-type="{{ column.type if column.type else 'number' }}">
-                                    {{ _col_display }}
+                                    {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                                 </th>
                             {% endif %}
                         {% endfor %}
@@ -191,7 +261,7 @@
                                 role="columnheader"
                                 scope="col"
                                 data-column-type="{{ column.type if column.type else 'number' }}">
-                                {{ _col_display }}
+                                {{ col_header_content(column, field.id, existing_matrix_data, _matrix_can_edit, _col_display) }}
                             </th>
                         {% endfor %}
                         {% if show_row_totals %}
@@ -226,12 +296,11 @@
                         {% endif %}
                     </tr>
                 {% endif %}
-                {% if is_advanced_mode %}
-                    {# Advanced mode: dynamic rows will be added here by JavaScript #}
+                {% if is_advanced_mode and not is_hybrid_mode %}
+                    {# Pure list_library mode: all rows added dynamically by JS — nothing to render here #}
                 {% else %}
-                    {# Manual mode: render predefined rows #}
-                    {# For manual mode, row label IS the row ID (labels are unique within a matrix) #}
-                    {# Rows may be plain strings (legacy) or {text, name_translations} objects #}
+                    {# Manual / Hybrid: render pre-defined static rows from config.
+                       In hybrid mode these rows are pinned at the top; JS adds dynamic rows below them. #}
                     {% for row in matrix_rows %}
                         {# Extract stable row ID (always the English text) and localized display label #}
                         {% if row is mapping %}
@@ -243,7 +312,7 @@
                             {% set row_id = row %}
                             {% set row_display = row %}
                         {% endif %}
-                        <tr role="row" class="matrix-data-row group" data-row-label="{{ row_id }}" data-row-id="{{ row_id }}">
+                        <tr role="row" class="matrix-data-row group" data-row-label="{{ row_id }}" data-row-id="{{ row_id }}"{{ ' data-is-static-row="true"' if is_hybrid_mode else '' }}>
                             <td class="border border-gray-300 font-medium text-gray-700 bg-gray-50"
                                 role="rowheader"
                                 scope="row"
@@ -418,6 +487,7 @@
                                            data-field-id="{{ field.id }}"
                                            data-lookup-list-id="{{ field.lookup_list_id or '' }}"
                                            data-display-column="{{ field.list_display_column or '' }}"
+                                           data-allow-other="{{ 'true' if matrix_config.get('allow_other') else 'false' }}"
                                            data-filters='{{ field.list_filters_json or "[]" }}'>
                                 </div>
                             </div>

@@ -449,10 +449,11 @@ calculateMatrixTotals(fieldId) {
     const config = matrix.config;
     const data = matrix.data; // Use stored data instead of reading from DOM
 
-    // For advanced mode, get rows from DOM; for manual mode, use config
+    // For list_library and hybrid: enumerate rows from the DOM (covers both static Jinja rows
+    // and dynamically added rows).  For manual mode the config rows array is the source of truth.
     let rows;
     let rowIdMap = new Map(); // Map row labels to row IDs for ID-based cell keys
-    if (config.row_mode === 'list_library') {
+    if (config.row_mode === 'list_library' || config.row_mode === 'hybrid') {
         // Get dynamic rows from DOM with both label and ID
         const rowElements = container.querySelectorAll('tr.matrix-data-row');
         rows = Array.from(rowElements).map(tr => {

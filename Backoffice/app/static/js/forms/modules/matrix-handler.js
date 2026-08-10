@@ -63,6 +63,7 @@ import { matrixSearchUiMixin } from './matrix/search-ui.js';
 import { matrixVariablesMixin } from './matrix/variables.js';
 import { matrixDynamicRowsMixin } from './matrix/dynamic-rows.js';
 import { matrixAutoLoadMixin } from './matrix/auto-load.js';
+import { matrixSelectableHeadersMixin } from './matrix/selectable-headers.js';
 
 class MatrixHandler {
     constructor() {
@@ -433,6 +434,32 @@ class MatrixHandler {
             if (e.target.closest('.matrix-search-option')) {
                 this.selectRowOption(e.target.closest('.matrix-search-option'));
             }
+            if (e.target.closest('.matrix-other-option')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleOtherRowOption(e.target.closest('.matrix-other-option'));
+            }
+            if (e.target.closest('.matrix-header-picker-trigger')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleHeaderPickerToggle(e.target.closest('.matrix-header-picker-trigger'));
+            }
+            if (e.target.closest('.matrix-header-picker-option')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleHeaderPickerOptionClick(e.target.closest('.matrix-header-picker-option'));
+            }
+            // Close header pickers when clicking outside
+            if (!e.target.closest('.matrix-header-picker')) {
+                this._closeAllHeaderPickers();
+            }
+        });
+
+        // Selectable column-header select changes
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('matrix-header-select')) {
+                this.handleHeaderSelectChange(e.target);
+            }
         });
 
         // Listen for search input and focus/blur events
@@ -449,6 +476,9 @@ class MatrixHandler {
                 e.target.closest('.matrix-container')) {
                 debugLog('matrix-handler', '[SEARCH EVENT] Matched input event - calling handleSearchInput');
                 this.handleSearchInput(e.target);
+            }
+            if (e.target.classList.contains('matrix-header-other-input')) {
+                this.handleHeaderOtherInputChange(e.target);
             }
         });
 
@@ -582,9 +612,17 @@ class MatrixHandler {
                 lookupRefs: {},
             });
 
+            // Initialize selectable column-header dropdowns (non-blocking)
+            this.initSelectableHeaders(fieldId);
+
             // For advanced mode matrices, restore dynamic rows from saved data
-            if (matrixConfig.row_mode === 'list_library') {
-                const autoLoadEnabled = __configFlag(matrixConfig.auto_load_entities, false);
+            const _isHybrid = matrixConfig.row_mode === 'hybrid';
+            if (matrixConfig.row_mode === 'list_library' || _isHybrid) {
+                const autoLoadEnabled = !_isHybrid && __configFlag(matrixConfig.auto_load_entities, false);
+                // Hybrid: pre-rendered static rows already exist in the DOM — fill their cell values now
+                if (_isHybrid) {
+                    this.restoreStaticMatrixValues(fieldId);
+                }
                 const listLibraryPromise = this.restoreDynamicRows(fieldId).then(() => {
                     // Apply highlighting to existing rows after restoration
                     this.applyManualRowHighlighting(fieldId);
@@ -626,8 +664,8 @@ class MatrixHandler {
                 }
             }
 
-            // Apply highlighting for static matrices only; list_library restores in restoreDynamicRows
-            if (matrixConfig.row_mode !== 'list_library') {
+            // Apply highlighting for non-list_library / non-hybrid modes (dynamic modes apply it in restoreDynamicRows)
+            if (matrixConfig.row_mode !== 'list_library' && !_isHybrid) {
                 setTimeout(() => {
                     this.applyManualRowHighlighting(fieldId);
                     this.applyWholeNumberViolationHighlighting(fieldId);
@@ -1376,7 +1414,10 @@ class MatrixHandler {
             const existingData = this.parseExistingData(container);
             matrix.data = existingData && typeof existingData === 'object' ? existingData : {};
             const config = matrix.config || {};
-            if (config.row_mode === 'list_library') {
+            if (config.row_mode === 'list_library' || config.row_mode === 'hybrid') {
+                if (config.row_mode === 'hybrid') {
+                    this.restoreStaticMatrixValues(fieldId);
+                }
                 matrixPromises.push(
                     this.restoreDynamicRows(fieldId).then(() => {
                         this.applyManualRowHighlighting(fieldId);
@@ -1404,6 +1445,7 @@ Object.assign(
     matrixVariablesMixin,
     matrixDynamicRowsMixin,
     matrixAutoLoadMixin,
+    matrixSelectableHeadersMixin,
 );
 // Create and export singleton instance
 export const matrixHandler = new MatrixHandler();

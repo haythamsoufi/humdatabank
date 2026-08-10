@@ -801,8 +801,21 @@ async restoreDynamicRows(fieldId) {
 
     debugLog('matrix-handler', `Restoring dynamic rows for matrix ${fieldId}`, data);
 
+    // For hybrid mode: collect static row IDs so we skip them here
+    // (they're already rendered by Jinja and their cell values are filled by restoreStaticMatrixValues)
+    const staticRowIds = new Set();
+    if (config?.row_mode === 'hybrid' && Array.isArray(config.rows)) {
+        config.rows.forEach(row => {
+            const id = typeof row === 'string' ? row : (row.text || '');
+            if (id) staticRowIds.add(id);
+        });
+    }
+
     // Extract row information from saved data
     const rowInfoMap = this.extractRowInfoFromData(data, config);
+
+    // Drop static row entries — Jinja already rendered them
+    staticRowIds.forEach(id => rowInfoMap.delete(id));
 
     debugLog('matrix-handler', `Found ${rowInfoMap.size} dynamic rows to restore:`, Array.from(rowInfoMap.keys()));
 
@@ -941,7 +954,25 @@ sortMatrixRows(fieldId) {
     const groupTableEnabled = matrix.config?.group_table_enabled !== false;
     const effectiveGroupByColumn = (groupByColumn && groupTableEnabled) ? groupByColumn : null;
 
-    dataRows.sort((a, b) => {
+    // Hybrid: separate pinned static rows (rendered by Jinja) from dynamic rows so static rows stay at the top.
+    // We derive the static-row identity from config.rows rather than a DOM attribute so this
+    // works even when data-is-static-row is absent (e.g. older cached renders or pre-migration items).
+    const isHybrid = matrix.config?.row_mode === 'hybrid';
+    const staticRowIds = new Set();
+    if (isHybrid && Array.isArray(matrix.config.rows)) {
+        matrix.config.rows.forEach(r => {
+            const id = typeof r === 'string' ? r : (r.text || '');
+            if (id) staticRowIds.add(id);
+        });
+    }
+    const staticRows = isHybrid
+        ? dataRows.filter(r => staticRowIds.has(r.dataset.rowId) || staticRowIds.has(r.dataset.rowLabel))
+        : [];
+    const sortableRows = isHybrid
+        ? dataRows.filter(r => !staticRowIds.has(r.dataset.rowId) && !staticRowIds.has(r.dataset.rowLabel))
+        : dataRows;
+
+    sortableRows.sort((a, b) => {
         if (effectiveGroupByColumn) {
             const gA = (a.getAttribute('data-group') || 'zzz').toLowerCase();
             const gB = (b.getAttribute('data-group') || 'zzz').toLowerCase();
@@ -952,13 +983,20 @@ sortMatrixRows(fieldId) {
         return labelA.localeCompare(labelB);
     });
 
+    // Remove all sortable rows (static rows removed too so we can re-insert them at top)
     dataRows.forEach(row => row.remove());
 
     const colCount = matrix.config?.columns?.length || 1;
     const totalCols = colCount + 2;
     let lastGroup = null;
 
-    dataRows.forEach(row => {
+    // In hybrid mode, put pinned static rows back first (in their original config order)
+    staticRows.forEach(row => {
+        if (insertBefore) tbody.insertBefore(row, insertBefore);
+        else tbody.appendChild(row);
+    });
+
+    sortableRows.forEach(row => {
         if (effectiveGroupByColumn) {
             const group = row.getAttribute('data-group') || 'Other';
             if (group !== lastGroup) {
@@ -990,7 +1028,7 @@ sortMatrixRows(fieldId) {
 
     this._ensureTotalsRowAtTop(tbody);
     this.applyManualRowHighlighting(fieldId);
-    debugLog('matrix-handler', `Sorted ${dataRows.length} rows for matrix ${fieldId}${effectiveGroupByColumn ? ' with grouping by ' + effectiveGroupByColumn : ''}`);
+    debugLog('matrix-handler', `Sorted ${sortableRows.length} dynamic rows (+${staticRows.length} pinned) for matrix ${fieldId}${effectiveGroupByColumn ? ' with grouping by ' + effectiveGroupByColumn : ''}`);
 }
 
 /**

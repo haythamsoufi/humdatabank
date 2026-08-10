@@ -768,7 +768,7 @@
       <span class="lang-sep" aria-hidden="true" style="margin:0 8px;"></span>
       <a id="openRegisterModal" role="button" tabindex="0">{{ _('Create account') }}</a>
       {% else %}
-      <a href="mailto:{{ (ORGANIZATION_BRANDING or {}).get('support_email') or 'support@ifrc.org' }}">{{ _('Need help signing in?') }}</a>
+      <a href="mailto:{{ get_org_team_email('support@ifrc.org') }}">{{ _('Need help signing in?') }}</a>
       {% endif %}
     </div>
   </aside>

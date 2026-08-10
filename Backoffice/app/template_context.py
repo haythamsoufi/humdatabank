@@ -194,7 +194,7 @@ def register_template_context(app, config_class):
     @app.context_processor
     def inject_org_branding():
         try:
-            from app.utils.organization_helpers import get_org_name, get_org_short_name, get_org_email_domain, get_org_domain
+            from app.utils.organization_helpers import get_org_name, get_org_short_name, get_org_email_domain, get_org_domain, get_org_team_email
             from app.services.platform.app_settings_service import (
                 get_organization_branding,
                 get_organization_logo_path,
@@ -217,6 +217,7 @@ def register_template_context(app, config_class):
                 'user_is_explicit_beta_tester': user_is_explicit_beta_tester,
                 'get_organization_domain': get_organization_domain,
                 'get_organization_email_domain': get_organization_email_domain,
+                'get_org_team_email': get_org_team_email,
                 'ORGANIZATION_BRANDING': branding,
                 'ORG_LOGO_PATH': get_organization_logo_path(),
                 'INDICATOR_BANK_PUBLIC_BASE': (current_app.config.get('INDICATOR_BANK_PUBLIC_BASE') or '').strip(),
@@ -233,6 +234,7 @@ def register_template_context(app, config_class):
                 'user_is_explicit_beta_tester': lambda user: False,
                 'get_organization_domain': lambda default='humdatabank.org': default,
                 'get_organization_email_domain': lambda default='humdatabank.org': default,
+                'get_org_team_email': lambda default=None: default,
                 'ORGANIZATION_BRANDING': {},
                 'ORG_LOGO_PATH': 'logo.svg',
                 'INDICATOR_BANK_PUBLIC_BASE': '',

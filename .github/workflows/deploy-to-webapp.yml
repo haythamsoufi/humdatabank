@@ -7,11 +7,11 @@
 name: Deploy to Webapp
 
 # Shown in the Actions run list instead of the default "Manually run by …" title.
-# Manual runs: title uses the environment-scoped ACR tag. Release runs use the published tag.
+# Manual runs: title uses environment and release label. Release runs use the published tag.
 run-name: >-
   ${{ github.event_name == 'release'
     && format('Auto-deploy to Staging — {0}', github.event.release.tag_name)
-    || format('Deploy to Webapp — {0} (image:{1})', inputs.environment, inputs.environment == 'Production' && 'production' || 'staging') }}
+    || format('Deploy to Webapp — {0} ({1})', inputs.environment, inputs.release_label) }}
 
 on:
   # Release auto-deploy to Staging is disabled — use workflow_dispatch to deploy.

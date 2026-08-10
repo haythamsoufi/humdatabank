@@ -201,6 +201,7 @@
 {% set can_manage_users = is_system_manager or has_permission('admin.users.edit') %}
 <body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}{% if can_manage_users %} user-hover-details-enabled{% endif %}" data-language="{{ _ui_language }}">
     {% include 'components/_staging_environment_banner.html' %}
+    {% block outer_body %}
     <div class="flex h-screen staging-app-shell">
         {% if is_admin_user %}
         <aside id="adminSidebar" class="admin-sidebar bg-gray-800 text-white fixed top-0 left-0 h-full">
@@ -395,6 +396,7 @@
             </main>
         </div>
     </div>
+    {% endblock %}
 
     {% if current_user.is_authenticated and (is_admin_user or is_focal_point) %}
     <button type="button" id="mobileMenuFAB" class="btn btn-icon btn-lg btn-dark shadow-lg" aria-label="{{ _('Open menu')|forceescape }}" aria-expanded="false" aria-controls="mobileFloatingMenu">

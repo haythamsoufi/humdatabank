@@ -1,0 +1,240 @@
+# Translations template for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-08-10 00:30+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: app/templates/auth/login.html:3
+msgid "Login"
+msgstr ""
+
+#: app/templates/auth/login.html:630
+msgid "National Societies"
+msgstr ""
+
+#: app/templates/auth/login.html:631
+msgid "One connected network"
+msgstr ""
+
+#: app/templates/auth/login.html:637
+msgid ""
+"The single, secure home for planning and reporting across the IFRC "
+"network — replacing scattered spreadsheets and disconnected tools with "
+"one connected platform."
+msgstr ""
+
+#: app/templates/auth/login.html:650
+msgid "Language"
+msgstr ""
+
+#: app/templates/auth/login.html:678
+msgid "Sign in"
+msgstr ""
+
+#: app/templates/auth/login.html:679
+msgid "Use your National Society or IFRC single sign-on account to continue."
+msgstr ""
+
+#: app/templates/auth/login.html:698
+msgid "Continue to sign in"
+msgstr ""
+
+#: app/templates/auth/login.html:707
+msgid "New here? You can create your account in the same step."
+msgstr ""
+
+#: app/templates/auth/login.html:714
+msgid "Act as (dev only)"
+msgstr ""
+
+#: app/templates/auth/login.html:716
+msgid "Sign in without a password to test as a role preset or any active user."
+msgstr ""
+
+#: app/templates/auth/login.html:724
+msgid "Act as System Manager"
+msgstr ""
+
+#: app/templates/auth/login.html:726
+msgid "System Manager"
+msgstr ""
+
+#: app/templates/auth/login.html:730
+msgid "Act as Admin"
+msgstr ""
+
+#: app/templates/auth/login.html:732
+msgid "Admin"
+msgstr ""
+
+#: app/templates/auth/login.html:736
+msgid "Act as Focal Point"
+msgstr ""
+
+#: app/templates/auth/login.html:738
+msgid "Focal Point"
+msgstr ""
+
+#: app/templates/auth/login.html:743
+msgid "Or choose a user"
+msgstr ""
+
+#: app/templates/auth/login.html:747 app/templates/auth/login.html:1112
+msgid "Select a user…"
+msgstr ""
+
+#: app/templates/auth/login.html:754
+msgid "Please select a user first."
+msgstr ""
+
+#: app/templates/auth/login.html:756
+msgid "Signing in…"
+msgstr ""
+
+#: app/templates/auth/login.html:757 app/templates/auth/login.html:759
+msgid "Act as selected user"
+msgstr ""
+
+#: app/templates/auth/login.html:767
+msgid "Forgot password?"
+msgstr ""
+
+#: app/templates/auth/login.html:769
+msgid "Create account"
+msgstr ""
+
+#: app/templates/auth/login.html:771
+msgid "Need help signing in?"
+msgstr ""
+
+#: app/templates/auth/login.html:782 app/templates/auth/login.html:827
+msgid "Close"
+msgstr ""
+
+#: app/templates/auth/login.html:783
+msgid "Create your account"
+msgstr ""
+
+#: app/templates/auth/login.html:786 app/templates/auth/login.html:832
+msgid "Email"
+msgstr ""
+
+#: app/templates/auth/login.html:789
+msgid "Name (optional)"
+msgstr ""
+
+#: app/templates/auth/login.html:791
+msgid "Title (optional)"
+msgstr ""
+
+#: app/templates/auth/login.html:794
+msgid "Country you will cover"
+msgstr ""
+
+#: app/templates/auth/login.html:797
+msgid ""
+"Select one country you request access to. An admin will review your "
+"request."
+msgstr ""
+
+#: app/templates/auth/login.html:800
+msgid "Message to admins (optional)"
+msgstr ""
+
+#: app/templates/auth/login.html:801
+msgid "Briefly describe your role and why you need access"
+msgstr ""
+
+#: app/templates/auth/login.html:805
+msgid "Password"
+msgstr ""
+
+#: app/templates/auth/login.html:809
+msgid "At least 8 characters"
+msgstr ""
+
+#: app/templates/auth/login.html:810
+msgid "Contains an uppercase letter"
+msgstr ""
+
+#: app/templates/auth/login.html:811
+msgid "Contains a lowercase letter"
+msgstr ""
+
+#: app/templates/auth/login.html:812
+msgid "Contains a number"
+msgstr ""
+
+#: app/templates/auth/login.html:813
+msgid "Contains a special character (e.g. !@#$)"
+msgstr ""
+
+#: app/templates/auth/login.html:817
+msgid "Confirm Password"
+msgstr ""
+
+#: app/templates/auth/login.html:820
+msgid "Create Account"
+msgstr ""
+
+#: app/templates/auth/login.html:820
+msgid "Creating account…"
+msgstr ""
+
+#: app/templates/auth/login.html:828
+msgid "Forgot your password?"
+msgstr ""
+
+#: app/templates/auth/login.html:829
+msgid "Enter your email and we'll send you a link to reset your password."
+msgstr ""
+
+#: app/templates/auth/login.html:834
+msgid "Send Reset Link"
+msgstr ""
+
+#: app/templates/auth/login.html:834
+msgid "Sending…"
+msgstr ""
+
+#: app/templates/auth/login.html:871
+msgid "Welcome to the"
+msgstr ""
+
+#: app/templates/auth/login.html:1178
+msgid "Select a country"
+msgstr ""
+
+#: app/templates/auth/login.html:1228
+msgid "Passwords match"
+msgstr ""
+
+#: app/templates/auth/login.html:1228
+msgid "Passwords do not match"
+msgstr ""
+
+#: app/templates/auth/login.html:1247
+msgid "Please enter a valid email address"
+msgstr ""
+
+#: app/templates/auth/login.html:1255 app/templates/auth/login.html:1268
+msgid "This email is already registered. Try signing in or reset your password."
+msgstr ""
+
+#: app/templates/auth/login.html:1256
+msgid "Great! This email is available."
+msgstr ""
+

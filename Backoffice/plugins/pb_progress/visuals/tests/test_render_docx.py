@@ -22,8 +22,11 @@ from pb_figures.render_docx import (  # noqa: E402
     _add_cumulative_block,
     _add_donut_pair_block,
     _chart_area_width,
+    _chart_render_width_px,
     _configure_page_margins,
     _cumulative_table_widths,
+    _docx_chart_display_height_in,
+    _docx_chart_height_px,
     _donut_pair_widths,
     _set_cell_text,
     _set_table_inner_borders,
@@ -99,6 +102,16 @@ class TableInnerBorderTests(unittest.TestCase):
     def test_donut_pair_widths_span_content_area(self) -> None:
         widths = _donut_pair_widths()
         self.assertAlmostEqual(sum(widths), _DOCX_CONTENT_WIDTH_IN, places=5)
+
+    def test_docx_chart_height_scales_with_width(self) -> None:
+        width_px = _chart_render_width_px(5)
+        height_px = _docx_chart_height_px(width_px)
+        self.assertGreater(height_px, 110)
+        self.assertLess(height_px, 250)
+        width_in = _chart_area_width(5)
+        height_in = _docx_chart_display_height_in(width_in, width_px, height_px)
+        self.assertGreaterEqual(height_in, 0.95)
+        self.assertLess(height_in, 1.35)
 
 
 class DonutPairTableTests(unittest.TestCase):

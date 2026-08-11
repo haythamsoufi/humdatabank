@@ -165,14 +165,20 @@ def _value_label_y_px(
     y_max: float,
     *,
     height: int = CHART_HEIGHT,
+    marker_r: float = 3.5,
+    font_size: float = 10,
 ) -> tuple[float, bool]:
+    v_scale = height / CHART_HEIGHT
     above = value_label_above(index, value, values, annual_target, y_max)
     v_y, _ = y_scale(value, values, annual_target, height=height)
+    clearance = marker_r + font_size * 0.55
+    above_offset = LABEL_ABOVE_OFFSET * v_scale + clearance
+    below_offset = LABEL_BELOW_OFFSET * v_scale + clearance
     if above:
-        return v_y - LABEL_ABOVE_OFFSET, True
-    below_y = v_y + LABEL_BELOW_OFFSET
-    if below_y > chart_data_bottom_y(height=height) - MIN_LABEL_CLEARANCE_FROM_BOTTOM:
-        return v_y - LABEL_ABOVE_OFFSET, True
+        return v_y - above_offset, True
+    below_y = v_y + below_offset
+    if below_y > chart_data_bottom_y(height=height) - MIN_LABEL_CLEARANCE_FROM_BOTTOM * v_scale:
+        return v_y - above_offset, True
     return below_y, False
 
 
@@ -262,13 +268,15 @@ def render_line_chart_svg(
     show_target_labels: bool = False,
     target_label: str | None = None,
     language: str = "English",
+    font_scale: float = 1.0,
 ) -> str:
     """Render line geometry as SVG (labels optional for PNG assets)."""
     values = item["values"]
+    v_scale = height / CHART_HEIGHT
     pad_l = CHART_PAD_L
     pad_r = CHART_PAD_R
-    pad_t = CHART_PAD_TOP
-    pad_b = CHART_PAD_BOTTOM
+    pad_t = CHART_PAD_TOP * v_scale
+    pad_b = CHART_PAD_BOTTOM * v_scale
     plot_w = width - pad_l - pad_r
 
     numeric = [v for v in values if v is not None]
@@ -301,8 +309,11 @@ def render_line_chart_svg(
     style = resolve_style()
     fx = style["line_chart_effects"]
     marker_ring = fx.get("marker_ring", False)
-    stroke_width = style["line_stroke_width"]
-    marker_r = style.get("marker_radius", 3.5)
+    stroke_width = style["line_stroke_width"] * font_scale
+    marker_r = style.get("marker_radius", 3.5) * font_scale
+    value_font = max(8, round(10 * font_scale))
+    target_tag_font = max(8, round(9 * font_scale))
+    target_value_font = max(8, round(10 * font_scale))
     is_modern = style.get("name") == "modern"
     label_layout = target_label_layout(
         values,
@@ -350,7 +361,7 @@ def render_line_chart_svg(
             f'stroke="{COLOR_TARGET}" {target_stroke}/>'
         )
         if show_target_labels and target_label:
-            tag_y = ty + 4 if label_layout["tag_below"] else ty - 5
+            tag_y = ty + 4 * v_scale if label_layout["tag_below"] else ty - 5 * v_scale
             tag_baseline = "hanging" if label_layout["tag_below"] else "auto"
             parts.append(
                 _svg_chart_text(
@@ -359,7 +370,7 @@ def render_line_chart_svg(
                     y=tag_y,
                     language=language,
                     fill=COLOR_TARGET,
-                    font_size=9,
+                    font_size=target_tag_font,
                     text_anchor="start",
                     dominant_baseline=tag_baseline,
                 )
@@ -368,10 +379,10 @@ def render_line_chart_svg(
             value_y = ty
             value_baseline = "middle"
             if label_layout["value_above"]:
-                value_y = ty - 5
+                value_y = ty - 5 * v_scale
                 value_baseline = "auto"
             elif label_layout["value_below"]:
-                value_y = ty + 4
+                value_y = ty + 4 * v_scale
                 value_baseline = "hanging"
             parts.append(
                 _svg_chart_text(
@@ -380,7 +391,7 @@ def render_line_chart_svg(
                     y=value_y,
                     language=language,
                     fill=COLOR_TARGET,
-                    font_size=10,
+                    font_size=target_value_font,
                     text_anchor="start",
                     dominant_baseline=value_baseline,
                 )
@@ -412,13 +423,13 @@ def render_line_chart_svg(
         cx = x_at(i)
         cy = y_at(value)
         if marker_ring:
-            ring_r = marker_r + 1.5
+            ring_r = marker_r + 1.5 * font_scale
             parts.append(
                 f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{ring_r}" fill="#ffffff" '
-                f'stroke="{COLOR_VALUE}" stroke-width="1.5"/>'
+                f'stroke="{COLOR_VALUE}" stroke-width="{1.5 * font_scale:.2f}"/>'
             )
             parts.append(
-                f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{max(marker_r - 1.0, 1.5)}" fill="{COLOR_VALUE}"/>'
+                f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{max(marker_r - 1.0 * font_scale, 1.5 * font_scale):.2f}" fill="{COLOR_VALUE}"/>'
             )
         else:
             parts.append(
@@ -428,7 +439,16 @@ def render_line_chart_svg(
         if show_value_labels:
             label = item["value_labels"][i]
             if label:
-                ly, _ = _value_label_y_px(i, value, values, annual_target, y_max, height=height)
+                ly, above = _value_label_y_px(
+                    i,
+                    value,
+                    values,
+                    annual_target,
+                    y_max,
+                    height=height,
+                    marker_r=marker_r,
+                    font_size=value_font,
+                )
                 parts.append(
                     _svg_chart_text(
                         str(label),
@@ -436,7 +456,8 @@ def render_line_chart_svg(
                         y=ly,
                         language=language,
                         fill=COLOR_VALUE,
-                        font_size=10,
+                        font_size=value_font,
+                        dominant_baseline="auto" if above else "hanging",
                     )
                 )
 

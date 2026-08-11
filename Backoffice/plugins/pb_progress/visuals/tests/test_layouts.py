@@ -19,7 +19,9 @@ from pb_figures.layouts import (  # noqa: E402
     cumulative_table_rows,
     is_ns_unit,
     mapping_indicator_rows,
+    normalize_section_code,
     ns_table_mode,
+    section_has_indicators,
     show_ns_breakdown,
     visible_donut_rows,
     visible_indicator_ids,
@@ -44,6 +46,23 @@ def _sample_mapping() -> pd.DataFrame:
 
 
 class DynamicLayoutTests(unittest.TestCase):
+    def test_normalize_section_code_maps_cross_cutting_to_cc1(self) -> None:
+        self.assertEqual(normalize_section_code("Cross-cutting"), "CC1")
+        self.assertEqual(normalize_section_code("CC1"), "CC1")
+        self.assertEqual(normalize_section_code("SP1"), "SP1")
+
+    def test_mapping_indicator_rows_accepts_cross_cutting_label(self) -> None:
+        mapping = pd.DataFrame(
+            {
+                "Strategic Priority / Enabling Function": ["Cross-cutting", "SP1"],
+                "ID": ["101", "618"],
+                "Type": ["Cumulative", "Cumulative"],
+            }
+        )
+        rows = mapping_indicator_rows(mapping, "CC1")
+        self.assertEqual(rows["ID"].tolist(), ["101"])
+        self.assertTrue(section_has_indicators(mapping, "CC1"))
+
     def test_mapping_indicator_rows_preserve_excel_order(self) -> None:
         rows = mapping_indicator_rows(_sample_mapping(), "SP1")
         self.assertEqual(rows["ID"].tolist(), ["612", "615", "616"])

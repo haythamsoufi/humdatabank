@@ -26,7 +26,7 @@ from app.services.organization.country_service import fds_member_user_display_na
 from app.services.email.client import send_email
 from app.services.email.delivery import (
     log_email_attempt,
-    mark_email_failed,
+    mark_email_failed_or_unknown,
     mark_email_sent,
     mark_email_skipped,
 )
@@ -289,6 +289,7 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
     if not log:
         return False
 
+    _failure_info: list = []
     try:
         if send_email(
             subject=subject,
@@ -296,13 +297,14 @@ def send_fds_access_request_digest_email(user: User, requests, existing_log=None
             html=body,
             cc=_team_email_cc_for_recipient(user.email),
             expose_recipients_in_to=True,
+            _failure_info=_failure_info,
         ):
             mark_email_sent(log.id)
             return True
-        mark_email_failed(log.id, 'Email API returned failure')
+        mark_email_failed_or_unknown(log.id, 'Email API returned failure', _failure_info[-1] if _failure_info else None)
         return False
     except Exception as exc:
-        mark_email_failed(log.id, str(exc))
+        mark_email_failed_or_unknown(log.id, str(exc), _failure_info[-1] if _failure_info else None)
         current_app.logger.error(
             "Error sending FDS access request digest to %s: %s",
             user.email,

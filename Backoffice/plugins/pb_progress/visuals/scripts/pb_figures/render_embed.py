@@ -143,41 +143,40 @@ def _render_target_labels(
     return "".join(parts)
 
 
-def _render_year_data_grid(item: dict[str, Any]) -> str:
+def _render_year_data_grid(item: dict[str, Any], chart_width: int = 0) -> str:
     n = len(item["years"])
     if n == 0:
         return ""
     show_reporting, show_implementing = cumulative_table_rows(item)
-    col_pct = 100.0 / n
-    colgroup = "".join(f'<col style="width:{col_pct:.6f}%">' for _ in range(n))
+    if not chart_width:
+        chart_width = _chart_width()
 
-    def _row(values: list[str], *, row_class: str = "") -> str:
-        cls = f' class="{row_class}"' if row_class else ""
-        cells = "".join(f"<td>{_esc(value)}</td>" for value in values)
-        return f"<tr{cls}>{cells}</tr>"
+    def _row(values: list[str], *, is_year: bool = False) -> str:
+        cell_class = "table-cell year-cell" if is_year else "table-cell"
+        cells = "".join(
+            f'<span class="{cell_class}" style="left:{x_percent(i, n, chart_width):.4f}%">'
+            f"{_esc(v)}</span>"
+            for i, v in enumerate(values)
+        )
+        return f'<div class="table-row">{cells}</div>'
 
-    parts = [
-        f'<table class="year-data-grid" role="presentation"{_RAW_TABLE}>',
-        f"<colgroup>{colgroup}</colgroup>",
-        _row(item["years"], row_class="year-row"),
-    ]
+    parts = ['<div class="year-data-grid">']
+    parts.append(_row(item["years"], is_year=True))
     if show_reporting:
         parts.append(_row(item["reporting"]))
     if show_implementing:
         parts.append(_row(item["implementing"]))
-    parts.append("</table>")
+    parts.append("</div>")
     return "".join(parts)
 
 
 
 def _render_data_table(item: dict[str, Any], chart_width: int) -> str:
-    del chart_width
-    return f'<div class="table-data">{_render_year_data_grid(item)}</div>'
+    return f'<div class="table-data">{_render_year_data_grid(item, chart_width)}</div>'
 
 
 def _render_data_table_cells(item: dict[str, Any], chart_width: int) -> str:
-    del chart_width
-    return f'<td class="table-data">{_render_year_data_grid(item)}</td>'
+    return f'<td class="table-data">{_render_year_data_grid(item, chart_width)}</td>'
 
 
 def _render_metric_labels(labels: dict[str, str], item: dict[str, Any]) -> str:
@@ -420,6 +419,8 @@ def render_section_assets(
             item,
             target_label,
             assets_dir / filename,
+            width=_chart_width(),
+            height=CHART_HEIGHT,
             language=language,
             show_labels=not is_rtl(language),
         )

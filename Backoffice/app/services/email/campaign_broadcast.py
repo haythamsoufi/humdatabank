@@ -13,7 +13,7 @@ from app.services.communication.campaign_email_templates_service import (
     normalize_campaign_email_template_key,
 )
 from app.services.email.client import send_email
-from app.services.email.delivery import log_email_attempt, mark_email_failed, mark_email_sent
+from app.services.email.delivery import log_email_attempt, mark_email_failed_or_unknown, mark_email_sent
 from app.services.email.rendering import render_admin_email_template
 from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
 from app.utils.datetime_helpers import utcnow
@@ -151,6 +151,7 @@ def send_campaign_broadcast_notification_email(
     log = log_email_attempt(notification.id, user.id, user.email, subject)
     try:
         filtered_out: List[str] = []
+        _failure_info: list = []
         success = send_email(
             subject=subject,
             recipients=[user.email],
@@ -160,15 +161,16 @@ def send_campaign_broadcast_notification_email(
             ),
             importance=importance,
             _filtered_out=filtered_out,
+            _failure_info=_failure_info,
         )
         if success:
             mark_email_sent(log.id)
             return True
         if filtered_out:
             return False
-        mark_email_failed(log.id, "Email send returned False", retry=False)
+        mark_email_failed_or_unknown(log.id, "Email send returned False", _failure_info[-1] if _failure_info else None)
     except Exception as exc:
-        mark_email_failed(log.id, str(exc), retry=False)
+        mark_email_failed_or_unknown(log.id, str(exc), _failure_info[-1] if _failure_info else None)
         current_app.logger.warning(
             "Campaign broadcast email failed for user %s notification %s: %s",
             user.id,

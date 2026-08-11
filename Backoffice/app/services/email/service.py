@@ -1,7 +1,7 @@
 from flask import current_app, url_for
 from app.services.email.rendering import render_admin_email_template
 from app.services.email.client import send_email
-from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed
+from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed_or_unknown
 from app.utils.datetime_helpers import utcnow
 from app.utils.organization_helpers import (
     get_org_name, get_org_short_name, get_org_copyright_year, get_org_team_email
@@ -1061,25 +1061,27 @@ def send_welcome_email(user, existing_log=None):
             db.session.commit()
 
         # Send email
+        _failure_info: list = []
         try:
             success = send_email(
                 subject=t['subject'],
                 recipients=[user.email],
                 html=html_content,
-                sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config.get('MAIL_DEFAULT_SENDER'))
+                sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config.get('MAIL_DEFAULT_SENDER')),
+                _failure_info=_failure_info,
             )
 
             if success:
                 mark_email_sent(log.id)
                 current_app.logger.info(f"Welcome email sent to {user.email}")
             else:
-                mark_email_failed(log.id, "Email send returned False")
+                mark_email_failed_or_unknown(log.id, "Email send returned False", _failure_info[-1] if _failure_info else None)
                 current_app.logger.error(f"Failed to send welcome email to {user.email}")
 
             return success
 
         except Exception as e:
-            mark_email_failed(log.id, str(e))
+            mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
             current_app.logger.error(f"Error sending welcome email to {user.email}: {str(e)}")
             return False
 

@@ -79,10 +79,15 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
     translation_sources = {
         # Assignment notifications (title = headline; message = detail — avoid repeating the same sentence in both)
         'notification.assignment_created.title': _notification_msgid(
-            'New assignment: %(assignment_title)s'
+            '%(assignment_title)s'
         ),
         'notification.assignment_created.message': _notification_msgid(
-            '%(country)s — due %(due_date)s.'
+            'A new reporting assignment has been issued for %(country)s. '
+            'Please complete and submit your response by %(due_date)s.'
+        ),
+        'notification.assignment_created.message_no_deadline': _notification_msgid(
+            'A new reporting assignment has been issued for %(country)s. '
+            'Please log in to the Backoffice to review the requirements and submit your response.'
         ),
 
         'notification.assignment_submitted.submitter.title': _notification_msgid('Submission successful'),

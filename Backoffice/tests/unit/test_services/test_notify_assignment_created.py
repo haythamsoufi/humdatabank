@@ -80,6 +80,77 @@ class TestNotifyAssignmentCreated:
         assert mock_create.call_args.kwargs["user_ids"] == [admin_only_id]
         assert result == ["admin-notification"]
 
+    def test_focal_points_bucket_disabled_skips_grouped_email_to_focal(self, app, pending_aes):
+        """Regression test: notify_assignment_created previously computed focal_user_ids
+        unconditionally and always emailed them, even when the focal_points audience
+        bucket was disabled — only the in-app notification was gated. The grouped email
+        must respect the same bucket flag as notify_entity_focal_points (and as
+        preview_assignment_created_grouped_email, which already checked this)."""
+        would_be_focal_ids = [101]
+
+        with app.app_context():
+            with patch(
+                "app.services.notification.notifiers.assignment.audience_bucket_enabled",
+                return_value=False,
+            ), patch(
+                "app.services.notification.notifiers.assignment.get_assignment_editor_submitter_user_ids_for_entity",
+                return_value=would_be_focal_ids,
+            ) as mock_get_focal, patch(
+                "app.services.notification.notifiers.assignment.notify_entity_focal_points",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment._send_grouped_assignment_created_email",
+            ) as mock_send_email, patch(
+                "app.services.notification.notifiers.assignment.log_entity_activity",
+            ), patch(
+                "app.services.notification.notifiers.assignment.url_for",
+                return_value="/forms/assignment/1",
+            ):
+                notify_assignment_created(pending_aes)
+
+        # The bucket check must short-circuit before even querying for focal points.
+        mock_get_focal.assert_not_called()
+        # No focal recipients and no admin recipients => no grouped email at all.
+        mock_send_email.assert_not_called()
+
+    def test_focal_points_bucket_disabled_still_emails_admin_only_recipients(self, app, pending_aes):
+        """Admins are a separate audience bucket, so disabling focal_points must not
+        suppress admin CC emails — they should become the sole 'to' recipients."""
+        admin_only_id = 202
+
+        with app.app_context():
+            with patch(
+                "app.services.notification.notifiers.assignment.audience_bucket_enabled",
+                return_value=False,
+            ), patch(
+                "app.services.notification.notifiers.assignment.get_assignment_editor_submitter_user_ids_for_entity",
+            ) as mock_get_focal, patch(
+                "app.services.notification.notifiers.assignment.notify_entity_focal_points",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[admin_only_id],
+            ), patch(
+                "app.services.notification.notifiers.assignment.create_notification",
+                return_value=["admin-notification"],
+            ), patch(
+                "app.services.notification.notifiers.assignment._send_grouped_assignment_created_email",
+            ) as mock_send_email, patch(
+                "app.services.notification.notifiers.assignment.log_entity_activity",
+            ), patch(
+                "app.services.notification.notifiers.assignment.url_for",
+                return_value="/forms/assignment/1",
+            ):
+                notify_assignment_created(pending_aes, notify_admins=True)
+
+        mock_get_focal.assert_not_called()
+        mock_send_email.assert_called_once()
+        assert mock_send_email.call_args.kwargs["focal_user_ids"] == []
+        assert mock_send_email.call_args.kwargs["admin_user_ids"] == [admin_only_id]
+
     def test_excludes_assignment_creator(self, app, pending_aes):
         creator_id = 999
         mock_user = MagicMock()
@@ -106,3 +177,43 @@ class TestNotifyAssignmentCreated:
 
         assert mock_focal.call_args.kwargs["exclude_user_ids"] == [creator_id]
         assert mock_admin.call_args.kwargs["exclude_user_ids"] == [creator_id]
+
+
+class TestPreviewAssignmentCreatedGroupedEmail:
+    def test_renders_body_without_notify_admins_or_recipients(self, app, db_session):
+        from types import SimpleNamespace
+        from app.services.notification.notifiers.assignment import (
+            preview_assignment_created_grouped_email,
+        )
+
+        template = SimpleNamespace(id=42, name="FDRS Annual")
+
+        with app.app_context():
+            with patch(
+                "app.models.forms.FormTemplate.query"
+            ) as mock_query, patch(
+                "app.services.notification.notifiers.assignment.get_assignment_editor_submitter_user_ids_for_entity",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[501],
+            ), patch(
+                "app.services.notification.notifiers.assignment._resolve_entity_name",
+                return_value="Kenya",
+            ), patch(
+                "app.services.platform.app_settings_service.audience_bucket_enabled",
+                return_value=True,
+            ):
+                mock_query.get.return_value = template
+                preview = preview_assignment_created_grouped_email(
+                    country_id=1,
+                    template_id=template.id,
+                    period_name="Annual 2026",
+                    notify_admins=False,
+                )
+
+        assert not preview.get("empty_reason")
+        assert preview.get("html_body")
+        assert preview.get("subject")
+        assert preview.get("to") == []
+        assert preview.get("cc") == []

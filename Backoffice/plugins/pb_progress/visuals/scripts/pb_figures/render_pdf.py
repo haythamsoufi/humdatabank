@@ -80,6 +80,7 @@ body.pb-pdf-export .pb-dashboard .line-chart-inner > .line-chart-img {
   aspect-ratio: 481 / 110;
   object-fit: contain;
 }
+body.pb-pdf-export .pb-dashboard div.year-data-grid,
 body.pb-pdf-export .pb-dashboard table.year-data-grid {
   width: 100% !important;
   max-width: 100% !important;

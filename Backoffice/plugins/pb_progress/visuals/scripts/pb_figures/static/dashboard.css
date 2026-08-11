@@ -228,6 +228,11 @@
   table-layout: fixed;
 }
 
+.pb-dashboard div.year-data-grid {
+  width: 100%;
+  max-width: 481px;
+}
+
 .pb-dashboard table.year-data-grid td {
   text-align: center;
   font-size: 9px;
@@ -267,6 +272,9 @@
 
 .pb-dashboard .table-cell {
   position: absolute;
+  top: 0;
+  height: 18px;
+  line-height: 18px;
   transform: translateX(-50%);
   color: var(--text);
   text-align: center;

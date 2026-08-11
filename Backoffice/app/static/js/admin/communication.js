@@ -14,7 +14,10 @@ function rowNeedsEmailAttention(row) {
         return false;
     }
     const status = String(row.email_status || '').toLowerCase();
-    if (status !== 'failed') {
+    // 'unknown' = the Email API gave no HTTP response at all (timeout/connection
+    // error) — status could not be confirmed, so it needs the same admin attention
+    // as a confirmed 'failed' send even though it isn't necessarily a real failure.
+    if (status !== 'failed' && status !== 'unknown') {
         return false;
     }
     return row.email_can_retry === true || row.email_can_cancel === true;
@@ -4516,62 +4519,76 @@ class AdminNotifications {
     async _bulkEmailDeliveryAction(action, logIds, buttonId) {
         const t = window.COMMUNICATION_TRANSLATIONS || {};
         const button = document.getElementById(buttonId);
-        const originalHtml = button ? button.innerHTML : null;
         const spinnerLabel = action === 'retry'
             ? (t.retryingEmail || 'Retrying...')
             : (t.dismissingEmail || 'Dismissing...');
         const endpoint = action === 'retry'
             ? '/admin/api/communications/email-delivery/retry-failed'
             : '/admin/api/communications/email-delivery/cancel-failed';
+        await this._runBulkEmailAction(endpoint, { log_ids: logIds }, button, spinnerLabel);
+    }
+
+    async retryAllFailedEmails() {
+        const t = window.COMMUNICATION_TRANSLATIONS || {};
+        const button = document.getElementById('retry-all-failed-emails');
+        await this._runBulkEmailAction(
+            '/admin/api/communications/email-delivery/retry-failed',
+            {},
+            button,
+            t.retryingEmail || 'Retrying...'
+        );
+    }
+
+    /**
+     * POST to a bulk email-delivery endpoint, automatically re-calling it while the
+     * server reports `remaining_count` (retry-failed processes a bounded batch per
+     * call — see EMAIL_RETRY_BATCH_MAX_PER_CALL server-side — so one click still
+     * clears a large backlog without holding a single request open for minutes).
+     * Capped at maxRounds as a client-side safety net against an unexpected loop.
+     */
+    async _runBulkEmailAction(endpoint, body, button, spinnerLabel) {
+        const t = window.COMMUNICATION_TRANSLATIONS || {};
+        const originalHtml = button ? button.innerHTML : null;
+        const maxRounds = 10;
+        let totalSuccess = 0;
+        let totalFailure = 0;
+        let lastData = null;
 
         if (button) {
             button.disabled = true;
             button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>${spinnerLabel}`;
         }
         try {
-            const data = await _anFetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ log_ids: logIds }),
-            });
-            if (window.showAlert) {
-                window.showAlert(data.message || 'Done', data.success ? 'success' : 'warning');
-            }
-            await this.refreshNotificationsGrid();
-        } catch (error) {
-            console.error(`Bulk email ${action} failed:`, error);
-            if (window.showAlert) {
-                window.showAlert(`An error occurred while processing selected emails.`, 'error');
-            }
-        } finally {
-            if (button) {
-                button.disabled = false;
-                if (originalHtml !== null) {
-                    button.innerHTML = originalHtml;
+            for (let round = 0; round < maxRounds; round += 1) {
+                const data = await _anFetch(endpoint, {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                });
+                lastData = data;
+                totalSuccess += data.success_count || 0;
+                totalFailure += data.failure_count || 0;
+                const remaining = data.remaining_count || 0;
+                if (!remaining) {
+                    break;
+                }
+                if (button) {
+                    const progress = (t.retryBatchProgress || 'Retrying\u2026 (__DONE__ done, __REMAINING__ queued)')
+                        .replace('__DONE__', String(totalSuccess + totalFailure))
+                        .replace('__REMAINING__', String(remaining));
+                    button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>${progress}`;
                 }
             }
-        }
-    }
-
-    async retryAllFailedEmails() {
-        const button = document.getElementById('retry-all-failed-emails');
-        const originalHtml = button ? button.innerHTML : null;
-        if (button) {
-            button.disabled = true;
-            button.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>${(window.COMMUNICATION_TRANSLATIONS && window.COMMUNICATION_TRANSLATIONS.retryingEmail) || 'Retrying...'}`;
-        }
-        try {
-            const data = await _anFetch('/admin/api/communications/email-delivery/retry-failed', {
-                method: 'POST',
-                body: JSON.stringify({}),
-            });
-            if (window.showAlert) {
-                window.showAlert(data.message || 'Retry completed', data.success ? 'success' : 'warning');
+            if (window.showAlert && lastData) {
+                window.showAlert(
+                    lastData.message || 'Done',
+                    lastData.success !== false && totalFailure === 0 ? 'success' : 'warning'
+                );
             }
             await this.refreshNotificationsGrid();
         } catch (error) {
-            console.error('Bulk email retry failed:', error);
+            console.error(`Bulk email action failed (${endpoint}):`, error);
             if (window.showAlert) {
-                window.showAlert('An error occurred while retrying failed emails.', 'error');
+                window.showAlert('An error occurred while processing emails.', 'error');
             }
         } finally {
             if (button) {

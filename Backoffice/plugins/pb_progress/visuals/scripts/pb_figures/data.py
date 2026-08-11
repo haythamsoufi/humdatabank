@@ -24,6 +24,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import resolve_excel
+from .layouts import normalize_section_code
 
 # Expected Final sheet columns (Tableau: [Final$], header row 1)
 FINAL_COLUMNS = (
@@ -273,7 +274,7 @@ def build_model(
     section_col = f"{SECTION_COLUMN}_map"
     if section_col not in model.columns:
         section_col = SECTION_COLUMN
-    model["section"] = model[section_col]
+    model["section"] = model[section_col].astype(str).str.strip().map(normalize_section_code)
 
     if validate:
         _validate_join(model, path.name)

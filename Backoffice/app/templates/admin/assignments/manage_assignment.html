@@ -75,8 +75,10 @@
             {{ form.confirm_duplicate(class="hidden", id="confirm_duplicate") }}
         {% endif %}
 
-        {# Row 1: Form Template + Period fields #}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        {% set existing_trans = (assignment.custom_name_translations or {}) if assignment else {} %}
+
+        {# Form identity #}
+        <div class="grid grid-cols-1 {% if form.data_owner_id is defined %}md:grid-cols-3{% else %}md:grid-cols-2{% endif %} gap-4">
             <div>
                 {{ form.template_id.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
                 {{ form.template_id(class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm") }}
@@ -84,81 +86,29 @@
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
             </div>
+            {% if form.data_owner_id is defined %}
             <div>
-                <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Period Type') }}</label>
-                <select id="period-type" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
-                    <option value="single-year">{{ _('Single Year') }}</option>
-                    <option value="year-range">{{ _('Year Range') }}</option>
-                    <option value="month-range">{{ _('Month Range') }}</option>
-                </select>
+                <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2">
+                    {{ form.data_owner_id.label.text }}
+                    <span class="ml-1 text-gray-400" title="{{ _('The person accountable for data quality in this collection cycle. Defaults to the template owner.')|forceescape }}">
+                        <i class="fas fa-info-circle text-xs"></i>
+                    </span>
+                </label>
+                {{ form.data_owner_id(id="data_owner_id_select", class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                <div class="mt-1">
+                    {% if assignment and assignment.data_owner_user %}
+                        <p class="text-xs text-green-600"><i class="fas fa-user-check mr-1"></i>{{ assignment.data_owner_user.name }}</p>
+                    {% elif assignment and not assignment.data_owner_user %}
+                        <p class="text-xs text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('No data owner set — governance gap.') }}</p>
+                    {% endif %}
+                </div>
+                {% for error in form.data_owner_id.errors %}
+                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                {% endfor %}
             </div>
-            <div>
-                <div id="single-year-fields" class="period-fields">
-                    {{ year_picker('single-year', label=_('Year')) }}
-                </div>
-                <div id="year-range-fields" class="period-fields hidden">
-                    <div class="period-range-row">
-                        <div>
-                            {{ year_picker('start-year', label=_('Start Year')) }}
-                        </div>
-                        <div>
-                            {{ year_picker('end-year', label=_('End Year')) }}
-                        </div>
-                    </div>
-                </div>
-                <div id="month-range-start" class="period-fields hidden">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Start Period') }}</label>
-                    <div class="period-month-row">
-                        {{ year_picker('start-month-year') }}
-                        <select id="start-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 pl-3 pr-8">
-                            <option value="01">{{ _('Jan') }}</option>
-                            <option value="02">{{ _('Feb') }}</option>
-                            <option value="03">{{ _('Mar') }}</option>
-                            <option value="04">{{ _('Apr') }}</option>
-                            <option value="05">{{ _('May') }}</option>
-                            <option value="06">{{ _('Jun') }}</option>
-                            <option value="07">{{ _('Jul') }}</option>
-                            <option value="08">{{ _('Aug') }}</option>
-                            <option value="09">{{ _('Sep') }}</option>
-                            <option value="10">{{ _('Oct') }}</option>
-                            <option value="11">{{ _('Nov') }}</option>
-                            <option value="12">{{ _('Dec') }}</option>
-                        </select>
-                    </div>
-                </div>
-                <div id="month-range-end" class="period-fields hidden">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('End Period') }}</label>
-                    <div class="period-month-row">
-                        {{ year_picker('end-month-year') }}
-                        <select id="end-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 pl-3 pr-8">
-                            <option value="01">{{ _('Jan') }}</option>
-                            <option value="02">{{ _('Feb') }}</option>
-                            <option value="03">{{ _('Mar') }}</option>
-                            <option value="04">{{ _('Apr') }}</option>
-                            <option value="05">{{ _('May') }}</option>
-                            <option value="06">{{ _('Jun') }}</option>
-                            <option value="07">{{ _('Jul') }}</option>
-                            <option value="08">{{ _('Aug') }}</option>
-                            <option value="09">{{ _('Sep') }}</option>
-                            <option value="10">{{ _('Oct') }}</option>
-                            <option value="11">{{ _('Nov') }}</option>
-                            <option value="12">{{ _('Dec') }}</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            {{ form.period_name(class="hidden") }}
-            {% for error in form.period_name.errors %}
-                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-            {% endfor %}
-        </div>
-
-        {# Row 2: Custom Name + Data Owner + dates (new assignment shows due/expiry inline; edit shows them in their own section below) #}
-        {% set existing_trans = (assignment.custom_name_translations or {}) if assignment else {} %}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
-            {# Custom Name — optional override for the display name shown to users #}
+            {% endif %}
             <div class="flex flex-col">
-                <div class="flex items-center gap-2 flex-wrap mb-2 min-h-[2.75rem]">
+                <div class="flex items-center gap-2 flex-wrap mb-2">
                     <label for="{{ form.custom_name.id }}" class="text-gray-700 text-sm font-semibold">
                         {{ _('Custom Name') }}
                         <span class="ml-1 font-normal text-gray-400 text-xs">({{ _('optional') }})</span>
@@ -192,7 +142,7 @@
                        value="{{ existing_trans|tojson|e }}"
                        data-existing-translations="{{ existing_trans|tojson|e }}">
                 {% endif %}
-                <div class="mt-1 min-h-[2.5rem]">
+                <div class="mt-1">
                     {% if assignment and assignment.custom_name %}
                         <p class="text-xs text-blue-600">
                             <i class="fas fa-tag mr-1"></i>{{ _('Current name:') }} <span class="font-medium">{{ assignment.custom_name }}</span>
@@ -209,117 +159,186 @@
                     <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                 {% endfor %}
             </div>
-
-            {# Data Owner #}
-            {% if form.data_owner_id is defined %}
-            <div class="flex flex-col">
-                <label for="{{ form.data_owner_id.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">
-                    {{ form.data_owner_id.label.text }}
-                    <span class="ml-1 text-gray-400" title="{{ _('The person accountable for data quality in this collection cycle. Defaults to the template owner.')|forceescape }}">
-                        <i class="fas fa-info-circle text-xs"></i>
-                    </span>
-                </label>
-                {{ form.data_owner_id(id="data_owner_id_select", class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
-                <div class="mt-1 min-h-[2.5rem]">
-                    {% if assignment and assignment.data_owner_user %}
-                        <p class="text-xs text-green-600"><i class="fas fa-user-check mr-1"></i>{{ assignment.data_owner_user.name }}</p>
-                    {% elif assignment and not assignment.data_owner_user %}
-                        <p class="text-xs text-amber-600"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('No data owner set — governance gap.') }}</p>
-                    {% endif %}
-                </div>
-                {% for error in form.data_owner_id.errors %}
-                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                {% endfor %}
-            </div>
-            {% endif %}
-
-            {# Submission review notification (IFRC admin) #}
-            {% if form.submission_review_recipient_mode is defined %}
-            <div class="md:col-span-3 mt-2 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <fieldset>
-                    <legend class="block text-gray-700 text-sm font-semibold mb-3">
-                        {{ _('Submission review notification') }}
-                        <span class="ml-1 text-gray-400" title="{{ _('Who receives the review request when a focal point submits this assignment.')|forceescape }}">
-                            <i class="fas fa-info-circle text-xs"></i>
-                        </span>
-                    </legend>
-                    <div class="space-y-3">
-                        <label class="flex items-start gap-2 cursor-pointer">
-                            <input type="radio"
-                                   name="{{ form.submission_review_recipient_mode.name }}"
-                                   value="fds_member"
-                                   class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                   {% if (form.submission_review_recipient_mode.data or 'fds_member') == 'fds_member' %}checked{% endif %}>
-                            <span>
-                                <span class="text-sm text-gray-800 font-medium">{{ _('Designated FDS member') }}</span>
-                                <span class="block text-xs text-gray-500">{{ _('Notify the FDS member assigned to the submitting country (default).') }}</span>
-                            </span>
-                        </label>
-                        <label class="flex items-start gap-2 cursor-pointer">
-                            <input type="radio"
-                                   name="{{ form.submission_review_recipient_mode.name }}"
-                                   value="specific_admin"
-                                   class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                   {% if form.submission_review_recipient_mode.data == 'specific_admin' %}checked{% endif %}>
-                            <span>
-                                <span class="text-sm text-gray-800 font-medium">{{ _('Specific IFRC admin(s)') }}</span>
-                                <span class="block text-xs text-gray-500">{{ _('Choose one or more admins responsible for reviewing submissions for this assignment.') }}</span>
-                            </span>
-                        </label>
-                    </div>
-                    <div id="submission-review-user-picker"
-                         class="mt-4 {% if form.submission_review_recipient_mode.data != 'specific_admin' %}hidden{% endif %}">
-                        <label for="submission-review-user-search" class="block text-sm font-medium text-gray-700 mb-1">
-                            {{ _('Reviewers') }}
-                        </label>
-                        <div class="relative max-w-xl">
-                            <input type="text"
-                                   id="submission-review-user-search"
-                                   class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                                   placeholder="{{ _('Search by name or email...')|forceescape }}"
-                                   autocomplete="off">
-                            <div id="submission-review-user-results"
-                                 class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
-                        </div>
-                        <div id="submission-review-selected-users" class="mt-3 min-h-[2rem] flex flex-wrap gap-2"></div>
-                        <input type="hidden"
-                               name="{{ form.submission_review_recipient_user_ids.name }}"
-                               id="submission_review_recipient_user_ids"
-                               value="{{ form.submission_review_recipient_user_ids.data or '' }}">
-                        {% for error in form.submission_review_recipient_user_ids.errors %}
-                            <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                        {% endfor %}
-                    </div>
-                </fieldset>
-            </div>
-            {% endif %}
-
-            {% if not assignment %}
-            <div class="flex flex-col">
-                <label for="{{ form.due_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">{{ _('Due Date') }}</label>
-                {{ form.due_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
-                <div class="mt-1 min-h-[2.5rem]">
-                    <p class="text-xs text-gray-500">{{ _('Applies to all selected countries.') }}</p>
-                </div>
-                {% for error in form.due_date.errors %}
-                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                {% endfor %}
-            </div>
-            {% endif %}
         </div>
 
-        {% if not assignment %}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start mt-4">
-            <div class="flex flex-col md:col-span-1">
-                <label for="{{ form.expiry_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2 min-h-[2.75rem]">{{ _('Expiry Date') }}</label>
-                {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
-                <div class="mt-1 min-h-[2.5rem]">
-                    <p class="text-xs text-gray-500">{{ _('After this date the assignment will be treated as Closed. Leave empty for no automatic closure.') }}</p>
+        {# Period & deadlines #}
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                <i class="fas fa-calendar-alt mr-1.5 text-gray-400"></i>{{ _('Period & deadlines') }}
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+                <div>
+                    <label for="period-type" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Period Type') }}</label>
+                    <select id="period-type" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 px-3">
+                        <option value="single-year">{{ _('Single Year') }}</option>
+                        <option value="year-range">{{ _('Year Range') }}</option>
+                        <option value="month-range">{{ _('Month Range') }}</option>
+                    </select>
                 </div>
-                {% for error in form.expiry_date.errors %}
-                    <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                {% endfor %}
+
+                <div id="single-year-fields" class="period-fields min-w-0">
+                    {{ year_picker('single-year', label=_('Year')) }}
+                </div>
+
+                <div id="year-range-fields" class="period-fields hidden contents">
+                    <div class="min-w-0">
+                        {{ year_picker('start-year', label=_('Start Year')) }}
+                    </div>
+                    <div class="min-w-0">
+                        {{ year_picker('end-year', label=_('End Year')) }}
+                    </div>
+                </div>
+
+                <div id="month-range-fields" class="period-fields hidden contents">
+                    <div id="month-range-start" class="min-w-0">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Start Period') }}</label>
+                        <div class="period-month-row">
+                            {{ year_picker('start-month-year') }}
+                            <select id="start-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 pl-3 pr-8">
+                                <option value="01">{{ _('Jan') }}</option>
+                                <option value="02">{{ _('Feb') }}</option>
+                                <option value="03">{{ _('Mar') }}</option>
+                                <option value="04">{{ _('Apr') }}</option>
+                                <option value="05">{{ _('May') }}</option>
+                                <option value="06">{{ _('Jun') }}</option>
+                                <option value="07">{{ _('Jul') }}</option>
+                                <option value="08">{{ _('Aug') }}</option>
+                                <option value="09">{{ _('Sep') }}</option>
+                                <option value="10">{{ _('Oct') }}</option>
+                                <option value="11">{{ _('Nov') }}</option>
+                                <option value="12">{{ _('Dec') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="month-range-end" class="min-w-0">
+                        <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('End Period') }}</label>
+                        <div class="period-month-row">
+                            {{ year_picker('end-month-year') }}
+                            <select id="end-month" class="period-month-select shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md py-2 pl-3 pr-8">
+                                <option value="01">{{ _('Jan') }}</option>
+                                <option value="02">{{ _('Feb') }}</option>
+                                <option value="03">{{ _('Mar') }}</option>
+                                <option value="04">{{ _('Apr') }}</option>
+                                <option value="05">{{ _('May') }}</option>
+                                <option value="06">{{ _('Jun') }}</option>
+                                <option value="07">{{ _('Jul') }}</option>
+                                <option value="08">{{ _('Aug') }}</option>
+                                <option value="09">{{ _('Sep') }}</option>
+                                <option value="10">{{ _('Oct') }}</option>
+                                <option value="11">{{ _('Nov') }}</option>
+                                <option value="12">{{ _('Dec') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {% if not assignment %}
+                <div>
+                    <label for="{{ form.due_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Due Date') }}</label>
+                    {{ form.due_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                    <p class="mt-1 text-xs text-gray-500">{{ _('Applies to all selected countries.') }}</p>
+                    {% for error in form.due_date.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                <div>
+                    <label for="{{ form.expiry_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Expiry Date') }}</label>
+                    {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                    <p class="mt-1 text-xs text-gray-500">{{ _('After this date the assignment will be treated as Closed. Leave empty for no automatic closure.') }}</p>
+                    {% for error in form.expiry_date.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div>
+                    <label for="{{ form.expiry_date.id }}" class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Expiry Date') }}</label>
+                    {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
+                    <p class="mt-1 text-xs text-gray-500">{{ _('Auto-closes the assignment after this date.') }}</p>
+                    {% for error in form.expiry_date.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% if has_countries %}
+                <div>
+                    <label class="block text-gray-700 text-sm font-semibold mb-2">{{ _('Due Date') }}</label>
+                    {% if assignment.earliest_due_date %}
+                        <p class="text-sm text-gray-700"><span class="text-xs text-gray-500">{{ _('Earliest:') }}</span> <span class="font-medium">{{ assignment.earliest_due_date|datetime_local('date') }}</span></p>
+                        <p class="text-xs text-gray-500 mt-1">{{ _('Managed per entity below.') }}</p>
+                        {% if assignment.has_multiple_due_dates %}
+                        <p class="text-xs text-amber-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Multiple different due dates set across entities.') }}</p>
+                        {% endif %}
+                    {% else %}
+                        <p class="text-sm text-gray-400 italic">{{ _('Not set') }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ _('Managed per entity below.') }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endif %}
             </div>
+            {{ form.period_name(class="hidden") }}
+            {% for error in form.period_name.errors %}
+                <p class="mt-2 text-red-500 text-xs italic">{{ error }}</p>
+            {% endfor %}
+        </div>
+
+        {# Submission review notification #}
+        {% if form.submission_review_recipient_mode is defined %}
+        <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <fieldset>
+                <legend class="block text-gray-700 text-sm font-semibold mb-3">
+                    {{ _('Submission review notification') }}
+                    <span class="ml-1 text-gray-400" title="{{ _('Who receives the review request when a focal point submits this assignment.')|forceescape }}">
+                        <i class="fas fa-info-circle text-xs"></i>
+                    </span>
+                </legend>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="radio"
+                               name="{{ form.submission_review_recipient_mode.name }}"
+                               value="fds_member"
+                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                               {% if (form.submission_review_recipient_mode.data or 'fds_member') == 'fds_member' %}checked{% endif %}>
+                        <span>
+                            <span class="text-sm text-gray-800 font-medium">{{ _('Designated FDS member') }}</span>
+                            <span class="block text-xs text-gray-500">{{ _('Notify the FDS member assigned to the submitting country (default).') }}</span>
+                        </span>
+                    </label>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="radio"
+                               name="{{ form.submission_review_recipient_mode.name }}"
+                               value="specific_admin"
+                               class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                               {% if form.submission_review_recipient_mode.data == 'specific_admin' %}checked{% endif %}>
+                        <span>
+                            <span class="text-sm text-gray-800 font-medium">{{ _('Specific IFRC admin(s)') }}</span>
+                            <span class="block text-xs text-gray-500">{{ _('Choose one or more admins responsible for reviewing submissions for this assignment.') }}</span>
+                        </span>
+                    </label>
+                </div>
+                <div id="submission-review-user-picker"
+                     class="mt-4 {% if form.submission_review_recipient_mode.data != 'specific_admin' %}hidden{% endif %}">
+                    <label for="submission-review-user-search" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{ _('Reviewers') }}
+                    </label>
+                    <div class="relative max-w-xl">
+                        <input type="text"
+                               id="submission-review-user-search"
+                               class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                               placeholder="{{ _('Search by name or email...')|forceescape }}"
+                               autocomplete="off">
+                        <div id="submission-review-user-results"
+                             class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"></div>
+                    </div>
+                    <div id="submission-review-selected-users" class="mt-3 min-h-[2rem] flex flex-wrap gap-2"></div>
+                    <input type="hidden"
+                           name="{{ form.submission_review_recipient_user_ids.name }}"
+                           id="submission_review_recipient_user_ids"
+                           value="{{ form.submission_review_recipient_user_ids.data or '' }}">
+                    {% for error in form.submission_review_recipient_user_ids.errors %}
+                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
+                    {% endfor %}
+                </div>
+            </fieldset>
         </div>
         {% endif %}
 
@@ -332,44 +351,98 @@
 
         {# Public URL & notification options - only show for new assignments #}
         {% if not assignment %}
-        <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    <div class="flex items-center">
-                        {{ form.generate_public_url(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
-                        {{ form.generate_public_url.label(class="ml-2 text-sm text-gray-700") }}
+        <div class="mt-4 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 bg-white">
+                <h3 class="text-sm font-semibold text-gray-800">{{ _('Options') }}</h3>
+                <p class="mt-0.5 text-xs text-gray-500">{{ _('Public access and notifications for this assignment.') }}</p>
+            </div>
+
+            <div class="px-4 py-3 space-y-4">
+                {# Public URL #}
+                <div class="space-y-2">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.generate_public_url(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.generate_public_url.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Allow external submissions via a public link.') }}</p>
+                        </div>
                     </div>
-                    <div class="flex items-center" id="public-url-active-container" style="display: none;">
-                        {{ form.public_url_active(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
-                        {{ form.public_url_active.label(class="ml-2 text-sm text-gray-700") }}
+                    <div id="public-url-active-container" class="hidden pl-7">
+                        <div class="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2">
+                            {{ form.public_url_active(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                            {{ form.public_url_active.label(class="text-sm text-gray-700") }}
+                        </div>
                     </div>
                 </div>
-                <span class="text-xs text-gray-500">Allow external submissions</span>
-            </div>
-            <div class="flex items-center pt-2 border-t border-gray-200">
-                <div class="flex items-center">
-                    {{ form.send_notifications(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="send_notifications") }}
-                    {{ form.send_notifications.label(class="ml-2 text-sm text-gray-700") }}
+
+                <div class="border-t border-gray-200"></div>
+
+                {# Notifications #}
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.send_notifications(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="send_notifications") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.send_notifications.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Focal points will be notified about the new assignment. Uncheck to create without sending notifications.') }}</p>
+                        </div>
+                    </div>
+
+                    <div id="notif-details-panel" class="hidden pl-7 space-y-3">
+                        <div id="notif-audience-warning" class="hidden flex items-start gap-2 rounded-md bg-yellow-50 border border-yellow-300 px-3 py-2.5 text-xs text-yellow-800">
+                            <i class="fas fa-exclamation-triangle mt-0.5 flex-shrink-0"></i>
+                            <span id="notif-audience-warning-text"></span>
+                        </div>
+
+                        <div id="notif-recipient-preview" class="hidden rounded-lg border border-blue-200 bg-blue-50 overflow-hidden">
+                            <div class="px-3 py-2.5 flex items-start gap-2">
+                                <i class="fas fa-bell mt-0.5 flex-shrink-0 text-blue-600"></i>
+                                <p id="notif-recipient-preview-text" class="flex-1 min-w-0 text-xs text-blue-900 leading-relaxed"></p>
+                            </div>
+                            <div class="px-3 py-2 border-t border-blue-200/80 bg-blue-50/50 flex flex-wrap items-center justify-between gap-2">
+                                <span class="text-[11px] text-blue-700/80">{{ _('One email per country') }}</span>
+                                <button type="button"
+                                        id="notif-email-preview-btn"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium text-blue-800 bg-white hover:bg-blue-50 border border-blue-200 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        title="{{ _('Preview notification email')|e }}"
+                                        aria-label="{{ _('Preview notification email')|e }}">
+                                    <i class="fas fa-envelope-open-text"></i>
+                                    <span>{{ _('Preview email') }}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="notify-admins-row" class="hidden rounded-md border border-gray-200 bg-white px-3 py-2.5">
+                            <div class="flex items-start gap-3">
+                                <div class="pt-0.5">
+                                    {{ form.notify_admins(id="notify_admins", class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    {{ form.notify_admins.label(class="text-sm text-gray-800") }}
+                                    <p class="mt-0.5 text-xs text-gray-500" id="notify-admins-hint"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <span class="ml-2 text-xs text-gray-500">{{ _('Focal points will be notified about the new assignment. Uncheck to create without sending notifications.') }}</span>
-            </div>
-            <div id="notif-audience-warning" class="hidden mt-2 flex items-start gap-2 rounded-md bg-yellow-50 border border-yellow-300 px-3 py-2 text-xs text-yellow-800">
-                <i class="fas fa-exclamation-triangle mt-0.5 flex-shrink-0"></i>
-                <span id="notif-audience-warning-text"></span>
-            </div>
-            <div id="notif-recipient-preview" class="hidden mt-2 flex items-start gap-2 rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
-                <i class="fas fa-bell mt-0.5 flex-shrink-0"></i>
-                <span id="notif-recipient-preview-text"></span>
-            </div>
-            {% if form.requires_delegation_review is defined %}
-            <div class="flex items-start pt-2 border-t border-gray-200">
-                <div class="flex items-center">
-                    {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
-                    {{ form.requires_delegation_review.label(class="ml-2 text-sm text-gray-700") }}
+
+                {% if form.requires_delegation_review is defined %}
+                <div class="border-t border-gray-200 pt-3">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.requires_delegation_review.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</p>
+                        </div>
+                    </div>
                 </div>
-                <span class="ml-2 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</span>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
         {% endif %}
 
@@ -385,85 +458,46 @@
         </div>
         {% endif %}
 
-        {# Public URL, Due Date & Expiry Date - only for existing assignments #}
+        {# Public URL - only for existing assignments #}
         {% if assignment %}
         <div class="mt-6 border-t border-gray-200 pt-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {# Public URL #}
-                <div>
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">
-                        <i class="fas fa-link mr-1 text-gray-400"></i>
-                        {{ _('Public URL') }}
-                    </label>
-                    {% if assignment.has_public_url() %}
-                        <div class="flex items-center gap-2 mb-2 flex-wrap">
-                            {% if assignment.is_public_active %}
-                                {{ status_label_for_active(true) }}
-                            {% else %}
-                                {{ status_label_for_active(false) }}
-                            {% endif %}
-                            <button type="button" id="copy-public-url-btn"
-                                    class="btn btn-primary btn-sm"
-                                    data-url="{{ assignment.get_public_url() }}">
-                                <i class="fas fa-copy mr-1"></i>{{ _('Copy') }}
-                            </button>
-                            <button type="button" id="toggle-public-access-btn"
-                                    class="btn btn-warning btn-sm">
-                                <i class="fas {{ 'fa-toggle-on' if assignment.is_public_active else 'fa-toggle-off' }} mr-1"></i>
-                                {{ _('Deactivate') if assignment.is_public_active else _('Activate') }}
-                            </button>
-                        </div>
-                        <p class="text-xs text-gray-500 font-mono break-all mb-2">{{ assignment.get_public_url() }}</p>
-                        {% set total_countries = assignment.country_statuses.count() %}
-                        {% set public_count = assignment.country_statuses.filter_by(is_public_available=True).count() %}
-                        <p class="text-xs text-gray-600">
-                            <i class="fas fa-flag mr-1 text-gray-400"></i>
-                            <span class="font-medium">{{ public_count }}</span> / {{ total_countries }} {{ _('countries enabled for public submission') }}
-                        </p>
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">
+                <i class="fas fa-link mr-1.5 text-gray-400"></i>{{ _('Public URL') }}
+            </h3>
+            {% if assignment.has_public_url() %}
+                <div class="flex items-center gap-2 mb-2 flex-wrap">
+                    {% if assignment.is_public_active %}
+                        {{ status_label_for_active(true) }}
                     {% else %}
-                        <p class="text-sm text-gray-400 italic py-2">{{ _('Not generated') }}</p>
-                        <button type="button" id="generate-public-url-btn"
-                                class="btn btn-success btn-sm"
-                                data-action="{{ url_for('assignment_management.generate_public_url', assignment_id=assignment.id) }}"
-                                data-next="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) }}">
-                            <i class="fas fa-link mr-1"></i>{{ _('Generate Public URL') }}
-                        </button>
+                        {{ status_label_for_active(false) }}
                     {% endif %}
+                    <button type="button" id="copy-public-url-btn"
+                            class="btn btn-primary btn-sm"
+                            data-url="{{ assignment.get_public_url() }}">
+                        <i class="fas fa-copy mr-1"></i>{{ _('Copy') }}
+                    </button>
+                    <button type="button" id="toggle-public-access-btn"
+                            class="btn btn-warning btn-sm">
+                        <i class="fas {{ 'fa-toggle-on' if assignment.is_public_active else 'fa-toggle-off' }} mr-1"></i>
+                        {{ _('Deactivate') if assignment.is_public_active else _('Activate') }}
+                    </button>
                 </div>
-
-                {# Due Date #}
-                {% if has_countries %}
-                <div>
-                    <label class="block text-gray-700 text-sm font-semibold mb-2">
-                        <i class="fas fa-calendar-alt mr-1 text-gray-400"></i>
-                        {{ _('Due Date') }}
-                    </label>
-                    {% if assignment.earliest_due_date %}
-                        <p class="text-sm text-gray-700 py-2"><span class="text-xs text-gray-500">{{ _('Earliest:') }}</span> <span class="font-medium">{{ assignment.earliest_due_date|datetime_local('date') }}</span></p>
-                        <p class="text-xs text-gray-500">{{ _('Managed per entity below.') }}</p>
-                        {% if assignment.has_multiple_due_dates %}
-                        <p class="text-xs text-amber-600 mt-1"><i class="fas fa-exclamation-triangle mr-1"></i>{{ _('Multiple different due dates set across entities.') }}</p>
-                        {% endif %}
-                    {% else %}
-                        <p class="text-sm text-gray-400 italic py-2">{{ _('Not set') }}</p>
-                        <p class="text-xs text-gray-500">{{ _('Managed per entity below.') }}</p>
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                {# Expiry Date #}
-                <div>
-                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="expiry_date">
-                        <i class="fas fa-calendar-times mr-1 text-gray-400"></i>
-                        {{ _('Expiry Date') }}
-                    </label>
-                    {{ form.expiry_date(class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md") }}
-                    <p class="mt-1 text-xs text-gray-500">{{ _('Auto-closes the assignment after this date.') }}</p>
-                    {% for error in form.expiry_date.errors %}
-                        <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                    {% endfor %}
-                </div>
-            </div>
+                <p class="text-xs text-gray-500 font-mono break-all mb-2">{{ assignment.get_public_url() }}</p>
+                {% set total_countries = assignment.country_statuses.count() %}
+                {% set public_count = assignment.country_statuses.filter_by(is_public_available=True).count() %}
+                <p class="text-xs text-gray-600">
+                    <i class="fas fa-flag mr-1 text-gray-400"></i>
+                    <span class="font-medium">{{ public_count }}</span> / {{ total_countries }} {{ _('countries enabled for public submission') }}
+                </p>
+            {% else %}
+                <p class="text-sm text-gray-400 italic py-2">{{ _('Not generated') }}</p>
+                <button type="button" id="generate-public-url-btn"
+                        class="btn btn-success btn-sm"
+                        data-action="{{ url_for('assignment_management.generate_public_url', assignment_id=assignment.id) }}"
+                        data-next="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) }}">
+                    <i class="fas fa-link mr-1"></i>{{ _('Generate Public URL') }}
+                </button>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -835,6 +869,60 @@
 {# Modal for editing AssignmentEntityStatus - only for existing assignments #}
 {% from "macros/modal_shell.html" import modal_shell %}
 
+{% if not assignment %}
+{% call modal_shell('assignment-notif-email-preview-modal', _('Notification email preview'), max_width='max-w-5xl', content_class='flex flex-col min-h-0 max-h-[85vh] overflow-hidden') %}
+    <p class="text-sm text-gray-500 mb-4 leading-relaxed">{{ _('Preview the grouped email for one assigned country. Recipients reflect current preferences (instant email enabled).') }}</p>
+
+    <div class="flex flex-wrap items-end gap-3 pb-4 mb-4 border-b border-gray-200 flex-shrink-0">
+        <div class="flex-1 min-w-[14rem] max-w-md">
+            <label for="notif-email-preview-country" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">{{ _('Country') }}</label>
+            <select id="notif-email-preview-country" class="form-select w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></select>
+        </div>
+    </div>
+
+    <div id="notif-email-preview-loading" class="hidden flex items-center justify-center gap-2 py-12 text-sm text-gray-500 flex-shrink-0">
+        <i class="fas fa-spinner fa-spin text-blue-500"></i>
+        <span>{{ _('Loading preview…') }}</span>
+    </div>
+
+    <div id="notif-email-preview-empty" class="hidden rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 flex-shrink-0"></div>
+
+    <div id="notif-email-preview-content" class="hidden flex flex-col min-h-0 flex-1 gap-4 overflow-hidden">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex-shrink-0 shadow-sm">
+            <div class="px-4 py-3 bg-white border-b border-gray-200">
+                <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-1">{{ _('Subject') }}</div>
+                <div id="notif-email-preview-subject" class="text-sm font-semibold text-gray-900 leading-snug"></div>
+            </div>
+            <div id="notif-email-preview-recipients-grid" class="px-4 py-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="notif-email-preview-to-wrap" class="min-w-0 md:col-span-2">
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">{{ _('To') }}</div>
+                    <div id="notif-email-preview-to" class="flex flex-wrap gap-1.5 min-h-[1.75rem]"></div>
+                </div>
+                <div id="notif-email-preview-cc-wrap" class="hidden min-w-0 md:border-l md:border-gray-200 md:pl-4">
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 mb-2">{{ _('CC') }}</div>
+                    <div id="notif-email-preview-cc" class="flex flex-wrap gap-1.5 min-h-[1.75rem]"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col min-h-0 flex-1 rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
+            <div class="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center gap-2 flex-shrink-0">
+                <i class="fas fa-envelope text-gray-400 text-xs" aria-hidden="true"></i>
+                <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{{ _('Message') }}</span>
+            </div>
+            <iframe id="notif-email-preview-frame"
+                    class="w-full flex-1 min-h-[22rem] border-0 bg-white block"
+                    title="{{ _('Email body preview')|e }}"
+                    sandbox=""></iframe>
+        </div>
+    </div>
+
+    <div class="mt-4 pt-4 border-t border-gray-200 flex justify-end flex-shrink-0">
+        <button type="button" class="btn btn-secondary close-modal">{{ _('Close') }}</button>
+    </div>
+{% endcall %}
+{% endif %}
+
 {% if TRANSLATABLE_LANGUAGES %}
 {{ translation_modal(
     modal_id='custom-name-translations-modal',
@@ -1081,6 +1169,7 @@ window.manageAssignmentConfig = {
         organizationIndex: {{ url_for('organization.index')|tojson }},
         checkDuplicate: {{ url_for('assignment_management.check_assignment_duplicate')|tojson }},
         notificationPreview: {{ url_for('assignment_management.assignment_notification_preview')|tojson }},
+        notificationEmailPreview: {{ url_for('assignment_management.assignment_notification_email_preview')|tojson }},
         reviewRecipientSearch: {{ url_for('assignment_management.api_search_submission_review_recipients')|tojson }},
         adminBase: {{ url_for('system_admin.manage_indicator_bank')|replace('/indicator-bank', '')|tojson }},
         editEntityStatusBase: {{ url_for('assignment_management.edit_assignment_entity_status', aes_id=99999)|replace('99999', '')|tojson }},
@@ -1114,7 +1203,18 @@ window.manageAssignmentConfig = {
         notifyMsgDisabled: {{ _('The "Notify focal points" checkbox is ticked, but notifications for assignment_created are currently disabled in platform settings (Admin → Settings → Notifications). No one will be notified. Do you want to continue anyway?')|tojson }},
         notifyAudienceDisabled: {{ _('⚠ Platform settings have disabled notifications for this event — focal points will NOT receive notifications even though this box is checked.')|tojson }},
         notifyPreviewLoading: {{ _('Checking notification recipients…')|tojson }},
-        notifyRecipientsSummary: {{ '{users} focal point(s) will receive an in-app notification; {email_users} will also receive an email.'|tojson }},
+        notifyRecipientsSummary: {{ _('{users} focal points (in-app); {entities} emails to {email_users} with email enabled{no_focal_suffix}{admin_suffix}{admin_cc_suffix}')|tojson }},
+        notifyNoFocalCountriesSuffix: {{ _('. {no_focal} countries have no focal points')|tojson }},
+        notifyAdminInAppLine: {{ _('. {admin_users} admins in-app')|tojson }},
+        notifyAdminInAppAllFocal: {{ _('. {admin_total} admins in-app (already focal on selected countries)')|tojson }},
+        notifyAdminInAppNone: {{ ''|tojson }},
+        notifyAdminCcLine: {{ _('. {admin_email_users} admins on email CC')|tojson }},
+        notifyAdminCcPrompt: {{ _('. Tick "CC admins" below to add admins to email')|tojson }},
+        notifyAdminsHint: {{ _('Up to {admin_users} admin(s) can be CC\'d on emails.')|tojson }},
+        notifyAdminsDisabledHint: {{ _(' Org admin notifications disabled in Settings.')|tojson }},
+        notifyEmailPreviewNoCountries: {{ _('Select at least one country in Entity Assignments to preview the email.')|tojson }},
+        notifyEmailPreviewNeedTemplate: {{ _('Select a form template and reporting period before previewing the email.')|tojson }},
+        notifyEmailPreviewNoRecipients: {{ _('No email recipients for this country with the current settings.')|tojson }},
         notifyNoRecipients: {{ _('No focal points are configured for the selected countries — no notifications will be sent.')|tojson }},
         confirmAction: {{ _('Confirm action')|tojson }},
         clearReviewer: {{ _('Remove')|tojson }},

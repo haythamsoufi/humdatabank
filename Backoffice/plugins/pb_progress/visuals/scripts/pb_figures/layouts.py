@@ -66,10 +66,20 @@ def _section_column_name(frame: pd.DataFrame) -> str:
     return "section"
 
 
+def normalize_section_code(section: str | None) -> str:
+    """Map Mapping / Final section labels to canonical codes (CC1, SP1, …)."""
+    text = (section or "").strip().upper()
+    if not text or text in {"CROSS-CUTTING", "CROSS CUTTING"}:
+        return "CC1"
+    return text
+
+
 def mapping_indicator_rows(mapping: pd.DataFrame, section: str) -> pd.DataFrame:
     """Mapping rows for one section in Excel row order (first ID occurrence wins)."""
     section_col = _section_column_name(mapping)
-    subset = mapping[mapping[section_col].astype(str).str.strip() == section].copy()
+    target = normalize_section_code(section)
+    section_codes = mapping[section_col].astype(str).str.strip().map(normalize_section_code)
+    subset = mapping[section_codes == target].copy()
     if subset.empty:
         return subset
 

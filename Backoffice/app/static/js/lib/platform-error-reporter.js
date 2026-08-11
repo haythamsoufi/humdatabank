@@ -1,5 +1,8 @@
 /**
- * Reports platform-level errors (WAF 403, 502, 503, 504) to /api/v1/platform-error.
+ * Platform + client JavaScript error reporting for the Backoffice.
+ *
+ * Platform errors (WAF 403, 502, 503, 504) → POST /api/v1/platform-error
+ * Client JS runtime errors → POST /api/v1/client-error (SecurityEvent, no admin email)
  *
  * When a WAF or reverse-proxy intercepts an AJAX request the beacon script
  * embedded in the Azure custom error page never executes (the browser receives
@@ -12,12 +15,16 @@
  *   2. jQuery AJAX   — a global ajaxComplete handler catches $.ajax / $.post /
  *      $.get responses the same way.
  *
+ *   3. window.onerror + unhandledrejection — report ReferenceError and similar
+ *      bugs to /api/v1/client-error (disabled when __humdbClientErrorReportingEnabled
+ *      is false, e.g. Flask DEBUG).
+ *
  * WAF vs Flask detection: Flask sets X-App-Origin: 1 on every response via
  * security_headers middleware.  Responses without that header are treated as
  * WAF/proxy errors.
  *
- * Deduplication: each (status, page-path, request-path) is reported at most
- * once per tab session (sessionStorage).
+ * Deduplication: each report key is sent at most once per tab session
+ * (sessionStorage).
  *
  * Loaded from core/layout.html (and chat_immersive.html) so coverage is
  * automatic for all pages.
@@ -26,9 +33,26 @@
   'use strict';
 
   var REPORTABLE_CODES = [403, 502, 503, 504];
-  var ENDPOINT = '/api/v1/platform-error';
+  var PLATFORM_ENDPOINT = '/api/v1/platform-error';
+  var CLIENT_ERROR_ENDPOINT = '/api/v1/client-error';
   var WRAP_FLAG = '__humdbPlatformErrorFetchWrapped';
   var JQ_FLAG   = '__humdbPlatformErrorJqBound';
+  var WINDOW_ERROR_FLAG = '__humdbWindowErrorBound';
+
+  var IGNORED_CLIENT_ERROR_FRAGMENTS = [
+    'AbortError',
+    'message channel closed before a response was received',
+    'ResizeObserver loop limit exceeded',
+    'ResizeObserver loop completed with undelivered notifications',
+    'Non-Error promise rejection captured'
+  ];
+
+  var IGNORED_CLIENT_ERROR_SOURCE_PREFIXES = [
+    'chrome-extension://',
+    'moz-extension://',
+    'safari-extension://',
+    'safari-web-extension://'
+  ];
 
   var nativeFetch =
     typeof window !== 'undefined' && typeof window.fetch === 'function'
@@ -109,6 +133,118 @@
     }
   }
 
+  function isClientErrorRequestUrl(urlStr) {
+    try {
+      var p = pathnameForDedupe(urlStr);
+      return p.indexOf('/api/v1/client-error') !== -1;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function clientErrorReportingEnabled() {
+    return window.__humdbClientErrorReportingEnabled !== false;
+  }
+
+  function sendJsonBeacon(endpoint, payload) {
+    try {
+      var body = JSON.stringify(payload);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(
+          endpoint,
+          new Blob([body], { type: 'application/json' })
+        );
+      } else if (nativeFetch) {
+        nativeFetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body,
+          keepalive: true
+        }).catch(function () {});
+      }
+    } catch (_) {}
+  }
+
+  function shouldIgnoreClientErrorMessage(message, source) {
+    var msg = String(message || '').trim();
+    if (!msg) return true;
+    if (msg === 'Script error.' && !source) return true;
+    for (var i = 0; i < IGNORED_CLIENT_ERROR_FRAGMENTS.length; i++) {
+      if (msg.indexOf(IGNORED_CLIENT_ERROR_FRAGMENTS[i]) !== -1) return true;
+    }
+    if (source) {
+      var srcLower = String(source).toLowerCase();
+      for (var j = 0; j < IGNORED_CLIENT_ERROR_SOURCE_PREFIXES.length; j++) {
+        if (srcLower.indexOf(IGNORED_CLIENT_ERROR_SOURCE_PREFIXES[j]) === 0) return true;
+      }
+    }
+    return false;
+  }
+
+  function clientErrorDedupeKey(kind, message, source, line, column) {
+    var day = new Date().toISOString().slice(0, 10);
+    var pagePath = (window.location && window.location.pathname) || '';
+    return 'client_err_' + day + '_' + kind + '_' + pagePath + '_' + String(source || '') + '_' +
+      String(line || '') + '_' + String(column || '') + '_' + String(message || '').slice(0, 200);
+  }
+
+  function alreadyReportedClientError(kind, message, source, line, column) {
+    try {
+      return !!sessionStorage.getItem(clientErrorDedupeKey(kind, message, source, line, column));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function markClientErrorReported(kind, message, source, line, column) {
+    try {
+      sessionStorage.setItem(
+        clientErrorDedupeKey(kind, message, source, line, column),
+        '1'
+      );
+    } catch (_) {}
+  }
+
+  /**
+   * Report a client-side JavaScript error to the backend.
+   *
+   * @param {object} details
+   * @param {string} details.kind - "error" | "unhandledrejection"
+   * @param {string} details.message
+   * @param {string} [details.source]
+   * @param {number} [details.line]
+   * @param {number} [details.column]
+   * @param {string} [details.stack]
+   */
+  function reportClientError(details) {
+    if (!clientErrorReportingEnabled()) return;
+    var d = details || {};
+    var kind = d.kind === 'unhandledrejection' ? 'unhandledrejection' : 'error';
+    var message = String(d.message || '').trim();
+    var source = d.source ? String(d.source) : '';
+    var line = typeof d.line === 'number' ? d.line : null;
+    var column = typeof d.column === 'number' ? d.column : null;
+    var stack = d.stack ? String(d.stack).slice(0, 4000) : '';
+
+    if (shouldIgnoreClientErrorMessage(message, source)) return;
+    if (alreadyReportedClientError(kind, message, source, line, column)) return;
+
+    markClientErrorReported(kind, message, source, line, column);
+
+    sendJsonBeacon(CLIENT_ERROR_ENDPOINT, {
+      kind: kind,
+      message: message.slice(0, 1000),
+      source: source.slice(0, 500) || null,
+      line: line,
+      column: column,
+      stack: stack || null,
+      url: window.location.href,
+      referrer: document.referrer || null,
+      user_agent: navigator.userAgent || null,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   /**
    * Report a platform-level error to the backend.
    *
@@ -142,19 +278,7 @@
     };
 
     try {
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          ENDPOINT,
-          new Blob([JSON.stringify(payload)], { type: 'application/json' })
-        );
-      } else if (nativeFetch) {
-        nativeFetch(ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          keepalive: true
-        }).catch(function () {});
-      }
+      sendJsonBeacon(PLATFORM_ENDPOINT, payload);
     } catch (_) {}
 
     // For 504 specifically: schedule lightweight recovery probes at T+5s and
@@ -190,19 +314,7 @@
             probe_delay_s: delayMs / 1000
           };
           try {
-            if (nativeFetch) {
-              nativeFetch(ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(probePayload),
-                keepalive: true
-              }).catch(function () {});
-            } else if (navigator.sendBeacon) {
-              navigator.sendBeacon(
-                ENDPOINT,
-                new Blob([JSON.stringify(probePayload)], { type: 'application/json' })
-              );
-            }
+            sendJsonBeacon(PLATFORM_ENDPOINT, probePayload);
           } catch (_) {}
         }, delayMs);
       })(delays[i]);
@@ -277,6 +389,40 @@
         return;
       }
       console.warn('[humdb] Unhandled promise rejection:', reason);
+      reportClientError({
+        kind: 'unhandledrejection',
+        message: msg,
+        stack: reason && reason.stack ? String(reason.stack) : null
+      });
+    });
+  }
+
+  function installWindowErrorHandler() {
+    if (typeof window === 'undefined' || window[WINDOW_ERROR_FLAG]) return;
+    window[WINDOW_ERROR_FLAG] = true;
+    window.addEventListener('error', function (event) {
+      if (!event) return;
+      // Ignore resource load failures (images, stylesheets, etc.).
+      var target = event.target;
+      if (target && target !== window && target !== document) {
+        var tag = target.tagName ? String(target.tagName).toUpperCase() : '';
+        if (tag && tag !== 'SCRIPT') return;
+      }
+
+      var message = event.message || (event.error && event.error.message) || 'Unknown error';
+      var source = event.filename || (event.error && event.error.fileName) || '';
+      var line = typeof event.lineno === 'number' ? event.lineno : null;
+      var column = typeof event.colno === 'number' ? event.colno : null;
+      var stack = event.error && event.error.stack ? String(event.error.stack) : null;
+
+      reportClientError({
+        kind: 'error',
+        message: message,
+        source: source,
+        line: line,
+        column: column,
+        stack: stack
+      });
     });
   }
 
@@ -303,17 +449,9 @@
       };
 
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(
-          ENDPOINT,
-          new Blob([JSON.stringify(payload)], { type: 'application/json' })
-        );
+        sendJsonBeacon(PLATFORM_ENDPOINT, payload);
       } else if (nativeFetch) {
-        nativeFetch(ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          keepalive: true
-        }).catch(function () {});
+        sendJsonBeacon(PLATFORM_ENDPOINT, payload);
       }
     } catch (_) {}
   }
@@ -322,9 +460,11 @@
 
   if (typeof window !== 'undefined') {
     window.reportPlatformError = reportPlatformError;
+    window.reportClientError = reportClientError;
     window.looksLikeWafResponse = looksLikeWafResponse;
     installFetchWrapper();
     installJQueryHandler();
+    installWindowErrorHandler();
     installUnhandledRejectionHandler();
     installNavigationStatusCheck();
   }

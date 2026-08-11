@@ -56,6 +56,13 @@ class SecurityMonitor:
         try:
             client_info = SecurityMonitor._get_client_info()
 
+            # Client-side JS bugs are audit-only: never page admins by email, even if a
+            # caller passes notify_admins=True or a high severity by mistake.
+            if event_type == 'client_javascript_error':
+                notify_admins = False
+                if severity in ('high', 'critical'):
+                    severity = 'low'
+
             if user_id is not None:
                 resolved_user_id = user_id
             elif has_request_context():
@@ -145,6 +152,9 @@ class SecurityMonitor:
                 with it — when the same event type fires many times in a short burst
                 (e.g. a platform 502/503/504 storm reported by many browser tabs).
         """
+        if event.event_type == 'client_javascript_error':
+            return
+
         try:
             # Log to application log with high priority — always, even when the
             # email below is suppressed by cooldown, so incident timelines stay complete.

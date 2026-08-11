@@ -60,6 +60,9 @@ MAX_LOG_ROTATION_KEEP_LINES = 50000
 # ---------------------------------------------------------------------------
 MAX_NOTIFICATION_MESSAGE_LENGTH = 5000
 MAX_ERROR_LOG_REQUEST_BYTES = 5000
+MAX_CLIENT_ERROR_MESSAGE_CHARS = 1000
+MAX_CLIENT_ERROR_STACK_CHARS = 4000
+MAX_CLIENT_ERROR_SOURCE_CHARS = 500
 
 # ---------------------------------------------------------------------------
 # Data retrieval and form limits

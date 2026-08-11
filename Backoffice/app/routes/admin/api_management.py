@@ -256,6 +256,9 @@ EXTERNAL_API_REGISTRY = [
     {'group': 'System', 'path': '/api/v1/platform-error', 'methods': ['POST'],
      'auth': 'public', 'rate_limited': True,
      'description': 'Accept JSON from static error pages and client reporter (403/502/503/504) to log platform events'},
+    {'group': 'System', 'path': '/api/v1/client-error', 'methods': ['POST'],
+     'auth': 'public', 'rate_limited': True,
+     'description': 'Accept JSON from client reporter for JavaScript runtime errors (SecurityEvent, no admin email)'},
 ]
 
 # ── AI Chat API  /api/ai/v2/* ─────────────────────────────────────────────────

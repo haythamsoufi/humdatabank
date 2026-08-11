@@ -409,6 +409,115 @@ class TestApproveAllAccessRequests:
             )
         assert resp.status_code == 302
 
+    def test_bulk_approve_combines_notification_for_same_user(
+        self, logged_in_client, db_session, admin_user
+    ):
+        """Approving several countries for the same user in one bulk action should
+        send exactly one notification/email, not one per country (see the
+        2026-08-11 incident where a 10-country bulk approval fired 10 near-
+        simultaneous instant emails to the same recipient)."""
+        from app.models import Notification, NotificationType
+
+        user = create_test_user(db_session, email="bulk_combine@example.com")
+        country_a = create_test_country(db_session)
+        country_b = create_test_country(db_session)
+        _make_access_request(db_session, user, country_a, status="pending")
+        _make_access_request(db_session, user, country_b, status="pending")
+
+        with patch("app.services.notification.emails.send_instant_notification_email"), \
+             patch("app.services.notification.push.PushNotificationService"), \
+             patch("app.utils.ws_manager.broadcast_notification"), \
+             patch("app.utils.ws_manager.broadcast_unread_count"):
+            resp = logged_in_client.post(
+                "/admin/access-requests/approve-all", follow_redirects=False
+            )
+        assert resp.status_code == 302
+
+        notifications = Notification.query.filter_by(
+            user_id=user.id, notification_type=NotificationType.user_added_to_country
+        ).all()
+        assert len(notifications) == 1
+        assert country_a.name in notifications[0].message
+        assert country_b.name in notifications[0].message
+
+
+# ---------------------------------------------------------------------------
+# approve_user_access_requests (POST /admin/access-requests/user/<id>/approve-all)
+# ---------------------------------------------------------------------------
+
+class TestApproveUserAccessRequests:
+    def test_unauthenticated_redirects(self, client, db_session):
+        resp = client.post("/admin/access-requests/user/999/approve-all")
+        assert resp.status_code in (301, 302)
+
+    def test_404_for_nonexistent_user(self, logged_in_client, db_session):
+        resp = logged_in_client.post(
+            "/admin/access-requests/user/999999/approve-all", follow_redirects=False
+        )
+        assert resp.status_code == 404
+
+    def test_no_pending_requests(self, logged_in_client, db_session, admin_user):
+        user = create_test_user(db_session, email="no_pending_solo@example.com")
+        resp = logged_in_client.post(
+            f"/admin/access-requests/user/{user.id}/approve-all", follow_redirects=False
+        )
+        assert resp.status_code == 302
+
+    def test_approves_single_pending_request(self, logged_in_client, db_session, admin_user):
+        country = create_test_country(db_session)
+        user = create_test_user(db_session, email="single_pending_solo@example.com")
+        _make_access_request(db_session, user, country, status="pending")
+        with patch("app.services.notification.core.notify_user_added_to_country"):
+            resp = logged_in_client.post(
+                f"/admin/access-requests/user/{user.id}/approve-all", follow_redirects=False
+            )
+        assert resp.status_code == 302
+
+    def test_combines_notification_for_multiple_countries(
+        self, logged_in_client, db_session, admin_user
+    ):
+        """Approving all of one user's pending requests at once sends exactly
+        one notification/email covering every approved country."""
+        from app.models import Notification, NotificationType
+
+        user = create_test_user(db_session, email="multi_pending_solo@example.com")
+        country_a = create_test_country(db_session)
+        country_b = create_test_country(db_session)
+        country_c = create_test_country(db_session)
+        _make_access_request(db_session, user, country_a, status="pending")
+        _make_access_request(db_session, user, country_b, status="pending")
+        _make_access_request(db_session, user, country_c, status="pending")
+
+        with patch("app.services.notification.emails.send_instant_notification_email"), \
+             patch("app.services.notification.push.PushNotificationService"), \
+             patch("app.utils.ws_manager.broadcast_notification"), \
+             patch("app.utils.ws_manager.broadcast_unread_count"):
+            resp = logged_in_client.post(
+                f"/admin/access-requests/user/{user.id}/approve-all", follow_redirects=False
+            )
+        assert resp.status_code == 302
+
+        notifications = Notification.query.filter_by(
+            user_id=user.id, notification_type=NotificationType.user_added_to_country
+        ).all()
+        assert len(notifications) == 1
+        assert country_a.name in notifications[0].message
+        assert country_b.name in notifications[0].message
+        assert country_c.name in notifications[0].message
+
+    def test_handles_notify_exception(self, logged_in_client, db_session, admin_user):
+        country = create_test_country(db_session)
+        user = create_test_user(db_session, email="notify_exc_solo@example.com")
+        _make_access_request(db_session, user, country, status="pending")
+        with patch(
+            "app.services.notification.core.notify_user_added_to_country",
+            side_effect=Exception("notify error"),
+        ):
+            resp = logged_in_client.post(
+                f"/admin/access-requests/user/{user.id}/approve-all", follow_redirects=False
+            )
+        assert resp.status_code == 302
+
 
 # ---------------------------------------------------------------------------
 # new_user (GET/POST /admin/users/new)

@@ -488,7 +488,7 @@ def _should_track_pressure() -> bool:
     if is_static_asset_request():
         return False
     path = (request.path or '').lower()
-    if path in {'/health', '/favicon.ico', '/api/v1/platform-error'}:
+    if path in {'/health', '/favicon.ico', '/api/v1/platform-error', '/api/v1/client-error'}:
         return False
     return not _is_long_lived_connection_request()
 

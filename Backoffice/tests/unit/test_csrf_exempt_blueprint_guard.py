@@ -62,6 +62,10 @@ EXPLICITLY_ALLOWED_UNPROTECTED_ROUTES = {
         "Public, unauthenticated telemetry sink for client-side error reporting "
         "(no session, no user-specific state mutated). Rate-limited."
     ),
+    ("api", "/api/v1/client-error"): (
+        "Public, unauthenticated telemetry sink for client-side JavaScript runtime "
+        "errors (window.onerror / unhandledrejection). Rate-limited; no admin emails."
+    ),
     ("mobile_api", "/api/mobile/v1/auth/token"): (
         "Login endpoint itself — issues the JWT the rest of the blueprint checks "
         "via mobile_auth_required, so no token can exist yet to check. Guarded by "

@@ -86,6 +86,7 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
     if path in (
         "/api/v1/csrf-token",
         "/api/v1/platform-error",
+        "/api/v1/client-error",
         "/api/stream/status",
         "/api/users/profile-summary",
         "/api/preferences",

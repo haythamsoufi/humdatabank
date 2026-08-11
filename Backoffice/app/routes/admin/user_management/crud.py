@@ -441,6 +441,7 @@ def approve_all_access_requests():
 
     approved_count = 0
     errors = []
+    approved_country_ids_by_user_id = defaultdict(list)
     for req in pending:
         try:
             user = User.query.get(req.user_id)
@@ -470,15 +471,23 @@ def approve_all_access_requests():
             )
             db.session.flush()
 
-            try:
-                from app.services.notification.core import notify_user_added_to_country
-                notify_user_added_to_country(user.id, country.id)
-            except Exception as e:
-                current_app.logger.debug("notify_user_added_to_country failed: %s", e)
-
+            approved_country_ids_by_user_id[user.id].append(country.id)
             approved_count += 1
         except Exception as e:
             errors.append("Validation error.")
+
+    # One notification (and one instant email) per user for this whole batch,
+    # instead of one per country approved.
+    for user_id, country_ids in approved_country_ids_by_user_id.items():
+        try:
+            if len(country_ids) == 1:
+                from app.services.notification.core import notify_user_added_to_country
+                notify_user_added_to_country(user_id, country_ids[0])
+            else:
+                from app.services.notification.core import notify_user_added_to_countries
+                notify_user_added_to_countries(user_id, country_ids)
+        except Exception as e:
+            current_app.logger.debug("notify_user_added_to_country(ies) failed: %s", e)
 
     if approved_count:
         flash(f"Approved {approved_count} request(s).", "success")
@@ -500,6 +509,7 @@ def approve_user_access_requests(user_id):
 
     approved_count = 0
     errors = []
+    approved_country_ids = []
     for req in pending:
         try:
             country = Country.query.get(req.country_id)
@@ -528,15 +538,23 @@ def approve_user_access_requests(user_id):
             )
             db.session.flush()
 
-            try:
-                from app.services.notification.core import notify_user_added_to_country
-                notify_user_added_to_country(user.id, country.id)
-            except Exception as e:
-                current_app.logger.debug("notify_user_added_to_country failed: %s", e)
-
+            approved_country_ids.append(country.id)
             approved_count += 1
         except Exception:
             errors.append("Validation error.")
+
+    # One notification (and one instant email) for this whole batch, instead of
+    # one per country approved.
+    if approved_country_ids:
+        try:
+            if len(approved_country_ids) == 1:
+                from app.services.notification.core import notify_user_added_to_country
+                notify_user_added_to_country(user.id, approved_country_ids[0])
+            else:
+                from app.services.notification.core import notify_user_added_to_countries
+                notify_user_added_to_countries(user.id, approved_country_ids)
+        except Exception as e:
+            current_app.logger.debug("notify_user_added_to_country(ies) failed: %s", e)
 
     if approved_count:
         flash(f"Approved {approved_count} request(s) for {user.email}.", "success")

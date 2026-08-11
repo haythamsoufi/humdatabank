@@ -308,6 +308,27 @@ class TestLogSecurityEvent:
                 )
             mock_alert.assert_not_called()
 
+    def test_client_javascript_error_never_sends_alert_even_when_high(self, app, db_session):
+        from app.models import SecurityEvent
+        from app.services.security.monitoring import SecurityMonitor
+
+        with app.app_context():
+            with (
+                patch("app.services.security.monitoring.has_request_context", return_value=False),
+                patch.object(SecurityMonitor, "_send_security_alert") as mock_alert,
+            ):
+                SecurityMonitor.log_security_event(
+                    event_type="client_javascript_error",
+                    severity="high",
+                    description="ReferenceError: should not email",
+                    notify_admins=True,
+                )
+            mock_alert.assert_not_called()
+
+        event = SecurityEvent.query.filter_by(event_type="client_javascript_error").first()
+        assert event is not None
+        assert event.severity == "low"
+
     def test_does_not_send_alert_when_notify_false(self, app, db_session):
         from app.services.security.monitoring import SecurityMonitor
 

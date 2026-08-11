@@ -12,6 +12,7 @@ from app.utils.api_usage_logging_skip import should_skip_api_usage_path
     [
         ("/api/v1/csrf-token", "GET", True),
         ("/api/v1/platform-error", "POST", True),
+        ("/api/v1/client-error", "POST", True),
         ("/api/stream/status", "GET", True),
         ("/api/users/profile-summary", "GET", True),
         ("/api/preferences", "GET", True),

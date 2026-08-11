@@ -106,6 +106,8 @@ def y_scale(
     value: float,
     values: list[float | None],
     annual_target: float | None,
+    *,
+    height: int = CHART_HEIGHT,
 ) -> tuple[float, float]:
     numeric = [v for v in values if v is not None]
     all_y = list(numeric)
@@ -113,7 +115,7 @@ def y_scale(
         all_y.append(annual_target)
     y_max = max(all_y) * 1.18 if all_y else 1
     pad_t, pad_b = 22, 8
-    y_px = pad_t + (CHART_HEIGHT - pad_t - pad_b) * (1 - value / y_max)
+    y_px = pad_t + (height - pad_t - pad_b) * (1 - value / y_max)
     return y_px, y_max
 
 
@@ -134,8 +136,8 @@ def _nearest_value(values: list[float | None], index: int, direction: int) -> fl
     return None
 
 
-def chart_data_bottom_y() -> float:
-    return CHART_PAD_TOP + (CHART_HEIGHT - CHART_PAD_TOP - CHART_PAD_BOTTOM)
+def chart_data_bottom_y(*, height: int = CHART_HEIGHT) -> float:
+    return CHART_PAD_TOP + (height - CHART_PAD_TOP - CHART_PAD_BOTTOM)
 
 
 def value_label_above(
@@ -161,13 +163,15 @@ def _value_label_y_px(
     values: list[float | None],
     annual_target: float | None,
     y_max: float,
+    *,
+    height: int = CHART_HEIGHT,
 ) -> tuple[float, bool]:
     above = value_label_above(index, value, values, annual_target, y_max)
-    v_y, _ = y_scale(value, values, annual_target)
+    v_y, _ = y_scale(value, values, annual_target, height=height)
     if above:
         return v_y - LABEL_ABOVE_OFFSET, True
     below_y = v_y + LABEL_BELOW_OFFSET
-    if below_y > chart_data_bottom_y() - MIN_LABEL_CLEARANCE_FROM_BOTTOM:
+    if below_y > chart_data_bottom_y(height=height) - MIN_LABEL_CLEARANCE_FROM_BOTTOM:
         return v_y - LABEL_ABOVE_OFFSET, True
     return below_y, False
 
@@ -178,6 +182,8 @@ def target_label_layout(
     annual_target: float | None,
     annual_target_label: str | None,
     chart_width: int,
+    *,
+    height: int = CHART_HEIGHT,
 ) -> dict[str, bool]:
     """Return placement hints to reduce overlap between target and value labels."""
     if annual_target is None:
@@ -185,8 +191,8 @@ def target_label_layout(
 
     numeric = [v for v in values if v is not None]
     n = len(values)
-    _, y_max = y_scale(numeric[0] if numeric else 0, values, annual_target)
-    ty_px, _ = y_scale(annual_target, values, annual_target)
+    _, y_max = y_scale(numeric[0] if numeric else 0, values, annual_target, height=height)
+    ty_px, _ = y_scale(annual_target, values, annual_target, height=height)
 
     tag_below = False
     tag_top = ty_px - 12
@@ -196,7 +202,7 @@ def target_label_layout(
             continue
         if x_percent(i, n, chart_width) > 30:
             continue
-        ly, _ = _value_label_y_px(i, val, values, annual_target, y_max)
+        ly, _ = _value_label_y_px(i, val, values, annual_target, y_max, height=height)
         if not (tag_bottom < ly - 10 or tag_top > ly):
             tag_below = True
             break
@@ -208,7 +214,7 @@ def target_label_layout(
             continue
         if x_percent(i, n, chart_width) < 65:
             continue
-        ly, above = _value_label_y_px(i, val, values, annual_target, y_max)
+        ly, above = _value_label_y_px(i, val, values, annual_target, y_max, height=height)
         if abs(val - annual_target) < y_max * 0.08:
             value_above = not above
             value_below = above
@@ -249,6 +255,7 @@ def render_line_chart_svg(
     item: dict,
     width: int,
     *,
+    height: int = CHART_HEIGHT,
     chart_id: str = "line",
     show_target_line: bool = True,
     show_value_labels: bool = False,
@@ -258,7 +265,6 @@ def render_line_chart_svg(
 ) -> str:
     """Render line geometry as SVG (labels optional for PNG assets)."""
     values = item["values"]
-    height = CHART_HEIGHT
     pad_l = CHART_PAD_L
     pad_r = CHART_PAD_R
     pad_t = CHART_PAD_TOP
@@ -304,6 +310,7 @@ def render_line_chart_svg(
         annual_target,
         item.get("annual_target_label"),
         width,
+        height=height,
     )
 
     if fx.get("area_fill") or fx.get("line_shadow"):
@@ -421,7 +428,7 @@ def render_line_chart_svg(
         if show_value_labels:
             label = item["value_labels"][i]
             if label:
-                ly, _ = _value_label_y_px(i, value, values, annual_target, y_max)
+                ly, _ = _value_label_y_px(i, value, values, annual_target, y_max, height=height)
                 parts.append(
                     _svg_chart_text(
                         str(label),

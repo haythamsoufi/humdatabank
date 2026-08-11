@@ -3,6 +3,7 @@ Tests for app/routes/api/error_log.py
 
 Coverage targets:
 - POST /api/v1/platform-error        (all validation branches, success, exception)
+- POST /api/v1/client-error          (JS runtime errors, ignored noise, success)
 - _strip_control_chars               (empty, control chars, max_len)
 - sanitize_url                       (happy path, sensitive params, bad scheme, empty)
 """
@@ -358,3 +359,145 @@ class TestLogPlatformError:
                 "url": "javascript:alert(1)",
             })
         assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for client error helpers
+# ---------------------------------------------------------------------------
+
+class TestShouldIgnoreClientError:
+    def test_empty_message_ignored(self):
+        from app.routes.api.error_log import should_ignore_client_error
+        assert should_ignore_client_error(message="   ") is True
+
+    def test_script_error_without_source_ignored(self):
+        from app.routes.api.error_log import should_ignore_client_error
+        assert should_ignore_client_error(message="Script error.", source=None) is True
+
+    def test_abort_error_ignored(self):
+        from app.routes.api.error_log import should_ignore_client_error
+        assert should_ignore_client_error(message="Uncaught AbortError: The operation was aborted.") is True
+
+    def test_reference_error_not_ignored(self):
+        from app.routes.api.error_log import should_ignore_client_error
+        assert should_ignore_client_error(
+            message="ReferenceError: Cannot access 'availableCategories' before initialization",
+            source="https://example.com/static/js/admin/manage-assignment.js",
+        ) is False
+
+    def test_fingerprint_is_stable(self):
+        from app.routes.api.error_log import build_client_error_fingerprint
+        assert build_client_error_fingerprint(
+            kind="error",
+            message="boom",
+            source="https://example.com/a.js",
+            line_no=10,
+        ) == "error|boom|https://example.com/a.js|10"
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/client-error
+# ---------------------------------------------------------------------------
+
+class TestLogClientError:
+    """Tests for POST /api/v1/client-error."""
+
+    @pytest.fixture(autouse=True)
+    def disable_client_error_rate_limit(self, app):
+        from app.extensions import limiter
+        previous = limiter.enabled
+        limiter.enabled = False
+        yield
+        limiter.enabled = previous
+
+    def _post(self, client, payload, headers=None):
+        h = {**(headers or {}), "Content-Type": "application/json"}
+        return client.post(_api("/client-error"), json=payload, headers=h)
+
+    def test_wrong_content_type_returns_400(self, client, db_session):
+        resp = client.post(
+            _api("/client-error"),
+            data="message=bad",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        assert resp.status_code == 400
+
+    def test_invalid_kind_returns_400(self, client, db_session):
+        resp = self._post(client, {"kind": "resource", "message": "boom"})
+        assert resp.status_code == 400
+
+    def test_valid_reference_error_logged(self, client, db_session):
+        captured = {}
+
+        def capture(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture,
+        ):
+            resp = self._post(client, {
+                "kind": "error",
+                "message": "ReferenceError: Cannot access 'availableCategories' before initialization",
+                "source": "https://example.com/static/js/admin/manage-assignment.js",
+                "line": 1776,
+                "column": 5,
+                "stack": "ReferenceError: ...",
+                "url": "https://example.com/admin/assignments/1",
+            })
+        assert resp.status_code == 200
+        assert captured.get("event_type") == "client_javascript_error"
+        assert captured.get("severity") == "low"
+        assert captured.get("notify_admins") is False
+        ctx = captured.get("context_data", {})
+        assert ctx.get("kind") == "error"
+        assert "fingerprint" in ctx
+        assert "availableCategories" in ctx.get("message", "")
+
+    def test_ignored_message_returns_ok_without_logging(self, client, db_session):
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event") as mock_log:
+            resp = self._post(client, {
+                "kind": "unhandledrejection",
+                "message": "AbortError: The user aborted a request.",
+            })
+        assert resp.status_code == 200
+        mock_log.assert_not_called()
+
+    def test_missing_message_returns_ok_without_logging(self, client, db_session):
+        with patch("app.services.security.monitoring.SecurityMonitor.log_security_event") as mock_log:
+            resp = self._post(client, {"kind": "error", "message": "   "})
+        assert resp.status_code == 200
+        mock_log.assert_not_called()
+
+    def test_database_log_failure_does_not_break_endpoint(self, client, db_session):
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=Exception("DB down"),
+        ):
+            resp = self._post(client, {
+                "kind": "error",
+                "message": "TypeError: Cannot read properties of undefined",
+            })
+        assert resp.status_code == 200
+
+    def test_duplicate_same_day_suppressed(self, client, db_session):
+        from app.models import SecurityEvent
+
+        payload = {
+            "kind": "error",
+            "message": "ReferenceError: duplicate dedupe test marker",
+            "source": "https://example.com/static/js/test.js",
+            "line": 42,
+            "url": "https://example.com/admin/test",
+        }
+        resp1 = self._post(client, payload)
+        resp2 = self._post(client, payload)
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp2.get_json().get("message") == "Duplicate client error suppressed"
+        assert (
+            SecurityEvent.query.filter_by(event_type="client_javascript_error")
+            .filter(SecurityEvent.description.like("%duplicate dedupe test marker%"))
+            .count()
+            == 1
+        )

@@ -6,6 +6,19 @@ from app.services.notification.audience import collect_entity_admin_audience_rec
 from app.services.notification.creation import create_notification
 from app.services.notification.core import log_entity_activity, notify_entity_focal_points
 
+# Safety cap so a very large batch still produces a short, readable message/email
+# instead of listing hundreds of country names.
+_MAX_COUNTRIES_LISTED_IN_MESSAGE = 15
+
+
+def _format_country_names_for_message(names):
+    """Comma-joined country names, capped with a '(+N more)' suffix for large batches."""
+    if len(names) <= _MAX_COUNTRIES_LISTED_IN_MESSAGE:
+        return ', '.join(names)
+    shown = names[:_MAX_COUNTRIES_LISTED_IN_MESSAGE]
+    remaining = len(names) - len(shown)
+    return f"{', '.join(shown)} (+{remaining} more)"
+
 
 def notify_user_added_to_country(user_id, country_id):
     """Notify user when they are added as a focal point to a country."""
@@ -40,6 +53,81 @@ def notify_user_added_to_country(user_id, country_id):
         )
     except Exception as e:
         current_app.logger.error(f"Error notifying user {user_id} about being added to country {country_id}: {str(e)}", exc_info=True)
+        return []
+
+
+def notify_user_added_to_countries(user_id, country_ids):
+    """
+    Notify a user once about being added as a focal point to one or more countries.
+
+    Bulk approval flows (e.g. "approve all pending requests") used to call
+    notify_user_added_to_country() once per country, which meant one notification
+    row AND one instant email per country — a burst of 10+ near-simultaneous emails
+    to the same recipient during a single admin action (see the 2026-08-11 incident
+    where a 10-country bulk approval produced 10 failed instant-email sends).
+    This combines an entire batch into a single notification/email.
+
+    Falls back to the exact single-country message when only one id is given, so
+    callers can use this unconditionally regardless of batch size.
+    """
+    try:
+        unique_country_ids = list(dict.fromkeys(
+            int(cid) for cid in (country_ids or []) if cid is not None
+        ))
+        if not unique_country_ids:
+            return []
+
+        user = User.query.get(user_id)
+        if not user:
+            current_app.logger.warning(
+                f"Cannot notify user {user_id} about countries {unique_country_ids}: user not found"
+            )
+            return []
+
+        countries = Country.query.filter(Country.id.in_(unique_country_ids)).all()
+        if not countries:
+            current_app.logger.warning(
+                f"Cannot notify user {user_id} about countries {unique_country_ids}: no matching countries found"
+            )
+            return []
+
+        if len(countries) == 1:
+            return create_notification(
+                user_ids=[user_id],
+                notification_type=NotificationType.user_added_to_country,
+                title_key='notification.user_added_to_country.title',
+                title_params=None,
+                message_key='notification.user_added_to_country.message',
+                message_params={'country': countries[0].name},
+                entity_type='country',
+                entity_id=countries[0].id,
+                related_object_type='country',
+                related_object_id=countries[0].id,
+                related_url=url_for('main.dashboard'),
+                priority='high',
+                icon='fas fa-user-plus'
+            )
+
+        country_names = sorted(c.name for c in countries)
+        return create_notification(
+            user_ids=[user_id],
+            notification_type=NotificationType.user_added_to_country,
+            title_key='notification.user_added_to_country.title_bulk',
+            title_params={'country_count': len(country_names)},
+            message_key='notification.user_added_to_country.message_bulk',
+            message_params={
+                'country_count': len(country_names),
+                'countries': _format_country_names_for_message(country_names),
+            },
+            related_url=url_for('main.dashboard'),
+            priority='high',  # High priority so one email is still sent even if user has digest preferences
+            icon='fas fa-user-plus'
+        )
+    except Exception as e:
+        current_app.logger.error(
+            f"Error notifying user {user_id} about being added to countries {country_ids}: {str(e)}",
+            exc_info=True
+        )
         return []
 
 

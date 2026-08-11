@@ -25,6 +25,7 @@ from app.services.notification.core import (
 )
 from app.services.notification.validators import validate_notification_url as _validate_from_validators
 from app.models.enums import NotificationType
+from tests.factories import create_test_user, create_test_country
 
 
 # ---------------------------------------------------------------------------
@@ -867,6 +868,101 @@ class TestCreateNotification:
         assert result is not None
 
 
+# ---------------------------------------------------------------------------
+# notify_user_added_to_countries (bulk country-approval notifier)
+# ---------------------------------------------------------------------------
+
+class TestNotifyUserAddedToCountries:
+    """Bulk approvals should send one combined notification/email, not one per country."""
+
+    def test_multiple_countries_create_single_notification(self, app, db_session):
+        from app.services.notification.notifiers.digest import notify_user_added_to_countries
+        from app.models import Notification
+
+        with app.app_context():
+            user = create_test_user(db_session, email='bulk_notify_multi@test.com')
+            country_a = create_test_country(db_session)
+            country_b = create_test_country(db_session)
+            country_c = create_test_country(db_session)
+
+            with patch('app.services.notification.emails.send_instant_notification_email'), \
+                 patch('app.services.notification.push.PushNotificationService'), \
+                 patch('app.utils.ws_manager.broadcast_notification'), \
+                 patch('app.utils.ws_manager.broadcast_unread_count'):
+                result = notify_user_added_to_countries(
+                    user.id, [country_a.id, country_b.id, country_c.id]
+                )
+
+            assert len(result) == 1
+            notifications = Notification.query.filter_by(user_id=user.id).all()
+            assert len(notifications) == 1
+            message = notifications[0].message
+            assert country_a.name in message
+            assert country_b.name in message
+            assert country_c.name in message
+            assert notifications[0].message_key == 'notification.user_added_to_country.message_bulk'
+            assert notifications[0].message_params.get('country_count') == 3
+
+    def test_single_country_matches_singular_notifier(self, app, db_session):
+        """A one-country batch should look exactly like notify_user_added_to_country."""
+        from app.services.notification.notifiers.digest import notify_user_added_to_countries
+        from app.models import Notification
+
+        with app.app_context():
+            user = create_test_user(db_session, email='bulk_notify_single@test.com')
+            country = create_test_country(db_session)
+
+            with patch('app.services.notification.emails.send_instant_notification_email'), \
+                 patch('app.services.notification.push.PushNotificationService'), \
+                 patch('app.utils.ws_manager.broadcast_notification'), \
+                 patch('app.utils.ws_manager.broadcast_unread_count'):
+                result = notify_user_added_to_countries(user.id, [country.id])
+
+            assert len(result) == 1
+            notification = Notification.query.filter_by(user_id=user.id).first()
+            assert notification.message_key == 'notification.user_added_to_country.message'
+            assert notification.entity_id == country.id
+            assert country.name in notification.message
+
+    def test_duplicate_ids_deduplicated(self, app, db_session):
+        from app.services.notification.notifiers.digest import notify_user_added_to_countries
+        from app.models import Notification
+
+        with app.app_context():
+            user = create_test_user(db_session, email='bulk_notify_dupe@test.com')
+            country = create_test_country(db_session)
+
+            with patch('app.services.notification.emails.send_instant_notification_email'), \
+                 patch('app.services.notification.push.PushNotificationService'), \
+                 patch('app.utils.ws_manager.broadcast_notification'), \
+                 patch('app.utils.ws_manager.broadcast_unread_count'):
+                result = notify_user_added_to_countries(user.id, [country.id, country.id])
+
+            assert len(result) == 1
+            assert Notification.query.filter_by(user_id=user.id).count() == 1
+
+    def test_unknown_user_returns_empty_list(self, app, db_session):
+        from app.services.notification.notifiers.digest import notify_user_added_to_countries
+
+        with app.app_context():
+            country = create_test_country(db_session)
+            assert notify_user_added_to_countries(9999999, [country.id]) == []
+
+    def test_no_valid_countries_returns_empty_list(self, app, db_session):
+        from app.services.notification.notifiers.digest import notify_user_added_to_countries
+
+        with app.app_context():
+            user = create_test_user(db_session, email='bulk_notify_novalid@test.com')
+            assert notify_user_added_to_countries(user.id, [9999999, 8888888]) == []
+
+    def test_empty_country_ids_returns_empty_list(self, app, db_session):
+        from app.services.notification.notifiers.digest import notify_user_added_to_countries
+
+        with app.app_context():
+            user = create_test_user(db_session, email='bulk_notify_empty@test.com')
+            assert notify_user_added_to_countries(user.id, []) == []
+
+
 class TestNotifierReexports:
     """Typed notify_* helpers remain importable from notification.core."""
 
@@ -877,4 +973,5 @@ class TestNotifierReexports:
         assert core_mod.notify_assignment_created is assignment.notify_assignment_created
         assert core_mod.notify_document_uploaded is documents.notify_document_uploaded
         assert core_mod.notify_user_added_to_country is digest.notify_user_added_to_country
+        assert core_mod.notify_user_added_to_countries is digest.notify_user_added_to_countries
         assert core_mod.notify_standalone_document_uploaded is documents.notify_standalone_document_uploaded

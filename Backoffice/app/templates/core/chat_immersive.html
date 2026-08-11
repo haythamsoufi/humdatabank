@@ -71,6 +71,9 @@
             iUnderstand: {{ _('I understand') | tojson }}
         };
     </script>
+    <script nonce="{{ csp_nonce() }}">
+        window.__humdbClientErrorReportingEnabled = {{ (not config.DEBUG)|tojson }};
+    </script>
     <script src="{{ static_url('js/core/csrf.js') }}" defer></script>
     <script src="{{ static_url('js/lib/platform-error-reporter.js') }}"></script>
     <script src="{{ static_url('js/core/confirm-dialogs.js') }}"></script>

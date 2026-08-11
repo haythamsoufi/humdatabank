@@ -1,6 +1,7 @@
 """JSON API endpoints for user management (mobile / AJAX clients)."""
 
 import re
+from collections import defaultdict
 from contextlib import suppress
 
 from flask import request, current_app
@@ -637,6 +638,7 @@ def api_approve_all_access_requests():
 
     approved_count = 0
     errors = 0
+    approved_country_ids_by_user_id = defaultdict(list)
     for req in pending:
         try:
             user = User.query.get(req.user_id)
@@ -667,16 +669,25 @@ def api_approve_all_access_requests():
             )
             db.session.flush()
 
-            try:
-                from app.services.notification.core import notify_user_added_to_country
-
-                notify_user_added_to_country(user.id, country.id)
-            except Exception as e:
-                current_app.logger.debug("notify_user_added_to_country failed: %s", e)
-
+            approved_country_ids_by_user_id[user.id].append(country.id)
             approved_count += 1
         except Exception:
             errors += 1
+
+    # One notification (and one instant email) per user for this whole batch,
+    # instead of one per country approved.
+    for user_id, country_ids in approved_country_ids_by_user_id.items():
+        try:
+            if len(country_ids) == 1:
+                from app.services.notification.core import notify_user_added_to_country
+
+                notify_user_added_to_country(user_id, country_ids[0])
+            else:
+                from app.services.notification.core import notify_user_added_to_countries
+
+                notify_user_added_to_countries(user_id, country_ids)
+        except Exception as e:
+            current_app.logger.debug("notify_user_added_to_country(ies) failed: %s", e)
 
     return json_ok(approved_count=approved_count, errors=errors)
 

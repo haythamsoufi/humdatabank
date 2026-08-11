@@ -32,6 +32,7 @@ _DOCX_LABEL_COL_IN = 2.85
 _DOCX_DONUT_COL_IN = 0.55
 _DOCX_TABLE_FONT = 9
 _DOCX_CHART_DPI = 175  # PNG resolution for embedded line charts (~481px @ 2.75in)
+_DOCX_CHART_HEIGHT = 140  # SVG/PNG height for Word charts (px); taller than the HTML default (110)
 
 
 def _set_rfonts(r_pr, font_name: str) -> None:
@@ -174,6 +175,7 @@ def render_line_chart_asset(
     output_path: Path,
     *,
     width: int = CHART_WIDTH_PX,
+    height: int = _DOCX_CHART_HEIGHT,
     language: str = "English",
     show_labels: bool = True,
     session=None,
@@ -182,13 +184,14 @@ def render_line_chart_asset(
     svg = render_line_chart_svg(
         item,
         width,
+        height=height,
         chart_id="asset-line",
         show_value_labels=show_labels,
         show_target_labels=show_labels,
         target_label=target_label,
         language=language,
     )
-    write_svg_png(svg, output_path, width=width, height=110)
+    write_svg_png(svg, output_path, width=width, height=height)
     return output_path
 
 
@@ -247,6 +250,8 @@ def _set_cell_text(
 ) -> None:
     cell.text = ""
     p = cell.paragraphs[0]
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
     if align_center:
         alignment = WD_ALIGN_PARAGRAPH.CENTER
     elif align_right or is_rtl(language):
@@ -353,8 +358,11 @@ def _add_cumulative_block(
     chart_cell = table.cell(0, 1)
     chart_cell.merge(table.cell(0, n_years))
     chart_cell.text = ""
-    _apply_paragraph_language(chart_cell.paragraphs[0], language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
-    chart_cell.paragraphs[0].add_run().add_picture(
+    p = chart_cell.paragraphs[0]
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+    _apply_paragraph_language(p, language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
+    p.add_run().add_picture(
         str(chart_path),
         width=Inches(_chart_area_width(n_years)),
     )
@@ -390,8 +398,11 @@ def _set_row_cant_split(row) -> None:
 
 def _add_donut_image_cell(cell, image_path: Path, *, language: str) -> None:
     cell.text = ""
-    _apply_paragraph_language(cell.paragraphs[0], language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
-    cell.paragraphs[0].add_run().add_picture(str(image_path), width=Inches(0.45))
+    p = cell.paragraphs[0]
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(0)
+    _apply_paragraph_language(p, language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
+    p.add_run().add_picture(str(image_path), width=Inches(0.45))
     _set_cell_vertical_alignment(cell)
 
 

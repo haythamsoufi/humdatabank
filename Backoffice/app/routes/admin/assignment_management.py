@@ -604,17 +604,29 @@ def new_assignment():
                 # Send notifications to focal points only if requested
                 send_notifications = getattr(form.send_notifications, 'data', True)
                 if send_notifications:
+                    notif_ok = 0
+                    notif_err = 0
                     try:
                         from app.services.notification.core import notify_assignment_created
                         for aes in created_aes_list:
                             try:
-                                notify_assignment_created(aes)
+                                results = notify_assignment_created(aes) or []
+                                notif_ok += len(results)
                             except Exception as e:
+                                notif_err += 1
                                 current_app.logger.error(f"Error sending assignment created notification for AES {aes.id}: {e}", exc_info=True)
                                 # Don't fail the assignment creation if notification fails
                     except Exception as e:
                         current_app.logger.error(f"Error importing notification function: {e}", exc_info=True)
                         # Don't fail the assignment creation if notification fails
+                    current_app.logger.info(
+                        f"Creating assignment: notifications dispatched — "
+                        f"{notif_ok} sent, {notif_err} errors, {len(created_aes_list)} entities"
+                    )
+                else:
+                    current_app.logger.info(
+                        "Creating assignment: notifications skipped (send_notifications=False)"
+                    )
 
                 # Create success message with entity counts
                 total_entities = len(created_aes_list)
@@ -678,6 +690,86 @@ def check_assignment_duplicate():
         "is_closed": bool(getattr(existing, "is_closed", False)),
         "is_effectively_closed": bool(getattr(existing, "is_effectively_closed", False)),
     })
+
+@bp.route("/assignments/notification-preview", methods=["GET"])
+@permission_required('admin.assignments.create')
+def assignment_notification_preview():
+    """
+    Returns a preview of notifications that would be sent when creating an assignment.
+    Used by the create-assignment UI to show recipient counts in the confirmation dialog
+    and warn when audience settings disable notifications.
+
+    Query params:
+        country_ids[] – list of country IDs that will be in the new assignment
+    """
+    from app.services.platform.app_settings_service import audience_bucket_enabled
+    from app.models.enums import NotificationType
+    from app.models.core import UserEntityPermission
+    from app.models.rbac import RbacUserRole, RbacRole
+    from app.services.notification.creation import (
+        get_user_preferences_batch,
+        is_notification_type_enabled_for_user,
+        is_email_notification_type_enabled_for_user,
+    )
+    from sqlalchemy import distinct
+
+    focal_enabled = audience_bucket_enabled(NotificationType.assignment_created, "focal_points")
+
+    country_ids_raw = request.args.getlist('country_ids[]') or request.args.getlist('country_ids')
+    try:
+        country_ids = [int(c) for c in country_ids_raw if c]
+    except (ValueError, TypeError):
+        return json_bad_request("Invalid country_ids")
+
+    if not focal_enabled:
+        return json_ok(
+            focal_points_enabled=False,
+            total_focal_users=0,
+            email_users=0,
+            message="Notifications for 'assignment_created' are disabled in platform settings (Admin → Settings → Notifications)."
+        )
+
+    if not country_ids:
+        return json_ok(focal_points_enabled=True, total_focal_users=0, email_users=0)
+
+    # Single batched query: distinct users with assignment_editor_submitter on any of the selected countries
+    user_id_rows = (
+        db.session.query(distinct(UserEntityPermission.user_id))
+        .join(User, UserEntityPermission.user_id == User.id)
+        .filter(User.active.is_(True))
+        .join(RbacUserRole, RbacUserRole.user_id == User.id)
+        .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
+        .filter(
+            UserEntityPermission.entity_type == EntityType.country.value,
+            UserEntityPermission.entity_id.in_(country_ids),
+            RbacRole.code == "assignment_editor_submitter",
+        )
+        .all()
+    )
+    all_user_ids = [row[0] for row in user_id_rows if row[0] != current_user.id]
+
+    if not all_user_ids:
+        return json_ok(focal_points_enabled=True, total_focal_users=0, email_users=0)
+
+    # Check notification preferences in one batch
+    prefs_cache = get_user_preferences_batch(all_user_ids)
+    notif_enabled_ids = [
+        uid for uid in all_user_ids
+        if is_notification_type_enabled_for_user(uid, NotificationType.assignment_created, preferences_cache=prefs_cache)
+    ]
+
+    # Count how many of those would also receive an email
+    email_count = sum(
+        1 for uid in notif_enabled_ids
+        if is_email_notification_type_enabled_for_user(uid, NotificationType.assignment_created, preferences_cache=prefs_cache)
+    )
+
+    return json_ok(
+        focal_points_enabled=True,
+        total_focal_users=len(notif_enabled_ids),
+        email_users=email_count,
+    )
+
 
 @bp.route("/assignments/edit/<int:assignment_id>", methods=["GET", "POST"])
 @permission_required('admin.assignments.edit')

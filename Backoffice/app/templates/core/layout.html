@@ -562,6 +562,9 @@
     <script src="{{ static_url('js/core/page-header-pin.js') }}"></script>
     <script src="{{ static_url('js/core/confirm-dialogs.js') }}"></script>
     <script src="{{ static_url('js/lib/modal-utils.js') }}"></script>
+    <script nonce="{{ csp_nonce() }}">
+    window.__humdbClientErrorReportingEnabled = {{ (not config.DEBUG)|tojson }};
+    </script>
     <script src="{{ static_url('js/lib/platform-error-reporter.js') }}"></script>
     <script src="{{ static_url('js/lib/api-fetch.js') }}"></script>
     <script src="{{ static_url('js/lib/auto-translate-service.js') }}"></script>

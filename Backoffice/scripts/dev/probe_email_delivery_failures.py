@@ -94,6 +94,44 @@ def main() -> None:
                 f"MAIL_DEFAULT_SENDER={app.config.get('MAIL_DEFAULT_SENDER')}",
             )
 
+            from collections import Counter  # noqa: WPS433
+            from app.models import EmailDeliveryLog  # noqa: WPS433
+
+            today_rows = (
+                EmailDeliveryLog.query.filter(EmailDeliveryLog.created_at >= since)
+                .order_by(EmailDeliveryLog.created_at.asc())
+                .all()
+            )
+            print(
+                "today_delivery_log_summary:",
+                len(today_rows),
+                dict(Counter(str(r.status) for r in today_rows)),
+            )
+            for r in today_rows:
+                if r.id not in {log.id for log in logs}:
+                    print(
+                        f"  other id={r.id} status={r.status} email={r.email_address} "
+                        f"subject={(r.subject or '')[:60]} ts={r.created_at}"
+                    )
+
+            from app.models import AdminActionLog  # noqa: WPS433
+
+            admin_rows = (
+                AdminActionLog.query.filter(
+                    AdminActionLog.timestamp >= since,
+                    AdminActionLog.action_description.ilike("%rachael.ndune%"),
+                )
+                .order_by(AdminActionLog.timestamp.asc())
+                .limit(30)
+                .all()
+            )
+            print(f"admin_actions_rachael_today={len(admin_rows)}")
+            for row in admin_rows:
+                print(
+                    f"  ts={row.timestamp} action={row.action_type} "
+                    f"desc={row.action_description[:160]}"
+                )
+
 
 if __name__ == "__main__":
     main()

@@ -168,6 +168,15 @@ def translate_notification_message(translation_key: str, params: Optional[Dict[s
             'You are now a focal point for %(country)s.'
         ),
 
+        # Bulk variant: one notification/email for a whole batch of countries approved
+        # together (e.g. "approve all"), instead of one per country.
+        'notification.user_added_to_country.title_bulk': _notification_msgid(
+            'Added to %(country_count)s country teams'
+        ),
+        'notification.user_added_to_country.message_bulk': _notification_msgid(
+            'You are now a focal point for %(country_count)s countries: %(countries)s.'
+        ),
+
         # Form notifications
         'notification.form_updated.title': _notification_msgid('Form updated'),
         'notification.form_updated.message': _notification_msgid('Form data has been updated.'),
@@ -871,6 +880,10 @@ def notify_entity_focal_points(
     """
     try:
         if not audience_bucket_enabled(notification_type, "focal_points"):
+            current_app.logger.info(
+                "[NOTIFY] focal_points bucket disabled for %s — skipping notify_entity_focal_points "
+                "(%s:%s)", notification_type, entity_type, entity_id
+            )
             return []
 
         exclude_set = set()
@@ -886,6 +899,10 @@ def notify_entity_focal_points(
         )
 
         if not focal_point_ids:
+            current_app.logger.debug(
+                "[NOTIFY] notify_entity_focal_points: no focal points found for "
+                "%s:%s (type=%s)", entity_type, entity_id, notification_type
+            )
             return []
 
         return create_notification(
@@ -1305,6 +1322,7 @@ from app.services.notification.notifiers.documents import (
 )
 from app.services.notification.notifiers.digest import (
     notify_user_added_to_country,
+    notify_user_added_to_countries,
     notify_public_submission_received,
 )
 

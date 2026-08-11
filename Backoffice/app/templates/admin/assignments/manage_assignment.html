@@ -348,10 +348,18 @@
             </div>
             <div class="flex items-center pt-2 border-t border-gray-200">
                 <div class="flex items-center">
-                    {{ form.send_notifications(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
+                    {{ form.send_notifications(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="send_notifications") }}
                     {{ form.send_notifications.label(class="ml-2 text-sm text-gray-700") }}
                 </div>
                 <span class="ml-2 text-xs text-gray-500">{{ _('Focal points will be notified about the new assignment. Uncheck to create without sending notifications.') }}</span>
+            </div>
+            <div id="notif-audience-warning" class="hidden mt-2 flex items-start gap-2 rounded-md bg-yellow-50 border border-yellow-300 px-3 py-2 text-xs text-yellow-800">
+                <i class="fas fa-exclamation-triangle mt-0.5 flex-shrink-0"></i>
+                <span id="notif-audience-warning-text"></span>
+            </div>
+            <div id="notif-recipient-preview" class="hidden mt-2 flex items-start gap-2 rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
+                <i class="fas fa-bell mt-0.5 flex-shrink-0"></i>
+                <span id="notif-recipient-preview-text"></span>
             </div>
             {% if form.requires_delegation_review is defined %}
             <div class="flex items-start pt-2 border-t border-gray-200">
@@ -1072,6 +1080,7 @@ window.manageAssignmentConfig = {
         apiPartOfPrograms: {{ url_for('organization.api_get_part_of_programs')|tojson }},
         organizationIndex: {{ url_for('organization.index')|tojson }},
         checkDuplicate: {{ url_for('assignment_management.check_assignment_duplicate')|tojson }},
+        notificationPreview: {{ url_for('assignment_management.assignment_notification_preview')|tojson }},
         reviewRecipientSearch: {{ url_for('assignment_management.api_search_submission_review_recipients')|tojson }},
         adminBase: {{ url_for('system_admin.manage_indicator_bank')|replace('/indicator-bank', '')|tojson }},
         editEntityStatusBase: {{ url_for('assignment_management.edit_assignment_entity_status', aes_id=99999)|replace('99999', '')|tojson }},
@@ -1102,6 +1111,11 @@ window.manageAssignmentConfig = {
         continueBtn: {{ _('Continue')|tojson }},
         noNotifyMsg: {{ _('This assignment will be created without sending notifications to assigned entities. Do you want to continue?')|tojson }},
         notifyMsg: {{ _('Assigned entities (focal points) will be notified about this new assignment. Do you want to continue?')|tojson }},
+        notifyMsgDisabled: {{ _('The "Notify focal points" checkbox is ticked, but notifications for assignment_created are currently disabled in platform settings (Admin → Settings → Notifications). No one will be notified. Do you want to continue anyway?')|tojson }},
+        notifyAudienceDisabled: {{ _('⚠ Platform settings have disabled notifications for this event — focal points will NOT receive notifications even though this box is checked.')|tojson }},
+        notifyPreviewLoading: {{ _('Checking notification recipients…')|tojson }},
+        notifyRecipientsSummary: {{ _('%(users)s focal point(s) will receive an in-app notification; %(email_users)s will also receive an email.')|tojson }},
+        notifyNoRecipients: {{ _('No focal points are configured for the selected countries — no notifications will be sent.')|tojson }},
         confirmAction: {{ _('Confirm action')|tojson }},
         clearReviewer: {{ _('Remove')|tojson }},
         searchMinChars: {{ _('Type at least 2 characters to search.')|tojson }},

@@ -15,6 +15,7 @@ from app.services.notification.notifiers.documents import (
 )
 from app.services.notification.notifiers.digest import (
     notify_user_added_to_country,
+    notify_user_added_to_countries,
     notify_public_submission_received,
 )
 
@@ -30,5 +31,6 @@ __all__ = [
     'notify_document_uploaded',
     'notify_standalone_document_uploaded',
     'notify_user_added_to_country',
+    'notify_user_added_to_countries',
     'notify_public_submission_received',
 ]

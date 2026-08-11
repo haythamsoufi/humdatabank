@@ -3,7 +3,8 @@ Platform Error Logging API endpoint.
 Part of the /api/v1 blueprint.
 
 This endpoint allows Azure platform error pages and the client reporter (403, 502, 503, 504) to log errors
-for monitoring and debugging purposes.
+for monitoring and debugging purposes. Client-side JavaScript runtime errors are accepted at
+``/api/v1/client-error`` (see ``log_client_error``).
 
 SECURITY: This endpoint is public but protected by:
 - Rate limiting (10 requests per minute per IP) via Flask-Limiter
@@ -21,7 +22,12 @@ from typing import Optional
 from flask import current_app, request
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_error, json_ok, json_server_error
-from app.utils.constants import MAX_ERROR_LOG_REQUEST_BYTES
+from app.utils.constants import (
+    MAX_CLIENT_ERROR_MESSAGE_CHARS,
+    MAX_CLIENT_ERROR_SOURCE_CHARS,
+    MAX_CLIENT_ERROR_STACK_CHARS,
+    MAX_ERROR_LOG_REQUEST_BYTES,
+)
 
 # Import the API blueprint from parent
 from app.routes.api import api_bp
@@ -38,6 +44,7 @@ from app.services.monitoring.worker_investigation import (
     schedule_504_investigation,
 )
 from app.extensions import limiter
+from app.utils.datetime_helpers import utcnow
 
 PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
 
@@ -51,6 +58,21 @@ PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
 # platform-502 + email-timeout incident.
 PLATFORM_ERROR_ALERT_COOLDOWN_SECONDS = int(
     os.environ.get('PLATFORM_ERROR_ALERT_COOLDOWN_SECONDS', '600')
+)
+
+CLIENT_ERROR_IGNORED_MESSAGE_FRAGMENTS = (
+    'AbortError',
+    'message channel closed before a response was received',
+    'ResizeObserver loop limit exceeded',
+    'ResizeObserver loop completed with undelivered notifications',
+    'Non-Error promise rejection captured',
+)
+
+CLIENT_ERROR_IGNORED_SOURCE_PREFIXES = (
+    'chrome-extension://',
+    'moz-extension://',
+    'safari-extension://',
+    'safari-web-extension://',
 )
 
 
@@ -104,6 +126,83 @@ def sanitize_url(url):
         # If parsing fails, return None (don't log potentially malicious URLs)
         current_app.logger.warning("Failed to sanitize URL (first 100 chars): %s: %s", url[:100], e)
         return None
+
+
+def sanitize_client_error_text(value, *, max_len: int) -> Optional[str]:
+    """Sanitize free-text client error fields (message, stack)."""
+    return _strip_control_chars(value, max_len=max_len)
+
+
+def sanitize_client_error_source(value) -> Optional[str]:
+    """Sanitize script URL / filename from the browser."""
+    text = sanitize_client_error_text(value, max_len=MAX_CLIENT_ERROR_SOURCE_CHARS)
+    if not text:
+        return None
+    lowered = text.lower()
+    for prefix in CLIENT_ERROR_IGNORED_SOURCE_PREFIXES:
+        if lowered.startswith(prefix):
+            return None
+    return text
+
+
+def should_ignore_client_error(
+    *,
+    message: Optional[str],
+    source: Optional[str] = None,
+    kind: Optional[str] = None,
+) -> bool:
+    """Drop known-noise client errors before creating SecurityEvent rows."""
+    msg = sanitize_client_error_text(message, max_len=MAX_CLIENT_ERROR_MESSAGE_CHARS)
+    if not msg:
+        return True
+
+    if msg == 'Script error.' and not source:
+        return True
+
+    for fragment in CLIENT_ERROR_IGNORED_MESSAGE_FRAGMENTS:
+        if fragment in msg:
+            return True
+
+    if kind == 'resource' and not msg:
+        return True
+
+    return False
+
+
+def build_client_error_fingerprint(
+    *,
+    kind: str,
+    message: Optional[str],
+    source: Optional[str],
+    line_no: Optional[int],
+) -> str:
+    """Stable key for deduplicating the same JS error within a UTC calendar day."""
+    return '|'.join([
+        kind or 'error',
+        message or '',
+        source or 'unknown',
+        str(line_no if line_no is not None else ''),
+    ])
+
+
+def client_error_already_logged_today(fingerprint: str) -> bool:
+    """Return True when an identical client JS error was already stored today (UTC)."""
+    from app.models import SecurityEvent
+
+    start_of_day = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = (
+        SecurityEvent.query
+        .filter(
+            SecurityEvent.event_type == 'client_javascript_error',
+            SecurityEvent.timestamp >= start_of_day,
+        )
+        .with_entities(SecurityEvent.context_data)
+        .all()
+    )
+    for (context_data,) in rows:
+        if isinstance(context_data, dict) and context_data.get('fingerprint') == fingerprint:
+            return True
+    return False
 
 
 @api_bp.route('/platform-error', methods=['POST'])
@@ -295,4 +394,133 @@ def log_platform_error():
     except Exception as e:
         # Log the error but don't expose details to client
         current_app.logger.error(f"Error in platform error logging endpoint: {e}", exc_info=True)
+        return json_server_error('Failed to log error', success=False)
+
+
+@api_bp.route('/client-error', methods=['POST'])
+@limiter.limit("30 per minute", override_defaults=True)
+def log_client_error():
+    """
+    Log client-side JavaScript runtime errors for monitoring.
+
+    Called from platform-error-reporter.js via window.onerror and
+    unhandledrejection handlers. Intentionally public (no auth) with rate
+    limiting; does not send admin alert emails; deduplicates identical errors per UTC day.
+
+    Expected JSON payload:
+    {
+        "kind": "error" | "unhandledrejection",
+        "message": "ReferenceError: ...",
+        "source": "https://.../manage-assignment.js" (optional),
+        "line": 1776 (optional),
+        "column": 12 (optional),
+        "stack": "..." (optional),
+        "url": "page URL where error occurred",
+        "referrer": "..." (optional),
+        "user_agent": "..." (optional),
+        "timestamp": "ISO timestamp" (optional)
+    }
+    """
+    try:
+        content_type = request.headers.get('Content-Type', '')
+        if not content_type.startswith('application/json'):
+            return json_bad_request('Content-Type must be application/json', success=False)
+
+        if request.content_length and request.content_length > MAX_ERROR_LOG_REQUEST_BYTES:
+            return json_error('Request payload too large', 413, success=False)
+
+        data = get_json_safe()
+
+        kind = sanitize_client_error_text(data.get('kind'), max_len=40) or 'error'
+        if kind not in {'error', 'unhandledrejection'}:
+            return json_bad_request('Invalid kind. Must be "error" or "unhandledrejection".', success=False)
+
+        message = sanitize_client_error_text(data.get('message'), max_len=MAX_CLIENT_ERROR_MESSAGE_CHARS)
+        source = sanitize_client_error_source(data.get('source'))
+        stack = sanitize_client_error_text(data.get('stack'), max_len=MAX_CLIENT_ERROR_STACK_CHARS)
+        url = sanitize_url(data.get('url'))
+        referrer = sanitize_url(data.get('referrer'))
+        user_agent = _strip_control_chars(data.get('user_agent'), max_len=500) or ""
+
+        if should_ignore_client_error(message=message, source=source, kind=kind):
+            return json_ok(success=True, message='Ignored client error')
+
+        line_no = data.get('line')
+        column_no = data.get('column')
+        try:
+            line_no = int(line_no) if line_no is not None else None
+        except (TypeError, ValueError):
+            line_no = None
+        try:
+            column_no = int(column_no) if column_no is not None else None
+        except (TypeError, ValueError):
+            column_no = None
+
+        fingerprint = build_client_error_fingerprint(
+            kind=kind,
+            message=message,
+            source=source,
+            line_no=line_no,
+        )
+        if client_error_already_logged_today(fingerprint):
+            return json_ok(success=True, message='Duplicate client error suppressed')
+
+        timestamp = data.get('timestamp')
+        if timestamp:
+            try:
+                datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                timestamp = None
+
+        ip_address = get_client_ip() or 'unknown'
+
+        context_data = {
+            'kind': kind,
+            'message': message,
+            'source': source or 'unknown',
+            'line': line_no,
+            'column': column_no,
+            'stack': stack or '',
+            'url': url or 'unknown',
+            'referrer': referrer or 'none',
+            'user_agent': user_agent or 'unknown',
+            'platform': 'browser',
+            'reporter': 'client_reporter',
+            'fingerprint': fingerprint,
+        }
+        if timestamp:
+            context_data['client_timestamp'] = timestamp
+
+        description = message[:500]
+        if source and line_no is not None:
+            description = f'{description} ({source}:{line_no})'
+        description = description[:500]
+
+        try:
+            SecurityMonitor.log_security_event(
+                event_type='client_javascript_error',
+                severity='low',
+                description=description,
+                context_data=context_data,
+                user_id=None,
+                notify_admins=False,
+            )
+        except Exception as log_error:
+            current_app.logger.error(
+                "Failed to log client JavaScript error to database: %s",
+                log_error,
+                extra={'client_message': message[:200], 'url': (url or '')[:200], 'ip': ip_address},
+            )
+
+        current_app.logger.warning(
+            "Client JavaScript error: %s (page: %s, IP: %s)",
+            description,
+            url or 'unknown',
+            ip_address,
+        )
+
+        return json_ok(success=True, message='Error logged successfully')
+
+    except Exception as e:
+        current_app.logger.error("Error in client error logging endpoint: %s", e, exc_info=True)
         return json_server_error('Failed to log error', success=False)

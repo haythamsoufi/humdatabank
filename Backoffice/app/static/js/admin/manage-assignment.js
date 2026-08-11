@@ -3049,15 +3049,9 @@
                     return false;
                 }
 
-                // Notification confirmation: user must confirm they understand notifications will or won't be sent
+                // Notification confirmation: fetch recipient preview, then ask for confirm
                 const sendNotifCheckbox = mainForm.querySelector('input[name="send_notifications"]');
                 const sendNotifications = sendNotifCheckbox ? sendNotifCheckbox.checked : true;
-                const confirmMsgSend = cfg.t.notifyMsg;
-                const confirmMsgNoSend = cfg.t.noNotifyMsg;
-                const confirmMsg = sendNotifications ? confirmMsgSend : confirmMsgNoSend;
-                const confirmTitle = cfg.t.createAssignment;
-                const confirmContinue = cfg.t.continueBtn;
-                const confirmCancel = cfg.t.cancel;
 
                 function doSubmit() {
                     // Re-sync country checkboxes → hidden inputs right before submission
@@ -3066,6 +3060,60 @@
                     syncCountriesToMainForm();
                     HTMLFormElement.prototype.submit.call(mainForm);
                 }
+
+                // Collect country IDs currently selected for the assignment
+                function getSelectedCountryIds() {
+                    const ids = [];
+                    mainForm.querySelectorAll('input[name="country_ids[]"]:checked, input[name="countries"]:checked').forEach(el => {
+                        if (el.value) ids.push(el.value);
+                    });
+                    // Fallback: hidden country inputs added by syncCountriesToMainForm
+                    if (!ids.length) {
+                        mainForm.querySelectorAll('input[type="hidden"][name="countries"]').forEach(el => {
+                            if (el.value) ids.push(el.value);
+                        });
+                    }
+                    return ids;
+                }
+
+                async function fetchNotifPreview(countryIds) {
+                    if (!cfg.urls || !cfg.urls.notificationPreview) return null;
+                    try {
+                        const params = new URLSearchParams();
+                        countryIds.forEach(id => params.append('country_ids[]', id));
+                        const resp = await fetch(cfg.urls.notificationPreview + '?' + params.toString(), {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        if (!resp.ok) return null;
+                        return await resp.json();
+                    } catch (e) {
+                        return null;
+                    }
+                }
+
+                function buildConfirmMsg(sendNotifications, preview) {
+                    if (!sendNotifications) return cfg.t.noNotifyMsg;
+                    if (!preview) return cfg.t.notifyMsg;
+                    if (!preview.focal_points_enabled) return cfg.t.notifyMsgDisabled;
+                    if (!preview.total_focal_users) {
+                        return cfg.t.notifyMsg + '\n\n⚠ ' + cfg.t.notifyNoRecipients;
+                    }
+                    const summary = (cfg.t.notifyRecipientsSummary || '')
+                        .replace('%(users)s', preview.total_focal_users)
+                        .replace('%(email_users)s', preview.email_users);
+                    return cfg.t.notifyMsg + '\n\n' + summary;
+                }
+
+                // Sync countries into the form first so we can read them
+                syncCountriesToMainForm();
+                const selectedCountryIds = getSelectedCountryIds();
+
+                const preview = sendNotifications ? await fetchNotifPreview(selectedCountryIds) : null;
+                const confirmMsg = buildConfirmMsg(sendNotifications, preview);
+                const confirmTitle = cfg.t.createAssignment;
+                const confirmContinue = cfg.t.continueBtn;
+                const confirmCancel = cfg.t.cancel;
+
                 if (window.showConfirmation) {
                     window.showConfirmation(
                         confirmMsg,
@@ -3086,6 +3134,98 @@
 
         window.__clientLog && window.__clientLog('[SCRIPT] Document ready function completed - all initialization code executed');
         window.__clientLog && window.__clientLog('[SCRIPT] You can now call window.testLogging() or window.logColumnWidths() from console');
+
+        // --- Notification audience warning banner (new-assignment page only) ---
+        if (cfg.isNew && cfg.urls && cfg.urls.notificationPreview) {
+            const audienceWarningEl = document.getElementById('notif-audience-warning');
+            const audienceWarningTextEl = document.getElementById('notif-audience-warning-text');
+            const recipientPreviewEl = document.getElementById('notif-recipient-preview');
+            const recipientPreviewTextEl = document.getElementById('notif-recipient-preview-text');
+            const sendNotifCheckbox = document.getElementById('send_notifications');
+
+            let _lastPreview = null;
+
+            async function _fetchAndUpdateNotifBanner() {
+                if (!sendNotifCheckbox || !sendNotifCheckbox.checked) {
+                    if (audienceWarningEl) audienceWarningEl.classList.add('hidden');
+                    if (recipientPreviewEl) recipientPreviewEl.classList.add('hidden');
+                    return;
+                }
+
+                // Show loading state
+                if (recipientPreviewEl && recipientPreviewTextEl) {
+                    recipientPreviewTextEl.textContent = cfg.t.notifyPreviewLoading || 'Checking…';
+                    recipientPreviewEl.classList.remove('hidden');
+                }
+                if (audienceWarningEl) audienceWarningEl.classList.add('hidden');
+
+                // Collect currently checked country IDs from the country selector checkboxes
+                const countryIds = [];
+                document.querySelectorAll('input[data-country-checkbox]:checked, input.country-checkbox:checked').forEach(el => {
+                    if (el.value) countryIds.push(el.value);
+                });
+                // Fallback: read from hidden form inputs added by syncCountriesToMainForm
+                if (!countryIds.length && mainForm) {
+                    mainForm.querySelectorAll('input[type="hidden"][name="countries"]').forEach(el => {
+                        if (el.value) countryIds.push(el.value);
+                    });
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    countryIds.forEach(id => params.append('country_ids[]', id));
+                    const resp = await fetch(cfg.urls.notificationPreview + '?' + params.toString(), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (!resp.ok) throw new Error('preview fetch failed');
+                    _lastPreview = await resp.json();
+                } catch (e) {
+                    _lastPreview = null;
+                }
+
+                if (!_lastPreview) {
+                    if (recipientPreviewEl) recipientPreviewEl.classList.add('hidden');
+                    return;
+                }
+
+                if (!_lastPreview.focal_points_enabled) {
+                    // Audience bucket disabled — show warning, hide info banner
+                    if (audienceWarningEl && audienceWarningTextEl) {
+                        audienceWarningTextEl.textContent = cfg.t.notifyAudienceDisabled || 'Notifications are disabled in platform settings.';
+                        audienceWarningEl.classList.remove('hidden');
+                    }
+                    if (recipientPreviewEl) recipientPreviewEl.classList.add('hidden');
+                    return;
+                }
+
+                // Audience enabled — show recipient count
+                if (audienceWarningEl) audienceWarningEl.classList.add('hidden');
+                if (recipientPreviewEl && recipientPreviewTextEl) {
+                    if (!_lastPreview.total_focal_users) {
+                        recipientPreviewTextEl.textContent = cfg.t.notifyNoRecipients || 'No focal points configured for selected countries.';
+                    } else {
+                        const summary = (cfg.t.notifyRecipientsSummary || '%(users)s focal point(s) · %(email_users)s email(s)')
+                            .replace('%(users)s', _lastPreview.total_focal_users)
+                            .replace('%(email_users)s', _lastPreview.email_users);
+                        recipientPreviewTextEl.textContent = summary;
+                    }
+                    recipientPreviewEl.classList.remove('hidden');
+                }
+            }
+
+            // Run on load and whenever the checkbox changes
+            _fetchAndUpdateNotifBanner();
+            if (sendNotifCheckbox) {
+                sendNotifCheckbox.addEventListener('change', _fetchAndUpdateNotifBanner);
+            }
+
+            // Also re-run whenever countries are (de)selected so the preview stays current
+            document.addEventListener('change', function(e) {
+                if (e.target && (e.target.dataset.countryCheckbox !== undefined || e.target.classList.contains('country-checkbox'))) {
+                    _fetchAndUpdateNotifBanner();
+                }
+            });
+        }
 
         // Event delegation for remove public and remove entity buttons (use custom confirmation)
         $(document).on('click', '.remove-public-btn, .remove-entity-btn', function(e) {

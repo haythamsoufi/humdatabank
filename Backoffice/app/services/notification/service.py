@@ -326,6 +326,7 @@ class NotificationService:
         'notification.user_added_to_country.message',
         'notification.public_submission_received.message',
         'notification.assignment_created.message',
+        'notification.assignment_created.message_no_deadline',
         'notification.assignment_submitted.message',
         'notification.assignment_submitted.submitter.message',
         'notification.assignment_submitted.admin.message',
@@ -360,6 +361,7 @@ class NotificationService:
     _ASSIGNMENT_TITLE_KEYS = frozenset({
         'notification.assignment_created.title',
         'notification.assignment_created.message',
+        'notification.assignment_created.message_no_deadline',
         'notification.assignment_submitted.title',
         'notification.assignment_submitted.message',
         'notification.assignment_submitted.submitter.title',
@@ -1937,6 +1939,12 @@ class NotificationService:
         if status_raw == 'skipped':
             from flask_babel import gettext as _
             status_display = _('Skipped')
+        elif status_raw == 'unknown':
+            # Distinct from 'Failed': the Email API never returned an HTTP response
+            # (timeout/connection error) — the message may have actually been sent.
+            # See mark_email_failed_or_unknown / docs/runbooks/email-api-no-response.md.
+            from flask_babel import gettext as _
+            status_display = _('No Response')
 
         return {
             'has_email': True,
@@ -1956,23 +1964,23 @@ class NotificationService:
 
     @staticmethod
     def _email_delivery_log_can_cancel(log) -> bool:
-        from app.services.email.delivery import email_delivery_log_can_cancel
+        from app.services.email.delivery import ACTIONABLE_EMAIL_STATUSES, email_delivery_log_can_cancel
 
         status_raw = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
         if status_raw == 'retrying':
             status_raw = 'failed'
-        if status_raw != 'failed':
+        if status_raw not in ACTIONABLE_EMAIL_STATUSES:
             return False
         return email_delivery_log_can_cancel(log)
 
     @staticmethod
     def _email_delivery_log_can_retry(log) -> bool:
-        from app.services.email.delivery import email_delivery_log_can_retry
+        from app.services.email.delivery import ACTIONABLE_EMAIL_STATUSES, email_delivery_log_can_retry
 
         status_raw = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
         if status_raw == 'retrying':
             status_raw = 'failed'
-        if status_raw != 'failed':
+        if status_raw not in ACTIONABLE_EMAIL_STATUSES:
             return False
         return email_delivery_log_can_retry(log)
 

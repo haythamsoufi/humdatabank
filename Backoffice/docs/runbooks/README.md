@@ -15,6 +15,7 @@
 | Deploy a code change or release | [Release process](development/release-process.md) + [Azure App Service](deployment/azure-app-service.md) |
 | Understand application logs | [Logging & health](observability/logging-and-health.md) |
 | Investigate a WAF 403 in production | [WAF 403 guide](incidents/waf-403-form-payload-refactor-guide.md) |
+| Triage an email shown as "Failed" that may have sent | [Email API no-response timeouts](incidents/email-api-no-response.md) |
 | Manage database migrations safely | [Flask-Migrate & pgvector](data/flask-migrate-and-pgvector.md) |
 | Track FDRS sync field coverage (template 21) | [FDRS sync coverage](fdrs-sync-coverage.md) |
 | Restore from backup | [Backup & restore](data/backup-and-restore.md) |
@@ -43,6 +44,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 | [Gateway 504 / worker saturation](incidents/gateway-504-worker-saturation.md) | Recurring 504 on presence, notifications, or light APIs; worker timeouts in logs |
 | [Gateway load-test reproduction plan](incidents/gateway-loadtest-reproduction-plan.md) | Local AGW-sim + real-user traffic + staging AGW/Redis before/after |
 | [WAF 403 — form payloads](incidents/waf-403-form-payload-refactor-guide.md) | Azure Application Gateway blocking large admin/form POST bodies |
+| [Email API no-response timeouts](incidents/email-api-no-response.md) | Communication Center shows an email as "Failed" that may have actually sent; escalation ticket template |
 
 ---
 

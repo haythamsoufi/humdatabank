@@ -12,6 +12,9 @@ from tests.factories import (
     create_test_template,
     create_test_assignment_entity_status,
     create_test_public_submission,
+    create_test_user,
+    create_focal_point_with_country,
+    _grant_entity_permission,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -1470,6 +1473,204 @@ class TestDeletePublicSubmission:
     def test_delete_not_found(self, logged_in_client, db_session):
         resp = logged_in_client.post("/admin/public-submissions/999999/delete")
         assert resp.status_code in (404, 302)
+
+
+# ---------------------------------------------------------------------------
+# Assignment notification preview
+#
+# These assert that the preview endpoint's recipient counts are produced by
+# the *same* eligibility helpers used when the grouped email is actually sent
+# (filter_instant_email_eligible_user_ids / collect_entity_admin_audience_recipient_ids),
+# so the numbers shown before sending never diverge from what actually goes out.
+# ---------------------------------------------------------------------------
+
+class TestAssignmentNotificationPreview:
+    def _preview(self, logged_in_client, country_ids, **extra_params):
+        qs = [("country_ids[]", str(cid)) for cid in country_ids]
+        for key, value in extra_params.items():
+            qs.append((key, str(value)))
+        return logged_in_client.get("/admin/assignments/notification-preview", query_string=qs)
+
+    def test_no_countries_returns_zero_counts(self, logged_in_client, db_session):
+        resp = self._preview(logged_in_client, [])
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["entities_count"] == 0
+        assert data["total_focal_users"] == 0
+        assert data["email_batch_count"] == 0
+        assert data["countries_without_focal_count"] == 0
+
+    def test_country_without_focal_point_is_counted(self, logged_in_client, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id])
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["entities_count"] == 1
+        assert data["total_focal_users"] == 0
+        assert data["email_batch_count"] == 0
+        # This is the count that used to be missing entirely: countries selected
+        # for the assignment but with nobody to actually receive a focal email.
+        assert data["countries_without_focal_count"] == 1
+
+    def test_instant_focal_point_counted_as_email_recipient(self, logged_in_client, db_session, app):
+        with app.app_context():
+            _user, country, _aes = create_focal_point_with_country(db_session)
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id])
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["focal_points_enabled"] is True
+        assert data["total_focal_users"] == 1
+        assert data["email_users"] == 1
+        assert data["email_batch_count"] == 1
+        assert data["countries_without_focal_count"] == 0
+
+    def test_digest_focal_point_excluded_from_email_counts_but_not_in_app(
+        self, logged_in_client, db_session, app
+    ):
+        """
+        A focal point on a daily/weekly digest still gets an in-app notification,
+        but the grouped instant email is only ever sent to `instant`-frequency
+        users (filter_instant_email_eligible_user_ids). The preview must mirror
+        that instead of counting every focal point as an email recipient.
+        """
+        from app.models import NotificationPreferences
+
+        with app.app_context():
+            user, country, _aes = create_focal_point_with_country(db_session)
+            db_session.add(NotificationPreferences(
+                user_id=user.id,
+                email_notifications=True,
+                notification_types_enabled=[],
+                in_app_notification_types_enabled=[],
+                notification_frequency='daily',
+            ))
+            db_session.commit()
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id])
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["total_focal_users"] == 1
+        assert data["email_users"] == 0
+        assert data["email_batch_count"] == 0
+        # The country does have a focal point — it's just not email-eligible.
+        assert data["countries_without_focal_count"] == 0
+
+    def test_email_disabled_focal_point_excluded_from_email_counts(
+        self, logged_in_client, db_session, app
+    ):
+        from app.models import NotificationPreferences
+
+        with app.app_context():
+            user, country, _aes = create_focal_point_with_country(db_session)
+            db_session.add(NotificationPreferences(
+                user_id=user.id,
+                email_notifications=False,
+                notification_types_enabled=[],
+                in_app_notification_types_enabled=[],
+                notification_frequency='instant',
+            ))
+            db_session.commit()
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id])
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["total_focal_users"] == 1
+        assert data["email_users"] == 0
+        assert data["email_batch_count"] == 0
+
+    def test_admin_only_country_promoted_into_email_batch_with_notify_admins(
+        self, logged_in_client, db_session, app
+    ):
+        """
+        A country with an entity-scoped org admin but no focal point should
+        count toward email_batch_count once 'notify admins' is requested and
+        the admin_users audience bucket is enabled — matching the to/cc swap
+        onto admins in notify_assignment_created / send_grouped_entity_email.
+        """
+        from app.models.enums import EntityType
+        from app.services.platform.app_settings_service import set_notification_audience_rules
+
+        with app.app_context():
+            set_notification_audience_rules({
+                "assignment_created": {"focal_points": True, "admin_users": True, "system_managers": False},
+            })
+            country = create_test_country(db_session)
+            admin = create_test_admin(db_session)
+            _grant_entity_permission(db_session, admin, EntityType.country.value, country.id)
+            db_session.commit()
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id], notify_admins=1)
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["admins_enabled"] is True
+        assert data["admin_users"] == 1
+        assert data["countries_without_focal_count"] == 1
+        assert data["email_batch_count"] == 1
+
+    def test_admin_only_country_not_batched_without_notify_admins(
+        self, logged_in_client, db_session, app
+    ):
+        from app.models.enums import EntityType
+        from app.services.platform.app_settings_service import set_notification_audience_rules
+
+        with app.app_context():
+            set_notification_audience_rules({
+                "assignment_created": {"focal_points": True, "admin_users": True, "system_managers": False},
+            })
+            country = create_test_country(db_session)
+            admin = create_test_admin(db_session)
+            _grant_entity_permission(db_session, admin, EntityType.country.value, country.id)
+            db_session.commit()
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id])
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["admin_users"] == 1
+        # notify_admins was not requested, so the admin-only country is not
+        # promoted into the grouped-email batch.
+        assert data["email_batch_count"] == 0
+
+    def test_focal_points_bucket_disabled_still_reports_admin_recipients(
+        self, logged_in_client, db_session, app
+    ):
+        """
+        When the focal_points audience bucket is disabled, the preview must
+        still surface admin recipients (and any resulting email) instead of
+        hard-coding zero — mirrors notify_assignment_created, which stops
+        emailing focal_user_ids when this bucket is off but still emails/CCs
+        admin-only recipients.
+        """
+        from app.models.enums import EntityType
+        from app.services.platform.app_settings_service import set_notification_audience_rules
+
+        with app.app_context():
+            set_notification_audience_rules({
+                "assignment_created": {"focal_points": False, "admin_users": True, "system_managers": False},
+            })
+            _user, country, _aes = create_focal_point_with_country(db_session)
+            admin = create_test_admin(db_session)
+            _grant_entity_permission(db_session, admin, EntityType.country.value, country.id)
+            db_session.commit()
+            country_id = country.id
+
+        resp = self._preview(logged_in_client, [country_id], notify_admins=1)
+        _assert_ok(resp)
+        data = _get_json(resp)
+        assert data["focal_points_enabled"] is False
+        assert data["total_focal_users"] == 0
+        assert data["email_users"] == 0
+        assert data["admins_enabled"] is True
+        assert data["admin_users"] == 1
+        assert data["email_batch_count"] == 1
 
 
 # ---------------------------------------------------------------------------

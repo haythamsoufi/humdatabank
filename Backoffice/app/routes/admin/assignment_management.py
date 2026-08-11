@@ -603,6 +603,7 @@ def new_assignment():
 
                 # Send notifications to focal points only if requested
                 send_notifications = getattr(form.send_notifications, 'data', True)
+                notify_admins = getattr(form.notify_admins, 'data', False) if send_notifications else False
                 if send_notifications:
                     notif_ok = 0
                     notif_err = 0
@@ -610,7 +611,7 @@ def new_assignment():
                         from app.services.notification.core import notify_assignment_created
                         for aes in created_aes_list:
                             try:
-                                results = notify_assignment_created(aes) or []
+                                results = notify_assignment_created(aes, notify_admins=notify_admins) or []
                                 notif_ok += len(results)
                             except Exception as e:
                                 notif_err += 1
@@ -704,71 +705,246 @@ def assignment_notification_preview():
     """
     from app.services.platform.app_settings_service import audience_bucket_enabled
     from app.models.enums import NotificationType
-    from app.models.core import UserEntityPermission
-    from app.models.rbac import RbacUserRole, RbacRole
+    from app.services.notification.audience import (
+        collect_entity_admin_audience_recipient_ids,
+        get_assignment_editor_submitter_user_ids_for_entity,
+    )
     from app.services.notification.creation import (
         get_user_preferences_batch,
         is_notification_type_enabled_for_user,
-        is_email_notification_type_enabled_for_user,
     )
-    from sqlalchemy import distinct
+    # Single source of truth for email eligibility — the exact same filter
+    # used when the grouped email is actually sent (send_grouped_entity_email).
+    # Reusing it here (instead of a preview-only check) guarantees the counts
+    # shown to the admin match what will actually be sent.
+    from app.services.notification.emails import filter_instant_email_eligible_user_ids
 
     focal_enabled = audience_bucket_enabled(NotificationType.assignment_created, "focal_points")
+    admins_enabled = (
+        audience_bucket_enabled(NotificationType.assignment_created, "admin_users")
+        or audience_bucket_enabled(NotificationType.assignment_created, "system_managers")
+    )
 
     country_ids_raw = request.args.getlist('country_ids[]') or request.args.getlist('country_ids')
     try:
-        country_ids = [int(c) for c in country_ids_raw if c]
+        country_ids = list(dict.fromkeys(int(c) for c in country_ids_raw if c))
     except (ValueError, TypeError):
         return json_bad_request("Invalid country_ids")
 
+    notify_admins = request.args.get('notify_admins', '0') in ('1', 'true', 'yes', 'on')
+    exclude_ids = [current_user.id] if current_user and current_user.is_authenticated else []
+
+    def _email_batch_country_ids(focal_by_country, email_eligible_ids):
+        """
+        Countries that would receive a grouped email (matches notify_assignment_created).
+        """
+        batch: set[int] = set()
+        admin_only_by_country: dict[int, list[int]] = {}
+        all_admin_only_ids: set[int] = set()
+
+        for cid in country_ids:
+            focal_ids = focal_by_country.get(cid, set())
+            if any(uid in email_eligible_ids for uid in focal_ids):
+                batch.add(cid)
+                continue
+            if not notify_admins:
+                continue
+            country_admins = collect_entity_admin_audience_recipient_ids(
+                NotificationType.assignment_created,
+                EntityType.country.value,
+                cid,
+                exclude_user_ids=exclude_ids,
+            )
+            admin_only = [uid for uid in country_admins if uid not in focal_ids]
+            if admin_only:
+                admin_only_by_country[cid] = admin_only
+                all_admin_only_ids.update(admin_only)
+
+        if admin_only_by_country and all_admin_only_ids:
+            admin_prefs = get_user_preferences_batch(list(all_admin_only_ids))
+            admin_email_eligible = set(filter_instant_email_eligible_user_ids(
+                list(all_admin_only_ids),
+                NotificationType.assignment_created,
+                preferences_cache=admin_prefs,
+            ))
+            for cid, admin_only in admin_only_by_country.items():
+                if any(uid in admin_email_eligible for uid in admin_only):
+                    batch.add(cid)
+        return batch
+
+    def _admin_preview_for_countries(cids, focal_by_country=None):
+        """
+        Org/system admin preview using per-country focal exclusion (matches notify_assignment_created).
+        A user who is focal for country A but admin-only for country B is counted for B.
+        """
+        focal_by_country = focal_by_country or {}
+        admin_total_union: set[int] = set()
+        admin_only_union: set[int] = set()
+        for cid in cids:
+            country_admins = collect_entity_admin_audience_recipient_ids(
+                NotificationType.assignment_created,
+                EntityType.country.value,
+                cid,
+                exclude_user_ids=exclude_ids,
+            )
+            admin_total_union.update(country_admins)
+            focal_cover = focal_by_country.get(cid, set())
+            admin_only_union.update(uid for uid in country_admins if uid not in focal_cover)
+
+        if not admin_only_union:
+            return 0, 0, len(admin_total_union)
+
+        admin_prefs = get_user_preferences_batch(list(admin_only_union))
+        admin_notif_ids = [
+            uid for uid in admin_only_union
+            if is_notification_type_enabled_for_user(
+                uid, NotificationType.assignment_created, preferences_cache=admin_prefs
+            )
+        ]
+        # Matches notify_assignment_created: CC email eligibility is computed on the
+        # raw admin-only set (not the in-app-filtered subset), same as send_grouped_entity_email.
+        admin_email_count = len(filter_instant_email_eligible_user_ids(
+            list(admin_only_union), NotificationType.assignment_created, preferences_cache=admin_prefs
+        ))
+        return len(admin_notif_ids), admin_email_count, len(admin_total_union)
+
     if not focal_enabled:
+        admin_users, admin_email_users, admin_total_users = (
+            _admin_preview_for_countries(country_ids) if country_ids else (0, 0, 0)
+        )
+        # Focal points get nothing, but admins can still be emailed (as the primary "To",
+        # per build_grouped_entity_email_preview's to/cc swap) if notify_admins is ticked —
+        # matches notify_assignment_created, which no longer sends to focal_user_ids when
+        # this bucket is disabled but still CCs/emails admin_only recipients.
+        email_batch_countries = (
+            _email_batch_country_ids({}, set()) if country_ids else set()
+        )
         return json_ok(
             focal_points_enabled=False,
             total_focal_users=0,
             email_users=0,
+            admins_enabled=admins_enabled,
+            admin_users=admin_users,
+            admin_total_users=admin_total_users,
+            admin_email_users=admin_email_users,
+            entities_count=len(country_ids),
+            email_batch_count=len(email_batch_countries),
+            countries_without_focal_count=len(country_ids),
             message="Notifications for 'assignment_created' are disabled in platform settings (Admin → Settings → Notifications)."
         )
 
     if not country_ids:
-        return json_ok(focal_points_enabled=True, total_focal_users=0, email_users=0)
-
-    # Single batched query: distinct users with assignment_editor_submitter on any of the selected countries
-    user_id_rows = (
-        db.session.query(distinct(UserEntityPermission.user_id))
-        .join(User, UserEntityPermission.user_id == User.id)
-        .filter(User.active.is_(True))
-        .join(RbacUserRole, RbacUserRole.user_id == User.id)
-        .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
-        .filter(
-            UserEntityPermission.entity_type == EntityType.country.value,
-            UserEntityPermission.entity_id.in_(country_ids),
-            RbacRole.code == "assignment_editor_submitter",
+        return json_ok(
+            focal_points_enabled=True,
+            total_focal_users=0,
+            email_users=0,
+            admins_enabled=admins_enabled,
+            admin_users=0,
+            admin_total_users=0,
+            admin_email_users=0,
+            entities_count=0,
+            email_batch_count=0,
+            countries_without_focal_count=0,
         )
-        .all()
+
+    admin_users, admin_email_users, admin_total_users = (0, 0, 0)
+
+    # Focal points per selected country (role-aware: admins excluded from focal bucket)
+    focal_by_country = defaultdict(set)
+    for cid in country_ids:
+        for uid in get_assignment_editor_submitter_user_ids_for_entity(
+            EntityType.country.value,
+            cid,
+            exclude_user_ids=exclude_ids,
+        ):
+            focal_by_country[cid].add(uid)
+
+    all_user_ids = sorted(set().union(*focal_by_country.values()) if focal_by_country else set())
+
+    admin_users, admin_email_users, admin_total_users = _admin_preview_for_countries(
+        country_ids, focal_by_country
     )
-    all_user_ids = [row[0] for row in user_id_rows if row[0] != current_user.id]
 
-    if not all_user_ids:
-        return json_ok(focal_points_enabled=True, total_focal_users=0, email_users=0)
+    countries_with_focal = sum(1 for cid in country_ids if focal_by_country.get(cid))
+    countries_without_focal_count = len(country_ids) - countries_with_focal
 
-    # Check notification preferences in one batch
-    prefs_cache = get_user_preferences_batch(all_user_ids)
+    prefs_cache = get_user_preferences_batch(all_user_ids) if all_user_ids else {}
+    email_eligible_ids = set(filter_instant_email_eligible_user_ids(
+        all_user_ids, NotificationType.assignment_created, preferences_cache=prefs_cache
+    )) if all_user_ids else set()
+
+    email_batch_countries = _email_batch_country_ids(focal_by_country, email_eligible_ids)
+
     notif_enabled_ids = [
         uid for uid in all_user_ids
-        if is_notification_type_enabled_for_user(uid, NotificationType.assignment_created, preferences_cache=prefs_cache)
-    ]
-
-    # Count how many of those would also receive an email
-    email_count = sum(
-        1 for uid in notif_enabled_ids
-        if is_email_notification_type_enabled_for_user(uid, NotificationType.assignment_created, preferences_cache=prefs_cache)
-    )
+        if is_notification_type_enabled_for_user(
+            uid, NotificationType.assignment_created, preferences_cache=prefs_cache
+        )
+    ] if all_user_ids else []
 
     return json_ok(
         focal_points_enabled=True,
         total_focal_users=len(notif_enabled_ids),
-        email_users=email_count,
+        email_users=len(email_eligible_ids),
+        admins_enabled=admins_enabled,
+        admin_users=admin_users,
+        admin_total_users=admin_total_users,
+        admin_email_users=admin_email_users,
+        entities_count=len(country_ids),
+        email_batch_count=len(email_batch_countries),
+        countries_without_focal_count=countries_without_focal_count,
     )
+
+
+@bp.route("/assignments/notification-email-preview", methods=["GET"])
+@permission_required('admin.assignments.create')
+def assignment_notification_email_preview():
+    """
+    Preview grouped assignment-created email for one country (subject, body, To, CC).
+    Used by the create-assignment UI before the assignment exists.
+
+    Query params:
+        country_id, template_id, period_name
+        due_date (optional, YYYY-MM-DD), custom_name (optional)
+        notify_admins (0|1, default 0)
+    """
+    from app.services.notification.notifiers.assignment import preview_assignment_created_grouped_email
+    from datetime import datetime
+
+    try:
+        country_id = int(request.args.get('country_id', ''))
+    except (ValueError, TypeError):
+        return json_bad_request("Invalid country_id")
+
+    try:
+        template_id = int(request.args.get('template_id', ''))
+    except (ValueError, TypeError):
+        return json_bad_request("Invalid template_id")
+
+    period_name = (request.args.get('period_name') or '').strip()
+    custom_name = (request.args.get('custom_name') or '').strip() or None
+    notify_admins = request.args.get('notify_admins', '0') in ('1', 'true', 'yes', 'on')
+
+    due_date = None
+    due_date_raw = (request.args.get('due_date') or '').strip()
+    if due_date_raw:
+        try:
+            due_date = datetime.strptime(due_date_raw, '%Y-%m-%d').date()
+        except ValueError:
+            return json_bad_request("Invalid due_date (use YYYY-MM-DD)")
+
+    exclude_ids = [current_user.id] if current_user and current_user.is_authenticated else None
+
+    preview = preview_assignment_created_grouped_email(
+        country_id,
+        template_id,
+        period_name,
+        due_date=due_date,
+        custom_name=custom_name,
+        notify_admins=notify_admins,
+        exclude_user_ids=exclude_ids,
+    )
+    return json_ok(**preview)
 
 
 @bp.route("/assignments/edit/<int:assignment_id>", methods=["GET", "POST"])

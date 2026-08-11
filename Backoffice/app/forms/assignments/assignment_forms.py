@@ -43,6 +43,11 @@ class AssignedFormForm(BaseForm):
     # Notify assigned entities when assignment is created
     send_notifications = BooleanField("Notify assigned entities when assignment is created", default=True)
 
+    notify_admins = BooleanField(
+        "CC admins on notification emails",
+        default=False,
+    )
+
     # NS must send for org delegation review before upstream submit
     requires_delegation_review = BooleanField(
         "Require delegation review before final submission",

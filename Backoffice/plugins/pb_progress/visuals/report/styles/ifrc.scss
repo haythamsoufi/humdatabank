@@ -393,6 +393,7 @@ $font-family-arabic: "Tajawal", "Segoe UI", system-ui, sans-serif;
     object-fit: contain;
   }
 
+  .pb-dashboard div.year-data-grid,
   .pb-dashboard table.year-data-grid {
     width: 100%;
     max-width: 100%;
@@ -772,6 +773,11 @@ html.pb-report-arabic #quarto-margin-sidebar {
   vertical-align: middle;
 }
 
+.pb-dashboard div.year-data-grid {
+  width: 100%;
+  max-width: 481px;
+}
+
 .pb-dashboard table.year-data-grid {
   width: 100%;
   max-width: 481px;
@@ -871,6 +877,9 @@ html.pb-report-arabic #quarto-margin-sidebar {
 
 .pb-dashboard .table-cell {
   position: absolute;
+  top: 0;
+  height: 18px;
+  line-height: 18px;
   transform: translateX(-50%);
   color: var(--text);
   text-align: center;

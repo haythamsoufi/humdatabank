@@ -81,7 +81,204 @@ def _build_assignment_notification_params(
     return params
 
 
-def notify_assignment_created(assignment_entity_status):
+def _assignment_created_message_key(aes) -> str:
+    """Pick message copy based on whether the assignment has a submission deadline."""
+    if getattr(aes, 'due_date', None):
+        return 'notification.assignment_created.message'
+    return 'notification.assignment_created.message_no_deadline'
+
+
+def _build_assignment_email_sample(
+    aes,
+    assigned_form,
+    title_params,
+    message_params,
+    title_key='notification.assignment_created.title',
+    message_key='notification.assignment_created.message',
+):
+    """Build a notification-like object for grouped email rendering."""
+    from types import SimpleNamespace
+    from app.services.notification.core import translate_notification_message
+    from flask_babel import force_locale
+
+    with force_locale('en'):
+        title = translate_notification_message(title_key, title_params, locale='en')
+        message = translate_notification_message(message_key, message_params, locale='en')
+
+    return SimpleNamespace(
+        id=None,
+        title=title,
+        message=message,
+        notification_type=NotificationType.assignment_created,
+        priority='normal',
+        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        title_key=title_key,
+        message_key=message_key,
+        title_params=title_params,
+        message_params=message_params,
+    )
+
+
+def _send_grouped_assignment_created_email(
+    focal_user_ids,
+    admin_user_ids,
+    sample_notification,
+    entity_name,
+):
+    """One email per entity: focal points in To, admins in CC."""
+    from app.services.notification.emails import send_grouped_entity_email
+
+    if not focal_user_ids and not admin_user_ids:
+        return False
+    return send_grouped_entity_email(
+        to_user_ids=focal_user_ids,
+        cc_user_ids=admin_user_ids,
+        sample_notification=sample_notification,
+        entity_name=entity_name,
+    )
+
+
+class _PreviewAssignedForm:
+    """Minimal stand-in for AssignedForm when previewing emails before creation."""
+
+    def __init__(self, template_id, period_name, template_name, custom_name=None):
+        self.template_id = template_id
+        self.period_name = period_name or ''
+        self.custom_name = custom_name
+        self._template_name = template_name
+
+    @property
+    def display_name(self) -> str:
+        if self.custom_name and str(self.custom_name).strip():
+            return str(self.custom_name).strip()
+        if self._template_name and self.period_name:
+            return f"{self._template_name} \u2013 {self.period_name}"
+        return self._template_name or "this assignment"
+
+
+def preview_assignment_created_grouped_email(
+    country_id: int,
+    template_id: int,
+    period_name: str,
+    *,
+    due_date=None,
+    custom_name=None,
+    notify_admins=False,
+    exclude_user_ids=None,
+):
+    """
+    Preview the grouped assignment-created email for one country (no send).
+    Returns dict with subject, html_body, to, cc, country_name, empty_reason.
+    """
+    from types import SimpleNamespace
+    from app.models.forms import FormTemplate
+    from app.models.enums import EntityType
+    from app.services.notification.emails import build_grouped_entity_email_preview
+    from app.services.platform.app_settings_service import audience_bucket_enabled
+
+    if not audience_bucket_enabled(NotificationType.assignment_created, "focal_points"):
+        return {
+            'country_id': country_id,
+            'country_name': _resolve_entity_name(EntityType.country.value, country_id),
+            'subject': '',
+            'html_body': '',
+            'to': [],
+            'cc': [],
+            'empty_reason': (
+                "Notifications for assignment_created are disabled in platform settings."
+            ),
+        }
+
+    template = FormTemplate.query.get(template_id) if template_id else None
+    if not template:
+        return {
+            'country_id': country_id,
+            'country_name': _resolve_entity_name(EntityType.country.value, country_id),
+            'subject': '',
+            'html_body': '',
+            'to': [],
+            'cc': [],
+            'empty_reason': 'Select a form template to preview the email.',
+        }
+
+    if not (period_name or '').strip():
+        return {
+            'country_id': country_id,
+            'country_name': _resolve_entity_name(EntityType.country.value, country_id),
+            'subject': '',
+            'html_body': '',
+            'to': [],
+            'cc': [],
+            'empty_reason': 'Enter a reporting period name to preview the email.',
+        }
+
+    template_name = template.name
+    entity_type = EntityType.country.value
+    entity_id = int(country_id)
+    country_name = _resolve_entity_name(entity_type, entity_id)
+
+    assigned_form = _PreviewAssignedForm(
+        template_id=template_id,
+        period_name=period_name.strip(),
+        template_name=template_name,
+        custom_name=custom_name,
+    )
+    aes = SimpleNamespace(
+        id=0,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        due_date=due_date,
+        assigned_form_id=0,
+    )
+
+    due_date_str = due_date.strftime('%Y-%m-%d') if due_date else _('No deadline set')
+    message_params = _build_assignment_notification_params(
+        aes, assigned_form, template_name, due_date_str=due_date_str
+    )
+    title_params = {
+        'assignment_title': message_params['assignment_title'],
+        'country': message_params['country'],
+    }
+    assignment_message_key = _assignment_created_message_key(aes)
+
+    focal_user_ids = get_assignment_editor_submitter_user_ids_for_entity(
+        entity_type, entity_id, exclude_user_ids=exclude_user_ids
+    )
+
+    cc_admin_ids: list[int] = []
+    if notify_admins:
+        secondary_recipients = collect_entity_admin_audience_recipient_ids(
+            NotificationType.assignment_created,
+            entity_type,
+            entity_id,
+            exclude_user_ids=exclude_user_ids,
+        )
+        if secondary_recipients:
+            focal_cover = set(focal_user_ids)
+            cc_admin_ids = [uid for uid in secondary_recipients if uid not in focal_cover]
+
+    sample = _build_assignment_email_sample(
+        aes,
+        assigned_form,
+        title_params,
+        message_params,
+        message_key=assignment_message_key,
+    )
+    sample.related_url = None
+
+    preview = build_grouped_entity_email_preview(
+        focal_user_ids,
+        cc_admin_ids,
+        sample,
+        country_name,
+        preview_mode=True,
+    )
+    preview['country_id'] = country_id
+    preview['country_name'] = country_name
+    return preview
+
+
+def notify_assignment_created(assignment_entity_status, notify_admins=False):
     """Notify focal points (and optionally entity-scoped admins) when a new assignment is created."""
     aes = assignment_entity_status
     entity_type = aes.entity_type
@@ -139,10 +336,24 @@ def notify_assignment_created(assignment_entity_status):
         'assignment_title': message_params['assignment_title'],
         'country': message_params['country'],
     }
+    assignment_message_key = _assignment_created_message_key(aes)
 
     exclude_user_ids = None
     if current_user and current_user.is_authenticated:
         exclude_user_ids = [current_user.id]
+
+    # Gate on the same audience-bucket flag notify_entity_focal_points checks below, so the
+    # grouped email (which uses focal_user_ids directly) never emails focal points when the
+    # focal_points bucket is disabled — matching preview_assignment_created_grouped_email.
+    focal_user_ids = (
+        get_assignment_editor_submitter_user_ids_for_entity(
+            entity_type,
+            entity_id,
+            exclude_user_ids=exclude_user_ids,
+        )
+        if audience_bucket_enabled(NotificationType.assignment_created, "focal_points")
+        else []
+    )
 
     notifications = notify_entity_focal_points(
         entity_type=entity_type,
@@ -150,13 +361,14 @@ def notify_assignment_created(assignment_entity_status):
         notification_type=NotificationType.assignment_created,
         title_key='notification.assignment_created.title',
         title_params=title_params,
-        message_key='notification.assignment_created.message',
+        message_key=assignment_message_key,
         message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.assigned_form_id,
         related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
         priority='normal',
         exclude_user_ids=exclude_user_ids,
+        send_email_notifications=False,
     ) or []
 
     # Optional admin channels (org admins vs system managers are separate settings buckets).
@@ -167,10 +379,9 @@ def notify_assignment_created(assignment_entity_status):
         entity_id,
         exclude_user_ids=exclude_user_ids,
     )
+    admin_only: list[int] = []
     if secondary_recipients:
-        focal_cover = set(
-            get_assignment_editor_submitter_user_ids_for_entity(entity_type, entity_id)
-        )
+        focal_cover = set(focal_user_ids)
         admin_only = [uid for uid in secondary_recipients if uid not in focal_cover]
         if admin_only:
             admin_notifications = create_notification(
@@ -178,7 +389,7 @@ def notify_assignment_created(assignment_entity_status):
                 notification_type=NotificationType.assignment_created,
                 title_key='notification.assignment_created.title',
                 title_params=title_params,
-                message_key='notification.assignment_created.message',
+                message_key=assignment_message_key,
                 message_params=dict(message_params),
                 related_object_type='assignment',
                 related_object_id=aes.assigned_form_id,
@@ -186,7 +397,27 @@ def notify_assignment_created(assignment_entity_status):
                 entity_type=entity_type,
                 entity_id=entity_id,
                 priority='normal',
+                send_email_notifications=False,
             ) or []
+
+    # One grouped email per entity (focal points in To, optional admins in CC).
+    cc_admin_ids = admin_only if notify_admins else []
+    if focal_user_ids or cc_admin_ids:
+        sample = notifications[0] if notifications else _build_assignment_email_sample(
+            aes, assigned_form, title_params, message_params, message_key=assignment_message_key
+        )
+        try:
+            _send_grouped_assignment_created_email(
+                focal_user_ids=focal_user_ids,
+                admin_user_ids=cc_admin_ids,
+                sample_notification=sample,
+                entity_name=message_params['country'],
+            )
+        except Exception as e:
+            current_app.logger.error(
+                "[NOTIFY] Failed grouped assignment_created email for %s:%s: %s",
+                entity_type, entity_id, e, exc_info=True,
+            )
 
     return list(notifications) + list(admin_notifications)
 

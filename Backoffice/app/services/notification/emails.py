@@ -8,12 +8,18 @@ import html as html_lib
 import re
 import threading
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 from flask import current_app
 from markupsafe import escape
 from app import db
 from app.services.email.client import send_email
-from app.services.email.delivery import log_email_attempt, mark_email_sent, mark_email_failed, classify_orphan_email_log
+from app.services.email.delivery import (
+    log_email_attempt,
+    mark_email_sent,
+    mark_email_failed,
+    mark_email_failed_or_unknown,
+    classify_orphan_email_log,
+)
 from app.models import Notification, NotificationPreferences, User, EmailDeliveryLog
 from sqlalchemy import and_
 from app.utils.datetime_helpers import utcnow
@@ -151,22 +157,26 @@ def _retry_instant_notification_email_log(user, log, notification) -> bool:
     subject = _instant_notification_subject(notification, locale)
     body = render_instant_email(user, notification, locale=locale)
 
+    _failure_info: list = []
     try:
         success = send_email(
             subject=subject,
             recipients=[user.email],
             html=body,
             sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+            _failure_info=_failure_info,
         )
 
         if success:
             mark_email_sent(log.id)
             return True
 
-        mark_email_failed(log.id, "Retry failed: Email send returned False", retry=False)
+        mark_email_failed_or_unknown(
+            log.id, "Retry failed: Email send returned False", _failure_info[-1] if _failure_info else None
+        )
         return False
     except Exception as e:
-        mark_email_failed(log.id, f"Retry failed: {str(e)}", retry=False)
+        mark_email_failed_or_unknown(log.id, f"Retry failed: {str(e)}", _failure_info[-1] if _failure_info else None)
         current_app.logger.error(f"Error retrying notification email log {log.id}: {e}", exc_info=True)
         return False
 
@@ -244,6 +254,16 @@ def _instant_notification_subject(notification, locale: str) -> str:
     if notification.priority in ('high', 'urgent'):
         return notification.title
 
+    nt_val = getattr(getattr(notification, 'notification_type', None), 'value', None)
+    if nt_val == 'assignment_created':
+        def _make_assignment(_g):
+            return _g('New assignment: %(title)s', title=notification.title)
+
+        translated = _with_user_locale(locale, _make_assignment)
+        if translated is not None:
+            return translated
+        return f"New assignment: {notification.title}"
+
     def _make(_g):
         return _g('New Notification: %(title)s', title=notification.title)
 
@@ -293,16 +313,36 @@ def _build_instant_email_i18n(
     user_name: str,
     is_action_required: bool,
     notification_type_value: str,
+    *,
+    email_audience: str | None = None,
 ) -> dict:
     def _make(_g):
         if notification_type_value in ('assignment_submitted', 'assignment_reopened'):
             button_label = _g('View Submission')
+        elif notification_type_value == 'assignment_created':
+            button_label = _g('Open Assignment')
         else:
             button_label = _g('View Details')
+
+        if notification_type_value == 'assignment_created':
+            if email_audience == 'grouped':
+                greeting = _g('Dear colleagues,')
+            else:
+                greeting = _g('Hello %(name)s,', name=user_name)
+            header_label = _g('New Assignment')
+            header_subtitle = _g('Reporting task')
+            show_type_meta = False
+        else:
+            greeting = _g('Hello %(name)s,', name=user_name)
+            header_label = _g('Action Required') if is_action_required else _g('Notification')
+            header_subtitle = '' if is_action_required else _g('For your information')
+            show_type_meta = True
+
         return {
-            'greeting': _g('Hello %(name)s,', name=user_name),
-            'header_label': _g('Action Required') if is_action_required else _g('Notification'),
-            'header_subtitle': '' if is_action_required else _g('For your information'),
+            'greeting': greeting,
+            'header_label': header_label,
+            'header_subtitle': header_subtitle,
+            'show_type_meta': show_type_meta,
             'button_label': button_label,
             'view_all': _g('View all notifications'),
             'manage_prefs': _g('Manage preferences'),
@@ -314,12 +354,25 @@ def _build_instant_email_i18n(
     button_label = (
         'View Submission'
         if notification_type_value in ('assignment_submitted', 'assignment_reopened')
+        else 'Open Assignment' if notification_type_value == 'assignment_created'
         else 'View Details'
     )
+    if notification_type_value == 'assignment_created':
+        greeting = 'Dear colleagues,' if email_audience == 'grouped' else f'Hello {user_name},'
+        return {
+            'greeting': greeting,
+            'header_label': 'New Assignment',
+            'header_subtitle': 'Reporting task',
+            'show_type_meta': False,
+            'button_label': button_label,
+            'view_all': 'View all notifications',
+            'manage_prefs': 'Manage preferences',
+        }
     return {
         'greeting': f'Hello {user_name},',
         'header_label': 'Action Required' if is_action_required else 'Notification',
         'header_subtitle': '' if is_action_required else 'For your information',
+        'show_type_meta': True,
         'button_label': button_label,
         'view_all': 'View all notifications',
         'manage_prefs': 'Manage preferences',
@@ -680,12 +733,14 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
         user, notifications, 'Daily', subject, retry_count, existing_log
     )
 
+    _failure_info: list = []
     try:
         success = send_email(
             subject=subject,
             recipients=[user.email],
             html=body,
-            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER'])
+            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+            _failure_info=_failure_info,
         )
 
         if success:
@@ -693,12 +748,12 @@ def send_daily_digest(user, preferences, retry_count=0, max_retries=3, existing_
             current_app.logger.info(f"Daily digest sent to {user.email} (retry {retry_count})")
             return True
         else:
-            mark_email_failed(log.id, "Email send returned False", retry=False)
+            mark_email_failed_or_unknown(log.id, "Email send returned False", _failure_info[-1] if _failure_info else None)
             current_app.logger.error(f"Failed to send daily digest to {user.email}")
             return False
 
     except Exception as e:
-        mark_email_failed(log.id, str(e), retry=False)
+        mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
         current_app.logger.error(f"Error sending daily digest to {user.email}: {str(e)}")
         return False
 
@@ -783,12 +838,14 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
         user, notifications, 'Weekly', subject, retry_count, existing_log
     )
 
+    _failure_info: list = []
     try:
         success = send_email(
             subject=subject,
             recipients=[user.email],
             html=body,
-            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER'])
+            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+            _failure_info=_failure_info,
         )
 
         if success:
@@ -796,12 +853,12 @@ def send_weekly_digest(user, preferences, retry_count=0, max_retries=3, existing
             current_app.logger.info(f"Weekly digest sent to {user.email} (retry {retry_count})")
             return True
         else:
-            mark_email_failed(log.id, "Email send returned False", retry=False)
+            mark_email_failed_or_unknown(log.id, "Email send returned False", _failure_info[-1] if _failure_info else None)
             current_app.logger.error(f"Failed to send weekly digest to {user.email}")
             return False
 
     except Exception as e:
-        mark_email_failed(log.id, str(e), retry=False)
+        mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
         current_app.logger.error(f"Error sending weekly digest to {user.email}: {str(e)}")
         return False
 
@@ -957,6 +1014,7 @@ def send_assignment_submitted_team_email(
     )
 
     filtered_out = []
+    _failure_info: list = []
     success = send_email(
         subject=subject,
         recipients=recipient_emails,
@@ -964,6 +1022,7 @@ def send_assignment_submitted_team_email(
         sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
         expose_recipients_in_to=True,
         _filtered_out=filtered_out,
+        _failure_info=_failure_info,
     )
     if not success and not filtered_out:
         current_app.logger.error(
@@ -987,7 +1046,9 @@ def send_assignment_submitted_team_email(
         elif filtered_out:
             pass
         else:
-            mark_email_failed(log.id, "Team email send returned False", retry=False)
+            mark_email_failed_or_unknown(
+                log.id, "Team email send returned False", _failure_info[-1] if _failure_info else None
+            )
     return success or bool(filtered_out)
 
 
@@ -1045,6 +1106,7 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
 
     try:
         filtered_out = []
+        _failure_info: list = []
         success = send_email(
             subject=subject,
             recipients=[user.email],
@@ -1052,6 +1114,7 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
             sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
             importance=importance,
             _filtered_out=filtered_out,
+            _failure_info=_failure_info,
         )
 
         if success:
@@ -1059,12 +1122,270 @@ def send_instant_notification_email(user, notification, override_preferences=Fal
         elif filtered_out:
             pass  # Recipient filtered (e.g. ALLOWED_EMAIL_RECIPIENTS_DEV) - not a failure
         else:
-            mark_email_failed(log.id, "Email send returned False", retry=False)
+            mark_email_failed_or_unknown(
+                log.id, "Email send returned False", _failure_info[-1] if _failure_info else None
+            )
             current_app.logger.error(f"Failed to send instant notification to {user.email}")
 
     except Exception as e:
-        mark_email_failed(log.id, str(e), retry=False)
+        mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
         current_app.logger.error(f"Error sending instant notification to {user.email}: {str(e)}")
+
+
+def filter_instant_email_eligible_user_ids(
+    user_ids: List[int],
+    notification_type,
+    preferences_cache=None,
+) -> List[int]:
+    """
+    Return user IDs eligible for instant email delivery for *notification_type*.
+
+    This is the single source of truth for "will this user actually get an
+    email" — it is used both when a grouped/instant email is actually sent
+    (:func:`send_grouped_entity_email`, :func:`send_instant_notification_email`)
+    and by any UI preview that reports recipient counts before sending
+    (e.g. the assignment-creation notification preview). Preview code must call
+    this instead of re-implementing the eligibility check, so what a user is
+    shown always matches what is actually sent.
+    """
+    from app.services.notification.creation import (
+        get_user_preferences_batch,
+        is_email_notification_type_enabled_for_user,
+    )
+
+    if not user_ids:
+        return []
+
+    if preferences_cache is None:
+        preferences_cache = get_user_preferences_batch(user_ids)
+
+    eligible: List[int] = []
+    for uid in user_ids:
+        prefs = preferences_cache.get(uid)
+        if not prefs or not prefs.email_notifications:
+            continue
+        if prefs.notification_frequency != 'instant':
+            continue
+        if not is_email_notification_type_enabled_for_user(
+            uid, notification_type, preferences_cache=preferences_cache
+        ):
+            continue
+        eligible.append(uid)
+    return eligible
+
+
+# Backward-compatible alias for existing internal callers.
+_filter_instant_email_eligible_user_ids = filter_instant_email_eligible_user_ids
+
+
+def build_grouped_entity_email_preview(
+    to_user_ids: List[int],
+    cc_user_ids: List[int],
+    sample_notification,
+    entity_name: str,
+    *,
+    preview_mode: bool = False,
+) -> dict:
+    """
+    Build subject, HTML body, and To/CC recipient lists for a grouped entity email (no send).
+
+    When *preview_mode* is True (UI preview before send), subject and body are always
+    rendered even if no email-eligible recipients exist.
+    """
+    from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
+    from types import SimpleNamespace
+
+    empty = {
+        'subject': '',
+        'html_body': '',
+        'to': [],
+        'cc': [],
+        'entity_name': entity_name,
+        'empty_reason': None,
+    }
+
+    if sample_notification.notification_type in IN_APP_ONLY_NOTIFICATION_TYPES:
+        empty['empty_reason'] = 'This notification type does not support email.'
+        return empty
+
+    notification_type = sample_notification.notification_type
+    all_ids = list(dict.fromkeys(list(to_user_ids or []) + list(cc_user_ids or [])))
+    if not all_ids and not preview_mode:
+        empty['empty_reason'] = 'No recipients configured for this country.'
+        return empty
+
+    from app.services.notification.creation import get_user_preferences_batch
+
+    prefs_cache = {}
+    to_eligible: List[int] = []
+    cc_eligible: List[int] = []
+    user_map = {}
+    to_emails: List[str] = []
+    cc_emails: List[str] = []
+
+    if all_ids:
+        prefs_cache = get_user_preferences_batch(all_ids)
+        to_eligible = _filter_instant_email_eligible_user_ids(
+            list(to_user_ids or []), notification_type, preferences_cache=prefs_cache
+        )
+        cc_eligible = _filter_instant_email_eligible_user_ids(
+            list(cc_user_ids or []), notification_type, preferences_cache=prefs_cache
+        )
+
+        users = User.query.filter(User.id.in_(all_ids)).all()
+        user_map = {u.id: u for u in users}
+
+        to_emails = [
+            user_map[uid].email
+            for uid in to_eligible
+            if uid in user_map and user_map[uid].email
+        ]
+        cc_emails = [
+            user_map[uid].email
+            for uid in cc_eligible
+            if uid in user_map and user_map[uid].email
+            and user_map[uid].email not in to_emails
+        ]
+
+        if not to_emails and cc_emails:
+            to_emails = cc_emails
+            cc_emails = []
+
+    if not to_emails and not preview_mode:
+        empty['empty_reason'] = (
+            'No focal points or admins with instant email enabled for this notification type.'
+        )
+        return empty
+
+    proxy_user = SimpleNamespace(
+        name=entity_name,
+        email=to_emails[0] if to_emails else 'preview@example.com',
+        preferred_language='en',
+    )
+
+    user_locale = _user_locale(proxy_user)
+    if sample_notification.priority in ('high', 'urgent'):
+        translated_title, _ = _translate_notification_for_email(sample_notification, user_locale)
+        subject = translated_title or sample_notification.title
+    else:
+        subject = _instant_notification_subject(sample_notification, user_locale)
+    body = render_instant_email(
+        proxy_user,
+        sample_notification,
+        locale=user_locale,
+        email_audience='grouped',
+    )
+
+    def _recipient_rows(eligible_ids, emails):
+        rows = []
+        for uid in eligible_ids:
+            user = user_map.get(uid)
+            if not user or not user.email:
+                continue
+            if user.email not in emails:
+                continue
+            rows.append({
+                'email': user.email,
+                'name': user.name or user.email,
+            })
+        return rows
+
+    return {
+        'subject': subject,
+        'html_body': body,
+        'to': _recipient_rows(to_eligible, to_emails),
+        'cc': _recipient_rows(cc_eligible, cc_emails) if cc_emails else [],
+        'entity_name': entity_name,
+        'empty_reason': None,
+    }
+
+
+def send_grouped_entity_email(
+    to_user_ids: List[int],
+    cc_user_ids: List[int],
+    sample_notification,
+    entity_name: str,
+) -> bool:
+    """
+    Send one notification email per entity: focal points in To, admins in CC.
+
+    Uses *sample_notification* for subject/body content. Grouped assignment emails use
+    a team greeting ("Dear colleagues,") rather than a single recipient name.
+    """
+    from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
+    from app.services.notification.creation import get_user_preferences_batch
+
+    if sample_notification.notification_type in IN_APP_ONLY_NOTIFICATION_TYPES:
+        return False
+
+    preview = build_grouped_entity_email_preview(
+        to_user_ids, cc_user_ids, sample_notification, entity_name
+    )
+    if preview.get('empty_reason') or not preview.get('html_body'):
+        return False
+
+    subject = preview['subject']
+    body = preview['html_body']
+    to_emails = [r['email'] for r in preview['to']]
+    cc_emails = [r['email'] for r in preview['cc']]
+
+    notification_type = sample_notification.notification_type
+    all_ids = list(dict.fromkeys(list(to_user_ids or []) + list(cc_user_ids or [])))
+    prefs_cache = get_user_preferences_batch(all_ids) if all_ids else {}
+    to_eligible = _filter_instant_email_eligible_user_ids(
+        list(to_user_ids or []), notification_type, preferences_cache=prefs_cache
+    )
+    cc_eligible = _filter_instant_email_eligible_user_ids(
+        list(cc_user_ids or []), notification_type, preferences_cache=prefs_cache
+    )
+
+    importance = (
+        (sample_notification.priority or 'normal').lower()
+        if sample_notification.priority in ('high', 'urgent')
+        else None
+    )
+
+    primary_user_id = to_eligible[0] if to_eligible else (cc_eligible[0] if cc_eligible else None)
+    primary_email = to_emails[0] if to_emails else None
+    if not primary_user_id or not primary_email:
+        return False
+
+    notification_id = getattr(sample_notification, 'id', None)
+    log = log_email_attempt(notification_id, primary_user_id, primary_email, subject)
+
+    _failure_info: list = []
+    try:
+        filtered_out = []
+        success = send_email(
+            subject=subject,
+            recipients=to_emails,
+            cc=cc_emails or None,
+            html=body,
+            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+            importance=importance,
+            expose_recipients_in_to=True,
+            _filtered_out=filtered_out,
+            _failure_info=_failure_info,
+        )
+        if success:
+            mark_email_sent(log.id)
+            current_app.logger.info(
+                "[EMAIL_NOTIFICATION] Grouped entity email sent: entity=%r to=%d cc=%d",
+                entity_name, len(to_emails), len(cc_emails),
+            )
+        elif filtered_out:
+            pass
+        else:
+            mark_email_failed_or_unknown(
+                log.id, "Grouped entity email send returned False", _failure_info[-1] if _failure_info else None
+            )
+        return success or bool(filtered_out)
+    except Exception as e:
+        mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
+        current_app.logger.error(
+            "Error sending grouped entity email for %r: %s", entity_name, e, exc_info=True
+        )
+        return False
 
 
 def _translate_notification_for_email(notif, locale: Optional[str]) -> tuple:
@@ -1314,12 +1635,14 @@ _INSTANT_TEMPLATE_SRC = """
                     <div class="message-panel {% if is_action_required %}action-required{% endif %}">
                         <h2>{{ notification.title }}</h2>
                         <p>{{ notification.message }}</p>
+                        {% if show_type_meta %}
                         <p class="meta">
                             {{ notification.notification_type.value.replace('_', ' ').title() }}
                             {% if notification.priority and notification.priority != 'normal' %}
                             &nbsp;•&nbsp;<span style="color: #dc2626; font-weight: 600;">{{ notification.priority.upper() }}</span>
                             {% endif %}
                         </p>
+                        {% endif %}
                         {% if notification.related_url %}
                         <a href="{{ (base_url ~ notification.related_url) | e }}"
                            style="display:inline-block;padding:12px 24px;text-decoration:none;font-weight:600;font-size:15px;margin:12px 0 0;color:#ffffff !important;background-color:{% if is_action_required %}#dc2626{% else %}#0d9488{% endif %};border:1px solid {% if is_action_required %}#b91c1c{% else %}#0f766e{% endif %};">{{ button_label }}</a>
@@ -1341,13 +1664,15 @@ _INSTANT_TEMPLATE_SRC = """
     """
 
 
-def render_instant_email(user, notification, locale: Optional[str] = None):
+def render_instant_email(user, notification, locale: Optional[str] = None, *, email_audience: str | None = None):
     """Render HTML email template for instant notification."""
     is_action_required = (notification.priority or 'normal') in ('high', 'urgent')
     user_locale = locale or _user_locale(user)
     user_name = sanitize_for_email(user.name or user.email)
     nt_val = getattr(notification.notification_type, 'value', str(notification.notification_type))
-    i18n = _build_instant_email_i18n(user_locale, user_name, is_action_required, nt_val)
+    i18n = _build_instant_email_i18n(
+        user_locale, user_name, is_action_required, nt_val, email_audience=email_audience
+    )
 
     base_url = (current_app.config.get('BASE_URL') or 'http://localhost:5000').rstrip('/')
 

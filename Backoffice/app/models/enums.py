@@ -257,6 +257,10 @@ class EmailDeliveryStatusValue(str, enum.Enum):
     failed = 'failed'
     retrying = 'retrying'
     cancelled = 'cancelled'
+    # No HTTP response from the Email API at all (read timeout / connection error).
+    # Distinct from 'failed': the provider may have actually processed and sent the
+    # message — we just never received confirmation. See docs/runbooks/email-api-no-response.md.
+    unknown = 'unknown'
 
     @classmethod
     def values(cls) -> tuple[str, ...]:

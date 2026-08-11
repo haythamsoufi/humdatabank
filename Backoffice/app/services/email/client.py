@@ -3,6 +3,7 @@ import json
 import os
 import threading
 import time
+import uuid
 import requests
 from requests import Response
 from typing import Iterable, Optional, List, Tuple
@@ -592,8 +593,16 @@ def _send_via_ifrc(
 
     effective_url = ""
     redacted_url = ""
+    # Generated client-side and sent as a header (never as a JSON payload key — the
+    # IFRC gateway's contract isn't documented to tolerate unknown body fields, see
+    # the module docstring on `text`/`reply_to` above). The API doesn't currently echo
+    # any correlation id back, so this is mainly for our own logs: it lets us quote a
+    # single stable id when escalating a specific no-response send to the team who
+    # manages the API (see docs/runbooks/email-api-no-response.md), instead of only
+    # having an approximate timestamp to go on.
+    client_request_id = uuid.uuid4().hex
     try:
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "X-Client-Request-Id": client_request_id}
 
         if api_key_in_url:
             effective_url = api_url
@@ -622,12 +631,13 @@ def _send_via_ifrc(
             approx_json_bytes = -1
 
         current_app.logger.info(
-            "email_api outbound | method=POST | redacted_url=%s | scheme=%s netloc=%s path=%s "
+            "email_api outbound | client_request_id=%s | method=POST | redacted_url=%s | scheme=%s netloc=%s path=%s "
             "query_param_names=%s | api_key_already_in_EMAIL_API_URL=%s api_key_appended_by_app=%s | "
-            "request_headers=Content-Type:application/json | json_body_utf8_approx_bytes=%s "
+            "request_headers=Content-Type:application/json,X-Client-Request-Id:%s | json_body_utf8_approx_bytes=%s "
             "payload_keys=%s | BodyAsBase64_chars=%s html_utf8_bytes=%s envelope_single_logical_to=%s | "
             "path_note=HTTPS_TLS_from_this_process_via_requests_library_no_app_HTTP_proxy "
             "egress_IP_is_Azure_subnet_NSG_NAT_or_peer_route_VNet_rules_apply_outside_app",
+            client_request_id,
             redacted_url,
             parsed_eff.scheme or "",
             parsed_eff.netloc or "",
@@ -635,6 +645,7 @@ def _send_via_ifrc(
             query_names,
             api_key_in_url,
             api_key_appended_by_client,
+            client_request_id,
             approx_json_bytes,
             sorted(payload.keys()),
             len(body_b64),
@@ -667,10 +678,11 @@ def _send_via_ifrc(
 
         url_changed = (final_redacted != redacted_url) and bool(final_redacted)
         current_app.logger.info(
-            "email_api response | http_status=%s | elapsed_ms=%.0f | redacted_request_url=%s | "
+            "email_api response | client_request_id=%s | http_status=%s | elapsed_ms=%.0f | redacted_request_url=%s | "
             "redacted_final_url=%s | redirect_hops=%s | url_changed_after_redirects=%s | "
             "response_bytes=%s | response_content_type=%s | response_text_stripped_len=%s | %s | "
             "edge_headers: %s | waf_vnet_triage: %s",
+            client_request_id,
             resp.status_code,
             elapsed_ms,
             redacted_url,
@@ -691,12 +703,14 @@ def _send_via_ifrc(
             if guid:
                 current_app.logger.info(
                     f"Email sent successfully via Email API to {total_recipients} recipient(s) "
-                    f"(To: {len(recipients)}, CC: {len(cc)}, BCC: {len(bcc)}). GUID: {guid}"
+                    f"(To: {len(recipients)}, CC: {len(cc)}, BCC: {len(bcc)}). GUID: {guid} "
+                    f"client_request_id: {client_request_id}"
                 )
             else:
                 current_app.logger.info(
                     f"Email sent successfully via Email API to {total_recipients} recipient(s) "
-                    f"(To: {len(recipients)}, CC: {len(cc)}, BCC: {len(bcc)})"
+                    f"(To: {len(recipients)}, CC: {len(cc)}, BCC: {len(bcc)}) "
+                    f"client_request_id: {client_request_id}"
                 )
             return True
 
@@ -761,7 +775,11 @@ def _send_via_ifrc(
             )
 
         if _failure_info is not None:
-            fail: dict = {"code": "email_api_http_error", "http_status": resp.status_code}
+            fail: dict = {
+                "code": "email_api_http_error",
+                "http_status": resp.status_code,
+                "client_request_id": client_request_id,
+            }
             diag = _ifrc_http_error_diag(
                 resp, payload, body_b64, raw_html, is_single_in_to, recipients, cc, bcc
             )
@@ -778,15 +796,18 @@ def _send_via_ifrc(
     except Exception as e:
         # No HTTP response at all (timeout, connection error, DNS failure, ...) —
         # this is the expensive, thread-blocking failure mode the circuit breaker
-        # exists to short-circuit on repeated occurrence.
+        # exists to short-circuit on repeated occurrence. It's also genuinely
+        # ambiguous (unlike the HTTP-error branch above): the request may have
+        # reached the API and been processed — see mark_email_failed_or_unknown.
         _email_api_circuit_breaker.record_failure()
         err_url = redacted_url or _redact_email_api_url_for_logs(api_url_base)
         current_app.logger.error(
-            "Email API request failed (no HTTP response) | redacted_url=%s | error=%s",
+            "Email API request failed (no HTTP response) | client_request_id=%s | redacted_url=%s | error=%s",
+            client_request_id,
             err_url,
             str(e),
             exc_info=True,
         )
         if _failure_info is not None:
-            _failure_info.append({"code": "email_api_request_error"})
+            _failure_info.append({"code": "email_api_request_error", "client_request_id": client_request_id})
         return False

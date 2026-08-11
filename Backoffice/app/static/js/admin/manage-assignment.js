@@ -6,6 +6,93 @@
     var cfg = window.manageAssignmentConfig || {};
 
     $(document).ready(function() {
+        var scheduleNotifBannerRefresh = null;
+        var notifBannerRefreshTimer = null;
+
+        function collectSelectedCountryIdsForPreview() {
+            const seen = new Set();
+            const ids = [];
+            function addId(value) {
+                if (!value || seen.has(value)) return;
+                seen.add(value);
+                ids.push(value);
+            }
+            document.querySelectorAll('.country-checkbox-entity:checked:not([disabled])').forEach(function(el) {
+                addId(el.value);
+            });
+            if (!ids.length) {
+                document.querySelectorAll('#country-selections-container input[type="hidden"][name="countries"]').forEach(function(el) {
+                    addId(el.value);
+                });
+            }
+            return ids;
+        }
+
+        function resolvePreviewEmailBatchCount(preview) {
+            if (preview && typeof preview.email_batch_count === 'number') {
+                return preview.email_batch_count;
+            }
+            return 0;
+        }
+
+        function formatNoFocalCountriesSuffix(preview) {
+            if (!preview || !preview.countries_without_focal_count) return '';
+            return (cfg.t.notifyNoFocalCountriesSuffix || '')
+                .replace('{no_focal}', preview.countries_without_focal_count);
+        }
+
+        function buildNotifPreviewQueryParams(countryIds) {
+            const params = new URLSearchParams();
+            (countryIds || []).forEach(function(id) {
+                params.append('country_ids[]', id);
+            });
+            const notifyAdminsEl = document.getElementById('notify_admins');
+            if (notifyAdminsEl && notifyAdminsEl.checked) {
+                params.set('notify_admins', '1');
+            }
+            return params;
+        }
+
+        function formatAdminInAppSuffix(preview) {
+            if (!preview || !preview.admins_enabled) return '';
+            if (preview.admin_users) {
+                return (cfg.t.notifyAdminInAppLine || '')
+                    .replace('{admin_users}', preview.admin_users);
+            }
+            if (preview.admin_total_users) {
+                return (cfg.t.notifyAdminInAppAllFocal || '')
+                    .replace('{admin_total}', preview.admin_total_users);
+            }
+            return cfg.t.notifyAdminInAppNone || '';
+        }
+
+        function formatAdminCcSuffix(preview, includeAdminCc) {
+            if (!preview || !preview.admins_enabled) return '';
+            if (includeAdminCc && preview.admin_email_users) {
+                return (cfg.t.notifyAdminCcLine || '')
+                    .replace('{admin_email_users}', preview.admin_email_users);
+            }
+            if (preview.admin_users) {
+                return cfg.t.notifyAdminCcPrompt || '';
+            }
+            return '';
+        }
+
+        function formatNotifRecipientsSummary(preview, includeAdminCc, localCountryIds) {
+            if (!preview) return '';
+            const emailBatches = resolvePreviewEmailBatchCount(preview);
+            let text = (cfg.t.notifyRecipientsSummary || '')
+                .replace('{users}', preview.total_focal_users)
+                .replace('{email_users}', preview.email_users)
+                .replace('{entities}', emailBatches)
+                .replace('{no_focal_suffix}', formatNoFocalCountriesSuffix(preview))
+                .replace('{admin_suffix}', formatAdminInAppSuffix(preview))
+                .replace('{admin_cc_suffix}', formatAdminCcSuffix(preview, includeAdminCc));
+            if (!preview.admins_enabled) {
+                text += cfg.t.notifyAdminsDisabledHint || '';
+            }
+            return text;
+        }
 
         // --- Period Name Generation and Parsing ---
         const periodTypeSelect = document.getElementById('period-type');
@@ -70,8 +157,7 @@
             } else if (periodType === 'year-range') {
                 document.getElementById('year-range-fields').classList.remove('hidden');
             } else if (periodType === 'month-range') {
-                document.getElementById('month-range-start').classList.remove('hidden');
-                document.getElementById('month-range-end').classList.remove('hidden');
+                document.getElementById('month-range-fields').classList.remove('hidden');
             }
 
             setDefaultYearsIfEmpty();
@@ -990,11 +1076,7 @@
 
         if (generatePublicUrlCheckbox && publicUrlActiveContainer) {
             function togglePublicUrlActive() {
-                if (generatePublicUrlCheckbox.checked) {
-                    publicUrlActiveContainer.style.display = 'flex';
-                } else {
-                    publicUrlActiveContainer.style.display = 'none';
-                }
+                publicUrlActiveContainer.classList.toggle('hidden', !generatePublicUrlCheckbox.checked);
             }
 
             // Initial state
@@ -1989,6 +2071,10 @@
                 hiddenInput.value = checkbox.value;
                 container.appendChild(hiddenInput);
             });
+
+            if (scheduleNotifBannerRefresh) {
+                scheduleNotifBannerRefresh();
+            }
         }
 
         // Register change-event listeners and run initial sync only for new assignments
@@ -3063,24 +3149,13 @@
 
                 // Collect country IDs currently selected for the assignment
                 function getSelectedCountryIds() {
-                    const ids = [];
-                    mainForm.querySelectorAll('input[name="country_ids[]"]:checked, input[name="countries"]:checked').forEach(el => {
-                        if (el.value) ids.push(el.value);
-                    });
-                    // Fallback: hidden country inputs added by syncCountriesToMainForm
-                    if (!ids.length) {
-                        mainForm.querySelectorAll('input[type="hidden"][name="countries"]').forEach(el => {
-                            if (el.value) ids.push(el.value);
-                        });
-                    }
-                    return ids;
+                    return collectSelectedCountryIdsForPreview();
                 }
 
                 async function fetchNotifPreview(countryIds) {
                     if (!cfg.urls || !cfg.urls.notificationPreview) return null;
                     try {
-                        const params = new URLSearchParams();
-                        countryIds.forEach(id => params.append('country_ids[]', id));
+                        const params = buildNotifPreviewQueryParams(countryIds);
                         const resp = await fetch(cfg.urls.notificationPreview + '?' + params.toString(), {
                             headers: { 'X-Requested-With': 'XMLHttpRequest' }
                         });
@@ -3091,16 +3166,25 @@
                     }
                 }
 
-                function buildConfirmMsg(sendNotifications, preview) {
+                function _formatNotifSummary(preview, includeAdminCc, localCountryIds) {
+                    return formatNotifRecipientsSummary(preview, includeAdminCc, localCountryIds);
+                }
+
+                function buildConfirmMsg(sendNotifications, preview, localCountryIds) {
                     if (!sendNotifications) return cfg.t.noNotifyMsg;
                     if (!preview) return cfg.t.notifyMsg;
-                    if (!preview.focal_points_enabled) return cfg.t.notifyMsgDisabled;
-                    if (!preview.total_focal_users) {
+                    // Admins are a separate audience bucket from focal points, so
+                    // focal_points_enabled=false doesn't necessarily mean no one is notified.
+                    const hasAdminRecipients = !!(preview.admins_enabled && preview.admin_users);
+                    if (!preview.focal_points_enabled && !hasAdminRecipients) {
+                        return cfg.t.notifyMsgDisabled;
+                    }
+                    if (!preview.total_focal_users && !hasAdminRecipients) {
                         return cfg.t.notifyMsg + '\n\n⚠ ' + cfg.t.notifyNoRecipients;
                     }
-                    const summary = (cfg.t.notifyRecipientsSummary || '')
-                        .replace('{users}', preview.total_focal_users)
-                        .replace('{email_users}', preview.email_users);
+                    const notifyAdminsCheckbox = document.getElementById('notify_admins');
+                    const includeAdminCc = notifyAdminsCheckbox ? notifyAdminsCheckbox.checked : false;
+                    const summary = _formatNotifSummary(preview, includeAdminCc, localCountryIds);
                     return cfg.t.notifyMsg + '\n\n' + summary;
                 }
 
@@ -3109,7 +3193,7 @@
                 const selectedCountryIds = getSelectedCountryIds();
 
                 const preview = sendNotifications ? await fetchNotifPreview(selectedCountryIds) : null;
-                const confirmMsg = buildConfirmMsg(sendNotifications, preview);
+                const confirmMsg = buildConfirmMsg(sendNotifications, preview, selectedCountryIds);
                 const confirmTitle = cfg.t.createAssignment;
                 const confirmContinue = cfg.t.continueBtn;
                 const confirmCancel = cfg.t.cancel;
@@ -3142,15 +3226,62 @@
             const recipientPreviewEl = document.getElementById('notif-recipient-preview');
             const recipientPreviewTextEl = document.getElementById('notif-recipient-preview-text');
             const sendNotifCheckbox = document.getElementById('send_notifications');
+            const notifDetailsPanel = document.getElementById('notif-details-panel');
+            const notifyAdminsRow = document.getElementById('notify-admins-row');
+            const notifyAdminsCheckbox = document.getElementById('notify_admins');
+            const notifyAdminsHint = document.getElementById('notify-admins-hint');
 
             let _lastPreview = null;
+            let _lastPreviewCountryIds = [];
+
+            function _formatBannerSummary(preview) {
+                const includeAdminCc = notifyAdminsCheckbox ? notifyAdminsCheckbox.checked : false;
+                return formatNotifRecipientsSummary(preview, includeAdminCc, _lastPreviewCountryIds);
+            }
+
+            function _updateNotifyAdminsRow(preview) {
+                if (!notifyAdminsRow) return;
+                // Admins are a separate audience bucket from focal points, so this row can
+                // stay available even when focal_points_enabled is false (admins may still
+                // be notified — see admins_enabled check below).
+                if (!sendNotifCheckbox || !sendNotifCheckbox.checked || !preview) {
+                    notifyAdminsRow.classList.add('hidden');
+                    return;
+                }
+                if (!preview.admins_enabled) {
+                    notifyAdminsRow.classList.add('hidden');
+                    if (notifyAdminsCheckbox) {
+                        notifyAdminsCheckbox.checked = false;
+                    }
+                    return;
+                }
+                notifyAdminsRow.classList.remove('hidden');
+                if (notifyAdminsCheckbox) {
+                    notifyAdminsCheckbox.disabled = false;
+                    if (notifyAdminsHint) {
+                        if (preview.admin_users) {
+                            notifyAdminsHint.textContent = (cfg.t.notifyAdminsHint || '')
+                                .replace('{admin_users}', preview.admin_users);
+                        } else if (preview.admin_total_users) {
+                            notifyAdminsHint.textContent = (cfg.t.notifyAdminInAppAllFocal || '')
+                                .replace('{admin_total}', preview.admin_total_users);
+                        } else {
+                            notifyAdminsHint.textContent = cfg.t.notifyAdminInAppNone || '';
+                        }
+                    }
+                }
+            }
 
             async function _fetchAndUpdateNotifBanner() {
                 if (!sendNotifCheckbox || !sendNotifCheckbox.checked) {
+                    if (notifDetailsPanel) notifDetailsPanel.classList.add('hidden');
                     if (audienceWarningEl) audienceWarningEl.classList.add('hidden');
                     if (recipientPreviewEl) recipientPreviewEl.classList.add('hidden');
+                    if (notifyAdminsRow) notifyAdminsRow.classList.add('hidden');
                     return;
                 }
+
+                if (notifDetailsPanel) notifDetailsPanel.classList.remove('hidden');
 
                 // Show loading state
                 if (recipientPreviewEl && recipientPreviewTextEl) {
@@ -3159,21 +3290,11 @@
                 }
                 if (audienceWarningEl) audienceWarningEl.classList.add('hidden');
 
-                // Collect currently checked country IDs from the country selector checkboxes
-                const countryIds = [];
-                document.querySelectorAll('input[data-country-checkbox]:checked, input.country-checkbox:checked').forEach(el => {
-                    if (el.value) countryIds.push(el.value);
-                });
-                // Fallback: read from hidden form inputs added by syncCountriesToMainForm
-                if (!countryIds.length && mainForm) {
-                    mainForm.querySelectorAll('input[type="hidden"][name="countries"]').forEach(el => {
-                        if (el.value) countryIds.push(el.value);
-                    });
-                }
+                // Collect selected countries from checkboxes (primary) or synced hidden inputs
+                _lastPreviewCountryIds = collectSelectedCountryIdsForPreview();
 
                 try {
-                    const params = new URLSearchParams();
-                    countryIds.forEach(id => params.append('country_ids[]', id));
+                    const params = buildNotifPreviewQueryParams(_lastPreviewCountryIds);
                     const resp = await fetch(cfg.urls.notificationPreview + '?' + params.toString(), {
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
@@ -3185,46 +3306,299 @@
 
                 if (!_lastPreview) {
                     if (recipientPreviewEl) recipientPreviewEl.classList.add('hidden');
+                    if (notifyAdminsRow) notifyAdminsRow.classList.add('hidden');
                     return;
                 }
 
                 if (!_lastPreview.focal_points_enabled) {
-                    // Audience bucket disabled — show warning, hide info banner
+                    // Focal-points bucket disabled — always show the warning (focal points truly get
+                    // nothing), but admins are a separate bucket and may still be notified, so keep
+                    // showing their controls/counts instead of hiding everything.
                     if (audienceWarningEl && audienceWarningTextEl) {
                         audienceWarningTextEl.textContent = cfg.t.notifyAudienceDisabled || 'Notifications are disabled in platform settings.';
                         audienceWarningEl.classList.remove('hidden');
                     }
-                    if (recipientPreviewEl) recipientPreviewEl.classList.add('hidden');
+                    _updateNotifyAdminsRow(_lastPreview);
+                    if (recipientPreviewEl && recipientPreviewTextEl) {
+                        const hasRecipients = _lastPreview.admin_users || _lastPreview.email_batch_count;
+                        if (hasRecipients) {
+                            recipientPreviewTextEl.textContent = _formatBannerSummary(_lastPreview);
+                            recipientPreviewEl.classList.remove('hidden');
+                        } else {
+                            recipientPreviewEl.classList.add('hidden');
+                        }
+                    }
                     return;
                 }
 
                 // Audience enabled — show recipient count
                 if (audienceWarningEl) audienceWarningEl.classList.add('hidden');
+                _updateNotifyAdminsRow(_lastPreview);
                 if (recipientPreviewEl && recipientPreviewTextEl) {
-                    if (!_lastPreview.total_focal_users) {
+                    const hasRecipients = _lastPreview.total_focal_users
+                        || _lastPreview.email_batch_count
+                        || _lastPreview.admin_users;
+                    if (!hasRecipients) {
                         recipientPreviewTextEl.textContent = cfg.t.notifyNoRecipients || 'No focal points configured for selected countries.';
                     } else {
-                        const summary = (cfg.t.notifyRecipientsSummary || '{users} focal point(s) · {email_users} email(s)')
-                            .replace('{users}', _lastPreview.total_focal_users)
-                            .replace('{email_users}', _lastPreview.email_users);
-                        recipientPreviewTextEl.textContent = summary;
+                        recipientPreviewTextEl.textContent = _formatBannerSummary(_lastPreview);
                     }
                     recipientPreviewEl.classList.remove('hidden');
                 }
             }
+
+            scheduleNotifBannerRefresh = function() {
+                clearTimeout(notifBannerRefreshTimer);
+                notifBannerRefreshTimer = setTimeout(_fetchAndUpdateNotifBanner, 150);
+            };
 
             // Run on load and whenever the checkbox changes
             _fetchAndUpdateNotifBanner();
             if (sendNotifCheckbox) {
                 sendNotifCheckbox.addEventListener('change', _fetchAndUpdateNotifBanner);
             }
+            if (notifyAdminsCheckbox) {
+                notifyAdminsCheckbox.addEventListener('change', function() {
+                    scheduleNotifBannerRefresh();
+                });
+            }
 
-            // Also re-run whenever countries are (de)selected so the preview stays current
+            // Re-run when country selection changes via individual checkboxes, Select All,
+            // region Select All, or Part of filters (all paths call syncCountriesToMainForm).
             document.addEventListener('change', function(e) {
-                if (e.target && (e.target.dataset.countryCheckbox !== undefined || e.target.classList.contains('country-checkbox'))) {
-                    _fetchAndUpdateNotifBanner();
+                const target = e.target;
+                if (!target) return;
+                if (target.classList.contains('country-checkbox-entity')) {
+                    scheduleNotifBannerRefresh();
+                    return;
+                }
+                if (target.id === 'select-all-countries-entity' || target.classList.contains('region-select-all-entity')) {
+                    scheduleNotifBannerRefresh();
+                    return;
+                }
+                if (target.classList.contains('category-filter-checkbox') && !target.classList.contains('category-filter-manage')) {
+                    scheduleNotifBannerRefresh();
                 }
             });
+        }
+
+        // --- Notification email preview modal (new-assignment page only) ---
+        if (cfg.isNew && cfg.urls && cfg.urls.notificationEmailPreview) {
+            const emailPreviewBtn = document.getElementById('notif-email-preview-btn');
+            const emailPreviewModal = document.getElementById('assignment-notif-email-preview-modal');
+            const emailPreviewCountrySelect = document.getElementById('notif-email-preview-country');
+            const emailPreviewLoading = document.getElementById('notif-email-preview-loading');
+            const emailPreviewEmpty = document.getElementById('notif-email-preview-empty');
+            const emailPreviewContent = document.getElementById('notif-email-preview-content');
+            const emailPreviewSubject = document.getElementById('notif-email-preview-subject');
+            const emailPreviewTo = document.getElementById('notif-email-preview-to');
+            const emailPreviewCc = document.getElementById('notif-email-preview-cc');
+            const emailPreviewCcWrap = document.getElementById('notif-email-preview-cc-wrap');
+            const emailPreviewToWrap = document.getElementById('notif-email-preview-to-wrap');
+            const emailPreviewFrame = document.getElementById('notif-email-preview-frame');
+
+            function collectSelectedCountriesWithNames() {
+                const seen = new Set();
+                const out = [];
+                document.querySelectorAll('.country-checkbox-entity:checked:not([disabled])').forEach(function(cb) {
+                    if (!cb.value || seen.has(cb.value)) return;
+                    seen.add(cb.value);
+                    const label = cb.id
+                        ? document.querySelector('label[for="' + String(cb.id).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]')
+                        : null;
+                    let name = cb.value;
+                    if (label) {
+                        name = label.textContent.replace(/\s*\(assigned\)\s*$/i, '').trim();
+                    }
+                    out.push({ id: cb.value, name: name });
+                });
+                out.sort(function(a, b) { return a.name.localeCompare(b.name); });
+                return out;
+            }
+
+            function getAssignmentFormPreviewParams() {
+                const form = document.getElementById('manageAssignmentForm') ||
+                    document.querySelector('form[action*="assignments"]') ||
+                    document.querySelector('form[method="POST"]');
+                const notifyAdminsEl = document.getElementById('notify_admins');
+                return {
+                    templateId: form && form.querySelector('select[name="template_id"]')
+                        ? form.querySelector('select[name="template_id"]').value : '',
+                    periodName: form && form.querySelector('input[name="period_name"]')
+                        ? (form.querySelector('input[name="period_name"]').value || '').trim() : '',
+                    customName: form && form.querySelector('input[name="custom_name"]')
+                        ? (form.querySelector('input[name="custom_name"]').value || '').trim() : '',
+                    dueDate: form && form.querySelector('input[name="due_date"]')
+                        ? (form.querySelector('input[name="due_date"]').value || '').trim() : '',
+                    notifyAdmins: notifyAdminsEl ? notifyAdminsEl.checked : false,
+                };
+            }
+
+            function renderRecipientList(container, recipients, emptyText) {
+                if (!container) return;
+                container.innerHTML = '';
+                if (!recipients || !recipients.length) {
+                    const empty = document.createElement('span');
+                    empty.className = 'text-xs text-gray-400 italic';
+                    empty.textContent = emptyText;
+                    container.appendChild(empty);
+                    return;
+                }
+                recipients.forEach(function(r) {
+                    const chip = document.createElement('span');
+                    chip.className = 'inline-flex max-w-full items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 shadow-sm';
+                    chip.title = r.email || '';
+                    const nameEl = document.createElement('span');
+                    nameEl.className = 'truncate font-medium';
+                    nameEl.textContent = r.name || r.email;
+                    chip.appendChild(nameEl);
+                    if (r.name && r.email && r.name !== r.email) {
+                        const emailEl = document.createElement('span');
+                        emailEl.className = 'hidden truncate text-gray-400 sm:inline';
+                        emailEl.textContent = r.email;
+                        chip.appendChild(emailEl);
+                    }
+                    container.appendChild(chip);
+                });
+            }
+
+            async function loadNotifEmailPreview(countryId) {
+                if (!countryId) return;
+                const params = getAssignmentFormPreviewParams();
+                if (emailPreviewLoading) emailPreviewLoading.classList.remove('hidden');
+                if (emailPreviewContent) emailPreviewContent.classList.add('hidden');
+                if (emailPreviewEmpty) emailPreviewEmpty.classList.add('hidden');
+                if (emailPreviewFrame) emailPreviewFrame.srcdoc = '';
+
+                const qs = new URLSearchParams({
+                    country_id: countryId,
+                    template_id: params.templateId || '',
+                    period_name: params.periodName || '',
+                    notify_admins: params.notifyAdmins ? '1' : '0',
+                });
+                if (params.customName) qs.set('custom_name', params.customName);
+                if (params.dueDate) qs.set('due_date', params.dueDate);
+
+                try {
+                    const resp = await fetch(cfg.urls.notificationEmailPreview + '?' + qs.toString(), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await resp.json();
+                    if (emailPreviewLoading) emailPreviewLoading.classList.add('hidden');
+
+                    if (!resp.ok || !data || data.success === false) {
+                        if (emailPreviewEmpty) {
+                            emailPreviewEmpty.textContent = (data && data.message) || 'Preview failed.';
+                            emailPreviewEmpty.classList.remove('hidden');
+                        }
+                        return;
+                    }
+
+                    if (data.empty_reason) {
+                        if (emailPreviewEmpty) {
+                            emailPreviewEmpty.textContent = data.empty_reason;
+                            emailPreviewEmpty.classList.remove('hidden');
+                        }
+                        return;
+                    }
+
+                    if (emailPreviewSubject) emailPreviewSubject.textContent = data.subject || '';
+                    renderRecipientList(
+                        emailPreviewTo,
+                        data.to,
+                        cfg.t.notifyEmailPreviewNoRecipients || 'No To recipients.'
+                    );
+                    const hasCc = data.cc && data.cc.length;
+                    if (emailPreviewCcWrap) {
+                        emailPreviewCcWrap.classList.toggle('hidden', !hasCc);
+                    }
+                    if (emailPreviewToWrap) {
+                        emailPreviewToWrap.classList.toggle('md:col-span-2', !hasCc);
+                    }
+                    if (hasCc) {
+                        renderRecipientList(
+                            emailPreviewCc,
+                            data.cc,
+                            cfg.t.notifyEmailPreviewNoRecipients || 'No CC recipients.'
+                        );
+                    } else if (emailPreviewCc) {
+                        emailPreviewCc.innerHTML = '';
+                    }
+                    if (emailPreviewFrame) {
+                        emailPreviewFrame.srcdoc = data.html_body || '';
+                    }
+                    if (emailPreviewContent) emailPreviewContent.classList.remove('hidden');
+                } catch (e) {
+                    if (emailPreviewLoading) emailPreviewLoading.classList.add('hidden');
+                    if (emailPreviewEmpty) {
+                        emailPreviewEmpty.textContent = 'Preview failed.';
+                        emailPreviewEmpty.classList.remove('hidden');
+                    }
+                }
+            }
+
+            function openNotifEmailPreviewModal() {
+                if (!emailPreviewModal) return;
+                const countries = collectSelectedCountriesWithNames();
+                const formParams = getAssignmentFormPreviewParams();
+
+                if (!formParams.templateId || !formParams.periodName) {
+                    if (window.showAlert) {
+                        window.showAlert(
+                            cfg.t.notifyEmailPreviewNeedTemplate || 'Select template and period first.',
+                            'warning'
+                        );
+                    }
+                    return;
+                }
+                if (!countries.length) {
+                    if (window.showAlert) {
+                        window.showAlert(
+                            cfg.t.notifyEmailPreviewNoCountries || 'Select countries first.',
+                            'warning'
+                        );
+                    }
+                    return;
+                }
+
+                if (emailPreviewCountrySelect) {
+                    emailPreviewCountrySelect.innerHTML = '';
+                    countries.forEach(function(c) {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.name;
+                        emailPreviewCountrySelect.appendChild(opt);
+                    });
+                }
+
+                if (emailPreviewContent) emailPreviewContent.classList.add('hidden');
+                if (emailPreviewEmpty) emailPreviewEmpty.classList.add('hidden');
+                if (emailPreviewLoading) emailPreviewLoading.classList.add('hidden');
+
+                emailPreviewModal.classList.remove('hidden');
+                loadNotifEmailPreview(countries[0].id);
+            }
+
+            if (emailPreviewBtn) {
+                emailPreviewBtn.addEventListener('click', openNotifEmailPreviewModal);
+            }
+            if (emailPreviewCountrySelect) {
+                emailPreviewCountrySelect.addEventListener('change', function() {
+                    loadNotifEmailPreview(this.value);
+                });
+            }
+            const notifyAdminsForPreview = document.getElementById('notify_admins');
+            if (notifyAdminsForPreview) {
+                notifyAdminsForPreview.addEventListener('change', function() {
+                    if (!emailPreviewModal || emailPreviewModal.classList.contains('hidden')) {
+                        return;
+                    }
+                    const countryId = emailPreviewCountrySelect && emailPreviewCountrySelect.value;
+                    if (countryId) {
+                        loadNotifEmailPreview(countryId);
+                    }
+                });
+            }
         }
 
         // Event delegation for remove public and remove entity buttons (use custom confirmation)

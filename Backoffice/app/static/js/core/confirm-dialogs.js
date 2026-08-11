@@ -213,7 +213,7 @@ function _showConfirmationWithButtons(message, onConfirm, onCancel, confirmText,
     const messageDiv = document.createElement('div');
     messageDiv.className = 'mb-6';
     const messageP = document.createElement('p');
-    messageP.className = 'text-sm text-gray-600';
+    messageP.className = 'text-sm text-gray-600 whitespace-pre-line';
     messageP.textContent = message;
     messageDiv.appendChild(messageP);
 
@@ -527,7 +527,7 @@ function showAlert(message, type = 'info', title = null, onClose = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'mb-6';
     const messageP = document.createElement('p');
-    messageP.className = 'text-sm text-gray-600';
+    messageP.className = 'text-sm text-gray-600 whitespace-pre-line';
     messageP.textContent = message;
     messageDiv.appendChild(messageP);
 

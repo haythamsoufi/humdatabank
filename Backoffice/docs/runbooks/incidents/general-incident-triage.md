@@ -174,6 +174,22 @@ Also set **`WEBSITES_CONTAINER_START_TIME_LIMIT=230`** (Configuration → Applic
 3. If schema errors appear: the migration was not run after deployment. Run `python -m flask db upgrade` (confirm single head first).
 4. If a migration failed mid-apply: restore from the pre-deploy snapshot — do not attempt `db downgrade` without a recovery plan.
 
+### Scenario G: Communication Center shows an email as "Failed" but it may have sent
+
+1. Check whether the row is **"Failed"** (red) or **"No Response"** (amber) — only
+   `failed` is a confirmed rejection; `unknown`/"No Response" means the Email API
+   never returned an HTTP response within our 15s timeout, so it may have actually
+   gone through.
+2. Grep application logs for `Email API request failed (no HTTP response)` around
+   the send time and note the `client_request_id`.
+3. Check whether it's an isolated blip (recent calls succeeded) or a full outage (all
+   calls failing, possibly with the circuit breaker open) — see full triage steps and
+   the escalation ticket template in [Email API no-response timeouts](email-api-no-response.md).
+4. Don't blindly mass-retry "No Response" rows for anything recipient-sensitive
+   (e.g. approval emails) without confirming with the recipient first — there's no
+   idempotency key, so a retry after a successful-but-unconfirmed send is a real
+   duplicate.
+
 ---
 
 ## 5. Escalation
@@ -190,6 +206,10 @@ Request: **targeted path + argument exclusion only** — not global rule disable
 
 ### Security / RBAC regression
 Never remove guards without reviewing [RBAC audit exemptions policy](../security/rbac-admin-route-audit-exemptions.md) and getting a second reviewer.
+
+### Email API (`microservices.ifrc.org`) — no response / suspected duplicate risk
+Ready-to-send ticket template and what to hand them (timestamp, `client_request_id`,
+surrounding successful calls): [Email API no-response timeouts](email-api-no-response.md) §6.
 
 ### Database corruption / migration failure
 1. Immediately take a snapshot of the current DB state.

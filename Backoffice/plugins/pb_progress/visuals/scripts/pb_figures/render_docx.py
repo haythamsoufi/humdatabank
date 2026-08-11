@@ -16,7 +16,7 @@ from docx.shared import Inches, Pt, RGBColor
 from .languages import ARABIC_VISUAL_FONT, LATIN_DOCX_FONT, is_rtl
 from .calculations import not_available
 from .layouts import cumulative_table_rows, mapping_from_model, section_has_indicators
-from .line_chart import render_line_chart_svg
+from .line_chart import CHART_HEIGHT, render_line_chart_svg
 from .donut_chart import render_donut_svg
 from .svg_raster import write_svg_png
 from .payload import build_payload
@@ -175,7 +175,7 @@ def render_line_chart_asset(
     output_path: Path,
     *,
     width: int = CHART_WIDTH_PX,
-    height: int = _DOCX_CHART_HEIGHT,
+    height: int = CHART_HEIGHT,
     language: str = "English",
     show_labels: bool = True,
     session=None,
@@ -343,6 +343,7 @@ def _add_cumulative_block(
         target_label,
         chart_path,
         width=chart_width_px,
+        height=_DOCX_CHART_HEIGHT,
         language=language,
         session=session,
     )

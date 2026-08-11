@@ -606,9 +606,13 @@ class CommunicationsGridManager {
         if (status === 'sent') badgeClass = 'bg-green-100 text-green-800';
         else if (status === 'pending') badgeClass = 'bg-yellow-100 text-yellow-800';
         else if (status === 'failed') badgeClass = 'bg-red-100 text-red-800';
+        else if (status === 'unknown') badgeClass = 'bg-orange-100 text-orange-800';
         else if (status === 'skipped') badgeClass = 'bg-slate-100 text-slate-700';
         else if (status === 'cancelled') badgeClass = 'bg-gray-100 text-gray-600';
-        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClass}">${label}</span>`;
+        const title = status === 'unknown'
+            ? ` title="${(t.emailStatusUnknownTooltip || 'The Email API gave no response before our timeout — delivery could not be confirmed. It may have already been sent.').replace(/"/g, '&quot;')}"`
+            : '';
+        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClass}"${title}>${label}</span>`;
     }
 
     renderEmailContent(params) {

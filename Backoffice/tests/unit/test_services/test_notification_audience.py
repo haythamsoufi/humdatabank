@@ -323,3 +323,83 @@ class TestGetAssignmentEditorSubmitterUserIdsForEntity:
             )
 
         assert user.id not in result
+
+    def test_excludes_entity_scoped_org_admin_with_editor_role(self, app, db_session):
+        """Admin role + country assignment = admin for that country, not focal."""
+        from app.models import User
+        from app.models.rbac import RbacRole, RbacUserRole
+        from app.models.core import UserEntityPermission
+        from app import db
+
+        with app.app_context():
+            user = User(email='admin_focal@test.com', name='Admin Focal', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+
+            editor_role = RbacRole.query.filter_by(code='assignment_editor_submitter').first()
+            if not editor_role:
+                editor_role = RbacRole(code='assignment_editor_submitter', name='Editor')
+                db.session.add(editor_role)
+                db.session.flush()
+
+            admin_role = RbacRole.query.filter_by(code='admin_core').first()
+            if not admin_role:
+                admin_role = RbacRole(code='admin_core', name='Admin Core')
+                db.session.add(admin_role)
+                db.session.flush()
+
+            db.session.add(RbacUserRole(user_id=user.id, role_id=editor_role.id))
+            db.session.add(RbacUserRole(user_id=user.id, role_id=admin_role.id))
+            db.session.add(
+                UserEntityPermission(user_id=user.id, entity_type='country', entity_id=55)
+            )
+            db.session.commit()
+
+            result = get_assignment_editor_submitter_user_ids_for_entity('country', 55)
+
+        assert user.id not in result
+
+    def test_pure_focal_not_affected_by_other_country_admins(self, app, db_session):
+        """Focal user on country B is unaffected by admins scoped to country A."""
+        from app.models import User
+        from app.models.rbac import RbacRole, RbacUserRole
+        from app.models.core import UserEntityPermission
+        from app import db
+
+        with app.app_context():
+            focal = User(email='pure_focal@test.com', name='Pure Focal', active=True)
+            focal.set_password('pw')
+            admin = User(email='country_admin@test.com', name='Country Admin', active=True)
+            admin.set_password('pw')
+            db.session.add_all([focal, admin])
+            db.session.flush()
+
+            editor_role = RbacRole.query.filter_by(code='assignment_editor_submitter').first()
+            if not editor_role:
+                editor_role = RbacRole(code='assignment_editor_submitter', name='Editor')
+                db.session.add(editor_role)
+                db.session.flush()
+
+            admin_role = RbacRole.query.filter_by(code='admin_core').first()
+            if not admin_role:
+                admin_role = RbacRole(code='admin_core', name='Admin Core')
+                db.session.add(admin_role)
+                db.session.flush()
+
+            db.session.add(RbacUserRole(user_id=focal.id, role_id=editor_role.id))
+            db.session.add(
+                UserEntityPermission(user_id=focal.id, entity_type='country', entity_id=20)
+            )
+
+            db.session.add(RbacUserRole(user_id=admin.id, role_id=admin_role.id))
+            db.session.add(
+                UserEntityPermission(user_id=admin.id, entity_type='country', entity_id=10)
+            )
+            db.session.commit()
+
+            focal_country = get_assignment_editor_submitter_user_ids_for_entity('country', 20)
+            admin_country = get_assignment_editor_submitter_user_ids_for_entity('country', 10)
+
+        assert focal.id in focal_country
+        assert admin.id not in admin_country

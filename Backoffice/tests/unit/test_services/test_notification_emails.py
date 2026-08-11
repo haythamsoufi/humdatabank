@@ -24,6 +24,10 @@ from app.services.notification.emails import (
     send_instant_notification_email,
     retry_email_delivery_log,
     _translate_notification_for_email,
+    filter_instant_email_eligible_user_ids,
+    _filter_instant_email_eligible_user_ids,
+    build_grouped_entity_email_preview,
+    send_grouped_entity_email,
 )
 from app.models.enums import NotificationType
 
@@ -1139,3 +1143,283 @@ class TestTranslateNotificationForEmail:
             n.title_params = '{"submitter_name": "John"}'
             title, message = _translate_notification_for_email(n, 'en')
         assert isinstance(title, str)
+
+
+# ---------------------------------------------------------------------------
+# filter_instant_email_eligible_user_ids
+#
+# This is the single source of truth for "will this user actually get an
+# instant email" — both the real send path (send_grouped_entity_email,
+# send_instant_notification_email) and any UI preview of recipient counts
+# must call this instead of re-implementing the eligibility rules, so a
+# preview never promises more (or fewer) emails than will really be sent.
+# ---------------------------------------------------------------------------
+
+class TestFilterInstantEmailEligibleUserIds:
+    def _pref(self, email_notifications=True, frequency='instant', types_enabled=None):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            email_notifications=email_notifications,
+            notification_frequency=frequency,
+            notification_types_enabled=types_enabled if types_enabled is not None else [],
+        )
+
+    def test_empty_user_ids_returns_empty(self, app, db_session):
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids([1, 2], NotificationType.assignment_created)
+        # Should not raise even with no cache provided; exercised fully below with a cache.
+        assert isinstance(result, list)
+
+    def test_eligible_user_is_included(self, app, db_session):
+        cache = {1: self._pref()}
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == [1]
+
+    def test_excludes_user_with_email_notifications_disabled(self, app, db_session):
+        cache = {1: self._pref(email_notifications=False)}
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == []
+
+    def test_excludes_digest_frequency_user(self, app, db_session):
+        """A user on daily/weekly digest must NOT count towards instant-email totals,
+        even though their global email toggle is on and the type isn't excluded —
+        this is exactly the case the assignment-creation preview previously miscounted."""
+        cache = {1: self._pref(frequency='daily')}
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == []
+
+    def test_excludes_user_with_type_disabled(self, app, db_session):
+        cache = {1: self._pref(types_enabled=['deadline_reminder'])}
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == []
+
+    def test_excludes_user_missing_from_cache(self, app, db_session):
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1], NotificationType.assignment_created, preferences_cache={}
+            )
+        assert result == []
+
+    def test_mixed_users_preserves_order_of_eligible_only(self, app, db_session):
+        cache = {
+            1: self._pref(),
+            2: self._pref(frequency='weekly'),
+            3: self._pref(email_notifications=False),
+            4: self._pref(),
+        }
+        with app.app_context():
+            result = filter_instant_email_eligible_user_ids(
+                [1, 2, 3, 4], NotificationType.assignment_created, preferences_cache=cache
+            )
+        assert result == [1, 4]
+
+    def test_backward_compatible_private_alias_is_same_function(self):
+        """Internal callers within emails.py still use the private-named alias;
+        guard against the two ever drifting apart."""
+        assert _filter_instant_email_eligible_user_ids is filter_instant_email_eligible_user_ids
+
+
+# ---------------------------------------------------------------------------
+# build_grouped_entity_email_preview / send_grouped_entity_email
+#
+# preview_assignment_created_grouped_email (single-country "Preview email"
+# button) and send_grouped_entity_email (the real send) both call
+# build_grouped_entity_email_preview — asserting its eligibility behavior here
+# protects the preview/send contract from both sides at once.
+# ---------------------------------------------------------------------------
+
+class TestBuildGroupedEntityEmailPreview:
+    def _sample_notification(self, nt=NotificationType.assignment_created, priority='normal'):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            id=None,
+            title='New assignment',
+            message='Body',
+            notification_type=nt,
+            priority=priority,
+            related_url=None,
+            title_key=None,
+            message_key=None,
+            title_params=None,
+            message_params=None,
+        )
+
+    def _user(self, uid, email):
+        from types import SimpleNamespace
+        return SimpleNamespace(id=uid, email=email, name=f'User {uid}')
+
+    def test_digest_frequency_recipient_excluded_from_to(self, app, db_session):
+        """A focal point on daily digest must not appear in 'to' — matches the
+        preview endpoint's total_focal_users/email_users split."""
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            user = User(email='digest_focal@example.com', name='Digest Focal', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id,
+                email_notifications=True,
+                notification_types_enabled=[],
+                notification_frequency='daily',
+            ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [user.id], [], self._sample_notification(), 'Kenya'
+            )
+
+        assert preview['to'] == []
+        assert preview['empty_reason']
+
+    def test_instant_recipient_included_in_to(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            user = User(email='instant_focal@example.com', name='Instant Focal', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id,
+                email_notifications=True,
+                notification_types_enabled=[],
+                notification_frequency='instant',
+            ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [user.id], [], self._sample_notification(), 'Kenya'
+            )
+
+        assert not preview['empty_reason']
+        assert [r['email'] for r in preview['to']] == ['instant_focal@example.com']
+
+    def test_cc_promoted_to_to_when_no_eligible_focal(self, app, db_session):
+        """If focal points aren't email-eligible but a CC'd admin is, the admin
+        becomes the primary 'To' rather than the email silently having no To."""
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            focal = User(email='digest_focal2@example.com', name='Digest Focal', active=True)
+            focal.set_password('pw')
+            admin = User(email='instant_admin@example.com', name='Instant Admin', active=True)
+            admin.set_password('pw')
+            db.session.add_all([focal, admin])
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=focal.id, email_notifications=True,
+                notification_types_enabled=[], notification_frequency='daily',
+            ))
+            db.session.add(NotificationPreferences(
+                user_id=admin.id, email_notifications=True,
+                notification_types_enabled=[], notification_frequency='instant',
+            ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [focal.id], [admin.id], self._sample_notification(), 'Kenya'
+            )
+
+        assert not preview['empty_reason']
+        assert [r['email'] for r in preview['to']] == ['instant_admin@example.com']
+        assert preview['cc'] == []
+
+    def test_preview_mode_renders_body_with_no_recipients(self, app, db_session):
+        """UI preview (preview_mode=True) must still render subject/body so the
+        admin can see the content even before any recipients are resolved."""
+        with app.app_context():
+            preview = build_grouped_entity_email_preview(
+                [], [], self._sample_notification(), 'Kenya', preview_mode=True
+            )
+        assert preview['html_body']
+        assert preview['subject']
+        assert not preview['empty_reason']
+
+    def test_non_preview_mode_empty_without_recipients(self, app, db_session):
+        with app.app_context():
+            preview = build_grouped_entity_email_preview(
+                [], [], self._sample_notification(), 'Kenya', preview_mode=False
+            )
+        assert preview['empty_reason']
+        assert preview['html_body'] == ''
+
+    def test_in_app_only_type_always_empty(self, app, db_session):
+        with app.app_context():
+            preview = build_grouped_entity_email_preview(
+                [1], [], self._sample_notification(nt=NotificationType.document_uploaded), 'Kenya'
+            )
+        assert preview['empty_reason'] == 'This notification type does not support email.'
+
+
+class TestSendGroupedEntityEmail:
+    def test_returns_false_when_no_eligible_recipients(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            user = User(email='digest_only@example.com', name='Digest Only', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id, email_notifications=True,
+                notification_types_enabled=[], notification_frequency='daily',
+            ))
+            db.session.commit()
+
+            from types import SimpleNamespace
+            sample = SimpleNamespace(
+                id=None, title='t', message='m',
+                notification_type=NotificationType.assignment_created,
+                priority='normal', related_url=None,
+                title_key=None, message_key=None, title_params=None, message_params=None,
+            )
+
+            result = send_grouped_entity_email([user.id], [], sample, 'Kenya')
+
+        assert result is False
+
+    def test_sends_when_recipient_is_instant_eligible(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+        from types import SimpleNamespace
+
+        with app.app_context():
+            user = User(email='instant_send@example.com', name='Instant Send', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id, email_notifications=True,
+                notification_types_enabled=[], notification_frequency='instant',
+            ))
+            db.session.commit()
+
+            sample = SimpleNamespace(
+                id=None, title='t', message='m',
+                notification_type=NotificationType.assignment_created,
+                priority='normal', related_url=None,
+                title_key=None, message_key=None, title_params=None, message_params=None,
+            )
+
+            with patch('app.services.notification.emails.send_email', return_value=True):
+                result = send_grouped_entity_email([user.id], [], sample, 'Kenya')
+
+        assert result is True

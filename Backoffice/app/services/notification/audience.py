@@ -119,6 +119,36 @@ def get_entity_scoped_non_system_manager_admin_user_ids(
     return sorted({u.id for u in rows if u.id not in exclude})
 
 
+def _global_admin_type_role_ids_subquery():
+    """
+    Roles that classify a user as Admin in user_form.html (never focal for notifications).
+
+    ``system_manager`` and ``assignment_approver`` are global; entity-scoped org admins
+    are excluded separately via :func:`get_entity_scoped_non_system_manager_admin_user_ids`.
+    """
+    return select(RbacRole.id).where(
+        or_(
+            RbacRole.code == "system_manager",
+            RbacRole.code == "assignment_approver",
+        )
+    )
+
+
+def _entity_scoped_org_admin_user_ids_subquery(entity_type: str, entity_id: int):
+    """User IDs with admin_core / admin_* plus permission on this entity."""
+    from app.models.core import UserEntityPermission
+
+    return (
+        select(UserEntityPermission.user_id)
+        .join(RbacUserRole, RbacUserRole.user_id == UserEntityPermission.user_id)
+        .filter(
+            UserEntityPermission.entity_type == entity_type,
+            UserEntityPermission.entity_id == int(entity_id),
+            RbacUserRole.role_id.in_(_non_system_manager_admin_role_ids_subquery()),
+        )
+    )
+
+
 def collect_entity_admin_audience_recipient_ids(
     notification_type,
     entity_type: Optional[str],
@@ -153,11 +183,18 @@ def get_assignment_editor_submitter_user_ids_for_entity(
     exclude_user_ids: Optional[Iterable[int]] = None,
 ) -> List[int]:
     """
-    Users with ``assignment_editor_submitter`` on this entity (focal/editor recipients).
+    Focal/editor recipients for this entity: ``assignment_editor_submitter`` with
+    ``UserEntityPermission``, excluding users treated as Admin (org admin for this
+    entity, or global ``system_manager`` / ``assignment_approver``).
     """
     exclude: Set[int] = set(int(x) for x in (exclude_user_ids or []) if x is not None)
 
     from app.models.core import UserEntityPermission
+
+    global_admin_users = select(RbacUserRole.user_id).where(
+        RbacUserRole.role_id.in_(_global_admin_type_role_ids_subquery())
+    )
+    entity_org_admins = _entity_scoped_org_admin_user_ids_subquery(entity_type, entity_id)
 
     permissions = (
         UserEntityPermission.query.filter_by(entity_type=entity_type, entity_id=int(entity_id))
@@ -166,6 +203,17 @@ def get_assignment_editor_submitter_user_ids_for_entity(
         .join(RbacUserRole, RbacUserRole.user_id == User.id)
         .join(RbacRole, RbacUserRole.role_id == RbacRole.id)
         .filter(RbacRole.code == "assignment_editor_submitter")
+        .filter(~UserEntityPermission.user_id.in_(entity_org_admins))
+        .filter(~User.id.in_(global_admin_users))
+        .distinct()
         .all()
     )
-    return [perm.user_id for perm in permissions if perm.user_id not in exclude]
+    seen: Set[int] = set()
+    out: List[int] = []
+    for perm in permissions:
+        uid = perm.user_id
+        if uid is None or uid in exclude or uid in seen:
+            continue
+        seen.add(uid)
+        out.append(uid)
+    return out

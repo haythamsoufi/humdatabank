@@ -854,7 +854,7 @@ class TestSendWelcomeEmail:
                  patch("app.services.email.service._create_welcome_notification", return_value=99) as mock_create_notif, \
                  patch("app.services.email.service.log_email_attempt") as mock_log, \
                  patch("app.services.email.service.mark_email_sent") as mock_sent, \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
                 mock_log.return_value = MagicMock(id=1)
@@ -880,7 +880,7 @@ class TestSendWelcomeEmail:
             app.config.setdefault("MAIL_NOREPLY_SENDER", "noreply@example.com")
 
             with patch("app.services.email.service.send_email", return_value=True), \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
                 result = send_welcome_email(user)
@@ -909,8 +909,8 @@ class TestSendWelcomeEmail:
             with patch("app.services.email.service.send_email", return_value=False), \
                  patch("app.services.email.service._create_welcome_notification", return_value=99), \
                  patch("app.services.email.service.log_email_attempt") as mock_log, \
-                 patch("app.services.email.service.mark_email_failed") as mock_failed, \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.mark_email_failed_or_unknown") as mock_failed, \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
                 mock_log.return_value = MagicMock(id=2)
@@ -930,8 +930,8 @@ class TestSendWelcomeEmail:
             with patch("app.services.email.service.send_email", side_effect=Exception("SMTP error")), \
                  patch("app.services.email.service._create_welcome_notification", return_value=99), \
                  patch("app.services.email.service.log_email_attempt") as mock_log, \
-                 patch("app.services.email.service.mark_email_failed") as mock_failed, \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.mark_email_failed_or_unknown") as mock_failed, \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
                 mock_log.return_value = MagicMock(id=3)
@@ -954,7 +954,7 @@ class TestSendWelcomeEmail:
                  patch("app.services.email.service._create_welcome_notification", return_value=1), \
                  patch("app.services.email.service.log_email_attempt", return_value=MagicMock(id=1)), \
                  patch("app.services.email.service.mark_email_sent"), \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"), \
                  patch("app.services.email.service.render_admin_email_template") as mock_render:
@@ -977,7 +977,7 @@ class TestSendWelcomeEmail:
                  patch("app.services.email.service._create_welcome_notification", return_value=1), \
                  patch("app.services.email.service.log_email_attempt", return_value=MagicMock(id=1)), \
                  patch("app.services.email.service.mark_email_sent"), \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"), \
                  patch("app.services.email.service.render_admin_email_template") as mock_render:
@@ -1009,7 +1009,7 @@ class TestSendWelcomeEmail:
                  patch("app.services.email.service._create_welcome_notification", return_value=1), \
                  patch("app.services.email.service.log_email_attempt", return_value=MagicMock(id=1)), \
                  patch("app.services.email.service.mark_email_sent"), \
-                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d: d), \
+                 patch("app.services.email.service.get_email_template", side_effect=lambda k, d, **kw: d), \
                  patch("app.services.email.service.get_org_name", return_value="IFRC"), \
                  patch("app.services.email.service.get_org_copyright_year", return_value="2024"):
                 send_welcome_email(user)

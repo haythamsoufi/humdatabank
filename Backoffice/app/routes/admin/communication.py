@@ -926,6 +926,8 @@ def api_retry_failed_email_deliveries():
             f"Retried {result['attempted']} email(s): "
             f"{result['success_count']} sent, {result['failure_count']} failed."
         )
+        if result.get('remaining_count'):
+            message += f" {result['remaining_count']} more queued — retry again to continue."
         return json_ok(success=overall_success, message=message, **result)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

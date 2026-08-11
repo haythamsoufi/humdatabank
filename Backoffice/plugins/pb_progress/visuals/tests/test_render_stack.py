@@ -35,7 +35,7 @@ class TestPrepareHtmlForPdf(unittest.TestCase):
         prepared = prepare_html_for_pdf(html, "English")
         self.assertIn("pb-pdf-export", prepared)
         self.assertIn("aspect-ratio: 481 / 110", prepared)
-        self.assertIn("table.year-data-grid", prepared)
+        self.assertIn("div.year-data-grid", prepared)
 
     def test_prepare_html_shows_one_language_panel(self) -> None:
         html = """

@@ -3462,6 +3462,14 @@
                 });
             }
 
+            function setEmailPreviewFrameHtml(htmlBody) {
+                if (!emailPreviewFrame) return;
+                const html = htmlBody || '';
+                requestAnimationFrame(function() {
+                    emailPreviewFrame.srcdoc = html;
+                });
+            }
+
             async function loadNotifEmailPreview(countryId) {
                 if (!countryId) return;
                 const params = getAssignmentFormPreviewParams();
@@ -3524,10 +3532,8 @@
                     } else if (emailPreviewCc) {
                         emailPreviewCc.innerHTML = '';
                     }
-                    if (emailPreviewFrame) {
-                        emailPreviewFrame.srcdoc = data.html_body || '';
-                    }
                     if (emailPreviewContent) emailPreviewContent.classList.remove('hidden');
+                    setEmailPreviewFrameHtml(data.html_body || '');
                 } catch (e) {
                     if (emailPreviewLoading) emailPreviewLoading.classList.add('hidden');
                     if (emailPreviewEmpty) {
@@ -3573,10 +3579,12 @@
 
                 if (emailPreviewContent) emailPreviewContent.classList.add('hidden');
                 if (emailPreviewEmpty) emailPreviewEmpty.classList.add('hidden');
-                if (emailPreviewLoading) emailPreviewLoading.classList.add('hidden');
+                if (emailPreviewLoading) emailPreviewLoading.classList.remove('hidden');
 
                 emailPreviewModal.classList.remove('hidden');
-                loadNotifEmailPreview(countries[0].id);
+                requestAnimationFrame(function() {
+                    loadNotifEmailPreview(countries[0].id);
+                });
             }
 
             if (emailPreviewBtn) {

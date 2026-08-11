@@ -32,7 +32,23 @@ _DOCX_LABEL_COL_IN = 2.85
 _DOCX_DONUT_COL_IN = 0.55
 _DOCX_TABLE_FONT = 9
 _DOCX_CHART_DPI = 175  # PNG resolution for embedded line charts (~481px @ 2.75in)
-_DOCX_CHART_HEIGHT = 140  # SVG/PNG height for Word charts (px); taller than the HTML default (110)
+_DOCX_CHART_MIN_HEIGHT_IN = 0.95  # minimum embedded chart height in Word
+_DOCX_CHART_HEIGHT_SCALE = 1.15  # slight lift over HTML aspect ratio
+_DOCX_CHART_FONT_SCALE_MAX = 1.25  # cap label/marker growth for wide charts
+
+
+def _docx_chart_height_px(width_px: int) -> int:
+    """Scale chart height with width (HTML aspect ratio) plus a modest Word boost."""
+    proportional = width_px * CHART_HEIGHT / CHART_WIDTH_PX
+    return max(int(proportional * _DOCX_CHART_HEIGHT_SCALE), CHART_HEIGHT)
+
+
+def _docx_chart_font_scale(height_px: int) -> float:
+    return min(height_px / CHART_HEIGHT, _DOCX_CHART_FONT_SCALE_MAX)
+
+
+def _docx_chart_display_height_in(width_in: float, width_px: int, height_px: int) -> float:
+    return max(width_in * height_px / width_px, _DOCX_CHART_MIN_HEIGHT_IN)
 
 
 def _set_rfonts(r_pr, font_name: str) -> None:
@@ -176,6 +192,7 @@ def render_line_chart_asset(
     *,
     width: int = CHART_WIDTH_PX,
     height: int = CHART_HEIGHT,
+    font_scale: float = 1.0,
     language: str = "English",
     show_labels: bool = True,
     session=None,
@@ -190,6 +207,7 @@ def render_line_chart_asset(
         show_target_labels=show_labels,
         target_label=target_label,
         language=language,
+        font_scale=font_scale,
     )
     write_svg_png(svg, output_path, width=width, height=height)
     return output_path
@@ -338,12 +356,17 @@ def _add_cumulative_block(
     n_years = len(item["years"])
     chart_path = assets_dir / f"{block_id}_line.png"
     chart_width_px = _chart_render_width_px(n_years)
+    chart_height_px = _docx_chart_height_px(chart_width_px)
+    font_scale = _docx_chart_font_scale(chart_height_px)
+    chart_width_in = _chart_area_width(n_years)
+    chart_height_in = _docx_chart_display_height_in(chart_width_in, chart_width_px, chart_height_px)
     render_line_chart_asset(
         item,
         target_label,
         chart_path,
         width=chart_width_px,
-        height=_DOCX_CHART_HEIGHT,
+        height=chart_height_px,
+        font_scale=font_scale,
         language=language,
         session=session,
     )
@@ -365,9 +388,11 @@ def _add_cumulative_block(
     _apply_paragraph_language(p, language, alignment=WD_ALIGN_PARAGRAPH.CENTER)
     p.add_run().add_picture(
         str(chart_path),
-        width=Inches(_chart_area_width(n_years)),
+        width=Inches(chart_width_in),
+        height=Inches(chart_height_in),
     )
     _set_cell_vertical_alignment(chart_cell)
+    _set_row_min_height(table.rows[0], chart_height_in)
 
     _add_data_row(table, 1, labels["year"], item["years"], language=language, bold_label=True, bold_values=True)
     row_idx = 2
@@ -395,6 +420,17 @@ def _set_row_cant_split(row) -> None:
     tr_pr = row._tr.get_or_add_trPr()
     if tr_pr.find(qn("w:cantSplit")) is None:
         tr_pr.append(OxmlElement("w:cantSplit"))
+
+
+def _set_row_min_height(row, height_in: float) -> None:
+    """Ensure Word allocates enough vertical space (prevents squashed chart images)."""
+    tr_pr = row._tr.get_or_add_trPr()
+    tr_height = tr_pr.find(qn("w:trHeight"))
+    if tr_height is None:
+        tr_height = OxmlElement("w:trHeight")
+        tr_pr.append(tr_height)
+    tr_height.set(qn("w:val"), str(int(height_in * 1440)))
+    tr_height.set(qn("w:hRule"), "atLeast")
 
 
 def _add_donut_image_cell(cell, image_path: Path, *, language: str) -> None:

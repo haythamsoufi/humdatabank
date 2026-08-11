@@ -1248,6 +1248,12 @@ def build_grouped_entity_email_preview(
         ]
 
         if not to_emails and cc_emails:
+            # Keep the eligible-id lists in sync with the email-string swap below —
+            # _recipient_rows() (and thus send_grouped_entity_email's actual send)
+            # reads recipient rows from these id lists, so if only the email
+            # strings were swapped, the returned 'to' rows would end up empty
+            # even though to_emails correctly lists the promoted CC recipient.
+            to_eligible, cc_eligible = cc_eligible, []
             to_emails = cc_emails
             cc_emails = []
 

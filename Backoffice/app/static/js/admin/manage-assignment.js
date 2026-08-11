@@ -3099,8 +3099,8 @@
                         return cfg.t.notifyMsg + '\n\n⚠ ' + cfg.t.notifyNoRecipients;
                     }
                     const summary = (cfg.t.notifyRecipientsSummary || '')
-                        .replace('%(users)s', preview.total_focal_users)
-                        .replace('%(email_users)s', preview.email_users);
+                        .replace('{users}', preview.total_focal_users)
+                        .replace('{email_users}', preview.email_users);
                     return cfg.t.notifyMsg + '\n\n' + summary;
                 }
 
@@ -3204,9 +3204,9 @@
                     if (!_lastPreview.total_focal_users) {
                         recipientPreviewTextEl.textContent = cfg.t.notifyNoRecipients || 'No focal points configured for selected countries.';
                     } else {
-                        const summary = (cfg.t.notifyRecipientsSummary || '%(users)s focal point(s) · %(email_users)s email(s)')
-                            .replace('%(users)s', _lastPreview.total_focal_users)
-                            .replace('%(email_users)s', _lastPreview.email_users);
+                        const summary = (cfg.t.notifyRecipientsSummary || '{users} focal point(s) · {email_users} email(s)')
+                            .replace('{users}', _lastPreview.total_focal_users)
+                            .replace('{email_users}', _lastPreview.email_users);
                         recipientPreviewTextEl.textContent = summary;
                     }
                     recipientPreviewEl.classList.remove('hidden');

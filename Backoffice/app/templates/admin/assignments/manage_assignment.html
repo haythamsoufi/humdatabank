@@ -1114,7 +1114,7 @@ window.manageAssignmentConfig = {
         notifyMsgDisabled: {{ _('The "Notify focal points" checkbox is ticked, but notifications for assignment_created are currently disabled in platform settings (Admin → Settings → Notifications). No one will be notified. Do you want to continue anyway?')|tojson }},
         notifyAudienceDisabled: {{ _('⚠ Platform settings have disabled notifications for this event — focal points will NOT receive notifications even though this box is checked.')|tojson }},
         notifyPreviewLoading: {{ _('Checking notification recipients…')|tojson }},
-        notifyRecipientsSummary: {{ _('%(users)s focal point(s) will receive an in-app notification; %(email_users)s will also receive an email.')|tojson }},
+        notifyRecipientsSummary: {{ '{users} focal point(s) will receive an in-app notification; {email_users} will also receive an email.'|tojson }},
         notifyNoRecipients: {{ _('No focal points are configured for the selected countries — no notifications will be sent.')|tojson }},
         confirmAction: {{ _('Confirm action')|tojson }},
         clearReviewer: {{ _('Remove')|tojson }},

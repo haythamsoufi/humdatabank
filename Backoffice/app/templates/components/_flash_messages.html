@@ -1,6 +1,6 @@
 {# Standard flash message mount — shared by layout.html and full-page templates (e.g. login).
    Pass `messages` when the caller already called get_flashed_messages(with_categories=true).
-   Pass `wrapper_class` for optional modifiers (e.g. flash-messages--in-panel on login). #}
+   Pass `wrapper_class` for optional modifiers on `.flash-messages`. #}
 {% from "components/_svg_icons.html" import svg_icon %}
 {% if messages is not defined %}
   {% set messages = get_flashed_messages(with_categories=true) %}

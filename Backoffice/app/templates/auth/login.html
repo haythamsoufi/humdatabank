@@ -281,17 +281,11 @@
   @keyframes barGrowV{ to{ transform: scaleY(1); } }
 
   /* staggered content reveal */
-  .lang-nav, #flashMessagesContainer, .panel-brand, .panel-title, .panel-lead,
+  .lang-nav, .panel-brand, .panel-title, .panel-lead,
   .btn-sso, .panel-hint, .dev-panel, .panel-footer{
     opacity:0; transform: translateY(12px);
   }
-  .login-panel:has(#flashMessagesContainer .alert) #flashMessagesContainer,
-  .login-panel:has(#flashMessagesContainer .alert) #flashMessagesContainer .flash-messages,
-  .login-panel:has(#flashMessagesContainer .alert) #flashMessagesContainer .alert{
-    opacity:1 !important; transform:none !important;
-  }
   .login-panel.in .lang-nav   { animation: fadeUp .5s var(--ease-expo) .18s forwards; }
-  .login-panel.in #flashMessagesContainer{ animation: fadeUp .5s var(--ease-expo) .20s forwards; }
   .login-panel.in .panel-brand{ animation: fadeUp .5s var(--ease-expo) .24s forwards; }
   .login-panel.in .panel-title{ animation: fadeUp .5s var(--ease-expo) .30s forwards; }
   .login-panel.in .panel-lead { animation: fadeUp .5s var(--ease-expo) .36s forwards; }
@@ -325,76 +319,6 @@
   .panel-brand{ font-size:.76rem; font-weight:700; letter-spacing:.09em; color: var(--red); text-transform:uppercase; margin:0 0 16px 0; }
   .panel-title{ margin:0 0 8px 0; font-size:1.5rem; font-weight:800; color: var(--navy); letter-spacing:-.01em; }
   .panel-lead{ margin:0 0 28px 0; font-size:.9rem; color:#6b7280; line-height:1.55; }
-
-  /* In-panel flash mount — same markup as layout.html; positioning/theme overrides only */
-  .login-page #flashMessagesContainer{
-    margin:0 0 16px 0;
-    height:auto;
-    min-height:0;
-    overflow:visible;
-  }
-  .login-panel:not(:has(#flashMessagesContainer .alert)) #flashMessagesContainer{
-    display:none;
-    margin:0;
-  }
-  .login-page .flash-messages--in-panel{
-    position:static;
-    left:auto;
-    bottom:auto;
-    transform:none;
-    max-width:none;
-    width:100%;
-    gap:6px;
-    pointer-events:auto;
-    z-index:auto;
-  }
-  .login-page .flash-messages--in-panel .alert{
-    padding:10px 2.25rem 10px 12px;
-    border-radius:8px;
-    font-size:.83rem;
-    line-height:1.45;
-    pointer-events:auto;
-    box-shadow:none;
-    backdrop-filter:none;
-    background-color:transparent;
-    border:1px solid transparent;
-    color:inherit;
-    gap:0;
-  }
-  .login-page .flash-messages--in-panel .alert-icon{
-    display:none;
-  }
-  .login-page .flash-messages--in-panel .alert-message{
-    color:inherit;
-    font-weight:500;
-  }
-  .login-page .flash-messages--in-panel .alert-close{
-    top:8px;
-    inset-inline-end:8px;
-    padding:2px;
-    opacity:.55;
-    color:inherit;
-  }
-  .login-page .flash-messages--in-panel .alert-close:hover{
-    opacity:1;
-    color:inherit;
-  }
-  .login-page .flash-messages--in-panel .alert-warning{
-    background:#fefce8; color:#854d0e; border-color:#fef08a;
-    border-left:1px solid #fef08a;
-  }
-  .login-page .flash-messages--in-panel .alert-danger{
-    background:#fef2f2; color:#991b1b; border-color:#fecaca;
-    border-left:1px solid #fecaca;
-  }
-  .login-page .flash-messages--in-panel .alert-success{
-    background:#f0fdf4; color:#166534; border-color:#bbf7d0;
-    border-left:1px solid #bbf7d0;
-  }
-  .login-page .flash-messages--in-panel .alert-info{
-    background:#eff6ff; color:#1e40af; border-color:#bfdbfe;
-    border-left:1px solid #bfdbfe;
-  }
 
   /* SSO button */
   .btn-sso{
@@ -504,7 +428,6 @@
     @keyframes panelInMobile{ from{ opacity:0; transform: translate3d(0, 12px, 0); } to{ opacity:1; transform:none; } }
 
     .login-panel.in .lang-nav,
-    .login-panel.in #flashMessagesContainer,
     .login-panel.in .panel-brand,
     .login-panel.in .panel-title,
     .login-panel.in .panel-lead,
@@ -585,8 +508,7 @@
     .hero-copy-col.in{ animation:none !important; opacity:1 !important; transform:none !important; }
     .login-panel.in::before, .login-panel::before{ animation:none !important; transform:none !important; }
     .brand-mark, .hero-copy-col, .hero-stat, h1.headline .w, p.subcopy, .login-panel, .hero-footer,
-    .login-panel.in .lang-nav, .login-panel.in #flashMessagesContainer,
-    .login-panel.in .panel-brand, .login-panel.in .panel-title,
+    .login-panel.in .lang-nav, .login-panel.in .panel-brand, .login-panel.in .panel-title,
     .login-panel.in .panel-lead, .login-panel.in .btn-sso,
     .login-panel.in .panel-hint, .login-panel.in .dev-panel,
     .login-panel.in .panel-footer{
@@ -723,10 +645,6 @@
     </nav>
     {% endif %}
 
-    {% with wrapper_class='flash-messages--in-panel' %}
-    {% include 'components/_flash_messages.html' %}
-    {% endwith %}
-
     <div class="panel-brand" id="panelMark">{{ ORG_NAME }}</div>
     <h2 class="panel-title" id="panelTitle">{{ _('Sign in') }}</h2>
     <p class="panel-lead" id="panelLead">{{ _('Use your National Society or IFRC single sign-on account to continue.') }}</p>
@@ -827,6 +745,9 @@
   </aside>
 
 </div>
+
+{# Standard flash toasts — same bottom-center mount as layout.html (outside login panel) #}
+{% include 'components/_flash_messages.html' %}
 
 {# ===================== Modals (register + forgot password) ===================== #}
 {% if not (azure_b2c_configured | default(false)) %}

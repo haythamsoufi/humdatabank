@@ -1134,6 +1134,10 @@
         // button `click` event, which a click-listener-only approach would miss).
         // `loadCategoriesAndMapping` is a hoisted function declaration (defined further
         // below in this scope), so calling it here ahead of its textual definition is safe.
+        // Category state must be declared here too — page-load tab restoration can call
+        // loadCategoriesOnce → bootstrapPartOfCategoriesFromConfig before later lines run.
+        let availableCategories = [];
+        let categoryToCountriesMap = {}; // Maps category name to array of country IDs
         let categoriesLoaded = false;
         function loadCategoriesOnce() {
             if (categoriesLoaded) return;
@@ -1588,8 +1592,6 @@
         const entityGlobalSelectAllCheckbox = document.getElementById('select-all-countries-entity');
 
         // --- Category-based Country Selection ---
-        let availableCategories = [];
-        let categoryToCountriesMap = {}; // Maps category name to array of country IDs
 
         // Load categories and build mapping
         function loadCategoriesAndMapping() {

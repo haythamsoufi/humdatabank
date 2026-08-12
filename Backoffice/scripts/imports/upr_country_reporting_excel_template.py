@@ -18,7 +18,7 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -530,6 +530,120 @@ def _load_workbook_yes_no_bank_ids(
 ) -> Set[int]:
     """Yes/No bank ids referenced by this workbook (ID column + Final KPI list)."""
     return _load_yes_no_bank_ids(_collect_workbook_indicator_bank_ids(wb, kpi_lookup))
+
+
+def _is_percentage_indicator_type(type_value: Any) -> bool:
+    normalized = str(type_value or "").strip().lower().replace("/", "").replace("-", "").replace(" ", "")
+    return normalized in ("percentage", "percent", "pct")
+
+
+def _load_percentage_bank_ids(bank_ids: Iterable[int]) -> Set[int]:
+    """Return indicator bank ids whose type is Percentage."""
+    ids = {int(bid) for bid in bank_ids if bid}
+    if not ids:
+        return set()
+    from app.models import IndicatorBank
+
+    rows = IndicatorBank.query.filter(IndicatorBank.id.in_(ids)).all()
+    return {int(row.id) for row in rows if _is_percentage_indicator_type(row.type)}
+
+
+def _load_percentage_allow_over_100_bank_ids(bank_ids: Iterable[int]) -> Set[int]:
+    """Percentage bank ids where at least one live form item explicitly allows values
+    over 100% (cumulative/ratio-based indicators configured with ``allow_over_100``)."""
+    ids = {int(bid) for bid in bank_ids if bid}
+    if not ids:
+        return set()
+    from app.models.form_items import FormItem
+
+    out: Set[int] = set()
+    rows = FormItem.query.filter(
+        FormItem.indicator_bank_id.in_(ids),
+        FormItem.archived == False,  # noqa: E712
+    ).all()
+    for item in rows:
+        config = item.config or {}
+        if config.get("allow_over_100") in (True, "true", "True", 1, "1"):
+            out.add(int(item.indicator_bank_id))
+    return out
+
+
+def _load_workbook_percentage_bank_ids(
+    wb,
+    kpi_lookup: Optional[Dict[Tuple[str, str], int]] = None,
+) -> Tuple[Set[int], Set[int]]:
+    """Percentage bank ids referenced by this workbook, and the subset explicitly
+    allowed to exceed 100% — returns ``(percentage_bank_ids, allow_over_100_bank_ids)``."""
+    all_ids = _collect_workbook_indicator_bank_ids(wb, kpi_lookup)
+    percentage_ids = _load_percentage_bank_ids(all_ids)
+    allow_over_100_ids = _load_percentage_allow_over_100_bank_ids(percentage_ids)
+    return percentage_ids, allow_over_100_ids
+
+
+def _iter_numeric_leaves(value: Any) -> Iterator[float]:
+    """Yield every numeric leaf inside a scalar or an arbitrarily nested dict/list
+    structure (e.g. a ``disagg_data`` payload with per-sex/age breakdowns)."""
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, (int, float)):
+        yield float(value)
+        return
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return
+        try:
+            yield float(text)
+        except (TypeError, ValueError):
+            return
+        return
+    if isinstance(value, dict):
+        for sub in value.values():
+            yield from _iter_numeric_leaves(sub)
+        return
+    if isinstance(value, (list, tuple)):
+        for sub in value:
+            yield from _iter_numeric_leaves(sub)
+
+
+def _percentage_range_warning(
+    row: Dict[str, Any],
+    bank_id: Optional[int],
+    value: Any,
+    disagg: Optional[Dict[str, Any]],
+    percentage_bank_ids: Set[int],
+    allow_over_100_bank_ids: Set[int],
+    *,
+    context_label: str = "",
+) -> Optional[str]:
+    """Flag a percentage-type indicator whose resolved value — scalar or any
+    disaggregated sub-value — falls outside the plausible 0-100% range (the classic
+    "entered 500 instead of 50" mistake). Non-blocking: the value still imports as
+    entered so a reviewer can decide, but the mistake is surfaced instead of being
+    silently saved as a nonsensical number.
+    """
+    if not bank_id or bank_id not in percentage_bank_ids:
+        return None
+    upper_bound = None if bank_id in allow_over_100_bank_ids else 100.0
+    bad_values: Set[float] = set()
+    for leaf in _iter_numeric_leaves(value):
+        if leaf < 0 or (upper_bound is not None and leaf > upper_bound):
+            bad_values.add(leaf)
+    for leaf in _iter_numeric_leaves(disagg):
+        if leaf < 0 or (upper_bound is not None and leaf > upper_bound):
+            bad_values.add(leaf)
+    if not bad_values:
+        return None
+    indicator = str(row.get("indicator") or "").strip() or f"bank {bank_id}"
+    sp_ef = str(row.get("sp_ef") or "").strip()
+    shown = ", ".join(f"{v:g}" for v in sorted(bad_values)[:5])
+    location = f" ({sp_ef!r})" if sp_ef else ""
+    suffix = f" ({context_label})" if context_label else ""
+    return (
+        f"Percentage indicator {indicator!r}{location} has a value of {shown} outside the "
+        f"valid 0-100% range{suffix} — please check for a data-entry mistake (e.g. 500 "
+        f"instead of 50) before saving."
+    )
 
 
 def _resolve_workbook_indicator_bank_id(
@@ -2347,6 +2461,7 @@ def _collect_workbook_dynamic_indicator_entries(
     ea_dynamic = section_ids.get("ea_dynamic")
     other_dynamic = section_ids.get("other_dynamic")
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
+    percentage_bank_ids, percentage_allow_over_100_ids = _load_workbook_percentage_bank_ids(wb, kpi_lookup)
     kpi_display = _build_kpi_display_map(wb)
     entries: List[Dict[str, Any]] = []
     order = 0.0
@@ -2388,6 +2503,11 @@ def _collect_workbook_dynamic_indicator_entries(
         )
         if not should_import:
             continue
+        range_warning = _percentage_range_warning(
+            row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids
+        )
+        if range_warning:
+            ctx.warnings.append(range_warning)
         order += 1.0
         entries.append(
             {
@@ -2440,6 +2560,11 @@ def _collect_workbook_dynamic_indicator_entries(
                 )
                 if not should_import:
                     continue
+                range_warning = _percentage_range_warning(
+                    row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids
+                )
+                if range_warning:
+                    ctx.warnings.append(range_warning)
                 order += 1.0
                 entries.append(
                     {
@@ -3007,6 +3132,7 @@ def transform_upr_country_reporting_to_import_rows(
     kpi_lookup = build_kpi_lookup(wb)
     kpi_display = _build_kpi_display_map(wb)
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
+    percentage_bank_ids, percentage_allow_over_100_ids = _load_workbook_percentage_bank_ids(wb, kpi_lookup)
     section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID)
 
     # NS Data scalars
@@ -3062,6 +3188,12 @@ def transform_upr_country_reporting_to_import_rows(
         )
         if not should_import:
             continue
+        range_warning = _percentage_range_warning(
+            row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids,
+            context_label=iso3,
+        )
+        if range_warning:
+            ctx.warnings.append(range_warning)
         if not item_id:
             if bank_id and (is_dna or value is not None or disagg):
                 _queue_other_dynamic_indicator(

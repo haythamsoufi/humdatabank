@@ -88,6 +88,19 @@ def _assignment_created_message_key(aes) -> str:
     return 'notification.assignment_created.message_no_deadline'
 
 
+def _assignment_created_related_url(aes) -> str:
+    """
+    Deep link for assignment-created emails.
+
+    When the AssignmentEntityStatus already exists, link straight to the assignment
+    workspace; otherwise (UI preview before save) fall back to the main dashboard.
+    """
+    aes_id = getattr(aes, 'id', None)
+    if aes_id:
+        return url_for('forms.view_edit_form', form_type='assignment', form_id=aes_id)
+    return url_for('main.dashboard')
+
+
 def _build_assignment_email_sample(
     aes,
     assigned_form,
@@ -111,7 +124,7 @@ def _build_assignment_email_sample(
         message=message,
         notification_type=NotificationType.assignment_created,
         priority='normal',
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=_assignment_created_related_url(aes),
         title_key=title_key,
         message_key=message_key,
         title_params=title_params,
@@ -264,7 +277,6 @@ def preview_assignment_created_grouped_email(
         message_params,
         message_key=assignment_message_key,
     )
-    sample.related_url = None
 
     preview = build_grouped_entity_email_preview(
         focal_user_ids,
@@ -403,8 +415,12 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False):
     # One grouped email per entity (focal points in To, optional admins in CC).
     cc_admin_ids = admin_only if notify_admins else []
     if focal_user_ids or cc_admin_ids:
-        sample = notifications[0] if notifications else _build_assignment_email_sample(
-            aes, assigned_form, title_params, message_params, message_key=assignment_message_key
+        sample = _build_assignment_email_sample(
+            aes,
+            assigned_form,
+            title_params,
+            message_params,
+            message_key=assignment_message_key,
         )
         try:
             _send_grouped_assignment_created_email(

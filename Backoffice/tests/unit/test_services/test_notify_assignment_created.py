@@ -178,6 +178,31 @@ class TestNotifyAssignmentCreated:
         assert mock_focal.call_args.kwargs["exclude_user_ids"] == [creator_id]
         assert mock_admin.call_args.kwargs["exclude_user_ids"] == [creator_id]
 
+    def test_grouped_email_sample_includes_assignment_related_url(self, app, pending_aes):
+        with app.app_context():
+            with patch(
+                "app.services.notification.notifiers.assignment.notify_entity_focal_points",
+                return_value=[{"user_id": 101}],
+            ), patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment.get_assignment_editor_submitter_user_ids_for_entity",
+                return_value=[101],
+            ), patch(
+                "app.services.notification.notifiers.assignment._send_grouped_assignment_created_email",
+            ) as mock_send_email, patch(
+                "app.services.notification.notifiers.assignment.log_entity_activity",
+            ), patch(
+                "app.services.notification.notifiers.assignment.url_for",
+                return_value="/forms/assignment/99",
+            ):
+                notify_assignment_created(pending_aes)
+
+        mock_send_email.assert_called_once()
+        sample = mock_send_email.call_args.kwargs["sample_notification"]
+        assert sample.related_url == "/forms/assignment/99"
+
 
 class TestPreviewAssignmentCreatedGroupedEmail:
     def test_renders_body_without_notify_admins_or_recipients(self, app, db_session):
@@ -217,3 +242,39 @@ class TestPreviewAssignmentCreatedGroupedEmail:
         assert preview.get("subject")
         assert preview.get("to") == []
         assert preview.get("cc") == []
+
+    def test_preview_includes_open_assignment_button(self, app, db_session):
+        from types import SimpleNamespace
+        from app.services.notification.notifiers.assignment import (
+            preview_assignment_created_grouped_email,
+        )
+
+        template = SimpleNamespace(id=42, name="Unified Country Plan")
+
+        with app.app_context():
+            with patch(
+                "app.models.forms.FormTemplate.query"
+            ) as mock_query, patch(
+                "app.services.notification.notifiers.assignment.get_assignment_editor_submitter_user_ids_for_entity",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[],
+            ), patch(
+                "app.services.notification.notifiers.assignment._resolve_entity_name",
+                return_value="Afghanistan",
+            ), patch(
+                "app.services.platform.app_settings_service.audience_bucket_enabled",
+                return_value=True,
+            ):
+                mock_query.get.return_value = template
+                preview = preview_assignment_created_grouped_email(
+                    country_id=1,
+                    template_id=template.id,
+                    period_name="2027",
+                    notify_admins=False,
+                )
+
+        html = preview.get("html_body") or ""
+        assert 'href="' in html
+        assert "/forms/" in html or 'href="/"' in html or "Open Assignment" in html

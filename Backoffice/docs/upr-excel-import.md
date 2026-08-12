@@ -134,6 +134,8 @@ Built once per import run by `build_import_context()`. Caches all DB lookups so 
 | `emergency_ops_by_iso` / `_ordered_by_iso` | Lazy GO-API cache per country |
 | `staff_matrix_item_id` | Fixed `FormItem.id` **1367** (`PNS staff contributions` matrix on template 22) |
 | `iso3_to_hns_id` | `{ISO3: NationalSociety.id}` — host country's primary active NS; row key for T22 Staff and T23 Funding |
+| `percentage_bank_ids` | Indicator bank ids whose `IndicatorBank.type` is Percentage — used to sanity-check resolved values against the 0-100 range |
+| `percentage_allow_over_100_bank_ids` | Subset of `percentage_bank_ids` where a live `FormItem.config.allow_over_100` explicitly permits values above 100 (cumulative/ratio indicators) |
 | `warnings` | Accumulated warnings (deduplicated for display) |
 
 ---
@@ -575,6 +577,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 - [x] 3-step UI wizard: Upload+Analyze inline (step 1), Configure (step 2), Import (step 3)
 - [x] Warning deduplication with repeat counts
 - [x] Shared `upsert_form_data_rows` with FDRS importer
+- [x] Percentage-indicator range check (both this importer and the T33 per-country round-trip) — flags any resolved value (scalar or a disaggregated sub-value) outside 0-100% as a warning (e.g. `500` entered instead of `50`); non-blocking — the value still imports so a reviewer can decide, unless the indicator's `FormItem.config.allow_over_100` explicitly permits values above 100, in which case only negative values are flagged
 
 ### Planning (rounds P*)
 - [x] Template 24: NS Data scalars

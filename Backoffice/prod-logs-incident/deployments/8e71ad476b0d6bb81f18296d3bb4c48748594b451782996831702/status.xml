@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>8e71ad476b0d6bb81f18296d3bb4c48748594b451782996831702</id>
+  <author>haythamsoufi</author>
+  <deployer>GitHub</deployer>
+  <authorEmail />
+  <message>{"type":"Deployment","sha":"8e71ad476b0d6bb81f18296d3bb4c48748594b45","repoName":"IFRC-C2/IFRCNetworkDatabank","actor":"haythamsoufi","slotName":"production"}</message>
+  <progress />
+  <status>Success</status>
+  <statusText />
+  <lastSuccessEndTime>2026-07-02T12:53:51.7825294Z</lastSuccessEndTime>
+  <receivedTime>2026-07-02T12:53:51.7825294Z</receivedTime>
+  <startTime>2026-07-02T12:53:51.7825294Z</startTime>
+  <endTime>2026-07-02T12:53:51.7825294Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <containerId>10526a77e415</containerId>
+  <buildSummary />
+</deployment>

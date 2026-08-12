@@ -1306,17 +1306,34 @@ def build_grouped_entity_email_preview(
     }
 
 
+def _linked_notification_id(linked) -> Optional[int]:
+    """Resolve notification id from a Notification row or bulk-insert stub dict."""
+    if linked is None:
+        return None
+    if hasattr(linked, 'id') and linked.id:
+        return int(linked.id)
+    if isinstance(linked, dict):
+        raw = linked.get('id')
+        return int(raw) if raw is not None else None
+    return None
+
+
 def send_grouped_entity_email(
     to_user_ids: List[int],
     cc_user_ids: List[int],
     sample_notification,
     entity_name: str,
+    notification_by_user_id=None,
 ) -> bool:
     """
     Send one notification email per entity: focal points in To, admins in CC.
 
     Uses *sample_notification* for subject/body content. Grouped assignment emails use
     a team greeting ("Dear colleagues,") rather than a single recipient name.
+
+    When *notification_by_user_id* is provided, one EmailDeliveryLog row is written per
+    email-eligible recipient, each linked via notification_id so Communication Center
+    shows notification + email on the same grid row (same pattern as team emails).
     """
     from app.services.notification.core import IN_APP_ONLY_NOTIFICATION_TYPES
     from app.services.notification.creation import get_user_preferences_batch
@@ -1356,8 +1373,12 @@ def send_grouped_entity_email(
     if not primary_user_id or not primary_email:
         return False
 
-    notification_id = getattr(sample_notification, 'id', None)
-    log = log_email_attempt(notification_id, primary_user_id, primary_email, subject)
+    notification_by_user_id = notification_by_user_id or {}
+    eligible_user_ids = list(dict.fromkeys(list(to_eligible) + list(cc_eligible)))
+    users = User.query.filter(
+        User.id.in_(eligible_user_ids),
+        User.active.is_(True),
+    ).all()
 
     _failure_info: list = []
     try:
@@ -1374,20 +1395,46 @@ def send_grouped_entity_email(
             _failure_info=_failure_info,
         )
         if success:
-            mark_email_sent(log.id)
             current_app.logger.info(
                 "[EMAIL_NOTIFICATION] Grouped entity email sent: entity=%r to=%d cc=%d",
                 entity_name, len(to_emails), len(cc_emails),
             )
-        elif filtered_out:
-            pass
-        else:
-            mark_email_failed_or_unknown(
-                log.id, "Grouped entity email send returned False", _failure_info[-1] if _failure_info else None
+        elif not filtered_out:
+            current_app.logger.error(
+                "[EMAIL_NOTIFICATION] Grouped entity email send returned False for entity=%r",
+                entity_name,
             )
+
+        for user in users:
+            if not user.email:
+                continue
+            linked = notification_by_user_id.get(user.id)
+            notification_id = _linked_notification_id(linked)
+            if notification_id is None:
+                notification_id = getattr(sample_notification, 'id', None)
+            log = log_email_attempt(notification_id, user.id, user.email, subject)
+            if success:
+                mark_email_sent(log.id)
+            elif filtered_out:
+                pass
+            else:
+                mark_email_failed_or_unknown(
+                    log.id,
+                    "Grouped entity email send returned False",
+                    _failure_info[-1] if _failure_info else None,
+                )
+
         return success or bool(filtered_out)
     except Exception as e:
-        mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
+        for user in users:
+            if not user.email:
+                continue
+            linked = notification_by_user_id.get(user.id)
+            notification_id = _linked_notification_id(linked)
+            if notification_id is None:
+                notification_id = getattr(sample_notification, 'id', None)
+            log = log_email_attempt(notification_id, user.id, user.email, subject)
+            mark_email_failed_or_unknown(log.id, str(e), _failure_info[-1] if _failure_info else None)
         current_app.logger.error(
             "Error sending grouped entity email for %r: %s", entity_name, e, exc_info=True
         )

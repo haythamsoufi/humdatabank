@@ -178,6 +178,67 @@ class TestNotifyAssignmentCreated:
         assert mock_focal.call_args.kwargs["exclude_user_ids"] == [creator_id]
         assert mock_admin.call_args.kwargs["exclude_user_ids"] == [creator_id]
 
+    def test_actor_user_id_param_overrides_current_user(self, app, pending_aes):
+        """
+        actor_user_id must win over current_user for creator-exclusion.
+
+        This is exercised by the async notification dispatch (see
+        docs/runbooks/incidents/2026-08-12-prod-assignment-create-gateway-timeout.md):
+        that code runs on a background thread with no request context, where
+        current_user always resolves to anonymous, so the caller must pass the
+        actor id captured earlier on the request thread explicitly.
+        """
+        explicit_actor_id = 555
+        mock_user = MagicMock()
+        mock_user.is_authenticated = True
+        mock_user.id = 999  # must be ignored once actor_user_id is provided
+
+        with app.app_context():
+            with patch(
+                "app.services.notification.notifiers.assignment.current_user",
+                mock_user,
+            ), patch(
+                "app.services.notification.notifiers.assignment.notify_entity_focal_points",
+                return_value=[],
+            ) as mock_focal, patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[],
+            ) as mock_admin, patch(
+                "app.services.notification.notifiers.assignment.log_entity_activity",
+            ), patch(
+                "app.services.notification.notifiers.assignment.url_for",
+                return_value="/forms/assignment/1",
+            ):
+                notify_assignment_created(pending_aes, actor_user_id=explicit_actor_id)
+
+        assert mock_focal.call_args.kwargs["exclude_user_ids"] == [explicit_actor_id]
+        assert mock_admin.call_args.kwargs["exclude_user_ids"] == [explicit_actor_id]
+
+    def test_actor_user_id_none_without_current_user_excludes_no_one(self, app, pending_aes):
+        """Documents the failure mode the actor_user_id param fixes: with no explicit
+        actor and no request-bound current_user (i.e. called from a bare app context,
+        like a background thread), nobody is excluded from the notification."""
+        with app.app_context():
+            with patch(
+                "app.services.notification.notifiers.assignment.current_user",
+                None,
+            ), patch(
+                "app.services.notification.notifiers.assignment.notify_entity_focal_points",
+                return_value=[],
+            ) as mock_focal, patch(
+                "app.services.notification.notifiers.assignment.collect_entity_admin_audience_recipient_ids",
+                return_value=[],
+            ) as mock_admin, patch(
+                "app.services.notification.notifiers.assignment.log_entity_activity",
+            ), patch(
+                "app.services.notification.notifiers.assignment.url_for",
+                return_value="/forms/assignment/1",
+            ):
+                notify_assignment_created(pending_aes)
+
+        assert mock_focal.call_args.kwargs["exclude_user_ids"] is None
+        assert mock_admin.call_args.kwargs["exclude_user_ids"] is None
+
     def test_grouped_email_sample_includes_assignment_related_url(self, app, pending_aes):
         with app.app_context():
             with patch(

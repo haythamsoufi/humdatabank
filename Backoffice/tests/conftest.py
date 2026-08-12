@@ -146,11 +146,20 @@ def _reset_test_schema(app):
     if db.engine.dialect.name == "postgresql":
         with db.engine.connect() as conn:
             conn.execute(text("SELECT pg_advisory_lock(7474242)"))
+            # pg_advisory_lock is session-scoped, not transaction-scoped: committing
+            # here does NOT release it, but it stops this connection from sitting
+            # idle-in-transaction for the whole (multi-second) reset below. The test
+            # DB's idle_in_transaction_session_timeout would otherwise kill this
+            # connection while _run_test_schema_reset() does its real work on other
+            # connections, turning an otherwise-successful reset into a spurious
+            # "server closed the connection unexpectedly" failure on unlock.
+            conn.commit()
             try:
                 _run_test_schema_reset()
             finally:
-                conn.execute(text("SELECT pg_advisory_unlock(7474242)"))
-                conn.commit()
+                with suppress(Exception):
+                    conn.execute(text("SELECT pg_advisory_unlock(7474242)"))
+                    conn.commit()
         return
 
     _run_test_schema_reset()

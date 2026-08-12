@@ -186,11 +186,18 @@ WORKBOOK_NORM_HEADER_TO_KEY: Dict[str, str] = {
     "total male": "male",
     "total female": "female",
     "other/ unknown": "unknown",
-    "male <5": "male_5",
+    # NOTE: the "<5" age-group label slugifies (see slugify_age_group /
+    # processing_service.py) to "_5" (the "<" becomes "_"), and the sexage
+    # field-name/JSON-key pattern is "{sex_slug}_{age_slug}" — so the real
+    # key the entry form reads/writes is "male__5" / "female__5" (DOUBLE
+    # underscore), not "male_5". Using a single underscore here silently
+    # orphans every "<5" sex-age value: it imports/exports under a key the
+    # rest of the system never looks up.
+    "male <5": "male__5",
     "male 5-17": "male_5_17",
     "male 18-49": "male_18_49",
     "male 50+": "male_50_",
-    "female <5": "female_5",
+    "female <5": "female__5",
     "female 5-17": "female_5_17",
     "female 18-49": "female_18_49",
     "female 50+": "female_50_",
@@ -319,8 +326,14 @@ def _build_upr_country_reporting_disagg_header_maps(wb) -> Tuple[Dict[str, str],
     return key_to_header, norm_to_header
 
 
-def _parse_workbook_row_disagg(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Build entry-form disagg_data JSON from a workbook indicator table row."""
+def _extract_disagg_components(
+    row: Dict[str, Any],
+) -> Tuple[Dict[str, float], Dict[str, float], Optional[float], Optional[float]]:
+    """Scan a workbook indicator-table row for its raw sex_age / sex / direct / indirect
+    values, before any "which mode wins" resolution. Shared by _parse_workbook_row_disagg
+    (resolves the single winning mode) and _disagg_consistency_warning (flags when a
+    *lower*-priority tier was also filled in and disagrees with the winning one).
+    """
     sex_age: Dict[str, float] = {}
     sex: Dict[str, float] = {}
     direct_total: Optional[float] = None
@@ -338,7 +351,7 @@ def _parse_workbook_row_disagg(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         val = _coerce_disagg_number(raw)
         if val is None:
             continue
-        if logical_key in ("male_5", "male_5_17", "male_18_49", "male_50_", "female_5", "female_5_17", "female_18_49", "female_50_"):
+        if logical_key in ("male__5", "male_5_17", "male_18_49", "male_50_", "female__5", "female_5_17", "female_18_49", "female_50_"):
             sex_age[logical_key] = val
         elif logical_key in ("male", "female", "unknown"):
             sex[logical_key] = val
@@ -346,6 +359,67 @@ def _parse_workbook_row_disagg(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             direct_total = val
         elif logical_key == "indirect":
             indirect = val
+    return sex_age, sex, direct_total, indirect
+
+
+def _disagg_consistency_warning(
+    row: Dict[str, Any],
+    *,
+    indicator_label: str = "",
+    context_label: str = "",
+    tolerance: float = 0.5,
+) -> Optional[str]:
+    """Flag a workbook row that has values in more than one disaggregation tier
+    (sex+age / sex-only / a flat Total Direct) that don't agree with each other.
+
+    _parse_workbook_row_disagg() always prefers the richest tier present
+    (sex_age > sex > total) and silently ignores the others — correct when the
+    other tier is just redundant/matching data, but when the totals disagree it's
+    a strong signal a cell was moved, duplicated, or only partially updated in
+    Excel, which is exactly the kind of mistake this import must surface rather
+    than resolve silently.
+    """
+    sex_age, sex, direct_total, _indirect = _extract_disagg_components(row)
+    if not sex_age and not sex:
+        return None
+
+    name = indicator_label or "This indicator"
+    where = f" ({context_label})" if context_label else ""
+
+    if sex_age:
+        sex_age_total = sum(sex_age.values())
+        if sex and abs(sex_age_total - sum(sex.values())) > tolerance:
+            return (
+                f"{name!r}{where} has both a sex+age breakdown (summing to {sex_age_total:g}) and "
+                f"separate Total Male/Female values (summing to {sum(sex.values()):g}) that don't "
+                f"match — the sex+age breakdown was imported and the separate totals were ignored. "
+                f"Please check for moved, duplicated, or stale cells."
+            )
+        if sex_age and direct_total is not None and abs(sex_age_total - direct_total) > tolerance:
+            return (
+                f"{name!r}{where} has a sex+age breakdown (summing to {sex_age_total:g}) that "
+                f"doesn't match its Total Direct value ({direct_total:g}) — the sex+age breakdown "
+                f"was imported and Total Direct was ignored. Please check for moved, duplicated, "
+                f"or stale cells."
+            )
+        return None
+
+    # sex-only wins here (sex_age is empty, sex is non-empty per the guard above).
+    if direct_total is not None:
+        sex_total = sum(sex.values())
+        if abs(sex_total - direct_total) > tolerance:
+            return (
+                f"{name!r}{where} has Total Male/Female values (summing to {sex_total:g}) that "
+                f"don't match its Total Direct value ({direct_total:g}) — the Male/Female "
+                f"breakdown was imported and Total Direct was ignored. Please check for moved, "
+                f"duplicated, or stale cells."
+            )
+    return None
+
+
+def _parse_workbook_row_disagg(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Build entry-form disagg_data JSON from a workbook indicator table row."""
+    sex_age, sex, direct_total, indirect = _extract_disagg_components(row)
 
     if sex_age:
         values: Dict[str, Any] = {"direct": sex_age}
@@ -463,7 +537,7 @@ def _indicator_disagg_row(
 
 
 def _is_yes_no_indicator_type(type_value: Any) -> bool:
-    normalized = str(type_value or "").strip().lower().replace("/", "").replace("-", "")
+    normalized = str(type_value or "").strip().lower().replace("/", "").replace("-", "").replace(" ", "")
     return normalized in ("yesno", "boolean", "bool")
 
 
@@ -720,10 +794,13 @@ def _bank_id_row_integrity_warning(
 
 
 def _workbook_yes_no_value(applicable_text: str) -> str:
-    """Map workbook Applicable column to entry-form yes/no storage."""
+    """Map workbook Applicable column to entry-form yes/no storage.
+
+    Callers must check for "Data not available" (via row["data_not_available"],
+    see _resolve_indicator_import_value) BEFORE calling this — it only decides
+    between "yes"/"no" and has no representation for DNA itself.
+    """
     text = str(applicable_text or "").strip().lower()
-    if "data not available" in text:
-        return "no"
     if "applicable" in text:
         return "yes"
     return "no"
@@ -740,10 +817,14 @@ def _resolve_indicator_import_value(
     yes_no_bank_ids: Set[int],
 ) -> Tuple[Optional[Any], bool, Optional[Dict[str, Any]], bool]:
     """Return (value, data_not_available, disagg, should_import)."""
-    if bank_id and bank_id in yes_no_bank_ids:
-        return _workbook_yes_no_value(row.get("applicable_text", "")), False, None, True
+    # Check DNA first, even for Yes/No indicators: a Yes/No answer marked "Data
+    # not available" in Excel must import as DNA (is_data_not_available=True),
+    # not silently coerce to a "No" answer — those are materially different
+    # claims ("we don't know" vs "confirmed no").
     if row.get("data_not_available"):
         return None, True, None, True
+    if bank_id and bank_id in yes_no_bank_ids:
+        return _workbook_yes_no_value(row.get("applicable_text", "")), False, None, True
     disagg = row.get("disagg")
     value = row.get("value")
     return value, False, disagg, bool(disagg or value is not None)
@@ -1848,6 +1929,9 @@ def parse_indicators(
             applicable = str(row.get(INDICATOR_DNA_HEADER) or "").strip().lower()
             is_dna = "data not available" in applicable
             disagg = _parse_workbook_row_disagg(row)
+            disagg_warning = _disagg_consistency_warning(
+                row, indicator_label=indicator, context_label=sp_ef
+            )
             direct_val: Optional[float] = None
             for header, raw in row.items():
                 if _normalize_workbook_header(header) == "total direct":
@@ -1867,9 +1951,12 @@ def parse_indicators(
                 resolved_bank_id and yes_no_bank_ids and resolved_bank_id in yes_no_bank_ids
             )
             if is_yes_no:
-                value = "yes" if "applicable" in applicable and not is_dna else "no"
                 disagg = None
-                is_dna = False
+                # Preserve is_dna as-is (already computed from the Applicable column
+                # above) instead of forcing it to False — a Yes/No indicator marked
+                # "Data not available" in Excel must import as DNA, not silently
+                # coerce to a "No" answer (a materially different, false claim).
+                value = None if is_dna else ("yes" if "applicable" in applicable else "no")
             elif not is_dna and "applicable" in applicable and disagg is None and value is None:
                 # Numeric placeholders: Applicable with no values — skip on import.
                 continue
@@ -1882,6 +1969,7 @@ def parse_indicators(
                     "applicable_text": applicable,
                     "value": value,
                     "disagg": disagg,
+                    "disagg_warning": disagg_warning,
                     "sheet_name": sheet_name,
                     "table_name": table_name,
                 }
@@ -2508,6 +2596,8 @@ def _collect_workbook_dynamic_indicator_entries(
         )
         if range_warning:
             ctx.warnings.append(range_warning)
+        if row.get("disagg_warning"):
+            ctx.warnings.append(row["disagg_warning"])
         order += 1.0
         entries.append(
             {
@@ -2565,6 +2655,8 @@ def _collect_workbook_dynamic_indicator_entries(
                 )
                 if range_warning:
                     ctx.warnings.append(range_warning)
+                if row.get("disagg_warning"):
+                    ctx.warnings.append(row["disagg_warning"])
                 order += 1.0
                 entries.append(
                     {
@@ -3194,6 +3286,8 @@ def transform_upr_country_reporting_to_import_rows(
         )
         if range_warning:
             ctx.warnings.append(range_warning)
+        if row.get("disagg_warning"):
+            ctx.warnings.append(row["disagg_warning"])
         if not item_id:
             if bank_id and (is_dna or value is not None or disagg):
                 _queue_other_dynamic_indicator(

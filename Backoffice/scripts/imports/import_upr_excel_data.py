@@ -276,6 +276,12 @@ class UprImportContext:
     # PNS assignment AES ids with at least one Excel Funding row where PNS reported = Yes.
     pns_t22_reported_aes: Set[int] = field(default_factory=set)
     pns_t23_reported_aes: Set[int] = field(default_factory=set)
+    # (aes_id, item_id) / (aes_id, section_id, bank_id, repeat_instance_number) pairs that
+    # already carry a real sex/age/sex_age breakdown in the DB — see
+    # _load_existing_disaggregated_keys. UPR Master's flat ValueNum has no breakdown columns,
+    # so writing it here unguarded would silently erase that existing breakdown.
+    existing_disagg_static_keys: Set[Tuple[int, int]] = field(default_factory=set)
+    existing_disagg_dynamic_keys: Set[Tuple[int, int, int, Optional[int]]] = field(default_factory=set)
 
 
 def round_to_period(round_code: str) -> Optional[str]:
@@ -773,6 +779,117 @@ def _reporting_indicator_import_value(
     if warning:
         ctx.warnings.append(warning)
     return value_num
+
+
+def _has_real_disagg_breakdown(disagg: Any) -> bool:
+    """True when a disagg_data payload is an actual sex/age/sex_age breakdown
+    with at least one non-null sub-value (not just ``{"mode": "total", ...}``).
+    """
+    if not isinstance(disagg, dict):
+        return False
+    if disagg.get("mode") not in ("sex", "age", "sex_age"):
+        return False
+    values = disagg.get("values")
+    if not isinstance(values, dict):
+        return False
+    direct = values.get("direct", values)
+    return isinstance(direct, dict) and any(v is not None for v in direct.values())
+
+
+def _load_existing_disaggregated_keys(
+    aes_ids: Set[int],
+) -> Tuple[Set[Tuple[int, int]], Set[Tuple[int, int, int, Optional[int]]]]:
+    """Find static (aes_id, item_id) and dynamic (aes_id, section_id, bank_id,
+    repeat_instance_number) keys that already carry a real sex/age/sex_age breakdown.
+
+    UPR Master's "UPR Data" sheet is flat — one ``ValueNum`` per country/indicator/round,
+    with no Male/Female/Age columns — so a scalar value built from it must never be written
+    over an indicator that already has a real breakdown (e.g. entered via the T33
+    per-country Excel import or directly in the web form): both
+    ``FormData.set_simple_value()`` and ``DynamicIndicatorData.set_simple_value()``
+    (``DataEntryMixin``, app/models/forms.py) unconditionally clear ``disagg_data`` when a
+    plain value is set, which would silently destroy the breakdown.
+    """
+    static_keys: Set[Tuple[int, int]] = set()
+    dynamic_keys: Set[Tuple[int, int, int, Optional[int]]] = set()
+    if not aes_ids:
+        return static_keys, dynamic_keys
+
+    from app.models.forms import DynamicIndicatorData, FormData
+
+    aes_list = list(aes_ids)
+    chunk_size = 1000
+    for i in range(0, len(aes_list), chunk_size):
+        chunk = aes_list[i : i + chunk_size]
+        static_rows = (
+            FormData.query.filter(
+                FormData.assignment_entity_status_id.in_(chunk),
+                FormData.disagg_data.isnot(None),
+            )
+            .with_entities(
+                FormData.assignment_entity_status_id,
+                FormData.form_item_id,
+                FormData.disagg_data,
+            )
+            .all()
+        )
+        for aes_id, item_id, disagg in static_rows:
+            if _has_real_disagg_breakdown(disagg):
+                static_keys.add((int(aes_id), int(item_id)))
+
+        dynamic_rows = (
+            DynamicIndicatorData.query.filter(
+                DynamicIndicatorData.assignment_entity_status_id.in_(chunk),
+                DynamicIndicatorData.disagg_data.isnot(None),
+            )
+            .with_entities(
+                DynamicIndicatorData.assignment_entity_status_id,
+                DynamicIndicatorData.section_id,
+                DynamicIndicatorData.indicator_bank_id,
+                DynamicIndicatorData.repeat_instance_number,
+                DynamicIndicatorData.disagg_data,
+            )
+            .all()
+        )
+        for aes_id, section_id, bank_id, repeat_num, disagg in dynamic_rows:
+            if _has_real_disagg_breakdown(disagg):
+                dynamic_keys.add((int(aes_id), int(section_id), int(bank_id), repeat_num))
+
+    return static_keys, dynamic_keys
+
+
+def _disaggregation_overwrite_warning(
+    ctx: UprImportContext,
+    *,
+    value_num: Optional[float],
+    is_dna: bool,
+    static_key: Optional[Tuple[int, int]] = None,
+    dynamic_key: Optional[Tuple[int, int, int, Optional[int]]] = None,
+    iso3: str = "",
+    rnd: str = "",
+    label: str = "",
+) -> Optional[str]:
+    """Guard against UPR Master's flat ValueNum silently erasing an existing sex/age
+    breakdown for the same indicator/assignment (see _load_existing_disaggregated_keys).
+    Returns a warning message when the write should be skipped, else None.
+    """
+    if is_dna or value_num is None:
+        return None
+    conflict = bool(
+        (static_key and static_key in ctx.existing_disagg_static_keys)
+        or (dynamic_key and dynamic_key in ctx.existing_disagg_dynamic_keys)
+    )
+    if not conflict:
+        return None
+    name = label or "indicator"
+    where = " ".join(part for part in (iso3, rnd) if part)
+    suffix = f" ({where})" if where else ""
+    return (
+        f"Skipped UPR Master value for {name!r}{suffix} — this indicator already has a "
+        f"sex/age breakdown saved from a richer source. Importing the flat total "
+        f"({value_num:g}) would have erased that breakdown, so the existing data was left "
+        f"unchanged; update the breakdown directly if the total has actually changed."
+    )
 
 
 def _load_core_yes_no_item_ids(
@@ -2129,6 +2246,12 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
         ctx.percentage_allow_over_100_bank_ids = _load_percentage_allow_over_100_bank_ids(
             ctx.percentage_bank_ids
         )
+        reporting_aes_ids = set(
+            ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).values()
+        )
+        ctx.existing_disagg_static_keys, ctx.existing_disagg_dynamic_keys = (
+            _load_existing_disaggregated_keys(reporting_aes_ids)
+        )
         pub_vid = ctx.published_version_ids.get(REPORTING_COUNTRY_TEMPLATE_ID)
         if pub_vid:
             ctx.core_yes_no_item_ids = _load_core_yes_no_item_ids(
@@ -2712,7 +2835,16 @@ def transform_to_import_rows(
             has_value = _reporting_indicator_has_import_value(
                 ctx, indicator_id, value_num, is_dna=is_dna
             )
-            if has_value:
+            overwrite_warning = _disaggregation_overwrite_warning(
+                ctx,
+                value_num=value_num,
+                is_dna=is_dna,
+                dynamic_key=(aes_id, ctx.ea_dynamic_section_id, indicator_id, slot),
+                iso3=iso3, rnd=rnd, label=indicator,
+            )
+            if overwrite_warning:
+                ctx.warnings.append(overwrite_warning)
+            elif has_value:
                 _queue_emergency_dynamic_indicator(
                     ctx,
                     aes_id=aes_id,
@@ -2745,7 +2877,16 @@ def transform_to_import_rows(
             )
 
             if sec == "Other indicators":
-                if has_value:
+                other_overwrite_warning = _disaggregation_overwrite_warning(
+                    ctx,
+                    value_num=value_num,
+                    is_dna=is_dna,
+                    dynamic_key=(aes_id, ctx.other_indicators_section_id, indicator_id, None),
+                    iso3=iso3, rnd=rnd, label=indicator,
+                )
+                if other_overwrite_warning:
+                    ctx.warnings.append(other_overwrite_warning)
+                elif has_value:
                     _queue_other_dynamic_indicator(
                         ctx,
                         aes_id=aes_id,
@@ -2759,7 +2900,17 @@ def transform_to_import_rows(
                 continue
 
             item_id = _resolve_item_by_bank_and_area(ctx, REPORTING_COUNTRY_TEMPLATE_ID, indicator_id, area)
-            if item_id:
+            core_overwrite_warning = _disaggregation_overwrite_warning(
+                ctx,
+                value_num=value_num,
+                is_dna=is_dna,
+                static_key=(aes_id, item_id) if item_id else None,
+                dynamic_key=None if item_id else (aes_id, ctx.other_indicators_section_id, indicator_id, None),
+                iso3=iso3, rnd=rnd, label=indicator,
+            )
+            if core_overwrite_warning:
+                ctx.warnings.append(core_overwrite_warning)
+            elif item_id:
                 if is_dna:
                     import_rows.append(
                         _data_na_row(

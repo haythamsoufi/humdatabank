@@ -132,11 +132,54 @@ def _build_assignment_email_sample(
     )
 
 
+def _notification_by_user_id_map(
+    notifications,
+    *,
+    entity_type,
+    entity_id,
+    assigned_form_id,
+):
+    """
+    Map user_id -> Notification for grouped email delivery logging.
+
+    Bulk in-app inserts return stub dicts without ids; query them back from the DB.
+    """
+    from datetime import timedelta
+
+    from app.models import Notification
+    from app.utils.datetime_helpers import utcnow
+
+    result = {}
+    missing_user_ids: list[int] = []
+    for item in notifications or []:
+        if hasattr(item, 'user_id') and hasattr(item, 'id') and item.id:
+            result[item.user_id] = item
+        elif isinstance(item, dict) and item.get('user_id'):
+            missing_user_ids.append(int(item['user_id']))
+
+    if not missing_user_ids:
+        return result
+
+    recent_cutoff = utcnow() - timedelta(seconds=60)
+    rows = Notification.query.filter(
+        Notification.user_id.in_(missing_user_ids),
+        Notification.notification_type == NotificationType.assignment_created,
+        Notification.related_object_id == assigned_form_id,
+        Notification.entity_type == entity_type,
+        Notification.entity_id == entity_id,
+        Notification.created_at >= recent_cutoff,
+    ).all()
+    for row in rows:
+        result[row.user_id] = row
+    return result
+
+
 def _send_grouped_assignment_created_email(
     focal_user_ids,
     admin_user_ids,
     sample_notification,
     entity_name,
+    notification_by_user_id=None,
 ):
     """One email per entity: focal points in To, admins in CC."""
     from app.services.notification.emails import send_grouped_entity_email
@@ -148,6 +191,7 @@ def _send_grouped_assignment_created_email(
         cc_user_ids=admin_user_ids,
         sample_notification=sample_notification,
         entity_name=entity_name,
+        notification_by_user_id=notification_by_user_id,
     )
 
 
@@ -290,8 +334,15 @@ def preview_assignment_created_grouped_email(
     return preview
 
 
-def notify_assignment_created(assignment_entity_status, notify_admins=False):
-    """Notify focal points (and optionally entity-scoped admins) when a new assignment is created."""
+def notify_assignment_created(assignment_entity_status, notify_admins=False, actor_user_id=None):
+    """
+    Notify focal points (and optionally entity-scoped admins) when a new assignment is created.
+
+    actor_user_id: explicit id of the admin who created the assignment, used to exclude them
+    from their own notification. Pass this when calling from outside the original request
+    (e.g. a background thread) — flask_login's current_user resolves to anonymous there, so
+    the current_user fallback below would otherwise stop excluding the creator.
+    """
     aes = assignment_entity_status
     entity_type = aes.entity_type
     entity_id = aes.entity_id
@@ -350,9 +401,12 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False):
     }
     assignment_message_key = _assignment_created_message_key(aes)
 
-    exclude_user_ids = None
-    if current_user and current_user.is_authenticated:
+    if actor_user_id is not None:
+        exclude_user_ids = [actor_user_id]
+    elif current_user and current_user.is_authenticated:
         exclude_user_ids = [current_user.id]
+    else:
+        exclude_user_ids = None
 
     # Gate on the same audience-bucket flag notify_entity_focal_points checks below, so the
     # grouped email (which uses focal_user_ids directly) never emails focal points when the
@@ -422,12 +476,19 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False):
             message_params,
             message_key=assignment_message_key,
         )
+        notification_by_user_id = _notification_by_user_id_map(
+            list(notifications) + list(admin_notifications),
+            entity_type=entity_type,
+            entity_id=entity_id,
+            assigned_form_id=aes.assigned_form_id,
+        )
         try:
             _send_grouped_assignment_created_email(
                 focal_user_ids=focal_user_ids,
                 admin_user_ids=cc_admin_ids,
                 sample_notification=sample,
                 entity_name=message_params['country'],
+                notification_by_user_id=notification_by_user_id,
             )
         except Exception as e:
             current_app.logger.error(

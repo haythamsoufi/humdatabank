@@ -10,8 +10,11 @@ if str(imports_dir) not in sys.path:
 
 from import_upr_excel_data import (  # noqa: E402
     UprImportContext,
+    _disaggregation_overwrite_warning,
     _fill_missing_core_yes_no_defaults,
+    _has_real_disagg_breakdown,
     _master_yes_no_value,
+    _percentage_scalar_range_warning,
     _queue_dynamic_indicator_entry,
     _queue_other_dynamic_indicator,
     _reporting_aes_ids_from_excel,
@@ -186,6 +189,193 @@ class TestMasterYesNoValue:
         assert _reporting_indicator_import_value(ctx, 631, 0) == "no"
         assert _reporting_indicator_has_import_value(ctx, 631, None, is_dna=False) is True
         assert _reporting_indicator_import_value(ctx, 724, 42) == 42
+
+
+class TestPercentageRangeWarning:
+    """UPR Master 'ValueNum' out of the plausible 0-100% range for a
+    percentage-type indicator (e.g. 450 entered instead of 45) must be
+    surfaced as a warning, not silently imported with no trace."""
+
+    def test_out_of_range_value_is_flagged_and_still_returned_unchanged(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        value = _reporting_indicator_import_value(
+            ctx, 500, 450, iso3="PAK", rnd="AR2025", label="Coverage %"
+        )
+        assert value == 450  # non-blocking: the value still imports as entered
+        assert len(ctx.warnings) == 1
+        assert "450" in ctx.warnings[0]
+        assert "Coverage %" in ctx.warnings[0]
+        assert "PAK" in ctx.warnings[0]
+
+    def test_in_range_value_is_silent(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        assert _reporting_indicator_import_value(ctx, 500, 45) == 45
+        assert ctx.warnings == []
+
+    def test_negative_value_is_flagged(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        _reporting_indicator_import_value(ctx, 500, -10)
+        assert len(ctx.warnings) == 1
+        assert "-10" in ctx.warnings[0]
+
+    def test_allow_over_100_override_permits_high_value_but_not_negative(self):
+        ctx = _ctx(percentage_bank_ids={500}, percentage_allow_over_100_bank_ids={500})
+        assert _reporting_indicator_import_value(ctx, 500, 250) == 250
+        assert ctx.warnings == []
+        _reporting_indicator_import_value(ctx, 500, -1)
+        assert len(ctx.warnings) == 1
+
+    def test_non_percentage_bank_id_is_never_flagged(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        assert _reporting_indicator_import_value(ctx, 724, 999) == 999
+        assert ctx.warnings == []
+
+    def test_yes_no_resolution_short_circuits_before_percentage_check(self):
+        ctx = _ctx(yes_no_bank_ids={631}, percentage_bank_ids={631})
+        assert _reporting_indicator_import_value(ctx, 631, 1) == "yes"
+        assert ctx.warnings == []
+
+    def test_none_value_never_flagged(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        assert _percentage_scalar_range_warning(ctx, 500, None) is None
+
+
+class TestHasRealDisaggBreakdown:
+    """UPR Master's 'UPR Data' sheet is flat (single ValueNum, no Male/Female/Age
+    columns), so the importer must recognise when an existing DB row already has a
+    real sex/age breakdown so it doesn't blindly flatten it into a scalar."""
+
+    def test_sex_age_mode_with_values_is_real(self):
+        assert _has_real_disagg_breakdown(
+            {"mode": "sex_age", "values": {"direct": {"male__5": 10, "female_5_17": 4}}}
+        )
+
+    def test_sex_mode_with_values_is_real(self):
+        assert _has_real_disagg_breakdown({"mode": "sex", "values": {"male": 5, "female": 3}})
+
+    def test_total_mode_is_not_a_breakdown(self):
+        assert not _has_real_disagg_breakdown({"mode": "total", "values": {"total": 42}})
+
+    def test_none_is_not_a_breakdown(self):
+        assert not _has_real_disagg_breakdown(None)
+
+    def test_empty_values_dict_is_not_a_breakdown(self):
+        assert not _has_real_disagg_breakdown({"mode": "sex_age", "values": {"direct": {}}})
+
+    def test_non_dict_is_not_a_breakdown(self):
+        assert not _has_real_disagg_breakdown("male__5:10")
+
+
+class TestDisaggregationOverwriteGuard:
+    """UPR Master must never silently flatten an indicator that already has a real
+    sex/age breakdown (entered via the T33 per-country Excel import or the web form)
+    into a bare scalar total — FormData/DynamicIndicatorData.set_simple_value()
+    unconditionally clears disagg_data, so this must be caught before that call."""
+
+    def test_warns_and_would_skip_when_static_key_has_existing_breakdown(self):
+        ctx = _ctx(existing_disagg_static_keys={(10, 9001)})
+        warning = _disaggregation_overwrite_warning(
+            ctx, value_num=100, is_dna=False, static_key=(10, 9001), iso3="PAK", rnd="AR2025", label="Reached"
+        )
+        assert warning is not None
+        assert "Reached" in warning
+        assert "PAK" in warning
+        assert "100" in warning
+
+    def test_warns_when_dynamic_key_has_existing_breakdown(self):
+        ctx = _ctx(existing_disagg_dynamic_keys={(10, 555, 619, None)})
+        warning = _disaggregation_overwrite_warning(
+            ctx, value_num=50, is_dna=False, dynamic_key=(10, 555, 619, None),
+        )
+        assert warning is not None
+
+    def test_no_warning_when_key_has_no_existing_breakdown(self):
+        ctx = _ctx(existing_disagg_static_keys={(10, 9001)})
+        assert _disaggregation_overwrite_warning(
+            ctx, value_num=100, is_dna=False, static_key=(10, 9999),
+        ) is None
+
+    def test_data_not_available_bypasses_the_guard(self):
+        # DNA is a deliberate status from the master sheet — it's allowed to clear
+        # an existing breakdown, unlike an incidental flat scalar.
+        ctx = _ctx(existing_disagg_static_keys={(10, 9001)})
+        assert _disaggregation_overwrite_warning(
+            ctx, value_num=None, is_dna=True, static_key=(10, 9001),
+        ) is None
+
+    def test_none_value_bypasses_the_guard(self):
+        ctx = _ctx(existing_disagg_static_keys={(10, 9001)})
+        assert _disaggregation_overwrite_warning(
+            ctx, value_num=None, is_dna=False, static_key=(10, 9001),
+        ) is None
+
+    def test_no_keys_provided_is_never_a_conflict(self):
+        ctx = _ctx(existing_disagg_static_keys={(10, 9001)}, existing_disagg_dynamic_keys={(10, 555, 619, None)})
+        assert _disaggregation_overwrite_warning(ctx, value_num=100, is_dna=False) is None
+
+
+class TestLoadExistingDisaggregatedKeysDb:
+    """End-to-end DB check: _load_existing_disaggregated_keys must find real
+    FormData/DynamicIndicatorData rows with a sex/age breakdown, and must not treat
+    a plain 'total' mode (or no disagg at all) as a breakdown worth protecting."""
+
+    def test_finds_static_and_dynamic_breakdowns_but_not_total_mode(self, app, db_session):
+        from import_upr_excel_data import _load_existing_disaggregated_keys
+        from app.models.forms import DynamicIndicatorData, FormData
+        from app.models.indicator_bank import IndicatorBank
+        from tests.factories import (
+            create_test_assignment_entity_status,
+            create_test_item,
+            create_test_section,
+            create_test_template,
+            create_test_user,
+        )
+
+        with app.app_context():
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            breakdown_item = create_test_item(db_session, section, template, item_type="indicator")
+            total_only_item = create_test_item(db_session, section, template, item_type="indicator")
+            aes = create_test_assignment_entity_status(db_session, template=template)
+            user = create_test_user(db_session)
+            bank = IndicatorBank(name="__test_disagg_guard_bank__", type="number")
+            db_session.add(bank)
+            db_session.flush()
+
+            db_session.add(FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=breakdown_item.id,
+                disagg_data={"mode": "sex_age", "values": {"direct": {"male__5": 10, "female_5_17": 4}}},
+            ))
+            db_session.add(FormData(
+                assignment_entity_status_id=aes.id,
+                form_item_id=total_only_item.id,
+                disagg_data={"mode": "total", "values": {"total": 99}},
+            ))
+            dyn_row = DynamicIndicatorData(
+                assignment_entity_status_id=aes.id,
+                section_id=section.id,
+                indicator_bank_id=bank.id,
+                repeat_instance_number=None,
+                added_by_user_id=user.id,
+            )
+            dyn_row.set_disaggregated_data("sex", {"male": 3, "female": 7})
+            db_session.add(dyn_row)
+            db_session.commit()
+
+            static_keys, dynamic_keys = _load_existing_disaggregated_keys({aes.id})
+
+            assert (aes.id, breakdown_item.id) in static_keys
+            assert (aes.id, total_only_item.id) not in static_keys
+            assert (aes.id, section.id, bank.id, None) in dynamic_keys
+
+    def test_empty_aes_ids_returns_empty_sets_without_querying(self, app):
+        from import_upr_excel_data import _load_existing_disaggregated_keys
+
+        with app.app_context():
+            static_keys, dynamic_keys = _load_existing_disaggregated_keys(set())
+            assert static_keys == set()
+            assert dynamic_keys == set()
 
 
 class TestMissingCoreYesNoDefaults:

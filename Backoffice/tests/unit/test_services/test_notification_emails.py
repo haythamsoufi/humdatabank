@@ -1310,6 +1310,83 @@ class TestBuildGroupedEntityEmailPreview:
         assert not preview['empty_reason']
         assert [r['email'] for r in preview['to']] == ['instant_focal@example.com']
 
+    def test_single_to_recipient_uses_personal_greeting(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            user = User(email='solo_focal@example.com', name='Solo Focal', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id,
+                email_notifications=True,
+                notification_types_enabled=[],
+                notification_frequency='instant',
+            ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [user.id], [], self._sample_notification(), 'Kenya'
+            )
+
+        assert 'Dear colleagues' not in preview['html_body']
+        assert 'Hello Solo Focal,' in preview['html_body']
+
+    def test_multiple_to_recipients_use_team_greeting(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            u1 = User(email='focal_a@example.com', name='Focal A', active=True)
+            u2 = User(email='focal_b@example.com', name='Focal B', active=True)
+            u1.set_password('pw')
+            u2.set_password('pw')
+            db.session.add_all([u1, u2])
+            db.session.flush()
+            for uid in (u1.id, u2.id):
+                db.session.add(NotificationPreferences(
+                    user_id=uid,
+                    email_notifications=True,
+                    notification_types_enabled=[],
+                    notification_frequency='instant',
+                ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [u1.id, u2.id], [], self._sample_notification(), 'Kenya'
+            )
+
+        assert 'Dear colleagues,' in preview['html_body']
+
+    def test_cc_recipient_keeps_team_greeting_even_with_one_to(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+
+        with app.app_context():
+            focal = User(email='focal@example.com', name='Focal One', active=True)
+            admin = User(email='admin@example.com', name='Admin One', active=True)
+            focal.set_password('pw')
+            admin.set_password('pw')
+            db.session.add_all([focal, admin])
+            db.session.flush()
+            for u in (focal, admin):
+                db.session.add(NotificationPreferences(
+                    user_id=u.id,
+                    email_notifications=True,
+                    notification_types_enabled=[],
+                    notification_frequency='instant',
+                ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [focal.id], [admin.id], self._sample_notification(), 'Kenya'
+            )
+
+        assert 'Dear colleagues,' in preview['html_body']
+        assert 'Hello Focal One,' not in preview['html_body']
+
     def test_cc_promoted_to_to_when_no_eligible_focal(self, app, db_session):
         """If focal points aren't email-eligible but a CC'd admin is, the admin
         becomes the primary 'To' rather than the email silently having no To."""

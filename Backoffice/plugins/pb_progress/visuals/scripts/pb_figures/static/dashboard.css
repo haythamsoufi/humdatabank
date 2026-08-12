@@ -73,7 +73,7 @@
 .pb-dashboard table.indicator-row td.line-chart-wrap {
   padding-left: var(--col-gap);
   min-height: 110px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pb-dashboard[dir="rtl"] table.indicator-row td.line-chart-wrap {
@@ -87,7 +87,7 @@
   max-width: 481px;
   height: 110px;
   min-height: 110px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pb-dashboard .line-chart-inner > svg,

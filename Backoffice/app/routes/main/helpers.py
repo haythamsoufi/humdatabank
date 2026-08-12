@@ -23,6 +23,24 @@ from app.routes.main import bp
 SELECTED_ENTITY_TYPE_SESSION_KEY = 'selected_entity_type'
 SELECTED_ENTITY_ID_SESSION_KEY = 'selected_entity_id'
 
+# Admin assignment lifecycle events excluded from dashboard assignment-card
+# contributor avatars and the recent-activity feed (not data-entry contributors).
+DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES = frozenset({'assignment_created'})
+
+
+def filter_dashboard_assignment_activities(activities):
+    """Drop admin-only assignment lifecycle events from dashboard activity lists."""
+    filtered = []
+    for activity in activities or []:
+        activity_type = getattr(activity, 'activity_type', None)
+        if activity_type in DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES:
+            continue
+        summary_key = getattr(activity, 'summary_key', None)
+        if summary_key == 'activity.assignment_created':
+            continue
+        filtered.append(activity)
+    return filtered
+
 
 def _parse_int(value, field_name, *, minimum=None) -> int:
     """Parse an integer from form inputs with optional minimum enforcement."""

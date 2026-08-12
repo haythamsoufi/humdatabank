@@ -4,7 +4,13 @@
  */
 
 import { addPendingDynamicIndicatorForImport } from './dynamic-indicators.js';
-import { addRepeatEntry, getEffectiveRepeatEntryMax } from './repeat-sections.js';
+import {
+    addRepeatEntry,
+    getEffectiveRepeatEntryMax,
+    setSelectValueWithFallback,
+    waitForCalculatedSelectOptions,
+} from './repeat-sections.js';
+import { applyDisaggToBlock, applyYesNoToBlock } from './disagg-dom-apply.js';
 import { debugLog, debugWarn } from './debug.js';
 
 const MODULE = 'upr-excel-import';
@@ -19,132 +25,87 @@ function findStaticFieldBlock(itemId) {
     return Array.from(blocks).find((block) => !block.closest('.repeat-entry'));
 }
 
-function applyDisaggToBlock(block, disaggData) {
-    if (!block || !disaggData || typeof disaggData !== 'object') return false;
-
-    if (!disaggData.mode && !disaggData.values) {
-        const itemId = String(block.getAttribute('data-item-id') || '').trim();
-        const hidden = itemId
-            ? block.querySelector(`input[type="hidden"][name="field_value[${itemId}]"]`)
-            : null;
-        if (hidden) {
-            hidden.value = JSON.stringify(disaggData);
-            dispatchInputEvents(hidden);
-            return true;
-        }
-    }
-
-    const sampleNamedInput = block.querySelector('input[name], textarea[name], select[name]');
-    const sampleName = sampleNamedInput ? String(sampleNamedInput.getAttribute('name') || '') : '';
-    const m = sampleName.match(/^(indicator|dynamic|question)_(\d+)_/);
-    if (!m) return false;
-
-    const base = `${m[1]}_${m[2]}`;
-    const mode = String(disaggData.mode || '').trim();
-    const values = (disaggData.values && typeof disaggData.values === 'object') ? disaggData.values : null;
-    if (!mode || !values) return false;
-
-    const modeRadio = block.querySelector(`input[type="radio"][name="${base}_reporting_mode"][value="${mode}"]:not([disabled])`);
-    if (modeRadio) {
-        modeRadio.checked = true;
-        dispatchInputEvents(modeRadio);
-    }
-
-    let appliedAny = false;
-    const trySetByName = (name, val) => {
-        const el = block.querySelector(`[name="${name}"]:not([disabled])`);
-        if (!el) return false;
-        el.value = String(val ?? '');
-        dispatchInputEvents(el);
-        return true;
-    };
-
-    if (Object.prototype.hasOwnProperty.call(values, 'total')) {
-        appliedAny = trySetByName(`${base}_total_value`, values.total) || appliedAny;
-    }
-    if (Object.prototype.hasOwnProperty.call(values, 'indirect')) {
-        appliedAny = trySetByName(`${base}_indirect_reach`, values.indirect) || appliedAny;
-    }
-
-    for (const [key, rawVal] of Object.entries(values)) {
-        if (key === 'total' || key === 'indirect') continue;
-        appliedAny = trySetByName(`${base}_${mode}_${key}`, rawVal) || appliedAny;
-        appliedAny = trySetByName(`${base}_${key}`, rawVal) || appliedAny;
-    }
-
-    return appliedAny;
-}
-
+/**
+ * @returns {boolean} true when a matching input was found and updated
+ */
 function applyFieldPayloadToBlock(block, fieldData) {
-    if (!block || !fieldData) return;
+    if (!block || !fieldData) return false;
 
     if (fieldData.data_not_available) {
         const dna = block.querySelector('input[name*="_data_not_available"]');
-        if (dna && !dna.checked) {
+        if (!dna) return false;
+        if (!dna.checked) {
             dna.checked = true;
             dispatchInputEvents(dna);
         }
-        return;
+        return true;
     }
 
     if (fieldData.disagg_data) {
-        applyDisaggToBlock(block, fieldData.disagg_data);
-        return;
+        return applyDisaggToBlock(block, fieldData.disagg_data);
     }
 
     const value = fieldData.value;
     if (value === 'yes' || value === 'no') {
-        const checkbox = block.querySelector(
-            `input[type="checkbox"][value="${value}"][name*="_standard_value"]`
-        ) || block.querySelector(`input[type="checkbox"][value="${value}"][name^="field_value"]`);
-        if (checkbox && window.handleYesNoCheckbox) {
-            window.handleYesNoCheckbox(checkbox, checkbox.name);
-        } else if (checkbox) {
-            checkbox.checked = true;
-            dispatchInputEvents(checkbox);
-        }
-        return;
+        return applyYesNoToBlock(block, value);
     }
 
     const input = block.querySelector('input[name*="_standard_value"], textarea[name*="_standard_value"], select[name*="_standard_value"]')
         || block.querySelector(`input[name="field_value[${block.dataset.itemId}]"], textarea[name="field_value[${block.dataset.itemId}]"]`);
-    if (input) {
-        if (input.type === 'checkbox') {
-            input.checked = value === '1' || value === 1 || value === 'true' || value === true;
-        } else {
-            input.value = value ?? '';
-        }
-        dispatchInputEvents(input);
+    if (!input) return false;
+
+    if (input.type === 'checkbox') {
+        input.checked = value === '1' || value === 1 || value === 'true' || value === true;
+    } else {
+        input.value = value ?? '';
     }
+    dispatchInputEvents(input);
+    return true;
 }
 
 function applyStaticFields(fields) {
     let count = 0;
+    const warnings = [];
     for (const [itemId, fieldData] of Object.entries(fields || {})) {
         const block = findStaticFieldBlock(itemId);
         if (!block) {
             debugWarn(MODULE, `Static field block not found for item ${itemId}`);
+            warnings.push(`Could not find field ${itemId} on the form — its imported value was not applied.`);
             continue;
         }
-        applyFieldPayloadToBlock(block, fieldData);
+        if (!applyFieldPayloadToBlock(block, fieldData)) {
+            debugWarn(MODULE, `Failed to apply imported value for field ${itemId}`);
+            warnings.push(`Could not apply the imported value for field ${itemId} — please check it manually.`);
+            continue;
+        }
         count += 1;
     }
-    return count;
+    return { count, warnings };
 }
 
 function applyMatrices(matrices) {
     let count = 0;
+    const warnings = [];
+    const entries = Object.entries(matrices || {});
+    if (!entries.length) return { count, warnings };
+
     const handler = window.matrixHandler;
     if (!handler || typeof handler.setMatrixData !== 'function') {
         debugWarn(MODULE, 'Matrix handler not available');
-        return 0;
+        warnings.push('Could not apply imported matrix data — the matrix control is not available on this page.');
+        return { count, warnings };
     }
 
-    for (const [itemId, data] of Object.entries(matrices || {})) {
-        handler.setMatrixData(String(itemId), data);
+    for (const [itemId, data] of entries) {
+        const applied = handler.setMatrixData(String(itemId), data);
+        if (!applied) {
+            debugWarn(MODULE, `Matrix ${itemId} not found on the page; imported data not applied`);
+            warnings.push(`Could not apply imported data for matrix ${itemId} — please check it manually.`);
+            continue;
+        }
         count += 1;
     }
-    return count;
+    return { count, warnings };
 }
 
 async function ensureRepeatEntryCount(sectionId, targetCount) {
@@ -203,34 +164,41 @@ function findRepeatEntry(sectionId, slotNum) {
         || document.querySelector(`.repeat-entry[data-repeat-instance="${slotNum}"]`);
 }
 
-function applyRepeatSlotChoice(repeatEntry, sectionId, slotNum, slot) {
+/**
+ * @returns {Promise<boolean>} true when the choice value was applied
+ */
+async function applyRepeatSlotChoice(repeatEntry, sectionId, slotNum, slot) {
     const choiceItemId = slot.choice_item_id;
-    if (!choiceItemId || !repeatEntry) return;
+    if (!choiceItemId || !repeatEntry) return false;
 
     const field = repeatEntry.querySelector(`[data-item-id="${choiceItemId}"]`);
     if (!field) {
         debugWarn(MODULE, `Emergency choice field ${choiceItemId} not found in repeat entry ${slotNum}`);
-        return;
+        return false;
     }
 
     const displayValue = slot.display_value || '';
     const select = field.querySelector('select');
     if (select) {
-        select.value = displayValue;
-        if (!select.value && displayValue) {
-            const options = Array.from(select.options);
-            const match = options.find((opt) => opt.text.trim() === displayValue || opt.value === displayValue);
-            if (match) select.value = match.value;
+        // Calculated-list selects (e.g. the emergency-operation/MDR picker)
+        // populate their <option>s asynchronously after being created, so a
+        // freshly-added repeat entry's select is very likely empty at this
+        // point — setting .value synchronously would silently no-op.
+        if (select.dataset.optionsSource === 'calculated' && select.options.length <= 1) {
+            await waitForCalculatedSelectOptions(select);
         }
+        setSelectValueWithFallback(select, displayValue);
         dispatchInputEvents(select);
-        return;
+        return !displayValue || select.value !== '';
     }
 
     const textInput = field.querySelector('input[type="text"], input:not([type])');
     if (textInput) {
         textInput.value = displayValue;
         dispatchInputEvents(textInput);
+        return true;
     }
+    return false;
 }
 
 async function applyRepeatSlots(repeatSlots) {
@@ -258,8 +226,14 @@ async function applyRepeatSlots(repeatSlots) {
 
         for (const slot of importable) {
             const repeatEntry = findRepeatEntry(sectionId, slot.slot_num);
-            applyRepeatSlotChoice(repeatEntry, sectionId, slot.slot_num, slot);
-            count += 1;
+            const applied = await applyRepeatSlotChoice(repeatEntry, sectionId, slot.slot_num, slot);
+            if (applied) {
+                count += 1;
+            } else if (slot.display_value) {
+                warnings.push(
+                    `Could not select "${describeEmergencySlot(slot)}" for emergency operation slot ${slot.slot_num} — please select it manually.`
+                );
+            }
         }
     }
     return { count, warnings };
@@ -320,14 +294,20 @@ async function applyDynamicIndicators(dynamicEntries, repeatEntryMax = null) {
         }
         if (!block) {
             debugWarn(MODULE, `Dynamic indicator block not found for bank ${bankId}`);
+            warnings.push(`Could not find indicator ${bankId} on the form — its imported value was not applied.`);
             continue;
         }
 
-        applyFieldPayloadToBlock(block, {
+        const applied = applyFieldPayloadToBlock(block, {
             value: entry.value != null ? String(entry.value) : undefined,
             data_not_available: entry.data_not_available,
             disagg_data: entry.disagg_data,
         });
+        if (!applied) {
+            debugWarn(MODULE, `Failed to apply imported value for dynamic indicator ${bankId}`);
+            warnings.push(`Could not apply the imported value for indicator ${bankId} — please check it manually.`);
+            continue;
+        }
         count += 1;
     }
 
@@ -354,8 +334,10 @@ export async function applyUprExcelImportPayload(payload) {
 
     const warnings = [];
 
-    const staticCount = applyStaticFields(payload.fields);
-    const matrixCount = applyMatrices(payload.matrices);
+    const staticResult = applyStaticFields(payload.fields);
+    warnings.push(...(staticResult.warnings || []));
+    const matrixResult = applyMatrices(payload.matrices);
+    warnings.push(...(matrixResult.warnings || []));
 
     const repeatSectionId = (payload.repeat_slots || []).find((s) => s.repeat_section_id)?.repeat_section_id
         || null;
@@ -370,6 +352,8 @@ export async function applyUprExcelImportPayload(payload) {
     );
     warnings.push(...(dynamicResult.warnings || []));
 
+    const staticCount = staticResult.count || 0;
+    const matrixCount = matrixResult.count || 0;
     const repeatCount = repeatResult.count || 0;
     const dynamicCount = dynamicResult.count || 0;
     const applied = staticCount + matrixCount + repeatCount + dynamicCount;

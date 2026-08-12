@@ -1,4 +1,5 @@
 import { debugLog, debugWarn } from './debug.js';
+import { applyDisaggToBlock } from './disagg-dom-apply.js';
 
 const MODULE_NAME = 'ai-opinions';
 const AI_VALIDATION_SOURCES_STORAGE_KEY = 'ifrc_ai_validation_sources_v1';
@@ -295,64 +296,6 @@ function applyScalarToBlock(block, value) {
     }
 
     return false;
-}
-
-function applyDisaggToBlock(block, disaggData) {
-    if (!block || !disaggData || typeof disaggData !== 'object') return false;
-
-    // Matrix/plugin style payload: write hidden JSON field directly when present.
-    if (disaggData && !disaggData.mode && !disaggData.values) {
-        const itemId = String(block.getAttribute('data-item-id') || '').trim();
-        const hidden = itemId ? block.querySelector(`input[type="hidden"][name="field_value[${itemId}]"]`) : null;
-        if (hidden) {
-            hidden.value = JSON.stringify(disaggData);
-            dispatchInputEvents(hidden);
-            return true;
-        }
-    }
-
-    const sampleNamedInput = block.querySelector('input[name], textarea[name], select[name]');
-    const sampleName = sampleNamedInput ? String(sampleNamedInput.getAttribute('name') || '') : '';
-    const m = sampleName.match(/^(indicator|dynamic|question)_(\d+)_/);
-    if (!m) return false;
-    const base = `${m[1]}_${m[2]}`;
-    const mode = String(disaggData.mode || '').trim();
-    const values = (disaggData.values && typeof disaggData.values === 'object') ? disaggData.values : null;
-    if (!mode || !values) return false;
-
-    const modeRadio = block.querySelector(`input[type="radio"][name="${base}_reporting_mode"][value="${mode}"]:not([disabled])`);
-    if (modeRadio) {
-        modeRadio.checked = true;
-        dispatchInputEvents(modeRadio);
-    }
-
-    let appliedAny = false;
-    const trySetByName = (name, val) => {
-        const el = block.querySelector(`[name="${name}"]:not([disabled])`);
-        if (!el) return false;
-        if (el.tagName === 'SELECT') {
-            el.value = String(val ?? '');
-        } else {
-            el.value = String(val ?? '');
-        }
-        dispatchInputEvents(el);
-        return true;
-    };
-
-    if (Object.prototype.hasOwnProperty.call(values, 'total')) {
-        appliedAny = trySetByName(`${base}_total_value`, values.total) || appliedAny;
-    }
-    if (Object.prototype.hasOwnProperty.call(values, 'indirect')) {
-        appliedAny = trySetByName(`${base}_indirect_reach`, values.indirect) || appliedAny;
-    }
-
-    for (const [key, rawVal] of Object.entries(values)) {
-        if (key === 'total' || key === 'indirect') continue;
-        appliedAny = trySetByName(`${base}_${mode}_${key}`, rawVal) || appliedAny;
-        appliedAny = trySetByName(`${base}_${key}`, rawVal) || appliedAny;
-    }
-
-    return appliedAny;
 }
 
 function markSuggestionApplied(button) {

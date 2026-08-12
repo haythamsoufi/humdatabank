@@ -70,6 +70,7 @@ body.pb-pdf-export .pb-dashboard .line-chart-inner {
   height: auto !important;
   min-height: 0 !important;
   aspect-ratio: 481 / 110;
+  overflow: visible !important;
 }
 body.pb-pdf-export .pb-dashboard .line-chart-inner > svg,
 body.pb-pdf-export .pb-dashboard .line-chart-inner > .line-chart-img {

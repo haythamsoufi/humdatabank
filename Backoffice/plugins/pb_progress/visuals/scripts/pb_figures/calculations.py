@@ -348,22 +348,44 @@ def _format_percentage(value: float) -> str:
     return f"{round(pct):.0f}%"
 
 
+def _arabic_million_suffix(millions: float) -> str:
+    """Arabic plural form for the million count (see IFRC Arabic style guide).
+
+    Range rules apply to the whole-number part of the count so values like
+    10.8M use the 3–10 form (ملايين), not the 100+ fallback. Values of 100+
+    use مليون only when the count is a whole number (e.g. 100 مليون); fractional
+    counts keep مليونا (e.g. 219.3 مليونا).
+
+    | Range  | Form     | Example    |
+    |--------|----------|------------|
+    | 1      | مليون    | 1 مليون    |
+    | 2      | مليونان  | 2 مليونان  |
+    | 3–10   | ملايين   | 5 ملايين   |
+    | 11–99  | مليونا  | 25 مليونا  |
+    | 100+   | مليون    | 100 مليون  |
+    """
+    count = int(math.floor(millions + 1e-9))
+    has_fraction = abs(millions - count) > 1e-9
+    if count == 1:
+        return "مليون"
+    if count == 2:
+        return "مليونان"
+    if 3 <= count <= 10:
+        return "ملايين"
+    if 11 <= count <= 99:
+        return "مليونا"
+    if count >= 100 and not has_fraction:
+        return "مليون"
+    if count >= 11:
+        return "مليونا"
+    return "مليون"
+
+
 def _format_millions_arabic(value: float) -> str:
     """Tableau [Formatted] Arabic plural rules for values >= 1,000,000."""
     millions = round(value / 1_000_000, 1)
     num = f"{millions:g}"
-    if millions == 1:
-        suffix = "مليون"
-    elif millions == 2:
-        suffix = "مليونان"
-    elif 3 <= millions <= 10:
-        suffix = "ملايين"
-    elif 11 <= millions <= 99:
-        suffix = "مليونا"
-    else:
-        suffix = "مليون"
-    # Arabic suffix before the LTR number so RTL renderers join the word correctly.
-    return f"{suffix} {num}"
+    return f"{num} {_arabic_million_suffix(millions)}"
 
 
 def format_value(value: float | int | None, unit: str | None, language: str = "English") -> str | None:
@@ -403,7 +425,8 @@ def format_donut_value(value: float | int | None, unit: str | None, language: st
         return _format_under_million(float(value))
     if language == "Arabic":
         millions = round(float(value) / 1_000_000)
-        return f"مليون\n{millions}"
+        num = f"{millions:g}"
+        return f"{num}\n{_arabic_million_suffix(millions)}"
     return _format_millions_english(float(value))
 
 

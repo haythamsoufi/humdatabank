@@ -50,6 +50,13 @@ function lineSegments(coords) {
 const LABEL_ABOVE_OFFSET = 10;
 const LABEL_BELOW_OFFSET = 16;
 const MIN_LABEL_CLEARANCE_FROM_BOTTOM = 12;
+const LABEL_EDGE_THRESHOLD_PCT = 12;
+
+function valueLabelTextAnchor(xPct) {
+  if (xPct < LABEL_EDGE_THRESHOLD_PCT) return "start";
+  if (xPct > 100 - LABEL_EDGE_THRESHOLD_PCT) return "end";
+  return "middle";
+}
 
 function valueLabelY(cy, above, bottomY) {
   if (above) return cy - LABEL_ABOVE_OFFSET;
@@ -60,7 +67,12 @@ function valueLabelY(cy, above, bottomY) {
   return belowY;
 }
 
-function targetLabelLayout(values, valueLabels, annualTarget, annualTargetLabel, width, padL, padR, chartH) {
+function plotIndex(i, n, rtl) {
+  if (n <= 0) return i;
+  return rtl ? n - 1 - i : i;
+}
+
+function targetLabelLayout(values, valueLabels, annualTarget, annualTargetLabel, width, padL, padR, chartH, rtl) {
   if (!annualTarget) return { tagBelow: false, valueAbove: false, valueBelow: false };
 
   const numeric = values.filter(hasValue);
@@ -71,7 +83,7 @@ function targetLabelLayout(values, valueLabels, annualTarget, annualTargetLabel,
   const yScale = v => padT + (chartH - padT - padB) * (1 - v / yMax);
   const w = width - padL - padR;
   const xStep = n > 1 ? w / (n - 1) : 0;
-  const xAt = i => ((padL + i * xStep) / width) * 100;
+  const xAt = i => ((padL + plotIndex(i, n, rtl) * xStep) / width) * 100;
   const ty = yScale(annualTarget);
 
   let tagBelow = false;
@@ -123,6 +135,7 @@ function renderLineChart(item, width, targetLabel, chartId, effects, options) {
   const opts = options || {};
   const showValueLabels = opts.showValueLabels !== false;
   const showTargetLabels = opts.showTargetLabels !== false;
+  const rtl = opts.rtl === true;
 
   const values = item.values;
   const h = 110;
@@ -137,7 +150,7 @@ function renderLineChart(item, width, targetLabel, chartId, effects, options) {
   const n = values.length;
   const xStep = n > 1 ? w / (n - 1) : 0;
   const yScale = v => padT + (h - padT - padB) * (1 - v / yMax);
-  const xAt = i => padL + i * xStep;
+  const xAt = i => padL + plotIndex(i, n, rtl) * xStep;
   const bottomY = padT + (h - padT - padB);
   const uid = String(chartId || "line0").replace(/[^a-zA-Z0-9_-]/g, "");
 
@@ -182,6 +195,7 @@ function renderLineChart(item, width, targetLabel, chartId, effects, options) {
       padL,
       padR,
       h,
+      rtl,
     );
     const targetStroke = isModern
       ? `stroke="${COLORS.target}" stroke-width="1.5" stroke-dasharray="4 3"`
@@ -190,7 +204,9 @@ function renderLineChart(item, width, targetLabel, chartId, effects, options) {
     if (showTargetLabels && targetLabel) {
       const tagY = layout.tagBelow ? ty + 4 : ty - 5;
       const tagBaseline = layout.tagBelow ? "hanging" : "auto";
-      svg += `<text x="${padL + 4}" y="${tagY}" fill="${COLORS.target}" font-size="9" font-weight="700" dominant-baseline="${tagBaseline}">${esc(targetLabel)}</text>`;
+      const tagX = rtl ? padL + w - 4 : padL + 4;
+      const tagAnchor = rtl ? "end" : "start";
+      svg += `<text x="${tagX}" y="${tagY}" fill="${COLORS.target}" font-size="9" font-weight="700" text-anchor="${tagAnchor}" dominant-baseline="${tagBaseline}">${esc(targetLabel)}</text>`;
     }
     if (showTargetLabels && item.annual_target_label) {
       let valueY = ty;
@@ -202,7 +218,8 @@ function renderLineChart(item, width, targetLabel, chartId, effects, options) {
         valueY = ty + 4;
         valueBaseline = "hanging";
       }
-      svg += `<text x="${padL + w + 6}" y="${valueY}" fill="${COLORS.target}" font-size="10" font-weight="700" dominant-baseline="${valueBaseline}">${esc(item.annual_target_label)}</text>`;
+      const valueX = rtl ? padL + 6 : padL + w + 6;
+      svg += `<text x="${valueX}" y="${valueY}" fill="${COLORS.target}" font-size="10" font-weight="700" dominant-baseline="${valueBaseline}">${esc(item.annual_target_label)}</text>`;
     }
   }
 
@@ -247,7 +264,9 @@ function renderLineChart(item, width, targetLabel, chartId, effects, options) {
       above = v > item.annual_target;
     }
     const ly = valueLabelY(cy, above, bottomY);
-    svg += `<text x="${cx}" y="${ly}" text-anchor="middle" fill="${COLORS.value}" font-size="10" font-weight="700">${esc(label)}</text>`;
+    const xPct = (cx / width) * 100;
+    const anchor = valueLabelTextAnchor(xPct);
+    svg += `<text x="${cx}" y="${ly}" text-anchor="${anchor}" fill="${COLORS.value}" font-size="10" font-weight="700">${esc(label)}</text>`;
   });
 
   svg += "</svg>";

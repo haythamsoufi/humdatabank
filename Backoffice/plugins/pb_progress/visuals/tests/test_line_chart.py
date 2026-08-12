@@ -15,6 +15,9 @@ from pb_figures.line_chart import (  # noqa: E402
     render_line_chart_svg,
     target_label_layout,
     value_label_above,
+    value_label_transform,
+    x_label_transform,
+    x_percent,
     y_scale,
 )
 
@@ -67,6 +70,50 @@ class LineChartNullValueTests(unittest.TestCase):
         self.assertIn('direction="rtl"', svg)
         self.assertIn("unicode-bidi", svg)
         ET.fromstring(svg)
+
+    def test_x_percent_reverses_axis_for_arabic(self) -> None:
+        from pb_figures.line_chart import plot_index, x_percent
+
+        width = 481
+        n = 5
+        ltr_first = x_percent(0, n, width, language="English")
+        ltr_last = x_percent(n - 1, n, width, language="English")
+        rtl_first = x_percent(0, n, width, language="Arabic")
+        rtl_last = x_percent(n - 1, n, width, language="Arabic")
+
+        self.assertAlmostEqual(ltr_first, rtl_last)
+        self.assertAlmostEqual(ltr_last, rtl_first)
+        self.assertEqual(plot_index(0, n, "Arabic"), n - 1)
+        self.assertEqual(plot_index(n - 1, n, "Arabic"), 0)
+
+    def test_render_line_chart_svg_arabic_places_first_point_on_right(self) -> None:
+        item = {
+            "values": [100.0, 200.0, 300.0],
+            "value_labels": ["100", "200", "300"],
+        }
+        svg_ltr = render_line_chart_svg(item, 481, chart_id="ltr", language="English")
+        svg_rtl = render_line_chart_svg(item, 481, chart_id="rtl", language="Arabic")
+
+        def first_circle_x(svg: str) -> float:
+            import re
+
+            match = re.search(r'<circle cx="([\d.]+)"', svg)
+            self.assertIsNotNone(match)
+            return float(match.group(1))
+
+        self.assertGreater(first_circle_x(svg_rtl), first_circle_x(svg_ltr))
+
+    def test_value_label_transform_anchors_at_chart_edges(self) -> None:
+        # Arabic RTL: index 0 plots on the right, last index on the left.
+        left_x = x_percent(4, 5, 481, language="Arabic")
+        right_x = x_percent(0, 5, 481, language="Arabic")
+        mid_x = x_percent(2, 5, 481, language="Arabic")
+
+        self.assertIn("translateX(0)", x_label_transform(left_x))
+        self.assertIn("translateX(-100%)", x_label_transform(right_x))
+        self.assertIn("translateX(-50%)", x_label_transform(mid_x))
+        self.assertIn("translate(0, -100%)", value_label_transform(left_x, above=True))
+        self.assertIn("translate(-100%, -100%)", value_label_transform(right_x, above=True))
 
     def test_render_line_chart_svg_is_valid_xml(self) -> None:
         item = {

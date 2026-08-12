@@ -201,8 +201,7 @@ if (DATA.type === "line") {
 
     LINE_CHART_EFFECTS,
 
-    DATA.chart_options || {},
-
+    { ...(DATA.chart_options || {}), rtl: DATA.language === "Arabic" },
   );
 
 } else {

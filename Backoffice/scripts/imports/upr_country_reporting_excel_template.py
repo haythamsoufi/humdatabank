@@ -199,9 +199,18 @@ WORKBOOK_NORM_HEADER_TO_KEY: Dict[str, str] = {
 }
 
 # Excel SP/EF labels that differ from published T33 section names.
+# Keys/values are compared AFTER _normalize_section_name's own whitespace and
+# hyphen normalization, so write them with single spaces and no hyphens.
 SECTION_ALIASES: Dict[str, str] = {
     "cross-cutting": "cross cutting",
     "cross cutting": "cross cutting",
+    # Observed real-world case: the Emergency Appeal indicator tables use
+    # "Response - Crises and Disasters" while the indicator_bank.area_label
+    # and Overall Action tables use "Response - Disasters and crises" for the
+    # exact same Strategic Priority. Without this alias, a blank-ID emergency
+    # row for this SP could never fuzzy-match by name (the section check
+    # would reject even a perfect indicator-name match).
+    "response crises and disasters": "response disasters and crises",
 }
 
 
@@ -527,17 +536,73 @@ def _resolve_workbook_indicator_bank_id(
     row: Dict[str, Any],
     kpi_lookup: Optional[Dict[Tuple[str, str], int]] = None,
 ) -> Optional[int]:
+    """Resolve a row's indicator bank id, falling back to fuzzy name matching
+    when the workbook's ID cell is blank (e.g. a row was pasted without its ID).
+
+    Picks the BEST-scoring candidate across the whole section rather than the
+    first one that merely clears the threshold — with a loose 0.60 ratio and
+    humanitarian indicator labels that are often near-duplicates of each other
+    ("Number of people reached with X" vs "...with X and Y"), returning the
+    first hit could silently attribute a row's value to the wrong indicator.
+    """
     bank_id = row.get("bank_id")
     if bank_id:
         return int(bank_id)
     if not kpi_lookup:
         return None
+    best_bid: Optional[int] = None
+    best_score = 0.0
     for (sp, ind), bid in kpi_lookup.items():
         if not _section_names_match(row["sp_ef"], sp):
             continue
-        if _indicator_similarity(row["indicator"], ind) >= INDICATOR_MATCH_THRESHOLD:
-            return int(bid)
+        score = _indicator_similarity(row["indicator"], ind)
+        if score > best_score:
+            best_score = score
+            best_bid = int(bid)
+    if best_bid is not None and best_score >= INDICATOR_MATCH_THRESHOLD:
+        return best_bid
     return None
+
+
+def _bank_id_row_integrity_warning(
+    row: Dict[str, Any],
+    bank_id: int,
+    kpi_display: Optional[Dict[int, Tuple[str, str]]],
+    *,
+    context_label: str = "",
+) -> Optional[str]:
+    """Detect a row whose explicit ID cell doesn't match its own indicator
+    text — e.g. a user dragged/copy-pasted a value into another row without
+    its ID cell moving with it, or swapped two IDs while reordering rows.
+
+    Unlike the blank-ID fuzzy fallback, this never changes which bank id is
+    used for import (the workbook's stated ID always wins) — it only flags
+    the row so a reviewer can catch a silent mismatch before it's saved.
+
+    Only the indicator NAME is compared against the master KPI list, not the
+    SP/EF section: the same indicator can legitimately be listed under a
+    different (often cross-cutting) SP/EF grouping in the reporting tables
+    than its single canonical entry in the master list, so comparing section
+    names produces false positives on perfectly valid, untouched rows.
+    """
+    if not kpi_display:
+        return None
+    expected = kpi_display.get(int(bank_id))
+    if not expected:
+        return None
+    _expected_sp_ef, expected_indicator = expected
+    indicator = str(row.get("indicator") or "").strip()
+    if not indicator:
+        return None
+    if _indicator_similarity(indicator, expected_indicator) >= INDICATOR_MATCH_THRESHOLD:
+        return None
+    sp_ef = str(row.get("sp_ef") or "").strip()
+    suffix = f" ({context_label})" if context_label else ""
+    return (
+        f"Row ID {bank_id} in {sp_ef!r} is labeled {indicator!r}, but that ID belongs to "
+        f"{expected_indicator!r} in the master KPI list{suffix} — this row's ID may have "
+        f"been moved, copied, or swapped in Excel. Please verify before saving."
+    )
 
 
 def _workbook_yes_no_value(applicable_text: str) -> str:
@@ -905,10 +970,45 @@ def period_to_workbook_version(period_name: str) -> str:
     return "MYR26.V1.0"
 
 
+def _load_live_indicator_bank_catalog() -> List[Tuple[int, str, str]]:
+    """Fetch (id, area_label, name) for every row in the live indicator_bank table.
+
+    The workbook's "Indicators list / Final" table is a curated, easily-stale
+    subset (observed to cover as little as ~1% of the ids actually used by the
+    Overall Action / Emergency Appeal tables in a real template) — it is NOT a
+    complete catalog of every indicator bank id in use. The live table is the
+    only source that reliably covers every id a row might reference, so it is
+    the authoritative source both for verifying "does this id really mean what
+    this row's text says it means" and for resolving rows whose ID cell was
+    left blank.
+    """
+    from app.extensions import db
+    from app.models.indicator_bank import IndicatorBank
+
+    return list(
+        db.session.query(IndicatorBank.id, IndicatorBank.area_label, IndicatorBank.name).all()
+    )
+
+
 def build_kpi_lookup(wb) -> Dict[Tuple[str, str], int]:
-    """Build (normalized_sp_ef, normalized_indicator_name) -> bank_id from Final table."""
-    _, rows = read_named_table(wb, "Indicators list", "Final")
+    """Build (normalized_sp_ef, normalized_indicator_name) -> bank_id.
+
+    Combines the live indicator_bank table (authoritative and complete) with
+    the workbook's own "Indicators list / Final" table, which can additionally
+    carry legacy (sp_ef, name) phrasings the live table no longer has (e.g. if
+    an indicator was since renamed) but that may still appear in older rows.
+    """
     lookup: Dict[Tuple[str, str], int] = {}
+    try:
+        for bank_id, area_label, name in _load_live_indicator_bank_catalog():
+            sp_ef = _normalize_text(area_label)
+            indicator = _normalize_text(name)
+            if sp_ef and indicator:
+                lookup[(sp_ef, indicator)] = int(bank_id)
+    except Exception:
+        logger.exception("Failed to load live indicator_bank catalog for kpi_lookup")
+
+    _, rows = read_named_table(wb, "Indicators list", "Final")
     for row in rows:
         bank_raw = row.get("KPI ID")
         if bank_raw is None:
@@ -920,14 +1020,34 @@ def build_kpi_lookup(wb) -> Dict[Tuple[str, str], int]:
         sp_ef = _normalize_text(row.get("SP/EF"))
         indicator = _normalize_text(row.get("Indicator Name"))
         if sp_ef and indicator:
-            lookup[(sp_ef, indicator)] = bank_id
+            lookup.setdefault((sp_ef, indicator), bank_id)
     return lookup
 
 
-def _build_kpi_display_map(wb) -> Dict[int, Tuple[str, str]]:
-    """Map indicator bank id -> (SP/EF display label, indicator display label)."""
-    _, rows = read_named_table(wb, "Indicators list", "Final")
+def _build_live_indicator_bank_display_map() -> Dict[int, Tuple[str, str]]:
+    """Map indicator_bank.id -> (area_label, name) straight from the database."""
     out: Dict[int, Tuple[str, str]] = {}
+    for bank_id, area_label, name in _load_live_indicator_bank_catalog():
+        name = str(name or "").strip()
+        if name:
+            out[int(bank_id)] = (str(area_label or "").strip(), name)
+    return out
+
+
+def _build_kpi_display_map(wb) -> Dict[int, Tuple[str, str]]:
+    """Map indicator bank id -> (SP/EF display label, indicator display label).
+
+    Prefers the live ``indicator_bank`` table (authoritative and complete) and
+    falls back to the workbook's own "Indicators list / Final" table only for
+    ids the database lookup didn't return (e.g. DB unavailable, or an id that
+    has since been hard-deleted) so a display label can still be shown.
+    """
+    out: Dict[int, Tuple[str, str]] = {}
+    try:
+        out.update(_build_live_indicator_bank_display_map())
+    except Exception:
+        logger.exception("Failed to load live indicator_bank display map; falling back to workbook Final table")
+    _, rows = read_named_table(wb, "Indicators list", "Final")
     for row in rows:
         bank_raw = row.get("KPI ID")
         if bank_raw is None:
@@ -935,6 +1055,8 @@ def _build_kpi_display_map(wb) -> Dict[int, Tuple[str, str]]:
         try:
             bank_id = int(bank_raw)
         except (ValueError, TypeError):
+            continue
+        if bank_id in out:
             continue
         sp_ef = str(row.get("SP/EF") or "").strip()
         indicator = str(row.get("Indicator Name") or "").strip()
@@ -972,7 +1094,7 @@ def _load_items_by_section_label(template_id: int, version_id: Optional[int] = N
 
 
 def _normalize_section_name(value: Any) -> str:
-    text = _normalize_text(value).replace("-", " ")
+    text = re.sub(r"\s+", " ", _normalize_text(value).replace("-", " ")).strip()
     return SECTION_ALIASES.get(text, text)
 
 
@@ -986,6 +1108,24 @@ def _section_names_match(left: str, right: str) -> bool:
     return a == b or a.startswith(b) or b.startswith(a)
 
 
+# Ultra-generic connector words shared by dozens of otherwise-unrelated KPI
+# indicator sentences (e.g. "Number of people reached with X" / "...with Y").
+# Excluded when comparing "content" words so two indicators that only share
+# boilerplate phrasing don't look similar just because of it.
+_INDICATOR_STOPWORDS = frozenset(
+    {
+        "a", "an", "and", "are", "as", "at", "by", "for", "from", "has",
+        "have", "in", "is", "national", "no", "not", "of", "on", "or",
+        "over", "people", "percentage", "number", "society", "that", "the",
+        "their", "this", "through", "to", "who", "with", "within",
+    }
+)
+
+
+def _indicator_content_words(text: str) -> Set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", text) if w not in _INDICATOR_STOPWORDS and len(w) > 2}
+
+
 def _indicator_similarity(excel_indicator: str, form_label: str) -> float:
     a = _normalize_indicator_label(excel_indicator)
     b = _normalize_indicator_label(form_label)
@@ -994,11 +1134,28 @@ def _indicator_similarity(excel_indicator: str, form_label: str) -> float:
     if a == b:
         return 1.0
     short, long = (a, b) if len(a) <= len(b) else (b, a)
-    if len(short) >= 25 and long.startswith(short[:25]):
-        return 0.9
+    # A genuine truncation/abbreviation has the ENTIRE shorter label appear as a
+    # prefix/substring of the longer one. Do NOT shortcut on just the first N
+    # characters matching — many distinct KPI indicators in the master list share
+    # a long common opening phrase (e.g. "Number of people reached with ...",
+    # "Number of national society ...") and then diverge completely, so a
+    # fixed-length prefix check previously scored totally different indicators
+    # as 0.9 "similar", risking silent mismatches for blank-ID rows.
     if short in long or long in short:
         return 0.8
-    return SequenceMatcher(None, a, b).ratio()
+    char_ratio = SequenceMatcher(None, a, b).ratio()
+    # Character-level ratio alone is fooled by shared boilerplate: e.g. "Number
+    # of people reached with long-term services and programmes" vs "...with
+    # emergency response and early recovery programmes" scores ~0.72 despite
+    # describing opposite ends of the humanitarian response spectrum, because
+    # most of each sentence is the same generic carrier phrase. Require the
+    # DISTINCTIVE (non-boilerplate) words to also overlap meaningfully before
+    # trusting a high character ratio.
+    a_words, b_words = _indicator_content_words(a), _indicator_content_words(b)
+    if a_words or b_words:
+        word_overlap = len(a_words & b_words) / len(a_words | b_words) if (a_words and b_words) else 0.0
+        return min(char_ratio, word_overlap * 1.5 + 0.15) if word_overlap < 1.0 else char_ratio
+    return char_ratio
 
 
 def _indicator_names_match(excel_indicator: str, form_label: str) -> bool:
@@ -2190,6 +2347,7 @@ def _collect_workbook_dynamic_indicator_entries(
     ea_dynamic = section_ids.get("ea_dynamic")
     other_dynamic = section_ids.get("other_dynamic")
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
+    kpi_display = _build_kpi_display_map(wb)
     entries: List[Dict[str, Any]] = []
     order = 0.0
 
@@ -2209,6 +2367,16 @@ def _collect_workbook_dynamic_indicator_entries(
                 f"No indicator bank id for emergency indicator {row['indicator']!r} ({row['sp_ef']!r})"
             )
             continue
+        if not row.get("bank_id"):
+            ctx.warnings.append(
+                f"Emergency indicator {row['indicator']!r} ({row['sp_ef']!r}) had no ID in the "
+                f"workbook — matched by name instead. Please verify this row wasn't moved, "
+                f"copy-pasted, or edited in Excel."
+            )
+        else:
+            integrity_warning = _bank_id_row_integrity_warning(row, bank_id, kpi_display)
+            if integrity_warning:
+                ctx.warnings.append(integrity_warning)
         slot_num = next(
             (num for sheet, table, num, *_rest in EMERGENCY_SLOTS if sheet == row["sheet_name"]),
             None,
@@ -2257,6 +2425,16 @@ def _collect_workbook_dynamic_indicator_entries(
                 bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
                 if not bank_id:
                     continue
+                if not row.get("bank_id"):
+                    ctx.warnings.append(
+                        f"Indicator {row['indicator']!r} ({row['sp_ef']!r}) had no ID in the "
+                        f"workbook — matched by name instead. Please verify this row wasn't "
+                        f"moved, copy-pasted, or edited in Excel."
+                    )
+                else:
+                    integrity_warning = _bank_id_row_integrity_warning(row, bank_id, kpi_display)
+                    if integrity_warning:
+                        ctx.warnings.append(integrity_warning)
                 value, is_dna, disagg, should_import = _resolve_indicator_import_value(
                     row, bank_id, yes_no_bank_ids
                 )
@@ -2827,6 +3005,7 @@ def transform_upr_country_reporting_to_import_rows(
     sp_breakdown_item = reporting_special_item(ctx, "sp_breakdown") or ITEM_REPORTING_COUNTRY_SP_BREAKDOWN
     support_item = reporting_special_item(ctx, "support") or ITEM_REPORTING_COUNTRY_SUPPORT
     kpi_lookup = build_kpi_lookup(wb)
+    kpi_display = _build_kpi_display_map(wb)
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
     section_label_map = _load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID)
 
@@ -2856,6 +3035,18 @@ def transform_upr_country_reporting_to_import_rows(
     # Indicators (Overall Action tables only — emergency tables use dynamic import).
     for row in parse_indicators(wb, yes_no_bank_ids=yes_no_bank_ids, kpi_lookup=kpi_lookup):
         bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
+        if bank_id and not row.get("bank_id"):
+            ctx.warnings.append(
+                f"Row for {row['indicator']!r} in {row['sp_ef']!r} had no ID in the workbook — "
+                f"matched by name instead ({iso3}). Please verify this row wasn't moved, "
+                f"copy-pasted, or edited in Excel."
+            )
+        elif bank_id and row.get("bank_id"):
+            integrity_warning = _bank_id_row_integrity_warning(
+                row, bank_id, kpi_display, context_label=iso3
+            )
+            if integrity_warning:
+                ctx.warnings.append(integrity_warning)
         if bank_id:
             item_id = _resolve_item_for_workbook_indicator(ctx, bank_id, row["sp_ef"])
         else:
@@ -3056,11 +3247,15 @@ def run_upr_country_reporting_import(
 
         ctx = build_import_context([REPORTING_COUNTRY_TEMPLATE_ID])
         import_rows = transform_upr_country_reporting_to_import_rows(aes_id, wb, ctx, iso3=iso3, period=period)
-        stats["warnings"].extend(ctx.warnings)
-        stats["warnings"] = dedupe_upr_import_warnings(stats["warnings"])
         stats["transformed"] = len(import_rows)
 
         if not persist:
+            # NOTE: build_upr_country_reporting_client_payload (via
+            # _collect_workbook_dynamic_indicator_entries) appends more entries
+            # to ctx.warnings — snapshot stats["warnings"] from ctx AFTER this
+            # call, not before, or dynamic/emergency-indicator warnings (e.g.
+            # "no indicator bank id", fuzzy-name-match notices) are silently
+            # dropped from the response even though they were generated.
             payload = build_upr_country_reporting_client_payload(
                 aes_id,
                 wb,
@@ -3069,6 +3264,8 @@ def run_upr_country_reporting_import(
                 iso3=iso3,
                 period=period,
             )
+            stats["warnings"].extend(ctx.warnings)
+            stats["warnings"] = dedupe_upr_import_warnings(stats["warnings"])
             field_count = len(payload.get("fields") or {})
             matrix_count = len(payload.get("matrices") or {})
             dynamic_count = len(payload.get("dynamic_indicators") or [])
@@ -3120,7 +3317,12 @@ def run_upr_country_reporting_import(
             )
         upsert_stats["success"] = upsert_stats.get("errors", 0) == 0
         upsert_stats["updated_count"] = upsert_stats.get("inserted", 0) + upsert_stats.get("updated", 0)
-        upsert_stats["warnings"] = stats["warnings"]
+        # Snapshot ctx.warnings only now — _import_dynamic_indicators_from_workbook
+        # (via _collect_workbook_dynamic_indicator_entries) appends to it above,
+        # and doing this earlier would silently drop those warnings (see the
+        # matching note in the stage-only branch).
+        stats["warnings"].extend(ctx.warnings)
+        upsert_stats["warnings"] = dedupe_upr_import_warnings(stats["warnings"])
         upsert_stats["transformed"] = len(import_rows)
         wb.close()
         return upsert_stats

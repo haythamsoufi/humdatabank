@@ -1133,7 +1133,7 @@ class MatrixHandler {
      */
     setMatrixData(fieldId, data) {
         const matrix = this.matrices.get(fieldId);
-        if (!matrix) return;
+        if (!matrix) return false;
 
         matrix.data = data;
 
@@ -1172,6 +1172,7 @@ class MatrixHandler {
         }
 
         debugLog(`MatrixHandler: Set data for matrix ${fieldId}`, matrix.data);
+        return true;
     }
 
     /**

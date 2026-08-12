@@ -35,6 +35,7 @@ from app.services.organization.entity_service import EntityService
 from app.utils.api_helpers import json_response, api_error, PAST_ASSIGNMENT_DAYS, get_json_safe
 from app.utils.dashboard_focal_points import get_focal_points_for_country
 from app.utils.request_validation import enforce_csrf_json
+from app.routes.main.helpers import DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
 from app import db
 
 
@@ -695,6 +696,9 @@ def get_dashboard():
                         EntityActivityLog.entity_type == selected_entity_type,
                         EntityActivityLog.entity_id == selected_entity_id,
                         EntityActivityLog.assignment_id.in_(aes_ids),
+                        EntityActivityLog.activity_type.notin_(
+                            DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+                        ),
                     )
                     .group_by(EntityActivityLog.assignment_id)
                 ).subquery()
@@ -735,6 +739,9 @@ def get_dashboard():
                         EntityActivityLog.entity_id == selected_entity_id,
                         EntityActivityLog.assignment_id.in_(aes_ids),
                         EntityActivityLog.user_id.isnot(None),
+                        EntityActivityLog.activity_type.notin_(
+                            DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+                        ),
                     )
                     .group_by(EntityActivityLog.assignment_id, EntityActivityLog.user_id)
                     .all()

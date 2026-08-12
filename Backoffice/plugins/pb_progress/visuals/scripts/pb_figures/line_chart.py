@@ -26,6 +26,8 @@ LABEL_ABOVE_OFFSET = 10
 LABEL_BELOW_OFFSET = 16
 MIN_LABEL_CLEARANCE_FROM_BOTTOM = 12
 
+LABEL_EDGE_THRESHOLD_PCT = 12.0
+
 LINE_CHART_JS_PATH = Path(__file__).parent / "templates" / "line_chart.js"
 _LINE_CHART_JS_PLACEHOLDER = "__LINE_CHART_JS__"
 
@@ -68,20 +70,20 @@ def _svg_chart_text(
         return ""
 
     if is_rtl(language):
-        match = _ARABIC_MILLIONS_WORD_FIRST.match(text)
-        if not match:
-            match_num_first = _ARABIC_MILLIONS_NUM_FIRST.match(text)
-            if match_num_first:
-                num, word = match_num_first.group(1), match_num_first.group(2).strip()
+        match = _ARABIC_MILLIONS_NUM_FIRST.match(text)
+        if match:
+            num, word = match.group(1), match.group(2).strip()
+        else:
+            match_word_first = _ARABIC_MILLIONS_WORD_FIRST.match(text)
+            if match_word_first:
+                word, num = match_word_first.group(1).strip(), match_word_first.group(2)
             else:
                 num, word = None, text
-        else:
-            word, num = match.group(1).strip(), match.group(2)
 
         if num:
             inner = (
-                f'<tspan>{html.escape(word)} </tspan>'
                 f'<tspan direction="ltr" unicode-bidi="embed">{html.escape(num)}</tspan>'
+                f'<tspan> {html.escape(word)}</tspan>'
             )
         else:
             inner = html.escape(word)
@@ -119,10 +121,47 @@ def y_scale(
     return y_px, y_max
 
 
-def x_percent(index: int, count: int, width: int) -> float:
+def x_label_transform(x_pct: float) -> str:
+    """CSS transform for x-axis table cells — avoid clipping at chart edges."""
+    if x_pct < LABEL_EDGE_THRESHOLD_PCT:
+        return "translateX(0)"
+    if x_pct > 100 - LABEL_EDGE_THRESHOLD_PCT:
+        return "translateX(-100%)"
+    return "translateX(-50%)"
+
+
+def value_label_transform(x_pct: float, *, above: bool) -> str:
+    """CSS transform for HTML chart value overlays."""
+    if x_pct < LABEL_EDGE_THRESHOLD_PCT:
+        return "translate(0, -100%)" if above else "translateX(0)"
+    if x_pct > 100 - LABEL_EDGE_THRESHOLD_PCT:
+        return "translate(-100%, -100%)" if above else "translateX(-100%)"
+    return "translate(-50%, -100%)" if above else "translateX(-50%)"
+
+
+def value_label_text_anchor(x_pct: float) -> str:
+    """SVG text-anchor for value labels near the left/right chart edge."""
+    if x_pct < LABEL_EDGE_THRESHOLD_PCT:
+        return "start"
+    if x_pct > 100 - LABEL_EDGE_THRESHOLD_PCT:
+        return "end"
+    return "middle"
+
+
+def plot_index(index: int, count: int, language: str = "English") -> int:
+    """Map data index to plot x-order (earliest year on the right for RTL)."""
+    if count <= 0:
+        return index
+    if is_rtl(language):
+        return count - 1 - index
+    return index
+
+
+def x_percent(index: int, count: int, width: int, *, language: str = "English") -> float:
+    plot_i = plot_index(index, count, language)
     w = width - CHART_PAD_L - CHART_PAD_R
     step = w / (count - 1) if count > 1 else 0
-    x = CHART_PAD_L + index * step
+    x = CHART_PAD_L + plot_i * step
     return (x / width) * 100
 
 
@@ -190,6 +229,7 @@ def target_label_layout(
     chart_width: int,
     *,
     height: int = CHART_HEIGHT,
+    language: str = "English",
 ) -> dict[str, bool]:
     """Return placement hints to reduce overlap between target and value labels."""
     if annual_target is None:
@@ -206,7 +246,7 @@ def target_label_layout(
     for i, val in enumerate(values):
         if not value_labels[i] or val is None:
             continue
-        if x_percent(i, n, chart_width) > 30:
+        if x_percent(i, n, chart_width, language=language) > 30:
             continue
         ly, _ = _value_label_y_px(i, val, values, annual_target, y_max, height=height)
         if not (tag_bottom < ly - 10 or tag_top > ly):
@@ -218,7 +258,7 @@ def target_label_layout(
     for i, val in enumerate(values):
         if not value_labels[i] or val is None:
             continue
-        if x_percent(i, n, chart_width) < 65:
+        if x_percent(i, n, chart_width, language=language) < 65:
             continue
         ly, above = _value_label_y_px(i, val, values, annual_target, y_max, height=height)
         if abs(val - annual_target) < y_max * 0.08:
@@ -290,7 +330,7 @@ def render_line_chart_svg(
     x_step = plot_w / (count - 1) if count > 1 else 0
 
     def x_at(index: int) -> float:
-        return pad_l + index * x_step
+        return pad_l + plot_index(index, count, language) * x_step
 
     def y_at(value: float) -> float:
         return pad_t + (height - pad_t - pad_b) * (1 - value / y_max)
@@ -322,6 +362,7 @@ def render_line_chart_svg(
         item.get("annual_target_label"),
         width,
         height=height,
+        language=language,
     )
 
     if fx.get("area_fill") or fx.get("line_shadow"):
@@ -363,15 +404,21 @@ def render_line_chart_svg(
         if show_target_labels and target_label:
             tag_y = ty + 4 * v_scale if label_layout["tag_below"] else ty - 5 * v_scale
             tag_baseline = "hanging" if label_layout["tag_below"] else "auto"
+            if is_rtl(language):
+                tag_x = pad_l + plot_w - 4
+                tag_anchor = "end"
+            else:
+                tag_x = pad_l + 4
+                tag_anchor = "start"
             parts.append(
                 _svg_chart_text(
                     target_label,
-                    x=pad_l + 4,
+                    x=tag_x,
                     y=tag_y,
                     language=language,
                     fill=COLOR_TARGET,
                     font_size=target_tag_font,
-                    text_anchor="start",
+                    text_anchor=tag_anchor,
                     dominant_baseline=tag_baseline,
                 )
             )
@@ -384,15 +431,21 @@ def render_line_chart_svg(
             elif label_layout["value_below"]:
                 value_y = ty + 4 * v_scale
                 value_baseline = "hanging"
+            if is_rtl(language):
+                value_x = pad_l + 6
+                value_anchor = "start"
+            else:
+                value_x = pad_l + plot_w + 6
+                value_anchor = "start"
             parts.append(
                 _svg_chart_text(
                     str(item["annual_target_label"]),
-                    x=pad_l + plot_w + 6,
+                    x=value_x,
                     y=value_y,
                     language=language,
                     fill=COLOR_TARGET,
                     font_size=target_value_font,
-                    text_anchor="start",
+                    text_anchor=value_anchor,
                     dominant_baseline=value_baseline,
                 )
             )
@@ -449,6 +502,7 @@ def render_line_chart_svg(
                     marker_r=marker_r,
                     font_size=value_font,
                 )
+                x_pct = x_percent(i, count, width, language=language)
                 parts.append(
                     _svg_chart_text(
                         str(label),
@@ -457,6 +511,7 @@ def render_line_chart_svg(
                         language=language,
                         fill=COLOR_VALUE,
                         font_size=value_font,
+                        text_anchor=value_label_text_anchor(x_pct),
                         dominant_baseline="auto" if above else "hanging",
                     )
                 )

@@ -381,6 +381,7 @@ $font-family-arabic: "Tajawal", "Segoe UI", system-ui, sans-serif;
     height: auto;
     min-height: 0;
     aspect-ratio: 481 / 110;
+    overflow: visible;
   }
 
   .pb-dashboard .line-chart-inner > svg,
@@ -622,7 +623,7 @@ html.pb-report-arabic #quarto-margin-sidebar {
 .pb-dashboard .line-chart-wrap {
   padding-left: 12px;
   min-height: 110px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pb-dashboard .line-chart-inner {
@@ -631,7 +632,7 @@ html.pb-report-arabic #quarto-margin-sidebar {
   max-width: 481px;
   height: 110px;
   min-height: 110px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .pb-dashboard .line-chart-inner > svg,

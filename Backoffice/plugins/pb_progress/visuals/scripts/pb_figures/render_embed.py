@@ -17,6 +17,8 @@ from .line_chart import (
     _value_label_y_px,
     render_line_chart_svg,
     target_label_layout,
+    value_label_transform,
+    x_label_transform,
     x_percent,
     y_scale,
 )
@@ -39,19 +41,19 @@ def _chart_label_html(label: str, *, language: str) -> str:
     if not is_rtl(language):
         return html.escape(text)
 
-    match = _ARABIC_MILLIONS_WORD_FIRST.match(text)
-    if not match:
-        num_first = _ARABIC_MILLIONS_NUM_FIRST.match(text)
-        if num_first:
-            num, word = num_first.group(1), num_first.group(2).strip()
+    match = _ARABIC_MILLIONS_NUM_FIRST.match(text)
+    if match:
+        num, word = match.group(1), match.group(2).strip()
+    else:
+        word_first = _ARABIC_MILLIONS_WORD_FIRST.match(text)
+        if word_first:
+            word, num = word_first.group(1).strip(), word_first.group(2)
         else:
             return f'<span dir="rtl">{html.escape(text)}</span>'
-    else:
-        word, num = match.group(1).strip(), match.group(2)
 
     return (
         f'<span dir="rtl">'
-        f"{html.escape(word)} <bdi dir=\"ltr\">{html.escape(num)}</bdi>"
+        f'<bdi dir="ltr">{html.escape(num)}</bdi> {html.escape(word)}'
         f"</span>"
     )
 
@@ -90,12 +92,9 @@ def _render_value_labels(
         if val is None or not label:
             continue
         ly, above = _value_label_y_px(i, val, item["values"], annual_target, y_max)
-        if above:
-            transform = "translate(-50%, -100%)"
-        else:
-            transform = "translateX(-50%)"
         y_pct = (ly / CHART_HEIGHT) * 100
-        x_pct = x_percent(i, len(item["values"]), chart_width)
+        x_pct = x_percent(i, len(item["values"]), chart_width, language=language)
+        transform = value_label_transform(x_pct, above=above)
         parts.append(
             f'<span class="chart-value-label" style="left:{x_pct:.4f}%;top:{y_pct:.4f}%;'
             f'transform:{transform}">{_chart_label_html(label, language=language)}</span>'
@@ -122,10 +121,15 @@ def _render_target_labels(
         annual_target,
         item.get("annual_target_label"),
         chart_width,
+        language=language,
     )
     tag_transform = "translateY(4px)" if layout["tag_below"] else "translateY(-100%)"
+    if is_rtl(language):
+        tag_style = f'top:{y_pct:.4f}%;right:4px;transform:{tag_transform}'
+    else:
+        tag_style = f'top:{y_pct:.4f}%;left:4px;transform:{tag_transform}'
     parts = [
-        f'<span class="chart-target-tag" style="top:{y_pct:.4f}%;left:4px;transform:{tag_transform}">'
+        f'<span class="chart-target-tag" style="{tag_style}">'
         f'{_esc(target_label)}</span>',
     ]
     if item.get("annual_target_label"):
@@ -135,15 +139,24 @@ def _render_target_labels(
             value_transform = "translateY(4px)"
         else:
             value_transform = "translateY(-50%)"
+        if is_rtl(language):
+            value_pos = f'left:{((CHART_PAD_L + 6) / chart_width) * 100:.4f}%'
+        else:
+            value_pos = f'left:{right_pct:.4f}%'
         parts.append(
-            f'<span class="chart-target-value" style="top:{y_pct:.4f}%;left:{right_pct:.4f}%;'
+            f'<span class="chart-target-value" style="top:{y_pct:.4f}%;{value_pos};'
             f'transform:{value_transform}">'
             f'{_chart_label_html(str(item["annual_target_label"]), language=language)}</span>'
         )
     return "".join(parts)
 
 
-def _render_year_data_grid(item: dict[str, Any], chart_width: int = 0) -> str:
+def _render_year_data_grid(
+    item: dict[str, Any],
+    chart_width: int = 0,
+    *,
+    language: str = "English",
+) -> str:
     n = len(item["years"])
     if n == 0:
         return ""
@@ -153,11 +166,14 @@ def _render_year_data_grid(item: dict[str, Any], chart_width: int = 0) -> str:
 
     def _row(values: list[str], *, is_year: bool = False) -> str:
         cell_class = "table-cell year-cell" if is_year else "table-cell"
-        cells = "".join(
-            f'<span class="{cell_class}" style="left:{x_percent(i, n, chart_width):.4f}%">'
-            f"{_esc(v)}</span>"
-            for i, v in enumerate(values)
-        )
+        cell_parts: list[str] = []
+        for i, v in enumerate(values):
+            x_pct = x_percent(i, n, chart_width, language=language)
+            cell_parts.append(
+                f'<span class="{cell_class}" style="left:{x_pct:.4f}%;'
+                f'transform:{x_label_transform(x_pct)}">{_esc(v)}</span>'
+            )
+        cells = "".join(cell_parts)
         return f'<div class="table-row">{cells}</div>'
 
     parts = ['<div class="year-data-grid">']
@@ -171,12 +187,12 @@ def _render_year_data_grid(item: dict[str, Any], chart_width: int = 0) -> str:
 
 
 
-def _render_data_table(item: dict[str, Any], chart_width: int) -> str:
-    return f'<div class="table-data">{_render_year_data_grid(item, chart_width)}</div>'
+def _render_data_table(item: dict[str, Any], chart_width: int, *, language: str = "English") -> str:
+    return f'<div class="table-data">{_render_year_data_grid(item, chart_width, language=language)}</div>'
 
 
-def _render_data_table_cells(item: dict[str, Any], chart_width: int) -> str:
-    return f'<td class="table-data">{_render_year_data_grid(item, chart_width)}</td>'
+def _render_data_table_cells(item: dict[str, Any], chart_width: int, *, language: str = "English") -> str:
+    return f'<td class="table-data">{_render_year_data_grid(item, chart_width, language=language)}</td>'
 
 
 def _render_metric_labels(labels: dict[str, str], item: dict[str, Any]) -> str:
@@ -283,7 +299,7 @@ def _render_line_block(
         "</tr>"
         f'<tr class="{footer_class}">'
         f"{_render_metric_labels_cells(table_labels, item)}"
-        f"{_render_data_table_cells(item, chart_width)}"
+        f"{_render_data_table_cells(item, chart_width, language=language)}"
         "</tr>"
         "</table>"
     )

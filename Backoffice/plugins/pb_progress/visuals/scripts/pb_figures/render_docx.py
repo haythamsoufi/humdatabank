@@ -32,23 +32,21 @@ _DOCX_LABEL_COL_IN = 2.85
 _DOCX_DONUT_COL_IN = 0.55
 _DOCX_TABLE_FONT = 9
 _DOCX_CHART_DPI = 175  # PNG resolution for embedded line charts (~481px @ 2.75in)
-_DOCX_CHART_MIN_HEIGHT_IN = 0.95  # minimum embedded chart height in Word
-_DOCX_CHART_HEIGHT_SCALE = 1.15  # slight lift over HTML aspect ratio
-_DOCX_CHART_FONT_SCALE_MAX = 1.25  # cap label/marker growth for wide charts
 
 
 def _docx_chart_height_px(width_px: int) -> int:
-    """Scale chart height with width (HTML aspect ratio) plus a modest Word boost."""
-    proportional = width_px * CHART_HEIGHT / CHART_WIDTH_PX
-    return max(int(proportional * _DOCX_CHART_HEIGHT_SCALE), CHART_HEIGHT)
+    """Match PNG dashboard aspect ratio (110 px tall @ 481 px wide)."""
+    return int(width_px * CHART_HEIGHT / CHART_WIDTH_PX)
 
 
-def _docx_chart_font_scale(height_px: int) -> float:
-    return min(height_px / CHART_HEIGHT, _DOCX_CHART_FONT_SCALE_MAX)
+def _docx_chart_font_scale(width_px: int) -> float:
+    """Scale labels/markers with chart width so physical size matches PNG output."""
+    return width_px / CHART_WIDTH_PX
 
 
-def _docx_chart_display_height_in(width_in: float, width_px: int, height_px: int) -> float:
-    return max(width_in * height_px / width_px, _DOCX_CHART_MIN_HEIGHT_IN)
+def _docx_chart_display_height_in(width_in: float) -> float:
+    """Embedded height preserving the PNG 110/481 aspect ratio."""
+    return width_in * CHART_HEIGHT / CHART_WIDTH_PX
 
 
 def _set_rfonts(r_pr, font_name: str) -> None:
@@ -311,7 +309,8 @@ def _add_data_row(
     bold_values: bool = False,
 ) -> None:
     _set_cell_text(table.cell(row_idx, 0), label, language=language, bold=bold_label, align_right=True)
-    for col, value in enumerate(values, start=1):
+    ordered_values = list(reversed(values)) if is_rtl(language) else values
+    for col, value in enumerate(ordered_values, start=1):
         if col < len(table.rows[row_idx].cells):
             _set_cell_text(
                 table.cell(row_idx, col),
@@ -357,9 +356,9 @@ def _add_cumulative_block(
     chart_path = assets_dir / f"{block_id}_line.png"
     chart_width_px = _chart_render_width_px(n_years)
     chart_height_px = _docx_chart_height_px(chart_width_px)
-    font_scale = _docx_chart_font_scale(chart_height_px)
+    font_scale = _docx_chart_font_scale(chart_width_px)
     chart_width_in = _chart_area_width(n_years)
-    chart_height_in = _docx_chart_display_height_in(chart_width_in, chart_width_px, chart_height_px)
+    chart_height_in = _docx_chart_display_height_in(chart_width_in)
     render_line_chart_asset(
         item,
         target_label,

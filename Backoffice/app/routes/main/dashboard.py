@@ -42,7 +42,9 @@ from app.services.data_quality.service import list_data_quality_templates_for_en
 from app.routes.main.helpers import (
     SELECTED_ENTITY_TYPE_SESSION_KEY,
     SELECTED_ENTITY_ID_SESSION_KEY,
+    DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES,
     _parse_int,
+    filter_dashboard_assignment_activities,
     get_localized_template_name,
     localized_field_name,
     format_activity_value,
@@ -593,7 +595,10 @@ def dashboard():
                         .filter(
                             EntityActivityLog.entity_type == 'country',
                             EntityActivityLog.entity_id == selected_country.id,
-                            EntityActivityLog.assignment_id.in_(aes_ids)
+                            EntityActivityLog.assignment_id.in_(aes_ids),
+                            EntityActivityLog.activity_type.notin_(
+                                DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+                            ),
                         )
                         .group_by(EntityActivityLog.assignment_id)
                     ).subquery()
@@ -629,6 +634,9 @@ def dashboard():
                             EntityActivityLog.entity_id == selected_country.id,
                             EntityActivityLog.assignment_id.in_(aes_ids),
                             EntityActivityLog.user_id.isnot(None),
+                            EntityActivityLog.activity_type.notin_(
+                                DASHBOARD_EXCLUDED_ASSIGNMENT_ACTIVITY_TYPES
+                            ),
                         )
                         .group_by(EntityActivityLog.assignment_id, EntityActivityLog.user_id)
                         .all()
@@ -909,10 +917,12 @@ def dashboard():
 
     if selected_country:
         # Get recent activities for this country (last month, initial load of 10)
-        recent_activities = get_country_recent_activities(
-            country_id=selected_country.id,
-            days=30,
-            limit=10
+        recent_activities = filter_dashboard_assignment_activities(
+            get_country_recent_activities(
+                country_id=selected_country.id,
+                days=30,
+                limit=10,
+            )
         )
 
         current_app.logger.debug(f"Found {len(recent_activities)} recent activities for {selected_country.name}")
@@ -1042,10 +1052,12 @@ def load_more_activities():
 
         # Get more activities - when loading more, go beyond the 1 month limit
         fetch_limit = offset + limit + 1
-        all_activities = get_country_recent_activities(
-            country_id=country_id,
-            days=365,
-            limit=fetch_limit
+        all_activities = filter_dashboard_assignment_activities(
+            get_country_recent_activities(
+                country_id=country_id,
+                days=365,
+                limit=fetch_limit,
+            )
         )
 
         # Get the next batch

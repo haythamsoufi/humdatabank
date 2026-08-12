@@ -23,6 +23,7 @@ def test_chart_label_html_splits_arabic_millions_with_bdi() -> None:
     assert "219.3" in html
     assert "<bdi" in html
     assert 'dir="rtl"' in html
+    assert html.index("219.3") < html.index("مليون")
 
 
 @pytest.mark.unit
@@ -54,3 +55,35 @@ def test_render_line_block_arabic_png_includes_html_value_labels() -> None:
     assert "chart-value-label" in html
     assert "<bdi" in html
     assert "مليون" in html
+
+
+@pytest.mark.unit
+def test_render_line_block_arabic_year_grid_reverses_axis() -> None:
+    import re
+
+    item = {
+        "label": "Indicator",
+        "values": [1.0, 2.0, 3.0],
+        "value_labels": ["1", "2", "3"],
+        "years": ["2021", "2022", "2023"],
+        "reporting": ["1", "2", "3"],
+        "implementing": ["1", "2", "3"],
+        "show_ns_breakdown": True,
+    }
+    html = _render_line_block(
+        item,
+        chart_index=0,
+        target_label="Target",
+        table_labels={"year": "Year", "reporting": "R", "implementing": "I"},
+        chart_width=481,
+        asset_refs={"line_0": "line_0.png"},
+        language="Arabic",
+    )
+
+    positions: dict[str, float] = {}
+    for year in ("2021", "2022", "2023"):
+        match = re.search(rf'left:([\d.]+)%[^>]*>{year}</span>', html)
+        assert match is not None, f"missing year cell for {year}"
+        positions[year] = float(match.group(1))
+
+    assert positions["2021"] > positions["2023"]

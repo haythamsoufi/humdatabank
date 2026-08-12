@@ -15,7 +15,9 @@ from docx.oxml.ns import qn
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
+from pb_figures.line_chart import CHART_HEIGHT  # noqa: E402
 from pb_figures.render_docx import (  # noqa: E402
+    CHART_WIDTH_PX,
     _DOCX_CONTENT_WIDTH_IN,
     _DOCX_LABEL_COL_IN,
     _DOCX_PAGE_MARGIN,
@@ -26,6 +28,7 @@ from pb_figures.render_docx import (  # noqa: E402
     _configure_page_margins,
     _cumulative_table_widths,
     _docx_chart_display_height_in,
+    _docx_chart_font_scale,
     _docx_chart_height_px,
     _donut_pair_widths,
     _set_cell_text,
@@ -103,15 +106,16 @@ class TableInnerBorderTests(unittest.TestCase):
         widths = _donut_pair_widths()
         self.assertAlmostEqual(sum(widths), _DOCX_CONTENT_WIDTH_IN, places=5)
 
-    def test_docx_chart_height_scales_with_width(self) -> None:
+    def test_docx_chart_height_matches_png_aspect_ratio(self) -> None:
         width_px = _chart_render_width_px(5)
         height_px = _docx_chart_height_px(width_px)
-        self.assertGreater(height_px, 110)
-        self.assertLess(height_px, 250)
+        png_ratio = CHART_HEIGHT / CHART_WIDTH_PX
+        self.assertAlmostEqual(height_px / width_px, png_ratio, places=2)
         width_in = _chart_area_width(5)
-        height_in = _docx_chart_display_height_in(width_in, width_px, height_px)
-        self.assertGreaterEqual(height_in, 0.95)
-        self.assertLess(height_in, 1.35)
+        height_in = _docx_chart_display_height_in(width_in)
+        self.assertAlmostEqual(height_in / width_in, png_ratio, places=4)
+        self.assertAlmostEqual(_docx_chart_font_scale(width_px), width_px / CHART_WIDTH_PX, places=4)
+        self.assertGreater(_docx_chart_font_scale(width_px), 1.0)
 
 
 class DonutPairTableTests(unittest.TestCase):

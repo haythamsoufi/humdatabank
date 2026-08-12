@@ -15,8 +15,11 @@ if IMPORTS_DIR not in sys.path:
 from upr_country_reporting_excel_template import (  # noqa: E402
     INDICATOR_APPLICABLE_VALUE,
     INDICATOR_DNA_VALUE,
+    INDICATOR_DNA_HEADER,
     INDICATOR_ID_HEADER,
     INDICATOR_MATCH_THRESHOLD,
+    SP_EF_HEADER,
+    INDICATOR_HEADER,
     _build_bank_id_row_locations,
     _build_indicator_row_index,
     _build_kpi_display_map,
@@ -24,6 +27,8 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _disagg_payload_to_workbook_cells,
     _find_row_for_form_item,
     _find_row_in_indicator_table,
+    _indicator_similarity,
+    _bank_id_row_integrity_warning,
     _merge_non_binary_into_unknown_breakdown,
     _parse_support_matrix_ticks,
     _matrix_cell_is_set,
@@ -35,6 +40,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _parse_emergency_selection_from_entry,
     _format_emergency_operation_display,
     _upsert_emergency_repeat_choice,
+    _resolve_workbook_indicator_bank_id,
     _workbook_yes_no_value,
     _resolve_indicator_import_value,
     _yes_no_value_is_applicable,
@@ -179,7 +185,12 @@ def test_data_other_table_has_overflow_capacity(upr_country_reporting_workbook):
 
 
 def test_find_row_for_form_items_in_data_core(upr_country_reporting_workbook):
-    """Core T33 indicators should resolve to Data_core rows (not require Data_other)."""
+    """Core T33 indicators with an explicit ID cell in the workbook should
+    resolve to their Data_core row via the direct bank-id lookup (the primary,
+    intended path — every currently-published T33 indicator item has an
+    explicit ID cell in the real template; fuzzy text matching is only a
+    fallback for corrupted/edited files, see test below).
+    """
     import openpyxl
 
     wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=True)
@@ -188,7 +199,6 @@ def test_find_row_for_form_items_in_data_core(upr_country_reporting_workbook):
     bank_locations = _build_bank_id_row_locations(wb)
     samples = [
         ("Cross Cutting", "Number of people reached with emergency response and early recovery programmes.", 619),
-        ("Respect - Values, power and inclusion", "National Society has community engagement and accountability integrated in its strategy or plan with clear goals, designated CEA budget lines, and key performance indicators", 611),
     ]
     for section, label, bank_id in samples:
         loc = _find_row_for_form_item(
@@ -203,8 +213,131 @@ def test_find_row_for_form_items_in_data_core(upr_country_reporting_workbook):
     wb.close()
 
 
+def test_find_row_for_form_item_falls_back_to_fuzzy_text_match():
+    """When a form item's bank id has no explicit ID cell anywhere in the
+    workbook (e.g. the row was pasted without its ID, or the item is newer
+    than the last template regeneration), _find_row_for_form_item should
+    still locate the right row by matching its (section, label) text against
+    kpi_lookup and the workbook's own indicator_row_index — as long as the
+    text is a close, high-confidence match, not merely a superficially
+    similar one (see the "conditional" bank_id in the low-confidence sample).
+    """
+    kpi_lookup = {
+        ("health", "number of people vaccinated against measles"): 501,
+    }
+    indicator_row_index = {
+        ("health", "number of people vaccinated against measles"): ("Sheet1", "Data_core", 3),
+    }
+    loc = _find_row_for_form_item(
+        section_name="Health",
+        label="Number of people vaccinated against measles",
+        bank_id=501,
+        indicator_row_index=indicator_row_index,
+        kpi_lookup=kpi_lookup,
+        bank_id_locations={},
+    )
+    assert loc == ("Sheet1", "Data_core", 3)
+
+    # Two genuinely different indicators that only share a long generic
+    # opening phrase must NOT match, even though a naive character-level
+    # ratio alone would score them ~0.72 (see test_indicator_similarity_*
+    # below) — this is the real-world pair ("long-term services" vs
+    # "emergency response") that motivated tightening _indicator_similarity.
+    other_index = {
+        (
+            "cross cutting",
+            "number of people reached with long-term services and programmes",
+        ): ("Sheet1", "Data_core", 0),
+    }
+    loc_wrong = _find_row_for_form_item(
+        section_name="Cross Cutting",
+        label="Number of people reached with emergency response and early recovery programmes",
+        bank_id=619,
+        indicator_row_index=other_index,
+        kpi_lookup={
+            (
+                "cross cutting",
+                "number of people reached with emergency response and early recovery programmes",
+            ): 619,
+        },
+        bank_id_locations={},
+    )
+    assert loc_wrong is None
+
+
 def test_indicator_match_threshold_allows_truncated_excel_labels():
     assert INDICATOR_MATCH_THRESHOLD <= 0.65
+
+
+def test_indicator_similarity_exact_and_truncated_match():
+    assert _indicator_similarity("Number of shelters built", "Number of shelters built") == 1.0
+    assert _indicator_similarity("Number of shelters built.", "Number of shelters built") == 1.0
+    # Genuine truncation/abbreviation: the whole shorter label is a prefix of the longer one.
+    assert _indicator_similarity(
+        "Number of shelters built",
+        "Number of shelters built in the reporting period",
+    ) == 0.8
+
+
+def test_indicator_similarity_rejects_shared_boilerplate_phrase():
+    """Real regression: two completely different KPIs that only share a long
+    generic opening ("Number of people reached with ...") must NOT be
+    considered similar just because a naive character-ratio is fooled by the
+    shared boilerplate — the distinctive words carry no overlap at all here.
+    """
+    score = _indicator_similarity(
+        "Number of people reached with long-term services and programmes",
+        "Number of people reached with emergency response and early recovery programmes",
+    )
+    assert score < INDICATOR_MATCH_THRESHOLD
+
+
+def test_indicator_similarity_high_word_overlap_still_matches():
+    """Sanity check: genuinely close rewordings (same distinctive words, minor
+    phrasing differences) must still clear the threshold — the fix must not
+    over-correct into rejecting everything that isn't a verbatim match.
+    """
+    score = _indicator_similarity(
+        "Number of people reached with mental health and psychosocial services",
+        "Number of people reached with psychosocial and mental health services",
+    )
+    assert score >= INDICATOR_MATCH_THRESHOLD
+
+
+def test_bank_id_row_integrity_warning_flags_genuine_mismatch():
+    kpi_display = {
+        619: ("Cross-cutting", "Number of people reached with emergency response and early recovery programmes."),
+    }
+    row = {
+        "sp_ef": "Cross-cutting",
+        "indicator": "Number of people reached with long-term services and programmes",
+    }
+    warning = _bank_id_row_integrity_warning(row, 619, kpi_display)
+    assert warning is not None
+    assert "619" in warning
+
+
+def test_bank_id_row_integrity_warning_ignores_section_only_difference():
+    """The same indicator can legitimately be grouped under a different SP/EF
+    in the reporting tables than its single canonical entry in the master
+    list (real observed case: bank id 711 files under 'Accountability and
+    agility' in Data_core but 'Respect - Values, power and inclusion' in the
+    master KPI list) — only the indicator NAME should be checked, not section.
+    """
+    kpi_display = {
+        711: ("Respect - Values, power and inclusion", "Shared indicator text"),
+    }
+    row = {"sp_ef": "Accountability and agility", "indicator": "Shared indicator text"}
+    assert _bank_id_row_integrity_warning(row, 711, kpi_display) is None
+
+
+def test_bank_id_row_integrity_warning_no_reference_data_is_silent():
+    """If the id isn't in the reference map at all (e.g. deleted from the DB,
+    or DB lookup failed), don't guess — stay silent rather than risk a false
+    positive against data we can't actually verify.
+    """
+    assert _bank_id_row_integrity_warning({"sp_ef": "X", "indicator": "Y"}, 999999, {}) is None
+    assert _bank_id_row_integrity_warning({"sp_ef": "X", "indicator": "Y"}, 999999, None) is None
 
 
 def test_parse_workbook_row_disagg_total_only_uses_total_key():
@@ -854,3 +987,102 @@ def test_dedupe_upr_import_warnings_collapses_period_mismatch():
     assert len(warnings) == 2
     assert sum("period" in w.lower() for w in warnings) == 1
     assert any("Example" in w for w in warnings)
+
+
+def test_resolve_workbook_indicator_bank_id_prefers_explicit_id():
+    """An explicit ID cell always wins, even if the indicator text would
+    fuzzy-match a completely different bank id in kpi_lookup."""
+    row = {"bank_id": 555, "sp_ef": "Health", "indicator": "Totally unrelated text"}
+    kpi_lookup = {("Health", "Totally unrelated text"): 999}
+    assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) == 555
+
+
+def test_resolve_workbook_indicator_bank_id_picks_best_fuzzy_match_not_first():
+    """Regression test: when a row's ID cell is blank (e.g. cleared or a row
+    was pasted without it), the fallback must pick the BEST-scoring candidate
+    across the section, not merely the first one that clears the 0.60
+    threshold. Humanitarian indicator labels are often near-duplicates
+    ("...reached with X" vs "...reached with X and Y"), so picking the first
+    match found in kpi_lookup's (arbitrary) iteration order can silently
+    attribute a value to the wrong indicator.
+    """
+    kpi_lookup = {
+        # Inserted first — a strict-prefix substring of the row's text below,
+        # so it also clears the threshold (short-in-long => 0.8) but is NOT
+        # the row's actual indicator.
+        ("Health", "Number of people reached with health services"): 101,
+        # The row's exact indicator — inserted second, would be skipped by a
+        # naive first-match loop even though it's a perfect (1.0) match.
+        ("Health", "Number of people reached with health services and referrals"): 102,
+    }
+    row = {
+        "bank_id": None,
+        "sp_ef": "Health",
+        "indicator": "Number of people reached with health services and referrals",
+    }
+    assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) == 102
+
+
+def test_resolve_workbook_indicator_bank_id_returns_none_below_threshold():
+    row = {"bank_id": None, "sp_ef": "Health", "indicator": "Completely different indicator"}
+    kpi_lookup = {("Health", "Number of shelters distributed"): 42}
+    assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) is None
+
+
+def test_resolve_workbook_indicator_bank_id_respects_section(upr_country_reporting_workbook):
+    """A blank-ID row must not fuzzy-match an indicator in a different SP/EF section."""
+    kpi_lookup = build_kpi_lookup(upr_country_reporting_workbook)
+    (sp_ef, indicator_label), bank_id = next(iter(kpi_lookup.items()))
+    row = {"bank_id": None, "sp_ef": f"NOT-{sp_ef}", "indicator": indicator_label}
+    assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) is None
+
+
+def test_transform_warns_when_row_has_no_id_and_matched_by_name(app):
+    """End-to-end regression test for two related fixes:
+    (1) _resolve_workbook_indicator_bank_id resolving a blank-ID row via the
+        best fuzzy match, and
+    (2) run_upr_country_reporting_import no longer silently dropping
+        dynamic/emergency-indicator warnings that are appended to
+        ctx.warnings AFTER the initial snapshot was taken.
+    This test exercises the first fix directly and the underlying warning
+    plumbing that the second fix depends on (transform_... appending to
+    ctx.warnings, which the caller must read after all steps complete).
+    """
+    import openpyxl
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    from import_upr_excel_data import build_import_context, REPORTING_COUNTRY_TEMPLATE_ID
+    from upr_country_reporting_excel_template import transform_upr_country_reporting_to_import_rows
+
+    with app.app_context():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=True)
+        try:
+            sheet_name, table_name = "Overall action Indicators", "Data_core"
+            kpi_lookup = build_kpi_lookup(wb)
+            (sp_ef, indicator_label), _bank_id = next(iter(kpi_lookup.items()))
+
+            # Simulate a corrupted row: ID cell cleared, but Applicable + a
+            # value entered — exactly the "moved/cleared cell" scenario users
+            # can accidentally trigger in Excel. Write the SP/EF + indicator
+            # text verbatim from kpi_lookup's own key so this test exercises
+            # the fuzzy-match fallback deterministically, independent of
+            # whether Data_core row 0 happens to line up 1:1 with the master
+            # KPI list's exact text/section-label formatting.
+            write_table_cell(wb, sheet_name, table_name, 0, SP_EF_HEADER, sp_ef)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_HEADER, indicator_label)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_ID_HEADER, None)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_DNA_HEADER, INDICATOR_APPLICABLE_VALUE)
+            write_table_cell(wb, sheet_name, table_name, 0, "Total\nDirect", 123)
+
+            ctx = build_import_context([REPORTING_COUNTRY_TEMPLATE_ID])
+            transform_upr_country_reporting_to_import_rows(
+                999999999, wb, ctx, iso3="ZZZ", period="Jan-Jun 2026"
+            )
+
+            assert any(
+                "had no ID" in w and str(indicator_label) in w for w in ctx.warnings
+            ), f"Expected a 'had no ID' warning mentioning {indicator_label!r}; got: {ctx.warnings}"
+        finally:
+            wb.close()

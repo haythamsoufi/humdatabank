@@ -2038,7 +2038,7 @@ function coerceEmergencyOperationDisplayValue(value) {
 /**
  * Set select value with fallback to text matching if value doesn't match
  */
-function setSelectValueWithFallback(select, valueToSet) {
+export function setSelectValueWithFallback(select, valueToSet) {
     if (valueToSet && typeof valueToSet === 'object') {
         valueToSet = coerceEmergencyOperationDisplayValue(valueToSet);
     }
@@ -2088,6 +2088,37 @@ function setSelectValueWithFallback(select, valueToSet) {
     if (select.dataset.useAsRepeatEntryTitle === 'true' && select.value) {
         revealRepeatEntryTitleSelect(select);
     }
+}
+
+/**
+ * Resolve once a calculated-list <select> (e.g. emergency operation picker)
+ * has real options loaded beyond the placeholder, or after a safety timeout.
+ * Options for these selects are fetched asynchronously, so code that needs to
+ * set a value programmatically right after the select is created (e.g.
+ * applying an Excel import or restoring a draft) must wait for this before
+ * assigning `.value`, otherwise the assignment silently has no effect.
+ * Mirrors the wait used internally when restoring draft/repeat data.
+ * @returns {Promise<void>}
+ */
+export function waitForCalculatedSelectOptions(select, { timeoutMs = 10000 } = {}) {
+    if (!select || select.options.length > 1) return Promise.resolve();
+    if (window.refreshCalculatedSelect && typeof window.refreshCalculatedSelect === 'function') {
+        window.refreshCalculatedSelect(select);
+    }
+    return new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+            if (select.options.length > 1) {
+                observer.disconnect();
+                clearTimeout(safetyTimer);
+                resolve();
+            }
+        });
+        observer.observe(select, { childList: true });
+        const safetyTimer = setTimeout(() => {
+            observer.disconnect();
+            resolve();
+        }, timeoutMs);
+    });
 }
 
 /**

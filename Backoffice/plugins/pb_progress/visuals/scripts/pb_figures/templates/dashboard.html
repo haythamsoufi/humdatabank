@@ -537,9 +537,11 @@ const MARKER_RADIUS = DATA.marker_radius ?? 3.5;
 __LINE_CHART_JS__
 
 function xPercent(i, n, width) {
+  const rtl = DATA.language === "Arabic";
+  const plotI = rtl && n > 0 ? n - 1 - i : i;
   const w = width - CHART_PAD_L - CHART_PAD_R;
   const step = n > 1 ? w / (n - 1) : 0;
-  const x = CHART_PAD_L + i * step;
+  const x = CHART_PAD_L + plotI * step;
   return (x / width) * 100;
 }
 
@@ -586,11 +588,17 @@ function renderDonut(item) {
   </svg>`;
 }
 
+function xLabelTransform(xPct) {
+  if (xPct < 12) return "translateX(0)";
+  if (xPct > 88) return "translateX(-100%)";
+  return "translateX(-50%)";
+}
+
 function renderPositionedRow(values, n, chartWidth, cellClass = "") {
   const cls = cellClass ? ` table-cell ${cellClass}` : " table-cell";
   return `<div class="table-row">${values.map((v, i) => {
     const pct = xPercent(i, n, chartWidth);
-    return `<span class="${cls.trim()}" style="left:${pct}%">${esc(v)}</span>`;
+    return `<span class="${cls.trim()}" style="left:${pct}%;transform:${xLabelTransform(pct)}">${esc(v)}</span>`;
   }).join("")}</div>`;
 }
 
@@ -672,7 +680,7 @@ function renderSP(data) {
     const chartId = `${(data.section || "sp").toLowerCase()}-line-${idx}`;
     parts.push(`<div class="indicator-row">
       <div class="indicator-text">${esc(item.label)}</div>
-      <div class="line-chart-wrap"><div class="line-chart-inner" style="--chart-width:${chartWidth}">${renderLineChart(item, chartWidth, targetLabel, chartId, LINE_CHART_EFFECTS)}</div></div>
+      <div class="line-chart-wrap"><div class="line-chart-inner" style="--chart-width:${chartWidth}">${renderLineChart(item, chartWidth, targetLabel, chartId, LINE_CHART_EFFECTS, { rtl: DATA.language === "Arabic" })}</div></div>
       <div class="x-axis-divider-row">
         <div class="x-axis-divider-left"></div>
         <div class="x-axis-divider-right"></div>

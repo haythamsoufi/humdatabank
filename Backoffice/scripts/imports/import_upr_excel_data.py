@@ -268,6 +268,8 @@ class UprImportContext:
     emergency_matrix_plugin_config: Dict[str, Any] = field(default_factory=dict)
     emergency_go_plugin_config: Dict[str, Any] = field(default_factory=dict)
     yes_no_bank_ids: Set[int] = field(default_factory=set)
+    percentage_bank_ids: Set[int] = field(default_factory=set)
+    percentage_allow_over_100_bank_ids: Set[int] = field(default_factory=set)
     indicator_bank_ids: Set[int] = field(default_factory=set)
     core_yes_no_item_ids: List[int] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -668,6 +670,71 @@ def _load_indicator_bank_ids() -> Set[int]:
     return {int(row.id) for row in IndicatorBank.query.with_entities(IndicatorBank.id).all()}
 
 
+def _is_percentage_indicator_type(type_value: Any) -> bool:
+    normalized = str(type_value or "").strip().lower().replace("/", "").replace("-", "").replace(" ", "")
+    return normalized in ("percentage", "percent", "pct")
+
+
+def _load_percentage_bank_ids() -> Set[int]:
+    """Indicator bank ids whose type is Percentage (UPR Master ValueNum expected 0-100)."""
+    from app.models.indicator_bank import IndicatorBank
+
+    out: Set[int] = set()
+    for row in IndicatorBank.query.filter_by(archived=False).all():
+        if _is_percentage_indicator_type(row.type):
+            out.add(int(row.id))
+    return out
+
+
+def _load_percentage_allow_over_100_bank_ids(bank_ids: Set[int]) -> Set[int]:
+    """Percentage bank ids where at least one live form item explicitly allows values
+    over 100% (cumulative/ratio-based indicators configured with ``allow_over_100``)."""
+    if not bank_ids:
+        return set()
+    from app.models.form_items import FormItem
+
+    out: Set[int] = set()
+    rows = FormItem.query.filter(
+        FormItem.indicator_bank_id.in_(bank_ids),
+        FormItem.archived == False,  # noqa: E712
+    ).all()
+    for item in rows:
+        config = item.config or {}
+        if config.get("allow_over_100") in (True, "true", "True", 1, "1"):
+            out.add(int(item.indicator_bank_id))
+    return out
+
+
+def _percentage_scalar_range_warning(
+    ctx: "UprImportContext",
+    indicator_bank_id: Optional[int],
+    value_num: Optional[float],
+    *,
+    iso3: str = "",
+    rnd: str = "",
+    label: str = "",
+) -> Optional[str]:
+    """Flag a percentage-type indicator whose Master ``ValueNum`` is outside the
+    plausible 0-100% range — the classic 'entered 500 instead of 50' mistake.
+    Non-blocking: the value still imports as entered, but the mistake becomes visible
+    instead of silently landing as a nonsensical number.
+    """
+    if not indicator_bank_id or value_num is None:
+        return None
+    if indicator_bank_id not in ctx.percentage_bank_ids:
+        return None
+    upper_bound = None if indicator_bank_id in ctx.percentage_allow_over_100_bank_ids else 100.0
+    if value_num >= 0 and (upper_bound is None or value_num <= upper_bound):
+        return None
+    name = label or f"bank {indicator_bank_id}"
+    where = " ".join(part for part in (iso3, rnd) if part)
+    suffix = f" ({where})" if where else ""
+    return (
+        f"Percentage indicator {name!r} = {value_num:g} is outside the valid 0-100% "
+        f"range{suffix} — please check for a data-entry mistake (e.g. 500 instead of 50)."
+    )
+
+
 def _master_yes_no_value(value_num: Optional[float]) -> str:
     """Map UPR Master ValueNum to entry-form yes/no storage."""
     if value_num is not None and float(value_num) == 1:
@@ -693,9 +760,18 @@ def _reporting_indicator_import_value(
     ctx: UprImportContext,
     indicator_bank_id: int,
     value_num: Optional[float],
+    *,
+    iso3: str = "",
+    rnd: str = "",
+    label: str = "",
 ) -> Any:
     if indicator_bank_id in ctx.yes_no_bank_ids:
         return _master_yes_no_value(value_num)
+    warning = _percentage_scalar_range_warning(
+        ctx, indicator_bank_id, value_num, iso3=iso3, rnd=rnd, label=label
+    )
+    if warning:
+        ctx.warnings.append(warning)
     return value_num
 
 
@@ -2049,6 +2125,10 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
         )
         ctx.other_indicators_section_id = _load_other_indicators_section_id()
         ctx.yes_no_bank_ids = _load_yes_no_bank_ids()
+        ctx.percentage_bank_ids = _load_percentage_bank_ids()
+        ctx.percentage_allow_over_100_bank_ids = _load_percentage_allow_over_100_bank_ids(
+            ctx.percentage_bank_ids
+        )
         pub_vid = ctx.published_version_ids.get(REPORTING_COUNTRY_TEMPLATE_ID)
         if pub_vid:
             ctx.core_yes_no_item_ids = _load_core_yes_no_item_ids(
@@ -2638,7 +2718,9 @@ def transform_to_import_rows(
                     aes_id=aes_id,
                     slot=slot,
                     indicator_bank_id=indicator_id,
-                    value=None if is_dna else _reporting_indicator_import_value(ctx, indicator_id, value_num),
+                    value=None if is_dna else _reporting_indicator_import_value(
+                        ctx, indicator_id, value_num, iso3=iso3, rnd=rnd, label=indicator
+                    ),
                     data_not_available=is_dna,
                     order_counters=emergency_dynamic_order,
                 )
@@ -2668,7 +2750,9 @@ def transform_to_import_rows(
                         ctx,
                         aes_id=aes_id,
                         indicator_bank_id=indicator_id,
-                        value=None if is_dna else _reporting_indicator_import_value(ctx, indicator_id, value_num),
+                        value=None if is_dna else _reporting_indicator_import_value(
+                            ctx, indicator_id, value_num, iso3=iso3, rnd=rnd, label=indicator
+                        ),
                         data_not_available=is_dna,
                         order_counters=dynamic_order,
                     )
@@ -2692,7 +2776,9 @@ def transform_to_import_rows(
                     built = _scalar_row(
                         aes_id=aes_id,
                         item_id=item_id,
-                        value=_reporting_indicator_import_value(ctx, indicator_id, value_num),
+                        value=_reporting_indicator_import_value(
+                            ctx, indicator_id, value_num, iso3=iso3, rnd=rnd, label=indicator
+                        ),
                         iso3=iso3,
                         period=period,
                         debug_kpi=indicator or f"bank_{indicator_id}",
@@ -2706,7 +2792,9 @@ def transform_to_import_rows(
                     ctx,
                     aes_id=aes_id,
                     indicator_bank_id=indicator_id,
-                    value=None if is_dna else _reporting_indicator_import_value(ctx, indicator_id, value_num),
+                    value=None if is_dna else _reporting_indicator_import_value(
+                        ctx, indicator_id, value_num, iso3=iso3, rnd=rnd, label=indicator
+                    ),
                     data_not_available=is_dna,
                     order_counters=dynamic_order,
                 )

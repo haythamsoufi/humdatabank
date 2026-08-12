@@ -1352,6 +1352,44 @@ class TestBuildGroupedEntityEmailPreview:
         assert preview['subject']
         assert not preview['empty_reason']
 
+    def test_related_url_renders_open_assignment_button(self, app, db_session):
+        from app.models import User, NotificationPreferences
+        from app import db
+        from types import SimpleNamespace
+
+        sample = SimpleNamespace(
+            id=None,
+            title='Unified Country Plan – 2027',
+            message='A new reporting assignment has been issued for Afghanistan.',
+            notification_type=NotificationType.assignment_created,
+            priority='normal',
+            related_url='/forms/assignment/42',
+            title_key=None,
+            message_key=None,
+            title_params=None,
+            message_params=None,
+        )
+
+        with app.app_context():
+            user = User(email='instant_focal@example.com', name='Instant Focal', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id,
+                email_notifications=True,
+                notification_types_enabled=[],
+                notification_frequency='instant',
+            ))
+            db.session.commit()
+
+            preview = build_grouped_entity_email_preview(
+                [user.id], [], sample, 'Afghanistan', preview_mode=True
+            )
+
+        assert '/forms/assignment/42' in preview['html_body']
+        assert 'Open Assignment' in preview['html_body']
+
     def test_non_preview_mode_empty_without_recipients(self, app, db_session):
         with app.app_context():
             preview = build_grouped_entity_email_preview(

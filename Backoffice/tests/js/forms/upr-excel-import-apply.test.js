@@ -17,6 +17,7 @@ vi.mock('../../../app/static/js/forms/modules/dynamic-indicators.js', () => ({
 vi.mock('../../../app/static/js/forms/modules/repeat-sections.js', () => ({
     addRepeatEntry: vi.fn(),
     getEffectiveRepeatEntryMax: vi.fn().mockReturnValue(null),
+    findRepeatFieldSelects: vi.fn().mockReturnValue([]),
     setSelectValueWithFallback: vi.fn(),
     waitForCalculatedSelectOptions: vi.fn().mockResolvedValue(undefined),
 }));
@@ -70,8 +71,14 @@ describe('applyUprExcelImportPayload — static fields', () => {
 });
 
 describe('applyUprExcelImportPayload — emergency operation repeat slots', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.clearAllMocks();
+        // vi.clearAllMocks() only clears call history, not mockReturnValue/
+        // mockImplementation overrides from a previous test — so this must be
+        // reset explicitly, or a test that mocks a relocated select (below)
+        // would leak into the next test and mask real failures.
+        const repeatSections = await import('../../../app/static/js/forms/modules/repeat-sections.js');
+        repeatSections.findRepeatFieldSelects.mockReturnValue([]);
     });
 
     it('waits for the calculated-list select to load its options before selecting the emergency operation', async () => {
@@ -109,6 +116,48 @@ describe('applyUprExcelImportPayload — emergency operation repeat slots', () =
 
         expect(repeatSections.waitForCalculatedSelectOptions).toHaveBeenCalled();
         expect(document.querySelector('select').value).toBe('MDR Pakistan Floods (MDRPK001)');
+        expect(result.warnings).toEqual([]);
+        expect(result.applied).toBe(1);
+    });
+
+    it('finds a select relocated to the entry header by the title-dropdown feature', async () => {
+        // setupRepeatEntryTitleDropdown() (repeat-sections.js) physically moves a
+        // "use as repeat entry title" <select> out of its .form-item-block into the
+        // entry header, leaving `field` (queried by data-item-id) with no <select>
+        // descendant at all. applyRepeatSlotChoice must fall back to the same
+        // findRepeatFieldSelects() lookup repeat-sections.js itself uses for saved
+        // drafts, not a bare field.querySelector('select').
+        document.body.innerHTML = `
+            <div id="repeat-entries-5">
+                <div class="repeat-entry" id="repeat-entry-5-1" data-repeat-instance="1">
+                    <div class="repeat-entry__label">
+                        <select id="relocated-select" data-use-as-repeat-entry-title="true" data-field-item-id="77">
+                            <option value="">-- Select --</option>
+                            <option value="MDR Pakistan Floods (MDRPK001)">MDR Pakistan Floods (MDRPK001)</option>
+                        </select>
+                    </div>
+                    <div data-item-id="77" class="repeat-entry-title-field--hidden"></div>
+                </div>
+            </div>`;
+
+        const repeatSections = await import('../../../app/static/js/forms/modules/repeat-sections.js');
+        const relocatedSelect = document.getElementById('relocated-select');
+        repeatSections.findRepeatFieldSelects.mockReturnValue([relocatedSelect]);
+        repeatSections.setSelectValueWithFallback.mockImplementation((select, val) => {
+            select.value = val;
+        });
+
+        const { applyUprExcelImportPayload } = await importModule();
+        const result = await applyUprExcelImportPayload({
+            repeat_slots: [{
+                repeat_section_id: '5',
+                slot_num: 1,
+                choice_item_id: '77',
+                display_value: 'MDR Pakistan Floods (MDRPK001)',
+            }],
+        });
+
+        expect(relocatedSelect.value).toBe('MDR Pakistan Floods (MDRPK001)');
         expect(result.warnings).toEqual([]);
         expect(result.applied).toBe(1);
     });

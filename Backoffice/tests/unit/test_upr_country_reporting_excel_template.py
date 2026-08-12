@@ -43,6 +43,9 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _resolve_workbook_indicator_bank_id,
     _workbook_yes_no_value,
     _resolve_indicator_import_value,
+    _is_percentage_indicator_type,
+    _iter_numeric_leaves,
+    _percentage_range_warning,
     _yes_no_value_is_applicable,
     _write_indicator_entry,
     read_table_cell,
@@ -51,6 +54,8 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _entry_is_yes_no,
     _is_yes_no_indicator_type,
     _parse_workbook_row_disagg,
+    _disagg_consistency_warning,
+    _extract_disagg_components,
     import_rows_to_client_payload,
     dedupe_upr_import_warnings,
     build_kpi_lookup,
@@ -362,10 +367,77 @@ def test_parse_workbook_row_disagg_sex_age(upr_country_reporting_workbook):
     disagg = _parse_workbook_row_disagg(sample)
     assert disagg is not None
     assert disagg["mode"] == "sex_age"
-    assert disagg["values"]["direct"]["male_5"] == 10
+    # "<5" slugifies to "_5" (the "<" becomes "_"), so the real sex-age key is
+    # "male__5" (double underscore) — matching processing_service.slugify_age_group
+    # and the entry-form field name "indicator_{id}_sexage_male__5".
+    assert disagg["values"]["direct"]["male__5"] == 10
     assert disagg["values"]["direct"]["male_5_17"] == 20
-    assert disagg["values"]["direct"]["female_5"] == 5
+    assert disagg["values"]["direct"]["female__5"] == 5
     assert disagg["values"]["indirect"] == 3
+
+
+def test_disagg_consistency_warning_none_when_only_sex_age_present():
+    row = {"Male <5": 10, "Female <5": 5}
+    assert _disagg_consistency_warning(row, indicator_label="X") is None
+
+
+def test_disagg_consistency_warning_none_when_only_total_present():
+    row = {"Total Direct": 423.0}
+    assert _disagg_consistency_warning(row, indicator_label="X") is None
+
+
+def test_disagg_consistency_warning_none_when_sex_age_matches_sex_totals():
+    row = {"Male <5": 10, "Male 5-17": 20, "Total Male": 30, "Total Female": 0}
+    assert _disagg_consistency_warning(row, indicator_label="X") is None
+
+
+def test_disagg_consistency_warning_fires_when_sex_age_disagrees_with_sex_totals():
+    """A row that has BOTH a full sex+age breakdown AND separate Total Male/Female
+    values that don't match is a strong signal of a moved/stale/duplicated cell —
+    _parse_workbook_row_disagg() would silently import the sex_age breakdown and
+    drop the mismatched totals, so this must be surfaced as a warning instead.
+    """
+    row = {"Male <5": 10, "Male 5-17": 20, "Total Male": 999, "Total Female": 0}
+    warning = _disagg_consistency_warning(row, indicator_label="Some indicator", context_label="PAK")
+    assert warning is not None
+    assert "Some indicator" in warning
+    assert "PAK" in warning
+    assert "sex+age" in warning
+    assert "Total Male/Female" in warning
+
+
+def test_disagg_consistency_warning_fires_when_sex_age_disagrees_with_direct_total():
+    row = {"Male <5": 10, "Male 5-17": 20, "Total Direct": 999}
+    warning = _disagg_consistency_warning(row, indicator_label="Some indicator")
+    assert warning is not None
+    assert "Total Direct" in warning
+
+
+def test_disagg_consistency_warning_fires_when_sex_disagrees_with_direct_total():
+    row = {"Total Male": 345, "Total Female": 534, "Total Direct": 999}
+    warning = _disagg_consistency_warning(row, indicator_label="Some indicator")
+    assert warning is not None
+    assert "Male/Female" in warning
+    assert "Total Direct" in warning
+
+
+def test_disagg_consistency_warning_none_when_sex_matches_direct_total():
+    row = {"Total Male": 345, "Total Female": 534, "Total Direct": 879}
+    assert _disagg_consistency_warning(row, indicator_label="X") is None
+
+
+def test_disagg_consistency_warning_tolerates_rounding_noise():
+    row = {"Total Male": 345, "Total Female": 534.2, "Total Direct": 879}
+    assert _disagg_consistency_warning(row, indicator_label="X") is None
+
+
+def test_extract_disagg_components_ignores_id_and_underscore_keys():
+    row = {"ID": 42, "_internal": 1, "Total Direct": 10}
+    sex_age, sex, direct_total, indirect = _extract_disagg_components(row)
+    assert sex_age == {}
+    assert sex == {}
+    assert direct_total == 10
+    assert indirect is None
 
 
 def test_disagg_payload_roundtrip_to_excel_headers(upr_country_reporting_workbook):
@@ -430,12 +502,32 @@ def test_disagg_by_sex_age_sums_total_direct(upr_country_reporting_workbook):
     cells = _disagg_payload_to_workbook_cells(
         {
             "mode": "sex_age",
-            "values": {"direct": {"male_5": 10, "female_5": 5, "male_5_17": 20}, "indirect": 3},
+            "values": {"direct": {"male__5": 10, "female__5": 5, "male_5_17": 20}, "indirect": 3},
         },
         key_to_header,
     )
     assert cells[key_to_header["direct"]] == 35
     assert cells[key_to_header["indirect"]] == 3
+
+
+def test_disagg_key_to_header_uses_double_underscore_for_under5(upr_country_reporting_workbook):
+    """Regression test for a real data-loss bug: the "<5" age-group label slugifies
+    to "_5" (processing_service.slugify_age_group replaces "<" with "_"), so the
+    entry form's actual field name / disagg JSON key is "male__5" (double
+    underscore), not "male_5". A single-underscore key here would silently orphan
+    every "<5" sex-age value on both import and export.
+    """
+    key_to_header, _ = _build_upr_country_reporting_disagg_header_maps(upr_country_reporting_workbook)
+    assert key_to_header["male__5"] == "Male <5"
+    assert key_to_header["female__5"] == "Female <5"
+    assert "male_5" not in key_to_header
+    assert "female_5" not in key_to_header
+
+    cells = _disagg_payload_to_workbook_cells(
+        {"mode": "sex_age", "values": {"direct": {"male__5": 10, "female__5": 5}}},
+        key_to_header,
+    )
+    assert cells[key_to_header["direct"]] == 15
 
 
 def test_applicable_status_constants():
@@ -547,6 +639,9 @@ def test_yes_no_indicator_detected_from_bank():
 def test_is_yes_no_indicator_type():
     assert _is_yes_no_indicator_type("YesNo")
     assert _is_yes_no_indicator_type("yes/no")
+    assert _is_yes_no_indicator_type("Yes No")
+    assert _is_yes_no_indicator_type("Yes-No")
+    assert _is_yes_no_indicator_type("Boolean")
     assert not _is_yes_no_indicator_type("Number")
 
 
@@ -812,6 +907,41 @@ def test_parse_indicators_skips_applicable_only_for_numeric_banks(upr_country_re
     assert not applicable_only
 
 
+def test_parse_indicators_yes_no_dna_preserves_data_not_available():
+    """Regression test: a Yes/No indicator marked "Data not available" in Excel
+    must come out of parse_indicators() with data_not_available=True and
+    value=None — never silently coerced to a "no" answer. "No" and "we don't
+    have this data" are materially different claims and conflating them was a
+    real bug (the code used to force is_dna=False for every Yes/No row).
+
+    Uses a fresh workbook load (not the shared module-scoped
+    upr_country_reporting_workbook fixture) since this test writes into a
+    table row, and other tests in this module rely on that fixture's rows
+    being in their original state.
+    """
+    import openpyxl
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=True)
+    try:
+        sheet_name, table_name = "Overall action Indicators", "Data_core"
+        bank_id = 555555
+        write_table_cell(wb, sheet_name, table_name, 0, SP_EF_HEADER, "Health")
+        write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_HEADER, "A Yes/No indicator")
+        write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_ID_HEADER, bank_id)
+        write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_DNA_HEADER, INDICATOR_DNA_VALUE)
+
+        rows = parse_indicators(wb, yes_no_bank_ids={bank_id}, kpi_lookup={})
+        target = next(r for r in rows if r.get("bank_id") == bank_id)
+
+        assert target["data_not_available"] is True
+        assert target["value"] is None
+    finally:
+        wb.close()
+
+
 def test_resolve_indicator_import_value_yes_no():
     yes_row = {
         "data_not_available": False,
@@ -835,6 +965,10 @@ def test_resolve_indicator_import_value_yes_no():
     assert value == "no"
     assert should_import
 
+    # Regression test: a Yes/No indicator marked "Data not available" in Excel
+    # must import as DNA (is_data_not_available=True, no value), never silently
+    # coerced to a "No" answer — those are materially different claims ("we
+    # don't know" vs "confirmed no").
     dna_row = {
         "data_not_available": True,
         "applicable_text": "data not available",
@@ -842,8 +976,9 @@ def test_resolve_indicator_import_value_yes_no():
         "disagg": None,
     }
     value, is_dna, disagg, should_import = _resolve_indicator_import_value(dna_row, 999, {999})
-    assert value == "no"
-    assert not is_dna
+    assert value is None
+    assert is_dna
+    assert disagg is None
     assert should_import
 
     numeric_row = {
@@ -1084,5 +1219,203 @@ def test_transform_warns_when_row_has_no_id_and_matched_by_name(app):
             assert any(
                 "had no ID" in w and str(indicator_label) in w for w in ctx.warnings
             ), f"Expected a 'had no ID' warning mentioning {indicator_label!r}; got: {ctx.warnings}"
+        finally:
+            wb.close()
+
+
+# ---------------------------------------------------------------------------
+# Percentage out-of-range detection (e.g. 500 entered instead of 50).
+# ---------------------------------------------------------------------------
+
+
+def test_is_percentage_indicator_type_matches_common_spellings():
+    assert _is_percentage_indicator_type("percentage") is True
+    assert _is_percentage_indicator_type("Percentage") is True
+    assert _is_percentage_indicator_type("PERCENT") is True
+    assert _is_percentage_indicator_type("pct") is True
+    assert _is_percentage_indicator_type("number") is False
+    assert _is_percentage_indicator_type("yesno") is False
+    assert _is_percentage_indicator_type(None) is False
+
+
+def test_iter_numeric_leaves_scalar_values():
+    assert list(_iter_numeric_leaves(45)) == [45.0]
+    assert list(_iter_numeric_leaves(45.5)) == [45.5]
+    assert list(_iter_numeric_leaves("45")) == [45.0]
+    assert list(_iter_numeric_leaves(None)) == []
+    assert list(_iter_numeric_leaves("")) == []
+    assert list(_iter_numeric_leaves("not a number")) == []
+    # Booleans are a bool/int subtype in Python — must not be misread as 0/1.
+    assert list(_iter_numeric_leaves(True)) == []
+
+
+def test_iter_numeric_leaves_walks_nested_disagg_structure():
+    disagg = {
+        "mode": "sex_age",
+        "values": {
+            "direct": {"male_5_17": 60, "female_5_17": "45"},
+            "indirect": 10,
+        },
+    }
+    assert sorted(_iter_numeric_leaves(disagg)) == [10.0, 45.0, 60.0]
+
+
+def test_percentage_range_warning_ignores_non_percentage_indicator():
+    row = {"indicator": "Some indicator", "sp_ef": "Health"}
+    warning = _percentage_range_warning(row, 42, 500, None, percentage_bank_ids=set(), allow_over_100_bank_ids=set())
+    assert warning is None
+
+
+def test_percentage_range_warning_flags_scalar_over_100():
+    row = {"indicator": "Percentage of X reached", "sp_ef": "Health"}
+    warning = _percentage_range_warning(
+        row, 42, 500, None, percentage_bank_ids={42}, allow_over_100_bank_ids=set()
+    )
+    assert warning is not None
+    assert "500" in warning
+    assert "Percentage of X reached" in warning
+    assert "0-100%" in warning
+
+
+def test_percentage_range_warning_flags_negative_value():
+    row = {"indicator": "Percentage of X reached", "sp_ef": "Health"}
+    warning = _percentage_range_warning(
+        row, 42, -5, None, percentage_bank_ids={42}, allow_over_100_bank_ids=set()
+    )
+    assert warning is not None
+    assert "-5" in warning
+
+
+def test_percentage_range_warning_allows_in_range_value():
+    row = {"indicator": "Percentage of X reached", "sp_ef": "Health"}
+    warning = _percentage_range_warning(
+        row, 42, 45, None, percentage_bank_ids={42}, allow_over_100_bank_ids=set()
+    )
+    assert warning is None
+
+
+def test_percentage_range_warning_flags_disagg_sub_value_out_of_range():
+    """The scalar 'value' can be None while the real number lives inside a
+    sex/age disaggregation breakdown — the range check must look there too."""
+    row = {"indicator": "Percentage of X reached", "sp_ef": "Health"}
+    disagg = {"mode": "sex_age", "values": {"direct": {"male_5_17": 250, "female_5_17": 10}}}
+    warning = _percentage_range_warning(
+        row, 42, None, disagg, percentage_bank_ids={42}, allow_over_100_bank_ids=set()
+    )
+    assert warning is not None
+    assert "250" in warning
+
+
+def test_percentage_range_warning_respects_allow_over_100_override():
+    """Indicators explicitly configured with allow_over_100 (cumulative/ratio
+    KPIs) must not be flagged for exceeding 100 — but a negative value is
+    still nonsensical for a percentage and must still be flagged."""
+    row = {"indicator": "Cumulative coverage ratio", "sp_ef": "Health"}
+    over_100_warning = _percentage_range_warning(
+        row, 42, 250, None, percentage_bank_ids={42}, allow_over_100_bank_ids={42}
+    )
+    assert over_100_warning is None
+
+    negative_warning = _percentage_range_warning(
+        row, 42, -5, None, percentage_bank_ids={42}, allow_over_100_bank_ids={42}
+    )
+    assert negative_warning is not None
+
+
+def test_transform_warns_on_out_of_range_percentage_value(app):
+    """End-to-end regression test: a percentage-type indicator given a wildly
+    out-of-range value (the classic '500 instead of 50' data-entry mistake in
+    Excel) must produce a warning instead of silently importing as-is.
+
+    Creates its own temporary percentage-type IndicatorBank row (cleaned up
+    afterwards) so this test is deterministic regardless of what the test
+    database happens to have seeded.
+    """
+    import openpyxl
+    from app.extensions import db
+    from app.models import IndicatorBank
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    from import_upr_excel_data import build_import_context, REPORTING_COUNTRY_TEMPLATE_ID
+    from upr_country_reporting_excel_template import transform_upr_country_reporting_to_import_rows
+
+    indicator_name = "__test_percentage_range_indicator__"
+    with app.app_context():
+        temp_indicator = IndicatorBank(name=indicator_name, type="percentage")
+        db.session.add(temp_indicator)
+        db.session.flush()
+        bank_id = int(temp_indicator.id)
+        wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=True)
+        try:
+            sheet_name, table_name = "Overall action Indicators", "Data_core"
+            write_table_cell(wb, sheet_name, table_name, 0, SP_EF_HEADER, "Health")
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_HEADER, indicator_name)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_ID_HEADER, bank_id)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_DNA_HEADER, None)
+            write_table_cell(wb, sheet_name, table_name, 0, "Total\nDirect", 450)
+
+            ctx = build_import_context([REPORTING_COUNTRY_TEMPLATE_ID])
+            transform_upr_country_reporting_to_import_rows(
+                999999999, wb, ctx, iso3="ZZZ", period="Jan-Jun 2026"
+            )
+
+            assert any(
+                "outside the valid 0-100%" in w and "450" in w for w in ctx.warnings
+            ), f"Expected an out-of-range percentage warning; got: {ctx.warnings}"
+        finally:
+            wb.close()
+            db.session.delete(temp_indicator)
+            db.session.commit()
+
+
+def test_transform_warns_on_id_present_but_text_mismatched(app):
+    """End-to-end regression test for the OTHER half of the ID-integrity check:
+    the workbook's ID cell is filled in (so this is NOT the blank-ID/fuzzy-match
+    path), but the indicator TEXT next to it belongs to a different KPI — e.g.
+    a row was inserted/deleted elsewhere in Excel and the ID column no longer
+    lines up with the text column it was pasted next to.
+
+    Per _bank_id_row_integrity_warning's contract the workbook's stated ID must
+    still win the import (never silently switched), but a warning must reach
+    ctx.warnings so a reviewer can catch the swap before saving — this exercises
+    that full chain (parse_indicators -> transform_..._to_import_rows ->
+    ctx.warnings), not just the isolated helper function.
+    """
+    import openpyxl
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    from import_upr_excel_data import build_import_context, REPORTING_COUNTRY_TEMPLATE_ID
+    from upr_country_reporting_excel_template import transform_upr_country_reporting_to_import_rows
+
+    with app.app_context():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=True)
+        try:
+            sheet_name, table_name = "Overall action Indicators", "Data_core"
+            kpi_lookup = build_kpi_lookup(wb)
+            (sp_ef, _indicator_label), bank_id = next(iter(kpi_lookup.items()))
+
+            # Deliberately unrelated text sharing no meaningful words with any
+            # real indicator label, so the fuzzy-similarity check reliably
+            # falls below the match threshold regardless of which KPI ends up
+            # first in kpi_lookup.
+            mismatched_text = "ZZZZZ_MISMATCH_MARKER_424242 unrelated placeholder text"
+            write_table_cell(wb, sheet_name, table_name, 0, SP_EF_HEADER, sp_ef)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_HEADER, mismatched_text)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_ID_HEADER, bank_id)
+            write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_DNA_HEADER, INDICATOR_APPLICABLE_VALUE)
+            write_table_cell(wb, sheet_name, table_name, 0, "Total\nDirect", 123)
+
+            ctx = build_import_context([REPORTING_COUNTRY_TEMPLATE_ID])
+            transform_upr_country_reporting_to_import_rows(
+                999999999, wb, ctx, iso3="ZZZ", period="Jan-Jun 2026"
+            )
+
+            assert any(
+                f"Row ID {bank_id}" in w and "moved, copied, or swapped" in w for w in ctx.warnings
+            ), f"Expected an ID/text mismatch integrity warning for bank_id {bank_id}; got: {ctx.warnings}"
         finally:
             wb.close()

@@ -6,6 +6,7 @@
 import { addPendingDynamicIndicatorForImport } from './dynamic-indicators.js';
 import {
     addRepeatEntry,
+    findRepeatFieldSelects,
     getEffectiveRepeatEntryMax,
     setSelectValueWithFallback,
     waitForCalculatedSelectOptions,
@@ -50,8 +51,14 @@ function applyFieldPayloadToBlock(block, fieldData) {
         return applyYesNoToBlock(block, value);
     }
 
-    const input = block.querySelector('input[name*="_standard_value"], textarea[name*="_standard_value"], select[name*="_standard_value"]')
-        || block.querySelector(`input[name="field_value[${block.dataset.itemId}]"], textarea[name="field_value[${block.dataset.itemId}]"]`);
+    // Number/currency/percentage indicator and dynamic-indicator fields render as
+    // "{indicator|dynamic}_{id}_total_value" (see entry_form.html) — only text-type
+    // fields use "_standard_value". A payload can reach here with a bare scalar
+    // `value` (no disagg_data wrapper) for e.g. NS Data scalars or single-value
+    // indicator tables, so both suffixes must be checked or the value silently
+    // fails to apply.
+    const input = block.querySelector('input[name*="_standard_value"], textarea[name*="_standard_value"], select[name*="_standard_value"], input[name*="_total_value"]')
+        || block.querySelector(`input[name="field_value[${block.dataset.itemId}]"], textarea[name="field_value[${block.dataset.itemId}]"], select[name="field_value[${block.dataset.itemId}]"]`);
     if (!input) return false;
 
     if (input.type === 'checkbox') {
@@ -178,7 +185,14 @@ async function applyRepeatSlotChoice(repeatEntry, sectionId, slotNum, slot) {
     }
 
     const displayValue = slot.display_value || '';
-    const select = field.querySelector('select');
+    // The emergency-choice <select> is very likely the repeat entry's title
+    // dropdown, which setupRepeatEntryTitleDropdown() physically relocates out
+    // of `field` (its .form-item-block) into the entry header — so a plain
+    // `field.querySelector('select')` finds nothing once that relocation has
+    // run (which happens as soon as the entry is created). Use the same
+    // lookup repeat-sections.js itself uses when loading saved/draft values.
+    const selects = findRepeatFieldSelects(repeatEntry, field, choiceItemId, sectionId, slotNum);
+    const select = selects[0] || field.querySelector('select');
     if (select) {
         // Calculated-list selects (e.g. the emergency-operation/MDR picker)
         // populate their <option>s asynchronously after being created, so a

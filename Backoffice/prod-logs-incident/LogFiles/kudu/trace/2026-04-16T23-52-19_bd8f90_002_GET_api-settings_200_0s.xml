@@ -1,0 +1,6 @@
+<step title="Incoming Request" date="2026-04-16T23:52:19.741" instance="bd8f90" url="/api/settings" method="GET" type="request" pid="768,1,15" Host="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" User-Agent="Python-urllib/3.12" Accept-Encoding="identity" Authorization="Bas..." X-ARR-LOG-ID="6681ad68-ed74-40d1-b0c2-af518a179510" CLIENT-IP="13.83.161.17:14272" X-SITE-DEPLOYMENT-ID="ifrc-databank-app" WAS-DEFAULT-HOSTNAME="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/settings" X-Client-IP="13.83.161.17" X-Client-Port="14272" >
+  <step title="Cleanup Xml Logs" date="2026-04-16T23:52:19.749" >
+    <step title="Cleanup Infos" date="2026-04-16T23:52:19.761" totalFiles="275" totalCleanup="115" /><!-- duration: 10ms -->
+  </step><!-- duration: 51ms -->
+  <step title="Outgoing response" date="2026-04-16T23:52:19.851" type="response" statusCode="200" statusText="OK" /><!-- duration: 2ms -->
+</step><!-- duration: 113ms -->

@@ -63,3 +63,28 @@ class TestSummarizeWarnings:
         assert "MDRTD022" in result["warnings"][0]
         assert "×2" in result["warnings"][0]
         assert "2 countries" in result["warnings"][0]
+
+    def test_groups_percentage_out_of_range_by_indicator_across_countries(self):
+        warnings = [
+            "Percentage indicator 'Coverage of X' = 450 is outside the valid 0-100% range "
+            "(PAK AR2025) — please check for a data-entry mistake (e.g. 500 instead of 50).",
+            "Percentage indicator 'Coverage of X' = -5 is outside the valid 0-100% range "
+            "(AFG AR2025) — please check for a data-entry mistake (e.g. 500 instead of 50).",
+        ]
+        result = summarize_warnings(warnings)
+        assert result["warning_unique_count"] == 1
+        line = result["warnings"][0]
+        assert "Coverage of X" in line
+        assert "×2" in line
+        assert "2 countries" in line
+        assert "AR2025" in line
+
+    def test_keeps_distinct_percentage_indicators_separate(self):
+        warnings = [
+            "Percentage indicator 'Coverage of X' = 450 is outside the valid 0-100% range "
+            "(PAK AR2025) — please check for a data-entry mistake (e.g. 500 instead of 50).",
+            "Percentage indicator 'Coverage of Y' = 450 is outside the valid 0-100% range "
+            "(PAK AR2025) — please check for a data-entry mistake (e.g. 500 instead of 50).",
+        ]
+        result = summarize_warnings(warnings)
+        assert result["warning_unique_count"] == 2

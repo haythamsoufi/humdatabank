@@ -120,6 +120,19 @@ def _classify_warning_for_grouping(message: str) -> _WarningClassification:
                 bank_id=m.group(1),
             ),
         ),
+        (
+            re.compile(
+                r"^Percentage indicator '(.+)' = ([\-0-9.]+) is outside the valid 0-100% range "
+                r"\(([A-Z]{3}) (\S+)\) — please check for a data-entry mistake "
+                r"\(e\.g\. 500 instead of 50\)\.$"
+            ),
+            lambda m: _WarningClassification(
+                group_key=f"percentage_out_of_range|{m.group(1)}",
+                display_base=f"Percentage indicator {m.group(1)!r} has values outside the valid 0-100% range",
+                iso3=m.group(3),
+                rnd=m.group(4),
+            ),
+        ),
     )
 
     for pattern, builder in patterns:

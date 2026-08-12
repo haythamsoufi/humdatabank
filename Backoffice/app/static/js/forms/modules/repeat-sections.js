@@ -2342,7 +2342,11 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
 
                         Object.entries(value).forEach(([subCategory, subValue]) => {
                             if (subValue !== undefined && subValue !== null) {
-                                const subCategorySelector = `input[name*="repeat_${sectionId}_${actualRepeatNumber}"][name*="_${subCategory}"]`;
+                                // Anchored to the "_sexage_" prefix (not just "_${subCategory}") so
+                                // e.g. subCategory "male" from malformed/legacy data can't loosely
+                                // match "_sex_male" (a different container's input) — the sex_age
+                                // breakdown must only ever touch its own sexage-prefixed inputs.
+                                const subCategorySelector = `input[name*="repeat_${sectionId}_${actualRepeatNumber}"][name*="_sexage_${subCategory}"]`;
                                 debugLog('repeat-sections', `🔍 Looking for disaggregation "${subCategory}" with selector: ${subCategorySelector}`);
 
                                 const subCategoryInputs = Array.from(field.querySelectorAll(subCategorySelector))
@@ -2361,8 +2365,14 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
                             }
                         });
                     } else {
-                        // Find inputs that match this category pattern
-                        const categorySelector = `input[name*="repeat_${sectionId}_${actualRepeatNumber}"][name*="_${category}"]`;
+                        // Find inputs that match this category pattern. Anchored to the current
+                        // reportingMode ("_sex_" / "_age_") rather than a bare "_${category}":
+                        // a flat sex-mode category like "male" would otherwise also match
+                        // "_sexage_male_5_17", "_sexage_male__5", etc. (those field names all
+                        // contain "_male" as a substring too), silently overwriting the hidden
+                        // sex_age age-band inputs with the flat sex total whenever an indicator
+                        // has both a "sex" and a "sex_age" container rendered in the DOM.
+                        const categorySelector = `input[name*="repeat_${sectionId}_${actualRepeatNumber}"][name*="_${reportingMode}_${category}"]`;
                         debugLog('repeat-sections', `🔍 Looking for category "${category}" with selector: ${categorySelector}`);
 
                         const categoryInputs = Array.from(field.querySelectorAll(categorySelector))
@@ -2770,6 +2780,8 @@ export {
     addRepeatEntry,
     getEffectiveRepeatEntryMax,
     updateRepeatLimitText,
+    findRepeatFieldSelects,
+    loadFieldValue,
     debugLog,
     debugWarn,
     debugError

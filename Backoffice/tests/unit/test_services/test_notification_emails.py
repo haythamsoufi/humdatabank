@@ -1461,3 +1461,47 @@ class TestSendGroupedEntityEmail:
                 result = send_grouped_entity_email([user.id], [], sample, 'Kenya')
 
         assert result is True
+
+    def test_grouped_email_links_delivery_log_to_notification(self, app, db_session):
+        from app.models import User, Notification, NotificationPreferences, EmailDeliveryLog
+        from app import db
+        from types import SimpleNamespace
+
+        with app.app_context():
+            user = User(email='linked@example.com', name='Linked User', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(NotificationPreferences(
+                user_id=user.id, email_notifications=True,
+                notification_types_enabled=[], notification_frequency='instant',
+            ))
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.assignment_created,
+                title='New assignment',
+                message='Please complete Uganda.',
+            )
+            db.session.add(notification)
+            db.session.commit()
+
+            sample = SimpleNamespace(
+                id=None, title='t', message='m',
+                notification_type=NotificationType.assignment_created,
+                priority='normal', related_url=None,
+                title_key=None, message_key=None, title_params=None, message_params=None,
+            )
+
+            with patch('app.services.notification.emails.send_email', return_value=True):
+                send_grouped_entity_email(
+                    [user.id], [], sample, 'Uganda',
+                    notification_by_user_id={user.id: notification},
+                )
+
+            log = EmailDeliveryLog.query.filter_by(user_id=user.id).order_by(
+                EmailDeliveryLog.id.desc()
+            ).first()
+
+        assert log is not None
+        assert log.notification_id == notification.id
+        assert log.status == 'sent'

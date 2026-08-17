@@ -29,7 +29,6 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     from app.routes.ai_documents import ai_docs_bp
     from app.routes import excel as excel_bp
     from app.routes.translation_review import bp as translation_review_bp
-    from app.routes.ai_ws import register_ai_ws
     from app.swagger.routes import swagger_bp
 
     bp_import_time = time.time() - bp_import_start
@@ -69,18 +68,23 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     except Exception as e:
         app.logger.warning("Could not exempt AI v2 blueprint from CSRF: %s", e)
 
-    try:
-        register_ai_ws(app)
-        app.logger.debug("AI WebSocket endpoint registered")
-    except Exception as e:
-        app.logger.warning("AI WebSocket endpoint not available: %s", e)
+    if app.config.get("WEBSOCKET_ENABLED", False):
+        try:
+            from app.routes.ai_ws import register_ai_ws
+            register_ai_ws(app)
+            app.logger.debug("AI WebSocket endpoint registered")
+        except Exception as e:
+            app.logger.warning("AI WebSocket endpoint not available: %s", e)
+    else:
+        app.logger.info("WebSocket disabled (WEBSOCKET_ENABLED=false); skipping WS endpoint registration")
 
-    try:
-        from app.routes.notifications_ws import register_notifications_ws
-        if register_notifications_ws(app):
-            app.logger.debug("Notifications WebSocket endpoint registered")
-    except Exception as e:
-        app.logger.warning("Notifications WebSocket endpoint not available: %s", e)
+    if app.config.get("WEBSOCKET_ENABLED", False):
+        try:
+            from app.routes.notifications_ws import register_notifications_ws
+            if register_notifications_ws(app):
+                app.logger.debug("Notifications WebSocket endpoint registered")
+        except Exception as e:
+            app.logger.warning("Notifications WebSocket endpoint not available: %s", e)
 
     bp_reg_time = time.time() - bp_reg_start
     if bp_reg_time > 0.5:

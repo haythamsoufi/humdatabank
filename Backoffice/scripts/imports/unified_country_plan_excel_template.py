@@ -48,6 +48,7 @@ from import_upr_excel_data import (  # noqa: E402
 )
 from upr_country_reporting_excel_template import (  # noqa: E402
     GENERIC_FORM_EXPORT_SHEETS,
+    _bilateral_ns_name_for_row,
     _load_form_data_map,
     _matrix_cell_scalar,
     _matrix_cells,
@@ -55,12 +56,17 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _normalize_workbook_header,
     _quiet_openpyxl_io,
     _scalar_value,
+    _table_data_row_capacity,
+    _write_bilateral_ns_source_cell,
     dedupe_upr_import_warnings,
     read_named_cell,
     read_named_table,
+    read_table_cell,
     write_named_cell,
     write_table_cell,
 )
+
+_PLANNING_SUPPORT_CELL_KEY_RE = re.compile(r"^(\d+)_(SP\d|EFs)$")
 
 PLANNING_COUNTRY_TEMPLATE_ID = 24  # Unified Country Plan
 
@@ -70,6 +76,16 @@ SUPPORT_SHEET = "Planned Bilateral Support"
 SUPPORT_TABLE = "Data_Support"
 FUNDING_SHEET = "Funding requirements"
 FUNDING_TABLE = "Data_FR"
+
+START_SHEET = "Start"
+START_REGION_CELL = "C12"
+COUNTRY_REGION_TABLE_SHEET = "TemplateData"
+COUNTRY_REGION_TABLE = "Table7"
+
+# Workbook Table8 labels differ from platform canonical names (e.g. MENA).
+WORKBOOK_REGION_LABELS = {
+    "MENA": "Middle East and North Africa",
+}
 
 SP_AREAS: Tuple[str, ...] = ("SP2", "SP1", "SP3", "SP4", "SP5")
 FUNDING_AREAS_PER_YEAR: Tuple[str, ...] = ("EA1", "EA2", "EA3", *SP_AREAS, "EFs")
@@ -225,6 +241,47 @@ def rewrite_planning_year_headers(wb, period_name: str) -> None:
             _rewrite_table_header(wb, FUNDING_SHEET, FUNDING_TABLE, header, new_header)
 
 
+def _workbook_region_label(region_name: str) -> str:
+    """Map a platform/canonical region name to the Start-sheet dropdown label."""
+    from app.services.organization.secretariat_regional_office_service import normalize_region_label
+
+    canonical = normalize_region_label(region_name) or str(region_name or "").strip()
+    if not canonical:
+        return ""
+    return WORKBOOK_REGION_LABELS.get(canonical, canonical)
+
+
+def _workbook_region_for_country(wb, country_name: str, *, fallback_region: str = "") -> str:
+    """Resolve the Start-sheet region dropdown value for a country."""
+    name = str(country_name or "").strip()
+    if name and _workbook_table_exists(wb, COUNTRY_REGION_TABLE_SHEET, COUNTRY_REGION_TABLE):
+        try:
+            _, rows = read_named_table(wb, COUNTRY_REGION_TABLE_SHEET, COUNTRY_REGION_TABLE)
+        except ValueError:
+            rows = []
+        lower = name.lower()
+        for row in rows:
+            row_country = str(row.get("Country") or "").strip()
+            if row_country.lower() == lower:
+                region = str(row.get("Region") or "").strip()
+                if region:
+                    return region
+    return _workbook_region_label(fallback_region)
+
+
+def _write_start_sheet_selection(wb, country_name: str, region_name: str) -> None:
+    """Pre-fill Start sheet region (C12) and country (Data_Country / K12)."""
+    if START_SHEET not in wb.sheetnames:
+        return
+    ws = wb[START_SHEET]
+    region = str(region_name or "").strip()
+    country = str(country_name or "").strip()
+    if region:
+        ws[START_REGION_CELL].value = region
+    if country:
+        write_named_cell(wb, "Data_Country", country)
+
+
 def _load_assignment_meta(aes_id: int):
     from app.models.assignments import AssignmentEntityStatus
     from app.utils.api_serialization import _country_for_aes
@@ -235,13 +292,14 @@ def _load_assignment_meta(aes_id: int):
     country = _country_for_aes(aes)
     country_name = (country.name if country else "") or ""
     iso3 = (country.iso3 if country else "") or ""
+    region = (country.region if country else "") or ""
     period = (aes.assigned_form.period_name if aes.assigned_form else "") or ""
     template_id = int(getattr(aes.assigned_form, "template_id", 0) or 0)
     if template_id != PLANNING_COUNTRY_TEMPLATE_ID:
         raise ValueError(
             f"Assignment {aes_id} is template {template_id}, not T{PLANNING_COUNTRY_TEMPLATE_ID}"
         )
-    return aes, country_name.strip(), iso3.strip().upper(), period.strip()
+    return aes, country_name.strip(), iso3.strip().upper(), period.strip(), region.strip()
 
 
 def validate_unified_country_plan_import_file(
@@ -402,18 +460,62 @@ def _import_reach_matrices(
     return matrices
 
 
+def _parse_planning_support_ticks(cells: Dict[str, Any]) -> Dict[int, Dict[str, bool]]:
+    """Parse item 955 matrix keys into ns_id -> {area: True}."""
+    ticks: Dict[int, Dict[str, bool]] = {}
+    for cell_key, raw in cells.items():
+        if not _cell_is_tick(raw):
+            continue
+        match = _PLANNING_SUPPORT_CELL_KEY_RE.match(str(cell_key).strip())
+        if not match:
+            continue
+        ns_id = int(match.group(1))
+        area = match.group(2)
+        ticks.setdefault(ns_id, {})[area] = True
+    return ticks
+
+
+def _planning_support_ns_display_names(ctx, ns_ids: List[int]) -> Dict[int, str]:
+    id_to_name: Dict[int, str] = {}
+    try:
+        from app.models.organization import NationalSociety
+
+        for ns in NationalSociety.query.filter(NationalSociety.id.in_(list(ns_ids))).all():
+            id_to_name[int(ns.id)] = (ns.name or "").strip()
+    except Exception:
+        id_to_name = {}
+
+    for ns_id in ns_ids:
+        if int(ns_id) in id_to_name:
+            continue
+        for db_name, db_id in ctx.ns_name_to_id.items():
+            if db_id == int(ns_id):
+                id_to_name[int(ns_id)] = db_name
+                break
+    return id_to_name
+
+
+def _clear_planning_support_table(wb) -> None:
+    capacity = _table_data_row_capacity(wb, SUPPORT_SHEET, SUPPORT_TABLE)
+    for offset in range(capacity):
+        _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, "")
+        for area in (*SP_AREAS, "EFs"):
+            write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, area, None)
+
+
 def _import_support_matrix(wb, ctx, *, aes_id: int, warnings: List[str]) -> Dict[str, Any]:
     cells: Dict[str, Any] = {}
-    _, rows = read_named_table(wb, SUPPORT_SHEET, SUPPORT_TABLE)
-    for row in rows:
-        ns_name = str(row.get("NS") or "").strip()
+    capacity = _table_data_row_capacity(wb, SUPPORT_SHEET, SUPPORT_TABLE)
+    for offset in range(capacity):
+        ns_name = _bilateral_ns_name_for_row(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset)
         if not ns_name:
             continue
         ns_id = _resolve_ns_row_id(ctx, ns_name)
         if ns_id is None:
             continue
         for area in (*SP_AREAS, "EFs"):
-            if _cell_is_tick(row.get(area)):
+            val = read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, area)
+            if _cell_is_tick(val):
                 cells[f"{ns_id}_{area}"] = 1
     return cells
 
@@ -617,18 +719,21 @@ def _export_reach_to_workbook(wb, entry_954, entry_960) -> None:
 
 def _export_support_to_workbook(wb, entry_955, ctx) -> None:
     cells = _normalize_matrix_cells(_matrix_cells(entry_955))
-    if not cells:
+    ticks_by_ns = _parse_planning_support_ticks(cells)
+    if not ticks_by_ns:
         return
-    _, rows = read_named_table(wb, SUPPORT_SHEET, SUPPORT_TABLE)
-    for offset, row in enumerate(rows):
-        ns_name = str(row.get("NS") or "").strip()
+
+    ns_ids = sorted(ticks_by_ns.keys())
+    id_to_name = _planning_support_ns_display_names(ctx, ns_ids)
+    _clear_planning_support_table(wb)
+
+    for offset, ns_id in enumerate(ns_ids):
+        ns_name = id_to_name.get(int(ns_id), "")
         if not ns_name:
             continue
-        ns_id = ctx.ns_name_to_id.get(ns_name.lower())
-        if ns_id is None:
-            continue
-        for area in (*SP_AREAS, "EFs"):
-            if _cell_is_tick(cells.get(f"{ns_id}_{area}")):
+        _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, ns_name)
+        for area, ticked in ticks_by_ns[int(ns_id)].items():
+            if ticked:
                 write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, area, 1)
 
 
@@ -697,7 +802,7 @@ def build_unified_country_plan_export(aes_id: int, template_path: str, output_pa
     _require_openpyxl()
     import openpyxl
 
-    _aes, country_name, iso3, period = _load_assignment_meta(aes_id)
+    _aes, country_name, iso3, period, region = _load_assignment_meta(aes_id)
     if not os.path.isfile(template_path):
         raise FileNotFoundError(f"Unified Country Plan template not found: {template_path}")
 
@@ -705,7 +810,11 @@ def build_unified_country_plan_export(aes_id: int, template_path: str, output_pa
         wb = openpyxl.load_workbook(template_path)
     rewrite_planning_year_headers(wb, period)
     write_named_cell(wb, "Version", period_to_workbook_version(period))
-    write_named_cell(wb, "Data_Country", country_name)
+    _write_start_sheet_selection(
+        wb,
+        country_name,
+        _workbook_region_for_country(wb, country_name, fallback_region=region),
+    )
 
     ctx = build_import_context([PLANNING_COUNTRY_TEMPLATE_ID])
     entries = _load_form_data_map(aes_id)
@@ -785,7 +894,7 @@ def run_unified_country_plan_import(
     from app.extensions import db
     from app.models.form_items import FormItem
 
-    _aes, country_name, iso3, period = _load_assignment_meta(aes_id)
+    _aes, country_name, iso3, period, _region = _load_assignment_meta(aes_id)
     ctx = build_import_context([PLANNING_COUNTRY_TEMPLATE_ID])
 
     with _quiet_openpyxl_io():

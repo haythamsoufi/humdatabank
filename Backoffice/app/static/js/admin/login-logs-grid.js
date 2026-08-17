@@ -38,6 +38,7 @@
                     }
                     return d.email_attempted || '';
                 },
+                cellStyle: AgGridRenderers.userHoverCellStyle,
                 cellRenderer: function(params) {
                     var d = params.data || {};
                     var cls = String(d.device_icon_classes || 'fas fa-laptop text-gray-500')

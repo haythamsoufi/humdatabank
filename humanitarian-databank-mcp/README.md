@@ -21,8 +21,8 @@ It proxies the **public** IFRC Humanitarian Databank API for Claude, Cursor, and
 | `databank_get_indicator` | `getIndicatorById` | One indicator's metadata |
 | `databank_get_public_data` | `getPublicData` | One page of scoped public `/data` |
 | `databank_get_public_data_all_pages` | — | Auto-paginate public `/data` (raw rows; not deduped) |
-| `databank_build_country_report` | — | **One-pager builder** — headline KPIs + trend + cited narrative for one country/period |
-| `databank_get_report_template` | — | HTML/CSS layout skeleton + design tokens for the one-pager |
+| `databank_build_country_report` | `getCountryReport` | **One-pager builder** — headline KPIs + trend + cited narrative for one country/period |
+| `databank_get_report_template` | `getReportTemplate` | HTML/CSS layout skeleton + design tokens for the one-pager |
 | `databank_api_info` | — | Configured base URL and endpoint summary |
 
 Server instructions mirror [`instructions-core.md`](../Backoffice/docs/public/custom-gpt/instructions-core.md).

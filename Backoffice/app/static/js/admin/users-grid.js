@@ -222,6 +222,7 @@
             headerName: t.user_8f9bfe9d,
             width: 250, minWidth: 200, maxWidth: 350,
             filter: 'agTextColumnFilter', sortable: true,
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             cellRenderer: function (params) {
                 var inner = AgGridRenderers.userHoverCell(
                     { value: params.data, data: params.data },
@@ -236,8 +237,7 @@
                     return '<span class="block rounded -mx-1 px-1 users-grid-name-denied cursor-pointer hover:bg-gray-50" role="button" tabindex="0">' + inner + '</span>';
                 }
                 return inner;
-            },
-            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'overflow-wrap': 'break-word', 'line-height': '1.4', 'overflow': 'hidden', 'max-width': '100%' }
+            }
         },
         {
             field: 'email',

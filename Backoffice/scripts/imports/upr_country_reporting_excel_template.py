@@ -59,6 +59,7 @@ from import_upr_excel_data import (  # noqa: E402
     REPORTING_SP_BREAKDOWN_COLUMNS,
     UprImportContext,
     _data_na_row,
+    _not_applicable_row,
     _matrix_key_warning,
     _matrix_row,
     _resolve_emergency_operation_labels,
@@ -74,7 +75,7 @@ from import_upr_excel_data import (  # noqa: E402
     _matrix_column_name_from_item_id,
     _queue_other_dynamic_indicator,
 )
-from upr_import_warnings import dedupe_upr_import_warnings  # noqa: E402
+from upr_import_warnings import dedupe_upr_import_warnings, serialize_upr_import_warnings  # noqa: E402
 
 # NS Data indicator bank IDs (same as UPR T33 / T24 NS Data)
 NS_DATA_BANK_IDS: Dict[str, int] = {
@@ -804,12 +805,17 @@ def _bank_id_row_integrity_warning(
     )
 
 
+def _workbook_applicable_is_blank(applicable_text: Any) -> bool:
+    """True when the workbook Applicable / Data not available cell is empty."""
+    return not str(applicable_text or "").strip()
+
+
 def _workbook_yes_no_value(applicable_text: str) -> str:
     """Map workbook Applicable column to entry-form yes/no storage.
 
-    Callers must check for "Data not available" (via row["data_not_available"],
-    see _resolve_indicator_import_value) BEFORE calling this — it only decides
-    between "yes"/"no" and has no representation for DNA itself.
+    Callers must check for "Data not available" (via row["data_not_available"])
+    and a blank Applicable cell (via _workbook_applicable_is_blank) BEFORE
+    calling this — it only decides between "yes"/"no".
     """
     text = str(applicable_text or "").strip().lower()
     if "applicable" in text:
@@ -826,19 +832,22 @@ def _resolve_indicator_import_value(
     row: Dict[str, Any],
     bank_id: Optional[int],
     yes_no_bank_ids: Set[int],
-) -> Tuple[Optional[Any], bool, Optional[Dict[str, Any]], bool]:
-    """Return (value, data_not_available, disagg, should_import)."""
-    # Check DNA first, even for Yes/No indicators: a Yes/No answer marked "Data
-    # not available" in Excel must import as DNA (is_data_not_available=True),
-    # not silently coerce to a "No" answer — those are materially different
-    # claims ("we don't know" vs "confirmed no").
+) -> Tuple[Optional[Any], bool, Optional[Dict[str, Any]], bool, bool]:
+    """Return (value, data_not_available, disagg, should_import, not_applicable).
+
+    A blank Applicable / Data not available cell means Not Applicable — not
+    "No" and not a skipped row. DNA is checked first so "Data not available"
+    is never collapsed into N/A or a Yes/No answer.
+    """
     if row.get("data_not_available"):
-        return None, True, None, True
+        return None, True, None, True, False
+    if _workbook_applicable_is_blank(row.get("applicable_text")):
+        return None, False, None, True, True
     if bank_id and bank_id in yes_no_bank_ids:
-        return _workbook_yes_no_value(row.get("applicable_text", "")), False, None, True
+        return _workbook_yes_no_value(row.get("applicable_text", "")), False, None, True, False
     disagg = row.get("disagg")
     value = row.get("value")
-    return value, False, disagg, bool(disagg or value is not None)
+    return value, False, disagg, bool(disagg or value is not None), False
 
 
 def _write_indicator_applicable_cell(
@@ -1977,7 +1986,11 @@ def parse_indicators(
                 # above) instead of forcing it to False — a Yes/No indicator marked
                 # "Data not available" in Excel must import as DNA, not silently
                 # coerce to a "No" answer (a materially different, false claim).
-                value = None if is_dna else ("yes" if "applicable" in applicable else "no")
+                # A blank Applicable cell is Not Applicable, not "No".
+                if is_dna or not applicable:
+                    value = None
+                else:
+                    value = "yes" if "applicable" in applicable else "no"
             elif not is_dna and "applicable" in applicable and disagg is None and value is None:
                 # Numeric placeholders: Applicable with no values — skip on import.
                 continue
@@ -2530,6 +2543,7 @@ def _upsert_dynamic_indicator(
     repeat_instance_number: Optional[int],
     value: Any,
     data_not_available: bool,
+    not_applicable: bool = False,
     user_id: int,
     order: float,
     disagg_payload: Optional[Dict[str, Any]] = None,
@@ -2557,6 +2571,8 @@ def _upsert_dynamic_indicator(
         action = "inserted"
     if data_not_available:
         row.set_data_availability(data_not_available=True)
+    elif not_applicable:
+        row.set_data_availability(not_applicable=True)
     elif disagg_payload:
         row.set_disaggregated_data(disagg_payload["mode"], disagg_payload["values"])
     elif value is not None:
@@ -2634,7 +2650,7 @@ def _collect_workbook_dynamic_indicator_entries(
         )
         if slot_num is None:
             continue
-        value, is_dna, disagg, should_import = _resolve_indicator_import_value(
+        value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
             row, bank_id, yes_no_bank_ids
         )
         if not should_import:
@@ -2654,6 +2670,7 @@ def _collect_workbook_dynamic_indicator_entries(
                 "repeat_instance_number": slot_num,
                 "value": value,
                 "data_not_available": is_dna,
+                "not_applicable": is_na,
                 "disagg_data": disagg,
                 "order": order,
                 "existing_assignment_id": _lookup_existing_dynamic_assignment_id(
@@ -2693,7 +2710,7 @@ def _collect_workbook_dynamic_indicator_entries(
                     integrity_warning = _bank_id_row_integrity_warning(row, bank_id, kpi_display)
                     if integrity_warning:
                         ctx.warnings.append(integrity_warning)
-                value, is_dna, disagg, should_import = _resolve_indicator_import_value(
+                value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
                     row, bank_id, yes_no_bank_ids
                 )
                 if not should_import:
@@ -2713,6 +2730,7 @@ def _collect_workbook_dynamic_indicator_entries(
                         "repeat_instance_number": None,
                         "value": value,
                         "data_not_available": is_dna,
+                        "not_applicable": is_na,
                         "disagg_data": disagg,
                         "order": order,
                         "existing_assignment_id": _lookup_existing_dynamic_assignment_id(
@@ -2774,6 +2792,7 @@ def import_rows_to_client_payload(
         if not item_id:
             continue
         data_na = str(row.get(COL_DATA_NA) or "").strip() == "1"
+        not_appl = str(row.get(COL_NA) or "").strip().lower() in ("1", "true", "yes")
         disagg_raw = str(row.get(COL_DISAGG) or "").strip()
         value = row.get(COL_VALUE)
 
@@ -2789,6 +2808,8 @@ def import_rows_to_client_payload(
             continue
         if data_na:
             fields[item_id] = {"data_not_available": True}
+        elif not_appl:
+            fields[item_id] = {"not_applicable": True}
         elif value is not None and str(value).strip() != "":
             fields[item_id] = {"value": str(value)}
     return fields, matrices
@@ -2877,6 +2898,7 @@ def _import_dynamic_indicators_from_workbook(
             repeat_instance_number=entry.get("repeat_instance_number"),
             value=entry.get("value"),
             data_not_available=bool(entry.get("data_not_available")),
+            not_applicable=bool(entry.get("not_applicable")),
             user_id=user_id,
             order=float(entry.get("order") or 0),
             disagg_payload=entry.get("disagg_data"),
@@ -3308,7 +3330,7 @@ def transform_upr_country_reporting_to_import_rows(
                 row["indicator"],
                 kpi_lookup,
             )
-        value, is_dna, disagg, should_import = _resolve_indicator_import_value(
+        value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
             row, bank_id, yes_no_bank_ids
         )
         if not should_import:
@@ -3322,13 +3344,14 @@ def transform_upr_country_reporting_to_import_rows(
         if row.get("disagg_warning"):
             ctx.warnings.append(row["disagg_warning"])
         if not item_id:
-            if bank_id and (is_dna or value is not None or disagg):
+            if bank_id and (is_dna or is_na or value is not None or disagg):
                 _queue_other_dynamic_indicator(
                     ctx,
                     aes_id=aes_id,
                     indicator_bank_id=bank_id,
                     value=value,
                     data_not_available=is_dna,
+                    not_applicable=is_na,
                     order_counters=dynamic_order,
                     disagg_data=disagg,
                 )
@@ -3340,6 +3363,16 @@ def transform_upr_country_reporting_to_import_rows(
         if is_dna:
             import_rows.append(
                 _data_na_row(
+                    aes_id=aes_id,
+                    item_id=item_id,
+                    iso3=iso3,
+                    period=period,
+                    debug_kpi=f"indicator_{row['indicator'][:40]}",
+                )
+            )
+        elif is_na:
+            import_rows.append(
+                _not_applicable_row(
                     aes_id=aes_id,
                     item_id=item_id,
                     iso3=iso3,
@@ -3544,6 +3577,7 @@ def run_upr_country_reporting_import(
             )
             stats["warnings"].extend(ctx.warnings)
             stats["warnings"] = dedupe_upr_import_warnings(stats["warnings"])
+            warning_texts, warning_items = serialize_upr_import_warnings(stats["warnings"])
             field_count = len(payload.get("fields") or {})
             matrix_count = len(payload.get("matrices") or {})
             dynamic_count = len(payload.get("dynamic_indicators") or [])
@@ -3554,7 +3588,8 @@ def run_upr_country_reporting_import(
                 "success": True,
                 "stage_only": True,
                 "payload": payload,
-                "warnings": stats["warnings"],
+                "warnings": warning_texts,
+                "warning_items": warning_items,
                 "transformed": len(import_rows),
                 "updated_count": updated_count,
             }
@@ -3602,6 +3637,9 @@ def run_upr_country_reporting_import(
         # matching note in the stage-only branch).
         stats["warnings"].extend(ctx.warnings)
         upsert_stats["warnings"] = dedupe_upr_import_warnings(stats["warnings"])
+        warning_texts, warning_items = serialize_upr_import_warnings(upsert_stats["warnings"])
+        upsert_stats["warnings"] = warning_texts
+        upsert_stats["warning_items"] = warning_items
         upsert_stats["transformed"] = len(import_rows)
         wb.close()
         return upsert_stats

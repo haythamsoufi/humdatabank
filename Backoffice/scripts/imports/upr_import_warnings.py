@@ -7,9 +7,75 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 
+# Legacy phrasing (bulk importer / older workbooks) plus the entry-form wording.
 _EMERGENCY_CODE_IMPORTED_RE = re.compile(
     r"^Emergency code '([^']+)' not found in GO API for ([A-Z]{3}) — imported using Excel name/code; review in form$"
 )
+_EMERGENCY_APPEAL_NOT_LISTED_RE = re.compile(
+    r"^Emergency appeal ([A-Z0-9]+) is not listed for this country in GO\. "
+    r"The Excel name and code were imported — please review it on the form\.$"
+)
+_MATRIX_ROW_FRIENDLY_RE = re.compile(
+    r'^The imported row [“"\'](.+?)[”"\'] does not match a row on [“"\'](.+?)[”"\']\.'
+)
+_MATRIX_COL_FRIENDLY_RE = re.compile(
+    r'^The imported column [“"\'](.+?)[”"\'] does not match a column on [“"\'](.+?)[”"\']\.'
+)
+_MATRIX_ROW_LEGACY_RE = re.compile(
+    r"^Matrix row '([^']+)' not found in current form configuration(?: for item (\d+))?"
+)
+
+
+def warning_text(warning: Any) -> str:
+    """Return the display string from a warning (plain text or structured item)."""
+    if isinstance(warning, dict):
+        return str(warning.get("message") or warning.get("text") or "").strip()
+    return str(warning or "").strip()
+
+
+def warning_item_id(warning: Any) -> Optional[int]:
+    """Return a form-item id to scroll to, if the warning carries one."""
+    if not isinstance(warning, dict) or warning.get("item_id") is None:
+        return None
+    try:
+        return int(warning["item_id"])
+    except (TypeError, ValueError):
+        return None
+
+
+def make_import_warning(
+    message: str,
+    *,
+    item_id: Optional[int] = None,
+    code: Optional[str] = None,
+    iso3: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build a structured import warning the entry form can turn into a jump-link."""
+    out: Dict[str, Any] = {"message": str(message or "").strip()}
+    if item_id:
+        out["item_id"] = int(item_id)
+    if code:
+        out["code"] = str(code).strip().upper()
+    if iso3:
+        out["iso3"] = str(iso3).strip().upper()
+    return out
+
+
+def serialize_upr_import_warnings(warnings: Iterable[Any]) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """Split warnings into display strings plus structured items for the UI."""
+    texts: List[str] = []
+    items: List[Dict[str, Any]] = []
+    for raw in warnings:
+        text = warning_text(raw)
+        if not text:
+            continue
+        texts.append(text)
+        item: Dict[str, Any] = {"message": text}
+        item_id = warning_item_id(raw)
+        if item_id:
+            item["item_id"] = item_id
+        items.append(item)
+    return texts, items
 
 
 def canonicalize_upr_import_warning(message: str) -> str:
@@ -17,6 +83,12 @@ def canonicalize_upr_import_warning(message: str) -> str:
     text = str(message or "").strip()
     match = _EMERGENCY_CODE_IMPORTED_RE.match(text)
     if not match:
+        listed = _EMERGENCY_APPEAL_NOT_LISTED_RE.match(text)
+        if listed:
+            return (
+                f"Emergency appeal {listed.group(1).upper()} is not listed for this country "
+                "in GO. The Excel name and code were imported — please review it on the form."
+            )
         return text
     code, iso3 = match.group(1).upper(), match.group(2)
     return (
@@ -25,13 +97,99 @@ def canonicalize_upr_import_warning(message: str) -> str:
     )
 
 
-def dedupe_upr_import_warnings(warnings: Iterable[str]) -> List[str]:
+def _canonicalize_warning_item(raw: Any) -> Any:
+    if isinstance(raw, dict):
+        out = dict(raw)
+        out["message"] = canonicalize_upr_import_warning(warning_text(raw))
+        if out.get("code"):
+            out["code"] = str(out["code"]).upper()
+        return out
+    return canonicalize_upr_import_warning(str(raw or "").strip())
+
+
+def _matrix_row_group_key(text: str) -> Optional[Tuple[str, str]]:
+    """Return (field_label, row_name) when *text* is a matrix-row mismatch warning."""
+    match = _MATRIX_ROW_FRIENDLY_RE.match(text)
+    if match:
+        return match.group(2), match.group(1)
+    legacy = _MATRIX_ROW_LEGACY_RE.match(text)
+    if legacy:
+        return legacy.group(2) or "", legacy.group(1)
+    return None
+
+
+def _format_quoted_list(names: List[str]) -> str:
+    quoted = [f"“{name}”" for name in names]
+    if len(quoted) == 1:
+        return quoted[0]
+    if len(quoted) == 2:
+        return f"{quoted[0]} and {quoted[1]}"
+    return f"{', '.join(quoted[:-1])}, and {quoted[-1]}"
+
+
+def _merge_matrix_row_warnings(items: List[Any]) -> List[Any]:
+    """Collapse per-cell row mismatches into one warning per field (and list the rows)."""
+    groups: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    passthrough: List[Any] = []
+    for raw in items:
+        text = warning_text(raw)
+        parsed = _matrix_row_group_key(text)
+        if not parsed:
+            passthrough.append(raw)
+            continue
+        field_label, row_name = parsed
+        group_key = field_label or warning_text(raw)
+        if group_key not in groups:
+            groups[group_key] = {
+                "field": field_label,
+                "rows": [],
+                "item_id": warning_item_id(raw),
+                "first": raw,
+            }
+            order.append(group_key)
+        group = groups[group_key]
+        if row_name not in group["rows"]:
+            group["rows"].append(row_name)
+        if group["item_id"] is None:
+            group["item_id"] = warning_item_id(raw)
+
+    merged: List[Any] = []
+    for key in order:
+        group = groups[key]
+        rows: List[str] = group["rows"]
+        field = group["field"]
+        if len(rows) == 1 and field:
+            message = (
+                f"The imported row “{rows[0]}” does not match a row on “{field}”. "
+                "The value was imported but may not appear in the table."
+            )
+        elif len(rows) == 1:
+            message = warning_text(group["first"])
+        elif field:
+            message = (
+                f"These imported rows do not match the current “{field}” table: "
+                f"{_format_quoted_list(rows)}. The values were imported but may not appear "
+                "in the table."
+            )
+        else:
+            message = (
+                f"These imported rows do not match the current form table: "
+                f"{_format_quoted_list(rows)}. The values were imported but may not appear "
+                "in the table."
+            )
+        merged.append(make_import_warning(message, item_id=group["item_id"]))
+    return passthrough + merged
+
+
+def dedupe_upr_import_warnings(warnings: Iterable[Any]) -> List[Any]:
     """Return unique import warnings, collapsing redundant variants."""
     seen: Set[str] = set()
-    out: List[str] = []
+    out: List[Any] = []
     period_noted = False
     for raw in warnings:
-        text = canonicalize_upr_import_warning(str(raw or "").strip())
+        item = _canonicalize_warning_item(raw)
+        text = warning_text(item)
         if not text or text in seen:
             continue
         lower = text.lower()
@@ -40,8 +198,8 @@ def dedupe_upr_import_warnings(warnings: Iterable[str]) -> List[str]:
                 continue
             period_noted = True
         seen.add(text)
-        out.append(text)
-    return out
+        out.append(item)
+    return _merge_matrix_row_warnings(out)
 
 
 @dataclass
@@ -53,8 +211,18 @@ class _WarningClassification:
     bank_id: Optional[str] = None
 
 
-def _classify_warning_for_grouping(message: str) -> _WarningClassification:
+def _classify_warning_for_grouping(message: str, *, raw: Any = None) -> _WarningClassification:
     """Map a warning to a group key and display base, stripping country/round when useful."""
+    if isinstance(raw, dict) and raw.get("code"):
+        code = str(raw["code"]).upper()
+        return _WarningClassification(
+            group_key=f"ea_code_not_found|{code}",
+            display_base=(
+                f"Emergency appeal {code} is not listed in GO — "
+                "imported using the Excel name and code; please review it on the form"
+            ),
+            iso3=raw.get("iso3"),
+        )
     patterns: Tuple[
         Tuple[re.Pattern[str], Callable[[re.Match[str]], _WarningClassification]],
         ...,
@@ -92,6 +260,16 @@ def _classify_warning_for_grouping(message: str) -> _WarningClassification:
                     "imported using Excel labels; review in form"
                 ),
                 iso3=m.group(2),
+            ),
+        ),
+        (
+            _EMERGENCY_APPEAL_NOT_LISTED_RE,
+            lambda m: _WarningClassification(
+                group_key=f"ea_code_not_found|{m.group(1).upper()}",
+                display_base=(
+                    f"Emergency appeal {m.group(1).upper()} is not listed in GO — "
+                    "imported using the Excel name and code; please review it on the form"
+                ),
             ),
         ),
         (
@@ -221,7 +399,8 @@ def summarize_warnings(warnings: List[str]) -> Dict[str, Any]:
     order: List[str] = []
 
     for message in warnings:
-        parts = _classify_warning_for_grouping(message)
+        text = warning_text(message)
+        parts = _classify_warning_for_grouping(text, raw=message)
         if parts.group_key not in groups:
             groups[parts.group_key] = _Group(label=parts.display_base)
             order.append(parts.group_key)

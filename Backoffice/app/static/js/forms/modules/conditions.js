@@ -602,12 +602,9 @@ function evaluateSingleConditionQuietly(condition) {
     let fieldId = item_id;
     let isPluginMeasure = false;
 
-    if (item_id.includes('_') && item_id.startsWith('plugin_')) {
-        const parts = item_id.split('_');
-        if (parts.length >= 3) {
-            isPluginMeasure = true;
-            fieldId = item_id; // pass full id so plugin measure data attribute is resolved
-        }
+    if (parsePluginMeasureId(item_id)) {
+        isPluginMeasure = true;
+        fieldId = item_id; // pass full id so plugin measure data attribute is resolved
     }
 
     // Get the actual value from the field (prefer live value quietly).
@@ -630,11 +627,11 @@ function evaluateSingleConditionQuietly(condition) {
 
         case 'equals':
         case 'equal_to':
-            return String(actualValue || '').trim() === String(resolvedExpectedValue || '').trim();
+            return comparableConditionValue(actualValue) === comparableConditionValue(resolvedExpectedValue);
 
         case 'not_equals':
         case 'not_equal_to':
-            return String(actualValue || '').trim() !== String(resolvedExpectedValue || '').trim();
+            return comparableConditionValue(actualValue) !== comparableConditionValue(resolvedExpectedValue);
 
         case 'is_yes':
             // Only return true if value is explicitly "yes" - treat null/undefined/empty as false
@@ -895,7 +892,7 @@ function setupListenerForField(sourceFieldId, targetFieldId) {
     debugLog(MODULE_NAME, `\n🔗 Setting up listener: field ${sourceFieldId} -> field ${targetFieldId}`);
 
     // Check if this is a plugin field - plugin fields use custom events, not traditional input listeners
-    if (sourceFieldId.startsWith('plugin_') && sourceFieldId.includes('_')) {
+    if (parsePluginMeasureId(sourceFieldId)) {
         debugLog(MODULE_NAME, `  🔌 Plugin field detected: ${sourceFieldId} - using custom event system`);
         debugLog(MODULE_NAME, `  📊 Added 0 listeners for field ${sourceFieldId} (plugin field uses custom events)`);
         return; // Skip setting up traditional input listeners for plugin fields
@@ -1090,7 +1087,7 @@ function checkFieldRelevance(fieldId) {
         // Special debugging for plugin measures
         if (conditionData.conditions) {
             conditionData.conditions.forEach((condition, index) => {
-                if (condition.item_id && condition.item_id.includes('_') && condition.item_id.startsWith('plugin_')) {
+                if (parsePluginMeasureId(condition.item_id)) {
                     debugLog(MODULE_NAME, `🔌 PLUGIN MEASURE CONDITION ${index + 1}: ${condition.item_id} ${condition.condition_type} "${condition.value}"`);
                 }
             });
@@ -1414,14 +1411,14 @@ function evaluateSingleCondition(condition) {
             fieldId = `question_${numericId}`;
             debugLog(MODULE_NAME, `    ⚠️ Could not determine prefix for ID ${item_id}, defaulting to: ${fieldId}`);
         }
-    } else if (item_id.includes('_') && item_id.startsWith('plugin_')) {
-        const parts = item_id.split('_');
-        if (parts.length >= 3) {
+    } else {
+        const parsedMeasure = parsePluginMeasureId(item_id);
+        if (parsedMeasure) {
             fieldId = item_id; // pass full id so plugin measure data attribute is resolved
-            measureName = parts.slice(2).join('_');
+            measureName = parsedMeasure.measureId;
             isPluginMeasure = true;
             debugLog(MODULE_NAME, `    🔌 PLUGIN MEASURE DETECTED: ${item_id}`);
-            debugLog(MODULE_NAME, `    🔌 Base field ID: ${parts.slice(0, 2).join('_')}, Measure: ${measureName}`);
+            debugLog(MODULE_NAME, `    🔌 Base field ID: ${parsedMeasure.baseFieldId}, Measure: ${measureName}`);
         }
     }
 
@@ -1497,13 +1494,13 @@ function evaluateSingleCondition(condition) {
 
         case 'equals':
         case 'equal_to':
-            const equals = String(actualValue || '').trim() === String(resolvedExpectedValue || '').trim();
+            const equals = comparableConditionValue(actualValue) === comparableConditionValue(resolvedExpectedValue);
             debugLog(MODULE_NAME, `    ✅ equals/equal_to check: "${actualValue}" === "${resolvedExpectedValue}" -> ${equals}`);
             return equals;
 
         case 'not_equals':
         case 'not_equal_to':
-            const notEquals = String(actualValue || '').trim() !== String(resolvedExpectedValue || '').trim();
+            const notEquals = comparableConditionValue(actualValue) !== comparableConditionValue(resolvedExpectedValue);
             debugLog(MODULE_NAME, `    ✅ not_equals/not_equal_to check: "${actualValue}" !== "${resolvedExpectedValue}" -> ${notEquals}`);
             return notEquals;
 
@@ -1551,6 +1548,11 @@ function evaluateSingleCondition(condition) {
             debugWarn(MODULE_NAME, `Unknown condition type: ${condition_type}`);
             return false;
     }
+}
+
+function comparableConditionValue(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).trim();
 }
 
 function isValueEmpty(value) {

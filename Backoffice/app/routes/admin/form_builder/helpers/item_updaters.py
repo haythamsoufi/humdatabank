@@ -7,6 +7,7 @@ from app import db
 from app.models import IndicatorBank, LookupList
 from config.config import Config
 from .field_parsing import get_field_value
+from .item_config_fields import apply_preserve_existing_bools
 import json
 
 ENTRY_FORM_HINT_STYLES = frozenset({'normal', 'info', 'warning', 'tip', 'important'})
@@ -700,65 +701,7 @@ def _update_item_config(form_item, form, request_form):
     form_item.config['allow_disability_questions'] = form.allow_disability_questions.data if hasattr(form, 'allow_disability_questions') and hasattr(form.allow_disability_questions, 'data') else False
     form_item.config['indirect_reach'] = form.indirect_reach.data if hasattr(form, 'indirect_reach') and hasattr(form.indirect_reach, 'data') else False
 
-    # Allow over 100% for percentage items
-    # Check direct field first, then fall back to config JSON if present
-    allow_over_100 = False
-    if 'allow_over_100' in request_form:
-        allow_over_100 = request_form.get('allow_over_100') in ['true', 'on', '1']
-    elif request_form.get('config'):
-        try:
-            config_json = json.loads(request_form.get('config'))
-            allow_over_100 = config_json.get('allow_over_100', False)
-        except (json.JSONDecodeError, TypeError):
-            allow_over_100 = False
-    form_item.config['allow_over_100'] = bool(allow_over_100)
-
-    # Unique option selection within a section (single/multi choice questions)
-    unique_options_in_section = False
-    if 'unique_options_in_section' in request_form:
-        unique_options_in_section = request_form.get('unique_options_in_section') in ['true', 'on', '1']
-    elif request_form.get('config'):
-        try:
-            config_json = json.loads(request_form.get('config'))
-            unique_options_in_section = bool(config_json.get('unique_options_in_section', False))
-        except (json.JSONDecodeError, TypeError):
-            unique_options_in_section = False
-    form_item.config['unique_options_in_section'] = unique_options_in_section
-
-    # Repeat entry title dropdown (single choice in repeat sections)
-    use_as_repeat_entry_title = False
-    if 'use_as_repeat_entry_title' in request_form:
-        use_as_repeat_entry_title = request_form.get('use_as_repeat_entry_title') in ['true', 'on', '1']
-    elif request_form.get('config'):
-        try:
-            config_json = json.loads(request_form.get('config'))
-            use_as_repeat_entry_title = bool(config_json.get('use_as_repeat_entry_title', False))
-        except (json.JSONDecodeError, TypeError):
-            use_as_repeat_entry_title = False
-    form_item.config['use_as_repeat_entry_title'] = use_as_repeat_entry_title
-
-    exclude_from_completion_rate = False
-    if 'exclude_from_completion_rate' in request_form:
-        exclude_from_completion_rate = request_form.get('exclude_from_completion_rate') in ['true', 'on', '1']
-    elif request_form.get('config'):
-        try:
-            config_json = json.loads(request_form.get('config'))
-            exclude_from_completion_rate = bool(config_json.get('exclude_from_completion_rate', False))
-        except (json.JSONDecodeError, TypeError):
-            exclude_from_completion_rate = False
-    form_item.config['exclude_from_completion_rate'] = exclude_from_completion_rate
-
-    # Allow "Other" free-text entry for choice questions
-    allow_other = False
-    if 'allow_other' in request_form:
-        allow_other = request_form.get('allow_other') in ['true', 'on', '1']
-    elif request_form.get('config'):
-        try:
-            config_json = json.loads(request_form.get('config'))
-            allow_other = bool(config_json.get('allow_other', False))
-        except (json.JSONDecodeError, TypeError):
-            allow_other = False
-    form_item.config['allow_other'] = allow_other
+    apply_preserve_existing_bools(form_item.config, request_form)
 
     # Max additional "Other" entries allowed on top of option-count limit
     try:
@@ -767,18 +710,6 @@ def _update_item_config(form_item, form, request_form):
     except (ValueError, TypeError):
         max_other_entries = 0
     form_item.config['max_other_entries'] = max_other_entries
-
-    # Limit repeat entries to option count (single choice in repeat sections with unique options)
-    limit_entries_to_option_count = False
-    if 'limit_entries_to_option_count' in request_form:
-        limit_entries_to_option_count = request_form.get('limit_entries_to_option_count') in ['true', 'on', '1']
-    elif request_form.get('config'):
-        try:
-            config_json = json.loads(request_form.get('config'))
-            limit_entries_to_option_count = bool(config_json.get('limit_entries_to_option_count', False))
-        except (json.JSONDecodeError, TypeError):
-            limit_entries_to_option_count = False
-    form_item.config['limit_entries_to_option_count'] = limit_entries_to_option_count
 
     # Privacy (dropdown, defaults to organization network / internal visibility)
     try:
@@ -894,18 +825,7 @@ def _update_plugin_fields(plugin_item, form, request_form):
         plugin_item.config['allow_not_applicable'] = form.allow_not_applicable.data if hasattr(form, 'allow_not_applicable') and hasattr(form.allow_not_applicable, 'data') else False
         plugin_item.config['indirect_reach'] = form.indirect_reach.data if hasattr(form, 'indirect_reach') and hasattr(form.indirect_reach, 'data') else False
 
-        # Allow over 100% for percentage items
-        # Check direct field first, then fall back to config JSON if present
-        allow_over_100 = False
-        if 'allow_over_100' in request_form:
-            allow_over_100 = request_form.get('allow_over_100') in ['true', 'on', '1']
-        elif request_form.get('config'):
-            try:
-                config_json = json.loads(request_form.get('config'))
-                allow_over_100 = config_json.get('allow_over_100', False)
-            except (json.JSONDecodeError, TypeError):
-                allow_over_100 = False
-        plugin_item.config['allow_over_100'] = bool(allow_over_100)
+        apply_preserve_existing_bools(plugin_item.config, request_form)
 
         # Privacy for plugin items (edit path)
         try:

@@ -229,6 +229,7 @@
                     var d = p.data || {};
                     return [d.user_name, d.user_email].filter(Boolean).join(' ');
                 },
+                cellStyle: AgGridRenderers.userHoverCellStyle,
                 cellRenderer: function(params) {
                     var d = params.data || {};
                     var cls = String(d.device_icon_classes || 'fas fa-laptop text-gray-500')

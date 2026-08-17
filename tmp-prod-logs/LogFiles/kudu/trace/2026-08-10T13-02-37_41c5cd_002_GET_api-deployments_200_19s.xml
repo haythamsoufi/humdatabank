@@ -1,9 +1,0 @@
-<step title="Incoming Request" date="2026-08-10T13:02:37.199" instance="41c5cd" url="/api/deployments/" method="GET" type="request" pid="831,1,14" Accept="*/*" Host="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" User-Agent="AZURECLI/2.77.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bas..." x-ms-client-request-id="bbc82a3e-94bb-11f1-bb3b-105fad8a3815" X-ARR-LOG-ID="bbc82a3e-94bb-11f1-bb3b-105fad8a3815" CLIENT-IP="88.185.235.63:18537" X-SITE-DEPLOYMENT-ID="ifrc-databank-app" WAS-DEFAULT-HOSTNAME="ifrc-databank-app-gtfncudqb2cwhngw.scm.westeurope-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/" X-Client-IP="88.185.235.63" X-Client-Port="18537" >
-  <step title="DeploymentService.GetCurrentEtag" date="2026-08-10T13:02:37.356" >
-    <step title="Current Etag: &quot;f72109a17d9e9169&quot;, Cached Etag: " date="2026-08-10T13:02:37.922" /><!-- duration: 5ms -->
-  </step><!-- duration: 573ms -->
-  <step title="DeploymentService.GetDeployResults" date="2026-08-10T13:02:37.931" >
-    <step title="DeploymentManager.GetResults" date="2026-08-10T13:02:37.934" /><!-- duration: 17939ms -->
-  </step><!-- duration: 17950ms -->
-  <step title="Outgoing response" date="2026-08-10T13:02:55.917" type="response" statusCode="200" statusText="OK" /><!-- duration: 3ms -->
-</step><!-- duration: 18723ms -->

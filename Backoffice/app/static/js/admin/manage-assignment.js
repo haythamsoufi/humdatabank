@@ -712,7 +712,7 @@
                 maxWidth: 300,
                 filter: 'agTextColumnFilter',
                 sortable: true,
-                cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+                cellStyle: AgGridRenderers.userHoverCellStyle,
                 valueGetter: function(params) {
                     return params.data && params.data.fds_member_name ? params.data.fds_member_name : '';
                 },

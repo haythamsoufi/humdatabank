@@ -3,7 +3,7 @@
  * must stay disabled until a value has been chosen in that column's header
  * (see app/static/js/forms/modules/matrix/selectable-headers.js).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
   debugLog: vi.fn(),
@@ -13,6 +13,7 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
 
 vi.mock('../../../app/static/js/forms/modules/matrix/shared.js', () => ({
   _t: (k) => k,
+  __canEditMatrixContainer: (container) => container?.getAttribute('data-can-edit') !== 'false',
 }));
 
 describe('__matrixCellIsHeaderGated', () => {
@@ -245,6 +246,40 @@ describe('matrixSelectableHeadersMixin gating helpers', () => {
     expect(handler._applyMatrixInputEditability).toHaveBeenCalledTimes(2);
   });
 
+  it('_saveHeaderValue keeps the GO-unmatched flag unless the caller clears it', () => {
+    document.body.innerHTML = `
+      <div class="matrix-container">
+        <table><tbody><tr><td><input data-column="SP1"></td></tr></tbody></table>
+      </div>`;
+    const matrix = {
+      container: document.querySelector('.matrix-container'),
+      config: { columns: [{ name: 'SP1', header_type: 'selectable' }] },
+      data: { 'col_header_go_unmatched|SP1': 1 },
+    };
+    const handler = makeHandler(matrix);
+
+    handler._saveHeaderValue('1', 'SP1', 'Imported value');
+    expect(matrix.data['col_header_go_unmatched|SP1']).toBe(1);
+
+    handler._saveHeaderValue('1', 'SP1', 'Typed by hand', { clearGoUnmatched: true });
+    expect(matrix.data['col_header_go_unmatched|SP1']).toBeUndefined();
+  });
+
+  it('_saveHeaderValue tolerates a matrix registered without a data dict', () => {
+    document.body.innerHTML = `
+      <div class="matrix-container">
+        <table><tbody><tr><td><input data-column="SP1"></td></tr></tbody></table>
+      </div>`;
+    const matrix = {
+      container: document.querySelector('.matrix-container'),
+      config: { columns: [{ name: 'SP1', header_type: 'selectable' }] },
+    };
+    const handler = makeHandler(matrix);
+
+    expect(() => handler._saveHeaderValue('1', 'SP1', 'Region A')).not.toThrow();
+    expect(matrix.data['col_header|SP1']).toBe('Region A');
+  });
+
   it('_saveHeaderValue persists the value, updates the hidden field, and re-syncs cell editability', () => {
     document.body.innerHTML = `
       <div class="matrix-container">
@@ -274,5 +309,252 @@ describe('matrixSelectableHeadersMixin gating helpers', () => {
 
     expect(matrix.data['col_header|SP1']).toBeUndefined();
     expect(handler._applyMatrixInputEditability).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('selectable header picker: values, option lists and keyboard', () => {
+  let matrixSelectableHeadersMixin;
+
+  beforeEach(async () => {
+    document.body.innerHTML = '';
+    ({ matrixSelectableHeadersMixin } = await import(
+      '../../../app/static/js/forms/modules/matrix/selectable-headers.js'
+    ));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /**
+   * Mirrors the col_header_content macro in
+   * app/templates/forms/entry_form/partials/matrix_table.html.
+   */
+  function mountPicker({ options = ['Region A'], allowOther = false, listLibrary = false } = {}) {
+    const optionTags = options.map((o) => `<option value="${o}">${o}</option>`).join('');
+    document.body.innerHTML = `
+      <div class="matrix-container" data-field-id="1" data-can-edit="true">
+        <table>
+          <thead><tr><th>
+            <div class="matrix-header-picker">
+              <button type="button" class="matrix-header-picker-trigger" role="combobox"
+                      aria-haspopup="listbox" aria-expanded="false">
+                <span class="matrix-header-picker-label"></span>
+              </button>
+              <select class="matrix-header-select matrix-header-select-native"
+                      data-field-id="1" data-col-name="SP1"
+                      data-header-source="${listLibrary ? 'list_library' : 'manual'}"
+                      ${listLibrary ? 'data-header-lookup-list-id="9" data-header-list-display-column="name"' : ''}
+                      data-header-allow-other="${allowOther}"
+                      tabindex="-1" aria-hidden="true">
+                <option value="">Select...</option>
+                ${optionTags}
+                ${allowOther ? '<option value="__other__">Other (please specify)...</option>' : ''}
+              </select>
+              <ul class="matrix-header-picker-menu hidden" role="listbox"></ul>
+            </div>
+            ${allowOther ? '<input type="text" class="matrix-header-other-input hidden" data-field-id="1" data-col-name="SP1">' : ''}
+          </th></tr></thead>
+          <tbody><tr><td><input data-column="SP1" data-cell-key="r1_SP1"></td></tr></tbody>
+        </table>
+        <input type="hidden" name="field_value[1]">
+      </div>`;
+
+    const container = document.querySelector('.matrix-container');
+    return {
+      container,
+      selectEl: container.querySelector('.matrix-header-select'),
+      trigger: container.querySelector('.matrix-header-picker-trigger'),
+      label: container.querySelector('.matrix-header-picker-label'),
+      menu: container.querySelector('.matrix-header-picker-menu'),
+      otherInput: container.querySelector('.matrix-header-other-input'),
+      hiddenField: container.querySelector('input[type="hidden"]'),
+    };
+  }
+
+  function makeHandler(container, data, extra = {}) {
+    const matrix = {
+      container,
+      hiddenField: container.querySelector('input[type="hidden"]'),
+      config: { columns: [{ name: 'SP1', header_type: 'selectable' }] },
+      data,
+    };
+    const handler = Object.assign(
+      {
+        matrices: new Map([['1', matrix]]),
+        _applyMatrixInputEditability: vi.fn(),
+        getAssignmentEntityStatusId: () => null,
+        ...extra,
+      },
+      matrixSelectableHeadersMixin
+    );
+    return { handler, matrix };
+  }
+
+  function press(handler, trigger, key) {
+    handler.handleHeaderPickerKeydown({ target: trigger, key, preventDefault: () => {} });
+  }
+
+  it('switching to Other clears the previous value instead of leaving it persisted', () => {
+    const { container, selectEl, otherInput } = mountPicker({ allowOther: true });
+    const { handler, matrix } = makeHandler(container, { 'col_header|SP1': 'Region A' });
+    selectEl.value = 'Region A';
+
+    selectEl.value = '__other__';
+    handler.handleHeaderSelectChange(selectEl);
+
+    expect(matrix.data['col_header|SP1']).toBeUndefined();
+    expect(matrix.hiddenField.value).not.toContain('Region A');
+    expect(otherInput.classList.contains('hidden')).toBe(false);
+  });
+
+  it('typing a free-text header persists it and drops the GO-unmatched provenance', () => {
+    const { container, selectEl, otherInput } = mountPicker({ allowOther: true });
+    const { handler, matrix } = makeHandler(container, {
+      'col_header|SP1': 'Afghanistan: Population Movement (MDRAF070)',
+      'col_header_go_unmatched|SP1': 1,
+    });
+    selectEl.value = '__other__';
+    otherInput.value = 'Typed by hand';
+
+    handler.handleHeaderOtherInputChange(otherInput, { immediate: true });
+
+    expect(matrix.data['col_header|SP1']).toBe('Typed by hand');
+    expect(matrix.data['col_header_go_unmatched|SP1']).toBeUndefined();
+    expect(document.querySelector('.matrix-header-picker--go-unmatched')).toBeNull();
+  });
+
+  it('re-selecting the injected GO-unmatched option keeps the flag', () => {
+    const { container, selectEl } = mountPicker({ options: ['GO appeal (MDR001)'] });
+    const { handler, matrix } = makeHandler(container, {
+      'col_header|SP1': 'Afghanistan: Population Movement (MDRAF070)',
+      'col_header_go_unmatched|SP1': 1,
+    });
+
+    handler._restoreHeaderSelectValue(selectEl, '1');
+    handler.handleHeaderSelectChange(selectEl);
+
+    expect(matrix.data['col_header|SP1']).toBe('Afghanistan: Population Movement (MDRAF070)');
+    expect(matrix.data['col_header_go_unmatched|SP1']).toBe(1);
+  });
+
+  it('shows a stored value that is no longer in the option list rather than blanking the header', () => {
+    const { container, selectEl, label } = mountPicker({ options: ['Region A'] });
+    const { handler } = makeHandler(container, { 'col_header|SP1': 'Renamed region' });
+
+    handler._restoreHeaderSelectValue(selectEl, '1');
+    handler._syncHeaderPickerUI(selectEl);
+
+    expect(selectEl.value).toBe('Renamed region');
+    expect(selectEl.querySelector('option[data-stored-header-value="true"]')).not.toBeNull();
+    expect(label.textContent).toBe('Renamed region');
+    expect(label.classList.contains('matrix-header-picker-label--placeholder')).toBe(false);
+  });
+
+  it('restoring after an import that cleared the header resets the dropdown', async () => {
+    const { container, selectEl, label, otherInput } = mountPicker({ allowOther: true });
+    const { handler } = makeHandler(container, {});
+    selectEl.value = '__other__';
+    otherInput.value = 'Stale text';
+    otherInput.classList.remove('hidden');
+
+    await handler.restoreSelectableHeadersFromData('1');
+
+    expect(selectEl.value).toBe('');
+    expect(otherInput.value).toBe('');
+    expect(otherInput.classList.contains('hidden')).toBe(true);
+    expect(label.textContent).toBe('Select...');
+  });
+
+  it('surfaces a failed lookup-list fetch in the header label', async () => {
+    const { container, selectEl, label } = mountPicker({ listLibrary: true, options: [] });
+    const { handler } = makeHandler(container, {}, {
+      _fetchMatrixSearchOptionsCached: vi.fn().mockRejectedValue(new Error('gateway timeout')),
+    });
+
+    await handler._initOneHeaderSelect(selectEl, '1');
+
+    expect(selectEl.dataset.headerState).toBe('error');
+    expect(label.textContent).toBe('Error loading options');
+    expect(label.classList.contains('matrix-header-picker-label--error')).toBe(true);
+  });
+
+  it('shares one lookup-list load when init and restore race, so options are not duplicated', async () => {
+    const { container, selectEl } = mountPicker({ listLibrary: true, options: [] });
+    const fetchOptions = vi.fn().mockResolvedValue([{ value: 'Region A' }, { value: 'Region B' }]);
+    const { handler } = makeHandler(container, {}, { _fetchMatrixSearchOptionsCached: fetchOptions });
+
+    await Promise.all([
+      handler._loadHeaderListOptions(selectEl, '1', '9', 'name', false),
+      handler._loadHeaderListOptions(selectEl, '1', '9', 'name', false),
+    ]);
+
+    expect(fetchOptions).toHaveBeenCalledTimes(1);
+    const values = Array.from(selectEl.options).map((o) => o.value);
+    expect(values).toEqual(['', 'Region A', 'Region B']);
+  });
+
+  it('supports arrow-key navigation and Enter selection without a mouse', () => {
+    const { container, selectEl, trigger, menu } = mountPicker({ options: ['Region A', 'Region B'] });
+    const { handler, matrix } = makeHandler(container, {});
+    const onChange = (e) => handler.handleHeaderSelectChange(e.target);
+    document.addEventListener('change', onChange);
+
+    try {
+      handler._syncHeaderPickerUI(selectEl);
+      press(handler, trigger, 'ArrowDown');
+      expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+      press(handler, trigger, 'ArrowDown');
+      const active = menu.querySelector('.matrix-header-picker-option.is-active');
+      expect(active.dataset.value).toBe('Region A');
+      expect(trigger.getAttribute('aria-activedescendant')).toBe(active.id);
+
+      press(handler, trigger, 'Enter');
+
+      expect(selectEl.value).toBe('Region A');
+      expect(matrix.data['col_header|SP1']).toBe('Region A');
+      expect(trigger.getAttribute('aria-expanded')).toBe('false');
+      expect(trigger.hasAttribute('aria-activedescendant')).toBe(false);
+    } finally {
+      document.removeEventListener('change', onChange);
+    }
+  });
+
+  it('closes the menu on Escape and marks the selected option for assistive tech', () => {
+    const { container, selectEl, trigger, menu } = mountPicker({ options: ['Region A'] });
+    const { handler } = makeHandler(container, { 'col_header|SP1': 'Region A' });
+    selectEl.value = 'Region A';
+    handler._syncHeaderPickerUI(selectEl);
+
+    expect(menu.querySelector('[aria-selected="true"]').dataset.value).toBe('Region A');
+
+    handler.handleHeaderPickerToggle(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+    press(handler, trigger, 'Escape');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(menu.classList.contains('hidden')).toBe(true);
+  });
+
+  it('debounces free-text edits and flushes them on demand', () => {
+    vi.useFakeTimers();
+    const { container, selectEl, otherInput } = mountPicker({ allowOther: true });
+    const { handler, matrix } = makeHandler(container, {});
+    selectEl.value = '__other__';
+
+    otherInput.value = 'Reg';
+    handler.handleHeaderOtherInputChange(otherInput);
+    otherInput.value = 'Region A';
+    handler.handleHeaderOtherInputChange(otherInput);
+
+    expect(matrix.data['col_header|SP1']).toBeUndefined();
+
+    handler.flushPendingHeaderEdits();
+
+    expect(matrix.data['col_header|SP1']).toBe('Region A');
+
+    vi.advanceTimersByTime(1000);
+    expect(handler._headerOtherSaveTimers.size).toBe(0);
   });
 });

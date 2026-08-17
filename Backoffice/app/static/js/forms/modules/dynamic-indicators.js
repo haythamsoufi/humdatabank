@@ -1006,6 +1006,40 @@ function addDynamicIndicator(sectionId, indicatorId, rowId, repeatInstance = nul
 }
 
 /**
+ * Find a rendered dynamic-indicator .form-item-block inside a section/repeat
+ * container. Layout clones fields after insert, so callers must query the
+ * live node — not a previously held reference, and not a catalog picker row.
+ */
+export function findDynamicIndicatorFormBlock(container, indicatorBankId) {
+    if (!container || indicatorBankId == null || indicatorBankId === '') {
+        return null;
+    }
+    const bankId = String(indicatorBankId);
+    const byBank = container.querySelector(`.form-item-block[data-indicator-bank-id="${bankId}"]`);
+    if (byBank) return byBank;
+
+    const proposeBtn = container.querySelector(
+        `.form-item-block[data-assignment-id] .propose-changes-btn[data-indicator-id="${bankId}"]`
+    );
+    return proposeBtn?.closest('.form-item-block') || null;
+}
+
+/**
+ * After applyLayoutToSection clones the inserted field, return the in-document
+ * copy. The original node is detached by layout.replaceChildren().
+ */
+export function findLivePendingIndicatorBlock(tempAssignmentId, fallbackElement = null) {
+    if (tempAssignmentId) {
+        const live = document.querySelector(
+            `.form-item-block[data-pending-assignment-id="${tempAssignmentId}"], `
+            + `.form-item-block[data-assignment-id="${tempAssignmentId}"]`
+        );
+        if (live) return live;
+    }
+    return fallbackElement?.isConnected ? fallbackElement : null;
+}
+
+/**
  * Render a pending dynamic indicator (no DB write) for Excel import staging.
  * Returns the inserted DOM element, or null when already present.
  */
@@ -1084,6 +1118,7 @@ export function addPendingDynamicIndicatorForImport(sectionId, indicatorBankId, 
             }
 
             indicatorElement.setAttribute('data-pending-assignment-id', tempAssignmentId);
+            indicatorElement.setAttribute('data-indicator-bank-id', String(indicatorBankId));
             if (interfaceEl) {
                 insertionPoint.insertBefore(indicatorElement, interfaceEl);
             } else {
@@ -1091,7 +1126,12 @@ export function addPendingDynamicIndicatorForImport(sectionId, indicatorBankId, 
             }
 
             applyLayoutToSection(sectionContainer);
-            initializeFieldListeners(indicatorElement);
+            // Layout clones .form-item-block nodes into flex wrappers and
+            // discards the originals. Apply values / listeners to the live clone.
+            const liveBlock = findLivePendingIndicatorBlock(tempAssignmentId, indicatorElement);
+            if (liveBlock) {
+                initializeFieldListeners(liveBlock);
+            }
             if (window.reinitializeDisaggregationCalculator) {
                 window.reinitializeDisaggregationCalculator();
             }
@@ -1099,25 +1139,17 @@ export function addPendingDynamicIndicatorForImport(sectionId, indicatorBankId, 
                 window.cleanupInputValues();
             }
             refreshDynamicIndicatorButtonStates();
-            return indicatorElement;
+            return liveBlock;
         });
 }
 
 function isIndicatorAlreadyAdded(sectionId, indicatorId, repeatInstance = null) {
-    // Check within the appropriate container (per-entry clone or section-level)
     const containerId = repeatInstance !== null
         ? `section-container-${sectionId}-ri-${repeatInstance}`
         : `section-container-${sectionId}`;
-    const container = document.getElementById(containerId) ||
-                      document.getElementById(`section-container-${sectionId}`);
-
-    if (container) {
-        const existing = container.querySelector(`.propose-changes-btn[data-indicator-id="${indicatorId}"]`);
-        if (existing) {
-            return true;
-        }
-    }
-    return false;
+    const container = document.getElementById(containerId)
+        || document.getElementById(`section-container-${sectionId}`);
+    return !!findDynamicIndicatorFormBlock(container, indicatorId);
 }
 
 function openIndicatorProposalForm(sectionId) {

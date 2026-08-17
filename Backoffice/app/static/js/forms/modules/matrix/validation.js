@@ -220,8 +220,17 @@ hasMatrixData(fieldId) {
     const matrix = this.matrices.get(fieldId);
     if (!matrix) return false;
 
-    const data = matrix.data;
-    return Object.values(data).some(value => value && value > 0);
+    const data = matrix.data || {};
+    return Object.entries(data).some(([key, value]) => {
+        if (key === '_table' || (typeof key === 'string' && key.startsWith('_'))) return false;
+        if (value === null || value === undefined || value === '') return false;
+        if (typeof value === 'object') {
+            const inner = value.value ?? value.modified;
+            return inner !== undefined && inner !== null && inner !== '';
+        }
+        // 0 is a real saved cell (see updateMatrixData); do not treat it as empty.
+        return true;
+    });
 },
 
 /**

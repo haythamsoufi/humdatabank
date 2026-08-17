@@ -85,7 +85,9 @@ class TestResolveEmergencyOperationLabels:
         assert name == "Nigeria Floods EA"
         assert code == "MDRNG999"
         assert display == _format_emergency_operation_display("Nigeria Floods EA", "MDRNG999")
-        assert any("not found in GO API" in w for w in ctx.warnings)
+        from upr_import_warnings import warning_text
+
+        assert any("is not listed for this country in GO" in warning_text(w) for w in ctx.warnings)
 
     def test_warns_once_when_same_code_resolved_with_different_casing(self):
         ctx = UprImportContext(template_ids=[24])
@@ -93,9 +95,11 @@ class TestResolveEmergencyOperationLabels:
         ctx.emergency_ops_ordered_by_iso["AFG"] = []
         _resolve_emergency_operation_labels(ctx, iso3="AFG", excel_name="Appeal A", excel_code="rfqwerqw")
         _resolve_emergency_operation_labels(ctx, iso3="AFG", excel_name="Appeal A", excel_code="RFQWERQW")
-        ea_warnings = [w for w in ctx.warnings if "not found in GO API" in w]
+        from upr_import_warnings import warning_text
+
+        ea_warnings = [w for w in ctx.warnings if "is not listed for this country in GO" in warning_text(w)]
         assert len(ea_warnings) == 1
-        assert "'RFQWERQW'" in ea_warnings[0]
+        assert "RFQWERQW" in warning_text(ea_warnings[0])
 
 
 class TestResolveEmergencyRowKey:
@@ -111,7 +115,9 @@ class TestResolveEmergencyRowKey:
             excel_name="Nigeria Floods EA",
         )
         assert cell_key == f"Nigeria Floods EA (MDRNG999)_{EMERGENCY_APPEALS_COLUMN}"
-        assert any("imported using Excel name/code" in w for w in ctx.warnings)
+        from upr_import_warnings import warning_text
+
+        assert any("The Excel name and code were imported" in warning_text(w) for w in ctx.warnings)
 
     def test_uses_go_api_labels_when_code_matches(self):
         ctx = UprImportContext(template_ids=[24])
@@ -127,7 +133,9 @@ class TestResolveEmergencyRowKey:
             excel_name="Excel-only name",
         )
         assert cell_key == f"Nigeria - Floods (MDRNG041)_{EMERGENCY_APPEALS_COLUMN}"
-        assert not any("not found in GO API" in w for w in ctx.warnings)
+        from upr_import_warnings import warning_text
+
+        assert not any("is not listed for this country in GO" in warning_text(w) for w in ctx.warnings)
 
 
 class TestResolveEmergencyMatrixCells:

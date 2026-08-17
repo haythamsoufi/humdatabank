@@ -27,7 +27,7 @@ Update these files whenever you change public integration endpoints under `/api/
 2. **Schema limits:** ChatGPT rejects operation `description` fields longer than **300 characters** — keep [`openapi.yaml`](openapi.yaml) concise (details belong in [`instructions.md`](instructions.md)).
 3. **Action payload limit:** request and response bodies must stay under **~100,000 characters** each or ChatGPT returns `ResponseTooLargeError`. Use `full_coverage=true` with `page`/`per_page` for cross-country document queries; keep `top_k≤12` for non–full-coverage search.
 4. **Authentication:** None (public endpoints only).
-5. **Instructions:** paste [`instructions-core.md`](instructions-core.md) (~7.5k chars, stay under 8000).
+5. **Instructions:** paste [`instructions-core.md`](instructions-core.md) (~5.7k chars; must stay **≤8000**).
 6. **Knowledge:** upload [`instructions.md`](instructions.md) as a reference file (full workflows). The file includes rules **not** to cite it in user answers — refresh Instructions + Knowledge together after edits.
 7. **Description & starters:** copy from [`profile.md`](profile.md).
 8. **Privacy policy:** `https://databank.ifrc.org/privacy`.

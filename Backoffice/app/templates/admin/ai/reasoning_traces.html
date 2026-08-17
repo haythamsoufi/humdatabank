@@ -306,6 +306,7 @@
             filter: 'customSetFilter',
             sortable: true,
             valueFormatter: AgGridRenderers.dashIfEmpty,
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             cellRenderer: function(params) {
                 return AgGridRenderers.userHoverCell(params, {
                     idField: 'user_id',

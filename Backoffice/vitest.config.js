@@ -13,6 +13,7 @@ export default defineConfig({
     test: {
         environment: 'jsdom',
         globals: true,
+        setupFiles: ['tests/js/setup.js'],
         include: ['tests/js/**/*.test.js'],
         exclude: ['tests/js/data-exploration-analysis-core.test.js'],
         coverage: {

@@ -720,6 +720,11 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     font-weight: 500;
 }
 
+/* Lookup-list fetch failed — see _syncHeaderPickerUI in selectable-headers.js */
+.matrix-header-picker-label--error {
+    color: #b91c1c;
+}
+
 .matrix-header-picker-chevron {
     position: absolute;
     top: 50%;
@@ -770,6 +775,19 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     text-align: left;
 }
 
+/* Open menus are positioned with fixed coords in JS so they escape overflow-x scroll wrappers. */
+.matrix-header-picker-menu.matrix-header-picker-menu--floating {
+    position: fixed;
+    z-index: 100;
+    transform: none;
+    margin: 0;
+    /* _positionHeaderPickerMenu sets an explicit px width. The percentage
+       min-width above would otherwise resolve against the viewport (the
+       containing block of a fixed element) and stretch the menu full width. */
+    min-width: 11rem;
+    max-width: none;
+}
+
 .matrix-header-picker-option {
     padding: 0.45rem 0.65rem;
     font-size: 0.75rem;
@@ -791,6 +809,17 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .matrix-header-picker-option.is-selected {
     background: #dbeafe;
     color: #1e40af;
+}
+
+/* Keyboard "active option": the trigger keeps DOM focus and points here through
+   aria-activedescendant, so this is the only cue that arrow keys are moving. */
+.matrix-header-picker-option.is-active {
+    background: #eff6ff;
+    box-shadow: inset 2px 0 0 #2563eb;
+}
+
+.matrix-header-picker-option.is-active.is-selected {
+    background: #dbeafe;
 }
 
 .matrix-header-picker-option.is-placeholder {

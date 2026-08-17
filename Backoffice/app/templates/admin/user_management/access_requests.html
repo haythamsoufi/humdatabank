@@ -842,7 +842,7 @@
             maxWidth: 300,
             filter: 'agTextColumnFilter',
             sortable: true,
-            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'overflow-wrap': 'break-word', 'line-height': '1.4', 'overflow': 'hidden', 'max-width': '100%' },
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             cellRenderer: function(params) {
                 return AgGridRenderers.userHoverCell(params, {
                     idField: 'user_id',
@@ -1048,7 +1048,7 @@
             filter: 'agTextColumnFilter',
             sortable: true,
             hide: true,
-            cellStyle: { 'white-space': 'normal', 'word-wrap': 'break-word', 'line-height': '1.4' },
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             cellRenderer: function(params) {
                 if (!params.data || !params.data.fds_member_user_id) {
                     if (params.data && params.data.multiple_fds_members && params.value) {
@@ -1175,7 +1175,7 @@
             {
                 colId: 'created_at',
                 field: 'created_at',
-                headerName: {{ _('Requested At')|tojson|safe }},
+                headerName: {{ _('Requested at')|tojson|safe }},
                 width: 180,
                 minWidth: 150,
                 maxWidth: 250,
@@ -1225,7 +1225,7 @@
             {
                 colId: 'created_at',
                 field: 'created_at',
-                headerName: {{ _('Requested At')|tojson|safe }},
+                headerName: {{ _('Requested at')|tojson|safe }},
                 width: 180,
                 minWidth: 150,
                 maxWidth: 250,
@@ -1265,12 +1265,13 @@
             {
                 colId: 'processed_by_email',
                 field: 'processed_by_email',
-                headerName: {{ _('Processed By')|tojson|safe }},
+                headerName: {{ _('Processed by')|tojson|safe }},
                 width: 250,
                 minWidth: 200,
                 maxWidth: 400,
                 filter: 'agTextColumnFilter',
                 sortable: true,
+                cellStyle: AgGridRenderers.userHoverCellStyle,
                 cellRenderer: function(params) {
                     if (grouped && params.data.multiple_processed_by) {
                         return '<span class="text-sm text-gray-600">' + AgGridRenderers.escapeHtml(params.value || '') + '</span>';
@@ -1289,12 +1290,13 @@
             {
                 colId: 'processed_at',
                 field: 'processed_at',
-                headerName: {{ _('Processed At')|tojson|safe }},
+                headerName: {{ _('Processed at')|tojson|safe }},
                 width: 180,
                 minWidth: 150,
                 maxWidth: 250,
-                filter: 'agTextColumnFilter',
-                sortable: true
+                filter: 'agDateColumnFilter',
+                sortable: true,
+                cellRenderer: AgGridRenderers.dateTime
             }
         );
         return cols;

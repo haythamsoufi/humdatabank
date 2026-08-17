@@ -376,7 +376,7 @@ class CommunicationsGridManager {
                         + '<div class="min-w-0 flex-1 overflow-hidden">' + userHtml + '</div>'
                         + '</div>';
                 },
-                cellStyle: { overflow: 'hidden', 'line-height': '1.4' }
+                cellStyle: AgGridRenderers.userHoverCellStyle
             }
         ];
 
@@ -1020,7 +1020,7 @@ class CampaignsGridManager {
                         showEmail: false
                     });
                 },
-                cellStyle: { overflow: 'hidden', 'line-height': '1.4' }
+                cellStyle: AgGridRenderers.userHoverCellStyle
             },
             {
                 field: 'sent_count',

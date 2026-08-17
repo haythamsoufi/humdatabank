@@ -22,6 +22,7 @@ from import_upr_excel_data import (  # noqa: E402
     is_skipped_legacy_funding_area,
     transform_to_import_rows,
 )
+from upr_import_warnings import warning_text  # noqa: E402
 
 
 def _funding_source_row(**overrides):
@@ -171,8 +172,9 @@ class TestMatrixKeyWarning:
             item_id=4242, cell_key="IFRC Secretariat_tot_fn", column_name="tot_fn",
         )
         assert warning is not None
-        assert "tot_fn" in warning
-        assert "4242" in warning
+        text = warning_text(warning)
+        assert "tot_fn" in text
+        assert warning.get("item_id") == 4242
 
     def test_flags_unknown_manual_row(self, monkeypatch):
         from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
@@ -189,7 +191,7 @@ class TestMatrixKeyWarning:
             row_name="Bogus Row",
         )
         assert warning is not None
-        assert "Bogus Row" in warning
+        assert "Bogus Row" in warning_text(warning)
 
     def test_silent_when_column_and_row_match(self, monkeypatch):
         from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
@@ -250,6 +252,7 @@ class TestMatrixKeyWarning:
             schema = _matrix_key_schema(item.id)
             assert schema["columns"] == {"Funding (CHF)", "Expenditure (CHF)"}
             assert schema["rows"] == {"Resilience - Climate and environment", "Enabling functions"}
+            assert schema["label"] == "Test SP Breakdown Matrix"
 
     def test_schema_has_no_row_set_for_list_library_row_mode(self, app, db_session):
         from app.models.form_items import FormItem
@@ -335,6 +338,57 @@ class TestMatrixKeyWarning:
             assert cells == {"Response - Disasters and crises_Funding (CHF)": 12345}
             # ...but the mismatch is now visible instead of silent.
             assert any(
-                "Funding (CHF)" in w and "not found in current form configuration" in w
+                "Funding (CHF)" in warning_text(w) and "does not match a column" in warning_text(w)
                 for w in ctx.warnings
             ), f"Expected a matrix column mismatch warning; got: {ctx.warnings}"
+
+    def test_schema_reads_plain_string_rows(self, app, db_session):
+        """Published T33 matrices store rows as strings, not {text: ...} objects."""
+        from app.models.form_items import FormItem
+        from tests.factories import create_test_section, create_test_template
+
+        with app.app_context():
+            _clear_matrix_key_schema_cache()
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            item = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                version_id=section.version_id,
+                item_type="matrix",
+                label="Optional breakdown by SP/EF (CHF)",
+                order=1,
+                config={
+                    "matrix_config": {
+                        "row_mode": "manual",
+                        "columns": [{"name": "Funding (CHF)"}, {"name": "Expenditure (CHF)"}],
+                        "rows": [
+                            "Response - Disasters and crises",
+                            "Resilience - Climate and environment",
+                            "Enabling functions",
+                        ],
+                    }
+                },
+            )
+            db_session.add(item)
+            db_session.commit()
+
+            schema = _matrix_key_schema(item.id)
+            assert schema["rows"] == {
+                "Response - Disasters and crises",
+                "Resilience - Climate and environment",
+                "Enabling functions",
+            }
+            assert _matrix_key_warning(
+                item_id=item.id,
+                cell_key="Resilience - Climate and environment_Funding (CHF)",
+                column_name="Funding (CHF)",
+                row_name="Resilience - Climate and environment",
+            ) is None
+            # Case-only differences must not warn (Excel labels use "Crises").
+            assert _matrix_key_warning(
+                item_id=item.id,
+                cell_key="Response - Disasters and Crises_Funding (CHF)",
+                column_name="Funding (CHF)",
+                row_name="Response - Disasters and Crises",
+            ) is None

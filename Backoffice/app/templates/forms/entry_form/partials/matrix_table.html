@@ -20,8 +20,11 @@
       {%- set _trigger_label = _('Other (please specify)...') -%}
     {%- endif -%}
     <div class="matrix-header-picker">
+        {# role="combobox" (not a plain button) so aria-activedescendant set by
+           selectable-headers.js on keyboard navigation is announced. #}
         <button type="button"
                 class="matrix-header-picker-trigger"
+                role="combobox"
                 aria-haspopup="listbox"
                 aria-expanded="false"
                 {% if not can_edit %}disabled{% endif %}>

@@ -458,6 +458,7 @@ def import_upr_country_reporting_template(aes_id):
                     message=success_msg,
                     updated_count=updated_count,
                     warnings=warnings,
+                    warning_items=result.get("warning_items") or [],
                     stage_only=True,
                     payload=result.get("payload"),
                 )
@@ -621,6 +622,7 @@ def import_unified_country_plan_template(aes_id):
                 message=success_msg,
                 updated_count=updated_count,
                 warnings=warnings,
+                warning_items=result.get("warning_items") or [],
                 stage_only=True,
                 payload=result.get("payload"),
             )

@@ -680,8 +680,11 @@ def test_resolve_workbook_emergency_slot_metadata_warns_when_code_unknown():
         # Excel values are preserved as a fallback -- the slot's data is never dropped.
         assert resolved[1]["appeal_name"] == "Nigeria Floods EA"
         assert resolved[1]["mdr_code"] == "MDRNG999"
+        from upr_import_warnings import warning_text
+
         assert any(
-            "MDRNG999" in w and "not found in GO API" in w for w in ctx.warnings
+            "MDRNG999" in warning_text(w) and "is not listed for this country in GO" in warning_text(w)
+            for w in ctx.warnings
         ), f"Expected a GO API mismatch warning; got: {ctx.warnings}"
     finally:
         wb.close()
@@ -1059,6 +1062,37 @@ def test_parse_indicators_yes_no_dna_preserves_data_not_available():
         wb.close()
 
 
+def test_parse_indicators_blank_applicable_is_not_applicable():
+    """A blank Applicable cell must import as Not Applicable, not Yes/No or skip."""
+    import openpyxl
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    wb = openpyxl.load_workbook(TEMPLATE_PATH, data_only=True)
+    try:
+        sheet_name, table_name = "Overall action Indicators", "Data_core"
+        bank_id = 555556
+        write_table_cell(wb, sheet_name, table_name, 0, SP_EF_HEADER, "Health")
+        write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_HEADER, "A core indicator")
+        write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_ID_HEADER, bank_id)
+        write_table_cell(wb, sheet_name, table_name, 0, INDICATOR_DNA_HEADER, None)
+
+        rows = parse_indicators(wb, yes_no_bank_ids={bank_id}, kpi_lookup={})
+        target = next(r for r in rows if r.get("bank_id") == bank_id)
+        value, is_dna, _disagg, should_import, is_na = _resolve_indicator_import_value(
+            target, bank_id, {bank_id}
+        )
+
+        assert target["applicable_text"] == ""
+        assert value is None
+        assert is_dna is False
+        assert is_na is True
+        assert should_import is True
+    finally:
+        wb.close()
+
+
 def test_resolve_indicator_import_value_yes_no():
     yes_row = {
         "data_not_available": False,
@@ -1066,20 +1100,23 @@ def test_resolve_indicator_import_value_yes_no():
         "value": None,
         "disagg": None,
     }
-    value, is_dna, disagg, should_import = _resolve_indicator_import_value(yes_row, 999, {999})
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(yes_row, 999, {999})
     assert value == "yes"
     assert not is_dna
+    assert not is_na
     assert disagg is None
     assert should_import
 
-    no_row = {
+    blank_row = {
         "data_not_available": False,
         "applicable_text": "",
         "value": None,
         "disagg": None,
     }
-    value, is_dna, disagg, should_import = _resolve_indicator_import_value(no_row, 999, {999})
-    assert value == "no"
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(blank_row, 999, {999})
+    assert value is None
+    assert not is_dna
+    assert is_na
     assert should_import
 
     # Regression test: a Yes/No indicator marked "Data not available" in Excel
@@ -1092,9 +1129,10 @@ def test_resolve_indicator_import_value_yes_no():
         "value": None,
         "disagg": None,
     }
-    value, is_dna, disagg, should_import = _resolve_indicator_import_value(dna_row, 999, {999})
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(dna_row, 999, {999})
     assert value is None
     assert is_dna
+    assert not is_na
     assert disagg is None
     assert should_import
 
@@ -1104,9 +1142,24 @@ def test_resolve_indicator_import_value_yes_no():
         "value": None,
         "disagg": None,
     }
-    value, _, _, should_import = _resolve_indicator_import_value(numeric_row, 123, {999})
+    value, _, _, should_import, is_na = _resolve_indicator_import_value(numeric_row, 123, {999})
     assert value is None
     assert not should_import
+    assert not is_na
+
+    numeric_blank = {
+        "data_not_available": False,
+        "applicable_text": "  ",
+        "value": 12,
+        "disagg": None,
+    }
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
+        numeric_blank, 123, {999}
+    )
+    assert value is None
+    assert not is_dna
+    assert is_na
+    assert should_import
 
 
 def test_reporting_funding_matrix_column_matches_form_item(app):
@@ -1193,7 +1246,7 @@ def test_quiet_openpyxl_io_suppresses_pil_debug(capsys):
 
 
 def test_import_rows_to_client_payload_splits_fields_and_matrices():
-    from import_fdrs_form_data import COL_DATA_NA, COL_DISAGG, COL_ITEM, COL_VALUE
+    from import_fdrs_form_data import COL_DATA_NA, COL_DISAGG, COL_ITEM, COL_NA, COL_VALUE
 
     rows = [
         {
@@ -1220,12 +1273,20 @@ def test_import_rows_to_client_payload_splits_fields_and_matrices():
             COL_DISAGG: "",
             COL_DATA_NA: "1",
         },
+        {
+            COL_ITEM: "500",
+            COL_VALUE: "",
+            COL_DISAGG: "",
+            COL_DATA_NA: "",
+            COL_NA: "1",
+        },
     ]
     fields, matrices = import_rows_to_client_payload(rows)
     assert fields["100"]["value"] == "42"
     assert fields["200"]["disagg_data"]["mode"] == "total"
     assert matrices["300"]["IFRC_tot_fn"] == 1500
     assert fields["400"]["data_not_available"] is True
+    assert fields["500"]["not_applicable"] is True
     assert "400" not in matrices
 
 

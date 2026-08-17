@@ -65,6 +65,7 @@
             headerName: cfg.t.data_owner_eba18e59,
             width: 180, minWidth: 120, maxWidth: 280,
             filter: 'agTextColumnFilter', sortable: true,
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             cellRenderer: function (params) {
                 return AgGridRenderers.userHoverCell(params, {
                     idField: 'data_owner_user_id',

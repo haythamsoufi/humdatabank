@@ -589,6 +589,16 @@ html[dir="rtl"] .ag-theme-alpine .ag-floating-filter-input input.ag-number-field
     box-shadow: none !important;
 }
 
+/* User-name cells: clip long names so they do not overlap the next column.
+   Hover popup is position:fixed on document.body, so overflow:hidden is safe. */
+.ag-cell:has(.ag-user-hover-cell),
+.ag-cell:has(.ag-user-hover-cell) .ag-cell-wrapper,
+.ag-cell:has(.ag-user-hover-cell) .ag-cell-value {
+    overflow: hidden;
+    max-width: 100%;
+    min-width: 0;
+}
+
 /* ===================================================================
    MOBILE ACTIONS OVERFLOW (vertical three-dots menu)
    =================================================================== */

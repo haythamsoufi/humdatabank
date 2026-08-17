@@ -33,10 +33,14 @@ call them directly — do not curl or web_fetch:
 | `databank_get_indicator` | `getIndicatorById` | Full metadata for one id |
 | `databank_get_public_data` | `getPublicData` | One page of scoped public data (raw rows) |
 | `databank_get_public_data_all_pages` | — | Raw multi-page export (not deduped) |
+| `databank_build_country_report` | `getCountryReport` | **One-country one-pager** — headline KPIs + trend + cited narrative in one call |
+| `databank_get_report_template` | `getReportTemplate` | HTML/CSS layout skeleton + design tokens to fill with one-pager data |
+| `databank_get_chunk_context` | — | Neighboring chunks before/after a search result (expand a truncated match) |
 
 **FDRS numeric:** resolve → aggregate_global_trend or get_public_data (`template_id=21` for FDRS-only).  
 **UPR documents:** `databank_search_public_documents` — answer only from `chunks[].content`; use `full_coverage=true` for cross-country themes.  
-**Counting countries:** never paginate + count by hand — use `databank_get_submission_coverage` (data) or `databank_get_documents_catalog` (documents).
+**Counting countries:** never paginate + count by hand — use `databank_get_submission_coverage` (data) or `databank_get_documents_catalog` (documents).  
+**One-country one-pager:** `databank_build_country_report` replaces chaining resolve + data + document search; fill `design_template.html_template` — never invent a layout.
 
 Example — volunteers by year:
 
@@ -55,6 +59,18 @@ Example — "How many countries submitted an annual report through FDRS for 2024
 ```text
 databank_get_submission_coverage(template_id=21, period_name="Annual 2024")   # data
 databank_get_documents_catalog(document_type="annual_report")                 # documents, all years
+```
+
+Example — country one-pager report:
+
+```text
+databank_build_country_report(country="Syria", period_hint="2026 midyear", template_style="default")
+```
+
+Example — expand a truncated or ambiguous chunk:
+
+```text
+databank_get_chunk_context(chunk_id=17842, before=1, after=1)
 ```
 
 Do **not** sum raw `databank_get_public_data*` rows for worldwide totals.  

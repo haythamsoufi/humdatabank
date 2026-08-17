@@ -28,7 +28,7 @@
      {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
      {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
      {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}
-     {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}"{% endif %}>
+     {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}" data-indicator-bank-id="{{ field.indicator_bank_id or (field.source_indicator_from_bank.id if field.source_indicator_from_bank else '') }}"{% endif %}>
     <div class="flex items-start justify-between">
        <div class="flex-1 pr-2">
             {# Use resolved display label if available (for variable replacement), otherwise use original #}

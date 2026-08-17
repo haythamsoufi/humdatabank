@@ -55,11 +55,12 @@ export function getUnifiedFieldValue(fieldId, mode = 'total', preferCurrent = fa
         return null;
     }
 
+    // Use nullish coalescing so a legitimate 0 is not treated as "missing"
+    // (the previous `||` fell through and hid zero values from relevance/validation).
     if (preferCurrent) {
-        return getCurrentDOMValue(fieldId, mode) || getExistingDataValue(fieldId, mode);
-    } else {
-        return getExistingDataValue(fieldId, mode) || getCurrentDOMValue(fieldId, mode);
+        return getCurrentDOMValue(fieldId, mode) ?? getExistingDataValue(fieldId, mode);
     }
+    return getExistingDataValue(fieldId, mode) ?? getCurrentDOMValue(fieldId, mode);
 }
 
 /**
@@ -122,11 +123,14 @@ function getExistingDataValue(fieldId, mode) {
     const normalizedFieldId = fieldId.toString().replace(/^indicator_/, '');
     const dataKey = `field_value[${normalizedFieldId}]`;
 
-    if (!window.existingData || !window.existingData[dataKey]) {
+    if (!window.existingData || !Object.prototype.hasOwnProperty.call(window.existingData, dataKey)) {
         return null;
     }
 
     const existingValue = window.existingData[dataKey];
+    if (existingValue === undefined || existingValue === null) {
+        return null;
+    }
 
     // Handle both object and JSON string formats
     let parsedValue = existingValue;
@@ -145,7 +149,7 @@ function getExistingDataValue(fieldId, mode) {
             if (parsedValue.mode === 'total' && parsedValue.values.total !== undefined) {
                 return parsedValue.values.total;
             }
-            return parsedValue.values[mode] || parsedValue.values.value;
+            return parsedValue.values[mode] ?? parsedValue.values.value;
         }
     }
 
@@ -323,8 +327,9 @@ function getDataAttributeValue(fieldId, normalizedFieldId) {
     // Plugin measure: plugin_<numericId>_<measureId> -> find field by base id, read data-<measureId> (underscores to dashes)
     let actualFieldId = fieldId;
     let measureId = null;
-    if (fieldId.includes('_') && fieldId.startsWith('plugin_')) {
-        const parts = fieldId.split('_');
+    const fieldIdStr = String(fieldId ?? '');
+    if (fieldIdStr.startsWith('plugin_') && fieldIdStr.includes('_')) {
+        const parts = fieldIdStr.split('_');
         if (parts.length >= 3) {
             actualFieldId = parts[1];
             measureId = parts.slice(2).join('_');

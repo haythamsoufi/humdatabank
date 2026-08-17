@@ -477,10 +477,23 @@ class MatrixHandler {
             }
         });
 
+        // Keyboard interaction for the custom header picker (the native
+        // <select> is aria-hidden, so the trigger carries the whole listbox)
+        document.addEventListener('keydown', (e) => {
+            if (e.target.closest?.('.matrix-header-picker-trigger')) {
+                this.handleHeaderPickerKeydown(e);
+            }
+        });
+
         // Selectable column-header select changes
         document.addEventListener('change', (e) => {
             if (e.target.classList.contains('matrix-header-select')) {
                 this.handleHeaderSelectChange(e.target);
+            }
+            // Blur / Enter on the free-text header input: commit without waiting
+            // for the debounce in handleHeaderOtherInputChange.
+            if (e.target.classList.contains('matrix-header-other-input')) {
+                this.handleHeaderOtherInputChange(e.target, { immediate: true });
             }
         });
 
@@ -570,6 +583,7 @@ class MatrixHandler {
             // Use requestAnimationFrame for smooth repositioning during scroll
             this.scrollRafId = requestAnimationFrame(() => {
                 this.repositionVisibleDropdowns();
+                this.repositionOpenHeaderPickers();
                 this.scrollRafId = null;
             });
         };
@@ -587,6 +601,7 @@ class MatrixHandler {
             }
             this.repositionDebounceTimer = setTimeout(() => {
                 this.repositionVisibleDropdowns();
+                this.repositionOpenHeaderPickers();
             }, 150);
         });
     }
@@ -1038,6 +1053,10 @@ class MatrixHandler {
      * Collect matrix data for form submission
      */
     collectMatrixData() {
+        // Free-text selectable-header edits save on a debounce; submitting
+        // mid-keystroke must not drop the last characters.
+        this.flushPendingHeaderEdits();
+
         this.matrices.forEach((matrix, fieldId) => {
             // Skip if container is no longer in DOM
             if (!matrix.container.isConnected) {
@@ -1478,6 +1497,17 @@ class MatrixHandler {
             } else {
                 this.restoreStaticMatrixValues(fieldId);
             }
+
+            // The draft may carry different selectable column-header choices;
+            // without this the pickers keep the pre-restore selection and the
+            // cells keep the pre-restore gating.
+            matrixPromises.push(
+                Promise.resolve(this.restoreSelectableHeadersFromData(fieldId))
+                    .then(() => this._applyHeaderGatingForMatrix(fieldId))
+                    .catch((err) => {
+                        debugError('matrix-handler', 'syncFromDraftRestore restoreSelectableHeaders failed', err);
+                    })
+            );
         });
         return Promise.all(matrixPromises).then(() => {
             this._lockAllReadOnlyMatrices();

@@ -2599,6 +2599,18 @@ function loadFieldValue(repeatEntry, fieldId, fieldValue, sectionId, instanceNum
                                                     debugWarn('repeat-sections', `❌ Error restoring matrix rows: ${err}`);
                                                 });
                                             }
+
+                                            // Selectable column headers live in the same payload; sync the
+                                            // pickers and cell gating to the entry we just loaded.
+                                            if (window.matrixHandler.restoreSelectableHeadersFromData) {
+                                                Promise.resolve(
+                                                    window.matrixHandler.restoreSelectableHeadersFromData(transformedFieldId)
+                                                ).then(() => {
+                                                    window.matrixHandler._applyHeaderGatingForMatrix(transformedFieldId);
+                                                }).catch(err => {
+                                                    debugWarn('repeat-sections', `❌ Error restoring matrix headers: ${err}`);
+                                                });
+                                            }
                                         } else {
                                             debugWarn('repeat-sections', `⚠️ Matrix not found in handler for ${transformedFieldId}, will retry...`);
                                             // Retry after a bit if matrix handler hasn't initialized yet

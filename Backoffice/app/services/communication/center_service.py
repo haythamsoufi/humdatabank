@@ -14,9 +14,14 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
 from flask_babel import gettext as _
+from sqlalchemy import String, cast
+from sqlalchemy.orm import joinedload
 
 from app.models import EmailDeliveryLog, Notification, User
-from app.services.email.delivery import get_email_delivery_logs_needing_attention
+from app.services.email.delivery import (
+    get_email_delivery_logs_needing_attention,
+    get_skipped_email_delivery_logs,
+)
 from app.services.notification.core import get_default_icon_for_notification_type
 from app.services.notification.service import NotificationService
 from app.utils.datetime_helpers import ensure_utc
@@ -24,6 +29,9 @@ from app.utils.datetime_helpers import ensure_utc
 RECORD_TYPE_NOTIFICATION = 'notification'
 RECORD_TYPE_EMAIL = 'email'
 RECORD_TYPE_BOTH = 'both'
+
+DEFAULT_CENTER_PAGE_SIZE = 50
+MAX_CENTER_PAGE_SIZE = 200
 
 
 def count_attention_needed_email_deliveries() -> int:
@@ -46,13 +54,83 @@ def _record_type_display(record_type: str) -> str:
     return _('Notification')
 
 
-def get_orphan_email_delivery_logs_for_grid() -> List[EmailDeliveryLog]:
+def clamp_center_page_size(per_page: Optional[int]) -> int:
+    """Keep Communication Center pages within a safe UI bound."""
+    try:
+        value = int(per_page) if per_page is not None else DEFAULT_CENTER_PAGE_SIZE
+    except (TypeError, ValueError):
+        return DEFAULT_CENTER_PAGE_SIZE
+    if value < 1:
+        return DEFAULT_CENTER_PAGE_SIZE
+    return min(value, MAX_CENTER_PAGE_SIZE)
+
+
+def build_notifications_query(
+    *,
+    unread_only: bool = False,
+    notification_type: Optional[str] = None,
+    user_id: Optional[int] = None,
+    priority: Optional[str] = None,
+    archived_only: bool = False,
+    include_archived: bool = False,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+):
+    """Filtered notification query for the Communication Center timeline."""
+    query = Notification.query.join(User, Notification.user_id == User.id)
+
+    if unread_only:
+        query = query.filter(Notification.is_read == False)  # noqa: E712
+
+    if notification_type:
+        query = query.filter(cast(Notification.notification_type, String) == notification_type)
+
+    if user_id:
+        query = query.filter(Notification.user_id == user_id)
+
+    if priority:
+        query = query.filter(Notification.priority == priority)
+
+    if archived_only:
+        query = query.filter(Notification.is_archived == True)  # noqa: E712
+    elif not include_archived:
+        query = query.filter(Notification.is_archived == False)  # noqa: E712
+
+    if date_from:
+        query = query.filter(Notification.created_at >= date_from)
+    if date_to:
+        query = query.filter(Notification.created_at <= date_to)
+
+    return query
+
+
+def build_orphan_email_query(
+    *,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+):
     """Email delivery logs with no linked in-app notification."""
-    return (
-        EmailDeliveryLog.query.filter(EmailDeliveryLog.notification_id.is_(None))
-        .order_by(EmailDeliveryLog.created_at.desc())
-        .all()
+    query = EmailDeliveryLog.query.filter(EmailDeliveryLog.notification_id.is_(None))
+    if date_from:
+        query = query.filter(EmailDeliveryLog.created_at >= date_from)
+    if date_to:
+        query = query.filter(EmailDeliveryLog.created_at <= date_to)
+    return query
+
+
+def get_orphan_email_delivery_logs_for_grid(
+    limit: Optional[int] = None,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> List[EmailDeliveryLog]:
+    """Email delivery logs with no linked in-app notification."""
+    query = build_orphan_email_query(date_from=date_from, date_to=date_to).order_by(
+        EmailDeliveryLog.created_at.desc(),
+        EmailDeliveryLog.id.desc(),
     )
+    if limit is not None:
+        query = query.limit(limit)
+    return query.all()
 
 
 def ensure_notifications_for_linked_email_logs(
@@ -299,3 +377,151 @@ def build_communications_center_grid(
     rows.extend(build_email_grid_rows(orphan_email_logs, iso_dates=iso_dates))
     rows.sort(key=lambda row: row.get('sort_at') or '', reverse=True)
     return rows
+
+
+def _serialize_center_rows(
+    notifications: List[Notification],
+    orphan_email_logs: List[EmailDeliveryLog],
+    *,
+    original_notification_ids: Set[int],
+    attention_notification_ids: Set[int],
+) -> List[Dict[str, Any]]:
+    assignment_status_cache, _ = NotificationService._build_assignment_caches_for_notifications(
+        notifications
+    )
+    actor_fields_by_id = NotificationService.build_actor_display_fields_map(
+        notifications, assignment_status_cache
+    )
+    email_fields_by_id = NotificationService.build_email_delivery_fields_map(
+        [n.id for n in notifications],
+        notifications=notifications,
+        actor_fields_by_id=actor_fields_by_id,
+    )
+    return build_communications_center_grid(
+        notifications,
+        orphan_email_logs,
+        actor_fields_by_id=actor_fields_by_id,
+        email_fields_by_id=email_fields_by_id,
+        original_notification_ids=original_notification_ids,
+        attention_notification_ids=attention_notification_ids,
+        iso_dates=True,
+    )
+
+
+def fetch_communications_center_page(
+    *,
+    page: int = 1,
+    per_page: int = DEFAULT_CENTER_PAGE_SIZE,
+    unread_only: bool = False,
+    notification_type: Optional[str] = None,
+    user_id: Optional[int] = None,
+    priority: Optional[str] = None,
+    archived_only: bool = False,
+    include_archived: bool = False,
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+) -> Dict[str, Any]:
+    """
+    Newest-first page of Communication Center rows (notifications + orphan emails).
+
+    Page 1 also pins email-attention rows (and filtered-out linked notifications)
+    so failures stay visible without loading the full history.
+    """
+    try:
+        page = max(1, int(page or 1))
+    except (TypeError, ValueError):
+        page = 1
+    per_page = clamp_center_page_size(per_page)
+    offset = (page - 1) * per_page
+    window = offset + per_page
+
+    filter_kwargs = {
+        'unread_only': unread_only,
+        'notification_type': notification_type,
+        'user_id': user_id,
+        'priority': priority,
+        'archived_only': archived_only,
+        'include_archived': include_archived,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+    notif_q = build_notifications_query(**filter_kwargs)
+    orphan_q = build_orphan_email_query(date_from=date_from, date_to=date_to)
+
+    notif_total = notif_q.count()
+    orphan_total = orphan_q.count()
+
+    notifications = (
+        notif_q.options(joinedload(Notification.user))
+        .order_by(Notification.created_at.desc(), Notification.id.desc())
+        .limit(window)
+        .all()
+    )
+    orphan_logs = (
+        orphan_q.order_by(EmailDeliveryLog.created_at.desc(), EmailDeliveryLog.id.desc())
+        .limit(window)
+        .all()
+    )
+
+    attention_logs = get_email_delivery_logs_needing_attention()
+    skipped_logs = get_skipped_email_delivery_logs()
+    linked_email_logs = attention_logs + skipped_logs
+    attention_notification_ids = {
+        log.notification_id for log in attention_logs if log.notification_id
+    }
+    linked_ids = {log.notification_id for log in linked_email_logs if log.notification_id}
+
+    extra_ids: Set[int] = set()
+    if linked_ids:
+        in_filter = {
+            nid
+            for (nid,) in notif_q.with_entities(Notification.id)
+            .filter(Notification.id.in_(linked_ids))
+            .all()
+        }
+        extra_ids = linked_ids - in_filter
+
+    original_ids = {n.id for n in notifications if n.id is not None}
+    timeline_rows = _serialize_center_rows(
+        notifications,
+        orphan_logs,
+        original_notification_ids=original_ids,
+        attention_notification_ids=attention_notification_ids,
+    )
+    page_rows = timeline_rows[offset:offset + per_page]
+
+    if page == 1:
+        already_ids = {
+            row.get('notification_id') for row in page_rows if row.get('notification_id')
+        }
+        pin_ids = (attention_notification_ids | extra_ids) - already_ids
+        pin_ids.discard(None)
+        if pin_ids:
+            extra_notifs = Notification.query.filter(Notification.id.in_(pin_ids)).all()
+            extra_rows = _serialize_center_rows(
+                extra_notifs,
+                [],
+                original_notification_ids=set(),
+                attention_notification_ids=attention_notification_ids,
+            )
+            seen = {row.get('grid_row_id') for row in page_rows}
+            for row in extra_rows:
+                rid = row.get('grid_row_id')
+                if rid in seen:
+                    continue
+                page_rows.append(row)
+                seen.add(rid)
+            page_rows.sort(key=lambda row: row.get('sort_at') or '', reverse=True)
+
+    timeline_total = notif_total + orphan_total
+    total_count = timeline_total + len(extra_ids)
+    has_more = (offset + per_page) < timeline_total
+
+    return {
+        'rows': page_rows,
+        'total_count': total_count,
+        'page': page,
+        'per_page': per_page,
+        'has_more': has_more,
+        'failed_email_delivery_count': len(attention_logs),
+    }

@@ -5,6 +5,7 @@
 
 import { debugLog } from './debug.js';
 import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
+import { getScrollableContainer } from '../../core/scroll-container.js';
 
 export class ExcelExportManager {
     constructor(config = {}) {
@@ -433,7 +434,9 @@ export class ExcelExportManager {
                     const { applyUprExcelImportPayload } = await import('./upr-excel-import-apply.js');
                     const applyResult = await applyUprExcelImportPayload(data.payload);
                     const allWarnings = this._dedupeImportWarnings([
-                        ...(data.warnings || []),
+                        ...((data.warning_items && data.warning_items.length)
+                            ? data.warning_items
+                            : (data.warnings || [])),
                         ...(applyResult.warnings || []),
                     ]);
                     this.hideModal();
@@ -491,22 +494,133 @@ export class ExcelExportManager {
         return text;
     }
 
+    _warningText(warning) {
+        if (warning && typeof warning === 'object') {
+            return String(warning.message || warning.text || '').trim();
+        }
+        return String(warning || '').trim();
+    }
+
+    _warningItemId(warning) {
+        if (warning && typeof warning === 'object' && warning.item_id != null && warning.item_id !== '') {
+            const parsed = Number(warning.item_id);
+            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        }
+        const text = this._warningText(warning);
+        const match = text.match(/\b(?:item|field|matrix|indicator)\s+(\d+)\b/i);
+        return match ? Number(match[1]) : null;
+    }
+
+    _normalizeImportWarning(warning) {
+        const message = this._warningText(warning);
+        if (!message) return null;
+        const itemId = this._warningItemId(warning);
+        return itemId ? { message, item_id: itemId } : { message };
+    }
+
     _dedupeImportWarnings(warnings) {
         const seen = new Set();
         const out = [];
         let periodNoted = false;
         for (const raw of warnings || []) {
-            const text = String(raw || '').trim();
-            if (!text || seen.has(text)) continue;
+            const item = this._normalizeImportWarning(raw);
+            if (!item) continue;
+            const text = item.message;
+            if (seen.has(text)) continue;
             const lower = text.toLowerCase();
             if (lower.includes('period') && (lower.includes('does not match') || lower.includes('differs from'))) {
                 if (periodNoted) continue;
                 periodNoted = true;
             }
             seen.add(text);
-            out.push(text);
+            out.push(item);
         }
         return out;
+    }
+
+    _findImportedField(itemId) {
+        const id = String(itemId || '').trim();
+        if (!id) return null;
+        const candidates = document.querySelectorAll(
+            `.form-item-block[data-item-id="${id}"], [data-item-id="${id}"]`
+        );
+        const visible = Array.from(candidates).find((node) => (
+            !node.closest('.repeat-template')
+            && !node.closest('.relevance-hidden')
+        ));
+        return visible
+            || candidates[0]
+            || document.getElementById(`field-${id}`)
+            || document.getElementById(`form-item-${id}`);
+    }
+
+    _revealImportedField(el) {
+        let node = el;
+        while (node && node !== document.body) {
+            if (node.hasAttribute && node.hasAttribute('data-collapsible-content')
+                && (node.style.display === 'none' || node.hidden)) {
+                const toggle = node.closest('[data-collapsible-id]')
+                    ?.querySelector('.collapse-toggle[aria-expanded="false"]');
+                if (toggle) {
+                    toggle.click();
+                } else {
+                    node.hidden = false;
+                    node.style.display = '';
+                }
+            }
+            node = node.parentElement;
+        }
+    }
+
+    _scrollToImportedField(el) {
+        const scrollContainer = getScrollableContainer();
+        const marginTop = 100;
+        const rect = el.getBoundingClientRect();
+        if (scrollContainer !== window) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const topRel = rect.top - containerRect.top;
+            const targetTop = Math.max(0, scrollContainer.scrollTop + topRel - marginTop);
+            scrollContainer.scrollTo({ top: targetTop, behavior: 'smooth' });
+            return;
+        }
+        const targetTop = Math.max(0, window.pageYOffset + rect.top - marginTop);
+        window.scrollTo({ top: targetTop, behavior: 'smooth' });
+    }
+
+    _highlightImportedField(el) {
+        const target = el.closest('.form-item-block') || el.closest('.repeat-entry') || el;
+        document.querySelectorAll('.excel-io-imported-field-highlight').forEach((node) => {
+            node.classList.remove('excel-io-imported-field-highlight');
+        });
+        target.classList.add('excel-io-imported-field-highlight');
+        window.setTimeout(() => {
+            target.classList.remove('excel-io-imported-field-highlight');
+        }, 2500);
+    }
+
+    navigateToImportedField(itemId) {
+        const el = this._findImportedField(itemId);
+        if (!el) return false;
+        if (this.isModalVisible()) {
+            this.modal.classList.add('hidden');
+            this.modal.classList.remove('flex');
+            document.body.style.overflow = '';
+        }
+        if (window.formValidator && typeof window.formValidator.ensurePaginatedPageVisibleForElement === 'function') {
+            window.formValidator.ensurePaginatedPageVisibleForElement(el);
+        } else {
+            const pageHost = el.closest('[data-page-number]');
+            if (pageHost && window.__ifrcPagination?.showPageByNumber) {
+                window.__ifrcPagination.showPageByNumber(pageHost.dataset.pageNumber);
+            }
+        }
+        this._revealImportedField(el);
+        const block = el.closest('.form-item-block') || el.closest('.repeat-entry') || el;
+        window.requestAnimationFrame(() => {
+            this._scrollToImportedField(block);
+            this._highlightImportedField(block);
+        });
+        return true;
     }
 
     clearPageImportNotice() {
@@ -543,9 +657,19 @@ export class ExcelExportManager {
         let warningsHtml = '';
         if (hasWarnings) {
             const items = dedupedWarnings
-                .map((w) => (
-                    `<li class="excel-io-page-notice__warning-item">${this._escapeNoticeHtml(w)}</li>`
-                ))
+                .map((w) => {
+                    const text = this._warningText(w);
+                    const itemId = this._warningItemId(w);
+                    if (itemId) {
+                        return (
+                            `<li class="excel-io-page-notice__warning-item">`
+                            + `<button type="button" class="excel-io-page-notice__warning-link" data-excel-import-warning-item="${itemId}">`
+                            + `${this._escapeNoticeHtml(text)}`
+                            + `</button></li>`
+                        );
+                    }
+                    return `<li class="excel-io-page-notice__warning-item">${this._escapeNoticeHtml(text)}</li>`;
+                })
                 .join('');
             warningsHtml = `
                 <p class="text-sm font-medium mt-3 mb-1 m-0">Warnings (${dedupedWarnings.length})</p>
@@ -576,6 +700,11 @@ export class ExcelExportManager {
         if (dismissBtn) {
             dismissBtn.addEventListener('click', () => this.clearPageImportNotice(), { once: true });
         }
+        anchor.querySelectorAll('[data-excel-import-warning-item]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.navigateToImportedField(btn.getAttribute('data-excel-import-warning-item'));
+            });
+        });
 
         anchor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -624,8 +753,8 @@ export class ExcelExportManager {
         this.captureGuidePanelDefault();
 
         const normalizedMessage = (message || '').trim();
-        const uniqueItems = [...new Set((items || []).filter(Boolean))]
-            .filter((item) => item.trim() !== normalizedMessage);
+        const uniqueItems = this._dedupeImportWarnings(items)
+            .filter((item) => this._warningText(item) !== normalizedMessage);
 
         const iconClass = type === 'error'
             ? 'fas fa-exclamation-circle excel-io-guide-validation__icon'
@@ -633,12 +762,21 @@ export class ExcelExportManager {
 
         const itemsHtml = uniqueItems.length
             ? `<div class="excel-io-guide-validation__items">${uniqueItems
-                .map((item) => (
-                    `<div class="excel-io-guide-validation__item">`
-                    + `<i class="fas fa-circle excel-io-guide-validation__item-icon" aria-hidden="true"></i>`
-                    + `<span>${this._escapeNoticeHtml(item)}</span>`
-                    + `</div>`
-                ))
+                .map((item) => {
+                    const text = this._warningText(item);
+                    const itemId = this._warningItemId(item);
+                    const body = itemId
+                        ? `<button type="button" class="excel-io-page-notice__warning-link" data-excel-import-warning-item="${itemId}">`
+                            + `${this._escapeNoticeHtml(text)}`
+                            + `</button>`
+                        : `<span>${this._escapeNoticeHtml(text)}</span>`;
+                    return (
+                        `<div class="excel-io-guide-validation__item">`
+                        + `<i class="fas fa-circle excel-io-guide-validation__item-icon" aria-hidden="true"></i>`
+                        + body
+                        + `</div>`
+                    );
+                })
                 .join('')}</div>`
             : '';
 
@@ -671,6 +809,11 @@ export class ExcelExportManager {
                 });
             }
         }
+        panel.querySelectorAll('[data-excel-import-warning-item]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                this.navigateToImportedField(btn.getAttribute('data-excel-import-warning-item'));
+            });
+        });
     }
 
     _clearModalTransientMessages() {

@@ -305,6 +305,19 @@
         },
 
         /**
+         * Cell style for user-name columns (userHoverCell / userHoverCellWithDeviceIcon).
+         * Clips long names so they do not overlap the next column.
+         */
+        userHoverCellStyle: {
+            'white-space': 'normal',
+            'word-wrap': 'break-word',
+            'overflow-wrap': 'break-word',
+            'line-height': '1.4',
+            'overflow': 'hidden',
+            'max-width': '100%'
+        },
+
+        /**
          * User cell with hover profile popup support
          * Usage:
          *   AgGridRenderers.userHoverCell(params, {
@@ -721,7 +734,7 @@
                     return user ? (user.name || user.email || '') : '';
                 },
                 cellRenderer: options.wrap ? AgGridRenderers.profileIconWrap : AgGridRenderers.profileIcon,
-                cellStyle: { 'white-space': 'normal', 'line-height': '1.4' }
+                cellStyle: AgGridRenderers.userHoverCellStyle
             };
         },
 

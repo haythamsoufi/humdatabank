@@ -690,6 +690,33 @@
     line-height: 1.45;
 }
 
+.excel-io-page-notice__warning-link {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+}
+
+.excel-io-page-notice__warning-link:hover,
+.excel-io-page-notice__warning-link:focus-visible {
+    color: #92400e;
+    outline: none;
+}
+
+.excel-io-imported-field-highlight {
+    outline: 2px solid #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.28);
+    transition: box-shadow 0.3s ease, outline 0.3s ease;
+}
+
 .excel-io-modal__section-title {
     font-size: 1.125rem;
     font-weight: 500;

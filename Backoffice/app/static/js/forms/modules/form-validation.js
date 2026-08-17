@@ -941,7 +941,12 @@ class FormValidator {
         const container = field && field.closest
             ? field.closest('.form-item-block, .repeat-entry, .disaggregation-inputs')
             : null;
-        if (!container) return false;
+        if (!container) {
+            // Repeat templates and other bare [required] inputs are not always
+            // wrapped in .form-item-block. Still skip them when a relevance
+            // condition hid an ancestor (do not use display:none — pagination).
+            return !!(field && field.closest && field.closest('.relevance-hidden'));
+        }
 
         // Relevance conditions: always treat as hidden (self or any ancestor)
         if (container.classList.contains('relevance-hidden') || (container.closest && container.closest('.relevance-hidden'))) {

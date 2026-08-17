@@ -5,6 +5,7 @@ import { DocumentItem } from '../items/document.js';
 import { PluginItem } from '../items/plugin.js';
 import { serializeCarryForwardSources } from './carry-forward.js';
 import { clearDisabledDescriptions } from './description-hint-ui.js';
+import { serializeConfigCheckboxes } from './config-checkbox-serializer.js';
 
 export const FormSubmitMixin = {
     /**
@@ -137,10 +138,22 @@ export const FormSubmitMixin = {
             }
         } catch (_e) {}
 
+        // Always, not only in edit/populateEditFormFields: write explicit true/false
+        // hidden inputs at the form root. Unchecked boxes are otherwise omitted from
+        // FormData, and writing into name="config" is dropped because that field lives
+        // in the disabled matrix panel.
+        try {
+            serializeConfigCheckboxes(this.modalElement, form);
+        } catch (_e) {
+            console.warn('[ItemModal] serializeConfigCheckboxes failed — exclude_from_completion_rate / allow_over_100 may not be in payload:', _e);
+        }
+
         if (this.currentMode === 'edit') {
             try {
                 this.populateEditFormFields();
-            } catch (_e) {}
+            } catch (_e) {
+                console.warn('[ItemModal] populateEditFormFields failed — config checkboxes may not be serialized:', _e);
+            }
             try {
                 form.action = `/admin/items/edit/${this.currentItemId}`;
             } catch (_e) {}
@@ -235,29 +248,6 @@ export const FormSubmitMixin = {
 
         if (this.currentItemType.startsWith('plugin_')) {
             this.collectPluginConfigFields(form);
-        }
-
-        const allowOver100Checkbox = this.modalElement.querySelector('#item-allow-over-100');
-        if (allowOver100Checkbox) {
-            let configField = form.querySelector('input[name="config"]');
-            if (!configField) {
-                configField = document.createElement('input');
-                configField.type = 'hidden';
-                configField.name = 'config';
-                form.appendChild(configField);
-            }
-
-            let config = {};
-            try {
-                if (configField.value) {
-                    config = JSON.parse(configField.value);
-                }
-            } catch (e) {
-                config = {};
-            }
-
-            config.allow_over_100 = allowOver100Checkbox.checked;
-            configField.value = JSON.stringify(config);
         }
     },
 

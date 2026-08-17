@@ -353,7 +353,7 @@ function initPagination() {
         // Update buttons
         prevBtn.style.display = targetIdx === 0 ? 'none' : '';
         nextBtn.style.display = targetIdx === pages.length - 1 ? 'none' : '';
-        const ofText = PAGINATION_LABELS.of || 'of';
+        const ofText = (window.PAGINATION_LABELS || {}).of || 'of';
         pageIndicator.textContent = `${targetPage.name} (${targetIdx + 1} ${ofText} ${pages.length})`;
 
         currentPageIdx = targetIdx;

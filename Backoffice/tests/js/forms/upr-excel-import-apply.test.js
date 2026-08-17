@@ -12,6 +12,25 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 vi.mock('../../../app/static/js/forms/modules/dynamic-indicators.js', () => ({
     addPendingDynamicIndicatorForImport: vi.fn().mockResolvedValue(null),
+    findDynamicIndicatorFormBlock: (container, indicatorBankId) => {
+        if (!container || indicatorBankId == null || indicatorBankId === '') return null;
+        const bankId = String(indicatorBankId);
+        return container.querySelector(`.form-item-block[data-indicator-bank-id="${bankId}"]`)
+            || container.querySelector(
+                `.form-item-block[data-assignment-id] .propose-changes-btn[data-indicator-id="${bankId}"]`
+            )?.closest('.form-item-block')
+            || null;
+    },
+    findLivePendingIndicatorBlock: (tempAssignmentId, fallbackElement = null) => {
+        if (tempAssignmentId) {
+            const live = document.querySelector(
+                `.form-item-block[data-pending-assignment-id="${tempAssignmentId}"], `
+                + `.form-item-block[data-assignment-id="${tempAssignmentId}"]`
+            );
+            if (live) return live;
+        }
+        return fallbackElement?.isConnected ? fallbackElement : null;
+    },
 }));
 
 vi.mock('../../../app/static/js/forms/modules/repeat-sections.js', () => ({
@@ -55,7 +74,10 @@ describe('applyUprExcelImportPayload — static fields', () => {
         const result = await applyUprExcelImportPayload({ fields: { 999: { value: '5' } } });
 
         expect(result.applied).toBe(0);
-        expect(result.warnings.some((w) => w.includes('999'))).toBe(true);
+        expect(result.warnings.some((w) => (
+            (typeof w === 'object' ? w.item_id : w) == 999
+            || String(w.message || w).includes('999')
+        ))).toBe(true);
     });
 
     it('warns when the block exists but has no matching input for the value', async () => {
@@ -66,7 +88,10 @@ describe('applyUprExcelImportPayload — static fields', () => {
         const result = await applyUprExcelImportPayload({ fields: { 11: { value: '7' } } });
 
         expect(result.applied).toBe(0);
-        expect(result.warnings.some((w) => w.includes('11'))).toBe(true);
+        expect(result.warnings.some((w) => (
+            (typeof w === 'object' ? w.item_id : w) == 11
+            || String(w.message || w).includes('11')
+        ))).toBe(true);
     });
 });
 
@@ -213,7 +238,10 @@ describe('applyUprExcelImportPayload — matrices', () => {
         const result = await applyUprExcelImportPayload({ matrices: { 21: { 'row_col': 5 } } });
 
         expect(result.applied).toBe(0);
-        expect(result.warnings.some((w) => w.includes('21'))).toBe(true);
+        expect(result.warnings.some((w) => (
+            (typeof w === 'object' ? w.item_id : w) == 21
+            || String(w.message || w).includes('21')
+        ))).toBe(true);
     });
 
     it('reports success with no warnings when the matrix handler applies the data', async () => {
@@ -225,5 +253,112 @@ describe('applyUprExcelImportPayload — matrices', () => {
         expect(result.applied).toBe(1);
         expect(result.warnings).toEqual([]);
         expect(window.matrixHandler.setMatrixData).toHaveBeenCalledWith('22', { row_col: 5 });
+    });
+});
+
+describe('applyUprExcelImportPayload — dynamic indicators', () => {
+    beforeEach(async () => {
+        vi.clearAllMocks();
+        const dynamicIndicators = await import('../../../app/static/js/forms/modules/dynamic-indicators.js');
+        dynamicIndicators.addPendingDynamicIndicatorForImport.mockResolvedValue(null);
+    });
+
+    it('applies values to a live field that has no propose-changes button', async () => {
+        document.body.innerHTML = `
+            <div id="section-container-8">
+                <div class="form-item-block" data-item-type="indicator"
+                     data-assignment-id="pending_1" data-indicator-bank-id="42">
+                    <input name="dynamic_pending_1_total_value">
+                </div>
+            </div>`;
+        const { applyUprExcelImportPayload } = await importModule();
+
+        const result = await applyUprExcelImportPayload({
+            dynamic_indicators: [{
+                section_id: 8,
+                indicator_bank_id: 42,
+                value: '1500',
+            }],
+        });
+
+        expect(result.warnings).toEqual([]);
+        expect(result.applied).toBe(1);
+        expect(document.querySelector('[name="dynamic_pending_1_total_value"]').value).toBe('1500');
+    });
+
+    it('writes first-import values onto the live layout clone, not a detached insert node', async () => {
+        document.body.innerHTML = `
+            <div id="section-container-8"></div>`;
+
+        const live = document.createElement('div');
+        live.className = 'form-item-block';
+        live.setAttribute('data-assignment-id', 'pending_abc');
+        live.setAttribute('data-pending-assignment-id', 'pending_abc');
+        live.setAttribute('data-indicator-bank-id', '42');
+        live.innerHTML = '<input name="dynamic_pending_abc_total_value">';
+        document.getElementById('section-container-8').appendChild(live);
+
+        const detached = live.cloneNode(true);
+        const dynamicIndicators = await import('../../../app/static/js/forms/modules/dynamic-indicators.js');
+        dynamicIndicators.addPendingDynamicIndicatorForImport.mockResolvedValue(detached);
+
+        const { applyUprExcelImportPayload } = await importModule();
+        const result = await applyUprExcelImportPayload({
+            dynamic_indicators: [{
+                section_id: 8,
+                indicator_bank_id: 42,
+                value: '88',
+            }],
+        });
+
+        expect(detached.isConnected).toBe(false);
+        expect(document.querySelector('[name="dynamic_pending_abc_total_value"]').value).toBe('88');
+        expect(detached.querySelector('input').value).toBe('');
+        expect(result.applied).toBe(1);
+        expect(result.warnings).toEqual([]);
+    });
+
+    it('falls through an empty disagg_data object to the scalar value', async () => {
+        document.body.innerHTML = `
+            <div id="section-container-8">
+                <div class="form-item-block" data-item-type="indicator"
+                     data-assignment-id="9" data-indicator-bank-id="42">
+                    <input name="dynamic_9_total_value">
+                </div>
+            </div>`;
+        const { applyUprExcelImportPayload } = await importModule();
+
+        const result = await applyUprExcelImportPayload({
+            dynamic_indicators: [{
+                section_id: 8,
+                indicator_bank_id: 42,
+                existing_assignment_id: 9,
+                value: '77',
+                disagg_data: {},
+            }],
+        });
+
+        expect(result.applied).toBe(1);
+        expect(document.querySelector('[name="dynamic_9_total_value"]').value).toBe('77');
+    });
+});
+
+describe('applyUprExcelImportPayload — not applicable', () => {
+    it('checks the not-applicable box for a core indicator', async () => {
+        document.body.innerHTML = `
+            <div class="form-item-block" data-item-id="88" data-item-type="indicator">
+                <input type="checkbox" name="indicator_88_not_applicable">
+                <input name="indicator_88_total_value">
+            </div>`;
+        const { applyUprExcelImportPayload } = await importModule();
+
+        const result = await applyUprExcelImportPayload({
+            fields: { 88: { not_applicable: true } },
+        });
+
+        expect(result.applied).toBe(1);
+        expect(result.warnings).toEqual([]);
+        expect(document.querySelector('[name="indicator_88_not_applicable"]').checked).toBe(true);
+        expect(document.querySelector('[name="indicator_88_total_value"]').value).toBe('');
     });
 });

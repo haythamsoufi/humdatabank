@@ -234,6 +234,7 @@
             maxWidth: 300,
             filter: 'agTextColumnFilter',
             sortable: true,
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             cellRenderer: function(params) {
                 return AgGridRenderers.userHoverCell(params, {
                     idField: 'changed_by_user_id',

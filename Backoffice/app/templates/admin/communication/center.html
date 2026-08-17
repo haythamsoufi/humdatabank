@@ -96,6 +96,14 @@
                     </div>
                 </div>
                 {{ ag_grid_body_wrap('notificationsGrid', loading_text=_('Loading notifications...'), grid_height='600px', use_container=false) }}
+                <div id="communications-load-more" class="mt-4 flex flex-col items-center gap-2 border-t border-gray-200 pt-4{% if not comms_has_more %} hidden{% endif %}">
+                    <p id="communications-load-more-status" class="text-sm text-gray-600">
+                        {{ _('Showing the %(loaded)s most recent of %(total)s communications.', loaded=(notifications|length), total=total_count) }}
+                    </p>
+                    <button type="button" id="communications-load-more-btn" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-chevron-down mr-1"></i>{{ _('Load more') }}
+                    </button>
+                </div>
             {% else %}
                 <h3 class="text-sm font-medium text-gray-900 m-0 mb-4">{{ _('Notifications and email delivery') }}</h3>
                 <p class="text-sm text-gray-700">{{ _('No communications found.') }}</p>
@@ -1399,6 +1407,10 @@
         'retrySelected': {{ _('Retry selected')|tojson }},
         'dismissSelected': {{ _('Dismiss selected')|tojson }},
         'clearSelection': {{ _('Clear selection')|tojson }},
+        'loadMore': {{ _('Load more')|tojson }},
+        'loadingMore': {{ _('Loading more…')|tojson }},
+        'loadMoreError': {{ _('Could not load more communications. Please try again.')|tojson }},
+        'showingRecentOfTotal': {{ _('Showing the %(loaded)s most recent of %(total)s communications.', loaded='%(loaded)s', total='%(total)s')|tojson }},
         'rowsSelected': {{ _('row(s) selected')|tojson }},
         'dismissedEmail': {{ _('Email failure dismissed')|tojson }},
         'confirmDismissSelected': {{ _('Dismiss selected email failure(s) without retrying?')|tojson }},
@@ -1445,6 +1457,12 @@
     window.communicationPageConfig = {
         notificationsPushEnabled: {{ notifications_push_enabled|tojson }},
         failedEmailDeliveryCount: {{ (failed_email_delivery_count or 0)|tojson }},
+        pagination: {
+            page: {{ (page or 1)|tojson }},
+            perPage: {{ (per_page or 50)|tojson }},
+            total: {{ (total_count or 0)|tojson }},
+            hasMore: {{ (comms_has_more or false)|tojson }},
+        },
         campaignEmailTemplates: {{ campaign_email_templates|tojson|safe }},
         urls: {
             campaignEmailComposePreview: {{ url_for('admin_communication.api_campaign_email_compose_preview')|tojson }},

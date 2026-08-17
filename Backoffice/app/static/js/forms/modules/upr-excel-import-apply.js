@@ -3,7 +3,11 @@
  * without persisting — the user must click Save to write to the database.
  */
 
-import { addPendingDynamicIndicatorForImport } from './dynamic-indicators.js';
+import {
+    addPendingDynamicIndicatorForImport,
+    findDynamicIndicatorFormBlock,
+    findLivePendingIndicatorBlock,
+} from './dynamic-indicators.js';
 import {
     addRepeatEntry,
     findRepeatFieldSelects,
@@ -42,8 +46,22 @@ function applyFieldPayloadToBlock(block, fieldData) {
         return true;
     }
 
-    if (fieldData.disagg_data) {
-        return applyDisaggToBlock(block, fieldData.disagg_data);
+    if (fieldData.not_applicable) {
+        const na = block.querySelector('input[name*="_not_applicable"]');
+        if (!na) return false;
+        if (!na.checked) {
+            na.checked = true;
+            dispatchInputEvents(na);
+        }
+        return true;
+    }
+
+    if (fieldData.disagg_data && typeof fieldData.disagg_data === 'object'
+        && Object.keys(fieldData.disagg_data).length > 0) {
+        const appliedDisagg = applyDisaggToBlock(block, fieldData.disagg_data);
+        if (appliedDisagg) return true;
+        // Empty/unusable disagg payloads still carry a scalar `value` for
+        // total-only dynamic indicators — fall through rather than no-op.
     }
 
     const value = fieldData.value;
@@ -77,12 +95,18 @@ function applyStaticFields(fields) {
         const block = findStaticFieldBlock(itemId);
         if (!block) {
             debugWarn(MODULE, `Static field block not found for item ${itemId}`);
-            warnings.push(`Could not find field ${itemId} on the form — its imported value was not applied.`);
+            warnings.push({
+                message: 'Could not find this field on the form — its imported value was not applied.',
+                item_id: Number(itemId) || itemId,
+            });
             continue;
         }
         if (!applyFieldPayloadToBlock(block, fieldData)) {
             debugWarn(MODULE, `Failed to apply imported value for field ${itemId}`);
-            warnings.push(`Could not apply the imported value for field ${itemId} — please check it manually.`);
+            warnings.push({
+                message: 'Could not apply the imported value for this field — please check it manually.',
+                item_id: Number(itemId) || itemId,
+            });
             continue;
         }
         count += 1;
@@ -107,7 +131,10 @@ async function applyMatrices(matrices) {
         const applied = await handler.setMatrixData(String(itemId), data);
         if (!applied) {
             debugWarn(MODULE, `Matrix ${itemId} not found on the page; imported data not applied`);
-            warnings.push(`Could not apply imported data for matrix ${itemId} — please check it manually.`);
+            warnings.push({
+                message: 'Could not apply imported data for this table — please check it manually.',
+                item_id: Number(itemId) || itemId,
+            });
             continue;
         }
         count += 1;
@@ -270,10 +297,15 @@ function findDynamicIndicatorBlock(sectionId, entry) {
         || document.getElementById(`section-container-${sectionId}`);
     if (!container) return null;
 
-    const proposeBtn = container.querySelector(
-        `.propose-changes-btn[data-indicator-id="${entry.indicator_bank_id}"]`
-    );
-    return proposeBtn?.closest('.form-item-block') || null;
+    return findDynamicIndicatorFormBlock(container, entry.indicator_bank_id);
+}
+
+function resolveLiveDynamicBlock(block, sectionId, entry) {
+    if (block?.isConnected) return block;
+    const pendingId = block?.getAttribute?.('data-pending-assignment-id')
+        || block?.getAttribute?.('data-assignment-id');
+    return findLivePendingIndicatorBlock(pendingId)
+        || findDynamicIndicatorBlock(sectionId, entry);
 }
 
 async function applyDynamicIndicators(dynamicEntries, repeatEntryMax = null) {
@@ -303,9 +335,7 @@ async function applyDynamicIndicators(dynamicEntries, repeatEntryMax = null) {
             }
         }
 
-        if (!block) {
-            block = findDynamicIndicatorBlock(sectionId, entry);
-        }
+        block = resolveLiveDynamicBlock(block, sectionId, entry);
         if (!block) {
             debugWarn(MODULE, `Dynamic indicator block not found for bank ${bankId}`);
             warnings.push(`Could not find indicator ${bankId} on the form — its imported value was not applied.`);
@@ -315,6 +345,7 @@ async function applyDynamicIndicators(dynamicEntries, repeatEntryMax = null) {
         const applied = applyFieldPayloadToBlock(block, {
             value: entry.value != null ? String(entry.value) : undefined,
             data_not_available: entry.data_not_available,
+            not_applicable: entry.not_applicable,
             disagg_data: entry.disagg_data,
         });
         if (!applied) {

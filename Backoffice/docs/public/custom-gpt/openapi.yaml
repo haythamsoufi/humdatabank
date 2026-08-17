@@ -253,6 +253,42 @@ paths:
         "200":
           description: total_documents, countries_count, by_type, by_year, by_country
 
+  /public/documents/chunks/{chunk_id}/context:
+    get:
+      operationId: getChunkContext
+      summary: Neighboring chunks around one search result
+      description: Fetches up to before+1+after chunks in reading order from the same document. Use when a searchPublicDocuments chunk is truncated or its match is unclear — avoids re-searching the whole document.
+      parameters:
+        - name: chunk_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: chunk_id from a searchPublicDocuments result
+        - name: before
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 0
+            maximum: 5
+          description: Chunks to include before the requested chunk
+        - name: after
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 0
+            maximum: 5
+          description: Chunks to include after the requested chunk
+      responses:
+        "200":
+          description: document_id, document_title, chunks[] with content/page_number/is_requested_chunk, in reading order
+        "404":
+          description: Chunk not found or its document is not public
+
   /public/documents/{document_id}:
     get:
       operationId: getPublicDocument

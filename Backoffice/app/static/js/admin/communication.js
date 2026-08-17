@@ -41,8 +41,11 @@ function updateFailedEmailNotice(dataOverride) {
     if (!notice) {
         return;
     }
+    const cfg = window.communicationPageConfig || {};
     const data = dataOverride !== undefined ? dataOverride : window.notificationsData;
-    const count = countFailedEmailsInNotificationsData(data);
+    const counted = countFailedEmailsInNotificationsData(data);
+    const serverCount = cfg.failedEmailDeliveryCount;
+    const count = (serverCount != null && serverCount !== '') ? Number(serverCount) : counted;
     const messageEl = document.getElementById('failed-email-notice-message');
     if (messageEl) {
         messageEl.textContent = formatFailedEmailNoticeMessage(count);
@@ -51,6 +54,42 @@ function updateFailedEmailNotice(dataOverride) {
         notice.classList.remove('hidden');
     } else {
         notice.classList.add('hidden');
+    }
+}
+
+function communicationsListUrl(page, perPage) {
+    const url = new URL('/admin/api/notifications/all', window.location.origin);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('per_page', String(perPage));
+    const src = new URLSearchParams(window.location.search);
+    ['unread_only', 'type', 'user_id', 'priority', 'archived_only', 'include_archived', 'date_from', 'date_to'].forEach((key) => {
+        if (src.has(key)) {
+            url.searchParams.set(key, src.get(key));
+        }
+    });
+    return url.pathname + url.search;
+}
+
+function formatShowingRecentStatus(loaded, total) {
+    const t = window.COMMUNICATION_TRANSLATIONS || {};
+    const template = t.showingRecentOfTotal || 'Showing the %(loaded)s most recent of %(total)s communications.';
+    return String(template)
+        .replace('%(loaded)s', String(loaded))
+        .replace('%(total)s', String(total));
+}
+
+function updateCommunicationsLoadMoreUi() {
+    const cfg = window.communicationPageConfig || {};
+    const pagination = cfg.pagination || {};
+    const wrap = document.getElementById('communications-load-more');
+    const status = document.getElementById('communications-load-more-status');
+    const loaded = Array.isArray(window.notificationsData) ? window.notificationsData.length : 0;
+    const total = pagination.total != null ? Number(pagination.total) : loaded;
+    if (status) {
+        status.textContent = formatShowingRecentStatus(loaded, total);
+    }
+    if (wrap) {
+        wrap.classList.toggle('hidden', !pagination.hasMore);
     }
 }
 
@@ -113,6 +152,7 @@ class AdminNotifications {
         this.hideCampaignEditFields();
         this._initCampaignEmailComposeEditor();
         updateFailedEmailNotice();
+        updateCommunicationsLoadMoreUi();
 
         // Tab strip: _initNotificationsCenterTabs() wires #communication-center-tabs (AdminUnderlineTabs, same as manage_settings)
 
@@ -153,6 +193,10 @@ class AdminNotifications {
 
         document.getElementById('dismiss-selected-failed-emails')?.addEventListener('click', () => {
             this.dismissSelectedFailedEmails();
+        });
+
+        document.getElementById('communications-load-more-btn')?.addEventListener('click', () => {
+            this.loadMoreCommunications();
         });
 
         document.getElementById('clear-grid-email-selection')?.addEventListener('click', () => {
@@ -4356,6 +4400,77 @@ class AdminNotifications {
         } catch (error) {
             console.error('Failed to refresh notifications grid:', error);
             return false;
+        }
+    }
+
+    /**
+     * Fetch the next page of communications and append (de-duplicated) to the grid.
+     * Backs the "Load more" button — server paginates via /admin/api/notifications/all
+     * so the initial page load only serializes communicationsPageSize rows instead of
+     * the full history (see fetch_communications_center_page).
+     */
+    async loadMoreCommunications() {
+        if (this._loadingMoreCommunications) {
+            return;
+        }
+        const t = window.COMMUNICATION_TRANSLATIONS || {};
+        const btn = document.getElementById('communications-load-more-btn');
+        const originalHtml = btn ? btn.innerHTML : null;
+        const cfg = window.communicationPageConfig || (window.communicationPageConfig = {});
+        const pagination = cfg.pagination || { page: 1, perPage: 50, total: 0, hasMore: false };
+
+        this._loadingMoreCommunications = true;
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin fa-fw mr-1"></i>${t.loadingMore || 'Loading more…'}`;
+        }
+        try {
+            const nextPage = (Number(pagination.page) || 1) + 1;
+            const perPage = Number(pagination.perPage) || 50;
+            const data = await _anFetch(communicationsListUrl(nextPage, perPage));
+            if (!data || !data.success || !Array.isArray(data.notifications)) {
+                throw new Error((data && data.error) || 'Failed to load more communications');
+            }
+
+            const existing = Array.isArray(window.notificationsData) ? window.notificationsData : [];
+            const seen = new Set(existing.map((row) => row.grid_row_id));
+            const merged = existing.slice();
+            data.notifications.forEach((row) => {
+                if (!seen.has(row.grid_row_id)) {
+                    merged.push(row);
+                    seen.add(row.grid_row_id);
+                }
+            });
+
+            const manager = window.communicationsGridManager || window.notificationsGridManager;
+            if (manager && typeof manager.setRowData === 'function') {
+                manager.setRowData(merged);
+            } else {
+                window.notificationsData = merged;
+            }
+
+            const serverPagination = data.pagination || {};
+            cfg.pagination = {
+                page: nextPage,
+                perPage,
+                total: data.total_count ?? serverPagination.total ?? pagination.total,
+                hasMore: (data.has_more ?? serverPagination.has_more) === true,
+            };
+            updateFailedEmailNotice(merged);
+            updateCommunicationsLoadMoreUi();
+        } catch (error) {
+            console.error('Failed to load more communications:', error);
+            if (window.showAlert) {
+                window.showAlert(t.loadMoreError || 'Could not load more communications. Please try again.', 'error');
+            }
+        } finally {
+            this._loadingMoreCommunications = false;
+            if (btn) {
+                btn.disabled = false;
+                if (originalHtml !== null) {
+                    btn.innerHTML = originalHtml;
+                }
+            }
         }
     }
 

@@ -856,7 +856,7 @@ $(document).ready(function() {
                     showEmail: true
                 });
             },
-            cellStyle: { 'white-space': 'normal', 'line-height': '1.4' }
+            cellStyle: AgGridRenderers.userHoverCellStyle
         },
         {
             field: 'entity_name',

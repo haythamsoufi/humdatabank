@@ -59,6 +59,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _table_data_row_capacity,
     _write_bilateral_ns_source_cell,
     dedupe_upr_import_warnings,
+    serialize_upr_import_warnings,
     read_named_cell,
     read_named_table,
     read_table_cell,
@@ -1323,6 +1324,7 @@ def run_unified_country_plan_import(
         )
         warnings.extend(ctx.warnings)
         warnings = dedupe_upr_import_warnings(warnings)
+        warning_texts, warning_items = serialize_upr_import_warnings(warnings)
 
         field_count = len(payload.get("fields") or {})
         matrix_count = sum(len(v or {}) for v in (payload.get("matrices") or {}).values())
@@ -1333,7 +1335,8 @@ def run_unified_country_plan_import(
                 "success": True,
                 "stage_only": True,
                 "payload": payload,
-                "warnings": warnings,
+                "warnings": warning_texts,
+                "warning_items": warning_items,
                 "updated_count": updated_count,
             }
 
@@ -1350,7 +1353,8 @@ def run_unified_country_plan_import(
             valid_form_item_ids=valid_item_ids,
         )
         stats["success"] = True
-        stats["warnings"] = warnings
+        stats["warnings"] = warning_texts
+        stats["warning_items"] = warning_items
         stats["updated_count"] = int(stats.get("inserted", 0) or 0) + int(stats.get("updated", 0) or 0)
         return stats
     finally:

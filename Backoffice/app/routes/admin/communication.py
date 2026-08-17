@@ -16,16 +16,14 @@ from app.utils.sql_utils import safe_ilike_pattern
 from app.services.notification.core import create_notification, get_default_icon_for_notification_type
 from app.utils.request_validation import enforce_api_or_csrf_protection
 from app.services.notification.push import PushNotificationService
-from app.services.notification.service import NotificationService
 from app.services.email.client import send_email as send_email_message
 from app.services.communication.center_service import (
-    build_communications_center_grid,
-    ensure_notifications_for_linked_email_logs,
-    get_orphan_email_delivery_logs_for_grid,
+    DEFAULT_CENTER_PAGE_SIZE,
+    MAX_CENTER_PAGE_SIZE,
+    fetch_communications_center_page,
 )
+from app.utils.api_pagination import validate_pagination_params
 from app.services.email.delivery import (
-    get_email_delivery_logs_needing_attention,
-    get_skipped_email_delivery_logs,
     log_email_attempt,
     mark_email_sent,
     mark_email_failed,
@@ -44,11 +42,52 @@ from app.utils.error_handling import handle_json_view_exception
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from flask_babel import gettext as _
 from datetime import datetime, timedelta
-from sqlalchemy import and_, or_, func, cast, String
+from sqlalchemy import cast, String
 from contextlib import suppress
 from app.utils.datetime_helpers import utcnow
 
 bp = Blueprint("admin_communication", __name__, url_prefix="/admin")
+
+
+def _communications_center_filters_from_request(args):
+    """Parse shared Communication Center list filters from query args."""
+    unread_only = args.get('unread_only', 'false').lower() == 'true'
+    notification_type = args.get('type', None)
+    user_id = args.get('user_id', None, type=int)
+    priority = args.get('priority', None)
+    archived_only = args.get('archived_only', 'false').lower() == 'true'
+    include_archived = args.get('include_archived', 'false').lower() == 'true'
+
+    date_from = None
+    date_to = None
+    if args.get('date_from'):
+        with suppress(ValueError):
+            date_from = datetime.fromisoformat(args.get('date_from'))
+    if args.get('date_to'):
+        with suppress(ValueError):
+            date_to = datetime.fromisoformat(args.get('date_to'))
+
+    return {
+        'unread_only': unread_only,
+        'notification_type': notification_type,
+        'user_id': user_id,
+        'priority': priority,
+        'archived_only': archived_only,
+        'include_archived': include_archived,
+        'date_from': date_from,
+        'date_to': date_to,
+    }
+
+
+def _attach_rbac_role_codes(rows):
+    """Fill rbac_role_codes on serialized Communication Center rows."""
+    user_ids = list({row.get('user_id') for row in rows if row.get('user_id') is not None})
+    rbac_role_codes_by_user_id = AuthorizationService.prefetch_role_codes(user_ids)
+    for row in rows:
+        uid = row.get('user_id')
+        if uid is not None:
+            row['rbac_role_codes'] = rbac_role_codes_by_user_id.get(uid, [])
+    return rows
 
 
 def _latest_admin_notifications_by_user(user_ids, within_seconds=30):
@@ -79,82 +118,20 @@ def communication_center():
     # Get all notification types for the filter dropdown
     notification_types = [nt.value for nt in NotificationType]
 
-    # Get filter parameters
-    unread_only = request.args.get('unread_only', 'false').lower() == 'true'
-    notification_type = request.args.get('type', None)
-    user_id = request.args.get('user_id', None, type=int)
-    priority = request.args.get('priority', None)
-    archived_only = request.args.get('archived_only', 'false').lower() == 'true'
-
-    # Date filters
-    date_from = None
-    date_to = None
-    if request.args.get('date_from'):
-        with suppress(ValueError):
-            date_from = datetime.fromisoformat(request.args.get('date_from'))
-    if request.args.get('date_to'):
-        with suppress(ValueError):
-            date_to = datetime.fromisoformat(request.args.get('date_to'))
-
-    # Build query for all notifications
-    query = Notification.query.join(User, Notification.user_id == User.id)
-
-    # Apply filters
-    if unread_only:
-        query = query.filter(Notification.is_read == False)
-
-    if notification_type:
-        query = query.filter(cast(Notification.notification_type, String) == notification_type)
-
-    if user_id:
-        query = query.filter(Notification.user_id == user_id)
-
-    if priority:
-        query = query.filter(Notification.priority == priority)
-
-    if archived_only:
-        query = query.filter(Notification.is_archived == True)
-    else:
-        query = query.filter(Notification.is_archived == False)
-
-    if date_from:
-        query = query.filter(Notification.created_at >= date_from)
-    if date_to:
-        query = query.filter(Notification.created_at <= date_to)
-
-    # All matching rows for the grid (client-side AG Grid pagination)
-    notifications = query.order_by(Notification.created_at.desc()).all()
-    original_notification_ids = {n.id for n in notifications if n.id is not None}
-
-    attention_logs = get_email_delivery_logs_needing_attention()
-    skipped_logs = get_skipped_email_delivery_logs()
-    failed_email_delivery_count = len(attention_logs)
-    linked_email_logs = attention_logs + skipped_logs
-    attention_notification_ids = {log.notification_id for log in attention_logs if log.notification_id}
-
-    notifications = ensure_notifications_for_linked_email_logs(notifications, linked_email_logs)
-    orphan_email_logs = get_orphan_email_delivery_logs_for_grid()
-
-    assignment_status_cache, _ = NotificationService._build_assignment_caches_for_notifications(notifications)
-    actor_fields_by_id = NotificationService.build_actor_display_fields_map(
-        notifications, assignment_status_cache
+    page, per_page = validate_pagination_params(
+        request.args, default_per_page=DEFAULT_CENTER_PAGE_SIZE, max_per_page=MAX_CENTER_PAGE_SIZE
     )
-    email_fields_by_id = NotificationService.build_email_delivery_fields_map(
-        [n.id for n in notifications],
-        notifications=notifications,
-        actor_fields_by_id=actor_fields_by_id,
+    center_page = fetch_communications_center_page(
+        page=page,
+        per_page=per_page,
+        **_communications_center_filters_from_request(request.args),
     )
-
-    notifications_data = build_communications_center_grid(
-        notifications,
-        orphan_email_logs,
-        actor_fields_by_id=actor_fields_by_id,
-        email_fields_by_id=email_fields_by_id,
-        original_notification_ids=original_notification_ids,
-        attention_notification_ids=attention_notification_ids,
-        iso_dates=True,
-    )
-    total_count = len(notifications_data)
+    notifications_data = center_page['rows']
+    total_count = center_page['total_count']
+    failed_email_delivery_count = center_page['failed_email_delivery_count']
+    comms_has_more = center_page['has_more']
+    comms_page = center_page['page']
+    comms_per_page = center_page['per_page']
 
     # Fetch campaigns for the campaigns tab
     campaigns = NotificationCampaign.query.order_by(NotificationCampaign.created_at.desc()).all()
@@ -217,9 +194,10 @@ def communication_center():
         notification_types=notification_types,
         notifications=notifications_data,
         total_count=total_count,
-        page=1,
-        per_page=total_count,
-        total_pages=1 if total_count else 0,
+        page=comms_page,
+        per_page=comms_per_page,
+        total_pages=(total_count + comms_per_page - 1) // comms_per_page if comms_per_page else 0,
+        comms_has_more=comms_has_more,
         campaigns=campaigns_data,
         failed_email_delivery_count=failed_email_delivery_count,
         campaign_compose_templates=campaign_compose_templates,
@@ -740,98 +718,33 @@ def api_search_users():
 @bp.route("/api/notifications/all", methods=["GET"])
 @permission_required("admin.communication.manage")
 def api_get_all_notifications():
-    """Get all notifications from all users (admin view)"""
+    """Get a newest-first page of communications (admin view)."""
     try:
-        # Get filter parameters
-        unread_only = request.args.get('unread_only', 'false').lower() == 'true'
-        notification_type = request.args.get('type', None)
-        user_id = request.args.get('user_id', None, type=int)
-        include_archived = request.args.get('include_archived', 'false').lower() == 'true'
-        archived_only = request.args.get('archived_only', 'false').lower() == 'true'
-
-        # Date filters
-        date_from = None
-        date_to = None
-        if request.args.get('date_from'):
-            with suppress(ValueError):
-                date_from = datetime.fromisoformat(request.args.get('date_from'))
-        if request.args.get('date_to'):
-            with suppress(ValueError):
-                date_to = datetime.fromisoformat(request.args.get('date_to'))
-
-        # Build query for all notifications
-        query = Notification.query.join(User, Notification.user_id == User.id)
-
-        # Apply filters
-        if unread_only:
-            query = query.filter(Notification.is_read == False)
-
-        if notification_type:
-            query = query.filter(Notification.notification_type == notification_type)
-
-        if user_id:
-            query = query.filter(Notification.user_id == user_id)
-
-        if not include_archived:
-            query = query.filter(Notification.is_archived == False)
-        elif archived_only:
-            query = query.filter(Notification.is_archived == True)
-
-        if date_from:
-            query = query.filter(Notification.created_at >= date_from)
-        if date_to:
-            query = query.filter(Notification.created_at <= date_to)
-
-        notifications = query.order_by(Notification.created_at.desc()).all()
-        original_notification_ids = {n.id for n in notifications if n.id is not None}
-
-        attention_logs = get_email_delivery_logs_needing_attention()
-        skipped_logs = get_skipped_email_delivery_logs()
-        linked_email_logs = attention_logs + skipped_logs
-        attention_notification_ids = {log.notification_id for log in attention_logs if log.notification_id}
-        notifications = ensure_notifications_for_linked_email_logs(notifications, linked_email_logs)
-        orphan_email_logs = get_orphan_email_delivery_logs_for_grid()
-
-        notif_user_ids = list({n.user_id for n in notifications if getattr(n, "user_id", None) is not None})
-        notif_user_ids.extend(log.user_id for log in orphan_email_logs if log.user_id)
-        notif_user_ids = list({uid for uid in notif_user_ids if uid is not None})
-        rbac_role_codes_by_user_id = AuthorizationService.prefetch_role_codes(notif_user_ids)
-
-        assignment_status_cache, _ = NotificationService._build_assignment_caches_for_notifications(notifications)
-        actor_fields_by_id = NotificationService.build_actor_display_fields_map(
-            notifications, assignment_status_cache
+        page, per_page = validate_pagination_params(
+            request.args, default_per_page=DEFAULT_CENTER_PAGE_SIZE, max_per_page=MAX_CENTER_PAGE_SIZE
         )
-        email_fields_by_id = NotificationService.build_email_delivery_fields_map(
-            [n.id for n in notifications],
-            notifications=notifications,
-            actor_fields_by_id=actor_fields_by_id,
+        center_page = fetch_communications_center_page(
+            page=page,
+            per_page=per_page,
+            **_communications_center_filters_from_request(request.args),
         )
-
-        notifications_data = build_communications_center_grid(
-            notifications,
-            orphan_email_logs,
-            actor_fields_by_id=actor_fields_by_id,
-            email_fields_by_id=email_fields_by_id,
-            original_notification_ids=original_notification_ids,
-            attention_notification_ids=attention_notification_ids,
-            iso_dates=True,
-        )
-        for row in notifications_data:
-            user_id = row.get('user_id')
-            if user_id is not None:
-                row['rbac_role_codes'] = rbac_role_codes_by_user_id.get(user_id, [])
-
-        total_count = len(notifications_data)
+        notifications_data = _attach_rbac_role_codes(center_page['rows'])
+        total_count = center_page['total_count']
+        per_page = center_page['per_page']
+        page = center_page['page']
 
         return json_ok(
             success=True,
             notifications=notifications_data,
-            failed_email_delivery_count=len(attention_logs),
+            failed_email_delivery_count=center_page['failed_email_delivery_count'],
+            has_more=center_page['has_more'],
+            total_count=total_count,
             pagination={
-                'page': 1,
-                'per_page': total_count,
+                'page': page,
+                'per_page': per_page,
                 'total': total_count,
-                'pages': 1 if total_count else 0,
+                'pages': (total_count + per_page - 1) // per_page if per_page else 0,
+                'has_more': center_page['has_more'],
             },
         )
 

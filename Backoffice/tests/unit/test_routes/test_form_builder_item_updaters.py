@@ -827,6 +827,109 @@ class TestUpdateItemConfig:
         _update_item_config(item, form, {'config': json.dumps({'allow_over_100': True})})
         assert item.config['allow_over_100'] is True
 
+    # -----------------------------------------------------------------------
+    # Checkbox absence / preserve-existing behaviour
+    #
+    # FormData omits unchecked HTML checkboxes, so the backend must distinguish
+    # between "user unchecked" (value explicitly False in config JSON) and
+    # "field not relevant to this request" (key absent entirely).
+    #
+    # Fields that require explicit serialization from the frontend:
+    #   exclude_from_completion_rate, allow_over_100, allow_other,
+    #   unique_options_in_section, use_as_repeat_entry_title,
+    #   limit_entries_to_option_count
+    #
+    # Each field: absent request → preserve existing / absent request → set via config JSON.
+    # -----------------------------------------------------------------------
+
+    @pytest.mark.parametrize('field,initial', [
+        ('exclude_from_completion_rate', True),
+        ('allow_over_100',              True),
+        ('allow_other',                 True),
+        ('unique_options_in_section',   True),
+        ('use_as_repeat_entry_title',   True),
+        ('limit_entries_to_option_count', True),
+    ])
+    def test_config_bool_absent_preserves_existing_true(self, app, field, initial):
+        """When a config-JSON checkbox field is absent from the request the stored value is kept.
+
+        This covers the case where the frontend payload doesn't include the field
+        (e.g. it is not applicable to the current item type and the modal doesn't
+        render its checkbox), so the backend must not silently reset it to False.
+        """
+        from app.models import FormItem
+        item = FormItem(item_type='question', section_id=1, template_id=1, version_id=1,
+                        label='Q', type='text', order=1)
+        item.config = {field: initial}
+        form = _make_form_with_config()
+        _update_item_config(item, form, {})   # nothing in request — field absent
+        assert item.config[field] is True, (
+            f"'{field}' should be preserved as True when absent from request; "
+            f"got {item.config[field]!r}"
+        )
+
+    @pytest.mark.parametrize('field', [
+        'exclude_from_completion_rate',
+        'allow_over_100',
+        'allow_other',
+        'unique_options_in_section',
+        'use_as_repeat_entry_title',
+        'limit_entries_to_option_count',
+    ])
+    def test_config_bool_explicit_false_in_config_json_saves_false(self, app, field):
+        """An explicit False in the config JSON (sent by the frontend for unchecked boxes) saves False.
+
+        The frontend serializes all config-panel checkboxes into the 'config' JSON hidden
+        field before submission so the backend always receives the current state — checked
+        or unchecked.  This test asserts that the False value is respected.
+        """
+        from app.models import FormItem
+        item = FormItem(item_type='question', section_id=1, template_id=1, version_id=1,
+                        label='Q', type='text', order=1)
+        item.config = {field: True}   # previously True
+        form = _make_form_with_config()
+        _update_item_config(item, form, {'config': json.dumps({field: False})})
+        assert item.config[field] is False, (
+            f"'{field}' should be False when config JSON sends False; "
+            f"got {item.config[field]!r}"
+        )
+
+    @pytest.mark.parametrize('field', [
+        'exclude_from_completion_rate',
+        'allow_over_100',
+        'allow_other',
+        'unique_options_in_section',
+        'use_as_repeat_entry_title',
+        'limit_entries_to_option_count',
+    ])
+    def test_config_bool_explicit_true_in_direct_field_saves_true(self, app, field):
+        """Direct request field (checkbox=on) takes priority over config JSON."""
+        from app.models import FormItem
+        item = FormItem(item_type='question', section_id=1, template_id=1, version_id=1,
+                        label='Q', type='text', order=1)
+        item.config = {field: False}
+        form = _make_form_with_config()
+        _update_item_config(item, form, {field: 'on'})
+        assert item.config[field] is True
+
+    def test_exclude_from_completion_rate_false_in_config_json_saves_false(self, app):
+        """Regression: unchecking 'Exclude from completion rate' in the modal must save False.
+
+        Before the fix, absent-from-request preserved the existing True value even when
+        the user had unchecked the box (because FormData drops unchecked checkboxes).
+        The frontend now serialises the checkbox state into the config JSON field, so this
+        test exercises the full round-trip: previous=True, config JSON sends False → saved False.
+        """
+        from app.models import FormItem
+        item = FormItem(item_type='question', section_id=1, template_id=1, version_id=1,
+                        label='Q', type='textarea', order=1)
+        item.config = {'exclude_from_completion_rate': True}
+        form = _make_form_with_config()
+        # Simulate what the frontend sends after the user unchecks the box
+        payload = {'config': json.dumps({'exclude_from_completion_rate': False})}
+        _update_item_config(item, form, payload)
+        assert item.config['exclude_from_completion_rate'] is False
+
     def test_privacy_normalized_to_ifrc_network_for_unknown_value(self, app):
         from app.models import FormItem
         item = FormItem(item_type='indicator', section_id=1, template_id=1, version_id=1,
@@ -948,12 +1051,19 @@ class TestUpdateItemConfig:
         item.config = {}
         form = _make_form_with_config()
         translations = {'en': 'Number format hint', 'fr': 'Format numérique'}
-        _update_item_config(item, form, {
-            'show_hint': 'on',
-            'hint_text': 'Number format hint',
-            'hint_text_translations': json.dumps(translations),
-            'hint_style': 'tip',
-        })
+        # Set SUPPORTED_LANGUAGES explicitly so this test is not sensitive to
+        # test execution order (another test sets it to ['en'] only).
+        prev = app.config.get('SUPPORTED_LANGUAGES')
+        app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
+        try:
+            _update_item_config(item, form, {
+                'show_hint': 'on',
+                'hint_text': 'Number format hint',
+                'hint_text_translations': json.dumps(translations),
+                'hint_style': 'tip',
+            })
+        finally:
+            app.config['SUPPORTED_LANGUAGES'] = prev
         assert item.config['show_hint'] is True
         assert item.config['hint_text'] == 'Number format hint'
         assert item.config['hint_text_translations'] == translations

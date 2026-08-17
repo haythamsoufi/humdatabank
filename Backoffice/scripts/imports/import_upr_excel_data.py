@@ -64,7 +64,7 @@ from import_fdrs_form_data import (  # noqa: E402
 from upr_import_versioning import (  # noqa: E402
     find_item_by_label,
 )
-from upr_import_warnings import summarize_warnings  # noqa: E402
+from upr_import_warnings import make_import_warning, summarize_warnings  # noqa: E402
 
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
@@ -1477,8 +1477,13 @@ def _resolve_emergency_operation_labels(
         if warn_key not in ctx.emergency_unmatched_codes_warned:
             ctx.emergency_unmatched_codes_warned.add(warn_key)
             ctx.warnings.append(
-                f"Emergency code {code_upper!r} not found in GO API for {iso3.upper()} — "
-                "imported using Excel name/code; review in form"
+                make_import_warning(
+                    f"Emergency appeal {code_upper} is not listed for this country in GO. "
+                    "The Excel name and code were imported — please review it on the form.",
+                    item_id=ctx.emergency_choice_item_id,
+                    code=code_upper,
+                    iso3=iso3.upper(),
+                )
             )
     return name, code, _format_emergency_operation_display(name, code)
 
@@ -1776,6 +1781,53 @@ def _matrix_column_name_from_item_id(item_id: int) -> str:
 _MATRIX_KEY_SCHEMA_CACHE: Dict[int, Optional[Dict[str, Any]]] = {}
 
 
+def _matrix_row_label(row: Any) -> Optional[str]:
+    """Return the identifier used as a matrix cell-key prefix for one configured row.
+
+    Form builder versions store rows as ``{"text": "..."}`` objects; published T33
+    items (e.g. the SP/EF breakdown) store them as plain strings. Both must count.
+    """
+    if isinstance(row, str):
+        text = row.strip()
+        return text or None
+    if isinstance(row, dict):
+        for key in ("text", "name", "label"):
+            val = row.get(key)
+            if val:
+                text = str(val).strip()
+                if text:
+                    return text
+    return None
+
+
+def _matrix_column_label(col: Any) -> Optional[str]:
+    """Return the matrix column ``name`` used in cell keys."""
+    if isinstance(col, str):
+        text = col.strip()
+        return text or None
+    if isinstance(col, dict):
+        for key in ("name", "label", "text"):
+            val = col.get(key)
+            if val:
+                text = str(val).strip()
+                if text:
+                    return text
+    return None
+
+
+def _normalize_matrix_name(name: str) -> str:
+    """Case-fold and collapse punctuation so 'Crises' matches 'crises'."""
+    cleaned = (name or "").replace("\u2013", "-").replace("\u2014", "-")
+    return " ".join(cleaned.split()).casefold()
+
+
+def _matrix_name_in(name: str, known: Set[str]) -> bool:
+    if name.strip() in known:
+        return True
+    norm = _normalize_matrix_name(name)
+    return any(_normalize_matrix_name(item) == norm for item in known)
+
+
 def _matrix_key_schema(item_id: Optional[int]) -> Optional[Dict[str, Any]]:
     """Load + cache the live column/row identifiers for a matrix FormItem.
 
@@ -1807,18 +1859,25 @@ def _matrix_key_schema(item_id: Optional[int]) -> Optional[Dict[str, Any]]:
         mc = item.config.get("matrix_config")
         if isinstance(mc, dict):
             columns = {
-                str(col.get("name")).strip()
+                label
                 for col in (mc.get("columns") or [])
-                if isinstance(col, dict) and col.get("name")
+                if (label := _matrix_column_label(col))
             }
             rows: Optional[Set[str]] = None
             if (mc.get("row_mode") or "manual") == "manual":
-                rows = {
-                    str(r.get("text")).strip()
-                    for r in (mc.get("rows") or [])
-                    if isinstance(r, dict) and r.get("text")
+                extracted = {
+                    label
+                    for row in (mc.get("rows") or [])
+                    if (label := _matrix_row_label(row))
                 }
-            schema = {"columns": columns, "rows": rows}
+                # Empty extraction means "couldn't read row ids", not "the form has
+                # zero rows" — treat as unverified so we don't warn on every cell.
+                rows = extracted or None
+            schema = {
+                "columns": columns,
+                "rows": rows,
+                "label": (getattr(item, "label", None) or "").strip(),
+            }
     _MATRIX_KEY_SCHEMA_CACHE[item_id] = schema
     return schema
 
@@ -1841,7 +1900,7 @@ def _matrix_key_warning(
     column_name: str,
     row_name: Optional[str] = None,
     context: str = "",
-) -> Optional[str]:
+) -> Optional[Dict[str, Any]]:
     """Warn when a hardcoded matrix column/row name no longer matches the item's live config.
 
     A form admin renaming a matrix column or manual row after this script's column/row name
@@ -1852,20 +1911,22 @@ def _matrix_key_warning(
     schema = _matrix_key_schema(item_id)
     if not schema or not schema.get("columns"):
         return None
-    label = f" for item {item_id}" if item_id else ""
-    if context:
-        label += f" ({context})"
-    if column_name.strip() not in schema["columns"]:
-        return (
-            f"Matrix column {column_name!r} not found in current form configuration{label} — "
-            f"value stored under key {cell_key!r} may not display until the import's column "
-            f"names are re-synced with the form."
+    field_label = (schema.get("label") or "").strip() or "this table"
+    if not _matrix_name_in(column_name, schema["columns"]):
+        return make_import_warning(
+            f"The imported column “{column_name}” does not match a column on “{field_label}”. "
+            "The value was imported but may not appear in the table.",
+            item_id=item_id,
         )
-    if row_name is not None and schema.get("rows") is not None and row_name.strip() not in schema["rows"]:
-        return (
-            f"Matrix row {row_name!r} not found in current form configuration{label} — "
-            f"value stored under key {cell_key!r} may not display until the import's row "
-            f"names are re-synced with the form."
+    if (
+        row_name is not None
+        and schema.get("rows") is not None
+        and not _matrix_name_in(row_name, schema["rows"])
+    ):
+        return make_import_warning(
+            f"The imported row “{row_name}” does not match a row on “{field_label}”. "
+            "The value was imported but may not appear in the table.",
+            item_id=item_id,
         )
     return None
 
@@ -2221,6 +2282,7 @@ def _queue_dynamic_indicator_entry(
     order_key: Tuple[Any, ...],
     repeat_instance_number: Optional[int] = None,
     disagg_data: Optional[Dict[str, Any]] = None,
+    not_applicable: bool = False,
     missing_section_warning: str = "",
 ) -> None:
     if not section_id:
@@ -2240,6 +2302,7 @@ def _queue_dynamic_indicator_entry(
         "repeat_instance_number": repeat_instance_number,
         "value": value,
         "data_not_available": data_not_available,
+        "not_applicable": not_applicable,
         "order": order_counters[order_key],
         "disagg_data": disagg_data,
     }
@@ -2264,6 +2327,7 @@ def _queue_other_dynamic_indicator(
     data_not_available: bool,
     order_counters: Dict[int, float],
     disagg_data: Optional[Dict[str, Any]] = None,
+    not_applicable: bool = False,
 ) -> None:
     _queue_dynamic_indicator_entry(
         ctx,
@@ -2272,6 +2336,7 @@ def _queue_other_dynamic_indicator(
         indicator_bank_id=indicator_bank_id,
         value=value,
         data_not_available=data_not_available,
+        not_applicable=not_applicable,
         order_counters=order_counters,
         order_key=(aes_id, "other"),
         repeat_instance_number=None,
@@ -2408,6 +2473,8 @@ def upsert_dynamic_indicator_entries(
 
         if entry.get("data_not_available"):
             row.set_data_availability(data_not_available=True)
+        elif entry.get("not_applicable"):
+            row.set_data_availability(not_applicable=True)
         elif entry.get("disagg_data"):
             payload = entry["disagg_data"]
             row.set_disaggregated_data(payload["mode"], payload["values"])
@@ -2585,6 +2652,32 @@ def _data_na_row(
         COL_DISAGG: "",
         COL_DATA_NA: "1",
         COL_NA: "",
+        COL_PREFILLED: "",
+        COL_IMPUTED: "",
+        COL_SUBMITTED: "",
+    }
+
+
+def _not_applicable_row(
+    *,
+    aes_id: int,
+    item_id: int,
+    iso3: str,
+    period: str,
+    debug_kpi: str,
+) -> Dict[str, str]:
+    """Build a form_data row that sets not_applicable = True (no value written)."""
+    return {
+        "_debug_iso3": iso3,
+        "_debug_year": period,
+        "_debug_kpi_code": debug_kpi,
+        COL_ASSIGNMENT: str(aes_id),
+        COL_PUBLIC: "",
+        COL_ITEM: str(item_id),
+        COL_VALUE: "",
+        COL_DISAGG: "",
+        COL_DATA_NA: "",
+        COL_NA: "1",
         COL_PREFILLED: "",
         COL_IMPUTED: "",
         COL_SUBMITTED: "",

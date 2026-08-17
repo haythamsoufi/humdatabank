@@ -228,7 +228,7 @@
             width: 190,
             minWidth: 160,
             cellRenderer: securityEventRenderers.userCell,
-            cellStyle: { overflow: 'hidden' },
+            cellStyle: AgGridRenderers.userHoverCellStyle,
             filter: 'agTextColumnFilter',
             sortable: true,
             valueGetter: function (params) {

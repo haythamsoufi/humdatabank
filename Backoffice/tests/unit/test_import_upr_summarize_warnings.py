@@ -65,6 +65,68 @@ class TestSummarizeWarnings:
         assert "×2" in result["warnings"][0]
         assert "2 countries" in result["warnings"][0]
 
+    def test_groups_new_emergency_appeal_wording(self):
+        warnings = [
+            {
+                "message": (
+                    "Emergency appeal MDRBD018 is not listed for this country in GO. "
+                    "The Excel name and code were imported — please review it on the form."
+                ),
+                "item_id": 1374,
+                "code": "MDRBD018",
+                "iso3": "BEN",
+            },
+            {
+                "message": (
+                    "Emergency appeal MDRBD018 is not listed for this country in GO. "
+                    "The Excel name and code were imported — please review it on the form."
+                ),
+                "item_id": 1374,
+                "code": "MDRBD018",
+                "iso3": "BGD",
+            },
+        ]
+        result = summarize_warnings(warnings)
+        assert result["warning_unique_count"] == 1
+        assert "MDRBD018" in result["warnings"][0]
+        assert "2 countries" in result["warnings"][0]
+
+    def test_dedupe_collapses_matrix_row_warnings_per_field(self):
+        from upr_import_warnings import dedupe_upr_import_warnings, warning_text
+
+        warnings = [
+            {
+                "message": (
+                    "The imported row “Resilience - Climate and environment” does not match "
+                    "a row on “Optional breakdown by SP/EF (CHF)”. The value was imported "
+                    "but may not appear in the table."
+                ),
+                "item_id": 1405,
+            },
+            {
+                "message": (
+                    "The imported row “Resilience - Climate and environment” does not match "
+                    "a row on “Optional breakdown by SP/EF (CHF)”. The value was imported "
+                    "but may not appear in the table."
+                ),
+                "item_id": 1405,
+            },
+            {
+                "message": (
+                    "The imported row “Enabling functions” does not match "
+                    "a row on “Optional breakdown by SP/EF (CHF)”. The value was imported "
+                    "but may not appear in the table."
+                ),
+                "item_id": 1405,
+            },
+        ]
+        result = dedupe_upr_import_warnings(warnings)
+        assert len(result) == 1
+        text = warning_text(result[0])
+        assert "Resilience - Climate and environment" in text
+        assert "Enabling functions" in text
+        assert result[0]["item_id"] == 1405
+
     def test_dedupes_emergency_code_warnings_case_insensitively(self):
         from upr_import_warnings import dedupe_upr_import_warnings
 

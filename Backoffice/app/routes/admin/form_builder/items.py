@@ -1,6 +1,7 @@
 """Form item management routes."""
 
 import copy
+import threading
 from contextlib import suppress
 from flask import request, flash, redirect, url_for, current_app
 from flask_login import current_user
@@ -14,7 +15,7 @@ from app.forms.form_builder import IndicatorForm, QuestionForm, DocumentFieldFor
 from app.routes.admin.shared import permission_required
 from app.utils.request_utils import is_json_request, get_request_data, get_request_int
 from app.services.platform.user_analytics_service import log_admin_action
-from app.utils.transactions import request_transaction_rollback
+from app.utils.transactions import request_transaction_rollback, register_post_commit, safe_remove
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import (json_forbidden, json_bad_request, json_ok,
     json_server_error, json_form_errors)
@@ -26,6 +27,46 @@ from .helpers import (_create_form_item, _update_indicator_fields, _update_quest
 import json
 
 from app.services.assignments.completion_service import AssignmentCompletionService
+
+
+def _start_completion_rate_refresh_bg(template_id: int) -> None:
+    """
+    Kick off completion rate recalculation without blocking the request.
+
+    Called via register_post_commit so it only runs after the item config
+    change has committed and is visible to the new session's DB connection.
+    Opens its own app context (own DB session) — same pattern as
+    _start_assignment_notification_dispatch in assignment_management.py.
+    Runs synchronously under TESTING so tests can assert on the outcome.
+    """
+    worker_app = current_app._get_current_object()
+
+    def _run(app: object, tmpl_id: int) -> None:
+        with app.app_context():
+            try:
+                count = AssignmentCompletionService.refresh_for_template_with_existing_rates(tmpl_id)
+                current_app.logger.info(
+                    "[completion_rate_refresh] Background refresh completed for template %s: "
+                    "%d assignment(s) updated",
+                    tmpl_id, count,
+                )
+            except Exception as exc:
+                current_app.logger.error(
+                    "[completion_rate_refresh] Background refresh failed for template %s: %s",
+                    tmpl_id, exc, exc_info=True,
+                )
+            finally:
+                safe_remove(reason="completion_rate_refresh_bg")
+
+    if current_app.config.get("TESTING"):
+        _run(worker_app, template_id)
+    else:
+        threading.Thread(
+            target=_run,
+            args=(worker_app, template_id),
+            daemon=False,
+            name=f"completion-rate-refresh-{template_id}",
+        ).start()
 
 
 def _form_item_audit_snapshot(form_item):
@@ -438,16 +479,32 @@ def edit_item(item_id):
             _update_version_timestamp(form_item.version_id, current_user.id)
             db.session.flush()
 
-            try:
-                AssignmentCompletionService.maybe_refresh_after_exclude_from_completion_change(
-                    form_item, previous_exclude
+            # If exclude_from_completion_rate changed on the published version, all stored
+            # completion rates for this template are stale and need recomputing. This is done
+            # asynchronously (post-commit background thread) so it never blocks the response.
+            _refresh_template = getattr(form_item, 'template', None)
+            new_exclude = AssignmentCompletionService._item_exclude_from_completion_rate(form_item)
+            _completion_refresh_queued = False
+            current_app.logger.info(
+                "[completion_rate_refresh] item %s: previous_exclude=%s new_exclude=%s "
+                "published_version_id=%s form_item.version_id=%s",
+                item_id, previous_exclude, new_exclude,
+                getattr(_refresh_template, 'published_version_id', None),
+                form_item.version_id,
+            )
+            if (
+                _refresh_template
+                and _refresh_template.published_version_id == form_item.version_id
+                and new_exclude != previous_exclude
+            ):
+                current_app.logger.info(
+                    "[completion_rate_refresh] exclude_from_completion_rate changed "
+                    "(%s -> %s) on published item %s (template %s) — "
+                    "queuing background completion rate refresh",
+                    previous_exclude, new_exclude, item_id, form_item.template_id,
                 )
-            except Exception as refresh_err:
-                current_app.logger.warning(
-                    "Completion rate refresh after exclude flag change failed for item %s: %s",
-                    item_id,
-                    refresh_err,
-                )
+                register_post_commit(_start_completion_rate_refresh_bg, form_item.template_id)
+                _completion_refresh_queued = True
 
             item_label = form_item.label or f"{form_item.item_type.title()} {item_id}"
             new_values_snapshot = _form_item_audit_snapshot(form_item)
@@ -464,11 +521,15 @@ def edit_item(item_id):
             )
 
             flash_message = f"{form_item.item_type.title()} '{item_label}' updated successfully."
+            if _completion_refresh_queued:
+                flash_message += " Completion rates are being recalculated in the background."
             target_version_id = data.get('version_id') or form_item.version_id
             redirect_url = url_for("form_builder.edit_template", template_id=form_item.template_id, version_id=target_version_id)
             if is_ajax:
                 return json_ok(message=flash_message, redirect_url=redirect_url)
             flash(flash_message, "success")
+            if _completion_refresh_queued:
+                flash("Completion rates are being recalculated in the background.", "info")
             return redirect(redirect_url)
 
         except Exception as e:

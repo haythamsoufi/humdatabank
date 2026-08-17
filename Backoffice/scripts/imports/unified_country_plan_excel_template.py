@@ -188,6 +188,10 @@ def _rewrite_table_header(wb, sheet_name: str, table_name: str, header: str, new
         h = str(raw).strip() if raw is not None else ""
         if h == header or _normalize_workbook_header(h) == target:
             ws.cell(min_row, col).value = new_value
+            # Keep Excel table metadata in sync with the header row (prevents table*.xml repair errors).
+            col_idx = col - min_col
+            if tbl.tableColumns and 0 <= col_idx < len(tbl.tableColumns):
+                tbl.tableColumns[col_idx].name = new_value
             return
 
 
@@ -201,17 +205,22 @@ def rewrite_planning_year_headers(wb, period_name: str) -> None:
             write_table_cell(wb, PEOPLE_SHEET, PEOPLE_TABLE, offset, "Year", year)
 
     headers, _ = read_named_table(wb, FUNDING_SHEET, FUNDING_TABLE)
-    group_size = len(FUNDING_AREAS_PER_YEAR)
     funding_headers = [h for h in headers if parse_funding_column_header(h)]
-    for idx, header in enumerate(funding_headers):
+    # The workbook uses 9 EA+SP columns for year 1 but only 6 SP columns for years 2–3,
+    # so idx // len(FUNDING_AREAS_PER_YEAR) must not be used to infer the target year.
+    template_years = sorted({parse_funding_column_header(h)[1] for h in funding_headers})
+    target_years = (y0, y1, y2)
+    year_map = {
+        template_years[i]: target_years[i]
+        for i in range(min(len(template_years), len(target_years)))
+    }
+    for header in funding_headers:
         parsed = parse_funding_column_header(header)
         if not parsed:
             continue
-        area, _old_year = parsed
-        offset = idx // group_size
-        if offset > 2:
-            continue
-        new_header = funding_column_header(area, y0 + offset)
+        area, old_year = parsed
+        new_year = year_map.get(old_year, old_year)
+        new_header = funding_column_header(area, new_year)
         if new_header != header:
             _rewrite_table_header(wb, FUNDING_SHEET, FUNDING_TABLE, header, new_header)
 

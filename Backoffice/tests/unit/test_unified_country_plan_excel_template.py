@@ -93,7 +93,9 @@ def test_validate_template_structure(ucp_workbook):
 
 def test_rewrite_planning_year_headers(ucp_workbook):
     import openpyxl
+    import re
     import tempfile
+    import zipfile
 
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         path = tmp.name
@@ -114,6 +116,42 @@ def test_rewrite_planning_year_headers(ucp_workbook):
             {parse_funding_column_header(h)[1] for h in headers if parse_funding_column_header(h)}
         )
         assert funding_years == [2029, 2030, 2031]
+        with zipfile.ZipFile(path) as z:
+            xml = z.read("xl/tables/table11.xml").decode("utf-8")
+        xml_cols = re.findall(r'<tableColumn[^>]*name="([^"]+)"', xml)
+        assert headers == xml_cols
+        wb2.close()
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def test_rewrite_planning_year_headers_same_period_keeps_table_metadata(ucp_workbook):
+    """Rewriting headers for the template's default period must not corrupt Data_FR."""
+    import openpyxl
+    import re
+    import tempfile
+    import zipfile
+
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        path = tmp.name
+    try:
+        with _quiet_openpyxl_io():
+            wb = openpyxl.load_workbook(TEMPLATE_PATH)
+        rewrite_planning_year_headers(wb, "2027")
+        with _quiet_openpyxl_io():
+            wb.save(path)
+        wb.close()
+
+        wb2 = openpyxl.load_workbook(path, data_only=True)
+        headers, _ = read_named_table(wb2, "Funding requirements", "Data_FR")
+        with zipfile.ZipFile(path) as z:
+            xml = z.read("xl/tables/table11.xml").decode("utf-8")
+        xml_cols = re.findall(r'<tableColumn[^>]*name="([^"]+)"', xml)
+        assert headers == xml_cols
+        assert headers[15:18] == ["SP2_2029", "SP1_2029", "SP3_2029"]
         wb2.close()
     finally:
         try:

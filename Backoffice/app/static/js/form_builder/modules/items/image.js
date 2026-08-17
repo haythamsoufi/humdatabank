@@ -3,6 +3,8 @@
  * Supports per-locale upload or URL sources stored in config.image.sources.
  */
 
+import { setHiddenField } from '../rules/form-serialization.js';
+
 function getSupportedLanguages() {
     try {
         const el = document.getElementById('translation-data');
@@ -151,15 +153,10 @@ export const ImageItem = {
         if (alignSelect) this._config.image.alignment = alignSelect.value || 'center';
         if (widthSelect) this._config.image.max_width = widthSelect.value || '100%';
 
-        let hidden = root.querySelector('#item-image-config');
-        if (!hidden) {
-            hidden = document.createElement('input');
-            hidden.type = 'hidden';
-            hidden.id = 'item-image-config';
-            hidden.name = 'image_config';
-            root.querySelector('#item-modal-form')?.appendChild(hidden);
+        const form = root.querySelector('#item-modal-form');
+        if (form) {
+            setHiddenField(form, 'image_config', JSON.stringify(this._config), { id: 'item-image-config' });
         }
-        hidden.value = JSON.stringify(this._config);
     },
 
     _bindEvents() {

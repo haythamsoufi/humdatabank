@@ -7,7 +7,7 @@ from app import db
 from app.models import IndicatorBank, LookupList
 from config.config import Config
 from .field_parsing import get_field_value
-from .item_config_fields import apply_preserve_existing_bools
+from .item_config_fields import apply_preserve_existing_bools, build_create_config_base
 import json
 
 ENTRY_FORM_HINT_STYLES = frozenset({'normal', 'info', 'warning', 'tip', 'important'})
@@ -610,13 +610,7 @@ def _update_matrix_fields(matrix_item, form, request_form):
             current_app.logger.warning(f"Invalid description translations JSON: {request_form['description_translations']}")
             matrix_item.description_translations = None
 
-    # Handle additional configuration fields
-    if hasattr(form, 'allow_data_not_available') and hasattr(form.allow_data_not_available, 'data'):
-        matrix_item.allow_data_not_available = form.allow_data_not_available.data
-    if hasattr(form, 'allow_not_applicable') and hasattr(form.allow_not_applicable, 'data'):
-        matrix_item.allow_not_applicable = form.allow_not_applicable.data
-    if hasattr(form, 'indirect_reach') and hasattr(form.indirect_reach, 'data'):
-        matrix_item.indirect_reach = form.indirect_reach.data
+    # Shared layout/data flags are written by _update_item_config (runs after this).
 
 
 def _update_image_fields(image_item, form, request_form):

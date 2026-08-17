@@ -2191,6 +2191,7 @@ export const MatrixItem = {
                 config.rows = [];
             }
         }
+        configInput.name = 'matrix_config';
         configInput.value = JSON.stringify(config);
         if (window.formBuilderDebug && window.formBuilderDebug.isEnabled && window.formBuilderDebug.isEnabled('matrix')) {
             window.formBuilderDebug.log('matrix', 'Updated matrix config:', config);

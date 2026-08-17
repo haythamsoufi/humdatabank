@@ -757,17 +757,14 @@ class TestUpdateMatrixFields:
         _update_matrix_fields(matrix, form, {'description_translations': dt})
         assert matrix.description_translations == {"en": "Desc En"}
 
-    def test_additional_config_fields_updated(self, app):
+    def test_additional_config_fields_updated_via_item_config(self, app):
+        """Shared layout/data flags are written by _update_item_config, not _update_matrix_fields."""
         matrix = _make_matrix()
-        form = _make_matrix_form()
-        form.allow_data_not_available = MagicMock()
-        form.allow_data_not_available.data = True
-        form.allow_not_applicable = MagicMock()
-        form.allow_not_applicable.data = True
-        form.indirect_reach = MagicMock()
-        form.indirect_reach.data = True
-        _update_matrix_fields(matrix, form, {})
-        assert matrix.allow_data_not_available is True
+        form = _make_form_with_config(allow_dna=True, allow_na=True, indirect_reach=True)
+        _update_item_config(matrix, form, {})
+        assert matrix.config['allow_data_not_available'] is True
+        assert matrix.config['allow_not_applicable'] is True
+        assert matrix.config['indirect_reach'] is True
 
 
 # ---------------------------------------------------------------------------

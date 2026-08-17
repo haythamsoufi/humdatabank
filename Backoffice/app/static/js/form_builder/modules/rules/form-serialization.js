@@ -1,26 +1,6 @@
 // Utilities for form serialization and prefix mapping used by item-modal
 import { serializeRule } from './rule-builder-helpers.js';
 
-// Map item type and mode to the form field prefix expected by the backend
-// For edit mode, most fields are unprefixed
-export function getFormPrefix(itemType, isEditMode) {
-	if (isEditMode) {
-		return '';
-	}
-	switch (itemType) {
-		case 'indicator':
-			return 'add_ind_modal-';
-		case 'question':
-			return 'add_q_modal-';
-		case 'document':
-			return 'doc_field-';
-		// Matrix and plugin items use unprefixed keys in current routes
-		case 'matrix':
-		default:
-			return '';
-	}
-}
-
 // Serialize a rule builder element into a string suitable for submit
 // Ensures no double-encoding and returns '' when empty/non-meaningful
 export function serializeRuleForSubmit(ruleBuilderElement) {
@@ -53,6 +33,34 @@ export function setHiddenRuleField(formElement, fieldName, ruleBuilderElement) {
 		formElement.appendChild(field);
 	}
 	field.value = value;
+}
+
+/**
+ * Ensure a hidden input exists on a form and set its value.
+ *
+ * @param {HTMLFormElement} formElement
+ * @param {string} fieldName
+ * @param {string} value
+ * @param {{ id?: string, disabled?: boolean }} [options]
+ */
+export function setHiddenField(formElement, fieldName, value, options = {}) {
+	if (!formElement || !fieldName) return;
+	let field = options.id
+		? formElement.querySelector(`#${options.id}`)
+		: formElement.querySelector(`input[name="${fieldName}"]`);
+	if (!field) {
+		field = document.createElement('input');
+		field.type = 'hidden';
+		field.name = fieldName;
+		if (options.id) field.id = options.id;
+		formElement.appendChild(field);
+	}
+	field.name = fieldName;
+	if (options.id) field.id = options.id;
+	if (typeof options.disabled === 'boolean') {
+		field.disabled = options.disabled;
+	}
+	field.value = value == null ? '' : String(value);
 }
 
 // Append a serialized rule into FormData (omit when empty)

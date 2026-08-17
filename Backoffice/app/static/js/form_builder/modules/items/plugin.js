@@ -1,5 +1,6 @@
 // Plugin item logic extracted from item-modal.js
 
+import { setHiddenField } from '../rules/form-serialization.js';
 import { mountEntryFormHintPanel, populateDescriptionVisibility } from '../modal/description-hint-ui.js';
 import { fetchBaseTemplate, fetchFieldBuilderConfig } from '../plugin-api.js';
 
@@ -991,14 +992,10 @@ export const PluginItem = {
             configString: JSON.stringify(pluginConfig)
         });
 
-        const pluginConfigInput = document.createElement('input');
-        pluginConfigInput.type = 'hidden';
-        pluginConfigInput.name = 'plugin_config';
-        pluginConfigInput.value = JSON.stringify(pluginConfig);
-        formElement.appendChild(pluginConfigInput);
+        setHiddenField(formElement, 'plugin_config', JSON.stringify(pluginConfig));
 
         console.log('[PluginItem] collectConfigFields: Config saved to hidden input', {
-            inputValue: pluginConfigInput.value
+            inputValue: formElement.querySelector('input[name="plugin_config"]')?.value,
         });
     }
 };

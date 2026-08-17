@@ -1,4 +1,5 @@
-import { setHiddenRuleField, setMultiHiddenFields } from '../rules/form-serialization.js';
+import { setHiddenRuleField, setMultiHiddenFields, setHiddenField } from '../rules/form-serialization.js';
+import { isActuallyHidden } from '../dom-visibility.js';
 import { MatrixItem } from '../items/matrix.js';
 import { ImageItem } from '../items/image.js';
 import { DocumentItem } from '../items/document.js';
@@ -75,13 +76,10 @@ export const FormSubmitMixin = {
         try {
             let itemTypeInput = form.querySelector('#item-modal-type') || form.querySelector('input[name="item_type"]');
             if (!itemTypeInput) {
-                itemTypeInput = document.createElement('input');
-                itemTypeInput.type = 'hidden';
-                itemTypeInput.id = 'item-modal-type';
-                itemTypeInput.name = 'item_type';
-                form.appendChild(itemTypeInput);
+                setHiddenField(form, 'item_type', this.currentItemType, { id: 'item-modal-type' });
+            } else {
+                itemTypeInput.value = this.currentItemType;
             }
-            itemTypeInput.value = this.currentItemType;
         } catch (_e) {}
 
         try {
@@ -138,14 +136,11 @@ export const FormSubmitMixin = {
             }
         } catch (_e) {}
 
-        // Always, not only in edit/populateEditFormFields: write explicit true/false
-        // hidden inputs at the form root. Unchecked boxes are otherwise omitted from
-        // FormData, and writing into name="config" is dropped because that field lives
-        // in the disabled matrix panel.
+        // Always serialize config-panel booleans (see config-checkbox-serializer.js).
         try {
             serializeConfigCheckboxes(this.modalElement, form);
         } catch (_e) {
-            console.warn('[ItemModal] serializeConfigCheckboxes failed — exclude_from_completion_rate / allow_over_100 may not be in payload:', _e);
+            console.warn('[ItemModal] serializeConfigCheckboxes failed — preserve-existing flags may not be in payload:', _e);
         }
 
         if (this.currentMode === 'edit') {
@@ -226,14 +221,7 @@ export const FormSubmitMixin = {
 
         const validationMessageInput = this.modalElement.querySelector('#item-validation-message');
         if (validationMessageInput && !isDisplayOnly) {
-            let validationMessageField = form.querySelector('input[name="validation_message"]');
-            if (!validationMessageField) {
-                validationMessageField = document.createElement('input');
-                validationMessageField.type = 'hidden';
-                validationMessageField.name = 'validation_message';
-                form.appendChild(validationMessageField);
-            }
-            validationMessageField.value = validationMessageInput.value;
+            setHiddenField(form, 'validation_message', validationMessageInput.value);
         }
 
         if (this.currentItemType === 'matrix') {
@@ -251,56 +239,8 @@ export const FormSubmitMixin = {
         }
     },
 
-    cleanupInactiveModalFields: function(form) {
-        const activeType = this.currentItemType;
-        const activeMode = this.currentMode;
-
-        const itemTypeSections = [
-            { selector: '#item-indicator-fields', type: 'indicator' },
-            { selector: '#item-question-fields', type: 'question' },
-            { selector: '#item-document-fields', type: 'document_field' },
-            { selector: '#item-matrix-fields', type: 'matrix' },
-            { selector: '#item-plugin-fields', type: 'plugin' }
-        ];
-
-        itemTypeSections.forEach(section => {
-            const element = form.querySelector(section.selector);
-            if (element && section.type !== activeType) {
-                const fields = element.querySelectorAll('input, textarea, select, button');
-                fields.forEach(field => {
-                    if (field.type === 'submit') return;
-                    field.disabled = true;
-                });
-            }
-        });
-
-        if (activeMode === 'edit') {
-            const addModalFields = [
-                '#item-document-label',
-                '#item-document-description',
-                '#item-document-label-translations',
-                '#item-document-description-translations'
-            ];
-
-            addModalFields.forEach(selector => {
-                const element = form.querySelector(selector);
-                if (element) {
-                    element.disabled = true;
-                }
-            });
-        }
-    },
-
     setupFormSubmission: function() {
-        document.addEventListener('submit', (e) => {
-            const form = e?.target;
-            if (!form || form.id !== 'item-modal-form') return;
-            try {
-                this.prepareItemModalFormForSubmit(form);
-            } catch (err) {
-                try { (window.__clientWarn || console.warn)('[ItemModal] submit prepare failed', err); } catch (_e) {}
-            }
-        });
+        // Serialization runs once via formBuilder:beforeAjaxSubmit (see setupAjaxBeforeSubmitHook).
     },
 
     ensureCanonicalSharedFieldNames: function(formEl) {
@@ -336,14 +276,6 @@ export const FormSubmitMixin = {
     },
 
     handleFormValidation: function(form) {
-        const isActuallyHidden = (el) => {
-            if (!el) return true;
-            if (el.closest('.hidden')) return true;
-            if (el.offsetParent === null) return true;
-            const style = window.getComputedStyle(el);
-            return style.display === 'none' || style.visibility === 'hidden';
-        };
-
         const allRequired = form.querySelectorAll('[required]');
         allRequired.forEach(field => {
             if (isActuallyHidden(field)) {

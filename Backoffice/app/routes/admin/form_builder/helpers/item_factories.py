@@ -7,6 +7,7 @@ from app.models import FormItem, FormSection, QuestionType, LookupList, Indicato
 from app.utils.transactions import request_transaction_rollback
 from config.config import Config
 from .item_updaters import is_conditions_meaningful, sanitize_blank_body_html
+from .item_config_fields import build_create_config_base
 from .field_parsing import make_field_reader
 import json
 
@@ -85,21 +86,12 @@ def _create_indicator_form_item(template, section, form_data, default_order):
     )
 
     # Initialize config with default values
-    config = {
-        'is_required': bool(get_field_value('is_required', '')),
-        'layout_column_width': int(get_field_value('layout_column_width', '12')),
-        'layout_break_after': bool(get_field_value('layout_break_after', '')),
-        'allowed_disaggregation_options': ["total"],
+    config = build_create_config_base(form_data)
+    config.update({
+        'allowed_disaggregation_options': ['total'],
         'age_groups_config': None,
-        'allow_data_not_available': bool(get_field_value('allow_data_not_available', '')),
-        'allow_not_applicable': bool(get_field_value('allow_not_applicable', '')),
-        'allow_disability_questions': bool(get_field_value('allow_disability_questions', '')),
-        'indirect_reach': bool(get_field_value('indirect_reach', '')),
-        'exclude_from_completion_rate': bool(get_field_value('exclude_from_completion_rate', '')),
         'default_value': None,
-        'privacy': (get_field_value('privacy', '') or 'ifrc_network'),
-        'allow_over_100': False  # Default to False
-    }
+    })
 
     # Default value (optional): literal or template variable like [var_name]
     try:
@@ -109,21 +101,6 @@ def _create_indicator_form_item(template, section, form_data, default_order):
             config['default_value'] = dv_raw
     except Exception as e:
         current_app.logger.debug("default_value config update failed: %s", e)
-
-    # Handle allow_over_100 - check direct field first, then config JSON
-    allow_over_100_val = get_field_value('allow_over_100', '')
-    if allow_over_100_val in ['true', 'on', '1']:
-        config['allow_over_100'] = True
-    else:
-        # Fall back to config field if present
-        config_field = form_data.get('config')
-        if config_field:
-            try:
-                config_json = json.loads(config_field)
-                if 'allow_over_100' in config_json:
-                    config['allow_over_100'] = bool(config_json['allow_over_100'])
-            except (json.JSONDecodeError, TypeError):
-                pass
 
     # Handle disaggregation options
     current_app.logger.debug("DISAGG_DEBUG: Processing disaggregation options")
@@ -248,40 +225,11 @@ def _create_question_form_item(template, section, form_data, default_order):
     )
 
     # Initialize config with default values
-    config = {
-        'is_required': bool(get_field_value('is_required', '')),
-        'layout_column_width': int(get_field_value('layout_column_width', '12')),
-        'layout_break_after': bool(get_field_value('layout_break_after', '')),
-        'allowed_disaggregation_options': ["total"],  # Not used for questions but kept for consistency
-        'age_groups_config': None,  # Not used for questions but kept for consistency
-        'allow_data_not_available': bool(get_field_value('allow_data_not_available', '')),
-        'allow_not_applicable': bool(get_field_value('allow_not_applicable', '')),
-        'allow_disability_questions': bool(get_field_value('allow_disability_questions', '')),
-        'indirect_reach': bool(get_field_value('indirect_reach', '')),
-        'privacy': (get_field_value('privacy', '') or 'ifrc_network'),
-        'allow_over_100': False,  # Default to False
-        'unique_options_in_section': bool(get_field_value('unique_options_in_section', '')),
-        'limit_entries_to_option_count': bool(get_field_value('limit_entries_to_option_count', '')),
-        'use_as_repeat_entry_title': bool(get_field_value('use_as_repeat_entry_title', '')),
-        'exclude_from_completion_rate': bool(get_field_value('exclude_from_completion_rate', '')),
-        'allow_other': get_field_value('allow_other', '') in ['true', 'on', '1'],
-        'max_other_entries': (lambda v: max(0, int(v)) if str(v).lstrip('-').isdigit() else 0)(get_field_value('max_other_entries', '0') or '0'),
-    }
-
-    # Handle allow_over_100 - check direct field first, then config JSON
-    allow_over_100_val = get_field_value('allow_over_100', '')
-    if allow_over_100_val in ['true', 'on', '1']:
-        config['allow_over_100'] = True
-    else:
-        # Fall back to config field if present
-        config_field = form_data.get('config')
-        if config_field:
-            try:
-                config_json = json.loads(config_field)
-                if 'allow_over_100' in config_json:
-                    config['allow_over_100'] = bool(config_json['allow_over_100'])
-            except (json.JSONDecodeError, TypeError):
-                pass
+    config = build_create_config_base(form_data)
+    config.update({
+        'allowed_disaggregation_options': ['total'],
+        'age_groups_config': None,
+    })
 
     if question_type.value == 'blank':
         config['is_required'] = False
@@ -482,12 +430,10 @@ def _create_document_field_form_item(template, section, form_data, default_order
         preset_period_val = str(preset_period_raw).strip()[:500] or None
 
     # Initialize config with default values
-    config = {
-        'is_required': bool(get_field_value('is_required', '')),
-        'layout_column_width': int(get_field_value('layout_column_width', '12')),
-        'layout_break_after': bool(get_field_value('layout_break_after', '')),
-        'max_documents': max_docs_value,  # Add max_documents configuration
-        'document_type': document_type,   # Optional: document type from system list
+    config = build_create_config_base(form_data)
+    config.update({
+        'max_documents': max_docs_value,
+        'document_type': document_type,
         'show_language': get_field_value('show_language', '') in ['true', 'on', '1', True],
         'show_document_type': get_field_value('show_document_type', '') in ['true', 'on', '1', True],
         'show_year': show_year_flag,
@@ -499,13 +445,9 @@ def _create_document_field_form_item(template, section, form_data, default_order
         'allow_month_range': get_field_value('allow_month_range', '') in ['true', 'on', '1', True],
         'cross_assignment_period_reuse': get_field_value('cross_assignment_period_reuse', '')
         in ['true', 'on', '1', True],
-        'allowed_disaggregation_options': ["total"],  # Not used for documents but kept for consistency
-        'age_groups_config': None,  # Not used for documents but kept for consistency
-        'allow_data_not_available': False,  # Not used for documents but kept for consistency
-        'allow_not_applicable': False,  # Not used for documents but kept for consistency
-        'indirect_reach': False,  # Not used for documents but kept for consistency
-        'privacy': (get_field_value('privacy', '') or 'ifrc_network')
-    }
+        'allowed_disaggregation_options': ['total'],
+        'age_groups_config': None,
+    })
 
     # Set the consolidated config
     form_item.config = config
@@ -572,18 +514,12 @@ def _create_matrix_form_item(template, section, form_data, default_order):
             'columns': []
         }
 
-    config = {
-        'is_required': bool(get_field_value('is_required')),
-        'layout_column_width': int(get_field_value('layout_column_width') or '12'),
-        'layout_break_after': bool(get_field_value('layout_break_after')),
+    config = build_create_config_base(form_data)
+    config.update({
         'matrix_config': matrix_config,
-        'allowed_disaggregation_options': ["total"],  # Not used for matrix but kept for consistency
-        'age_groups_config': None,  # Not used for matrix but kept for consistency
-        'allow_data_not_available': False,  # Not used for matrix but kept for consistency
-        'allow_not_applicable': False,  # Not used for matrix but kept for consistency
-        'indirect_reach': False,  # Not used for matrix but kept for consistency
-        'privacy': (get_field_value('privacy') or 'ifrc_network')
-    }
+        'allowed_disaggregation_options': ['total'],
+        'age_groups_config': None,
+    })
 
     # Set the consolidated config
     form_item.config = config
@@ -642,18 +578,13 @@ def _create_image_form_item(template, section, form_data, default_order):
         except (json.JSONDecodeError, TypeError):
             image_config = {'image': {'alignment': 'center', 'max_width': '100%', 'sources': {}}}
 
-    config = {
-        'is_required': False,
-        'layout_column_width': int(get_field_value('layout_column_width') or '12'),
-        'layout_break_after': bool(get_field_value('layout_break_after')),
-        **image_config,
+    config = build_create_config_base(form_data)
+    config['is_required'] = False
+    config.update(image_config)
+    config.update({
         'allowed_disaggregation_options': ['total'],
         'age_groups_config': None,
-        'allow_data_not_available': False,
-        'allow_not_applicable': False,
-        'indirect_reach': False,
-        'privacy': (get_field_value('privacy') or 'ifrc_network'),
-    }
+    })
     form_item.config = config
 
     _rel = get_field_value('relevance_condition') or ''
@@ -731,6 +662,12 @@ def _create_plugin_form_item(template, section, form_data, item_type, default_or
         # Get description
         description_value = form_data.get('description', '').strip() if form_data.get('description') else ''
 
+        config = build_create_config_base(form_data)
+        config.update({
+            'plugin_type': plugin_type,
+            'plugin_config': plugin_config,
+        })
+
         # Create a new FormItem with the plugin type
         form_item = FormItem(
             template_id=template.id,
@@ -740,34 +677,8 @@ def _create_plugin_form_item(template, section, form_data, item_type, default_or
             label=label_value,
             description=description_value,
             order=order,
-            config={
-                'is_required': form_data.get('is_required', False),
-                'layout_column_width': int(form_data.get('layout_column_width', 12)),
-                'layout_break_after': form_data.get('layout_break_after', False),
-                'allow_data_not_available': form_data.get('allow_data_not_available', False),
-                'allow_not_applicable': form_data.get('allow_not_applicable', False),
-                'indirect_reach': form_data.get('indirect_reach', False),
-                'privacy': (form_data.get('privacy') or 'ifrc_network'),
-                'plugin_type': plugin_type,
-                'plugin_config': plugin_config,
-                'allow_over_100': False  # Default to False
-            }
+            config=config,
         )
-
-        # Handle allow_over_100 - check direct field first, then config JSON
-        allow_over_100_val = form_data.get('allow_over_100', '')
-        if allow_over_100_val in ['true', 'on', '1']:
-            form_item.config['allow_over_100'] = True
-        else:
-            # Fall back to config field if present
-            config_field = form_data.get('config')
-            if config_field:
-                try:
-                    config_json = json.loads(config_field)
-                    if 'allow_over_100' in config_json:
-                        form_item.config['allow_over_100'] = bool(config_json['allow_over_100'])
-                except (json.JSONDecodeError, TypeError):
-                    pass
 
         # Handle conditions (save only if meaningful)
         with suppress(Exception):

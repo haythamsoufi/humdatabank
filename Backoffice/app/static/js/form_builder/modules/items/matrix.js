@@ -861,7 +861,7 @@ export const MatrixItem = {
 
                 // Plugin-specific configuration for this column's header list (e.g. Emergency Operations)
                 const pluginConfigContainer = columnDiv.querySelector('.column-header-plugin-config-container');
-                if (pluginConfigContainer && pluginConfigContainer.style.display !== 'none') {
+                if (pluginConfigContainer) {
                     const pluginConfig = this._extractPluginConfigFromContainer(pluginConfigContainer);
                     if (Object.keys(pluginConfig).length > 0) {
                         columnConfig.header_plugin_config = pluginConfig;
@@ -1739,6 +1739,7 @@ export const MatrixItem = {
 
             if (data && data.success && data.html) {
                 this.setSanitizedHtml(configContainer, data.html);
+                this._scopePluginConfigInputNames(configContainer);
                 configContainer.style.display = 'block';
                 await this._setupPluginConfigListeners(configContainer, selectedOption, listId, onChange);
             } else {
@@ -1841,6 +1842,32 @@ export const MatrixItem = {
     },
 
     /**
+     * Prefix plugin config input names with a per-panel scope id so identically-named
+     * fields (e.g. emops_timeframe_mode) in the matrix rows panel and a column header
+     * panel do not share one document-wide radio group.
+     */
+    _scopePluginConfigInputNames(container) {
+        if (!container || container.dataset.pluginConfigScoped === 'true') return;
+        const scope = Utils.generateUniqueId();
+        container.dataset.pluginConfigScope = scope;
+        container.dataset.pluginConfigScoped = 'true';
+        container.querySelectorAll('input[name], select[name], textarea[name]').forEach(el => {
+            const baseName = el.getAttribute('name');
+            if (!baseName || baseName.includes('__')) return;
+            el.dataset.configName = baseName;
+            el.setAttribute('name', `${scope}__${baseName}`);
+        });
+    },
+
+    _unscopePluginConfigKey(scopedName, container) {
+        const scope = container?.dataset?.pluginConfigScope;
+        if (scope && scopedName.startsWith(`${scope}__`)) {
+            return scopedName.slice(scope.length + 2);
+        }
+        return scopedName;
+    },
+
+    /**
      * Generically read all named inputs inside a plugin config panel into a
      * plain object. Shared by the matrix-level "rows" plugin config panel and
      * each column's "selectable header" plugin config panel.
@@ -1853,10 +1880,11 @@ export const MatrixItem = {
         container.querySelectorAll('input, select, textarea').forEach(input => {
             const name = input.name;
             if (!name) return;
-            if (!inputsByName.has(name)) {
-                inputsByName.set(name, []);
+            const key = this._unscopePluginConfigKey(name, container);
+            if (!inputsByName.has(key)) {
+                inputsByName.set(key, []);
             }
-            inputsByName.get(name).push(input);
+            inputsByName.get(key).push(input);
         });
 
         inputsByName.forEach((inputs, name) => {
@@ -1876,7 +1904,7 @@ export const MatrixItem = {
                 }
             } else if (sample.tagName === 'SELECT' && sample.multiple) {
                 pluginConfig[name] = Array.from(sample.selectedOptions).map(opt => opt.value);
-            } else if (sample.value) {
+            } else if (sample.value !== undefined && sample.value !== null && sample.value !== '') {
                 pluginConfig[name] = sample.value;
             }
         });
@@ -2152,7 +2180,7 @@ export const MatrixItem = {
             config.allow_other = allowOtherCheckbox?.checked === true;
 
             // Collect plugin-specific configuration generically
-            if (pluginConfigContainer && pluginConfigContainer.style.display !== 'none') {
+            if (pluginConfigContainer) {
                 const pluginConfig = this._extractPluginConfigFromContainer(pluginConfigContainer);
                 if (Object.keys(pluginConfig).length > 0) {
                     config.plugin_config = pluginConfig;
@@ -2269,7 +2297,9 @@ export const MatrixItem = {
                                         // Restore all plugin config values generically
                                         Object.keys(matrixConfig.plugin_config).forEach(key => {
                                             const value = matrixConfig.plugin_config[key];
-                                            const inputs = pluginConfigContainer.querySelectorAll(`[name="${key}"]`);
+                                            const inputs = pluginConfigContainer.querySelectorAll(
+                                                `[data-config-name="${key}"], [name="${key}"]`
+                                            );
 
                                             inputs.forEach(input => {
                                                 if (input.type === 'checkbox') {

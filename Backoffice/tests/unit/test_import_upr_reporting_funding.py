@@ -14,8 +14,11 @@ from import_upr_excel_data import (  # noqa: E402
     PLANNING_EA_FUNDING_AREAS,
     REPORTING_FUNDING_MATRIX_COLUMN,
     UprImportContext,
+    _clear_matrix_key_schema_cache,
     _ensure_funding_ea_col_header,
     _matrix_column_name_from_form_item,
+    _matrix_key_schema,
+    _matrix_key_warning,
     is_skipped_legacy_funding_area,
     transform_to_import_rows,
 )
@@ -145,3 +148,193 @@ class TestSkippedLegacyFundingAreas:
         cells = json.loads(funding_rows[0][COL_DISAGG])
         assert cells["IFRC Secretariat_EA1"] == 12000000
         assert cells["col_header|EA1"] == "Afghanistan - Earthquake (MDRAF018)"
+
+
+class TestMatrixKeyWarning:
+    """_matrix_key_warning/_matrix_key_schema: catch a form admin renaming a matrix
+    column/manual row after the SP-breakdown/support/funding key constants were
+    written, so values don't get silently stored under a key the UI never reads."""
+
+    def teardown_method(self):
+        _clear_matrix_key_schema_cache()
+
+    def test_none_when_schema_unavailable(self):
+        # No app/DB context and an id that was never cached -> "can't verify", not a warning.
+        _clear_matrix_key_schema_cache()
+        assert _matrix_key_warning(item_id=987654321, cell_key="row_col", column_name="col") is None
+
+    def test_flags_unknown_column(self, monkeypatch):
+        from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
+
+        monkeypatch.setitem(_MATRIX_KEY_SCHEMA_CACHE, 4242, {"columns": {"ns_fun"}, "rows": None})
+        warning = _matrix_key_warning(
+            item_id=4242, cell_key="IFRC Secretariat_tot_fn", column_name="tot_fn",
+        )
+        assert warning is not None
+        assert "tot_fn" in warning
+        assert "4242" in warning
+
+    def test_flags_unknown_manual_row(self, monkeypatch):
+        from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
+
+        monkeypatch.setitem(
+            _MATRIX_KEY_SCHEMA_CACHE,
+            4243,
+            {"columns": {"Funding (CHF)"}, "rows": {"Resilience - Climate and environment"}},
+        )
+        warning = _matrix_key_warning(
+            item_id=4243,
+            cell_key="Bogus Row_Funding (CHF)",
+            column_name="Funding (CHF)",
+            row_name="Bogus Row",
+        )
+        assert warning is not None
+        assert "Bogus Row" in warning
+
+    def test_silent_when_column_and_row_match(self, monkeypatch):
+        from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
+
+        monkeypatch.setitem(
+            _MATRIX_KEY_SCHEMA_CACHE,
+            4244,
+            {"columns": {"Funding (CHF)"}, "rows": {"Resilience - Climate and environment"}},
+        )
+        warning = _matrix_key_warning(
+            item_id=4244,
+            cell_key="Resilience - Climate and environment_Funding (CHF)",
+            column_name="Funding (CHF)",
+            row_name="Resilience - Climate and environment",
+        )
+        assert warning is None
+
+    def test_skips_row_check_when_rows_come_from_a_lookup_list(self, monkeypatch):
+        """row_mode != 'manual' (e.g. Support's national-society rows) -> rows is None
+        in the cached schema, meaning "don't try to validate row identity here"."""
+        from import_upr_excel_data import _MATRIX_KEY_SCHEMA_CACHE
+
+        monkeypatch.setitem(_MATRIX_KEY_SCHEMA_CACHE, 4245, {"columns": {"SP1 Supported"}, "rows": None})
+        warning = _matrix_key_warning(
+            item_id=4245,
+            cell_key="912_SP1 Supported",
+            column_name="SP1 Supported",
+            row_name="912",  # an NS row id that's obviously not a manual row label
+        )
+        assert warning is None
+
+    def test_schema_reads_manual_columns_and_rows_from_live_form_item(self, app, db_session):
+        from app.models.form_items import FormItem
+        from tests.factories import create_test_section, create_test_template
+
+        with app.app_context():
+            _clear_matrix_key_schema_cache()
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            item = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                version_id=section.version_id,
+                item_type="matrix",
+                label="Test SP Breakdown Matrix",
+                order=1,
+                config={
+                    "matrix_config": {
+                        "row_mode": "manual",
+                        "columns": [{"name": "Funding (CHF)"}, {"name": "Expenditure (CHF)"}],
+                        "rows": [{"text": "Resilience - Climate and environment"}, {"text": "Enabling functions"}],
+                    }
+                },
+            )
+            db_session.add(item)
+            db_session.commit()
+
+            schema = _matrix_key_schema(item.id)
+            assert schema["columns"] == {"Funding (CHF)", "Expenditure (CHF)"}
+            assert schema["rows"] == {"Resilience - Climate and environment", "Enabling functions"}
+
+    def test_schema_has_no_row_set_for_list_library_row_mode(self, app, db_session):
+        from app.models.form_items import FormItem
+        from tests.factories import create_test_section, create_test_template
+
+        with app.app_context():
+            _clear_matrix_key_schema_cache()
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            item = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                version_id=section.version_id,
+                item_type="matrix",
+                label="Test Support Matrix",
+                order=1,
+                config={
+                    "matrix_config": {
+                        "row_mode": "list_library",
+                        "lookup_list_id": 1,
+                        "columns": [{"name": "SP1 Supported"}, {"name": "SP2 Supported"}],
+                    }
+                },
+            )
+            db_session.add(item)
+            db_session.commit()
+
+            schema = _matrix_key_schema(item.id)
+            assert schema["columns"] == {"SP1 Supported", "SP2 Supported"}
+            assert schema["rows"] is None
+
+    def test_transform_warns_when_sp_breakdown_column_was_renamed_in_form_builder(self, app, db_session):
+        """End-to-end: transform_to_import_rows must still store the SP-breakdown value
+        (never silently drop it), but must also warn that the hardcoded 'Funding (CHF)'
+        column name no longer matches the live matrix, so a reviewer can catch it."""
+        from app.models.form_items import FormItem
+        from tests.factories import create_test_section, create_test_template
+
+        with app.app_context():
+            _clear_matrix_key_schema_cache()
+            template = create_test_template(db_session)
+            section = create_test_section(db_session, template)
+            item = FormItem(
+                section_id=section.id,
+                template_id=template.id,
+                version_id=section.version_id,
+                item_type="matrix",
+                label="Test SP Breakdown Matrix (renamed column)",
+                order=1,
+                config={
+                    "matrix_config": {
+                        "row_mode": "manual",
+                        # Deliberately does NOT include "Funding (CHF)" -- simulates a
+                        # form admin renaming the column after this script was written.
+                        "columns": [{"name": "Funding Amount (CHF)"}],
+                        "rows": [{"text": "Response - Disasters and crises"}],
+                    }
+                },
+            )
+            db_session.add(item)
+            db_session.commit()
+
+            ctx = UprImportContext(template_ids=[33])
+            ctx.assignment_by_template = {33: {("Jan-Jun 2026", "AFG"): 5001}}
+            ctx.reporting_special_items = {33: {"sp_breakdown": item.id}}
+            rows = [{
+                "ISO3": "AFG",
+                "Round": "MYR26",
+                "Section": "Funding",
+                "Entity": "HNS",
+                "Attribute": "SP Breakdown",
+                "indicatorId": 733,
+                "Indicator": "Funding",
+                "ValueNum": 12345,
+                "Area": "SP2",
+            }]
+            import_rows = transform_to_import_rows(rows, ctx, template_ids=[33], rounds={"MYR26"})
+
+            sp_rows = [r for r in import_rows if r[COL_ITEM] == str(item.id)]
+            assert len(sp_rows) == 1
+            cells = json.loads(sp_rows[0][COL_DISAGG])
+            # Value is still stored (never silently dropped)...
+            assert cells == {"Response - Disasters and crises_Funding (CHF)": 12345}
+            # ...but the mismatch is now visible instead of silent.
+            assert any(
+                "Funding (CHF)" in w and "not found in current form configuration" in w
+                for w in ctx.warnings
+            ), f"Expected a matrix column mismatch warning; got: {ctx.warnings}"

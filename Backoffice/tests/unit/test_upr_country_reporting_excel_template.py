@@ -39,6 +39,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     _matrix_cell_scalar,
     _parse_emergency_selection_from_entry,
     _format_emergency_operation_display,
+    _resolve_workbook_emergency_slot_metadata,
     _upsert_emergency_repeat_choice,
     _resolve_workbook_indicator_bank_id,
     _workbook_yes_no_value,
@@ -60,6 +61,7 @@ from upr_country_reporting_excel_template import (  # noqa: E402
     dedupe_upr_import_warnings,
     build_kpi_lookup,
     parse_comments,
+    parse_emergency_slot_metadata,
     parse_funding,
     parse_indicators,
     parse_ns_key_data,
@@ -84,7 +86,7 @@ TEMPLATE_PATH = os.path.join(
     "app",
     "static",
     "templates",
-    "upr_country_reporting_template.xlsx",
+    "unified_country_report.xlsx",
 )
 
 
@@ -282,6 +284,22 @@ def test_indicator_similarity_exact_and_truncated_match():
         "Number of shelters built",
         "Number of shelters built in the reporting period",
     ) == 0.8
+
+
+def test_indicator_similarity_rejects_short_generic_substring_fragment():
+    """A short/generic leftover fragment (a stray word left behind by a
+    partially cleared or mis-pasted cell) must NOT win the prefix/substring
+    shortcut just because it happens to be a literal substring of some
+    unrelated, much longer KPI sentence — that would score an automatic 0.8
+    and silently win a blank-ID row's fuzzy match against the wrong
+    indicator. Genuine truncations (see test above) are still full phrases
+    with real content, not a single word, so they clear the minimums fine.
+    """
+    score = _indicator_similarity(
+        "Support",
+        "Number of national society branches receiving direct technical support",
+    )
+    assert score < INDICATOR_MATCH_THRESHOLD
 
 
 def test_indicator_similarity_rejects_shared_boilerplate_phrase():
@@ -598,6 +616,105 @@ def test_format_emergency_operation_display():
     )
     assert _format_emergency_operation_display("Appeal", "") == "Appeal"
     assert _format_emergency_operation_display("", "MDR001") == "MDR001"
+
+
+def test_resolve_workbook_emergency_slot_metadata_uses_go_api_when_code_matches():
+    """A retyped-but-correct MDR code should resolve to the canonical GO API name,
+    self-healing minor Excel typos in the appeal name column."""
+    import openpyxl
+
+    from import_upr_excel_data import UprImportContext
+    from upr_country_reporting_excel_template import write_named_cell
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    try:
+        write_named_cell(wb, "Data_MDR1", "MDRNG041")
+        write_named_cell(wb, "Data_EO1", "Nigeria Floods EA (typo'd Excel name)")
+
+        ctx = UprImportContext(template_ids=[33])
+        # Pre-seeded so _ensure_emergency_ops short-circuits before any live GO API call.
+        ctx.emergency_ops_by_iso["NGA"] = {
+            "MDRNG041": {"name": "Nigeria - Floods", "code": "MDRNG041"},
+        }
+        ctx.emergency_ops_ordered_by_iso["NGA"] = [ctx.emergency_ops_by_iso["NGA"]["MDRNG041"]]
+
+        resolved = _resolve_workbook_emergency_slot_metadata(ctx, wb, "NGA")
+
+        assert resolved[1]["appeal_name"] == "Nigeria - Floods"
+        assert resolved[1]["mdr_code"] == "MDRNG041"
+        assert resolved[1]["display_value"] == "Nigeria - Floods (MDRNG041)"
+        assert ctx.warnings == []
+    finally:
+        wb.close()
+
+
+def test_resolve_workbook_emergency_slot_metadata_warns_when_code_unknown():
+    """A retyped/incorrect MDR code that matches no real GO appeal for the country must
+    not be silently trusted -- the slot's indicator values would otherwise be attributed
+    to a fictitious operation with zero visibility. Excel's name/code are kept so the
+    slot's data still imports (never blocks), but a warning must surface the mismatch."""
+    import openpyxl
+
+    from import_upr_excel_data import UprImportContext
+    from upr_country_reporting_excel_template import write_named_cell
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    try:
+        write_named_cell(wb, "Data_MDR1", "MDRNG999")
+        write_named_cell(wb, "Data_EO1", "Nigeria Floods EA")
+
+        ctx = UprImportContext(template_ids=[33])
+        ctx.emergency_ops_by_iso["NGA"] = {
+            "MDRNG041": {"name": "Nigeria - Floods", "code": "MDRNG041"},
+        }
+        ctx.emergency_ops_ordered_by_iso["NGA"] = [ctx.emergency_ops_by_iso["NGA"]["MDRNG041"]]
+
+        resolved = _resolve_workbook_emergency_slot_metadata(ctx, wb, "NGA")
+
+        # Excel values are preserved as a fallback -- the slot's data is never dropped.
+        assert resolved[1]["appeal_name"] == "Nigeria Floods EA"
+        assert resolved[1]["mdr_code"] == "MDRNG999"
+        assert any(
+            "MDRNG999" in w and "not found in GO API" in w for w in ctx.warnings
+        ), f"Expected a GO API mismatch warning; got: {ctx.warnings}"
+    finally:
+        wb.close()
+
+
+def test_resolve_workbook_emergency_slot_metadata_matches_raw_parse_when_no_ctx_data():
+    """Sanity check: with no GO API data seeded for the country at all (e.g. a country
+    the GO API has no operations for), resolution degrades to the raw Excel values --
+    same as calling parse_emergency_slot_metadata directly -- rather than erroring."""
+    import openpyxl
+
+    from import_upr_excel_data import UprImportContext
+    from upr_country_reporting_excel_template import write_named_cell
+
+    if not os.path.isfile(TEMPLATE_PATH):
+        pytest.skip("UPR Country Reporting template file not present")
+
+    wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    try:
+        write_named_cell(wb, "Data_MDR2", "MDRZZ001")
+        write_named_cell(wb, "Data_EO2", "Some Appeal")
+
+        ctx = UprImportContext(template_ids=[33])
+        ctx.emergency_ops_by_iso["ZZZ"] = {}
+        ctx.emergency_ops_ordered_by_iso["ZZZ"] = []
+
+        raw = parse_emergency_slot_metadata(wb)
+        resolved = _resolve_workbook_emergency_slot_metadata(ctx, wb, "ZZZ")
+
+        assert resolved[2]["appeal_name"] == raw[2]["appeal_name"] == "Some Appeal"
+        assert resolved[2]["mdr_code"] == raw[2]["mdr_code"] == "MDRZZ001"
+    finally:
+        wb.close()
 
 
 def test_upsert_emergency_repeat_choice(app):
@@ -1161,6 +1278,20 @@ def test_resolve_workbook_indicator_bank_id_picks_best_fuzzy_match_not_first():
 def test_resolve_workbook_indicator_bank_id_returns_none_below_threshold():
     row = {"bank_id": None, "sp_ef": "Health", "indicator": "Completely different indicator"}
     kpi_lookup = {("Health", "Number of shelters distributed"): 42}
+    assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) is None
+
+
+def test_resolve_workbook_indicator_bank_id_rejects_short_generic_fragment():
+    """Same real-world scenario as test_indicator_similarity_rejects_short_
+    generic_substring_fragment, exercised through the actual blank-ID
+    fallback used during import: a stray short fragment left in the
+    indicator cell must not fuzzy-match an unrelated KPI merely because it
+    is a literal substring of that KPI's (much longer) label.
+    """
+    row = {"bank_id": None, "sp_ef": "Health", "indicator": "Support"}
+    kpi_lookup = {
+        ("Health", "Number of national society branches receiving direct technical support"): 42,
+    }
     assert _resolve_workbook_indicator_bank_id(row, kpi_lookup) is None
 
 

@@ -16,7 +16,6 @@
 import { debugLog, debugWarn } from '../debug.js';
 import { _t } from './shared.js';
 import { __serializeMatrixData } from './formatting.js';
-import { mhFetchJson, MATRIX_SEARCH_OPTIONS_FETCH_LIMIT } from './api.js';
 
 const HEADER_KEY_PREFIX = 'col_header|';
 
@@ -93,35 +92,10 @@ async _loadHeaderListOptions(selectEl, fieldId, lookupListId, displayColumn, all
             : null;
         const pluginConfig = columnDef?.header_plugin_config || matrix?.config?.plugin_config || null;
         const aesId = this.getAssignmentEntityStatusId();
-        const cacheKey = this._buildMatrixSearchCacheKey(
+
+        const allOptions = await this._fetchMatrixSearchOptionsCached(
             lookupListId, displayColumn, [], pluginConfig, aesId
         );
-
-        let allOptions;
-        if (this.matrixSearchOptionsCache.has(cacheKey)) {
-            allOptions = await this.matrixSearchOptionsCache.get(cacheKey);
-        } else {
-            const p = mhFetchJson('/forms/matrix/search-rows', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': this.getCsrfToken(),
-                },
-                body: JSON.stringify({
-                    lookup_list_id: lookupListId,
-                    display_column: displayColumn,
-                    filters: [],
-                    search_term: '',
-                    existing_rows: [],
-                    limit: MATRIX_SEARCH_OPTIONS_FETCH_LIMIT,
-                    ...(aesId ? { assignment_entity_status_id: aesId } : {}),
-                    ...(pluginConfig ? { plugin_config: pluginConfig } : {}),
-                }),
-            });
-            this.matrixSearchOptionsCache.set(cacheKey, p);
-            const data = await p;
-            allOptions = Array.isArray(data.options) ? data.options : [];
-        }
 
         // Clear non-placeholder / non-other options
         Array.from(selectEl.options).forEach(o => {

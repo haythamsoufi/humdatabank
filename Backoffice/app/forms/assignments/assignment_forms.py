@@ -54,6 +54,31 @@ class AssignedFormForm(BaseForm):
         default=False,
     )
 
+    enable_upr_country_reporting_excel = BooleanField(
+        "Enable UPR Country Reporting Excel import/export",
+        default=False,
+    )
+
+    enable_unified_country_plan_excel = BooleanField(
+        "Enable Unified Country Plan Excel import/export",
+        default=False,
+    )
+
+    enable_export_excel = BooleanField(
+        "Enable Export Excel button",
+        default=False,
+    )
+
+    enable_import_excel = BooleanField(
+        "Enable Import Excel button",
+        default=False,
+    )
+
+    enable_export_pdf = BooleanField(
+        "Enable Export PDF button",
+        default=False,
+    )
+
     # Data owner governance — who is accountable for this collection cycle
     data_owner_id = SelectField(
         "Data Owner",

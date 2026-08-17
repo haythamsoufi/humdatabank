@@ -59,7 +59,9 @@ from import_upr_excel_data import (  # noqa: E402
     REPORTING_SP_BREAKDOWN_COLUMNS,
     UprImportContext,
     _data_na_row,
+    _matrix_key_warning,
     _matrix_row,
+    _resolve_emergency_operation_labels,
     _resolve_item_by_bank_and_area,
     _resolve_ns_row_id,
     _scalar_row,
@@ -179,6 +181,14 @@ UPR_COUNTRY_REPORTING_COMPATIBLE_ROUND_PREFIXES: Tuple[str, ...] = ("MYR", "AR")
 # Fuzzy label matching thresholds (Excel truncates long indicator names).
 INDICATOR_MATCH_THRESHOLD = 0.60
 INDICATOR_CROSS_SECTION_THRESHOLD = 0.95
+
+# Minimum size the SHORTER label must meet before a prefix/substring match is
+# trusted as a genuine truncation (see _indicator_similarity). A bare word or
+# two ("Volunteers", "See notes", a stray leftover fragment) can just as
+# easily be a coincidental substring of a long, completely unrelated KPI
+# sentence, so both minimums must hold before granting the flat 0.8 score.
+_SUBSTRING_SHORTCUT_MIN_LEN = 15
+_SUBSTRING_SHORTCUT_MIN_WORDS = 2
 
 # Normalized workbook indicator-table column header -> internal disagg key.
 WORKBOOK_NORM_HEADER_TO_KEY: Dict[str, str] = {
@@ -1329,14 +1339,25 @@ def _indicator_similarity(excel_indicator: str, form_label: str) -> float:
     if a == b:
         return 1.0
     short, long = (a, b) if len(a) <= len(b) else (b, a)
+    a_words, b_words = _indicator_content_words(a), _indicator_content_words(b)
+    short_words = a_words if short == a else b_words
     # A genuine truncation/abbreviation has the ENTIRE shorter label appear as a
     # prefix/substring of the longer one. Do NOT shortcut on just the first N
     # characters matching — many distinct KPI indicators in the master list share
     # a long common opening phrase (e.g. "Number of people reached with ...",
     # "Number of national society ...") and then diverge completely, so a
     # fixed-length prefix check previously scored totally different indicators
-    # as 0.9 "similar", risking silent mismatches for blank-ID rows.
-    if short in long or long in short:
+    # as 0.9 "similar", risking silent mismatches for blank-ID rows. Also require
+    # the shorter side to clear _SUBSTRING_SHORTCUT_MIN_LEN/_MIN_WORDS: without
+    # that, a short/generic fragment left behind by a stray edit (a single word,
+    # "N/A", a truncated cell) could be a coincidental substring of some
+    # unrelated, much longer KPI sentence and win an automatic 0.8 — exactly the
+    # kind of silent blank-ID collision this function exists to prevent.
+    if (
+        (short in long or long in short)
+        and len(short) >= _SUBSTRING_SHORTCUT_MIN_LEN
+        and len(short_words) >= _SUBSTRING_SHORTCUT_MIN_WORDS
+    ):
         return 0.8
     char_ratio = SequenceMatcher(None, a, b).ratio()
     # Character-level ratio alone is fooled by shared boilerplate: e.g. "Number
@@ -1346,7 +1367,6 @@ def _indicator_similarity(excel_indicator: str, form_label: str) -> float:
     # most of each sentence is the same generic carrier phrase. Require the
     # DISTINCTIVE (non-boilerplate) words to also overlap meaningfully before
     # trusting a high character ratio.
-    a_words, b_words = _indicator_content_words(a), _indicator_content_words(b)
     if a_words or b_words:
         word_overlap = len(a_words & b_words) / len(a_words | b_words) if (a_words and b_words) else 0.0
         return min(char_ratio, word_overlap * 1.5 + 0.15) if word_overlap < 1.0 else char_ratio
@@ -1986,6 +2006,33 @@ def parse_emergency_slot_metadata(wb) -> Dict[int, Dict[str, str]]:
         if mdr or name:
             slots[slot_num] = {"mdr_code": mdr, "appeal_name": name}
     return slots
+
+
+def _resolve_workbook_emergency_slot_metadata(
+    ctx: UprImportContext, wb, iso3: str
+) -> Dict[int, Dict[str, str]]:
+    """Cross-check each emergency slot's MDR/appeal code from the Start sheet against the
+    GO API before it's used for anything (repeat-slot title, dynamic indicator attribution).
+
+    The workbook's MDR code (``Data_MDR1``/``Data_EO1``, etc.) is free text a user can retype
+    without touching the indicator rows below it, and the slot number itself comes from sheet
+    position, not from the code — so a retyped/incorrect code would otherwise silently
+    re-attribute a slot's indicator values to the wrong (or a fictitious) operation with no
+    warning. When the code matches a real GO appeal for this country, canonical GO name/code
+    are used (self-healing minor Excel typos); when it doesn't match, ``ctx.warnings`` gets an
+    entry (via ``_resolve_emergency_operation_labels``) and the Excel name/code are kept as a
+    fallback so the import still proceeds rather than losing the slot's data entirely.
+    """
+    resolved: Dict[int, Dict[str, str]] = {}
+    for slot_num, meta in parse_emergency_slot_metadata(wb).items():
+        name, code, display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3=iso3,
+            excel_name=meta.get("appeal_name") or "",
+            excel_code=meta.get("mdr_code") or "",
+        )
+        resolved[slot_num] = {"mdr_code": code, "appeal_name": name, "display_value": display}
+    return resolved
 
 
 def parse_funding(wb) -> Dict[str, Any]:
@@ -2679,6 +2726,8 @@ def _collect_workbook_repeat_slot_entries(
     aes_id: int,
     wb,
     dynamic_entries: List[Dict[str, Any]],
+    ctx: UprImportContext,
+    iso3: str,
 ) -> List[Dict[str, Any]]:
     """Build repeat-slot metadata for client-side repeat entry creation."""
     section_ids = _load_upr_country_reporting_section_ids()
@@ -2687,7 +2736,7 @@ def _collect_workbook_repeat_slot_entries(
         return []
 
     choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
-    slot_meta = parse_emergency_slot_metadata(wb)
+    slot_meta = _resolve_workbook_emergency_slot_metadata(ctx, wb, iso3)
     required_slots: Set[int] = set(slot_meta.keys())
     for entry in dynamic_entries:
         repeat_num = entry.get("repeat_instance_number")
@@ -2706,7 +2755,8 @@ def _collect_workbook_repeat_slot_entries(
                 "mdr_code": mdr_code,
                 "appeal_name": appeal_name,
                 "choice_item_id": choice_item_id,
-                "display_value": _format_emergency_operation_display(appeal_name, mdr_code),
+                "display_value": meta.get("display_value")
+                or _format_emergency_operation_display(appeal_name, mdr_code),
             }
         )
     return out
@@ -2782,7 +2832,7 @@ def build_upr_country_reporting_client_payload(
         section_label_map=section_label_map,
         kpi_lookup=kpi_lookup,
     )
-    repeat_slots = _collect_workbook_repeat_slot_entries(aes_id, wb, dynamic_entries)
+    repeat_slots = _collect_workbook_repeat_slot_entries(aes_id, wb, dynamic_entries, ctx, iso3)
     return {
         "fields": fields,
         "matrices": matrices,
@@ -2800,6 +2850,7 @@ def _import_dynamic_indicators_from_workbook(
     section_label_map: Dict[Tuple[str, str], int],
     kpi_lookup: Dict[Tuple[str, str], int],
     dry_run: bool = False,
+    iso3: str = "",
 ) -> Dict[str, int]:
     from app.extensions import db
 
@@ -2811,7 +2862,7 @@ def _import_dynamic_indicators_from_workbook(
     if dry_run:
         return stats
 
-    slot_meta = parse_emergency_slot_metadata(wb)
+    slot_meta = _resolve_workbook_emergency_slot_metadata(ctx, wb, iso3)
     choice_item_id = _load_upr_country_reporting_emergency_choice_item_id(ea_repeat)
     for slot_num, meta in slot_meta.items():
         if ea_repeat:
@@ -3343,6 +3394,12 @@ def transform_upr_country_reporting_to_import_rows(
     for row_name, amount in funding.get("sources", {}).items():
         if amount:
             cell_key = f"{row_name}_{funding_matrix_col}"
+            key_warning = _matrix_key_warning(
+                item_id=funding_item, cell_key=cell_key, column_name=funding_matrix_col,
+                row_name=row_name, context=iso3,
+            )
+            if key_warning:
+                ctx.warnings.append(key_warning)
             matrix_cells.setdefault((aes_id, funding_item), {})[cell_key] = amount
 
     total_exp = funding.get("total_expenditure")
@@ -3364,6 +3421,12 @@ def transform_upr_country_reporting_to_import_rows(
         for col_name, amount in cols.items():
             if amount is not None:
                 cell_key = f"{row_name}_{col_name}"
+                key_warning = _matrix_key_warning(
+                    item_id=sp_breakdown_item, cell_key=cell_key, column_name=col_name,
+                    row_name=row_name, context=iso3,
+                )
+                if key_warning:
+                    ctx.warnings.append(key_warning)
                 matrix_cells.setdefault((aes_id, sp_breakdown_item), {})[cell_key] = amount
 
     # Bilateral support
@@ -3372,7 +3435,14 @@ def transform_upr_country_reporting_to_import_rows(
         if ns_id is None:
             continue
         for area in row["areas"]:
-            cell_key = f"{ns_id}_{area} Supported"
+            column_name = f"{area} Supported"
+            cell_key = f"{ns_id}_{column_name}"
+            key_warning = _matrix_key_warning(
+                item_id=support_item, cell_key=cell_key, column_name=column_name,
+                context=f"{row['ns_name']}, {iso3}",
+            )
+            if key_warning:
+                ctx.warnings.append(key_warning)
             matrix_cells.setdefault((aes_id, support_item), {})[cell_key] = 1
 
     # Comments (T33) → discussion panel (historical import, no author)
@@ -3530,6 +3600,7 @@ def run_upr_country_reporting_import(
                 section_label_map=_load_items_by_section_label(REPORTING_COUNTRY_TEMPLATE_ID),
                 kpi_lookup=build_kpi_lookup(wb),
                 dry_run=False,
+                iso3=iso3,
             )
             displaced_stats = upsert_dynamic_indicator_entries(
                 ctx.dynamic_indicator_entries,

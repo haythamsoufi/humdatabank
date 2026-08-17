@@ -155,16 +155,19 @@
                     <div class="action-controls">
                         {% if not is_preview_mode and not is_public_submission %}
                             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
-                            {% set _tpl_id = assignment_status.assigned_form.template_id if assignment_status and assignment_status.assigned_form else none %}
+                            {% set _assigned = assignment_status.assigned_form if assignment_status else none %}
                             {% set _aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
-                            {% set _use_upr_country_reporting_excel = _tpl_id == 33 and _aes_id %}
-                            {% if tmpl and (tmpl.enable_export_excel or tmpl.enable_import_excel or _use_upr_country_reporting_excel) %}
+                            {% set _use_upr_country_reporting_excel = _assigned and _assigned.enable_upr_country_reporting_excel and _aes_id %}
+                            {% set _use_unified_country_plan_excel = _assigned and _assigned.enable_unified_country_plan_excel and _aes_id %}
+                            {% set _use_export_excel = _assigned and _assigned.enable_export_excel and _aes_id %}
+                            {% set _use_import_excel = _assigned and _assigned.enable_import_excel and _aes_id %}
+                            {% if _use_export_excel or _use_import_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel %}
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">
                                 <i class="fas fa-file-excel"></i>
                                 <span>
-                                    {% if (tmpl.enable_export_excel or _use_upr_country_reporting_excel) and (tmpl.enable_import_excel or _use_upr_country_reporting_excel) %}
+                                    {% if (_use_export_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel) and (_use_import_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel) %}
                                         {{ _('Excel Import/Export') }}
-                                    {% elif tmpl.enable_export_excel or _use_upr_country_reporting_excel %}
+                                    {% elif _use_export_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel %}
                                         {{ _('Excel Export') }}
                                     {% else %}
                                         {{ _('Excel Import') }}
@@ -172,7 +175,7 @@
                                 </span>
                             </button>
                             {% endif %}
-                            {% if tmpl and tmpl.enable_export_pdf %}
+                            {% if _assigned and _assigned.enable_export_pdf and _aes_id %}
                             <button type="button" id="export-pdf-btn" class="professional-action-btn professional-action-btn-red">
                                 <i class="fas fa-file-pdf"></i>
                                 <span>{{ _('Export PDF') }}</span>
@@ -2632,15 +2635,25 @@
         {# Excel Options Modal — shared excel_io_modal #}
         {% from "macros/excel_io_modal.html" import excel_io_modal %}
         {% from "macros/upr_country_reporting_excel_instructions.html" import upr_country_reporting_excel_workflow, upr_country_reporting_excel_export_panel_lead, upr_country_reporting_excel_import_panel_lead %}
+        {% from "macros/unified_country_plan_excel_instructions.html" import unified_country_plan_excel_workflow, unified_country_plan_excel_export_panel_lead, unified_country_plan_excel_import_panel_lead %}
         {% from "macros/modal_shell.html" import modal_shell %}
         {% if not is_preview_mode and not is_public_submission %}
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
             {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
-            {% set _tpl_id = assignment_status.assigned_form.template_id if assignment_status and assignment_status.assigned_form else none %}
-            {% set _use_upr_country_reporting_excel = _tpl_id == 33 and aes_id %}
-            {% set _show_export = aes_id and (_use_upr_country_reporting_excel or (tmpl and tmpl.enable_export_excel)) %}
-            {% set _show_import = aes_id and (_use_upr_country_reporting_excel or (tmpl and tmpl.enable_import_excel)) %}
-            {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('UPR Country Reporting') if _use_upr_country_reporting_excel else _('Excel Options') }}{% endset %}
+            {% set _assigned = assignment_status.assigned_form if assignment_status else none %}
+            {% set _use_upr_country_reporting_excel = _assigned and _assigned.enable_upr_country_reporting_excel and aes_id %}
+            {% set _use_unified_country_plan_excel = _assigned and _assigned.enable_unified_country_plan_excel and aes_id %}
+            {% set _use_export_excel = _assigned and _assigned.enable_export_excel and aes_id %}
+            {% set _use_import_excel = _assigned and _assigned.enable_import_excel and aes_id %}
+            {% set _show_export = aes_id and (_use_upr_country_reporting_excel or _use_unified_country_plan_excel or _use_export_excel) %}
+            {% set _show_import = aes_id and (_use_upr_country_reporting_excel or _use_unified_country_plan_excel or _use_import_excel) %}
+            {% if _use_upr_country_reporting_excel %}
+                {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('UPR Country Reporting') }}{% endset %}
+            {% elif _use_unified_country_plan_excel %}
+                {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Unified Country Plan') }}{% endset %}
+            {% else %}
+                {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('Excel Options') }}{% endset %}
+            {% endif %}
             {% set _csrf_field %}{{ form.csrf_token if form else '' }}{% endset %}
             {% if _show_export or _show_import %}
             {% if _use_upr_country_reporting_excel %}
@@ -2678,6 +2691,42 @@
                 import_submit_disabled=not can_edit,
                 import_hidden_fields=_csrf_field,
                 import_note=_('The file is checked for template version, country, and reporting period before import.')
+            ) %}{% endcall %}
+            {% elif _use_unified_country_plan_excel %}
+            {% set _ucp_workflow %}{{ unified_country_plan_excel_workflow() }}{% endset %}
+            {% set _ucp_export_lead %}{{ unified_country_plan_excel_export_panel_lead() }}{% endset %}
+            {% set _ucp_import_lead %}{{ unified_country_plan_excel_import_panel_lead() }}{% endset %}
+            {% call excel_io_modal(
+                'excel-options-modal',
+                modal_title=excel_title,
+                aria_label=_('Unified Country Plan'),
+                max_width='max-w-4xl',
+                content_class='excel-io-modal-shell-content',
+                close_class='close-modal-btn',
+                layout='guide-split',
+                default_tab='export',
+                export_tab_label=_('Download template'),
+                import_tab_label=_('Upload & import'),
+                intro_html=_ucp_workflow,
+                export_intro_html=_ucp_export_lead,
+                import_intro_html=_ucp_import_lead,
+                show_export=_show_export,
+                show_import=_show_import,
+                export_url=url_for('excel.export_unified_country_plan_template', aes_id=aes_id),
+                export_label=_('Export Unified Country Plan (.xlsx)'),
+                import_form_id='modalImportExcelForm',
+                import_action=url_for('excel.import_unified_country_plan_template', aes_id=aes_id),
+                validate_url=url_for('excel.validate_unified_country_plan_import', aes_id=aes_id),
+                dropzone_id='entry-excel-dropzone',
+                dropzone_input_id='modal_excel_file',
+                dropzone_accept='.xlsx',
+                dropzone_max_size_bytes=10485760,
+                dropzone_title=_('Drop your saved workbook here'),
+                dropzone_hint=_('or click to browse — .xlsx only'),
+                import_submit_label=_('Load into form'),
+                import_submit_disabled=not can_edit,
+                import_hidden_fields=_csrf_field,
+                import_note=_('The file is checked for template version, country, and planning period before import.')
             ) %}{% endcall %}
             {% else %}
             {% call excel_io_modal(

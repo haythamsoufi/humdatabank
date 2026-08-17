@@ -588,7 +588,7 @@ class TestLoadExistingDataForAssignment:
                 "app.routes.forms.helpers.DynamicIndicatorData.query"
             ) as mock_did_query:
                 mock_fd_query.filter_by.return_value.options.return_value.all.return_value = [mock_entry]
-                mock_did_query.filter.return_value.all.return_value = [mock_dynamic]
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = [mock_dynamic]
 
                 mock_form_template = MagicMock()
                 result = _load_existing_data_for_assignment(mock_aes, mock_form_template)
@@ -613,7 +613,7 @@ class TestLoadExistingDataForAssignment:
                 "app.routes.forms.helpers.DynamicIndicatorData.query"
             ) as mock_did_query:
                 mock_fd_query.filter_by.return_value.options.return_value.all.return_value = [mock_entry]
-                mock_did_query.filter.return_value.all.return_value = []
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = []
 
                 result = _load_existing_data_for_assignment(mock_aes, MagicMock())
 
@@ -635,7 +635,7 @@ class TestLoadExistingDataForAssignment:
                 "app.routes.forms.helpers.DynamicIndicatorData.query"
             ) as mock_did_query:
                 mock_fd_query.filter_by.return_value.options.return_value.all.return_value = [mock_entry]
-                mock_did_query.filter.return_value.all.return_value = []
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = []
 
                 result = _load_existing_data_for_assignment(mock_aes, MagicMock())
 
@@ -662,7 +662,7 @@ class TestLoadExistingDataForAssignment:
                 "app.routes.forms.helpers.DynamicIndicatorData.query"
             ) as mock_did_query:
                 mock_fd_query.filter_by.return_value.options.return_value.all.return_value = []
-                mock_did_query.filter.return_value.all.return_value = [mock_dynamic]
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = [mock_dynamic]
 
                 result = _load_existing_data_for_assignment(mock_aes, MagicMock())
 
@@ -688,7 +688,7 @@ class TestLoadExistingDataForAssignment:
                 "app.routes.forms.helpers.DynamicIndicatorData.query"
             ) as mock_did_query:
                 mock_fd_query.filter_by.return_value.options.return_value.all.return_value = []
-                mock_did_query.filter.return_value.all.return_value = [mock_dynamic]
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = [mock_dynamic]
 
                 result = _load_existing_data_for_assignment(mock_aes, MagicMock())
 
@@ -714,7 +714,7 @@ class TestLoadExistingDataForAssignment:
                 "app.routes.forms.helpers.DynamicIndicatorData.query"
             ) as mock_did_query:
                 mock_fd_query.filter_by.return_value.options.return_value.all.return_value = []
-                mock_did_query.filter.return_value.all.return_value = [mock_dynamic]
+                mock_did_query.filter_by.return_value.options.return_value.all.return_value = [mock_dynamic]
 
                 result = _load_existing_data_for_assignment(mock_aes, MagicMock())
 
@@ -847,6 +847,10 @@ class TestCalculateSectionCompletionStatus:
         field.is_matrix = is_matrix
         field.is_required_for_js = is_required
         field.dynamic_assignment_id = dynamic_assignment_id
+        # Explicit False (not a MagicMock default, which is truthy and would make
+        # calculate_section_completion_status skip every field as if it were an image).
+        field.is_image = False
+        field.config = {}
         return field
 
     def _make_section(self, name, fields=None):
@@ -1048,14 +1052,64 @@ class TestBuildEntryFormFeatures:
         features = build_entry_form_features(sections)
         assert features['documents'] is True
 
-    def test_excel_export_follows_template_flags(self):
-        template = SimpleNamespace(enable_export_excel=True, enable_import_excel=False)
-        features = build_entry_form_features([], template)
+    def test_excel_export_follows_assignment_generic_flags(self):
+        template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
+        assigned_form = SimpleNamespace(
+            enable_upr_country_reporting_excel=False,
+            enable_unified_country_plan_excel=False,
+            enable_export_excel=True,
+            enable_import_excel=False,
+        )
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
         assert features['excelExport'] is True
 
-    def test_pdf_export_always_enabled(self):
-        features = build_entry_form_features([])
+    def test_excel_export_follows_assignment_upr_flag(self):
+        template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
+        assigned_form = SimpleNamespace(
+            enable_upr_country_reporting_excel=True,
+            enable_unified_country_plan_excel=False,
+            enable_export_excel=False,
+            enable_import_excel=False,
+        )
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
+        assert features['excelExport'] is True
+
+    def test_excel_export_follows_assignment_ucp_flag(self):
+        template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
+        assigned_form = SimpleNamespace(
+            enable_upr_country_reporting_excel=False,
+            enable_unified_country_plan_excel=True,
+            enable_export_excel=False,
+            enable_import_excel=False,
+        )
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
+        assert features['excelExport'] is True
+
+    def test_excel_export_disabled_without_assignment_flags(self):
+        template = SimpleNamespace(enable_export_excel=True, enable_import_excel=True)
+        assigned_form = SimpleNamespace(
+            enable_upr_country_reporting_excel=False,
+            enable_unified_country_plan_excel=False,
+            enable_export_excel=False,
+            enable_import_excel=False,
+        )
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
+        assert features['excelExport'] is False
+
+    def test_pdf_export_follows_assignment_flag(self):
+        assigned_form = SimpleNamespace(enable_export_pdf=True)
+        features = build_entry_form_features([], assigned_form=assigned_form)
         assert features['pdfExport'] is True
+
+    def test_pdf_export_disabled_without_assignment_flag(self):
+        template = SimpleNamespace(enable_export_pdf=True)
+        assigned_form = SimpleNamespace(enable_export_pdf=False)
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
+        assert features['pdfExport'] is False
+
+    def test_pdf_export_disabled_without_assignment(self):
+        features = build_entry_form_features([])
+        assert features['pdfExport'] is False
         assert features['excelExport'] is False
 
     def test_discussion_follows_template_flag(self):

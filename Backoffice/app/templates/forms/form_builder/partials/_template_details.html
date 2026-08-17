@@ -236,39 +236,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="mb-4">
-                        <div class="flex items-center">
-                            {{ form.enable_export_pdf(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
-                            {{ form.enable_export_pdf.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
-                        </div>
-                        {% if form.enable_export_pdf.errors %}
-                            {% for error in form.enable_export_pdf.errors %}
-                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                    <div class="mb-4">
-                        <div class="flex items-center">
-                            {{ form.enable_export_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
-                            {{ form.enable_export_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
-                        </div>
-                        {% if form.enable_export_excel.errors %}
-                            {% for error in form.enable_export_excel.errors %}
-                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
-                    <div class="mb-4">
-                        <div class="flex items-center">
-                            {{ form.enable_import_excel(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}
-                            {{ form.enable_import_excel.label(class="ml-2 block text-gray-700 text-sm font-semibold") }}
-                        </div>
-                        {% if form.enable_import_excel.errors %}
-                            {% for error in form.enable_import_excel.errors %}
-                                <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
-                            {% endfor %}
-                        {% endif %}
-                    </div>
+                    {# Assignment PDF/Excel export options are configured per assignment (Admin → Assignments), not here. #}
                     <div class="mb-4">
                         <div class="flex items-center">
                             {{ form.enable_ai_validation(class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500") }}

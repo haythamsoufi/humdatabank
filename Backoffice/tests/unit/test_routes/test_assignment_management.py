@@ -1532,7 +1532,9 @@ class TestBulkEnablePublicReporting:
             assignment_id = aes.assigned_form_id
             assignment = AssignedForm.query.get(assignment_id)
             assignment.generate_public_url()
-            db_session.flush()
+            # Commit (not just flush): the route runs in its own request context/
+            # transaction, so an uncommitted public URL wouldn't be visible to it.
+            db_session.commit()
             country_id = country.id
         resp = logged_in_client.post(
             f"/admin/assignments/{assignment_id}/bulk-enable-public",
@@ -1581,7 +1583,9 @@ class TestBulkUpdatePublicAvailability:
             aes_id = aes.id
             assignment = AssignedForm.query.get(assignment_id)
             assignment.generate_public_url()
-            db_session.flush()
+            # Commit (not just flush): the route runs in its own request context/
+            # transaction, so an uncommitted public URL wouldn't be visible to it.
+            db_session.commit()
         resp = logged_in_client.post(
             f"/admin/assignments/{assignment_id}/entities/bulk-update-public",
             json={"status_ids": [aes_id], "enable": True},
@@ -1597,7 +1601,9 @@ class TestBulkUpdatePublicAvailability:
             aes_id = aes.id
             assignment = AssignedForm.query.get(assignment_id)
             assignment.generate_public_url()
-            db_session.flush()
+            # Commit (not just flush): the route runs in its own request context/
+            # transaction, so an uncommitted public URL wouldn't be visible to it.
+            db_session.commit()
         resp = logged_in_client.post(
             f"/admin/assignments/{assignment_id}/entities/bulk-update-public",
             json={"status_ids": [aes_id], "enable": False},

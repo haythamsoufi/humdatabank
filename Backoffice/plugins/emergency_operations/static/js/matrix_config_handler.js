@@ -14,6 +14,22 @@ function _setVisible(wrapper, visible) {
     wrapper.classList.toggle('hidden', !visible);
 }
 
+/** Inputs that share a logical config field name (supports per-panel name scoping). */
+function _inputsByConfigName(container, baseName) {
+    const scoped = container.querySelectorAll(`[data-config-name="${baseName}"]`);
+    if (scoped.length) return scoped;
+    return container.querySelectorAll(`[name="${baseName}"]`);
+}
+
+function _checkedInputByConfigName(container, baseName) {
+    return Array.from(_inputsByConfigName(container, baseName)).find(inp => inp.checked) || null;
+}
+
+function _inputByConfigNameAndValue(container, baseName, value) {
+    return container.querySelector(`[data-config-name="${baseName}"][value="${value}"]`)
+        || container.querySelector(`[name="${baseName}"][value="${value}"]`);
+}
+
 /**
  * Setup event listeners for emergency operations configuration UI.
  * Called generically when the config panel is injected into any container.
@@ -43,11 +59,11 @@ export function setupEmergencyOperationsConfigUI(configContainer, updateConfigCa
     }
 
     // --- Country source radios ---
-    const countrySourceRadios = configContainer.querySelectorAll('input[name="emops_country_source"]');
+    const countrySourceRadios = _inputsByConfigName(configContainer, 'emops_country_source');
     const staticCountryWrapper = configContainer.querySelector('#emops-static-country-wrapper');
 
     function syncCountryUI() {
-        const selected = configContainer.querySelector('input[name="emops_country_source"]:checked');
+        const selected = _checkedInputByConfigName(configContainer, 'emops_country_source');
         _setVisible(staticCountryWrapper, selected && selected.value === 'static');
     }
 
@@ -57,11 +73,11 @@ export function setupEmergencyOperationsConfigUI(configContainer, updateConfigCa
     syncCountryUI();
 
     // --- Timeframe mode radios ---
-    const timeframeModeRadios = configContainer.querySelectorAll('input[name="emops_timeframe_mode"]');
+    const timeframeModeRadios = _inputsByConfigName(configContainer, 'emops_timeframe_mode');
     const staticDatesWrapper = configContainer.querySelector('#emops-static-dates-wrapper');
 
     function syncTimeframeUI() {
-        const selected = configContainer.querySelector('input[name="emops_timeframe_mode"]:checked');
+        const selected = _checkedInputByConfigName(configContainer, 'emops_timeframe_mode');
         _setVisible(staticDatesWrapper, !selected || selected.value === 'static');
     }
 
@@ -71,11 +87,11 @@ export function setupEmergencyOperationsConfigUI(configContainer, updateConfigCa
     syncTimeframeUI();
 
     // --- Operation types mutual-exclusion ---
-    const operationTypeCheckboxes = configContainer.querySelectorAll('input[name="emops_operation_types"]');
+    const operationTypeCheckboxes = _inputsByConfigName(configContainer, 'emops_operation_types');
     if (operationTypeCheckboxes.length > 0) {
         operationTypeCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', (e) => {
-                const allCheckbox = configContainer.querySelector('input[name="emops_operation_types"][value="All"]');
+                const allCheckbox = _inputByConfigNameAndValue(configContainer, 'emops_operation_types', 'All');
                 const otherCheckboxes = Array.from(operationTypeCheckboxes).filter(cb => cb.value !== 'All');
 
                 if (e.target.value === 'All') {

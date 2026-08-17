@@ -82,6 +82,19 @@ class AssignedForm(db.Model):
     # When true, non-org focal points must use sent_for_review before upstream submit
     requires_delegation_review = Column(Boolean, default=False, nullable=False)
 
+    # Structured UPR Country Reporting Excel workbook (export/import on entry form)
+    enable_upr_country_reporting_excel = Column(Boolean, default=False, nullable=False)
+
+    # Structured Unified Country Plan Excel workbook (T24 planning; export/import on entry form)
+    enable_unified_country_plan_excel = Column(Boolean, default=False, nullable=False)
+
+    # Generic form Excel export/import (flat item-row workbook on entry form)
+    enable_export_excel = Column(Boolean, default=False, nullable=False)
+    enable_import_excel = Column(Boolean, default=False, nullable=False)
+
+    # PDF export on entry form
+    enable_export_pdf = Column(Boolean, default=False, nullable=False)
+
     # Optional override for the assignment's display name.
     # When None the UI falls back to "<template name> – <period>".
     custom_name = Column(String(200), nullable=True)

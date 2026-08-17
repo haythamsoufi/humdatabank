@@ -12,6 +12,11 @@ from flask import current_app
 
 UPR_COUNTRY_REPORTING_LABEL = "UPR Country Reporting"
 
+
+def assignment_uses_upr_country_reporting_excel(assigned_form) -> bool:
+    """Return True when this assignment has UPR Country Reporting Excel enabled."""
+    return bool(getattr(assigned_form, "enable_upr_country_reporting_excel", False))
+
 _SCRIPTS_DIR: str | None = None
 
 
@@ -30,7 +35,7 @@ def _ensure_scripts_in_path() -> None:
 class UprCountryReportingExcelService:
     TEMPLATE_PATH_CONFIG_KEY = "UPR_COUNTRY_REPORTING_TEMPLATE_PATH"
     LEGACY_TEMPLATE_PATH_CONFIG_KEY = "MYR_REPORTING_TEMPLATE_PATH"
-    DEFAULT_TEMPLATE_REL = os.path.join("static", "templates", "upr_country_reporting_template.xlsx")
+    DEFAULT_TEMPLATE_REL = os.path.join("static", "templates", "unified_country_report.xlsx")
     LEGACY_TEMPLATE_REL = os.path.join("static", "templates", "myr_reporting_template.xlsx")
 
     @classmethod

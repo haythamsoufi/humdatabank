@@ -1,14 +1,39 @@
 {# Instruction copy for the T24 Unified Country Plan Excel import/export modal. #}
+{% from "macros/excel_workflow_instructions.html" import excel_workflow_step, excel_workflow_warning %}
+
 {% macro unified_country_plan_excel_workflow() -%}
 <div class="upr-excel-workflow" role="region" aria-label="{{ _('How to use Unified Country Plan Excel')|forceescape }}">
     <p class="text-sm font-medium text-gray-800 m-0 mb-1">{{ _('How it works') }}</p>
     <p class="text-xs text-gray-600 mb-3 leading-relaxed m-0">{{ _('Bulk-edit this planning assignment in Excel, load the file back here, then save when you are ready.') }}</p>
     <ol class="space-y-3 list-none p-0 m-0">
-        <li class="text-xs text-gray-700">{{ _('1. Download the pre-filled workbook for this country and planning period.') }}</li>
-        <li class="text-xs text-gray-700">{{ _('2. Edit in Excel. Do not rename sheets or tables. Save as .xlsx.') }}</li>
-        <li class="text-xs text-gray-700">{{ _('3. Upload here — we verify template version, country, and period.') }}</li>
-        <li class="text-xs text-gray-700">{{ _('4. Load into form, review, then Save on the assignment.') }}</li>
+        {{ excel_workflow_step(
+            '1',
+            'download',
+            _('Download'),
+            _('Export the pre-filled workbook for this country and planning period.')
+        ) }}
+        {{ excel_workflow_step(
+            '2',
+            'pen',
+            _('Edit in Excel'),
+            _('Update your figures. Do not rename sheets or tables. Save as .xlsx.')
+        ) }}
+        {{ excel_workflow_step(
+            '3',
+            'upload',
+            _('Upload'),
+            _('Return here and upload the saved file. We verify the template version, country, and period match this assignment.')
+        ) }}
+        {{ excel_workflow_step(
+            '4',
+            'save',
+            _('Review & save'),
+            _('Click Load into form, review the data on this page, then click Save on the assignment to persist.')
+        ) }}
     </ol>
+    <div class="mt-4">
+        {{ excel_workflow_warning(_('Older Unified Country Plan templates or exports from other forms will not work. Always start by downloading the template on this page.')) }}
+    </div>
 </div>
 {%- endmacro %}
 

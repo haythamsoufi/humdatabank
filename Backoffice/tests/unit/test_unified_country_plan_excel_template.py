@@ -13,19 +13,32 @@ if IMPORTS_DIR not in sys.path:
     sys.path.insert(0, IMPORTS_DIR)
 
 from unified_country_plan_excel_template import (  # noqa: E402
+    START_REGION_CELL,
+    START_SHEET,
+    SUPPORT_SHEET,
+    SUPPORT_TABLE,
     _cell_is_tick,
+    _export_support_to_workbook,
+    _import_support_matrix,
     _parse_funding_row_entity,
     _parse_emergency_row_id,
+    _parse_planning_support_ticks,
     _quiet_openpyxl_io,
+    _workbook_region_for_country,
+    _workbook_region_label,
+    _write_start_sheet_selection,
     funding_column_header,
     parse_funding_column_header,
     parse_version,
     period_to_workbook_version,
     planning_year_triplet,
     read_named_table,
+    read_table_cell,
     rewrite_planning_year_headers,
     validate_unified_country_plan_import_file,
+    write_table_cell,
 )
+from upr_country_reporting_excel_template import _bilateral_ns_name_for_row, _write_bilateral_ns_source_cell  # noqa: E402
 
 TEMPLATE_PATH = os.path.join(
     BACKOFFICE_DIR,
@@ -164,3 +177,74 @@ def test_parse_version(ucp_workbook):
     round_code, period = parse_version(ucp_workbook)
     assert round_code == "P27"
     assert period == "2027"
+
+
+def test_workbook_region_for_country_from_template_table(ucp_workbook):
+    assert _workbook_region_for_country(ucp_workbook, "Afghanistan") == "Asia Pacific"
+    assert _workbook_region_for_country(ucp_workbook, "afghanistan") == "Asia Pacific"
+
+
+def test_workbook_region_label_maps_mena():
+    assert _workbook_region_label("MENA") == "Middle East and North Africa"
+    assert _workbook_region_label("Asia Pacific") == "Asia Pacific"
+
+
+def test_write_start_sheet_selection(ucp_workbook):
+    import openpyxl
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _write_start_sheet_selection(wb, "Afghanistan", "Asia Pacific")
+    assert wb[START_SHEET][START_REGION_CELL].value == "Asia Pacific"
+    assert wb[START_SHEET]["K12"].value == "Afghanistan"
+    wb.close()
+
+
+def test_parse_planning_support_ticks():
+    cells = {"166_SP1": 1, "166_SP2": 0, "42_EFs": 1, "foo": 1}
+    assert _parse_planning_support_ticks(cells) == {166: {"SP1": True}, 42: {"EFs": True}}
+
+
+def test_bilateral_support_row_reads_column_c():
+    import openpyxl
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "Swiss Red Cross")
+    assert _bilateral_ns_name_for_row(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0) == "Swiss Red Cross"
+    wb.close()
+
+
+def test_export_support_writes_ns_and_ticks():
+    import openpyxl
+    from unittest.mock import patch
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    ctx = type("Ctx", (), {"ns_name_to_id": {"swiss red cross": 166}})()
+    entry = type("Entry", (), {"disagg_data": {"166_SP1": 1, "166_EFs": 1}})()
+
+    with patch("app.models.organization.NationalSociety") as mock_ns:
+        mock_ns.query.filter.return_value.all.return_value = [
+            type("NS", (), {"id": 166, "name": "Swiss Red Cross"})(),
+        ]
+        _export_support_to_workbook(wb, entry, ctx)
+
+    assert _bilateral_ns_name_for_row(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0) == "Swiss Red Cross"
+    assert read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "SP1") == 1
+    assert read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "EFs") == 1
+    wb.close()
+
+
+def test_import_support_matrix_reads_column_c():
+    import openpyxl
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "Swiss Red Cross")
+    write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "SP2", 1)
+    write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "EFs", 1)
+    ctx = type("Ctx", (), {"ns_name_to_id": {"swiss red cross": 166}})()
+    cells = _import_support_matrix(wb, ctx, aes_id=1, warnings=[])
+    assert cells == {"166_SP2": 1, "166_EFs": 1}
+    wb.close()

@@ -18,7 +18,6 @@ from app.services.notification.core import (
 )
 from app.models.enums import NotificationType
 from app.utils.datetime_helpers import utcnow
-from app.utils.ws_manager import broadcast_notification, broadcast_unread_count
 from app.services.notification.service import NotificationService
 from app.services.notification.push import PushNotificationService
 from app.services.notification.emails import send_instant_notification_email
@@ -339,7 +338,9 @@ def process_scheduled_notifications() -> int:
                         'category': getattr(notification, 'category', None),
                         'tags': getattr(notification, 'tags', None),
                     }
-                    broadcast_notification(notification.user_id, notification_data)
+                    if current_app.config.get("WEBSOCKET_ENABLED", False):
+                        from app.utils.ws_manager import broadcast_notification
+                        broadcast_notification(notification.user_id, notification_data)
                     users_to_notify_unread.add(notification.user_id)
                 except Exception as e:
                     current_app.logger.warning(
@@ -393,7 +394,9 @@ def process_scheduled_notifications() -> int:
         for uid in users_to_notify_unread:
             try:
                 unread_count = NotificationService.get_unread_count(uid)
-                broadcast_unread_count(uid, unread_count)
+                if current_app.config.get("WEBSOCKET_ENABLED", False):
+                    from app.utils.ws_manager import broadcast_unread_count
+                    broadcast_unread_count(uid, unread_count)
             except Exception as e:
                 current_app.logger.warning(
                     "Failed to broadcast unread count for user %d: %s", uid, e

@@ -167,8 +167,15 @@ def init_scheduler(app, is_reloader):
 
     if app.config.get('TESTING', False) or os.environ.get('RUNNING_MIGRATION'):
         return
-    if app.debug and not is_reloader:
-        return
+    if app.debug:
+        if not is_reloader:
+            # Parent watcher process — the reloader child will call init_scheduler.
+            return
+        if not app.config.get('SCHEDULER_ENABLED', True):
+            # Disabled in development by default (DevelopmentConfig.SCHEDULER_ENABLED=False).
+            # Set SCHEDULER_ENABLED=true in .env to opt in locally.
+            app.logger.debug('Scheduler disabled in development (SCHEDULER_ENABLED=false)')
+            return
 
     lock_result = _evaluate_scheduler_worker(app)
     if lock_result is None:

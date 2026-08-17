@@ -317,7 +317,7 @@ class Config:
 
     # WebSocket Configuration (env: true/false only)
     # WebSocket is used for real-time notifications and AI chat streaming
-    WEBSOCKET_ENABLED = _parse_bool(os.environ.get('WEBSOCKET_ENABLED'), default=True)
+    WEBSOCKET_ENABLED = _parse_bool(os.environ.get('WEBSOCKET_ENABLED'), default=False)
     # Max inbound WebSocket frame size (bytes). Enforced via flask-sock SOCK_SERVER_OPTIONS
     # and an application-level parse guard.
     WS_MAX_MESSAGE_BYTES = int(os.environ.get('WS_MAX_MESSAGE_BYTES', str(256 * 1024)))
@@ -1172,15 +1172,20 @@ class Config:
 class DevelopmentConfig(Config):
     # DEBUG is inherited from Config base class (automatically True for development)
     LOG_TO_STDOUT = True
-    # Terminal: DEBUG by default while developing (see debug_utils.configure_logging).
-    # Override with LOG_LEVEL or LOG_MODE in the environment if you want quieter output.
-    LOG_MODE = _parse_log_mode(os.environ.get("LOG_MODE"), default="debug")
-    LOG_LEVEL = _parse_log_level(os.environ.get("LOG_LEVEL"), default="DEBUG")
+    # Terminal logging: INFO+ by default in dev (quiet enough to work with, noisy enough to be useful).
+    # Set LOG_MODE=debug in .env for full DEBUG output ([EntryTiming], [EmOps Direct], etc.).
+    LOG_MODE = _parse_log_mode(os.environ.get("LOG_MODE"), default="normal")
+    LOG_LEVEL = _parse_log_level(os.environ.get("LOG_LEVEL"), default="INFO")
     # Prefer DEV_DATABASE_URL, fallback to DATABASE_URL. No SQLite fallback.
     SQLALCHEMY_DATABASE_URI = _normalize_database_uri(os.environ.get('DEV_DATABASE_URL') or os.environ.get('DATABASE_URL'))
 
     # Allow HTTP cookies in development (for localhost testing). Env: true/false only.
     SESSION_COOKIE_SECURE = _parse_bool(os.environ.get('SESSION_COOKIE_SECURE'), default=False)
+
+    # Background scheduler is off by default in dev — it fires notification/email jobs
+    # that block worker threads and pollute the terminal. Set SCHEDULER_ENABLED=true in
+    # .env to test scheduling behaviour locally.
+    SCHEDULER_ENABLED = _parse_bool(os.environ.get('SCHEDULER_ENABLED'), default=False)
 
     # Disable AI caches locally so prompt/tool changes apply on every request.
     AI_AGENT_SYSTEM_PROMPT_CACHE_TTL_SECONDS = 0

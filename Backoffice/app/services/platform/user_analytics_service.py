@@ -803,6 +803,58 @@ def end_user_session(session_id, ended_by='logout'):
         current_app.logger.error(f"Error ending user session: {str(e)}")
 
 
+def end_other_active_sessions_for_device(user_id, ip_address, browser, device_type, ended_by='reauthenticated'):
+    """
+    End any other still-active sessions for this user on the same device fingerprint.
+
+    Login never checks whether the user already has an active UserSessionLog row,
+    so re-authenticating from the same browser/device (a stale tab, a second
+    profile, a fresh SSO round-trip after the old one went idle, etc.) used to
+    leave the old row dangling as is_active=True -- sometimes for hours, until the
+    hourly `cleanup_inactive_sessions` inactivity sweep caught it -- even though the
+    new login has clearly superseded it. Call this right before creating the new
+    session row on every login path.
+
+    Deliberately scoped to matching ip_address + browser + device_type (same
+    fingerprint the Azure B2C callback already uses for its short-window dedup in
+    ``oauth_callback_guard.py``) and *not* time-boxed, so a genuinely different
+    device (e.g. desktop + mobile used concurrently) is left untouched -- this app
+    intentionally allows multiple concurrent sessions per user, just not multiple
+    concurrent "active" rows for what is really the same device.
+
+    Returns the number of sessions ended.
+    """
+    try:
+        if not user_id or not ip_address:
+            return 0
+
+        candidates = UserSessionLog.query.filter(
+            UserSessionLog.user_id == user_id,
+            UserSessionLog.is_active.is_(True),
+            UserSessionLog.ip_address == ip_address,
+            UserSessionLog.browser == browser,
+            UserSessionLog.device_type == device_type,
+        ).all()
+
+        if not candidates:
+            return 0
+
+        now = utcnow()
+        for session_log in candidates:
+            session_log.session_end = now
+            session_log.is_active = False
+            session_log.ended_by = ended_by
+            session_start_aware = ensure_utc(session_log.session_start)
+            session_log.duration_minutes = int((now - session_start_aware).total_seconds() / 60)
+
+        return len(candidates)
+
+    except Exception as e:
+        current_app.logger.error(f"Error ending other active sessions for device: {str(e)}")
+        _rollback_transaction("end_other_active_sessions_for_device_error")
+        return 0
+
+
 def effective_session_duration_minutes(session_log):
     """
     Wall-clock session length in minutes (login to session close).

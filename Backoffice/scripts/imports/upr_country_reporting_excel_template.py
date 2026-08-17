@@ -74,6 +74,7 @@ from import_upr_excel_data import (  # noqa: E402
     _matrix_column_name_from_item_id,
     _queue_other_dynamic_indicator,
 )
+from upr_import_warnings import dedupe_upr_import_warnings  # noqa: E402
 
 # NS Data indicator bank IDs (same as UPR T33 / T24 NS Data)
 NS_DATA_BANK_IDS: Dict[str, int] = {
@@ -2791,25 +2792,6 @@ def import_rows_to_client_payload(
         elif value is not None and str(value).strip() != "":
             fields[item_id] = {"value": str(value)}
     return fields, matrices
-
-
-def dedupe_upr_import_warnings(warnings: Iterable[str]) -> List[str]:
-    """Return unique import warnings, collapsing redundant period-mismatch messages."""
-    seen: Set[str] = set()
-    out: List[str] = []
-    period_noted = False
-    for raw in warnings:
-        text = str(raw or "").strip()
-        if not text or text in seen:
-            continue
-        lower = text.lower()
-        if "period" in lower and ("does not match" in lower or "differs from" in lower):
-            if period_noted:
-                continue
-            period_noted = True
-        seen.add(text)
-        out.append(text)
-    return out
 
 
 def build_upr_country_reporting_client_payload(

@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import zipfile
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -27,21 +28,19 @@ if "FLASK_CONFIG" not in os.environ:
 
 from import_fdrs_form_data import upsert_form_data_rows  # noqa: E402
 from import_upr_excel_data import (  # noqa: E402
-    COMMENT_INDICATOR_LABELS,
     EMERGENCY_APPEALS_COLUMN,
     FUNDING_MATRIX_BY_YEAR_OFFSET,
     ITEM_BILATERAL_SUPPORT,
+    ITEM_COMMENTS,
     ITEM_EMERGENCY_APPEALS,
     ITEM_LONGER_TERM_PROGRAMMES,
     PLANNING_EA_FUNDING_AREAS,
     build_import_context,
-    humanize_comment_label,
     parse_value_num,
     round_to_period,
-    upsert_upr_discussion_comments,
     _ensure_funding_ea_col_header,
     _matrix_row,
-    _resolve_emergency_row_key,
+    _resolve_emergency_matrix_cells,
     _resolve_ns_row_id,
     _scalar_row,
     _year_offset,
@@ -49,6 +48,7 @@ from import_upr_excel_data import (  # noqa: E402
 from upr_country_reporting_excel_template import (  # noqa: E402
     GENERIC_FORM_EXPORT_SHEETS,
     _bilateral_ns_name_for_row,
+    _bilateral_table_row_info,
     _load_form_data_map,
     _matrix_cell_scalar,
     _matrix_cells,
@@ -74,8 +74,22 @@ PEOPLE_SHEET = "People to be reached"
 PEOPLE_TABLE = "Data_People"
 SUPPORT_SHEET = "Planned Bilateral Support"
 SUPPORT_TABLE = "Data_Support"
+SUPPORT_NS_REGION_COL = 2  # Column B — must be set before column C (NS dropdown depends on region).
+NS_REGION_TABLE = "Table9"
 FUNDING_SHEET = "Funding requirements"
 FUNDING_TABLE = "Data_FR"
+COMMENTS_SHEET = "Comments"
+COMMENT_NAMED_CELL = "Comment"
+FUNDING_NETWORK_MEMBER_COL = 2  # "National Society name" / IFRC network member (column B).
+FUNDING_PNS_FIRST_ROW = 10
+FUNDING_PNS_LAST_ROW = 34
+FUNDING_HNS_ROW = FUNDING_PNS_FIRST_ROW - 2
+FUNDING_IFRC_ROW = FUNDING_PNS_FIRST_ROW - 1
+FUNDING_PNS_ROW_PLACEHOLDER_AREA = "SP2"
+FUNDING_PNS_ARRAY_FORMULA_TEXT = (
+    "IFERROR(_xlfn.UNIQUE(_xlfn._xlws.FILTER('Planned Bilateral Support'!$C$5:$C$34,"
+    "'Planned Bilateral Support'!$C$5:$C$34<>\"\")),\"\")"
+)
 
 START_SHEET = "Start"
 START_REGION_CELL = "C12"
@@ -107,6 +121,7 @@ NS_DATA_NAMED_CELLS: Dict[str, str] = {
 UNIFIED_COUNTRY_PLAN_REQUIRED_NAMED_RANGES: Tuple[str, ...] = (
     "Version",
     "Data_Country",
+    COMMENT_NAMED_CELL,
     *NS_DATA_NAMED_CELLS.values(),
 )
 
@@ -117,13 +132,6 @@ UNIFIED_COUNTRY_PLAN_REQUIRED_TABLES: Tuple[Tuple[str, str], ...] = (
 )
 
 UNIFIED_COUNTRY_PLAN_COMPATIBLE_ROUND_PREFIXES: Tuple[str, ...] = ("P",)
-
-COMMENT_NAMED_TO_SLUG: Dict[str, str] = {
-    "Comments_keyfigures": "comments_keyfigures",
-    "Comments_reach": "comments_reach",
-    "Comments_support": "comments_support",
-    "Comments_fundingrequirements": "comments_fundingrequirements",
-}
 
 EA_SLOT_NAMED_CELLS: Tuple[Tuple[str, str, str, str], ...] = (
     ("Reach_EA1", "Data_MDR1", "Data_EA1", "EA1"),
@@ -403,6 +411,277 @@ def _parse_funding_row_entity(ns_label: Any) -> Tuple[str, str]:
     return "pns", text
 
 
+def _funding_network_member_label(wb, row_idx: int) -> str:
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    val = wb[FUNDING_SHEET].cell(row_idx, FUNDING_NETWORK_MEMBER_COL).value
+    if val is None or isinstance(val, ArrayFormula):
+        return ""
+    if isinstance(val, str):
+        return val.replace("\r\n", "\n").strip()
+    return str(val).strip()
+
+
+def _funding_row_entity_from_workbook(wb, row: Dict[str, Any]) -> Tuple[str, str]:
+    """Resolve HNS/IFRC/PNS for a funding row."""
+    row_idx = int(row.get("_row") or 0)
+    if row_idx >= FUNDING_PNS_FIRST_ROW:
+        member_label = _funding_network_member_label(wb, row_idx)
+        if member_label:
+            return "pns", member_label
+        names = _collect_bilateral_support_ns_names(wb)
+        pns_idx = row_idx - FUNDING_PNS_FIRST_ROW
+        if 0 <= pns_idx < len(names):
+            return "pns", names[pns_idx]
+    return _parse_funding_row_entity(row.get("NS"))
+
+
+def _collect_bilateral_support_ns_names(wb) -> List[str]:
+    names: List[str] = []
+    capacity = _table_data_row_capacity(wb, SUPPORT_SHEET, SUPPORT_TABLE)
+    for offset in range(capacity):
+        ns_name = _bilateral_ns_name_for_row(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset)
+        if ns_name:
+            names.append(ns_name)
+    return names
+
+
+def _funding_table_headers(wb) -> List[str]:
+    from openpyxl.utils import range_boundaries
+
+    ws = wb[FUNDING_SHEET]
+    tbl = ws.tables[FUNDING_TABLE]
+    ref = tbl.ref if hasattr(tbl, "ref") else tbl
+    min_col, min_row, max_col, _max_row = range_boundaries(ref)
+    headers: List[str] = []
+    for col in range(min_col, max_col + 1):
+        raw = ws.cell(min_row, col).value
+        headers.append(str(raw).strip() if raw is not None else "")
+    return headers
+
+
+def _read_funding_table_row(wb, excel_row: int, headers: List[str]) -> Dict[str, Any]:
+    """Read one funding table row by Excel row number (works with data_only workbooks)."""
+    from openpyxl.utils import range_boundaries
+
+    ws = wb[FUNDING_SHEET]
+    tbl = ws.tables[FUNDING_TABLE]
+    ref = tbl.ref if hasattr(tbl, "ref") else tbl
+    min_col, min_row, max_col, _max_row = range_boundaries(ref)
+    header_to_col: Dict[str, int] = {}
+    for col in range(min_col, max_col + 1):
+        raw = ws.cell(min_row, col).value
+        if raw is not None and str(raw).strip():
+            header_to_col[str(raw).strip()] = col
+    record: Dict[str, Any] = {
+        "_row": excel_row,
+        "_sheet": FUNDING_SHEET,
+        "_table": FUNDING_TABLE,
+    }
+    for header in headers:
+        if not header:
+            continue
+        col = header_to_col.get(header)
+        record[header] = ws.cell(excel_row, col).value if col else None
+    return record
+
+
+def _import_funding_cells_for_row(
+    matrix_cells: Dict[Tuple[int, int], Dict[str, Any]],
+    ctx,
+    *,
+    aes_id: int,
+    iso3: str,
+    period: str,
+    rnd: str,
+    row: Dict[str, Any],
+    row_key: str,
+    funding_headers: List[str],
+    reach_ea_codes: Dict[Tuple[str, str, str], str],
+    reach_ea_names: Dict[Tuple[str, str, str], str],
+    warnings: List[str],
+) -> None:
+    for header in funding_headers:
+        parsed = parse_funding_column_header(header)
+        if not parsed:
+            continue
+        area, year = parsed
+        offset = _year_offset(period, year)
+        if offset is None:
+            continue
+        amount = parse_value_num(row.get(header))
+        if amount is None:
+            continue
+        item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+        if not item_id:
+            continue
+        if area in PLANNING_EA_FUNDING_AREAS:
+            if not _ensure_funding_ea_col_header(
+                matrix_cells,
+                ctx,
+                aes_id=aes_id,
+                funding_item_id=item_id,
+                iso3=iso3,
+                rnd=rnd,
+                area=area,
+                ea_code_raw=reach_ea_codes.get((iso3, rnd, area)),
+                reach_ea_codes=reach_ea_codes,
+                excel_name_raw=reach_ea_names.get((iso3, rnd, area)),
+                reach_ea_names=reach_ea_names,
+            ):
+                warnings.append(f"Could not resolve EA column header for {area} ({year}).")
+                continue
+        matrix_cells[(aes_id, item_id)][f"{row_key}_{area}"] = amount
+
+
+def _ensure_funding_pns_rows_in_matrices(
+    matrix_cells: Dict[Tuple[int, int], Dict[str, Any]],
+    *,
+    aes_id: int,
+    ns_id: int,
+) -> None:
+    """Ensure hybrid funding matrices include a PNS row (mirrors bilateral-driven Excel rows)."""
+    row_prefix = f"{ns_id}_"
+    for item_id in FUNDING_MATRIX_BY_YEAR_OFFSET.values():
+        cells = matrix_cells[(aes_id, item_id)]
+        if any(k.startswith(row_prefix) for k in cells if not k.startswith("col_header|")):
+            continue
+        cells[f"{ns_id}_{FUNDING_PNS_ROW_PLACEHOLDER_AREA}"] = ""
+
+
+def _funding_pns_array_formula_text(wb) -> str:
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    val = wb[FUNDING_SHEET].cell(FUNDING_PNS_FIRST_ROW, FUNDING_NETWORK_MEMBER_COL).value
+    if isinstance(val, ArrayFormula):
+        return val.text
+    return FUNDING_PNS_ARRAY_FORMULA_TEXT
+
+
+def _refresh_funding_pns_array_formula(wb) -> None:
+    """Re-apply the bilateral PNS listing formula and clear the spill area below it."""
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    ws = wb[FUNDING_SHEET]
+    ws.cell(FUNDING_PNS_FIRST_ROW, FUNDING_NETWORK_MEMBER_COL).value = ArrayFormula(
+        text=_funding_pns_array_formula_text(wb),
+        ref=f"B{FUNDING_PNS_FIRST_ROW}",
+    )
+    for row_idx in range(FUNDING_PNS_FIRST_ROW + 1, FUNDING_PNS_LAST_ROW + 1):
+        ws.cell(row_idx, FUNDING_NETWORK_MEMBER_COL).value = None
+
+
+def _dynamic_array_cell_flags_from_sheet_xml(xml: str) -> Dict[str, Dict[str, str]]:
+    flags_by_cell: Dict[str, Dict[str, str]] = {}
+    for match in re.finditer(r'<c r="([^"]+)"([^>]*)>', xml):
+        ref, attrs = match.group(1), match.group(2)
+        if 'cm="1"' not in attrs:
+            continue
+        flags: Dict[str, str] = {"cm": "1"}
+        type_match = re.search(r'\bt="([^"]+)"', attrs)
+        if type_match:
+            flags["t"] = type_match.group(1)
+        flags_by_cell[ref] = flags
+    return flags_by_cell
+
+
+def _patch_sheet_xml_dynamic_array_flags(xml: str, flags_by_cell: Dict[str, Dict[str, str]]) -> str:
+    if not flags_by_cell:
+        return xml
+
+    def _patch_cell(match: re.Match[str]) -> str:
+        ref, attrs = match.group(1), match.group(2)
+        flags = flags_by_cell.get(ref)
+        if not flags:
+            return match.group(0)
+        if flags.get("cm") and 'cm="1"' not in attrs:
+            attrs += ' cm="1"'
+        if flags.get("t") and not re.search(r'\bt="', attrs):
+            attrs += f' t="{flags["t"]}"'
+        return f'<c r="{ref}"{attrs}>'
+
+    return re.sub(r'<c r="([^"]+)"([^>]*)>', _patch_cell, xml)
+
+
+def restore_workbook_dynamic_array_metadata(template_path: str, output_path: str) -> None:
+    """
+    openpyxl drops Excel 365 dynamic-array metadata (xl/metadata.xml, cm=\"1\" flags).
+    Copy them back from the canonical template so FILTER/UNIQUE formulas spill on open.
+    """
+    metadata_part = "xl/metadata.xml"
+    rels_part = "xl/_rels/workbook.xml.rels"
+    content_types_part = "[Content_Types].xml"
+    metadata_rel_type = (
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata"
+    )
+    metadata_content_type = (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml"
+    )
+
+    with zipfile.ZipFile(template_path, "r") as template_zip:
+        if metadata_part not in template_zip.namelist():
+            return
+        template_metadata = template_zip.read(metadata_part)
+        sheet_flags = {
+            name: _dynamic_array_cell_flags_from_sheet_xml(template_zip.read(name).decode("utf-8"))
+            for name in template_zip.namelist()
+            if name.startswith("xl/worksheets/sheet") and name.endswith(".xml")
+        }
+
+    patched_path = f"{output_path}.dynamic-array-patch"
+    try:
+        with zipfile.ZipFile(output_path, "r") as src, zipfile.ZipFile(
+            patched_path, "w", zipfile.ZIP_DEFLATED
+        ) as dst:
+            wrote_metadata = False
+            for item in src.infolist():
+                data = src.read(item.filename)
+                if item.filename == rels_part:
+                    text = data.decode("utf-8")
+                    if "sheetMetadata" not in text:
+                        rel_ids = [int(value) for value in re.findall(r'Id="rId(\d+)"', text)]
+                        next_id = max(rel_ids, default=0) + 1
+                        insert = (
+                            f'<Relationship Id="rId{next_id}" '
+                            f'Type="{metadata_rel_type}" Target="metadata.xml"/>'
+                        )
+                        text = text.replace("</Relationships>", insert + "</Relationships>")
+                    data = text.encode("utf-8")
+                elif item.filename == content_types_part:
+                    text = data.decode("utf-8")
+                    if 'PartName="/xl/metadata.xml"' not in text:
+                        override = (
+                            f'<Override PartName="/xl/metadata.xml" '
+                            f'ContentType="{metadata_content_type}"/>'
+                        )
+                        text = text.replace("</Types>", override + "</Types>")
+                    data = text.encode("utf-8")
+                elif item.filename == metadata_part:
+                    data = template_metadata
+                    wrote_metadata = True
+                elif item.filename in sheet_flags and sheet_flags[item.filename]:
+                    data = _patch_sheet_xml_dynamic_array_flags(
+                        data.decode("utf-8"),
+                        sheet_flags[item.filename],
+                    ).encode("utf-8")
+                dst.writestr(item, data)
+            if not wrote_metadata:
+                dst.writestr(metadata_part, template_metadata)
+        os.replace(patched_path, output_path)
+    finally:
+        if os.path.isfile(patched_path):
+            try:
+                os.unlink(patched_path)
+            except OSError:
+                pass
+
+
+def _ensure_workbook_recalculates_on_open(wb) -> None:
+    wb.calculation.fullCalcOnLoad = True
+    wb.calculation.forceFullCalc = True
+    wb.calculation.calcOnSave = True
+
+
 def _workbook_reach_ea_codes(wb, *, iso3: str, rnd: str) -> Dict[Tuple[str, str, str], str]:
     codes: Dict[Tuple[str, str, str], str] = {}
     for _reach, mdr_name, _ea_name, area in EA_SLOT_NAMED_CELLS:
@@ -410,6 +689,15 @@ def _workbook_reach_ea_codes(wb, *, iso3: str, rnd: str) -> Dict[Tuple[str, str,
         if code:
             codes[(iso3, rnd, area)] = code
     return codes
+
+
+def _workbook_reach_ea_names(wb, *, iso3: str, rnd: str) -> Dict[Tuple[str, str, str], str]:
+    names: Dict[Tuple[str, str, str], str] = {}
+    for _reach, _mdr_name, ea_name, area in EA_SLOT_NAMED_CELLS:
+        name = str(read_named_cell(wb, ea_name) or "").strip()
+        if name:
+            names[(iso3, rnd, area)] = name
+    return names
 
 
 def _import_reach_matrices(
@@ -424,6 +712,7 @@ def _import_reach_matrices(
 ) -> Dict[int, Dict[str, Any]]:
     matrices: Dict[int, Dict[str, Any]] = defaultdict(dict)
     reach_ea_codes = _workbook_reach_ea_codes(wb, iso3=iso3, rnd=rnd)
+    reach_ea_names = _workbook_reach_ea_names(wb, iso3=iso3, rnd=rnd)
 
     _, people_rows = read_named_table(wb, PEOPLE_SHEET, PEOPLE_TABLE)
     for row in people_rows:
@@ -443,16 +732,25 @@ def _import_reach_matrices(
                 continue
             matrices[ITEM_LONGER_TERM_PROGRAMMES][f"{row_year}_{area}"] = amount
 
-    for reach_name, mdr_name, _ea_name, area in EA_SLOT_NAMED_CELLS:
-        amount = parse_value_num(read_named_cell(wb, reach_name))
+    for (reach_name, mdr_name, ea_name, area) in EA_SLOT_NAMED_CELLS:
+        amount_raw = read_named_cell(wb, reach_name)
+        amount = parse_value_num(amount_raw)
+        ea_code = read_named_cell(wb, mdr_name)
+        excel_name = read_named_cell(wb, ea_name)
         if amount is None:
             continue
-        ea_code = read_named_cell(wb, mdr_name)
-        cell_key = _resolve_emergency_row_key(ctx, iso3=iso3, area=area, ea_code=ea_code)
-        if not cell_key:
+        ea_cells = _resolve_emergency_matrix_cells(
+            ctx,
+            iso3=iso3,
+            area=area,
+            ea_code=ea_code,
+            excel_name=excel_name,
+            amount=amount,
+        )
+        if not ea_cells:
             warnings.append(f"Could not resolve emergency appeal row for {area} on Reach sheet.")
             continue
-        matrices[ITEM_EMERGENCY_APPEALS][cell_key] = amount
+        matrices[ITEM_EMERGENCY_APPEALS].update(ea_cells)
         code_text = str(ea_code or "").strip().upper()
         if code_text:
             reach_ea_codes[(iso3, rnd, area)] = code_text
@@ -473,6 +771,74 @@ def _parse_planning_support_ticks(cells: Dict[str, Any]) -> Dict[int, Dict[str, 
         area = match.group(2)
         ticks.setdefault(ns_id, {})[area] = True
     return ticks
+
+
+def _write_support_region_cell(wb, row_offset: int, region_name: str) -> None:
+    _min_col, min_row = _bilateral_table_row_info(wb, SUPPORT_SHEET, SUPPORT_TABLE)
+    wb[SUPPORT_SHEET].cell(min_row + 1 + row_offset, SUPPORT_NS_REGION_COL).value = str(region_name or "").strip()
+
+
+def _build_workbook_ns_region_index(wb) -> Dict[str, str]:
+    """NS name (lower) -> workbook region label from TemplateData/Table9."""
+    out: Dict[str, str] = {}
+    if not _workbook_table_exists(wb, COUNTRY_REGION_TABLE_SHEET, NS_REGION_TABLE):
+        return out
+    try:
+        _, rows = read_named_table(wb, COUNTRY_REGION_TABLE_SHEET, NS_REGION_TABLE)
+    except ValueError:
+        return out
+    for row in rows:
+        ns_name = str(row.get("NS name") or row.get("Value") or "").strip()
+        region = str(row.get("Region") or "").strip()
+        if ns_name and region:
+            out[ns_name.lower()] = region
+    return out
+
+
+def _workbook_region_for_ns_name(
+    wb,
+    ns_name: str,
+    *,
+    table_index: Optional[Dict[str, str]] = None,
+    fallback_region: str = "",
+) -> str:
+    name = str(ns_name or "").strip()
+    if name:
+        index = table_index if table_index is not None else _build_workbook_ns_region_index(wb)
+        region = index.get(name.lower())
+        if region:
+            return region
+    return _workbook_region_label(fallback_region)
+
+
+def _planning_support_ns_regions(
+    wb,
+    ns_ids: List[int],
+    id_to_name: Dict[int, str],
+) -> Dict[int, str]:
+    table_index = _build_workbook_ns_region_index(wb)
+    regions: Dict[int, str] = {}
+    db_regions: Dict[int, str] = {}
+    try:
+        from app.models.organization import NationalSociety
+
+        for ns in NationalSociety.query.filter(NationalSociety.id.in_(list(ns_ids))).all():
+            country_region = (ns.country.region if ns.country else "") or ""
+            db_regions[int(ns.id)] = _workbook_region_label(country_region)
+    except Exception:
+        db_regions = {}
+
+    for ns_id in ns_ids:
+        ns_name = id_to_name.get(int(ns_id), "")
+        region = _workbook_region_for_ns_name(
+            wb,
+            ns_name,
+            table_index=table_index,
+            fallback_region=db_regions.get(int(ns_id), ""),
+        )
+        if region:
+            regions[int(ns_id)] = region
+    return regions
 
 
 def _planning_support_ns_display_names(ctx, ns_ids: List[int]) -> Dict[int, str]:
@@ -498,6 +864,7 @@ def _planning_support_ns_display_names(ctx, ns_ids: List[int]) -> Dict[int, str]
 def _clear_planning_support_table(wb) -> None:
     capacity = _table_data_row_capacity(wb, SUPPORT_SHEET, SUPPORT_TABLE)
     for offset in range(capacity):
+        _write_support_region_cell(wb, offset, "")
         _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, "")
         for area in (*SP_AREAS, "EFs"):
             write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, area, None)
@@ -532,51 +899,72 @@ def _import_funding_matrices(
 ) -> Dict[int, Dict[str, Any]]:
     matrices: Dict[int, Dict[str, Any]] = defaultdict(dict)
     reach_ea_codes = _workbook_reach_ea_codes(wb, iso3=iso3, rnd=rnd)
-    headers, rows = read_named_table(wb, FUNDING_SHEET, FUNDING_TABLE)
+    reach_ea_names = _workbook_reach_ea_names(wb, iso3=iso3, rnd=rnd)
+    headers = _funding_table_headers(wb)
     funding_headers = [h for h in headers if parse_funding_column_header(h)]
 
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = defaultdict(dict)
+    bilateral_names = _collect_bilateral_support_ns_names(wb)
 
-    for row in rows:
-        entity, ns_name = _parse_funding_row_entity(row.get("NS"))
-        for header in funding_headers:
-            parsed = parse_funding_column_header(header)
-            if not parsed:
-                continue
-            area, year = parsed
-            offset = _year_offset(period, year)
-            if offset is None:
-                continue
-            amount = parse_value_num(row.get(header))
-            if amount is None:
-                continue
-            item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
-            if not item_id:
-                continue
-            if area in PLANNING_EA_FUNDING_AREAS:
-                if not _ensure_funding_ea_col_header(
-                    matrix_cells,
-                    ctx,
-                    aes_id=aes_id,
-                    funding_item_id=item_id,
-                    iso3=iso3,
-                    rnd=rnd,
-                    area=area,
-                    ea_code_raw=reach_ea_codes.get((iso3, rnd, area)),
-                    reach_ea_codes=reach_ea_codes,
-                ):
-                    warnings.append(f"Could not resolve EA column header for {area} ({year}).")
-                    continue
-            if entity == "hns":
-                row_key = "HNS"
-            elif entity == "ifrc":
-                row_key = "IFRC Secretariat"
-            else:
-                ns_id = _resolve_ns_row_id(ctx, ns_name)
-                if ns_id is None:
-                    continue
-                row_key = str(ns_id)
-            matrix_cells[(aes_id, item_id)][f"{row_key}_{area}"] = amount
+    for funding_item_id in FUNDING_MATRIX_BY_YEAR_OFFSET.values():
+        for area in sorted(PLANNING_EA_FUNDING_AREAS):
+            _ensure_funding_ea_col_header(
+                matrix_cells,
+                ctx,
+                aes_id=aes_id,
+                funding_item_id=funding_item_id,
+                iso3=iso3,
+                rnd=rnd,
+                area=area,
+                ea_code_raw=reach_ea_codes.get((iso3, rnd, area)),
+                reach_ea_codes=reach_ea_codes,
+                excel_name_raw=reach_ea_names.get((iso3, rnd, area)),
+                reach_ea_names=reach_ea_names,
+            )
+
+    for excel_row, row_key in (
+        (FUNDING_HNS_ROW, "HNS"),
+        (FUNDING_IFRC_ROW, "IFRC Secretariat"),
+    ):
+        row = _read_funding_table_row(wb, excel_row, headers)
+        _import_funding_cells_for_row(
+            matrix_cells,
+            ctx,
+            aes_id=aes_id,
+            iso3=iso3,
+            period=period,
+            rnd=rnd,
+            row=row,
+            row_key=row_key,
+            funding_headers=funding_headers,
+            reach_ea_codes=reach_ea_codes,
+            reach_ea_names=reach_ea_names,
+            warnings=warnings,
+        )
+
+    for pns_idx, ns_name in enumerate(bilateral_names):
+        excel_row = FUNDING_PNS_FIRST_ROW + pns_idx
+        if excel_row > FUNDING_PNS_LAST_ROW:
+            break
+        ns_id = _resolve_ns_row_id(ctx, ns_name)
+        if ns_id is None:
+            continue
+        row = _read_funding_table_row(wb, excel_row, headers)
+        _import_funding_cells_for_row(
+            matrix_cells,
+            ctx,
+            aes_id=aes_id,
+            iso3=iso3,
+            period=period,
+            rnd=rnd,
+            row=row,
+            row_key=str(ns_id),
+            funding_headers=funding_headers,
+            reach_ea_codes=reach_ea_codes,
+            reach_ea_names=reach_ea_names,
+            warnings=warnings,
+        )
+        _ensure_funding_pns_rows_in_matrices(matrix_cells, aes_id=aes_id, ns_id=ns_id)
 
     for (aid, item_id), cells in matrix_cells.items():
         if aid == aes_id and cells:
@@ -584,22 +972,47 @@ def _import_funding_matrices(
     return matrices
 
 
-def _import_comments_from_workbook(wb, aes_id: int) -> List[Dict[str, Any]]:
-    entries: List[Dict[str, Any]] = []
-    for named_cell, slug in COMMENT_NAMED_TO_SLUG.items():
-        if named_cell not in wb.defined_names:
-            continue
-        text = str(read_named_cell(wb, named_cell) or "").strip()
-        if not text:
-            continue
-        entries.append(
-            {
-                "aes_id": aes_id,
-                "body": f"{humanize_comment_label(slug)}: {text}",
-                "source": "upr_excel_import",
-            }
-        )
-    return entries
+def _resolve_comments_item_id(ctx) -> Optional[int]:
+    labels = ctx.item_ids_by_label.get(PLANNING_COUNTRY_TEMPLATE_ID, {})
+    for key, item_id in labels.items():
+        if "comment" in str(key).lower():
+            return int(item_id)
+    return ITEM_COMMENTS
+
+
+def _resolve_comment_named_cell(wb) -> Optional[str]:
+    if COMMENT_NAMED_CELL in wb.defined_names:
+        return COMMENT_NAMED_CELL
+    for name in wb.defined_names:
+        if str(name).lower() == COMMENT_NAMED_CELL.lower():
+            return str(name)
+    return None
+
+
+def parse_comment(wb) -> str:
+    """Read the single Comments sheet cell aligned with form item 956."""
+    named_cell = _resolve_comment_named_cell(wb)
+    if not named_cell:
+        return ""
+    return str(read_named_cell(wb, named_cell) or "").strip()
+
+
+def _import_comment_field_from_workbook(wb, ctx) -> Dict[str, Dict[str, Any]]:
+    text = parse_comment(wb)
+    if not text:
+        return {}
+    item_id = _resolve_comments_item_id(ctx)
+    if not item_id:
+        return {}
+    return {str(item_id): {"value": text}}
+
+
+def _export_comment_to_workbook(wb, entry) -> None:
+    named_cell = _resolve_comment_named_cell(wb)
+    if not named_cell:
+        return
+    text = str(_scalar_value(entry) or "").strip()
+    write_named_cell(wb, named_cell, text or None)
 
 
 def _ns_fields_from_workbook(wb, ctx) -> Dict[str, Dict[str, Any]]:
@@ -657,10 +1070,18 @@ def build_unified_country_plan_client_payload(
 ) -> Dict[str, Any]:
     warn = warnings if warnings is not None else []
     matrices = _workbook_matrices_from_payload(
-        wb, ctx, aes_id=aes_id, iso3=iso3, period=period, warnings=warn
+        wb,
+        ctx,
+        aes_id=aes_id,
+        iso3=iso3,
+        period=period,
+        warnings=warn,
     )
     return {
-        "fields": _ns_fields_from_workbook(wb, ctx),
+        "fields": {
+            **_ns_fields_from_workbook(wb, ctx),
+            **_import_comment_field_from_workbook(wb, ctx),
+        },
         "matrices": {str(k): v for k, v in matrices.items()},
         "dynamic_indicators": [],
         "repeat_slots": [],
@@ -725,16 +1146,20 @@ def _export_support_to_workbook(wb, entry_955, ctx) -> None:
 
     ns_ids = sorted(ticks_by_ns.keys())
     id_to_name = _planning_support_ns_display_names(ctx, ns_ids)
+    id_to_region = _planning_support_ns_regions(wb, ns_ids, id_to_name)
     _clear_planning_support_table(wb)
 
     for offset, ns_id in enumerate(ns_ids):
         ns_name = id_to_name.get(int(ns_id), "")
         if not ns_name:
             continue
+        region = id_to_region.get(int(ns_id), "")
+        if region:
+            _write_support_region_cell(wb, offset, region)
         _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, ns_name)
         for area, ticked in ticks_by_ns[int(ns_id)].items():
             if ticked:
-                write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, area, 1)
+                write_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, offset, area, "X")
 
 
 def _export_funding_to_workbook(wb, entries, period: str, ctx) -> None:
@@ -745,7 +1170,7 @@ def _export_funding_to_workbook(wb, entries, period: str, ctx) -> None:
         if not cells:
             continue
         for row_offset, row in enumerate(rows):
-            entity, ns_name = _parse_funding_row_entity(row.get("NS"))
+            entity, ns_name = _funding_row_entity_from_workbook(wb, row)
             for header in funding_headers:
                 parsed = parse_funding_column_header(header)
                 if not parsed:
@@ -765,36 +1190,6 @@ def _export_funding_to_workbook(wb, entries, period: str, ctx) -> None:
                 val = _matrix_cell_scalar(cells.get(f"{row_key}_{area}"))
                 if val is not None:
                     write_table_cell(wb, FUNDING_SHEET, FUNDING_TABLE, row_offset, header, val)
-
-
-def _load_discussion_comments_for_export(aes_id: int) -> Dict[str, str]:
-    from app.models import SubmissionDiscussionComment
-
-    slug_by_label = {humanize_comment_label(slug): slug for slug in COMMENT_INDICATOR_LABELS}
-    out: Dict[str, str] = {}
-    rows = (
-        SubmissionDiscussionComment.query.filter_by(assignment_entity_status_id=int(aes_id))
-        .order_by(SubmissionDiscussionComment.created_at.asc())
-        .all()
-    )
-    for row in rows:
-        body = (row.body or "").strip()
-        if not body:
-            continue
-        for label, slug in slug_by_label.items():
-            prefix = f"{label}:"
-            if body.startswith(prefix):
-                out[slug] = body[len(prefix) :].strip()
-                break
-    return out
-
-
-def _export_comments_to_workbook(wb, aes_id: int) -> None:
-    by_slug = _load_discussion_comments_for_export(aes_id)
-    for named_cell, slug in COMMENT_NAMED_TO_SLUG.items():
-        text = by_slug.get(slug)
-        if text and named_cell in wb.defined_names:
-            write_named_cell(wb, named_cell, text)
 
 
 def build_unified_country_plan_export(aes_id: int, template_path: str, output_path: str) -> Dict[str, Any]:
@@ -832,12 +1227,16 @@ def build_unified_country_plan_export(aes_id: int, template_path: str, output_pa
         entries.get(ITEM_EMERGENCY_APPEALS),
     )
     _export_support_to_workbook(wb, entries.get(ITEM_BILATERAL_SUPPORT), ctx)
+    _refresh_funding_pns_array_formula(wb)
     _export_funding_to_workbook(wb, entries, period, ctx)
-    _export_comments_to_workbook(wb, aes_id)
+    comments_item_id = _resolve_comments_item_id(ctx)
+    _export_comment_to_workbook(wb, entries.get(comments_item_id))
 
+    _ensure_workbook_recalculates_on_open(wb)
     with _quiet_openpyxl_io():
         wb.save(output_path)
     wb.close()
+    restore_workbook_dynamic_array_metadata(template_path, output_path)
 
     safe_country = re.sub(r"[^\w\-]+", "_", country_name or iso3 or "country").strip("_") or "country"
     safe_period = re.sub(r"[^\w\-]+", "_", period or "period").strip("_") or "period"
@@ -924,7 +1323,6 @@ def run_unified_country_plan_import(
         )
         warnings.extend(ctx.warnings)
         warnings = dedupe_upr_import_warnings(warnings)
-        discussion_entries = _import_comments_from_workbook(wb, aes_id)
 
         field_count = len(payload.get("fields") or {})
         matrix_count = sum(len(v or {}) for v in (payload.get("matrices") or {}).values())
@@ -951,12 +1349,9 @@ def run_unified_country_plan_import(
             dry_run=dry_run,
             valid_form_item_ids=valid_item_ids,
         )
-        discussion_stats = upsert_upr_discussion_comments(discussion_entries, dry_run=dry_run)
-        stats.update(discussion_stats)
         stats["success"] = True
         stats["warnings"] = warnings
         stats["updated_count"] = int(stats.get("inserted", 0) or 0) + int(stats.get("updated", 0) or 0)
-        stats["updated_count"] += int(discussion_stats.get("discussion_inserted", 0) or 0)
         return stats
     finally:
         wb.close()

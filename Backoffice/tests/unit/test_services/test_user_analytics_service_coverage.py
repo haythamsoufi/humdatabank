@@ -669,6 +669,99 @@ class TestEndUserSession:
 
 
 # ===========================================================================
+# end_other_active_sessions_for_device
+# ===========================================================================
+
+class TestEndOtherActiveSessionsForDevice:
+    def test_ends_matching_same_device_sessions(self, app):
+        with app.app_context():
+            fake_session = MagicMock()
+            fake_session.session_start = datetime.now(timezone.utc) - timedelta(hours=2)
+
+            with patch(
+                "app.services.platform.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.filter.return_value.all.return_value = [fake_session]
+                count = _svc.end_other_active_sessions_for_device(
+                    1, "1.2.3.4", "Chrome", "Desktop",
+                )
+
+            assert count == 1
+            assert fake_session.is_active is False
+            assert fake_session.ended_by == "reauthenticated"
+            assert fake_session.session_end is not None
+            assert fake_session.duration_minutes is not None
+
+    def test_custom_ended_by_is_used(self, app):
+        with app.app_context():
+            fake_session = MagicMock()
+            fake_session.session_start = datetime.now(timezone.utc)
+
+            with patch(
+                "app.services.platform.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.filter.return_value.all.return_value = [fake_session]
+                _svc.end_other_active_sessions_for_device(
+                    1, "1.2.3.4", "Chrome", "Desktop", ended_by="custom_reason",
+                )
+
+            assert fake_session.ended_by == "custom_reason"
+
+    def test_no_matching_sessions_returns_zero(self, app):
+        with app.app_context():
+            with patch(
+                "app.services.platform.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.filter.return_value.all.return_value = []
+                count = _svc.end_other_active_sessions_for_device(
+                    1, "1.2.3.4", "Chrome", "Desktop",
+                )
+
+            assert count == 0
+
+    def test_noop_when_user_id_missing(self, app):
+        with app.app_context():
+            with patch(
+                "app.services.platform.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                count = _svc.end_other_active_sessions_for_device(
+                    None, "1.2.3.4", "Chrome", "Desktop",
+                )
+                MockSL.query.filter.assert_not_called()
+
+            assert count == 0
+
+    def test_noop_when_ip_address_missing(self, app):
+        with app.app_context():
+            with patch(
+                "app.services.platform.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                count = _svc.end_other_active_sessions_for_device(
+                    1, None, "Chrome", "Desktop",
+                )
+                MockSL.query.filter.assert_not_called()
+
+            assert count == 0
+
+    def test_exception_is_swallowed_and_rolled_back(self, app):
+        with app.app_context():
+            with patch(
+                "app.services.platform.user_analytics_service.UserSessionLog"
+            ) as MockSL:
+                MockSL.query.filter.side_effect = Exception("boom")
+                with patch(
+                    "app.services.platform.user_analytics_service._rollback_transaction"
+                ) as mock_rb:
+                    # Should not raise
+                    count = _svc.end_other_active_sessions_for_device(
+                        1, "1.2.3.4", "Chrome", "Desktop",
+                    )
+                mock_rb.assert_called_once()
+
+            assert count == 0
+
+
+# ===========================================================================
 # update_session_activity
 # ===========================================================================
 

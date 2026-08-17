@@ -63,7 +63,7 @@ import { matrixSearchUiMixin } from './matrix/search-ui.js';
 import { matrixVariablesMixin } from './matrix/variables.js';
 import { matrixDynamicRowsMixin } from './matrix/dynamic-rows.js';
 import { matrixAutoLoadMixin } from './matrix/auto-load.js';
-import { matrixSelectableHeadersMixin } from './matrix/selectable-headers.js';
+import { matrixSelectableHeadersMixin, __matrixCellIsHeaderGated, __isMatrixHeaderDataKey } from './matrix/selectable-headers.js';
 
 class MatrixHandler {
     constructor() {
@@ -313,8 +313,30 @@ class MatrixHandler {
      */
     _applyMatrixInputEditability(input, container, variableReadonly = false) {
         if (!input || !container) return;
-        const shouldDisable = !this._canEditMatrix(container) || variableReadonly;
+
+        // Selectable-header columns: cells stay disabled until a value is chosen
+        // in the column's header dropdown/free-text input (see selectable-headers.js).
+        let headerGated = false;
+        if (input.dataset.isRowTotal !== 'true') {
+            const colName = input.dataset.column;
+            const fieldId = container.dataset?.fieldId;
+            const matrix = (colName && fieldId) ? this.matrices.get(String(fieldId)) : null;
+            headerGated = __matrixCellIsHeaderGated(matrix, colName);
+        }
+
+        const shouldDisable = !this._canEditMatrix(container) || variableReadonly || headerGated;
         input.disabled = shouldDisable;
+
+        const cell = input.closest('td');
+        if (cell) cell.classList.toggle('matrix-cell-header-gated', headerGated);
+
+        const headerGatedTitle = _t('Select a value in the column header to enable this cell');
+        if (headerGated) {
+            if (!input.title) input.title = headerGatedTitle;
+        } else if (input.title === headerGatedTitle) {
+            input.removeAttribute('title');
+        }
+
         if (input.type !== 'checkbox') {
             if (shouldDisable) {
                 input.setAttribute('readonly', 'readonly');
@@ -870,6 +892,7 @@ class MatrixHandler {
 
         // Handle different input types
         let value;
+        let omitNumericCell = false;
         if (input.type === 'checkbox') {
             value = input.checked ? 1 : 0;
             if (isVariable && cellKey) {
@@ -888,7 +911,7 @@ class MatrixHandler {
             const maxDecimals = __readMatrixMaxDecimals(input);
             const trimmed = String(input.value || '').trim();
             if (trimmed === '') {
-                value = 0;
+                omitNumericCell = true;
             } else if (maxDecimals === 0 && __rawValueHasNonZeroFraction(input.value, maxDecimals)) {
                 const unformatFn = typeof window.__numericUnformat === 'function' ? window.__numericUnformat : null;
                 const rawString = unformatFn
@@ -905,8 +928,15 @@ class MatrixHandler {
 
         // Update the data object using the cell key (for non-variable columns, use simple value)
         if (cellKey && columnType !== 'variable') {
-            matrix.data[cellKey] = value;
-            debugLog('matrix-handler', `Updated matrix ${fieldId} cell ${cellKey} = ${value}`);
+            if (omitNumericCell) {
+                if (matrix.data[cellKey] !== undefined) {
+                    delete matrix.data[cellKey];
+                    debugLog('matrix-handler', `Removed empty matrix cell ${cellKey} from data`);
+                }
+            } else {
+                matrix.data[cellKey] = value;
+                debugLog('matrix-handler', `Updated matrix ${fieldId} cell ${cellKey} = ${value}`);
+            }
         } else if (cellKey && columnType === 'variable') {
             // Variable columns already handled above with modification tracking
             debugLog('matrix-handler', `Updated matrix ${fieldId} variable cell ${cellKey}`, matrix.data[cellKey]);
@@ -1056,6 +1086,8 @@ class MatrixHandler {
             if (columns.length) {
                 Object.keys(dataToSave).forEach(cellKey => {
                     if (cellKey.startsWith('_')) return;
+                    // Selectable column-header values use col_header|{columnName}, not rowId_columnName.
+                    if (__isMatrixHeaderDataKey(cellKey)) return;
                     if (!__parseMatrixCellKey(cellKey, config)) {
                         delete dataToSave[cellKey];
                         debugLog('matrix-handler', `Dropped stale matrix cell key (no matching column): ${cellKey}`);
@@ -1129,31 +1161,48 @@ class MatrixHandler {
      */
 
     /**
-     * Set matrix data for a specific field
+     * Set matrix data for a specific field (creates dynamic/hybrid rows when needed).
      */
-    setMatrixData(fieldId, data) {
+    async setMatrixData(fieldId, data) {
         const matrix = this.matrices.get(fieldId);
         if (!matrix) return false;
 
-        matrix.data = data;
+        matrix.data = data && typeof data === 'object' ? { ...data } : {};
 
-        // Update inputs
         const container = matrix.container;
-        Object.entries(data).forEach(([cellKey, value]) => {
-            if (cellKey.startsWith('_')) return;
-            const input = container.querySelector(`input[data-cell-key="${cellKey}"]`);
-            if (input) {
-                const displayValue = (typeof value === 'object' && value != null && 'original' in value)
-                    ? (value.modified != null ? value.modified : value.original)
-                    : value;
-                if (input.type === 'checkbox') {
-                    const checked = displayValue === '1' || displayValue === 1 || displayValue === 'true' || displayValue === true;
-                    input.checked = checked;
-                } else {
-                    __setMatrixNumericCellDisplay(input, displayValue != null ? String(displayValue) : '');
-                }
+        const config = matrix.config || {};
+        const isHybrid = config.row_mode === 'hybrid';
+
+        if (config.row_mode === 'list_library' || isHybrid) {
+            if (isHybrid) {
+                this.restoreStaticMatrixValues(fieldId);
             }
-        });
+            await this.restoreDynamicRows(fieldId);
+            this.applyManualRowHighlighting(fieldId);
+            this.applyWholeNumberViolationHighlighting(fieldId);
+            this.applyPrefilledCellHighlighting(fieldId);
+            await this.restoreSelectableHeadersFromData(fieldId);
+            this._applyHeaderGatingForMatrix(fieldId);
+        } else {
+            Object.entries(matrix.data).forEach(([cellKey, value]) => {
+                if (cellKey.startsWith('_')) return;
+                const input = container.querySelector(`input[data-cell-key="${cellKey}"]`);
+                if (input) {
+                    const displayValue = (typeof value === 'object' && value != null && 'original' in value)
+                        ? (value.modified != null ? value.modified : value.original)
+                        : value;
+                    if (input.type === 'checkbox') {
+                        const checked = displayValue === '1' || displayValue === 1 || displayValue === 'true' || displayValue === true;
+                        input.checked = checked;
+                    } else {
+                        __setMatrixNumericCellDisplay(input, displayValue != null ? String(displayValue) : '');
+                    }
+                }
+            });
+            await this.restoreSelectableHeadersFromData(fieldId);
+            this._applyHeaderGatingForMatrix(fieldId);
+            this._applyGoUnmatchedRowHeadersFromData(fieldId);
+        }
 
         // Recalculate totals
         this.calculateMatrixTotals(fieldId);

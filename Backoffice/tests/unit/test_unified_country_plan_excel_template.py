@@ -12,23 +12,32 @@ IMPORTS_DIR = os.path.join(BACKOFFICE_DIR, "scripts", "imports")
 if IMPORTS_DIR not in sys.path:
     sys.path.insert(0, IMPORTS_DIR)
 
+from import_upr_excel_data import UprImportContext  # noqa: E402
 from unified_country_plan_excel_template import (  # noqa: E402
     START_REGION_CELL,
     START_SHEET,
+    FUNDING_SHEET,
+    FUNDING_TABLE,
     SUPPORT_SHEET,
     SUPPORT_TABLE,
+    COMMENT_NAMED_CELL,
     _cell_is_tick,
     _export_support_to_workbook,
+    _import_funding_matrices,
     _import_support_matrix,
     _parse_funding_row_entity,
     _parse_emergency_row_id,
     _parse_planning_support_ticks,
     _quiet_openpyxl_io,
+    _refresh_funding_pns_array_formula,
+    restore_workbook_dynamic_array_metadata,
+    _workbook_region_for_ns_name,
     _workbook_region_for_country,
     _workbook_region_label,
     _write_start_sheet_selection,
     funding_column_header,
     parse_funding_column_header,
+    parse_comment,
     parse_version,
     period_to_workbook_version,
     planning_year_triplet,
@@ -38,8 +47,7 @@ from unified_country_plan_excel_template import (  # noqa: E402
     validate_unified_country_plan_import_file,
     write_table_cell,
 )
-from upr_country_reporting_excel_template import _bilateral_ns_name_for_row, _write_bilateral_ns_source_cell  # noqa: E402
-
+from upr_country_reporting_excel_template import _bilateral_ns_name_for_row, write_named_cell, _write_bilateral_ns_source_cell  # noqa: E402
 TEMPLATE_PATH = os.path.join(
     BACKOFFICE_DIR,
     "app",
@@ -205,6 +213,10 @@ def test_parse_planning_support_ticks():
     assert _parse_planning_support_ticks(cells) == {166: {"SP1": True}, 42: {"EFs": True}}
 
 
+def test_workbook_region_for_ns_name_from_table9(ucp_workbook):
+    assert _workbook_region_for_ns_name(ucp_workbook, "Swiss Red Cross") == "Europe and Central Asia"
+
+
 def test_bilateral_support_row_reads_column_c():
     import openpyxl
 
@@ -231,8 +243,9 @@ def test_export_support_writes_ns_and_ticks():
         _export_support_to_workbook(wb, entry, ctx)
 
     assert _bilateral_ns_name_for_row(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0) == "Swiss Red Cross"
-    assert read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "SP1") == 1
-    assert read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "EFs") == 1
+    assert wb[SUPPORT_SHEET]["B5"].value == "Europe and Central Asia"
+    assert read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "SP1") == "X"
+    assert read_table_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "EFs") == "X"
     wb.close()
 
 
@@ -248,3 +261,142 @@ def test_import_support_matrix_reads_column_c():
     cells = _import_support_matrix(wb, ctx, aes_id=1, warnings=[])
     assert cells == {"166_SP2": 1, "166_EFs": 1}
     wb.close()
+
+
+def test_import_funding_adds_pns_rows_from_bilateral_support_without_values():
+    import openpyxl
+    import tempfile
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "Swiss Red Cross")
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 1, "Norwegian Red Cross")
+    fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+    os.close(fd)
+    wb2 = None
+    try:
+        wb.save(tmp)
+        wb.close()
+        wb = None
+        wb2 = openpyxl.load_workbook(tmp, data_only=True)
+        ctx = UprImportContext(template_ids=[24])
+        ctx.ns_name_to_id = {"swiss red cross": 166, "norwegian red cross": 200}
+        matrices = _import_funding_matrices(
+            wb2,
+            ctx,
+            aes_id=1,
+            iso3="AFG",
+            period="2027",
+            rnd="P27",
+            warnings=[],
+        )
+        for item_id in (967, 968, 974):
+            cells = matrices[item_id]
+            assert cells["166_SP2"] == ""
+            assert cells["200_SP2"] == ""
+    finally:
+        if wb2 is not None:
+            wb2.close()
+        if wb is not None:
+            wb.close()
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def test_import_funding_reads_pns_values_by_bilateral_row_index():
+    import openpyxl
+    import tempfile
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "Swiss Red Cross")
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 1, "Norwegian Red Cross")
+    headers, rows = read_named_table(wb, FUNDING_SHEET, FUNDING_TABLE)
+    row_offsets = {row["_row"]: idx for idx, row in enumerate(rows)}
+    write_table_cell(wb, FUNDING_SHEET, FUNDING_TABLE, row_offsets[11], "SP1_2027", 750)
+    fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+    os.close(fd)
+    wb2 = None
+    try:
+        wb.save(tmp)
+        wb.close()
+        wb = None
+        wb2 = openpyxl.load_workbook(tmp, data_only=True)
+        ctx = UprImportContext(template_ids=[24])
+        ctx.ns_name_to_id = {"swiss red cross": 166, "norwegian red cross": 200}
+        matrices = _import_funding_matrices(
+            wb2,
+            ctx,
+            aes_id=1,
+            iso3="AFG",
+            period="2027",
+            rnd="P27",
+            warnings=[],
+        )
+        assert matrices[967]["200_SP1"] == 750.0
+        assert matrices[967]["166_SP2"] == ""
+    finally:
+        if wb2 is not None:
+            wb2.close()
+        if wb is not None:
+            wb.close()
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def test_refresh_funding_pns_array_formula_keeps_dynamic_formula():
+    import openpyxl
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    names = ["Swiss Red Cross", "Norwegian Red Cross"]
+    for idx, name in enumerate(names):
+        _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, idx, name)
+    _refresh_funding_pns_array_formula(wb)
+    val = wb[FUNDING_SHEET]["B10"].value
+    assert isinstance(val, ArrayFormula)
+    assert "FILTER" in val.text
+    assert wb[FUNDING_SHEET]["B11"].value is None
+    wb.close()
+
+
+def test_parse_and_write_comment_single_cell(ucp_workbook):
+    write_named_cell(ucp_workbook, COMMENT_NAMED_CELL, "Planning notes from the NS.")
+    assert parse_comment(ucp_workbook) == "Planning notes from the NS."
+
+
+def test_restore_workbook_dynamic_array_metadata_preserves_cm_flag():
+    import openpyxl
+    import tempfile
+    import zipfile
+    from openpyxl.worksheet.formula import ArrayFormula
+
+    with _quiet_openpyxl_io():
+        wb = openpyxl.load_workbook(TEMPLATE_PATH)
+    _write_bilateral_ns_source_cell(wb, SUPPORT_SHEET, SUPPORT_TABLE, 0, "Swiss Red Cross")
+    _refresh_funding_pns_array_formula(wb)
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        path = tmp.name
+    try:
+        with _quiet_openpyxl_io():
+            wb.save(path)
+        wb.close()
+        restore_workbook_dynamic_array_metadata(TEMPLATE_PATH, path)
+        with zipfile.ZipFile(path) as z:
+            assert "xl/metadata.xml" in z.namelist()
+            funding_xml = z.read("xl/worksheets/sheet5.xml").decode("utf-8")
+            assert 'r="B10"' in funding_xml and 'cm="1"' in funding_xml
+            assert isinstance(
+                openpyxl.load_workbook(path)[FUNDING_SHEET]["B10"].value,
+                ArrayFormula,
+            )
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass

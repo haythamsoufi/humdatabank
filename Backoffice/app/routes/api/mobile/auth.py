@@ -25,6 +25,7 @@ def issue_tokens():
     from app.utils.mobile_jwt import issue_token_pair
     from app.services.platform.user_analytics_service import (
         log_login_attempt, start_user_session, log_user_activity,
+        get_client_info, end_other_active_sessions_for_device,
     )
     from app.services import UserService
     from app.routes.auth import _is_account_locked_out
@@ -51,6 +52,10 @@ def issue_tokens():
 
     log_login_attempt(email, success=True, user=user)
     jwt_session_id = str(_uuid.uuid4())
+    client_info = get_client_info()
+    end_other_active_sessions_for_device(
+        user.id, client_info['ip_address'], client_info.get('browser'), client_info.get('device_type'),
+    )
     start_user_session(user, jwt_session_id)
     log_user_activity(
         activity_type='login',

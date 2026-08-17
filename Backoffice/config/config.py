@@ -203,15 +203,17 @@ class Config:
     _KNOWN_WEAK_KEYS = {"dev_change_me", "change-me", "secret", "password", "development", "testing"}
 
     if not _secret_key:
-        if _flask_config == 'production':
+        if _flask_config in ('production', 'staging'):
             _config_logger.error("=" * 80)
-            _config_logger.error("ERROR: SECRET_KEY environment variable is required in production!")
+            _config_logger.error("ERROR: SECRET_KEY environment variable is required in %s!", _flask_config)
             _config_logger.error("=" * 80)
             _config_logger.error('Generate a secure key with: python -c "import secrets; print(secrets.token_urlsafe(32))"')
             raise RuntimeError(
-                "SECRET_KEY environment variable is required in production. "
+                f"SECRET_KEY environment variable is required in {_flask_config}. "
                 "Please set SECRET_KEY in your environment or deployment secrets. "
                 "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+                " Without it, each Gunicorn worker process generates its own random key, "
+                "breaking sessions/CSRF/mobile JWTs whenever requests land on a different worker."
             )
         else:
             import secrets
@@ -1083,11 +1085,10 @@ class Config:
     INDICATOR_BANK_PUBLIC_BASE = (os.environ.get('INDICATOR_BANK_PUBLIC_BASE') or '').strip()
 
     # Email API - select API key and URL based on environment
-    flask_config = os.environ.get('FLASK_CONFIG', '').lower()
-    if flask_config == 'production':
+    if _flask_config == 'production':
         EMAIL_API_KEY = os.environ.get('EMAIL_API_KEY_PROD') or os.environ.get('EMAIL_API_KEY', '')
         EMAIL_API_URL = os.environ.get('EMAIL_API_URL_PROD', '')
-    elif flask_config == 'staging':
+    elif _flask_config == 'staging':
         EMAIL_API_KEY = os.environ.get('EMAIL_API_KEY_STG') or os.environ.get('EMAIL_API_KEY', '')
         EMAIL_API_URL = os.environ.get('EMAIL_API_URL_STG', '')
     else:

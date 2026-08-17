@@ -141,6 +141,10 @@ def test_list_missing_items_excludes_hidden_fields():
 def test_compute_for_assignment_excludes_hidden_from_total():
     with patch.object(
         AssignmentCompletionService,
+        '_relevance_hidden_ids_for_assignment',
+        return_value=(frozenset(), frozenset()),
+    ), patch.object(
+        AssignmentCompletionService,
         '_count_template_total_items',
         return_value=5,
     ) as count_total, patch.object(
@@ -155,6 +159,54 @@ def test_compute_for_assignment_excludes_hidden_from_total():
     count_total.assert_called_once_with(21, 99, {2, 3}, {10})
     count_filled.assert_called_once_with(5, 21, 99, {2, 3}, {10})
     assert metrics == CompletionMetrics(filled_items=3, total_items=5, completion_rate=60.0)
+
+
+def test_compute_for_assignment_merges_relevance_hidden_ids():
+    """Server-resolvable relevance hiding (e.g. a period-gated section) must be
+    merged into the client-supplied hidden ids, not override them."""
+    with patch.object(
+        AssignmentCompletionService,
+        '_relevance_hidden_ids_for_assignment',
+        return_value=(frozenset({99}), frozenset({262})),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_count_template_total_items',
+        return_value=6,
+    ) as count_total, patch.object(
+        AssignmentCompletionService,
+        '_count_filled_items',
+        return_value=6,
+    ) as count_filled:
+        metrics = AssignmentCompletionService.compute_for_assignment(
+            5, 21, 99, hidden_field_ids={2}, hidden_section_ids={10},
+        )
+
+    count_total.assert_called_once_with(21, 99, {2, 99}, {10, 262})
+    count_filled.assert_called_once_with(5, 21, 99, {2, 99}, {10, 262})
+    assert metrics == CompletionMetrics(filled_items=6, total_items=6, completion_rate=100.0)
+
+
+def test_compute_for_assignment_no_client_hidden_ids_still_applies_relevance():
+    """Regression: the persisted/dashboard rate (no client-supplied hidden ids)
+    must still exclude relevance-hidden sections, e.g. a section gated on
+    assignment_period that doesn't match the current assignment."""
+    with patch.object(
+        AssignmentCompletionService,
+        '_relevance_hidden_ids_for_assignment',
+        return_value=(frozenset(), frozenset({262})),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_count_template_total_items',
+        return_value=6,
+    ) as count_total, patch.object(
+        AssignmentCompletionService,
+        '_count_filled_items',
+        return_value=6,
+    ):
+        metrics = AssignmentCompletionService.compute_for_assignment(5, 21, 99)
+
+    count_total.assert_called_once_with(21, 99, set(), {262})
+    assert metrics.completion_rate == 100.0
 
 
 def test_stored_rate_for_returns_persisted_value():
@@ -226,6 +278,10 @@ def test_backfill_persisted_rates_batches_updates(app, db_session):
             side_effect=_query_side_effect,
         ), patch.object(
             AssignmentCompletionService,
+            '_relevance_hidden_ids_for_assignment',
+            return_value=(frozenset(), frozenset()),
+        ), patch.object(
+            AssignmentCompletionService,
             '_count_template_total_items',
             return_value=5,
         ) as count_total, patch.object(
@@ -244,6 +300,52 @@ def test_backfill_persisted_rates_batches_updates(app, db_session):
     assert count_filled.call_count == 2
     assert bulk_update.call_count == 2
     assert commit.call_count == 2
+
+
+def test_backfill_persisted_rates_bypasses_total_cache_when_relevance_hidden(app, db_session):
+    """When a row has relevance-hidden sections, total_items must be recomputed
+    fresh (not shared via the per-template-version cache), since the hidden set
+    can differ from other assignments on the same template/version."""
+    rows = [(1, 10, 20)]
+
+    def _query_side_effect(*_args, **_kwargs):
+        chain = MagicMock()
+        chain.join.return_value = chain
+        chain.filter.return_value = chain
+        chain.order_by.return_value = chain
+        chain.limit.return_value = chain
+        if not hasattr(_query_side_effect, "calls"):
+            _query_side_effect.calls = 0
+        _query_side_effect.calls += 1
+        chain.all.return_value = rows if _query_side_effect.calls == 1 else []
+        return chain
+
+    with app.app_context():
+        with patch(
+            'app.services.assignments.completion_service.db.session.query',
+            side_effect=_query_side_effect,
+        ), patch.object(
+            AssignmentCompletionService,
+            '_relevance_hidden_ids_for_assignment',
+            return_value=(frozenset(), frozenset({262})),
+        ), patch.object(
+            AssignmentCompletionService,
+            '_count_template_total_items',
+            return_value=6,
+        ) as count_total, patch.object(
+            AssignmentCompletionService,
+            '_count_filled_items',
+            return_value=6,
+        ) as count_filled, patch(
+            'app.services.assignments.completion_service.db.session.bulk_update_mappings',
+        ), patch(
+            'app.services.assignments.completion_service.db.session.commit',
+        ):
+            updated = AssignmentCompletionService.backfill_persisted_rates(batch_size=2)
+
+    assert updated == 1
+    count_total.assert_called_once_with(10, 20, frozenset(), frozenset({262}))
+    count_filled.assert_called_once_with(1, 10, 20, frozenset(), frozenset({262}))
 
 
 def test_filled_non_matrix_query_uses_countable_form_item_filter():

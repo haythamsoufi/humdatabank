@@ -1,6 +1,8 @@
 """Assignment completion-rate calculations (dashboard, API, entry form)."""
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,6 +16,7 @@ from app.models import (
     FormItem,
     FormSection,
     FormTemplate,
+    FormTemplateVersion,
     RepeatGroupData,
     RepeatGroupInstance,
     SubmittedDocument,
@@ -189,6 +192,73 @@ def _visibility_filters(
     if hidden_section_ids:
         filters.append(~FormItem.section_id.in_(list(hidden_section_ids)))
     return tuple(filters)
+
+
+# ── Short-TTL cache for "which sections/items have a metadata-resolvable relevance
+# rule" per published version. Relevance rules rarely change, and this is queried
+# on every completion-rate recomputation across (potentially many) assignments
+# sharing the same template version — mirrors the caching approach used for
+# variable resolution (see VariableResolutionService's `_var_cache`).
+_relevance_rules_cache: dict[tuple[int, int], tuple[float, tuple]] = {}
+_relevance_rules_cache_lock = threading.Lock()
+_RELEVANCE_RULES_CACHE_TTL = 60.0
+_RELEVANCE_RULES_CACHE_MAX = 200
+
+
+def _metadata_relevant_relevance_rules(template_id: int, version_id: int) -> tuple[tuple, tuple]:
+    """
+    Return ``(relevant_sections, relevant_items)`` for a published version, where each
+    is a tuple of ``(id, relevance_condition)`` pairs restricted to rules that
+    reference at least one server-known metadata token (see
+    ``relevance_evaluator.METADATA_KEYS``). Rules that only reference other form
+    questions or plugin data are excluded here since they can never resolve to
+    True/False server-side anyway.
+    """
+    cache_key = (template_id, version_id)
+    now = time.time()
+    with _relevance_rules_cache_lock:
+        cached = _relevance_rules_cache.get(cache_key)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    from app.services.forms.relevance_evaluator import condition_references_metadata_keys
+
+    section_rows = (
+        db.session.query(FormSection.id, FormSection.relevance_condition)
+        .filter(
+            FormSection.template_id == template_id,
+            FormSection.version_id == version_id,
+            FormSection.archived == False,  # noqa: E712
+            FormSection.relevance_condition.isnot(None),
+        )
+        .all()
+    )
+    item_rows = (
+        db.session.query(FormItem.id, FormItem.relevance_condition)
+        .join(FormSection, FormItem.section_id == FormSection.id)
+        .filter(
+            FormSection.template_id == template_id,
+            FormSection.version_id == version_id,
+            FormSection.archived == False,  # noqa: E712
+            FormItem.version_id == version_id,
+            FormItem.archived == False,  # noqa: E712
+            FormItem.relevance_condition.isnot(None),
+        )
+        .all()
+    )
+
+    result = (
+        tuple((sid, cond) for sid, cond in section_rows if condition_references_metadata_keys(cond)),
+        tuple((iid, cond) for iid, cond in item_rows if condition_references_metadata_keys(cond)),
+    )
+
+    with _relevance_rules_cache_lock:
+        if cache_key not in _relevance_rules_cache and len(_relevance_rules_cache) >= _RELEVANCE_RULES_CACHE_MAX:
+            oldest = next(iter(_relevance_rules_cache))
+            _relevance_rules_cache.pop(oldest, None)
+        _relevance_rules_cache[cache_key] = (now + _RELEVANCE_RULES_CACHE_TTL, result)
+
+    return result
 
 
 def _repeat_group_row_is_filled(row) -> bool:
@@ -786,6 +856,52 @@ class AssignmentCompletionService:
         return missing
 
     @staticmethod
+    def _relevance_hidden_ids_for_assignment(
+        assignment_entity_status_id: int,
+        template_id: int,
+        version_id: int,
+    ) -> tuple[frozenset[int], frozenset[int]]:
+        """
+        Sections/items whose ``relevance_condition`` can be *proven* not-met from
+        server-known metadata (assignment period, entity type, template, etc.) —
+        safe to exclude from completion totals without a client-side JS evaluation.
+
+        Conditions that depend on other form answers or plugin-published values
+        return "unknown" from the evaluator and are conservatively left visible
+        here (unchanged from legacy behavior); only the client, which has live DOM
+        state, can resolve those.
+        """
+        relevant_sections, relevant_items = _metadata_relevant_relevance_rules(template_id, version_id)
+        if not relevant_sections and not relevant_items:
+            return frozenset(), frozenset()
+
+        from app.services.forms.relevance_evaluator import (
+            build_metadata_context,
+            evaluate_relevance_condition,
+            referenced_metadata_keys,
+        )
+
+        aes = db.session.get(AssignmentEntityStatus, assignment_entity_status_id)
+        if not aes:
+            return frozenset(), frozenset()
+        template_version = db.session.get(FormTemplateVersion, version_id)
+
+        needed_keys: set[str] = set()
+        for _id, cond in (*relevant_sections, *relevant_items):
+            needed_keys |= referenced_metadata_keys(cond)
+        metadata = build_metadata_context(aes, template_version, needed_keys=needed_keys)
+
+        hidden_sections = frozenset(
+            sid for sid, cond in relevant_sections
+            if evaluate_relevance_condition(cond, metadata) is False
+        )
+        hidden_fields = frozenset(
+            iid for iid, cond in relevant_items
+            if evaluate_relevance_condition(cond, metadata) is False
+        )
+        return hidden_fields, hidden_sections
+
+    @staticmethod
     def compute_for_assignment(
         assignment_entity_status_id: int,
         template_id: int,
@@ -794,18 +910,26 @@ class AssignmentCompletionService:
         hidden_field_ids: set[int] | None = None,
         hidden_section_ids: set[int] | None = None,
     ) -> CompletionMetrics:
+        relevance_hidden_fields, relevance_hidden_sections = (
+            AssignmentCompletionService._relevance_hidden_ids_for_assignment(
+                assignment_entity_status_id, template_id, version_id,
+            )
+        )
+        effective_hidden_fields = set(hidden_field_ids or ()) | relevance_hidden_fields
+        effective_hidden_sections = set(hidden_section_ids or ()) | relevance_hidden_sections
+
         total_items = AssignmentCompletionService._count_template_total_items(
             template_id,
             version_id,
-            hidden_field_ids,
-            hidden_section_ids,
+            effective_hidden_fields,
+            effective_hidden_sections,
         )
         filled_items = AssignmentCompletionService._count_filled_items(
             assignment_entity_status_id,
             template_id,
             version_id,
-            hidden_field_ids,
-            hidden_section_ids,
+            effective_hidden_fields,
+            effective_hidden_sections,
         )
         return CompletionMetrics(
             filled_items=filled_items,
@@ -876,16 +1000,30 @@ class AssignmentCompletionService:
                 if not published_version_id:
                     rate = 0.0
                 else:
-                    cache_key = (template_id, published_version_id)
-                    if cache_key not in total_items_cache:
-                        total_items_cache[cache_key] = (
-                            AssignmentCompletionService._count_template_total_items(
-                                template_id, published_version_id
-                            )
+                    relevance_hidden_fields, relevance_hidden_sections = (
+                        AssignmentCompletionService._relevance_hidden_ids_for_assignment(
+                            aes_id, template_id, published_version_id,
                         )
-                    total_items = total_items_cache[cache_key]
+                    )
+                    if relevance_hidden_fields or relevance_hidden_sections:
+                        # Relevance-hidden totals vary per assignment (e.g. period-gated
+                        # sections), so they can't share the per-template-version cache.
+                        total_items = AssignmentCompletionService._count_template_total_items(
+                            template_id, published_version_id,
+                            relevance_hidden_fields, relevance_hidden_sections,
+                        )
+                    else:
+                        cache_key = (template_id, published_version_id)
+                        if cache_key not in total_items_cache:
+                            total_items_cache[cache_key] = (
+                                AssignmentCompletionService._count_template_total_items(
+                                    template_id, published_version_id
+                                )
+                            )
+                        total_items = total_items_cache[cache_key]
                     filled_items = AssignmentCompletionService._count_filled_items(
-                        aes_id, template_id, published_version_id
+                        aes_id, template_id, published_version_id,
+                        relevance_hidden_fields, relevance_hidden_sections,
                     )
                     rate = round(completion_rate_percent(filled_items, total_items), 1)
 

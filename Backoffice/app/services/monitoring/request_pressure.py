@@ -69,7 +69,6 @@ _fs_mirror_disabled: bool = False
 _fs_dir_lock = threading.Lock()
 _fs_write_lock = threading.Lock()
 _fs_last_write_mono = 0.0
-_fs_dirty = False
 
 # ── DB pool stats (context-independent once resolved) ─────────────────────────
 
@@ -249,7 +248,7 @@ def _fs_build_payload(pid: int) -> Dict[str, Any]:
 
 def _fs_write_snapshot(*, force: bool = False) -> None:
     """Mirror this worker's pressure state to a shared JSON file (throttled)."""
-    global _fs_last_write_mono, _fs_dirty
+    global _fs_last_write_mono
     if not _fs_mirror_enabled():
         return
     pid = os.getpid()
@@ -259,9 +258,7 @@ def _fs_write_snapshot(*, force: bool = False) -> None:
     now_mono = time.monotonic()
     with _fs_write_lock:
         if not force and (now_mono - _fs_last_write_mono) < _FS_MIN_WRITE_INTERVAL_S:
-            _fs_dirty = True
             return
-        _fs_dirty = False
         _fs_last_write_mono = now_mono
         payload = _fs_build_payload(pid)
         tmp_path = f'{path}.{os.getpid()}.tmp'
@@ -275,11 +272,19 @@ def _fs_write_snapshot(*, force: bool = False) -> None:
 
 
 def _fs_schedule_write() -> None:
-    """Write soon; force a flush if a previous write was throttled away."""
-    global _fs_dirty
+    """Write the FS mirror, respecting the min-write-interval throttle.
+
+    Intentionally does NOT force a write when throttled: this is called from
+    ``register_inflight``/``unregister_inflight`` on every tracked request, so
+    forcing a write whenever this call happened to be throttled would write on
+    nearly every call regardless of ``_FS_MIN_WRITE_INTERVAL_S`` (a prior
+    version did exactly that, via a "dirty" flag it set and then immediately
+    rechecked in the same call — defeating the throttle it was meant to
+    enforce). The skipped write is picked up naturally by the next call once
+    the interval has elapsed, or by ``snapshot_inflight``'s own best-effort
+    flush.
+    """
     _fs_write_snapshot(force=False)
-    if _fs_dirty:
-        _fs_write_snapshot(force=True)
 
 
 def _fs_push_aborted_worker(pid: int, entries: List[Dict[str, Any]], stale_count: int) -> None:
@@ -341,9 +346,6 @@ def _fs_get_cross_worker_inflight(
                 for entry in data.get('in_flight') or []:
                     started = float(entry.get('started_at', now))
                     elapsed = now - started
-                    if 'elapsed_s' in entry and updated:
-                        # Prefer wall-clock from started_at when present
-                        elapsed = now - started
                     results.append({
                         'method': entry.get('method'),
                         'path': entry.get('path'),
@@ -520,9 +522,20 @@ def track_pressure_end() -> None:
 
 
 def _next_id() -> int:
+    """Return a fresh, unique in-flight request id.
+
+    Locked so concurrent ``register_inflight`` calls on different gthread
+    worker threads can never observe/increment the same counter value —
+    a bare ``_next_request_id += 1`` is a read-modify-write that is not
+    atomic across threads, and a collision here would silently drop one
+    of the two requests' entries from ``_inflight`` (the second insert
+    overwrites the first), undercounting concurrency in exactly the
+    high-load moments this module exists to diagnose.
+    """
     global _next_request_id
-    _next_request_id += 1
-    return _next_request_id
+    with _lock:
+        _next_request_id += 1
+        return _next_request_id
 
 
 def record_traffic() -> None:
@@ -832,7 +845,7 @@ def dump_inflight_on_abort(pid: int, log_fn=None) -> None:
 def reset_for_tests() -> None:
     """Clear registry state (tests only)."""
     global _next_request_id, _fs_dir_resolved, _fs_mirror_disabled
-    global _fs_last_write_mono, _fs_dirty, _redis_available, _redis_client
+    global _fs_last_write_mono, _redis_available, _redis_client
     global _cached_db_pool
     with _lock:
         _next_request_id = 0
@@ -842,7 +855,6 @@ def reset_for_tests() -> None:
     _fs_dir_resolved = None
     _fs_mirror_disabled = False
     _fs_last_write_mono = 0.0
-    _fs_dirty = False
     _redis_available = None
     _redis_client = None
     # Different tests spin up different Flask apps (different engines); a pool

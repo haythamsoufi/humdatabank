@@ -1145,7 +1145,7 @@
 
         function getEntityTabElements() {
             // Re-query elements each time to ensure we get them even if section was initially hidden
-            entityTabButtons = document.querySelectorAll('#entity-tabs button[role="tab"]');
+            entityTabButtons = document.querySelectorAll('#assignment-main-tabs button[role="tab"]');
 
             // Use ID-based lookup as primary method since it's more reliable
             // This ensures we find panels even if they're conditionally rendered or nested
@@ -1163,7 +1163,7 @@
 
             // Fallback to querySelectorAll if ID-based lookup didn't find all panels
             if (foundPanels.length < entityTabButtons.length) {
-                const queryPanels = document.querySelectorAll('#entity-tabs-content div[role="tabpanel"]');
+                const queryPanels = document.querySelectorAll('#assignment-main-tabs-content > [role="tabpanel"]');
                 // Merge any panels found by query that weren't found by ID
                 queryPanels.forEach(panel => {
                     if (!foundPanels.includes(panel)) {
@@ -1195,12 +1195,12 @@
                 })));
             } else if (entityTabButtons.length > 0) {
                 window.__clientWarn && window.__clientWarn('[DEBUG] getEntityTabElements: NO PANELS FOUND! Checking DOM structure...');
-                const tabsContent = document.getElementById('entity-tabs-content');
+                const tabsContent = document.getElementById('assignment-main-tabs-content');
                 if (tabsContent) {
-                    window.__clientLog && window.__clientLog('[DEBUG] entity-tabs-content exists, children:', tabsContent.children.length);
-                    window.__clientLog && window.__clientLog('[DEBUG] entity-tabs-content HTML:', tabsContent.innerHTML.substring(0, 500));
+                    window.__clientLog && window.__clientLog('[DEBUG] assignment-main-tabs-content exists, children:', tabsContent.children.length);
+                    window.__clientLog && window.__clientLog('[DEBUG] assignment-main-tabs-content HTML:', tabsContent.innerHTML.substring(0, 500));
                 } else {
-                    window.__clientWarn && window.__clientWarn('[DEBUG] entity-tabs-content does not exist!');
+                    window.__clientWarn && window.__clientWarn('[DEBUG] assignment-main-tabs-content does not exist!');
                 }
             }
         }
@@ -1353,8 +1353,8 @@
                     window.__clientWarn && window.__clientWarn('[DEBUG] activateEntityTab: Target panel with id', tabId, 'NOT FOUND even with direct ID lookup!');
                     window.__clientLog && window.__clientLog('[DEBUG] Available panel IDs from query:', Array.from(allPanels).map(p => p.id));
                     // Check what panels actually exist in the DOM
-                    const allDivsInContent = document.querySelectorAll('#entity-tabs-content div');
-                    window.__clientLog && window.__clientLog('[DEBUG] All divs in entity-tabs-content:', Array.from(allDivsInContent).map(d => ({
+                    const allDivsInContent = document.querySelectorAll('#assignment-main-tabs-content > [role="tabpanel"]');
+                    window.__clientLog && window.__clientLog('[DEBUG] All tabpanels in assignment-main-tabs-content:', Array.from(allDivsInContent).map(d => ({
                         id: d.id,
                         role: d.getAttribute('role'),
                         classes: d.className
@@ -1363,7 +1363,7 @@
             }
 
             // Store selected tab in localStorage
-            localStorage.setItem('selectedAssignmentEntityTab', tabId);
+            localStorage.setItem('selectedAssignmentMainTab', tabId);
             window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Completed for tabId', tabId);
         }
 
@@ -1495,24 +1495,15 @@
         }, 100);
 
         function getDefaultAssignmentEntityTab() {
-            window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: Starting');
-            getEntityTabElements();
-            if (entityTabButtons && entityTabButtons.length > 0) {
-                const firstButton = entityTabButtons[0];
-                const target = firstButton.getAttribute('data-tabs-target');
-                window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: First button', firstButton.id, 'targets', target);
-                if (target) {
-                    const panelId = target.replace('#', '');
-                    window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: Returning', panelId);
-                    return panelId;
-                }
+            window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: Returning assignment-details-panel');
+            if (document.getElementById('assignment-details-panel')) {
+                return 'assignment-details-panel';
             }
             window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: No default tab found, returning null');
             return null;
         }
 
-        // Initialize with stored tab or default to first available
-        // This will be called again when section is expanded to ensure correct state
+        // Initialize with stored tab or default to assignment details
         function initializeEntityTabs(useStoredTab = true) {
             window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Starting, useStoredTab:', useStoredTab);
             // Ensure elements are available
@@ -1523,61 +1514,42 @@
                 return; // No tabs available yet
             }
 
-            // Check if section is visible - if hidden, default to first tab when it opens
-            const assignmentsContent = document.getElementById('entity-assignments-content');
-            const isSectionVisible = assignmentsContent && !assignmentsContent.classList.contains('hidden');
-            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Section is visible:', isSectionVisible);
+            const storedMainTab = localStorage.getItem('selectedAssignmentMainTab')
+                || localStorage.getItem('selectedAssignmentEntityTab');
+            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Stored tab from localStorage:', storedMainTab);
 
-            // If section is not visible or we're explicitly told not to use stored tab, default to first tab
-            if (!isSectionVisible || !useStoredTab) {
-                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Section hidden or useStoredTab=false, defaulting to first tab');
-                const fallbackAssignmentTab = getDefaultAssignmentEntityTab();
-                if (fallbackAssignmentTab && document.getElementById(fallbackAssignmentTab)) {
-                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', fallbackAssignmentTab);
-                    activateEntityTab(fallbackAssignmentTab);
-                    return;
-                }
+            if (useStoredTab && storedMainTab && document.getElementById(storedMainTab)) {
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating stored tab', storedMainTab);
+                activateEntityTab(storedMainTab);
+                return;
             }
 
-            const storedEntityTab = localStorage.getItem('selectedAssignmentEntityTab');
-            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Stored tab from localStorage:', storedEntityTab);
+            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: No valid stored tab, using default');
+            const fallbackAssignmentTab = getDefaultAssignmentEntityTab();
+            if (fallbackAssignmentTab && document.getElementById(fallbackAssignmentTab)) {
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating default tab', fallbackAssignmentTab);
+                activateEntityTab(fallbackAssignmentTab);
+                return;
+            }
 
-            if (storedEntityTab && document.getElementById(storedEntityTab)) {
-                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating stored tab', storedEntityTab);
-                activateEntityTab(storedEntityTab);
-            } else {
-                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: No valid stored tab, using first tab');
-                const fallbackAssignmentTab = getDefaultAssignmentEntityTab();
-                if (fallbackAssignmentTab && document.getElementById(fallbackAssignmentTab)) {
-                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', fallbackAssignmentTab);
-                    activateEntityTab(fallbackAssignmentTab);
-                } else {
-                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Fallback failed, trying first button');
-                    // Fallback: activate first visible tab
-                    if (entityTabButtons.length > 0) {
-                        const firstButton = entityTabButtons[0];
-                        const targetPanelId = firstButton.getAttribute('data-tabs-target');
-                        window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: First button', firstButton.id, 'targets', targetPanelId);
-                        if (targetPanelId) {
-                            const panelId = targetPanelId.replace('#', '');
-                            window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', panelId);
-                            activateEntityTab(panelId);
-                        }
-                    }
+            // Fallback: activate first visible tab button
+            if (entityTabButtons.length > 0) {
+                const firstButton = entityTabButtons[0];
+                const targetPanelId = firstButton.getAttribute('data-tabs-target');
+                window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: First button', firstButton.id, 'targets', targetPanelId);
+                if (targetPanelId) {
+                    const panelId = targetPanelId.replace('#', '');
+                    window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Activating first tab', panelId);
+                    activateEntityTab(panelId);
                 }
             }
             window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Completed');
         }
 
         // Initialize on page load
-        // Check if section is visible - if hidden, don't initialize yet (will be initialized when expanded)
-        window.__clientLog && window.__clientLog('[DEBUG] Page load: Checking if section is visible');
-        const assignmentsContentOnLoad = document.getElementById('entity-assignments-content');
-        const isSectionVisibleOnLoad = assignmentsContentOnLoad && !assignmentsContentOnLoad.classList.contains('hidden');
-
-        if (isSectionVisibleOnLoad) {
-            window.__clientLog && window.__clientLog('[DEBUG] Page load: Section is visible, initializing tabs with stored preference');
-            initializeEntityTabs(true); // Use stored tab if section is already visible
+        window.__clientLog && window.__clientLog('[DEBUG] Page load: Initializing main assignment tabs');
+        if (document.getElementById('assignment-main-tabs')) {
+            initializeEntityTabs(true);
 
             // Initialize grid if "Manage Existing Entities" tab is active by default
             requestAnimationFrame(function() {
@@ -1588,8 +1560,7 @@
                 }
             });
         } else {
-            window.__clientLog && window.__clientLog('[DEBUG] Page load: Section is hidden, will initialize with first tab when expanded');
-            // Don't initialize yet - will be initialized when section is expanded
+            window.__clientLog && window.__clientLog('[DEBUG] Page load: No main tabs on page (details only)');
         }
 
         // ---------------------------------------------------------------------
@@ -3636,11 +3607,79 @@
     // Pre-fill data owner from template's owned_by when template selection changes
     const templateSelect = document.querySelector('select[name="template_id"]');
     const dataOwnerSelect = document.getElementById('data_owner_id_select');
-    if (!templateSelect || !dataOwnerSelect) return;
+    const uprExcelCheckbox = document.getElementById('enable_upr_country_reporting_excel');
+    const ucpExcelCheckbox = document.getElementById('enable_unified_country_plan_excel');
+    const exportExcelCheckbox = document.getElementById('enable_export_excel');
+    const importExcelCheckbox = document.getElementById('enable_import_excel');
+    const exportPdfCheckbox = document.getElementById('enable_export_pdf');
+    if (!templateSelect) return;
+
+    let uprExcelUserTouched = uprExcelCheckbox ? uprExcelCheckbox.checked : false;
+    let ucpExcelUserTouched = ucpExcelCheckbox ? ucpExcelCheckbox.checked : false;
+    let exportExcelUserTouched = exportExcelCheckbox ? exportExcelCheckbox.checked : false;
+    let importExcelUserTouched = importExcelCheckbox ? importExcelCheckbox.checked : false;
+    let exportPdfUserTouched = exportPdfCheckbox ? exportPdfCheckbox.checked : false;
+    if (uprExcelCheckbox) {
+        uprExcelCheckbox.addEventListener('change', function () {
+            uprExcelUserTouched = true;
+        });
+    }
+    if (ucpExcelCheckbox) {
+        ucpExcelCheckbox.addEventListener('change', function () {
+            ucpExcelUserTouched = true;
+        });
+    }
+    if (exportExcelCheckbox) {
+        exportExcelCheckbox.addEventListener('change', function () {
+            exportExcelUserTouched = true;
+        });
+    }
+    if (importExcelCheckbox) {
+        importExcelCheckbox.addEventListener('change', function () {
+            importExcelUserTouched = true;
+        });
+    }
+    if (exportPdfCheckbox) {
+        exportPdfCheckbox.addEventListener('change', function () {
+            exportPdfUserTouched = true;
+        });
+    }
+
+    function syncGenericExcelDefaults(templateMeta) {
+        if (cfg.isNew !== true && cfg.isNew !== 'true') {
+            return;
+        }
+        if (exportPdfCheckbox && !exportPdfUserTouched) {
+            exportPdfCheckbox.checked = Boolean(templateMeta && templateMeta.enable_export_pdf);
+        }
+        if (exportExcelCheckbox && !exportExcelUserTouched) {
+            exportExcelCheckbox.checked = Boolean(templateMeta && templateMeta.enable_export_excel);
+        }
+        if (importExcelCheckbox && !importExcelUserTouched) {
+            importExcelCheckbox.checked = Boolean(templateMeta && templateMeta.enable_import_excel);
+        }
+    }
+
+    function syncCustomExcelDefaults(templateId) {
+        if (cfg.isNew !== true && cfg.isNew !== 'true') {
+            return;
+        }
+        const selectedId = parseInt(templateId, 10);
+        const uprTemplateId = parseInt(cfg.uprReportingTemplateId, 10);
+        const ucpTemplateId = parseInt(cfg.uprPlanningTemplateId, 10);
+        if (uprExcelCheckbox && !uprExcelUserTouched) {
+            uprExcelCheckbox.checked = Number.isFinite(uprTemplateId) && selectedId === uprTemplateId;
+        }
+        if (ucpExcelCheckbox && !ucpExcelUserTouched) {
+            ucpExcelCheckbox.checked = Number.isFinite(ucpTemplateId) && selectedId === ucpTemplateId;
+        }
+    }
 
     const TEMPLATES_API = cfg.urls.adminBase;
 
     async function prefillDataOwnerFromTemplate(templateId) {
+        // Runs even without a data-owner field on this form: the fetched template
+        // metadata also drives syncGenericExcelDefaults (Export/Import Excel, PDF).
         if (!templateId) return;
         try {
             const resp = await fetch(cfg.urls.templateOwnedByBase + '/' + templateId + '/owned-by', {
@@ -3648,7 +3687,8 @@
             });
             if (!resp.ok) return;
             const data = await resp.json();
-            if (data && data.owned_by_user_id) {
+            syncGenericExcelDefaults(data);
+            if (dataOwnerSelect && data && data.owned_by_user_id) {
                 // Only pre-fill if data owner is not already set
                 if (!dataOwnerSelect.value || dataOwnerSelect.value === '') {
                     dataOwnerSelect.value = data.owned_by_user_id;
@@ -3662,13 +3702,16 @@
     // On template change (new assignment form)
     templateSelect.addEventListener('change', function () {
         prefillDataOwnerFromTemplate(this.value);
+        syncCustomExcelDefaults(this.value);
     });
 
-    // Auto-trigger on page load for new assignments with a pre-selected template and no data owner
+    // Auto-trigger on page load for new assignments with a pre-selected template: keeps
+    // Excel/PDF defaults in sync regardless of whether a data-owner field is present.
     if (!cfg.assignmentId) {
-    if (templateSelect.value && (!dataOwnerSelect.value || dataOwnerSelect.value === '')) {
-        prefillDataOwnerFromTemplate(templateSelect.value);
-    }
+        if (templateSelect.value) {
+            prefillDataOwnerFromTemplate(templateSelect.value);
+        }
+        syncCustomExcelDefaults(templateSelect.value);
     }
 })();
 

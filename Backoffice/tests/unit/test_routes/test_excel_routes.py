@@ -348,61 +348,7 @@ class TestImportAssignmentExcel:
             )
         assert resp.status_code in (301, 302)
 
-
-# =====================================================================
-# _user_can_access_aes helper
-# =====================================================================
-
-
-class TestUserCanAccessAes:
-    def test_admin_can_access_any_aes(self, app, admin_user, db_session):
-        from app.routes.excel import _user_can_access_aes
-
-        mock_aes = MagicMock()
-        mock_aes.entity_type = "country"
-        mock_aes.entity_id = 999
-
-        with app.test_request_context("/"):
-            from flask_login import login_user
-            from app.models import User
-            with app.app_context():
-                user = User.query.get(int(admin_user.id))
-            login_user(user)
-            with patch("app.services.organization.authorization_service.AuthorizationService.is_admin", return_value=True):
-                result = _user_can_access_aes(mock_aes)
-        assert result is True
-
-    def test_non_admin_no_country_access_returns_false(self, app, admin_user, db_session):
-        from app.routes.excel import _user_can_access_aes
-
-        mock_aes = MagicMock()
-        mock_aes.entity_type = "country"
-        mock_aes.entity_id = 9999
-
-        with app.test_request_context("/"):
-            from flask_login import login_user
-            from app.models import User
-            with app.app_context():
-                user = User.query.get(int(admin_user.id))
-            login_user(user)
-            with patch("app.routes.excel.AuthorizationService.is_admin", return_value=False):
-                # User has no countries matching entity_id=9999
-                result = _user_can_access_aes(mock_aes)
-        assert result is False
-
-    def test_non_country_entity_type_returns_false(self, app, admin_user, db_session):
-        from app.routes.excel import _user_can_access_aes
-
-        mock_aes = MagicMock()
-        mock_aes.entity_type = "national_society"
-        mock_aes.entity_id = 5
-
-        with app.test_request_context("/"):
-            from flask_login import login_user
-            from app.models import User
-            with app.app_context():
-                user = User.query.get(int(admin_user.id))
-            login_user(user)
-            with patch("app.routes.excel.AuthorizationService.is_admin", return_value=False):
-                result = _user_can_access_aes(mock_aes)
-        assert result is False
+# NOTE: excel.py previously had its own `_user_can_access_aes` helper (tested here),
+# but AES access-control now lives in `get_aes_with_joins()` (app/services/data_retrieval/
+# service.py), which delegates to `EntityService.check_user_entity_access` — covered by
+# `TestCheckUserEntityAccess` in tests/unit/test_services/test_entity_service.py.

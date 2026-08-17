@@ -1,0 +1,21 @@
+{# Instruction copy for the T24 Unified Country Plan Excel import/export modal. #}
+{% macro unified_country_plan_excel_workflow() -%}
+<div class="upr-excel-workflow" role="region" aria-label="{{ _('How to use Unified Country Plan Excel')|forceescape }}">
+    <p class="text-sm font-medium text-gray-800 m-0 mb-1">{{ _('How it works') }}</p>
+    <p class="text-xs text-gray-600 mb-3 leading-relaxed m-0">{{ _('Bulk-edit this planning assignment in Excel, load the file back here, then save when you are ready.') }}</p>
+    <ol class="space-y-3 list-none p-0 m-0">
+        <li class="text-xs text-gray-700">{{ _('1. Download the pre-filled workbook for this country and planning period.') }}</li>
+        <li class="text-xs text-gray-700">{{ _('2. Edit in Excel. Do not rename sheets or tables. Save as .xlsx.') }}</li>
+        <li class="text-xs text-gray-700">{{ _('3. Upload here — we verify template version, country, and period.') }}</li>
+        <li class="text-xs text-gray-700">{{ _('4. Load into form, review, then Save on the assignment.') }}</li>
+    </ol>
+</div>
+{%- endmacro %}
+
+{% macro unified_country_plan_excel_export_panel_lead() -%}
+<p class="excel-io-modal__panel-lead">{{ _('Pre-filled with your country, planning period, and saved NS key figures.') }}</p>
+{%- endmacro %}
+
+{% macro unified_country_plan_excel_import_panel_lead() -%}
+<p class="excel-io-modal__panel-lead">{{ _('Upload your saved .xlsx. Load into form is enabled after validation passes.') }}</p>
+{%- endmacro %}

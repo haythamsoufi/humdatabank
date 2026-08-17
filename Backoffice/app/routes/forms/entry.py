@@ -459,7 +459,7 @@ def handle_assignment_form(aes_id):
 
     # Feature flags — consumed by entry_form.html to emit window.__formFeatures for
     # conditional dynamic import() of heavy JS modules in main.js.
-    form_features = build_entry_form_features(all_sections, form_template)
+    form_features = build_entry_form_features(all_sections, form_template, assigned_form=assignment)
 
     # FormPage rows are immutable once published.
     # The cache stores plain page-ID lists (session-safe); re-query on hit.
@@ -1543,7 +1543,7 @@ def _preview_template_impl(template_id):
 
     from app.services.forms.variable_resolution_service import VariableResolutionService
 
-    form_features = build_entry_form_features(all_sections, template)
+    form_features = build_entry_form_features(all_sections, template, assigned_form=mock_acs.assigned_form)
 
     return render_template("forms/entry_form/entry_form.html",
                          title=_("Preview: %(name)s", name=get_localized_template_name(template)),
@@ -1552,6 +1552,7 @@ def _preview_template_impl(template_id):
                          template_structure=template,
                          all_sections=all_sections,
                          form=csrf_form,
+                         csrf_form=csrf_form,
                          published_pages=published_pages,
                          existing_data={},
                          existing_submitted_documents={},
@@ -1560,6 +1561,11 @@ def _preview_template_impl(template_id):
                          slugify_age_group=slugify_age_group,
                          config=Config,
                          can_edit=True,
+                         # Explicit False: overrides the globally-injected `can_return_for_revision`
+                         # RBAC helper (app/routes/main/__init__.py), which is a callable and would
+                         # otherwise be truthy here, wrongly rendering the standalone "return for
+                         # revision" form (entry_form.html) against a non-existent mock assignment.
+                         can_return_for_revision=False,
                          QuestionType=QuestionType,
                          isinstance=isinstance,
                          json=json,

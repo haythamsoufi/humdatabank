@@ -504,6 +504,11 @@ def _export_pdf_impl(aes_id):
             return redirect(url_for("main.dashboard"))
 
         assignment = assignment_entity_status.assigned_form
+        from app.services.imports.assignment_excel_access import assignment_uses_export_pdf
+        if not assignment or not assignment_uses_export_pdf(assignment):
+            flash("PDF export is not enabled for this assignment.", "warning")
+            return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+
         from app.utils.api_serialization import _country_for_aes
         country = _country_for_aes(assignment_entity_status)
         form_template_for_export = assignment.template

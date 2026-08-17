@@ -1667,6 +1667,105 @@ def _matrix_column_name_from_item_id(item_id: int) -> str:
     return REPORTING_FUNDING_MATRIX_COLUMN
 
 
+# item_id -> {"columns": {name, ...}, "rows": {text, ...} | None}. Populated lazily per
+# import run (a fresh process is used per import, so this can't go stale across edits).
+_MATRIX_KEY_SCHEMA_CACHE: Dict[int, Optional[Dict[str, Any]]] = {}
+
+
+def _matrix_key_schema(item_id: Optional[int]) -> Optional[Dict[str, Any]]:
+    """Load + cache the live column/row identifiers for a matrix FormItem.
+
+    Returns ``None`` when the item can't be resolved or has no ``matrix_config`` (nothing to
+    validate against — callers must treat that as "can't verify", not "invalid"). ``rows`` is
+    ``None`` when rows come from a lookup list (``row_mode`` other than ``"manual"``, e.g. the
+    Support matrix's national-society rows) rather than a fixed set we can check membership of.
+    """
+    if not item_id:
+        return None
+    item_id = int(item_id)
+    if item_id in _MATRIX_KEY_SCHEMA_CACHE:
+        return _MATRIX_KEY_SCHEMA_CACHE[item_id]
+
+    # Best-effort only: unit tests build UprImportContext/transform_to_import_rows without a
+    # Flask app/DB context, and a transient DB hiccup mid-import shouldn't crash the whole
+    # import over a nice-to-have validation. On failure, return (but deliberately don't cache)
+    # "can't verify" so a later call with a real context — e.g. a later test in the same
+    # process — isn't stuck with a stale negative result.
+    try:
+        from app.models.form_items import FormItem
+
+        item = FormItem.query.get(item_id)
+    except Exception:
+        return None
+
+    schema: Optional[Dict[str, Any]] = None
+    if item and isinstance(getattr(item, "config", None), dict):
+        mc = item.config.get("matrix_config")
+        if isinstance(mc, dict):
+            columns = {
+                str(col.get("name")).strip()
+                for col in (mc.get("columns") or [])
+                if isinstance(col, dict) and col.get("name")
+            }
+            rows: Optional[Set[str]] = None
+            if (mc.get("row_mode") or "manual") == "manual":
+                rows = {
+                    str(r.get("text")).strip()
+                    for r in (mc.get("rows") or [])
+                    if isinstance(r, dict) and r.get("text")
+                }
+            schema = {"columns": columns, "rows": rows}
+    _MATRIX_KEY_SCHEMA_CACHE[item_id] = schema
+    return schema
+
+
+def _clear_matrix_key_schema_cache() -> None:
+    """Test hook: clear the per-item matrix schema cache.
+
+    Production imports run in a fresh process per invocation so staleness never occurs there;
+    tests share one process across many FormItem fixtures reusing the same ids, so tests that
+    exercise ``_matrix_key_schema``/``_matrix_key_warning`` against the DB should call this
+    first to avoid picking up another test's cached (and possibly now-stale) schema.
+    """
+    _MATRIX_KEY_SCHEMA_CACHE.clear()
+
+
+def _matrix_key_warning(
+    *,
+    item_id: Optional[int],
+    cell_key: str,
+    column_name: str,
+    row_name: Optional[str] = None,
+    context: str = "",
+) -> Optional[str]:
+    """Warn when a hardcoded matrix column/row name no longer matches the item's live config.
+
+    A form admin renaming a matrix column or manual row after this script's column/row name
+    constants were written would otherwise store the value under a cell key the UI no longer
+    reads — silent, invisible data loss. This never blocks the import; it only surfaces a
+    warning so the value can be found and re-mapped by re-running with updated constants.
+    """
+    schema = _matrix_key_schema(item_id)
+    if not schema or not schema.get("columns"):
+        return None
+    label = f" for item {item_id}" if item_id else ""
+    if context:
+        label += f" ({context})"
+    if column_name.strip() not in schema["columns"]:
+        return (
+            f"Matrix column {column_name!r} not found in current form configuration{label} — "
+            f"value stored under key {cell_key!r} may not display until the import's column "
+            f"names are re-synced with the form."
+        )
+    if row_name is not None and schema.get("rows") is not None and row_name.strip() not in schema["rows"]:
+        return (
+            f"Matrix row {row_name!r} not found in current form configuration{label} — "
+            f"value stored under key {cell_key!r} may not display until the import's row "
+            f"names are re-synced with the form."
+        )
+    return None
+
+
 def _load_published_version_ids(template_ids: List[int]) -> Dict[int, int]:
     from app.models.forms import FormTemplate
 
@@ -2983,6 +3082,12 @@ def transform_to_import_rows(
                     sp_item = reporting_special_item(ctx, "sp_breakdown")
                     if aes_id and sp_item:
                         cell_key = f"{row_name}_{col_name}"
+                        key_warning = _matrix_key_warning(
+                            item_id=sp_item, cell_key=cell_key, column_name=col_name,
+                            row_name=row_name, context=f"{iso3} {rnd}",
+                        )
+                        if key_warning:
+                            ctx.warnings.append(key_warning)
                         matrix_cells[(aes_id, sp_item)][cell_key] = value_num
                 continue
 
@@ -3064,7 +3169,14 @@ def transform_to_import_rows(
             support_item = reporting_special_item(ctx, "support")
             if not support_item:
                 continue
-            cell_key = f"{ns_id}_{area} Supported"
+            column_name = f"{area} Supported"
+            cell_key = f"{ns_id}_{column_name}"
+            key_warning = _matrix_key_warning(
+                item_id=support_item, cell_key=cell_key, column_name=column_name,
+                context=f"{ns_name}, {iso3} {rnd}",
+            )
+            if key_warning:
+                ctx.warnings.append(key_warning)
             matrix_cells[(aes_id, support_item)][cell_key] = 1
             continue
 
@@ -3109,6 +3221,12 @@ def transform_to_import_rows(
     for (aes_id, funding_item_id, row_name), total in reporting_funding_staging.items():
         if total:
             cell_key = f"{row_name}_{reporting_funding_col}"
+            key_warning = _matrix_key_warning(
+                item_id=funding_item_id, cell_key=cell_key, column_name=reporting_funding_col,
+                row_name=row_name,
+            )
+            if key_warning:
+                ctx.warnings.append(key_warning)
             matrix_cells[(aes_id, funding_item_id)][cell_key] = total
 
     # Build reverse map: aes_id → (iso3, period) across ALL templates.

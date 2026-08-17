@@ -348,7 +348,7 @@ def calculate_assignment_completion_rate(assignment_entity_status_id, template_i
     return AssignmentCompletionService.stored_rate_for(aes)
 
 
-def build_entry_form_features(all_sections, form_template=None):
+def build_entry_form_features(all_sections, form_template=None, assigned_form=None):
     """Build ``window.__formFeatures`` flags for conditional JS module loading.
 
     Section-level features (repeat, dynamic indicators) are detected via
@@ -375,12 +375,15 @@ def build_entry_form_features(all_sections, form_template=None):
         for f in fields
     )
 
-    enable_export_excel = bool(getattr(form_template, 'enable_export_excel', False)) if form_template else False
-    enable_import_excel = bool(getattr(form_template, 'enable_import_excel', False)) if form_template else False
+    enable_export_excel = bool(getattr(assigned_form, 'enable_export_excel', False)) if assigned_form else False
+    enable_import_excel = bool(getattr(assigned_form, 'enable_import_excel', False)) if assigned_form else False
+    enable_export_pdf = bool(getattr(assigned_form, 'enable_export_pdf', False)) if assigned_form else False
     has_discussion_section = 'discussion' in section_types
     enable_discussion = bool(getattr(form_template, 'enable_discussion', False)) if form_template else False
-    template_id = int(getattr(form_template, 'id', 0) or 0)
-    upr_country_reporting_excel = template_id == 33
+    from app.services.upr.country_reporting_excel_service import assignment_uses_upr_country_reporting_excel
+    from app.services.upr.unified_country_plan_excel_service import assignment_uses_unified_country_plan_excel
+    upr_country_reporting_excel = assignment_uses_upr_country_reporting_excel(assigned_form)
+    unified_country_plan_excel = assignment_uses_unified_country_plan_excel(assigned_form)
 
     return {
         'matrix': has_matrix_fields,
@@ -388,8 +391,8 @@ def build_entry_form_features(all_sections, form_template=None):
         'dynamicIndicators': 'dynamic_indicators' in section_types,
         'documents': has_document_fields,
         'calculatedLists': has_calculated_list_fields,
-        'pdfExport': True,
-        'excelExport': enable_export_excel or enable_import_excel or upr_country_reporting_excel,
+        'pdfExport': enable_export_pdf,
+        'excelExport': enable_export_excel or enable_import_excel or upr_country_reporting_excel or unified_country_plan_excel,
         'discussion': enable_discussion or has_discussion_section,
     }
 

@@ -1147,15 +1147,23 @@ def create_template_from_indicator_bank():
 @bp.route("/templates/<int:template_id>/owned-by", methods=["GET"])
 @permission_required('admin.templates.view')
 def get_template_owned_by(template_id):
-    """Return the owned_by user info for a template (used to pre-fill data owner on assignments)."""
+    """Return template metadata used to pre-fill assignment create form."""
     template = FormTemplate.query.get_or_404(template_id)
+    version = template.published_version if template.published_version else template.versions.order_by('created_at').first()
+    payload = {
+        "enable_export_pdf": bool(version.enable_export_pdf) if version else False,
+        "enable_export_excel": bool(version.enable_export_excel) if version else False,
+        "enable_import_excel": bool(version.enable_import_excel) if version else False,
+    }
     if template.owned_by_user:
-        return json_ok(
+        payload.update(
             owned_by_user_id=template.owned_by,
             owned_by_user_name=template.owned_by_user.name,
             owned_by_user_email=template.owned_by_user.email,
         )
-    return json_ok(owned_by_user_id=None)
+        return json_ok(**payload)
+    payload["owned_by_user_id"] = None
+    return json_ok(**payload)
 
 
 @bp.route("/templates/<int:template_id>/clone-data", methods=["GET"])
@@ -1368,9 +1376,18 @@ def edit_template(template_id):
         selected_version.add_to_self_report = get_boolean_from_form('add_to_self_report', default_when_missing=False)
         selected_version.display_order_visible = get_boolean_from_form('display_order_visible', default_when_missing=False)
         selected_version.is_paginated = is_paginated_value
-        selected_version.enable_export_pdf = get_boolean_from_form('enable_export_pdf', default_when_missing=False)
-        selected_version.enable_export_excel = get_boolean_from_form('enable_export_excel', default_when_missing=False)
-        selected_version.enable_import_excel = get_boolean_from_form('enable_import_excel', default_when_missing=False)
+        selected_version.enable_export_pdf = get_boolean_from_form(
+            'enable_export_pdf',
+            default_when_missing=bool(selected_version.enable_export_pdf),
+        )
+        selected_version.enable_export_excel = get_boolean_from_form(
+            'enable_export_excel',
+            default_when_missing=bool(selected_version.enable_export_excel),
+        )
+        selected_version.enable_import_excel = get_boolean_from_form(
+            'enable_import_excel',
+            default_when_missing=bool(selected_version.enable_import_excel),
+        )
         selected_version.enable_ai_validation = get_boolean_from_form('enable_ai_validation', default_when_missing=False)
         selected_version.enable_data_quality = get_boolean_from_form('enable_data_quality', default_when_missing=False)
         selected_version.enable_discussion = get_boolean_from_form('enable_discussion', default_when_missing=False)

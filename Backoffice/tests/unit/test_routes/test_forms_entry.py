@@ -142,8 +142,9 @@ def _standard_aes_patches(aes, stack, *, can_edit=True, sections=None,
         patch("app.routes.forms.entry.get_locale", return_value="en"))
     mocks["url_for"] = stack.enter_context(
         patch("app.routes.forms.entry.url_for", return_value="/forms/assignment/1"))
-    mocks["render_template"] = stack.enter_context(
-        patch("app.routes.forms.entry.render_template", return_value=render_return))
+    # handle_assignment_form streams the entry form; preview still uses render_template.
+    mocks["stream_template"] = stack.enter_context(
+        patch("app.routes.forms.entry.stream_template", return_value=render_return))
     mocks["flash"] = stack.enter_context(
         patch("app.routes.forms.entry.flash"))
     mocks["redirect"] = stack.enter_context(
@@ -427,8 +428,8 @@ class TestHandleAssignmentFormGet:
                 from app.routes.forms.entry import handle_assignment_form
                 handle_assignment_form(1)
 
-        mocks["render_template"].assert_called_once()
-        assert mocks["render_template"].call_args[0][0] == "forms/entry_form/entry_form.html"
+        mocks["stream_template"].assert_called_once()
+        assert mocks["stream_template"].call_args[0][0] == "forms/entry_form/entry_form.html"
 
     def test_get_with_dynamic_indicators_section(self, app, mock_user):
         """Section with section_type='dynamic_indicators' should get filter config."""
@@ -472,7 +473,7 @@ class TestHandleAssignmentFormGet:
                 from app.routes.forms.entry import handle_assignment_form
                 handle_assignment_form(1)
 
-        mocks["render_template"].assert_called_once()
+        mocks["stream_template"].assert_called_once()
 
     def test_get_with_submitted_documents(self, app, mock_user):
         """Multiple submitted docs for same field_id → list in dict."""
@@ -516,7 +517,7 @@ class TestHandleAssignmentFormGet:
                 from app.routes.forms.entry import handle_assignment_form
                 handle_assignment_form(1)
 
-        mocks["render_template"].assert_called_once()
+        mocks["stream_template"].assert_called_once()
 
     def test_get_with_name_translations(self, app, mock_user):
         """Sections with name_translations should get a localised display_name."""

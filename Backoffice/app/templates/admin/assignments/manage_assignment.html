@@ -3,7 +3,13 @@
 {% from "components/_status_label.html" import status_label_for_active %}
 {% from "macros/translation_modal.html" import translation_modal %}
 
-{% block title %}{{ _('Edit Assignment') if assignment else _('Create New Assignment') }}{% endblock %}
+{% if assignment %}
+{% set assignment_page_title = _('Edit Assignment: %(name)s', name=assignment.display_name) %}
+{% else %}
+{% set assignment_page_title = _('Create New Assignment') %}
+{% endif %}
+
+{% block title %}{{ assignment_page_title }}{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -27,12 +33,12 @@
 }) %}
 
 {{ page_header(
-    title=_('Edit Assignment') if assignment else _('Create New Assignment'),
+    title=assignment_page_title,
     icon='fas fa-pen' if assignment else 'fas fa-plus-circle',
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
         {'name': _('Assignment Management'), 'url': url_for('assignment_management.manage_assignments')},
-        {'name': _('Edit Assignment') if assignment else _('Create New Assignment')}
+        {'name': assignment_page_title}
     ],
     actions=header_actions.items,
     pin_actions_on_scroll=True
@@ -48,28 +54,73 @@
 {% if has_countries or has_secretariat %}
 {% set __ = entity_tabs.order.append('add_entities') %}{% endif %}
 {% if has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
-{% set default_entity_tab = entity_tabs.order[0] if entity_tabs.order else None %}
-{# Set default sub-tab for add_entities: countries if available, otherwise secretariat #}
-{% if default_entity_tab == 'add_entities' %}
+{% set show_main_tabs = entity_tabs.order|length > 0 %}
 {% set default_add_entities_subtab = 'countries' if has_countries else 'secretariat' %}
-{% else %}
-{% set default_add_entities_subtab = None %}
-{% endif %}
-{# Determine if we should show tab navigation: hide if creating new assignment and only Add Entities tab would be shown #}
-{% set is_new_assignment = not (assignment and assignment_entities) %}
-{% set only_add_entities_tab = entity_tabs.order|length == 1 and entity_tabs.order[0] == 'add_entities' %}
-{% set show_entity_tabs = not (is_new_assignment and only_add_entities_tab) %}
 {# Determine if we should show sub-tabs within Add Entities: hide if only one sub-tab is available #}
 {% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_secretariat else 0) %}
 {% set show_add_entities_subtabs = sub_tabs_count > 1 %}
 
-{# The form for managing assignment details #}
+{# Assignment details form and entity management in one card with main tabs #}
 {# Flash messages are handled in layout.html #}
 <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
-    <h2 class="text-xl font-semibold mb-4 text-gray-700">
-        {{ 'Edit Assignment Details: ' + assignment.period_name if assignment else 'Create New Form Assignment' }}
-    </h2>
-    <form id="manageAssignmentForm" method="POST" action="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if assignment else url_for('assignment_management.new_assignment') }}">
+    {% if show_main_tabs %}
+    {% call scroll_tab_bar(inner_tag='ul', inner_id='assignment-main-tabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-6', aria_label=_('Assignment sections')) %}
+            <li class="me-2" role="presentation">
+                <button class="inline-block p-4 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
+                        id="assignment-details-tab"
+                        data-tabs-target="#assignment-details-panel"
+                        type="button"
+                        role="tab"
+                        aria-controls="assignment-details-panel"
+                        aria-selected="true">
+                    <i class="fas fa-file-alt mr-2"></i>{{ _('Assignment details') }}
+                </button>
+            </li>
+            {% if assignment and assignment_entities %}
+            <li class="me-2" role="presentation">
+                <button class="inline-block p-4 border-b-2 rounded-t-lg border-transparent hover:text-gray-600 hover:border-gray-300"
+                        id="manage-entities-tab"
+                        data-tabs-target="#manage-entities-panel"
+                        type="button"
+                        role="tab"
+                        aria-controls="manage-entities-panel"
+                        aria-selected="false">
+                    <i class="fas fa-cog mr-2"></i>{{ _('Manage Existing Entities') }}
+                </button>
+            </li>
+            {% endif %}
+            {% if has_countries or has_secretariat %}
+            <li class="me-2" role="presentation">
+                <button class="inline-block p-4 border-b-2 rounded-t-lg border-transparent hover:text-gray-600 hover:border-gray-300"
+                        id="add-entities-tab"
+                        data-tabs-target="#add-entities-panel"
+                        type="button"
+                        role="tab"
+                        aria-controls="add-entities-panel"
+                        aria-selected="false">
+                    <i class="fas fa-plus-circle mr-2"></i>{{ _('Add Entities') }}
+                </button>
+            </li>
+            {% endif %}
+            {% if has_ns_structure %}
+            <li class="me-2" role="presentation">
+                <button class="inline-block p-4 border-b-2 rounded-t-lg border-transparent hover:text-gray-600 hover:border-gray-300"
+                        id="ns-structure-tab"
+                        data-tabs-target="#ns-structure-panel"
+                        type="button"
+                        role="tab"
+                        aria-controls="ns-structure-panel"
+                        aria-selected="false">
+                    <i class="fas fa-sitemap mr-2"></i>{{ _('NS Structure') }}
+                </button>
+            </li>
+            {% endif %}
+    {% endcall %}
+    {% endif %}
+
+    <div id="assignment-main-tabs-content">
+        <div id="assignment-details-panel" role="tabpanel" aria-labelledby="assignment-details-tab">
+            <form id="manageAssignmentForm" method="POST" action="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if assignment else url_for('assignment_management.new_assignment') }}">
         {{ form.csrf_token }}
         {% if not assignment and form.confirm_duplicate is defined %}
             {{ form.confirm_duplicate(class="hidden", id="confirm_duplicate") }}
@@ -442,19 +493,153 @@
                     </div>
                 </div>
                 {% endif %}
+
+                {% if form.enable_upr_country_reporting_excel is defined %}
+                <div class="border-t border-gray-200 pt-3" id="upr-country-reporting-excel-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_upr_country_reporting_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_upr_country_reporting_excel") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_upr_country_reporting_excel.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured UPR Country Reporting workbook on the entry form (export template and import saved data). For template 33 reporting assignments.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if form.enable_unified_country_plan_excel is defined %}
+                <div class="border-t border-gray-200 pt-3" id="unified-country-plan-excel-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_unified_country_plan_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_unified_country_plan_excel") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_unified_country_plan_excel.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured Unified Country Plan workbook on the entry form (export template and import saved data). For template 24 planning assignments.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if form.enable_export_excel is defined %}
+                <div class="border-t border-gray-200 pt-3" id="assignment-export-excel-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_export_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_excel") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_export_excel.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel export button on the entry form (flat item-row workbook).') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if form.enable_import_excel is defined %}
+                <div class="border-t border-gray-200 pt-3" id="assignment-import-excel-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_import_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_import_excel") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_import_excel.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel import button on the entry form (flat item-row workbook).') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if form.enable_export_pdf is defined %}
+                <div class="border-t border-gray-200 pt-3" id="assignment-export-pdf-row-create">
+                    <div class="flex items-start gap-3">
+                        <div class="pt-0.5">
+                            {{ form.enable_export_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_pdf") }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            {{ form.enable_export_pdf.label(class="text-sm font-medium text-gray-800") }}
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Export PDF button on the entry form.') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% endif %}
 
-        {% if assignment and form.requires_delegation_review is defined %}
-        <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <div class="flex items-start">
-                <div class="flex items-center">
+        {% if assignment %}
+        <div class="mt-6 border-t border-gray-200 pt-6 space-y-4">
+            {% if form.requires_delegation_review is defined %}
+            <div class="flex items-start gap-3">
+                <div class="pt-0.5">
                     {{ form.requires_delegation_review(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded") }}
-                    {{ form.requires_delegation_review.label(class="ml-2 text-sm text-gray-700") }}
                 </div>
-                <span class="ml-2 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</span>
+                <div class="min-w-0 flex-1">
+                    {{ form.requires_delegation_review.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('National Society focal points must send to delegation for review before final submission; delegation can edit and submit upstream.') }}</p>
+                </div>
             </div>
+            {% endif %}
+
+            {% if form.enable_upr_country_reporting_excel is defined %}
+            <div class="flex items-start gap-3" id="upr-country-reporting-excel-row">
+                <div class="pt-0.5">
+                    {{ form.enable_upr_country_reporting_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_upr_country_reporting_excel") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_upr_country_reporting_excel.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured UPR Country Reporting workbook on the entry form (export template and import saved data). For template 33 reporting assignments.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_unified_country_plan_excel is defined %}
+            <div class="flex items-start gap-3" id="unified-country-plan-excel-row">
+                <div class="pt-0.5">
+                    {{ form.enable_unified_country_plan_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_unified_country_plan_excel") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_unified_country_plan_excel.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured Unified Country Plan workbook on the entry form (export template and import saved data). For template 24 planning assignments.') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_export_excel is defined %}
+            <div class="flex items-start gap-3" id="assignment-export-excel-row">
+                <div class="pt-0.5">
+                    {{ form.enable_export_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_excel") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_export_excel.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel export button on the entry form (flat item-row workbook).') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_import_excel is defined %}
+            <div class="flex items-start gap-3" id="assignment-import-excel-row">
+                <div class="pt-0.5">
+                    {{ form.enable_import_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_import_excel") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_import_excel.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel import button on the entry form (flat item-row workbook).') }}</p>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.enable_export_pdf is defined %}
+            <div class="flex items-start gap-3" id="assignment-export-pdf-row">
+                <div class="pt-0.5">
+                    {{ form.enable_export_pdf(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_export_pdf") }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    {{ form.enable_export_pdf.label(class="text-sm font-medium text-gray-800") }}
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Export PDF button on the entry form.') }}</p>
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -510,81 +695,14 @@
                 </p>
             </div>
         </div>
-    </form>
-</div>
+            </form>
+        </div>
 
-{# Entity Assignments Section - unified section for managing and assigning entities #}
-{% if entity_tabs.order %}
-<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
-    <div class="mb-4">
-        <h2 class="text-xl font-semibold text-gray-700">
-            <i class="fas fa-sitemap mr-2 text-blue-600"></i>
-            {{ _('Entity Assignments') }}
-        </h2>
-        <p class="text-sm text-gray-600 mt-1">
-            {% if assignment %}
-            {{ _('Manage existing entity assignments and assign new entities to this form. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).') }}
-            {% else %}
-            {{ _('Assign this form to specific organizational entities. Data will be collected at the specific entity level (e.g., branch data vs. country-wide data).') }}
-            {% endif %}
-        </p>
-    </div>
-
-    <div id="entity-assignments-content">
-
-        {# Tab Navigation - only show if there are multiple tabs or existing assignment #}
-        {% if show_entity_tabs %}
-        {% call scroll_tab_bar(inner_tag='ul', inner_id='entity-tabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Entity assignment mode')) %}
-                {% if assignment and assignment_entities %}
-                {% set is_manage_active = default_entity_tab == 'manage' %}
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 rounded-t-lg {% if is_manage_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
-                            id="manage-entities-tab"
-                            data-tabs-target="#manage-entities-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="manage-entities-panel"
-                            aria-selected="{{ 'true' if is_manage_active else 'false' }}">
-                        <i class="fas fa-cog mr-2"></i>{{ _('Manage Existing Entities') }}
-                    </button>
-                </li>
-                {% endif %}
-                {% if has_countries or has_secretariat %}
-                {% set is_add_entities_active = default_entity_tab == 'add_entities' or default_entity_tab == 'countries' or default_entity_tab == 'secretariat' %}
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 rounded-t-lg {% if is_add_entities_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
-                            id="add-entities-tab"
-                            data-tabs-target="#add-entities-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="add-entities-panel"
-                            aria-selected="{{ 'true' if is_add_entities_active else 'false' }}">
-                        <i class="fas fa-plus-circle mr-2"></i>{{ _('Add Entities') }}
-                    </button>
-                </li>
-                {% endif %}
-                {% if has_ns_structure %}
-                {% set is_entity_ns_active = default_entity_tab == 'ns_structure' %}
-                <li class="me-2" role="presentation">
-                    <button class="inline-block p-4 border-b-2 rounded-t-lg {% if is_entity_ns_active %}text-blue-600 border-blue-600{% else %}border-transparent hover:text-gray-600 hover:border-gray-300{% endif %}"
-                            id="ns-structure-tab"
-                            data-tabs-target="#ns-structure-panel"
-                            type="button"
-                            role="tab"
-                            aria-controls="ns-structure-panel"
-                            aria-selected="{{ 'true' if is_entity_ns_active else 'false' }}">
-                        <i class="fas fa-sitemap mr-2"></i>{{ _('NS Structure') }}
-                    </button>
-                </li>
-                {% endif %}
-        {% endcall %}
-        {% endif %}
-
-        {# Tab Panels #}
-        <div id="entity-tabs-content">
+        {% if entity_tabs.order %}
+        <div id="entity-assignments-content">
             {# Manage Existing Entities Tab - only for existing assignments #}
             {% if assignment and assignment_entities %}
-            <div class="p-4 rounded-lg bg-gray-50 {% if default_entity_tab != 'manage' %}hidden{% endif %}" id="manage-entities-panel" role="tabpanel" aria-labelledby="manage-entities-tab">
+            <div class="p-4 rounded-lg bg-gray-50 {% if show_main_tabs %}hidden{% endif %}" id="manage-entities-panel" role="tabpanel" aria-labelledby="manage-entities-tab">
                 {{ ag_grid_header_toolbar(placeholder_id='column-visibility-button-placeholder', wrapper_class='mb-4') }}
                 {% if has_countries %}
                 <div class="flex items-center gap-3 flex-wrap mb-4">
@@ -626,8 +744,7 @@
 
             {# Add Entities Tab - contains Countries and Secretariat as sub-tabs #}
             {% if has_countries or has_secretariat %}
-            {% set is_add_entities_active = default_entity_tab == 'add_entities' or default_entity_tab == 'countries' or default_entity_tab == 'secretariat' %}
-            <div class="p-4 rounded-lg bg-gray-50 {% if show_entity_tabs and not is_add_entities_active %}hidden{% endif %}" id="add-entities-panel" role="tabpanel" aria-labelledby="add-entities-tab">
+            <div class="p-4 rounded-lg bg-gray-50 {% if show_main_tabs %}hidden{% endif %}" id="add-entities-panel" role="tabpanel" aria-labelledby="add-entities-tab">
                 {# Sub-tab navigation for Add Entities - only show if multiple sub-tabs are available #}
                 {% if show_add_entities_subtabs %}
                 {% call scroll_tab_bar(inner_tag='ul', inner_id='add-entities-subtabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-4', aria_label=_('Add entities by')) %}
@@ -735,7 +852,6 @@
 
 
                 </form>
-                     </div>
                     </div>
                     {% endif %}
 
@@ -822,8 +938,7 @@
 
             {# NS Structure Tab - Hierarchical view of Branches > Sub-branches > Local Units #}
             {% if has_ns_structure %}
-            {% set is_entity_ns_active = default_entity_tab == 'ns_structure' %}
-            <div class="p-4 rounded-lg bg-gray-50 {% if not is_entity_ns_active %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
+            <div class="p-4 rounded-lg bg-gray-50 {% if show_main_tabs %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
                 <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <p class="text-xs text-blue-800">
                         <i class="fas fa-info-circle mr-2"></i>
@@ -861,10 +976,10 @@
                 </div>
             </div>
             {% endif %}
-        </div>
-    </div> {# End of entity-assignments-content #}
-</div> {# End of Entity Assignments section #}
-{% endif %}
+        </div> {# End of entity-assignments-content #}
+        {% endif %}
+    </div> {# End of assignment-main-tabs-content #}
+</div> {# End of assignment card #}
 
 {# Modal for editing AssignmentEntityStatus - only for existing assignments #}
 {% from "macros/modal_shell.html" import modal_shell %}
@@ -1154,6 +1269,8 @@ window.manageAssignmentConfig = {
         {%- endif -%}
     ],
     isNew: {{ 'true' if not assignment else 'false' }},
+    uprReportingTemplateId: {{ UPR_REPORTING_TEMPLATE_ID|default(33)|tojson }},
+    uprPlanningTemplateId: {{ UPR_PLANNING_TEMPLATE_ID|default(24)|tojson }},
     periodName: {{ (assignment.period_name if assignment and assignment.period_name else none)|tojson }},
     hasPublicUrl: {{ (assignment.has_public_url() if assignment else false)|tojson }},
     assignmentCountryIds: [

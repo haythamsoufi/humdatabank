@@ -135,6 +135,49 @@ class VariableResolutionService:
         return str(year) if year is not None else None
 
     @classmethod
+    def get_builtin_metadata_context(
+        cls,
+        assignment_entity_status: Optional[AssignmentEntityStatus],
+        template_version: Optional[FormTemplateVersion] = None,
+        keys: Optional[Iterable[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Public accessor for the built-in metadata tokens (entity/period/template
+        identifiers — see ``_BUILTIN_METADATA_TYPES``) WITHOUT resolving
+        template-defined custom variables, which can require querying other
+        assignments' saved data.
+
+        When ``keys`` is given, only those tokens are resolved — e.g. skips the
+        locale-dependent entity-name/national-society-name lookups (which need an
+        active HTTP request for locale detection) when a caller only needs
+        ``assignment_period``. Defaults to resolving all built-in tokens.
+
+        Used by server-side relevance evaluation
+        (``app/services/forms/relevance_evaluator.py``), which only ever matches
+        against this fixed token set and must stay cheap since it can run on every
+        completion-rate recomputation — including from CLI/maintenance contexts
+        with no active HTTP request.
+        """
+        if not assignment_entity_status:
+            return {}
+        if keys is None:
+            return cls._resolve_builtin_metadata_variables(assignment_entity_status, template_version)
+
+        resolved: Dict[str, Any] = {}
+        for token_name in keys:
+            metadata_type = cls._BUILTIN_METADATA_TYPES.get(token_name)
+            if not metadata_type:
+                continue
+            try:
+                resolved[token_name] = cls._resolve_metadata_variable(
+                    {'metadata_type': metadata_type}, assignment_entity_status, template_version
+                )
+            except Exception as e:
+                logger.debug("token %r resolution failed: %s", token_name, e)
+                resolved[token_name] = None
+        return resolved
+
+    @classmethod
     def get_assignment_year_from_period_name(cls, period_name: Optional[str]) -> Optional[str]:
         """Infer assignment year from a period label when no AssignedForm row is available (preview)."""
         if not period_name or not str(period_name).strip():

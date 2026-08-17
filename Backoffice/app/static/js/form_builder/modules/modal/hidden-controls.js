@@ -1,3 +1,5 @@
+import { isActuallyHidden } from '../dom-visibility.js';
+
 export const HiddenControlsMixin = {
     /**
      * Invariant: if a UI section is hidden, all non-hidden form controls inside it are disabled.
@@ -10,29 +12,10 @@ export const HiddenControlsMixin = {
         const root = rootEl || this.modalElement;
         if (!root) return;
 
-        const isActuallyHidden = (el) => {
-            if (!el) return true;
-            try {
-                if (el.closest && el.closest('.hidden')) return true;
-                const inlineDisplay = el.style && el.style.display;
-                const inlineVisibility = el.style && el.style.visibility;
-                if (inlineDisplay === 'none' || inlineVisibility === 'hidden') return true;
-                if (el.offsetParent === null) return true;
-                const style = window.getComputedStyle(el);
-                return style.display === 'none' || style.visibility === 'hidden';
-            } catch (_e) {
-                return false;
-            }
-        };
-
         root.querySelectorAll('input, select, textarea, button').forEach((el) => {
             if (!el) return;
             if (el.tagName.toLowerCase() === 'input' && el.type === 'hidden') return;
             if (el.type === 'submit') return;
-            // Screen-reader-only value carriers (e.g. blank/note definition textarea
-            // synced from a contenteditable editor) must stay enabled so syncUIToShared
-            // and FormData can still read them. Tailwind sr-only uses position:absolute
-            // which makes offsetParent null and would otherwise disable them.
             if (el.classList && el.classList.contains('sr-only')) return;
 
             const hidden = isActuallyHidden(el);

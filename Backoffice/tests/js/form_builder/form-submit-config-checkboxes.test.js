@@ -6,7 +6,7 @@
  * writes an always-enabled hidden input per checkbox onto the form root
  * (`name="<key>"`, value `"true"` / `"false"`).
  *
- * It must NOT write into `input[name="config"]` — that is the matrix config
+ * It must NOT write into `input[name="matrix_config"]` — that is the matrix config
  * field, which is disabled for non-matrix items and dropped from FormData.
  */
 
@@ -96,11 +96,11 @@ describe('serializeConfigCheckboxes — allow_over_100', () => {
 });
 
 describe('serializeConfigCheckboxes — form-root hidden inputs', () => {
-    it('does not write into the matrix name="config" field', () => {
+    it('does not write into the matrix name="matrix_config" field', () => {
         const form = makeForm();
         const matrixConfig = document.createElement('input');
         matrixConfig.type = 'hidden';
-        matrixConfig.name = 'config';
+        matrixConfig.name = 'matrix_config';
         matrixConfig.id = 'item-matrix-config';
         matrixConfig.value = '{}';
         matrixConfig.disabled = true;

@@ -2,6 +2,8 @@
 // - Global "saving" banner for the Form Builder
 // - AJAX submit + partial DOM refresh to avoid full page reloads
 
+import { isActuallyHidden } from './dom-visibility.js';
+
 // Lazily resolves translations via the server-injected catalog (window.t).
 // Falls back to the English string when the shim is absent.
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
@@ -398,17 +400,6 @@ export const FormSubmitUI = {
       // We restore immediately after snapshotting FormData.
       const tempDisabled = [];
       try {
-        const isActuallyHidden = (el) => {
-          if (!el) return true;
-          try {
-            if (el.closest && el.closest('.hidden')) return true;
-            if (el.offsetParent === null) return true;
-            const style = window.getComputedStyle(el);
-            return style.display === 'none' || style.visibility === 'hidden';
-          } catch (_e) {
-            return false;
-          }
-        };
         form.querySelectorAll('input, select, textarea, button').forEach((el) => {
           if (!el) return;
           if (el.tagName.toLowerCase() === 'input' && el.type === 'hidden') return;

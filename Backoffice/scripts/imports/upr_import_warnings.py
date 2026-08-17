@@ -4,7 +4,44 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+
+
+_EMERGENCY_CODE_IMPORTED_RE = re.compile(
+    r"^Emergency code '([^']+)' not found in GO API for ([A-Z]{3}) — imported using Excel name/code; review in form$"
+)
+
+
+def canonicalize_upr_import_warning(message: str) -> str:
+    """Normalize warning text so case variants dedupe to one message."""
+    text = str(message or "").strip()
+    match = _EMERGENCY_CODE_IMPORTED_RE.match(text)
+    if not match:
+        return text
+    code, iso3 = match.group(1).upper(), match.group(2)
+    return (
+        f"Emergency code '{code}' not found in GO API for {iso3} — "
+        "imported using Excel name/code; review in form"
+    )
+
+
+def dedupe_upr_import_warnings(warnings: Iterable[str]) -> List[str]:
+    """Return unique import warnings, collapsing redundant variants."""
+    seen: Set[str] = set()
+    out: List[str] = []
+    period_noted = False
+    for raw in warnings:
+        text = canonicalize_upr_import_warning(str(raw or "").strip())
+        if not text or text in seen:
+            continue
+        lower = text.lower()
+        if "period" in lower and ("does not match" in lower or "differs from" in lower):
+            if period_noted:
+                continue
+            period_noted = True
+        seen.add(text)
+        out.append(text)
+    return out
 
 
 @dataclass
@@ -45,21 +82,24 @@ def _classify_warning_for_grouping(message: str) -> _WarningClassification:
             ),
         ),
         (
+            re.compile(
+                r"^Emergency code '([^']+)' not found in GO API for ([A-Z]{3}) — imported using Excel name/code; review in form$"
+            ),
+            lambda m: _WarningClassification(
+                group_key=f"ea_code_not_found|{m.group(1).upper()}",
+                display_base=(
+                    f"Emergency code '{m.group(1).upper()}' not found in GO API — "
+                    "imported using Excel labels; review in form"
+                ),
+                iso3=m.group(2),
+            ),
+        ),
+        (
             re.compile(r"^Emergency appeal code (.+) not found in GO API for ([A-Z]{3})$"),
             lambda m: _WarningClassification(
                 group_key=f"ea_code_not_found|{m.group(1)}",
                 display_base=f"Emergency appeal code {m.group(1)} not found in GO API",
                 iso3=m.group(2),
-            ),
-        ),
-        (
-            re.compile(
-                r"^No EA Code for (EA\d) and only (\d+) appeal\(s\) in GO API for ([A-Z]{3}) — skipped$"
-            ),
-            lambda m: _WarningClassification(
-                group_key=f"no_ea_code|{m.group(1)}|{m.group(2)}",
-                display_base=f"No EA Code for {m.group(1)} and only {m.group(2)} appeal(s) in GO API — skipped",
-                iso3=m.group(3),
             ),
         ),
         (

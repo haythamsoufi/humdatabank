@@ -14,6 +14,7 @@ let fabSaveButton = null;
 let fabMenu = null;
 let mobileNavToggle = null;
 let _savingFlashHandle = null; // handle returned by FlashMessages.show() for the "Saving…" toast
+let _saveKeyboardHandler = null;
 
 /**
  * Initialize AJAX save functionality
@@ -32,12 +33,38 @@ export function initAjaxSave() {
 
     // Override the save button behavior
     saveButton.addEventListener('click', handleSaveClick);
+    initSaveKeyboardShortcut();
 
     fabSaveButton = document.getElementById('fab-save-btn');
     fabMenu = document.getElementById('fab-menu');
     mobileNavToggle = document.getElementById('mobile-nav-toggle-button');
 
     debugLog(MODULE_NAME, '✅ AJAX Save initialized');
+}
+
+/**
+ * Ctrl+S / Cmd+S — save without triggering the browser "Save page" dialog.
+ */
+function initSaveKeyboardShortcut() {
+    if (_saveKeyboardHandler) return;
+
+    _saveKeyboardHandler = (event) => {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+        if (event.key !== 's' && event.key !== 'S') return;
+        if (!saveButton || saveButton.disabled) return;
+
+        const target = event.target;
+        if (target && target.isContentEditable) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (isSaving) return;
+
+        saveButton.click();
+    };
+
+    document.addEventListener('keydown', _saveKeyboardHandler);
 }
 
 /**
@@ -497,10 +524,14 @@ function updateFormData(data) {
  * Manually trigger save (for external use)
  */
 export function triggerSave() {
-    if (!isSaving) {
-        updateSaveButtonState(true);
-        queueSave({ toast: true, buttonState: true });
+    if (isSaving) return;
+
+    if (window.collectHiddenFieldsForSubmission) {
+        window.collectHiddenFieldsForSubmission();
     }
+
+    updateSaveButtonState(true);
+    queueSave({ toast: true, buttonState: true });
 }
 
 /**

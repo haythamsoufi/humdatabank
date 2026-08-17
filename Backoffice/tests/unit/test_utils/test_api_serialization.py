@@ -1308,6 +1308,34 @@ class TestPruneStaleMatrixCellKeys:
         data = {'_matrix_change': True, 'IFRC Secretariat_ns_fun': 100}
         assert prune_stale_matrix_cell_keys(data, self.FUNDING_CONFIG) == data
 
+    def test_selectable_header_keys_are_preserved(self):
+        data = {
+            'col_header|SP1': 'Region A',
+            'IFRC Secretariat_ns_fun': 100,
+            'stale_unknown_column': 0,
+        }
+        assert prune_stale_matrix_cell_keys(data, self.FUNDING_CONFIG) == {
+            'col_header|SP1': 'Region A',
+            'IFRC Secretariat_ns_fun': 100,
+        }
+
+    def test_go_unmatched_metadata_keys_are_preserved(self):
+        """col_header_go_unmatched|* and row_go_unmatched|* must survive pruning so
+        the GO-unmatched flag is still present after the form is saved and reloaded."""
+        data = {
+            'col_header|EA2': 'MDRAF070',
+            'col_header_go_unmatched|EA2': 1,
+            'row_go_unmatched|MDRAF070': 1,
+            'IFRC Secretariat_ns_fun': 100,
+            'stale_unknown_column': 0,
+        }
+        assert prune_stale_matrix_cell_keys(data, self.FUNDING_CONFIG) == {
+            'col_header|EA2': 'MDRAF070',
+            'col_header_go_unmatched|EA2': 1,
+            'row_go_unmatched|MDRAF070': 1,
+            'IFRC Secretariat_ns_fun': 100,
+        }
+
     def test_matrix_without_column_defs_is_left_untouched(self):
         """No columns configured means we can't validate suffixes, so skip pruning entirely."""
         data = {'IFRC Secretariat_anything_goes_here': 100}

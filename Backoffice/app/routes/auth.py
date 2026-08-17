@@ -22,6 +22,7 @@ from app.utils.datetime_helpers import utcnow, ensure_utc
 from app.services.platform.user_analytics_service import (
     log_login_attempt, log_logout, start_user_session, log_user_activity, log_user_activity_for_user,
     create_security_event, get_client_ip, get_client_info, add_session_to_blacklist,
+    end_other_active_sessions_for_device,
 )
 from app.utils.redirect_utils import safe_redirect, is_safe_redirect_url
 from app.utils.rate_limiting import auth_rate_limit, password_reset_rate_limit, rate_limit
@@ -224,6 +225,10 @@ def _complete_dev_act_as_login(user: User) -> None:
         session['prompt_profile_completion'] = True
 
     log_login_attempt(user.email, success=True, user=user, session_id=session_id)
+    client_info = get_client_info()
+    end_other_active_sessions_for_device(
+        user.id, client_info['ip_address'], client_info.get('browser'), client_info.get('device_type'),
+    )
     start_user_session(user, session_id)
     log_user_activity(
         activity_type='login',
@@ -434,6 +439,13 @@ def login():
 
             # Log successful login
             log_login_attempt(user.email, success=True, user=user, session_id=session_id)
+
+            # End any other still-active session on this same device (stale tab, second
+            # profile, etc.) so re-authenticating doesn't leave duplicate active rows.
+            client_info = get_client_info()
+            end_other_active_sessions_for_device(
+                user.id, client_info['ip_address'], client_info.get('browser'), client_info.get('device_type'),
+            )
 
             # Start session tracking
             start_user_session(user, session_id)
@@ -1017,6 +1029,13 @@ def azure_callback():
     if created_new_session:
         with suppress(Exception):
             log_login_attempt(user.email, success=True, user=user, session_id=session_id)
+            # resolve_azure_b2c_login_session() only reuses a session started in the
+            # last OAUTH_LOGIN_DEDUP_SECONDS (90s) -- beyond that window it reports
+            # created_new_session=True even if an older same-device session is still
+            # is_active=True. Close that one out now instead of leaving two rows.
+            end_other_active_sessions_for_device(
+                user.id, client_info['ip_address'], client_info.get('browser'), client_info.get('device_type'),
+            )
             start_user_session(user, session_id)
             log_user_activity(
                 activity_type='login',

@@ -265,6 +265,7 @@ class UprImportContext:
     iso3_to_hns_id: Dict[str, int] = field(default_factory=dict)
     emergency_ops_by_iso: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     emergency_ops_ordered_by_iso: Dict[str, List[Dict[str, Any]]] = field(default_factory=dict)
+    emergency_unmatched_codes_warned: Set[Tuple[str, str]] = field(default_factory=set)
     emergency_matrix_plugin_config: Dict[str, Any] = field(default_factory=dict)
     emergency_go_plugin_config: Dict[str, Any] = field(default_factory=dict)
     yes_no_bank_ids: Set[int] = field(default_factory=set)
@@ -1396,6 +1397,28 @@ def _emergency_op_row_id(op: Dict[str, Any]) -> str:
     return f"{name} ({code})" if code else name
 
 
+def _emergency_op_display(op: Dict[str, Any]) -> str:
+    custom = str(op.get("_display") or "").strip()
+    if custom:
+        return custom
+    return _emergency_op_row_id(op)
+
+
+def _synthetic_emergency_op(name: str, code: str, display: str) -> Dict[str, Any]:
+    return {"name": name, "code": code, "_display": display, "go_matched": False}
+
+
+def _ea_operation_go_matched(op: Optional[Dict[str, Any]]) -> bool:
+    """False when the appeal label came from Excel fallback, not a live GO operation."""
+    if not op:
+        return True
+    return op.get("go_matched") is not False
+
+
+COL_HEADER_GO_UNMATCHED_PREFIX = "col_header_go_unmatched|"
+ROW_GO_UNMATCHED_PREFIX = "row_go_unmatched|"
+
+
 def _fetch_emergency_ops_for_country(iso3: str, plugin_cfg: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str, Any]]]:
     """Fetch GO emergency operations for a country; return ordered list and code index."""
     from app.services.forms.emergency_section_binding import _fetch_ordered_operations
@@ -1450,9 +1473,13 @@ def _resolve_emergency_operation_labels(
             api_name = (op.get("name") or "").strip()
             api_code = (op.get("code") or "").strip()
             return api_name or name, api_code or code, _emergency_op_row_id(op)
-        ctx.warnings.append(
-            f"Emergency code {code!r} not found in GO API for {iso3} — using Excel name/code"
-        )
+        warn_key = (iso3.upper(), code_upper)
+        if warn_key not in ctx.emergency_unmatched_codes_warned:
+            ctx.emergency_unmatched_codes_warned.add(warn_key)
+            ctx.warnings.append(
+                f"Emergency code {code_upper!r} not found in GO API for {iso3.upper()} — "
+                "imported using Excel name/code; review in form"
+            )
     return name, code, _format_emergency_operation_display(name, code)
 
 
@@ -1494,31 +1521,48 @@ def _resolve_ea_operation(
     iso3: str,
     area: str,
     ea_code: Any,
+    excel_name: Any = None,
     context: str = "Reach",
 ) -> Optional[Dict[str, Any]]:
     """Resolve a GO emergency operation for Excel EA1/EA2/EA3 slot or EA Code."""
     ordered, by_code = _ensure_emergency_ops(ctx, iso3)
-    code = (str(ea_code).strip().upper() if ea_code not in (None, "") else "")
-    if code:
-        op = by_code.get(code)
-        if op is None:
-            ctx.warnings.append(f"Emergency appeal code {code!r} not found in GO API for {iso3}")
-            return None
-        return op
+    code_raw = str(ea_code).strip() if ea_code not in (None, "") else ""
+    code_upper = code_raw.upper()
+    name = str(excel_name or "").strip() if excel_name not in (None, "") else ""
+
+    if code_upper:
+        op = by_code.get(code_upper)
+        if op:
+            return op
+        resolved_name, resolved_code, display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3=iso3,
+            excel_name=name,
+            excel_code=code_raw,
+        )
+        if display:
+            return _synthetic_emergency_op(resolved_name, resolved_code, display)
+        return None
 
     slot = _parse_ea_slot(area)
-    if slot is None:
-        return None
-    if slot < 1 or slot > len(ordered):
+    if slot is not None and 1 <= slot <= len(ordered):
+        op = ordered[slot - 1]
         ctx.warnings.append(
-            f"No EA Code for {area} and only {len(ordered)} appeal(s) in GO API for {iso3} — skipped"
+            f"{context} {area} for {iso3} missing EA Code — using GO slot {slot}: {_emergency_op_row_id(op)!r}"
         )
-        return None
-    op = ordered[slot - 1]
-    ctx.warnings.append(
-        f"{context} {area} for {iso3} missing EA Code — using GO slot {slot}: {_emergency_op_row_id(op)!r}"
-    )
-    return op
+        return op
+
+    if name or code_raw:
+        resolved_name, resolved_code, display = _resolve_emergency_operation_labels(
+            ctx,
+            iso3=iso3,
+            excel_name=name,
+            excel_code=code_raw,
+        )
+        if display:
+            return _synthetic_emergency_op(resolved_name, resolved_code, display)
+
+    return None
 
 
 def _resolve_ea_operation_display(
@@ -1527,13 +1571,21 @@ def _resolve_ea_operation_display(
     iso3: str,
     area: str,
     ea_code: Any,
+    excel_name: Any = None,
     context: str = "Reach",
 ) -> Optional[str]:
     """Display label for a selectable emergency-appeal column header (name_with_code)."""
-    op = _resolve_ea_operation(ctx, iso3=iso3, area=area, ea_code=ea_code, context=context)
+    op = _resolve_ea_operation(
+        ctx,
+        iso3=iso3,
+        area=area,
+        ea_code=ea_code,
+        excel_name=excel_name,
+        context=context,
+    )
     if not op:
         return None
-    return _emergency_op_row_id(op) or None
+    return _emergency_op_display(op) or None
 
 
 def _ensure_funding_ea_col_header(
@@ -1547,6 +1599,8 @@ def _ensure_funding_ea_col_header(
     area: str,
     ea_code_raw: Any,
     reach_ea_codes: Dict[Tuple[str, str, str], str],
+    excel_name_raw: Any = None,
+    reach_ea_names: Optional[Dict[Tuple[str, str, str], str]] = None,
 ) -> bool:
     """Set ``col_header|EA*`` once per matrix item when importing planning funding."""
     cells = matrix_cells[(aes_id, funding_item_id)]
@@ -1554,14 +1608,27 @@ def _ensure_funding_ea_col_header(
     if header_key in cells:
         return True
     ea_code = ea_code_raw
+    excel_name = excel_name_raw
     if ea_code in (None, ""):
         ea_code = reach_ea_codes.get((iso3, rnd, area))
-    display = _resolve_ea_operation_display(
-        ctx, iso3=iso3, area=area, ea_code=ea_code, context="Funding"
+    if excel_name in (None, "") and reach_ea_names:
+        excel_name = reach_ea_names.get((iso3, rnd, area))
+    op = _resolve_ea_operation(
+        ctx,
+        iso3=iso3,
+        area=area,
+        ea_code=ea_code,
+        excel_name=excel_name,
+        context="Funding",
     )
+    if not op:
+        return False
+    display = _emergency_op_display(op)
     if not display:
         return False
     cells[header_key] = display
+    if not _ea_operation_go_matched(op):
+        cells[f"{COL_HEADER_GO_UNMATCHED_PREFIX}{area}"] = 1
     return True
 
 
@@ -1571,15 +1638,52 @@ def _resolve_emergency_row_key(
     iso3: str,
     area: str,
     ea_code: Any,
+    excel_name: Any = None,
 ) -> Optional[str]:
     """Resolve Emergency Appeals matrix row key from Excel EA slot and/or EA Code."""
-    op = _resolve_ea_operation(ctx, iso3=iso3, area=area, ea_code=ea_code, context="Reach")
+    op = _resolve_ea_operation(
+        ctx,
+        iso3=iso3,
+        area=area,
+        ea_code=ea_code,
+        excel_name=excel_name,
+        context="Reach",
+    )
     if not op:
         return None
-    row_id = _emergency_op_row_id(op)
+    row_id = _emergency_op_display(op)
     if not row_id:
         return None
     return f"{row_id}_{EMERGENCY_APPEALS_COLUMN}"
+
+
+def _resolve_emergency_matrix_cells(
+    ctx: UprImportContext,
+    *,
+    iso3: str,
+    area: str,
+    ea_code: Any,
+    excel_name: Any = None,
+    amount: Any,
+) -> Optional[Dict[str, Any]]:
+    """Build Reach emergency-appeals matrix cells including GO-unmatched metadata."""
+    op = _resolve_ea_operation(
+        ctx,
+        iso3=iso3,
+        area=area,
+        ea_code=ea_code,
+        excel_name=excel_name,
+        context="Reach",
+    )
+    if not op:
+        return None
+    row_id = _emergency_op_display(op)
+    if not row_id:
+        return None
+    cells: Dict[str, Any] = {f"{row_id}_{EMERGENCY_APPEALS_COLUMN}": amount}
+    if not _ea_operation_go_matched(op):
+        cells[f"{ROW_GO_UNMATCHED_PREFIX}{row_id}"] = 1
+    return cells
 
 
 def _load_assignment_map(template_ids: List[int]) -> Dict[int, Dict[Tuple[str, str], int]]:
@@ -2829,15 +2933,16 @@ def transform_to_import_rows(
             if not aes_id or not value_num:
                 continue
             if area.startswith("EA") and area != "EAs":
-                cell_key = _resolve_emergency_row_key(
+                ea_cells = _resolve_emergency_matrix_cells(
                     ctx,
                     iso3=iso3,
                     area=area,
                     ea_code=row.get("EA Code"),
+                    amount=value_num,
                 )
-                if not cell_key:
+                if not ea_cells:
                     continue
-                matrix_cells[(aes_id, ITEM_EMERGENCY_APPEALS)][cell_key] = value_num
+                matrix_cells[(aes_id, ITEM_EMERGENCY_APPEALS)].update(ea_cells)
             elif area.startswith("SP"):
                 if year_val in (None, ""):
                     ctx.warnings.append(f"Reach row missing Year for {iso3} {rnd} {area}")

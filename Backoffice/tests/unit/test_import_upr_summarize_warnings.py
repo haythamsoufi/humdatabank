@@ -55,14 +55,28 @@ class TestSummarizeWarnings:
 
     def test_groups_emergency_appeal_code_by_code(self):
         warnings = [
-            "Emergency appeal code 'MDRTD022' not found in GO API for TCD",
-            "Emergency appeal code 'MDRTD022' not found in GO API for ETH",
+            "Emergency code 'MDRTD022' not found in GO API for TCD — imported using Excel name/code; review in form",
+            "Emergency code 'MDRTD022' not found in GO API for ETH — imported using Excel name/code; review in form",
         ]
         result = summarize_warnings(warnings)
         assert result["warning_unique_count"] == 1
         assert "MDRTD022" in result["warnings"][0]
+        assert "imported using Excel labels" in result["warnings"][0]
         assert "×2" in result["warnings"][0]
         assert "2 countries" in result["warnings"][0]
+
+    def test_dedupes_emergency_code_warnings_case_insensitively(self):
+        from upr_import_warnings import dedupe_upr_import_warnings
+
+        warnings = dedupe_upr_import_warnings([
+            "Emergency code 'rfqwerqw' not found in GO API for AFG — imported using Excel name/code; review in form",
+            "Emergency code 'RFQWERQW' not found in GO API for AFG — imported using Excel name/code; review in form",
+        ])
+        assert len(warnings) == 1
+        assert warnings[0] == (
+            "Emergency code 'RFQWERQW' not found in GO API for AFG — "
+            "imported using Excel name/code; review in form"
+        )
 
     def test_groups_percentage_out_of_range_by_indicator_across_countries(self):
         warnings = [

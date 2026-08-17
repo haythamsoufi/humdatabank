@@ -440,6 +440,25 @@ def _coerce_matrix_entity_id(raw):
 
 
 MATRIX_ROW_TOTAL_COLUMN = 'Total'
+MATRIX_HEADER_KEY_PREFIX = 'col_header|'
+_MATRIX_GO_UNMATCHED_PREFIXES = ('col_header_go_unmatched|', 'row_go_unmatched|')
+
+
+def _is_matrix_metadata_key(key: str) -> bool:
+    """True for keys that store selectable column-header choices or GO-unmatched flags.
+
+    These keys are not cell data and must be preserved through pruning/serialisation.
+    """
+    if not isinstance(key, str):
+        return False
+    return key.startswith(MATRIX_HEADER_KEY_PREFIX) or any(
+        key.startswith(p) for p in _MATRIX_GO_UNMATCHED_PREFIXES
+    )
+
+
+def _is_matrix_header_data_key(key):
+    """True for disagg_data keys that store a selectable column-header choice."""
+    return isinstance(key, str) and key.startswith(MATRIX_HEADER_KEY_PREFIX)
 
 
 def _matrix_config_flag(matrix_config, key, default=True):
@@ -544,6 +563,9 @@ def prune_stale_matrix_cell_keys(matrix_data, matrix_config):
     pruned = {}
     for key, value in matrix_data.items():
         if not isinstance(key, str) or key.startswith('_'):
+            pruned[key] = value
+            continue
+        if _is_matrix_metadata_key(key):
             pruned[key] = value
             continue
         _, column_key = _parse_matrix_cell_key(key, matrix_config)

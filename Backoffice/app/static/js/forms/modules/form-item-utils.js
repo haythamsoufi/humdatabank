@@ -253,11 +253,25 @@ function findFieldInput(fieldId, normalizedFieldId) {
     let input = document.getElementById(`field-${fieldId}`) || document.getElementById(`field-${normalizedFieldId}`);
 
     if (!input) {
-        // Try finding field container and get its input
+        // Try the named value inputs before falling back to any first input in the block,
+        // to avoid accidentally picking up a checkbox (e.g. data_not_available).
+        const valueInput = document.querySelector(
+            `input[name="indicator_${normalizedFieldId}_total_value"], ` +
+            `input[name="indicator_${normalizedFieldId}_standard_value"], ` +
+            `input[name="dynamic_${normalizedFieldId}_total_value"], ` +
+            `input[name="dynamic_${normalizedFieldId}_standard_value"]`
+        );
+        if (valueInput) return valueInput;
+    }
+
+    if (!input) {
+        // Try finding field container and get its value input (not a checkbox)
         const fieldContainer = document.querySelector(`[data-item-id="${fieldId}"]`) ||
                               document.querySelector(`[data-item-id="${normalizedFieldId}"]`);
         if (fieldContainer) {
-            input = fieldContainer.querySelector('input, select, textarea');
+            input = fieldContainer.querySelector(
+                'input[name*="_total_value"], input[name*="_standard_value"]'
+            ) || fieldContainer.querySelector('input:not([type="checkbox"]), select, textarea');
         }
     }
 

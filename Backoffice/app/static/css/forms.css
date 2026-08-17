@@ -616,6 +616,18 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
     table-layout: auto !important;
 }
 
+/* Selectable-header columns: cells stay locked until the column header has a value */
+.matrix-container td.matrix-cell-header-gated {
+    background-color: #f3f4f6;
+}
+.matrix-container td.matrix-cell-header-gated input {
+    cursor: not-allowed;
+    color: #9ca3af;
+}
+.matrix-container td.matrix-cell-header-gated input[type="checkbox"] {
+    opacity: 0.45;
+}
+
 /* Matrix table - first column header should match row header width constraints */
 .matrix-container table thead th:first-child {
     min-width: 80px !important;
@@ -784,6 +796,19 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .matrix-header-picker-option.is-placeholder {
     color: #6b7280;
     font-style: italic;
+}
+
+.matrix-header-picker--go-unmatched .matrix-header-picker-label {
+    color: #92400e;
+}
+
+.matrix-header-picker-option--go-unmatched {
+    color: #92400e;
+    font-style: italic;
+}
+
+.matrix-container table td[role="rowheader"].matrix-go-unmatched-row-header {
+    background-color: #fef3c7 !important;
 }
 
 .matrix-header-other-input {

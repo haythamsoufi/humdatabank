@@ -90,7 +90,7 @@ function applyStaticFields(fields) {
     return { count, warnings };
 }
 
-function applyMatrices(matrices) {
+async function applyMatrices(matrices) {
     let count = 0;
     const warnings = [];
     const entries = Object.entries(matrices || {});
@@ -104,7 +104,7 @@ function applyMatrices(matrices) {
     }
 
     for (const [itemId, data] of entries) {
-        const applied = handler.setMatrixData(String(itemId), data);
+        const applied = await handler.setMatrixData(String(itemId), data);
         if (!applied) {
             debugWarn(MODULE, `Matrix ${itemId} not found on the page; imported data not applied`);
             warnings.push(`Could not apply imported data for matrix ${itemId} — please check it manually.`);
@@ -350,7 +350,7 @@ export async function applyUprExcelImportPayload(payload) {
 
     const staticResult = applyStaticFields(payload.fields);
     warnings.push(...(staticResult.warnings || []));
-    const matrixResult = applyMatrices(payload.matrices);
+    const matrixResult = await applyMatrices(payload.matrices);
     warnings.push(...(matrixResult.warnings || []));
 
     const repeatSectionId = (payload.repeat_slots || []).find((s) => s.repeat_section_id)?.repeat_section_id
@@ -380,6 +380,13 @@ export async function applyUprExcelImportPayload(payload) {
         window.requestRelevanceRecheck('upr-excel-import');
     } else if (typeof window.checkAllRelevanceConditions === 'function') {
         window.checkAllRelevanceConditions({ reason: 'upr-excel-import' });
+    }
+
+    // Re-run cross-field validation conditions after all values are in the DOM.
+    // Per-field events during apply evaluate conditions against partially-updated
+    // state; this final pass sees all imported values together.
+    if (window.formValidator && typeof window.formValidator.initializeValidationConditions === 'function') {
+        window.formValidator.initializeValidationConditions();
     }
 
     return { applied, warnings };

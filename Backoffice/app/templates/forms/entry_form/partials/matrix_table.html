@@ -78,6 +78,7 @@
 {% set matrix_has_carry_forward_ref = matrix_carry_forward_ref is mapping and matrix_carry_forward_ref|length > 0 %}
 {% set matrix_highlight_prefilled_cells = (matrix_is_prefilled or matrix_has_carry_forward_ref) and not matrix_is_imputed %}
 {% set _matrix_prefilled_title = _('This is a prefilled value')|forceescape %}
+{% set _matrix_header_gated_title = _('Select a value in the column header to enable this cell')|forceescape %}
 {% set matrix_config = field.config.matrix_config if field.config and field.config.matrix_config else (field.config if field.config and field.config.get('rows') else {'type': 'matrix', 'rows': [], 'columns': []}) %}
 {% set _row_mode = matrix_config.get('row_mode', 'manual') %}
 {% set is_advanced_mode = _row_mode in ('list_library', 'hybrid') %}
@@ -333,6 +334,14 @@
                                 {% endif %}
                                 {% set is_variable = column.is_variable if column.is_variable is defined else (column.type == 'variable' if column.type else False) %}
                                 {% set column_variable = column.variable_name if column.variable_name else (column.variable if column.variable else None) %}
+                                {# Selectable-header columns stay disabled until a header value is chosen (see selectable-headers.js) #}
+                                {% set _col_header_gated = false %}
+                                {% if column is mapping and column.get('header_type') == 'selectable' %}
+                                    {% set _col_header_saved_value = existing_matrix_data.get('col_header|' ~ column_name, '') if existing_matrix_data else '' %}
+                                    {% if not (_col_header_saved_value and (_col_header_saved_value|string).strip()) %}
+                                        {% set _col_header_gated = true %}
+                                    {% endif %}
+                                {% endif %}
                                 {# Use row_id as the stable key (rowId_columnName format) #}
                                 {% set cell_key = row_id ~ '_' ~ column_name %}
                                 {% set cell_value = existing_matrix_data.get(cell_key, '') if existing_matrix_data else '' %}
@@ -352,7 +361,7 @@
                                         {% set _cell_prefill.has_value = true %}
                                     {% endif %}
                                 {% endif %}
-                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% endif %}" role="gridcell">
+                                <td class="border border-gray-300 px-2 py-1{% if column_type == 'tick' %} text-center{% endif %}{% if _whole_number_violation %} bg-red-50{% elif _cell_prefill.has_value %} bg-yellow-100{% elif _col_header_gated %} matrix-cell-header-gated{% endif %}" role="gridcell">
                                     {% if is_variable and column_variable %}
                                         {# Variable column - type can be number or tick, will be resolved via JavaScript with row entity context #}
                                         {% set variable_readonly = column.variable_readonly if column.variable_readonly is defined else True %}
@@ -372,9 +381,9 @@
                                                    {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
                                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto {% if variable_readonly %}opacity-50{% endif %}{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
                                                    aria-label="{{ _('Variable tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
-                                                   {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
+                                                   {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                    {% if variable_readonly %}readonly{% endif %}
-                                                   {% if not can_edit %}disabled{% endif %}>
+                                                   {% if not can_edit or _col_header_gated %}disabled{% endif %}>
                                         {% else %}
                                             {# Variable number column #}
                                             <input type="number"
@@ -390,11 +399,11 @@
                                                    {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
                                                    class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% elif variable_readonly %} border-0 bg-gray-100{% else %} border-0{% endif %}"
                                                    aria-label="{{ _('Variable value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
-                                                   {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit and not variable_readonly %}title="{{ _matrix_prefilled_title }}"{% endif %}
+                                                   {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit and not variable_readonly %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                    min="0"
                                                    step="0.01"
                                                    {% if variable_readonly %}readonly{% endif %}
-                                                   {% if not can_edit %}disabled{% endif %}>
+                                                   {% if not can_edit or _col_header_gated %}disabled{% endif %}>
                                         {% endif %}
                                     {% elif column_type == 'tick' %}
                                         <input type="checkbox"
@@ -407,8 +416,8 @@
                                                {% if cell_value == '1' or cell_value == 1 %}checked{% endif %}
                                                class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mx-auto{% if _cell_prefill.has_value %} ring-2 ring-yellow-300{% endif %}"
                                                aria-label="{{ _('Tick for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
-                                               {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
-                                               {% if not can_edit %}disabled{% endif %}>
+                                               {% if _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
+                                               {% if not can_edit or _col_header_gated %}disabled{% endif %}>
                                     {% else %}
                                         <input type="number"
                                                data-row="{{ row_id }}"
@@ -420,10 +429,10 @@
                                                {% if column_max_decimals is not none %}data-max-decimals="{{ column_max_decimals }}"{% endif %}
                                                class="w-full px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500{% if _whole_number_violation %} bg-red-100 border border-red-400 rounded-sm ring-1 ring-red-300{% elif _cell_prefill.has_value %} bg-yellow-100 border border-yellow-300 rounded-sm{% else %} border-0{% endif %}"
                                                aria-label="{{ _('Value for')|forceescape }} {{ row_display }} {{ _('and')|forceescape }} {{ column_name }}"
-                                               {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% endif %}
+                                               {% if _whole_number_violation and can_edit %}title="{{ _('This column requires a whole number. Please correct the decimal value.')|forceescape }}" aria-invalid="true"{% elif _cell_prefill.has_value and can_edit %}title="{{ _matrix_prefilled_title }}"{% elif _col_header_gated %}title="{{ _matrix_header_gated_title }}"{% endif %}
                                                min="0"
                                                step="0.01"
-                                               {% if not can_edit %}disabled{% endif %}>
+                                               {% if not can_edit or _col_header_gated %}disabled{% endif %}>
                                     {% endif %}
                                 </td>
                             {% endfor %}

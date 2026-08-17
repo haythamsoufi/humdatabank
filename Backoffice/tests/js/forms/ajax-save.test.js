@@ -122,6 +122,25 @@ describe('ajax-save', () => {
     expect(saveNow).not.toHaveBeenCalled();
   });
 
+  it('saves on Ctrl+S and prevents the browser save dialog', async () => {
+    fetch.mockResolvedValue(mockFetchResponse({ ok: true, status: 200 }));
+
+    const mod = await loadAjaxSave();
+    mod.initAjaxSave();
+
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefault = vi.spyOn(event, 'preventDefault');
+    document.dispatchEvent(event);
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
   it('shows friendly error when ok response body is HTML not JSON', async () => {
     fetch.mockResolvedValue(mockFetchResponse({
       ok: true,

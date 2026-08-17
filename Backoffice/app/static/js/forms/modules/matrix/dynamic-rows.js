@@ -18,6 +18,8 @@ import {
     __rowTotalValidation,
 } from './totals.js';
 
+const ROW_GO_UNMATCHED_PREFIX = 'row_go_unmatched|';
+
 export const matrixDynamicRowsMixin = {
 
 /**
@@ -763,17 +765,13 @@ restoreStaticMatrixValues(fieldId) {
     this.calculateMatrixTotals(fieldId);
     this.applyWholeNumberViolationHighlighting(fieldId);
     this.applyPrefilledCellHighlighting(fieldId);
+    this._applyHeaderGatingForMatrix(fieldId);
     this._lockMatrixContainerIfReadOnly(container);
 
     if (matrix.hiddenField) {
         matrix.hiddenField.value = __serializeMatrixData(matrix.data);
     }
-}
-
-/**
- * Restore dynamic rows from saved data
- */,
-
+},
 
 /**
  * Restore dynamic rows from saved data
@@ -902,8 +900,11 @@ async restoreDynamicRows(fieldId) {
             // Check for and highlight duplicates
             this.applyDuplicateEntityHighlighting(fieldId);
 
+            this._applyGoUnmatchedRowHeadersFromData(fieldId);
+
             this.applyWholeNumberViolationHighlighting(fieldId);
             this.applyPrefilledCellHighlighting(fieldId);
+            this._applyHeaderGatingForMatrix(fieldId);
 
             // Update legend visibility after restoration
             this.updateLegendVisibility(fieldId);
@@ -916,13 +917,30 @@ async restoreDynamicRows(fieldId) {
         // Clear batch operation flag
         this.batchOperationsInProgress.delete(fieldId);
     }
-}
-
+},
 
 /**
- * Auto-load entities from saved matrix data based on variable configurations
- */,
+ * Highlight emergency-appeal rows imported from Excel when the code was not matched in GO.
+ */
+_applyGoUnmatchedRowHeadersFromData(fieldId) {
+    const matrix = this.matrices.get(String(fieldId || ''));
+    if (!matrix?.data || !matrix.container) return;
 
+    Object.keys(matrix.data).forEach((key) => {
+        if (!key.startsWith(ROW_GO_UNMATCHED_PREFIX)) return;
+        const rowId = key.slice(ROW_GO_UNMATCHED_PREFIX.length);
+        if (!rowId) return;
+        const flag = matrix.data[key];
+        if (!(flag === 1 || flag === '1' || flag === true)) return;
+
+        const row = matrix.container.querySelector(`tr[data-row-id="${rowId}"]`);
+        const headerCell = row?.querySelector('td[role="rowheader"]');
+        if (headerCell) {
+            headerCell.classList.add('matrix-go-unmatched-row-header');
+            headerCell.setAttribute('title', _t('Not matched in GO API — imported from Excel'));
+        }
+    });
+},
 
 /**
  * Sort matrix rows alphabetically by row label

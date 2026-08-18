@@ -5,7 +5,9 @@ GET https://data-api.ifrc.org/api/documents?apiKey=...&showunpublished=true&forc
 
 Public document URLs must be percent-encoded (spaces in paths). Use GET (HEAD is unreliable).
 HTTP 200/206 → save to submission storage and clear ``file_pending``.
-HTTP 403/404 → keep ``file_pending=True``, set ``source_url_http_status``, retried on later syncs.
+HTTP 403/404 → retry once without a trailing ``_N`` filename suffix (API catalog
+sometimes includes a duplicate suffix the file store does not); if still failing,
+keep ``file_pending=True``, set ``source_url_http_status``, retried on later syncs.
 When IFRC fixes the URL, a successful 200/206 clears ``source_url_http_status`` and saves the file.
 """
 
@@ -69,6 +71,9 @@ _FDRS_DOC_USER_AGENT = "HumanitarianDatabank-FDRS-sync/1.0"
 _DEFAULT_DOWNLOAD_TIMEOUT = 120
 _PROGRESS_REPORT_EVERY = 10
 _YEAR_IN_TEXT_RE = re.compile(r"\b(20\d{2})\b")
+# IFRC duplicate-filename suffix immediately before the extension (_1.pdf, _12.docx).
+# Does not match year (_2016) or placeholder (_0).
+_DUP_FILENAME_SUFFIX_RE = re.compile(r"_([1-9]\d?)(\.[A-Za-z0-9]+)$")
 
 
 def encode_fdrs_document_url(url: str) -> str:
@@ -78,22 +83,37 @@ def encode_fdrs_document_url(url: str) -> str:
     return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, parts.query, parts.fragment))
 
 
-def fetch_fdrs_document_bytes(
-    url: str,
-    *,
-    timeout: int = _DEFAULT_DOWNLOAD_TIMEOUT,
-    dry_run: bool = False,
-) -> Tuple[Optional[bytes], int]:
+def fdrs_url_without_duplicate_suffix(url: str) -> Optional[str]:
     """
-    Download FDRS document content via GET.
+    Return *url* with a trailing ``_N`` filename suffix removed, or ``None``.
 
-    Returns ``(data, http_status)``. *data* is set for 200/206 when not *dry_run*
-    (dry_run uses a Range probe and returns ``(None, status)``).
+    The FDRS documents API sometimes returns ``…_es_1.pdf`` when the file on
+    disk is ``…_es.pdf``. Only strips 1–2 digit suffixes 1–99 (not ``_0`` / years).
     """
     raw = (url or "").strip()
     if not raw:
-        return None, 0
-    enc = encode_fdrs_document_url(raw)
+        return None
+    parts = urllib.parse.urlsplit(raw)
+    path = parts.path or ""
+    dirname, sep, filename = path.rpartition("/")
+    if not filename:
+        return None
+    new_name, n = _DUP_FILENAME_SUFFIX_RE.subn(r"\2", filename, count=1)
+    if n != 1 or new_name == filename:
+        return None
+    new_path = f"{dirname}{sep}{new_name}" if sep else new_name
+    return urllib.parse.urlunsplit(
+        (parts.scheme, parts.netloc, new_path, parts.query, parts.fragment)
+    )
+
+
+def _fetch_fdrs_document_bytes_once(
+    url: str,
+    *,
+    timeout: int,
+    dry_run: bool,
+) -> Tuple[Optional[bytes], int]:
+    enc = encode_fdrs_document_url(url)
     headers = {"User-Agent": _FDRS_DOC_USER_AGENT}
     if dry_run:
         headers["Range"] = "bytes=0-0"
@@ -109,8 +129,47 @@ def fetch_fdrs_document_bytes(
     except urllib.error.HTTPError as e:
         return None, e.code
     except Exception as e:
-        logger.warning("FDRS document download failed for %s: %s", raw[:120], e)
+        logger.warning("FDRS document download failed for %s: %s", url[:120], e)
         return None, -1
+
+
+def fetch_fdrs_document_bytes(
+    url: str,
+    *,
+    timeout: int = _DEFAULT_DOWNLOAD_TIMEOUT,
+    dry_run: bool = False,
+) -> Tuple[Optional[bytes], int]:
+    """
+    Download FDRS document content via GET.
+
+    Returns ``(data, http_status)``. *data* is set for 200/206 when not *dry_run*
+    (dry_run uses a Range probe and returns ``(None, status)``).
+
+    On HTTP 403/404, retries once without a trailing ``_N`` filename suffix
+    (API catalog sometimes includes a duplicate suffix the file store does not).
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return None, 0
+    data, status = _fetch_fdrs_document_bytes_once(
+        raw, timeout=timeout, dry_run=dry_run
+    )
+    if status not in (403, 404):
+        return data, status
+    alt = fdrs_url_without_duplicate_suffix(raw)
+    if not alt:
+        return data, status
+    alt_data, alt_status = _fetch_fdrs_document_bytes_once(
+        alt, timeout=timeout, dry_run=dry_run
+    )
+    if alt_status in (200, 206):
+        logger.info(
+            "FDRS document URL HTTP %s; succeeded without duplicate suffix: %s",
+            status,
+            alt[:160],
+        )
+        return alt_data, alt_status
+    return data, status
 
 
 def _save_fdrs_document_bytes(

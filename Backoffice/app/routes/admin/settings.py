@@ -246,6 +246,12 @@ def _build_ai_groups():
                     'When enabled, documents that are set to Approved (upload, edit, or Approve action) are queued for the AI knowledge base without a separate manual import.',
                     True,
                 ),
+                bln(
+                    'AI_DOC_COUNTRY_LLM_ENABLED',
+                    'LLM country/scope fallback',
+                    'Use a cheap LLM to classify country and geographic scope when keyword detection is uncertain (language editions, Geneva HQ mentions, missing scope).',
+                    True,
+                ),
                 num('AI_MAX_DOCUMENT_SIZE_MB', 'Max Document Size (MB)', 'Maximum file size for AI processing.', 50),
                 num('AI_CHUNK_SIZE', 'Chunk Size (tokens)', 'Smaller = more precise, larger = more context.', 512),
                 num('AI_CHUNK_OVERLAP', 'Chunk Overlap (tokens)', 'Overlap to maintain context across chunk boundaries.', 50),

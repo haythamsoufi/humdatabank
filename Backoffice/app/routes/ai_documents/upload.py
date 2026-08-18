@@ -580,12 +580,15 @@ def _apply_country_detection_to_doc(doc: AIDocument, extracted: dict | None, doc
             doc.country_name = det.primary_country_name
             doc.geographic_scope = det.scope
             logger.info(
-                "Country detection applied for AI document %s: primary_country_id=%r primary_country_name=%r scope=%r countries=%s",
+                "Country detection applied for AI document %s: primary_country_id=%r primary_country_name=%r scope=%r countries=%s source=%s confidence=%.2f reason=%s",
                 document_id,
                 det.primary_country_id,
                 det.primary_country_name,
                 det.scope,
                 [name for _cid, name in (det.countries or [])],
+                getattr(det, "source", "keyword"),
+                float(getattr(det, "confidence", 0) or 0),
+                getattr(det, "reason", "") or "",
             )
 
             try:

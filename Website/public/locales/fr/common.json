@@ -748,7 +748,7 @@
     },
     "endpoint": {
       "title": "Point de Terminaison",
-      "method": "GET",Humanitarian Databank
+      "method": "GET",
       "path": "http://localhost:5000/api/v1/data",
       "description": "Récupérer les données des formulaires et soumissions Humanitarian Databank (clé API incluse automatiquement)"
     },

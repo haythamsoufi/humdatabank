@@ -760,6 +760,14 @@ class Config:
     AI_AUTO_PROCESS_APPROVED_DOCUMENTS = _parse_bool(
         os.environ.get('AI_AUTO_PROCESS_APPROVED_DOCUMENTS'), default=True
     )
+    # Country/scope: keyword pass first; LLM only when keyword confidence is below this threshold.
+    AI_DOC_COUNTRY_LLM_ENABLED = _parse_bool(os.environ.get('AI_DOC_COUNTRY_LLM_ENABLED'), default=True)
+    try:
+        AI_DOC_COUNTRY_LLM_MIN_CONFIDENCE = float(os.environ.get('AI_DOC_COUNTRY_LLM_MIN_CONFIDENCE', '0.7'))
+    except ValueError:
+        AI_DOC_COUNTRY_LLM_MIN_CONFIDENCE = 0.7
+    # Blank => AI_QUERY_REWRITE_MODEL / gpt-4o-mini (cheap classifier, not the main chat model).
+    AI_DOC_COUNTRY_LLM_MODEL = (os.environ.get('AI_DOC_COUNTRY_LLM_MODEL') or '').strip() or None
 
     # Vector Search
     AI_TOP_K_RESULTS = int(os.environ.get('AI_TOP_K_RESULTS', '5'))

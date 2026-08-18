@@ -927,6 +927,185 @@ def reprocess_document_metadata(document_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
+@bp.route("/documents/mine-terminology", methods=["POST"])
+@admin_permission_required('admin.ai.manage')
+@limiter.limit("10 per minute")
+def mine_document_terminology():
+    """Mine glossary candidates from selected Knowledge Base documents."""
+    from app.services.translation.glossary_mining import mine_selected_documents
+    from app.utils.request_utils import parse_ids_from_request
+
+    try:
+        ids = parse_ids_from_request("ids")
+    except Exception:
+        ids = []
+        if is_json_request():
+            payload = get_json_safe() or {}
+            raw = payload.get("ids") or []
+            if isinstance(raw, str):
+                ids = [int(x) for x in raw.split(",") if x.strip().isdigit()]
+            elif isinstance(raw, list):
+                ids = [int(x) for x in raw if str(x).isdigit() or isinstance(x, int)]
+    if not ids:
+        return json_bad_request("No document IDs provided")
+    result = mine_selected_documents(ids)
+    message = result.get("message") or "Terminology mining complete"
+    if result.get("documents", 0) == 0:
+        message = (
+            "No completed documents in the selection. Wait until processing finishes, "
+            "then mine again."
+        )
+    elif result.get("candidates", 0) == 0:
+        reason = result.get("reason") or ""
+        if reason == "same_language":
+            message = (
+                "No new glossary candidates. Every completed file has the same "
+                "detected language. Reprocess metadata if these are different "
+                "language versions."
+            )
+        elif reason == "openai_unavailable":
+            message = (
+                "No new glossary candidates. LLM pairing needs OPENAI_API_KEY. "
+                "Regex acronym join also found no shared (ACRONYM) expansions."
+            )
+        elif reason == "llm_no_grounded_pairs":
+            message = (
+                "The model extracted English terms but could not attest a target "
+                "wording in retrieved chunks. Nothing was added to the inbox."
+            )
+        elif reason == "llm_no_source_terms":
+            message = (
+                "The model did not find glossary-length terms in the English document."
+            )
+        elif reason == "no_english_source":
+            message = (
+                "LLM pairing needs an English file in the selection (or mark English "
+                "via Reprocess metadata)."
+            )
+        else:
+            message = (
+                "No new glossary candidates. Acronym join found no shared expansions, "
+                "and LLM pairing did not produce grounded term pairs."
+            )
+    return json_ok(message=message, **result)
+
+
+@bp.route("/documents/translation-pair", methods=["POST"])
+@admin_permission_required('admin.ai.manage')
+def mark_translation_document_pair():
+    """Record an opt-in document pair. Sentence-level TM is deferred."""
+    from app.models.translation_quality import TranslationDocumentPair
+    from app.extensions import db
+
+    payload = get_json_safe() or {}
+    try:
+        source_id = int(payload.get("source_document_id"))
+        target_id = int(payload.get("target_document_id"))
+    except (TypeError, ValueError):
+        return json_bad_request("source_document_id and target_document_id are required")
+    if source_id == target_id:
+        return json_bad_request("Pair must be two different documents")
+    existing = TranslationDocumentPair.query.filter_by(
+        source_document_id=source_id, target_document_id=target_id
+    ).first()
+    if existing is None:
+        db.session.add(
+            TranslationDocumentPair(
+                source_document_id=source_id,
+                target_document_id=target_id,
+                source_lang=str(payload.get("source_lang") or "en")[:10],
+                target_lang=str(payload.get("target_lang") or "fr")[:10],
+                status="deferred",
+                note="Sentence-level TM is deferred until glossary mining is proven. Re-segment with LaBSE/Bertalign; do not align 512-token chunks.",
+                created_by_user_id=getattr(current_user, "id", None),
+            )
+        )
+        db.session.commit()
+    return json_ok(
+        deferred=True,
+        message="Pair recorded. Sentence-level translation memory is deferred.",
+    )
+
+
+@bp.route("/documents/translation-group", methods=["POST"])
+@admin_permission_required('admin.ai.manage')
+def mark_translation_document_group():
+    """Mark 2+ selected documents as the same publication in different languages."""
+    from app.models.embeddings import AIDocument
+    from app.models.translation_quality import TranslationDocumentPair
+    from app.extensions import db
+
+    payload = get_json_safe() or {}
+    raw_ids = payload.get("ids") or []
+    try:
+        ids = sorted({int(x) for x in raw_ids})
+    except (TypeError, ValueError):
+        return json_bad_request("ids must be a list of document IDs")
+    if len(ids) < 2:
+        return json_bad_request("Select at least two documents")
+
+    docs = AIDocument.query.filter(AIDocument.id.in_(ids)).all()
+    if len(docs) < 2:
+        return json_bad_request("Could not load the selected documents")
+
+    lang_overrides = payload.get("languages") if isinstance(payload.get("languages"), dict) else {}
+
+    def _lang(doc):
+        override = lang_overrides.get(str(doc.id)) or lang_overrides.get(doc.id)
+        return str(override or doc.document_language or "en").lower()[:10]
+
+    english = [d for d in docs if _lang(d) == "en"]
+    hub = english[0] if english else docs[0]
+    created = 0
+    pairs = []
+    for doc in docs:
+        if int(doc.id) == int(hub.id):
+            continue
+        existing = TranslationDocumentPair.query.filter_by(
+            source_document_id=int(hub.id),
+            target_document_id=int(doc.id),
+        ).first()
+        if existing is None:
+            db.session.add(
+                TranslationDocumentPair(
+                    source_document_id=int(hub.id),
+                    target_document_id=int(doc.id),
+                    source_lang=_lang(hub),
+                    target_lang=_lang(doc),
+                    status="deferred",
+                    note="Same publication marked from the Knowledge Base. Sentence-level TM stays deferred.",
+                    created_by_user_id=getattr(current_user, "id", None),
+                )
+            )
+            created += 1
+        pairs.append({
+            "source_document_id": int(hub.id),
+            "target_document_id": int(doc.id),
+            "source_lang": _lang(hub),
+            "target_lang": _lang(doc),
+        })
+    db.session.commit()
+    langs = sorted({_lang(d) for d in docs})
+    message = (
+        "Marked as the same publication. "
+        f"{created} language pair(s) recorded. "
+        "Sentence-level translation memory stays deferred; terminology mining can use the group."
+    )
+    if len(langs) < 2:
+        message += (
+            " Every file has the same detected language. "
+            "Use Reprocess metadata if these are different language versions, then mark again."
+        )
+    return json_ok(
+        created=created,
+        pairs=pairs,
+        hub_document_id=int(hub.id),
+        languages=langs,
+        deferred=True,
+        message=message,
+    )
+
+
 @bp.route("/documents/bulk-reprocess", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")

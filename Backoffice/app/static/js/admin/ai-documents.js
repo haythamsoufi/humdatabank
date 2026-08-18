@@ -91,6 +91,73 @@ function getCategoryLabel(value) {
     return opt ? opt.label : value.replace(/_/g, ' ');
 }
 
+var countryOptionsCache = null;
+var countryOptionsPromise = null;
+
+function geographySelectValue(data) {
+    const scope = String((data && data.geographic_scope) || '').trim().toLowerCase();
+    if (scope === 'global' || scope === 'regional' || scope === 'cluster') return 'scope:' + scope;
+    const countryId = data && data.country_id != null ? Number(data.country_id) : NaN;
+    if (Number.isFinite(countryId) && countryId > 0) return 'country:' + countryId;
+    return 'scope:';
+}
+
+function geographyPayloadFromSelectValue(value) {
+    const raw = String(value || '');
+    if (raw.indexOf('country:') === 0) {
+        const countryId = Number(raw.slice('country:'.length));
+        if (Number.isFinite(countryId) && countryId > 0) {
+            return { geographic_scope: null, country_id: countryId };
+        }
+        return { geographic_scope: null, country_id: null };
+    }
+    const scope = raw.indexOf('scope:') === 0 ? raw.slice('scope:'.length) : raw;
+    if (scope === 'global' || scope === 'regional' || scope === 'cluster') {
+        return { geographic_scope: scope };
+    }
+    return { geographic_scope: null, country_id: null };
+}
+
+function mapCountryOptions(list) {
+    const rows = Array.isArray(list) ? list : [];
+    return rows.map(function (c) {
+        const id = c && c.id != null ? Number(c.id) : NaN;
+        const name = String((c && (c.name || c.localized_name)) || '').trim();
+        return {
+            id: Number.isFinite(id) ? id : null,
+            name: name,
+            iso3: String((c && c.iso3) || '').trim(),
+        };
+    }).filter(function (c) { return c.id && c.name; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); });
+}
+
+function ensureCountryOptions() {
+    if (countryOptionsCache) return Promise.resolve(countryOptionsCache);
+    if (countryOptionsPromise) return countryOptionsPromise;
+    const fetchImpl = (window.getFetch && window.getFetch()) || fetch;
+    countryOptionsPromise = fetchImpl('/api/v1/countrymap', {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(function (response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+    }).then(function (payload) {
+        const raw = Array.isArray(payload) ? payload : (payload && payload.countries) || [];
+        countryOptionsCache = mapCountryOptions(raw);
+        if (documentsGridApi && typeof documentsGridApi.refreshCells === 'function') {
+            documentsGridApi.refreshCells({ columns: ['country_name'], force: true });
+        }
+        return countryOptionsCache;
+    }).catch(function (err) {
+        countryOptionsPromise = null;
+        window.__clientWarn && window.__clientWarn('Failed to load countries for editor', err);
+        return [];
+    });
+    return countryOptionsPromise;
+}
+
 // Processing status — server-backed jobs via ai-documents-job-progress.js
 var jobProgress = window.AiDocsJobProgress;
 const AI_DOCS_DEBUG = !!(cfg.debug);
@@ -255,7 +322,8 @@ function updateDocumentInGrid(docId, patch) {
         node.setData(next);
         const cols = ['processing_status', 'total_chunks', 'is_public'];
         const p = patch || {};
-        if (p.redetect_processing !== undefined || p.country_name !== undefined || p.country_iso3 !== undefined || p.geographic_scope !== undefined) {
+        if (p.redetect_processing !== undefined || p.country_name !== undefined || p.country_iso3 !== undefined
+            || p.geographic_scope !== undefined || p.country_id !== undefined || p.countries !== undefined) {
             cols.push('country_name', 'geographic_scope');
         }
         if (p.document_date !== undefined || p.document_language !== undefined || p.source_organization !== undefined
@@ -294,7 +362,11 @@ function mapDocToGridRow(doc) {
     if (!Array.isArray(countries)) countries = [];
     countries = countries.map(function(c) {
         if (c && typeof c === 'object') {
-            return { name: String(c.name || '').trim(), iso3: String(c.iso3 || '').trim() };
+            return {
+                id: c.id != null ? Number(c.id) : null,
+                name: String(c.name || '').trim(),
+                iso3: String(c.iso3 || '').trim(),
+            };
         }
         return { name: String(c || '').trim(), iso3: '' };
     });
@@ -302,6 +374,7 @@ function mapDocToGridRow(doc) {
         id: doc.id,
         title: doc.title || 'Untitled',
         filename: doc.filename || '',
+        country_id: doc.country_id || (countries[0] && countries[0].id) || null,
         country_name: doc.country_name || '',
         country_iso3: doc.country_iso3 || '',
         geographic_scope: doc.geographic_scope || '',
@@ -508,73 +581,40 @@ const columnDefs = [
                     '<span class="animate-spin inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full" aria-hidden="true"></span>' +
                     '<span>' + cfg.t.redetecting_aa72bb32 + '</span></span>';
             }
-            const scope = (data.geographic_scope || '').trim().toLowerCase();
-            let countries = Array.isArray(data.countries) ? data.countries : [];
-            if (!countries.length && data.country_name && (scope === 'regional' || scope === 'cluster')) {
-                countries = String(data.country_name)
-                    .split(',')
-                    .map(function(name) { return { name: name.trim(), iso3: '' }; })
-                    .filter(function(c) { return c.name; });
+            const docId = data.id || '';
+            const selected = geographySelectValue(data);
+            const title = cfg.t.click_to_change_country_or_scope_39b04e99 || '';
+            const currentCountryId = data.country_id != null ? Number(data.country_id) : null;
+            let options = countryOptionsCache ? countryOptionsCache.slice() : [];
+            if (currentCountryId && !options.some(function (c) { return Number(c.id) === currentCountryId; })) {
+                options = [{
+                    id: currentCountryId,
+                    name: data.country_name || String(currentCountryId),
+                    iso3: data.country_iso3 || '',
+                }].concat(options);
             }
-
-            // Scope pills: FA webfont glyphs need explicit box + line-height. Use inline styles here so
-            // alignment works even when Tailwind arbitrary classes (e.g. h-[1em]) are missing from output.css.
-            const _scopeIcon = function(iconClass) {
-                return '<span class="inline-flex shrink-0 items-center justify-center" style="width:1em;height:1em;line-height:1" aria-hidden="true">' +
-                    '<i class="' + iconClass + '" style="display:block;line-height:1;font-size:0.95em"></i></span>';
-            };
-            const _scopePill = function(twColorClasses, iconClass, labelHtml) {
-                return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ' + twColorClasses + '" style="line-height:1">' +
-                    _scopeIcon(iconClass) + '<span style="line-height:1">' + labelHtml + '</span></span>';
-            };
-            const _countryNameWrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;min-width:0';
-
-            // Global scope badge
-            if (scope === 'global') {
-                return _scopePill('bg-blue-100 text-blue-800', 'fas fa-globe', cfg.t.global_4cc6684d);
-            }
-
-            // Regional scope badge (no country list)
-            if (scope === 'regional' && countries.length === 0) {
-                return _scopePill('bg-purple-100 text-purple-800', 'fas fa-map', cfg.t.regional_9c1c6794);
-            }
-
-            // Regional with countries: badge only; full list on hover via tooltip
-            if (scope === 'regional' && countries.length > 0) {
-                return _scopePill('bg-purple-100 text-purple-800', 'fas fa-map', cfg.t.regional_9c1c6794);
-            }
-
-            // Cluster (multi-country / NS set, not a platform region label)
-            // Note: theme maps `blue` and `teal` to the same palette — do not use teal here or Cluster matches Global.
-            if (scope === 'cluster') {
-                return _scopePill('bg-amber-100 text-amber-800', 'fas fa-layer-group', cfg.t.cluster_249694a4);
-            }
-
-            // No countries at all
-            if (countries.length === 0) {
-                const name = (params.value || '').trim();
-                if (!name) {
-                    return '<span class="text-xs text-gray-400">' + cfg.t.n_a_382b0f51 + '</span>';
-                }
-                const iso3 = (data.country_iso3 ? String(data.country_iso3).trim() : '');
-                const suffix = iso3 ? ' <span class="text-xs text-gray-400">(' + escapeHtml(iso3) + ')</span>' : '';
-                return '<span class="text-sm font-medium text-gray-900" style="' + _countryNameWrap + '">' + escapeHtml(name) + '</span>' + suffix;
-            }
-
-            // Single country
-            if (countries.length === 1) {
-                const c = countries[0];
-                const iso = c.iso3 ? ' <span class="text-xs text-gray-400">(' + escapeHtml(c.iso3) + ')</span>' : '';
-                return '<span class="text-sm font-medium text-gray-900" style="' + _countryNameWrap + '">' + escapeHtml(c.name || '') + '</span>' + iso;
-            }
-
-            // Multiple countries, non-regional (e.g. multi-country doc)
-            const scopeBadge = '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 mr-1" style="line-height:1">' +
-                '<span class="inline-flex shrink-0 items-center justify-center" style="width:1em;height:1em;line-height:1" aria-hidden="true">' +
-                '<i class="fas fa-globe-americas" style="display:block;line-height:1;font-size:0.95em"></i></span>' +
-                '<span style="line-height:1">' + countries.length + ' ' + cfg.t.countries_71bee43a + '</span></span>';
-            const names = countries.map(function(c) { return c.name + (c.iso3 ? ' (' + c.iso3 + ')' : ''); }).join(', ');
-            return scopeBadge + '<span class="text-xs text-gray-600" style="' + _countryNameWrap + '" title="' + escapeAttr(names) + '">' + escapeHtml(names) + '</span>';
+            const scopeOpts = [
+                { value: 'scope:', label: cfg.t.none_49bd59b9 },
+                { value: 'scope:global', label: cfg.t.global_4cc6684d },
+                { value: 'scope:regional', label: cfg.t.regional_9c1c6794 },
+                { value: 'scope:cluster', label: cfg.t.cluster_249694a4 },
+            ].map(function (o) {
+                return '<option value="' + escapeAttr(o.value) + '"' + (o.value === selected ? ' selected' : '') + '>' +
+                    escapeHtml(o.label) + '</option>';
+            }).join('');
+            const countryOpts = options.map(function (c) {
+                const value = 'country:' + c.id;
+                const label = c.iso3 ? (c.name + ' (' + c.iso3 + ')') : c.name;
+                return '<option value="' + escapeAttr(value) + '"' +
+                    (value === selected ? ' selected' : '') + '>' +
+                    escapeHtml(label) + '</option>';
+            }).join('');
+            return '<select class="ai-doc-geography-select text-xs border-0 bg-transparent focus:ring-1 focus:ring-blue-400 rounded cursor-pointer w-full py-0.5 font-medium text-gray-800" ' +
+                'data-ai-doc-action="change-geography" data-doc-id="' + escapeAttr(String(docId)) + '" ' +
+                'title="' + escapeAttr(title) + '">' +
+                '<optgroup label="' + escapeAttr(cfg.t.country_scope_281f8863) + '">' + scopeOpts + '</optgroup>' +
+                '<optgroup label="' + escapeAttr(cfg.t.countries_790d59ef) + '">' + countryOpts + '</optgroup>' +
+                '</select>';
         },
         valueGetter: function(params) {
             const data = params.data || {};
@@ -851,6 +891,7 @@ async function loadDocumentsGrid() {
     try {
         const rows = await fetchAllDocumentsForGrid();
         ensureDocumentsGrid(rows);
+        ensureCountryOptions();
 
         if (loadingEl) loadingEl.style.display = 'none';
         if (rows.length > 0) {
@@ -895,12 +936,28 @@ function initializeDocumentsBulkActions() {
     const reprocessBtn = document.getElementById('bulkReprocessBtn');
     const redetectCountryBtn = document.getElementById('bulkRedetectCountryBtn');
     const reprocessMetaBtn = document.getElementById('bulkReprocessMetaBtn');
+    const mineTerminologyBtn = document.getElementById('bulkMineTerminologyBtn');
+    const markSamePublicationBtn = document.getElementById('bulkMarkSamePublicationBtn');
     const deleteBtn = document.getElementById('bulkDeleteBtn');
     const downloadLabel = document.getElementById('bulkDownloadBtnLabel');
     const reprocessLabel = document.getElementById('bulkReprocessBtnLabel');
     const redetectCountryLabel = document.getElementById('bulkRedetectCountryBtnLabel');
     const reprocessMetaLabel = document.getElementById('bulkReprocessMetaBtnLabel');
+    const mineTerminologyLabel = document.getElementById('bulkMineTerminologyBtnLabel');
+    const markSamePublicationLabel = document.getElementById('bulkMarkSamePublicationBtnLabel');
     const deleteLabel = document.getElementById('bulkDeleteBtnLabel');
+
+    const notifyDocs = function(msg, type) {
+        if (window.showAlert) {
+            window.showAlert(msg, type || 'info');
+        } else {
+            window.alert(msg);
+        }
+    };
+
+    const docLanguage = function(row) {
+        return String((row && (row.document_language || row.language)) || 'en').toLowerCase().slice(0, 10);
+    };
 
     if (!bulkContainer || !downloadBtn || !reprocessBtn || !deleteBtn || !downloadLabel || !reprocessLabel || !deleteLabel) {
         return;
@@ -947,6 +1004,14 @@ function initializeDocumentsBulkActions() {
             ? cfg.t.redetect_country_2f20e028 + ' (' + eligibleReprocess.length + ')'
             : cfg.t.redetect_country_2f20e028;
         if (reprocessMetaBtn) reprocessMetaBtn.disabled = eligibleReprocess.length === 0;
+        if (mineTerminologyBtn) mineTerminologyBtn.disabled = eligibleReprocess.length === 0;
+        if (mineTerminologyLabel) mineTerminologyLabel.textContent = selectedCount > 0
+            ? (cfg.t.mine_terminology_8c2f1a4d || 'Mine terminology') + ' (' + eligibleReprocess.length + ')'
+            : (cfg.t.mine_terminology_8c2f1a4d || 'Mine terminology');
+        if (markSamePublicationBtn) markSamePublicationBtn.disabled = selectedCount < 2;
+        if (markSamePublicationLabel) markSamePublicationLabel.textContent = selectedCount >= 2
+            ? (cfg.t.mark_as_same_publication_c4e8a1b2 || 'Mark as same publication') + ' (' + selectedCount + ')'
+            : (cfg.t.mark_as_same_publication_c4e8a1b2 || 'Mark as same publication');
         if (reprocessMetaLabel) reprocessMetaLabel.textContent = selectedCount > 0
             ? cfg.t.reprocess_metadata_4a7b1eab + ' (' + eligibleReprocess.length + ')'
             : cfg.t.reprocess_metadata_4a7b1eab;
@@ -1251,8 +1316,142 @@ function initializeDocumentsBulkActions() {
         }
     };
 
+    const bulkMineTerminologySelected = async function() {
+        const selectedRows = getSelectedDocs();
+        const targets = (selectedRows || []).filter(function(r) {
+            return r && r.id != null && r.id !== undefined && !isProcessingStatus(r.processing_status);
+        });
+        const ids = targets.map(function(r) { return r.id; });
+        if (!ids.length) {
+            notifyDocs(cfg.t.please_select_at_least_one_document_db0de074 || 'Please select at least one document', 'warning');
+            return;
+        }
+        const url = (cfg.urls && cfg.urls.mineTerminology) || '/admin/ai/documents/mine-terminology';
+        const title = cfg.t.mining_terminology_4d8e2a11 || 'Mining terminology';
+        const scanning = cfg.t.mining_scanning_chunks_7b1c9e02 || 'Reading chunks and comparing languages...';
+        const failedText = cfg.t.mining_failed_e5f6a7b8 || 'Terminology mining failed';
+
+        if (mineTerminologyBtn) {
+            mineTerminologyBtn.disabled = true;
+            mineTerminologyBtn.setAttribute('aria-busy', 'true');
+        }
+        if (mineTerminologyLabel) {
+            mineTerminologyLabel.textContent = title + '...';
+        }
+        showProcessingBanner(title + ' (0/' + ids.length + ')', cfg.t.starting_8c6ce9f8 || 'Starting...', 8);
+
+        let pulse = 12;
+        const pulseTimer = window.setInterval(function() {
+            pulse = Math.min(90, pulse + 6);
+            showProcessingBanner(title + ' (' + ids.length + ')', scanning, pulse);
+        }, 700);
+
+        try {
+            const res = await csrfFetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ids: ids })
+            });
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (parseErr) {
+                throw new Error(failedText + ' (HTTP ' + res.status + ')');
+            }
+            if (!res.ok && !data.success) {
+                throw new Error(data.message || data.error || (failedText + ' (HTTP ' + res.status + ')'));
+            }
+            const candidates = data.candidates || 0;
+            const documents = data.documents || 0;
+            const type = data.success
+                ? (candidates > 0 ? 'success' : 'warning')
+                : 'error';
+            const message = data.message || data.error || (cfg.t.mining_complete_3a6f8c14 || 'Terminology mining complete');
+            showProcessingBanner(
+                (cfg.t.mining_complete_3a6f8c14 || 'Terminology mining complete') + ' (' + documents + '/' + ids.length + ')',
+                candidates + ' candidates',
+                100
+            );
+            notifyDocs(message, type);
+            window.setTimeout(hideProcessingBanner, 3500);
+        } catch (e) {
+            hideProcessingBanner();
+            notifyDocs(failedText + ': ' + ((e && e.message) || e), 'error');
+        } finally {
+            window.clearInterval(pulseTimer);
+            if (mineTerminologyBtn) mineTerminologyBtn.removeAttribute('aria-busy');
+            updateButtons(getSelectedDocs());
+        }
+    };
+
+    const bulkMarkSamePublicationSelected = async function() {
+        if (!markSamePublicationBtn) return;
+        const selectedRows = getSelectedDocs();
+        const targets = (selectedRows || []).filter(function(r) {
+            return r && r.id != null && r.id !== undefined;
+        });
+        if (targets.length < 2) {
+            notifyDocs(cfg.t.select_at_least_two_documents_b8d1e4c3 || 'Select at least two documents', 'warning');
+            return;
+        }
+        const langs = targets.map(function(r) { return docLanguage(r); });
+        const uniqueLangs = Array.from(new Set(langs));
+        const listing = targets.map(function(r) {
+            return (r.title || r.filename || ('#' + r.id)) + ' (' + docLanguage(r) + ')';
+        }).join('\n');
+        let confirmMsg = (cfg.t.mark_same_publication_confirm_d7f2c9e1 || 'Mark these documents as the same publication in different languages?')
+            + '\n\n' + listing;
+        if (uniqueLangs.length < 2) {
+            confirmMsg += '\n\n' + (cfg.t.same_language_warning_a9c3d2e1
+                || 'Every selected file has the same detected language. Reprocess metadata first if these are different language versions.');
+        }
+
+        const proceed = async function() {
+            const url = (cfg.urls && cfg.urls.markTranslationGroup) || '/admin/ai/documents/translation-group';
+            try {
+                const res = await csrfFetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ ids: targets.map(function(r) { return r.id; }) })
+                });
+                const data = await res.json();
+                notifyDocs(
+                    data.message || data.error || (cfg.t.mark_same_publication_failed_f1a2b3c4 || 'Could not mark documents as the same publication'),
+                    data.success ? 'success' : 'error'
+                );
+            } catch (e) {
+                notifyDocs((cfg.t.mark_same_publication_failed_f1a2b3c4 || 'Could not mark documents as the same publication') + ': ' + ((e && e.message) || e), 'error');
+            }
+        };
+
+        if (window.showConfirmation) {
+            window.showConfirmation(
+                confirmMsg,
+                proceed,
+                null,
+                cfg.t.mark_as_same_publication_c4e8a1b2 || 'Mark as same publication',
+                cfg.t.cancel_ea478870,
+                cfg.t.mark_as_same_publication_c4e8a1b2 || 'Mark as same publication'
+            );
+        } else {
+            proceed();
+        }
+    };
+
     downloadBtn.addEventListener('click', function() {
         bulkDownloadSelected();
+    });
+    if (mineTerminologyBtn) mineTerminologyBtn.addEventListener('click', function() {
+        bulkMineTerminologySelected();
+    });
+    if (markSamePublicationBtn) markSamePublicationBtn.addEventListener('click', function() {
+        bulkMarkSamePublicationSelected();
     });
     reprocessBtn.addEventListener('click', function() {
         bulkReprocessSelected();
@@ -1301,26 +1500,68 @@ function initializeUploadForm() {
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadForm = document.getElementById('uploadForm');
-    const uploadProgress = document.getElementById('uploadProgress');
-    const progressBar = document.getElementById('progressBar');
-    const uploadStatus = document.getElementById('uploadStatus');
+    const selectedFilesList = document.getElementById('selectedFilesList');
+    const docTitle = document.getElementById('docTitle');
 
     if (!dropZone || !fileInput || !uploadBtn || !uploadForm) {
         console.error('Upload form elements not found');
         return;
     }
 
-    // Update file name and enable upload button
+    function selectedFiles() {
+        return fileInput.files ? Array.from(fileInput.files) : [];
+    }
+
+    function escapeFileName(name) {
+        return String(name == null ? '' : name)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     function updateFileName() {
-        if (fileInput.files && fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            const textElements = dropZone.querySelectorAll('p');
+        const files = selectedFiles();
+        const textElements = dropZone.querySelectorAll('p');
+        const defaultDropText = cfg.t.drag_and_drop_files_here_or_click_to_sel_d56c91ec;
+        if (files.length > 0) {
             if (textElements.length > 0) {
-                textElements[0].textContent = file.name;
+                if (files.length === 1) {
+                    textElements[0].textContent = files[0].name;
+                } else {
+                    const tpl = cfg.t.count_files_selected_305e0882 || '{count} files selected';
+                    textElements[0].textContent = tpl.replace('{count}', String(files.length));
+                }
+            }
+            if (selectedFilesList) {
+                selectedFilesList.innerHTML = files.map(function (file) {
+                    return '<li class="truncate">' + escapeFileName(file.name) + '</li>';
+                }).join('');
+                selectedFilesList.classList.toggle('hidden', files.length < 2);
+            }
+            if (docTitle) {
+                const multi = files.length > 1;
+                docTitle.disabled = multi;
+                if (multi) {
+                    docTitle.title = cfg.t.title_applies_to_a_single_file_only_a075be65 || '';
+                } else {
+                    docTitle.removeAttribute('title');
+                }
             }
             uploadBtn.disabled = false;
-            window.__clientLog && window.__clientLog('File selected:', file.name);
+            window.__clientLog && window.__clientLog('Files selected:', files.map(function (f) { return f.name; }));
         } else {
+            if (textElements.length > 0 && defaultDropText) {
+                textElements[0].textContent = defaultDropText;
+            }
+            if (selectedFilesList) {
+                selectedFilesList.innerHTML = '';
+                selectedFilesList.classList.add('hidden');
+            }
+            if (docTitle) {
+                docTitle.disabled = false;
+                docTitle.removeAttribute('title');
+            }
             uploadBtn.disabled = true;
         }
     }
@@ -1355,35 +1596,112 @@ function initializeUploadForm() {
     // File selected
     fileInput.addEventListener('change', updateFileName);
 
+    function waitForDocTerminal(docId) {
+        return new Promise(function (resolve) {
+            function check() {
+                const t = (jobProgress && jobProgress.getDocState ? jobProgress.getDocState(docId) : null);
+                if (t && (t.status === 'completed' || t.status === 'failed' || t.status === 'not_found')) {
+                    resolve(t);
+                } else {
+                    setTimeout(check, 500);
+                }
+            }
+            check();
+        });
+    }
+
+    function performUploadXhr(formData, csrfToken, onProgress) {
+        if (csrfToken) {
+            formData.set('csrf_token', csrfToken);
+        }
+        return new Promise(function (resolve, reject) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/ai/documents/upload', true);
+            xhr.withCredentials = true;
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+            if (csrfToken) {
+                xhr.setRequestHeader('X-CSRFToken', csrfToken);
+            }
+            xhr.upload.onprogress = function (evt) {
+                if (typeof onProgress === 'function') onProgress(evt);
+            };
+            xhr.onerror = function () {
+                reject(new Error('Upload failed'));
+            };
+            xhr.onload = function () {
+                let payload = null;
+                try {
+                    payload = JSON.parse(xhr.responseText || '{}');
+                } catch (parseErr) {
+                    reject(parseErr);
+                    return;
+                }
+                resolve({ status: xhr.status, result: payload });
+            };
+            xhr.send(formData);
+        });
+    }
+
+    async function uploadOneFile(file, title, isPublic, onProgress) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('title', title || '');
+        formData.append('is_public', isPublic);
+
+        const token = (typeof getCSRFToken === 'function') ? getCSRFToken() : null;
+        let result = await performUploadXhr(formData, token, onProgress);
+
+        // Retry once with a freshly-refreshed token if the server rejected this one as
+        // stale/invalid — csrfFetch does the same for regular fetch-based requests.
+        if (isCsrfFailureResponse(result.status, result.result) && typeof refreshCSRFToken === 'function') {
+            const newToken = await refreshCSRFToken();
+            if (newToken) {
+                result = await performUploadXhr(formData, newToken, onProgress);
+            }
+        }
+        return result;
+    }
+
+    function notifyUpload(message, type) {
+        if (window.showAlert) {
+            window.showAlert(message, type || 'error');
+        } else {
+            window.__clientWarn && window.__clientWarn(message);
+        }
+    }
+
+    function bannerUploadProgress(index, total, fileName, fileFrac) {
+        const ofTotalTpl = cfg.t.uploading_current_of_total_a2e8f4f8 || 'Uploading {current} of {total}';
+        const title = total === 1
+            ? cfg.t.uploading_f2870421
+            : ofTotalTpl.replace('{current}', String(index + 1)).replace('{total}', String(total));
+        const pct = Math.round(((index + (fileFrac || 0)) / total) * 100);
+        showProcessingBanner(title, fileName || cfg.t.starting_8c6ce9f8, pct);
+    }
+
     // Upload form submit
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
         if (uploadForm.dataset.uploading === '1') return;
 
-        if (!fileInput.files || !fileInput.files.length) {
-            if (window.showAlert) {
-                window.showAlert(cfg.t.please_select_a_file_b3d4e2bc, 'warning');
-            } else {
-                if (window.showAlert) window.showAlert(cfg.t.please_select_a_file_b3d4e2bc, 'warning');
-                else window.__clientWarn && window.__clientWarn('Please select a file');
-            }
+        const files = selectedFiles();
+        if (!files.length) {
+            notifyUpload(cfg.t.please_select_a_file_b3d4e2bc, 'warning');
             return;
         }
 
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('title', document.getElementById('docTitle').value);
-        formData.append('is_public', uploadForm.querySelector('[name="is_public"]').checked);
+        const titleValue = docTitle ? docTitle.value : '';
+        const isPublic = !!(uploadForm.querySelector('[name="is_public"]') && uploadForm.querySelector('[name="is_public"]').checked);
 
         uploadForm.dataset.uploading = '1';
-        uploadBtn.disabled = true;
-        uploadProgress.classList.remove('hidden');
-        progressBar.style.width = '0%';
-        uploadStatus.textContent = cfg.t.uploading_f2870421;
+        if (typeof closeUploadModal === 'function') {
+            closeUploadModal();
+        }
+        bannerUploadProgress(0, files.length, files[0].name, 0);
 
         try {
-            window.__clientLog && window.__clientLog('Uploading file:', fileInput.files[0].name);
+            window.__clientLog && window.__clientLog('Uploading files:', files.map(function (f) { return f.name; }));
 
             // Mirror csrfFetch's pre-flight: don't race an in-flight refresh, and
             // proactively refresh an aging token before a (potentially long) upload
@@ -1395,109 +1713,84 @@ function initializeUploadForm() {
                 await refreshCSRFTokenIfStale().catch(function () { return null; });
             }
 
-            function performUploadXhr(csrfToken) {
-                if (csrfToken) {
-                    formData.set('csrf_token', csrfToken);
-                }
-                return new Promise(function (resolve, reject) {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/api/ai/documents/upload', true);
-                    xhr.withCredentials = true;
-                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-                    if (csrfToken) {
-                        xhr.setRequestHeader('X-CSRFToken', csrfToken);
-                    }
-                    xhr.upload.onprogress = function (evt) {
-                        if (!evt.lengthComputable) return;
-                        const pct = Math.round((evt.loaded / evt.total) * 100);
-                        progressBar.style.width = pct + '%';
-                        uploadStatus.textContent = cfg.t.uploading_f2870421 + ' (' + pct + '%)';
-                    };
-                    xhr.onerror = function () {
-                        reject(new Error('Upload failed'));
-                    };
-                    xhr.onload = function () {
-                        let payload = null;
-                        try {
-                            payload = JSON.parse(xhr.responseText || '{}');
-                        } catch (parseErr) {
-                            reject(parseErr);
-                            return;
-                        }
-                        resolve({ status: xhr.status, result: payload });
-                    };
-                    xhr.send(formData);
+            const processingDocIds = [];
+            const immediateSuccesses = [];
+            const uploadErrors = [];
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileTitle = files.length === 1 ? titleValue : '';
+                bannerUploadProgress(i, files.length, file.name, 0);
+
+                const result = await uploadOneFile(file, fileTitle, isPublic, function (evt) {
+                    if (!evt.lengthComputable) return;
+                    bannerUploadProgress(i, files.length, file.name, evt.loaded / evt.total);
                 });
-            }
 
-            const token = (typeof getCSRFToken === 'function') ? getCSRFToken() : null;
-            let result = await performUploadXhr(token);
+                const uploadResult = result.result || {};
+                window.__clientLog && window.__clientLog('Upload response:', uploadResult);
 
-            // Retry once with a freshly-refreshed token if the server rejected this one as
-            // stale/invalid — csrfFetch does the same for regular fetch-based requests.
-            if (isCsrfFailureResponse(result.status, result.result) && typeof refreshCSRFToken === 'function') {
-                const newToken = await refreshCSRFToken();
-                if (newToken) {
-                    result = await performUploadXhr(newToken);
-                }
-            }
-
-            const response = { status: result.status };
-            const uploadResult = result.result;
-            window.__clientLog && window.__clientLog('Upload response:', uploadResult);
-
-            if (response.status === 202 && uploadResult.success && uploadResult.document_id) {
-                uploadProgress.classList.add('hidden');
-                const docId = uploadResult.document_id;
-                showProcessingBanner(cfg.t.processing_upload_9cb556a5, cfg.t.starting_8c6ce9f8, 0);
-                updateTrackedProcessingDoc(docId, { resetProgress: true, status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
-                startProcessingPoll(docId);
-                await new Promise(function (resolve) {
-                    function check() {
-                        const t = (jobProgress && jobProgress.getDocState ? jobProgress.getDocState(docId) : null);
-                        if (t && (t.status === 'completed' || t.status === 'failed' || t.status === 'not_found')) {
-                            resolve();
-                        } else {
-                            setTimeout(check, 500);
-                        }
-                    }
-                    check();
-                });
-                const t = (jobProgress && jobProgress.getDocState ? jobProgress.getDocState(docId) : null);
-                stopProcessingPoll(docId);
-                if (t && t.status === 'completed') {
-                    showProcessingBanner(cfg.t.upload_complete_f79598ab, cfg.t.done_f92965e2, 100);
-                closeUploadModal();
-                reloadDocumentsGrid();
-                setTimeout(function() { hideProcessingBanner(); uploadForm.dataset.uploading = '0'; uploadBtn.disabled = false; }, 2000);
+                if (result.status === 202 && uploadResult.success && uploadResult.document_id) {
+                    processingDocIds.push(uploadResult.document_id);
+                } else if (uploadResult.success) {
+                    immediateSuccesses.push(file.name);
                 } else {
-                    uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + ((t && t.error) || uploadResult.error || 'Unknown error');
-                    hideProcessingBanner();
-                    uploadForm.dataset.uploading = '0';
-                    uploadBtn.disabled = false;
+                    uploadErrors.push(file.name + ': ' + (uploadResult.error || uploadResult.message || 'Unknown error'));
                 }
-            } else if (uploadResult.success) {
-                uploadStatus.textContent = cfg.t.upload_complete_635c737d;
-                progressBar.style.width = '100%';
-                closeUploadModal();
+            }
+
+            if (!processingDocIds.length && !immediateSuccesses.length) {
+                hideProcessingBanner();
+                notifyUpload(cfg.t.error_3d9f514d + ' ' + uploadErrors.join('; '), 'error');
+                return;
+            }
+
+            if (processingDocIds.length) {
+                showProcessingBanner(cfg.t.processing_upload_9cb556a5, cfg.t.starting_8c6ce9f8, 0);
+                processingDocIds.forEach(function (docId) {
+                    updateTrackedProcessingDoc(docId, { resetProgress: true, status: 'pending', stage: cfg.t.starting_8c6ce9f8, progress: 0 });
+                    startProcessingPoll(docId);
+                });
+                const outcomes = await Promise.all(processingDocIds.map(waitForDocTerminal));
+                processingDocIds.forEach(stopProcessingPoll);
+
+                const completed = outcomes.filter(function (t) { return t && t.status === 'completed'; }).length;
+                const failed = outcomes.length - completed;
                 reloadDocumentsGrid();
-                setTimeout(function() {
-                    uploadProgress.classList.add('hidden');
-                    uploadForm.dataset.uploading = '0';
-                    uploadBtn.disabled = false;
-                }, 1500);
+
+                if (failed === 0 && uploadErrors.length === 0) {
+                    showProcessingBanner(cfg.t.upload_complete_f79598ab, cfg.t.done_f92965e2, 100);
+                    setTimeout(function() { hideProcessingBanner(); }, 2000);
+                } else {
+                    const parts = [];
+                    if (completed) {
+                        parts.push((cfg.t.successfully_processed_count_97c0ea56 || 'Successfully processed: {count}').replace('{count}', String(completed)));
+                    }
+                    if (failed) {
+                        parts.push((cfg.t.failed_count_bc24793b || 'Failed: {count}').replace('{count}', String(failed)));
+                    }
+                    if (uploadErrors.length) {
+                        parts.push(uploadErrors.join('; '));
+                    }
+                    showProcessingBanner(cfg.t.some_documents_failed_2221bc0e, parts.join(' · '), 100);
+                    notifyUpload(parts.join(' · '), 'warning');
+                    setTimeout(function() { hideProcessingBanner(); }, 2500);
+                }
+            } else if (uploadErrors.length) {
+                hideProcessingBanner();
+                reloadDocumentsGrid();
+                notifyUpload(cfg.t.some_documents_failed_2221bc0e + ' ' + uploadErrors.join('; '), 'warning');
             } else {
-                progressBar.style.width = '100%';
-                uploadStatus.textContent = cfg.t.error_3d9f514d + ' ' + (uploadResult.error || 'Unknown error');
-                uploadForm.dataset.uploading = '0';
-                uploadBtn.disabled = false;
+                showProcessingBanner(cfg.t.upload_complete_f79598ab, cfg.t.done_f92965e2, 100);
+                reloadDocumentsGrid();
+                setTimeout(function() { hideProcessingBanner(); }, 1500);
             }
         } catch (error) {
             console.error('Upload error:', error);
-            uploadProgress.classList.remove('hidden');
-            uploadStatus.textContent = cfg.t.upload_failed_0e76390e + ' ' + error.message;
+            hideProcessingBanner();
+            notifyUpload(cfg.t.upload_failed_0e76390e + ' ' + error.message, 'error');
+        } finally {
             uploadForm.dataset.uploading = '0';
-            uploadBtn.disabled = false;
         }
     });
 }
@@ -1796,10 +2089,19 @@ function initializeUploadModal() {
         const uploadProgress = document.getElementById('uploadProgress');
         const dropZone = document.getElementById('dropZone');
         const docTitle = document.getElementById('docTitle');
+        const selectedFilesList = document.getElementById('selectedFilesList');
         if (fileInput) fileInput.value = '';
         if (uploadBtn) uploadBtn.disabled = true;
         if (uploadProgress) uploadProgress.classList.add('hidden');
-        if (docTitle) docTitle.value = '';
+        if (docTitle) {
+            docTitle.value = '';
+            docTitle.disabled = false;
+            docTitle.removeAttribute('title');
+        }
+        if (selectedFilesList) {
+            selectedFilesList.innerHTML = '';
+            selectedFilesList.classList.add('hidden');
+        }
         if (dropZone) {
             const textElements = dropZone.querySelectorAll('p');
             if (textElements.length > 0) {
@@ -3348,6 +3650,70 @@ document.addEventListener('change', async function(e) {
     } finally {
         sel.disabled = false;
     }
+});
+
+function selectedOptionDefault(sel) {
+    for (let i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].defaultSelected) return sel.options[i].value;
+    }
+    return '';
+}
+
+function markSelectedDefault(sel, value) {
+    for (let i = 0; i < sel.options.length; i++) {
+        sel.options[i].defaultSelected = sel.options[i].value === value;
+    }
+}
+
+function applyGeographyToGrid(docId, document) {
+    if (!document) return;
+    const mapped = mapDocToGridRow(document);
+    updateDocumentInGrid(docId, {
+        country_id: mapped.country_id,
+        country_name: mapped.country_name,
+        country_iso3: mapped.country_iso3,
+        geographic_scope: mapped.geographic_scope,
+        countries: mapped.countries,
+    });
+}
+
+async function saveDocumentGeography(sel, docId, payload) {
+    const prev = selectedOptionDefault(sel);
+    sel.disabled = true;
+    try {
+        const response = await csrfFetch('/api/ai/documents/' + docId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            sel.value = prev;
+            const msg = (result && result.error) ? result.error : cfg.t.failed_to_update_country_or_scope_d89f7be8;
+            if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
+            return false;
+        }
+        markSelectedDefault(sel, sel.value);
+        applyGeographyToGrid(docId, result.document);
+        return true;
+    } catch (err) {
+        sel.value = prev;
+        const msg = err && err.message ? err.message : cfg.t.failed_to_update_country_or_scope_d89f7be8;
+        if (window.showAlert) window.showAlert(msg, 'error'); else console.error(msg);
+        return false;
+    } finally {
+        sel.disabled = false;
+    }
+}
+
+document.addEventListener('change', function (e) {
+    const sel = e.target && e.target.closest
+        ? e.target.closest('select[data-ai-doc-action="change-geography"]')
+        : null;
+    if (!sel) return;
+    const docId = sel.getAttribute('data-doc-id');
+    if (!docId) return;
+    void saveDocumentGeography(sel, docId, geographyPayloadFromSelectValue(sel.value));
 });
 
 // Markdown rendering function

@@ -606,19 +606,27 @@
             if (!this.resultCountElement || !this.gridApi) {
                 return;
             }
-    
-            let displayedCount = 0;
-            if (typeof this.gridApi.getDisplayedRowCount === 'function') {
-                displayedCount = this.gridApi.getDisplayedRowCount();
-            } else if (Array.isArray(this.config.rowData)) {
-                displayedCount = this.config.rowData.length;
+
+            var liveRowData = null;
+            if (typeof this.gridApi.getGridOption === 'function') {
+                liveRowData = this.gridApi.getGridOption('rowData');
+            }
+            if (!Array.isArray(liveRowData)) {
+                liveRowData = Array.isArray(this.config.rowData) ? this.config.rowData : [];
             }
     
-            let totalCount = displayedCount;
+            let displayedCount = 0;
+            if (typeof this.gridApi.forEachNodeAfterFilter === 'function') {
+                this.gridApi.forEachNodeAfterFilter(function () { displayedCount += 1; });
+            } else if (typeof this.gridApi.getDisplayedRowCount === 'function') {
+                displayedCount = this.gridApi.getDisplayedRowCount();
+            } else {
+                displayedCount = liveRowData.length;
+            }
+    
+            let totalCount = liveRowData.length;
             if (this._resultCountTotal != null && !isNaN(this._resultCountTotal)) {
                 totalCount = this._resultCountTotal;
-            } else if (Array.isArray(this.config.rowData)) {
-                totalCount = this.config.rowData.length;
             }
     
             const showingText = this.getTranslation('showing', 'Showing');

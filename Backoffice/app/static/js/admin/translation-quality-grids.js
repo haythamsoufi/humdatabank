@@ -80,7 +80,19 @@
     }
 
     var termsApi = null;
+    var termsHelper = null;
     var inboxApi = null;
+    var inboxHelper = null;
+
+    function setGridRows(api, helper, items) {
+        if (helper && typeof helper.setRowData === 'function') {
+            helper.setRowData(items);
+            return;
+        }
+        if (api && typeof api.setGridOption === 'function') {
+            api.setGridOption('rowData', items);
+        }
+    }
     var saving = {};
     var bulkBusy = false;
 
@@ -124,7 +136,7 @@
         return jsonFetch(url).then(function (data) {
             var items = (data && data.items) || [];
             termsLoaded = true;
-            if (termsApi) termsApi.setGridOption('rowData', items);
+            setGridRows(termsApi, termsHelper, items);
             updateTermCounts(items.filter(function (row) { return row.is_active; }).length);
             return items;
         }).catch(function (err) {
@@ -136,7 +148,7 @@
         return jsonFetch(cfg.candidatesUrl).then(function (data) {
             var items = (data && data.items) || [];
             inboxLoaded = true;
-            if (inboxApi) inboxApi.setGridOption('rowData', items);
+            setGridRows(inboxApi, inboxHelper, items);
             updateInboxCounts((data && data.total) || items.length);
             return items;
         }).catch(function (err) {
@@ -369,8 +381,9 @@
         if (!window.AgGridHelper || !document.getElementById('glossaryTermsGrid')) return;
         AgGridHelper.createTabAware('glossaryTermsGrid', 'translation-quality-glossary', termsColumns(), [], {
             emptyMessage: t.noTerms || 'No approved glossary terms yet.',
-            onReady: function (api) {
+            onReady: function (api, helper) {
                 termsApi = api;
+                termsHelper = helper || termsHelper;
                 if (!termsLoaded) loadTerms();
             },
             gridOptions: {
@@ -404,8 +417,9 @@
             eventName: 'quality-tab-activated',
             tabId: 'glossary',
             deferUntilVisible: true,
-            onTabActivated: function (api) {
+            onTabActivated: function (api, helper) {
                 termsApi = api;
+                termsHelper = helper || termsHelper;
                 if (!termsLoaded) loadTerms();
                 resizeApi(api);
             }
@@ -416,8 +430,9 @@
         if (!window.AgGridHelper || !document.getElementById('glossaryInboxGrid')) return;
         AgGridHelper.createTabAware('glossaryInboxGrid', 'translation-quality-inbox', inboxColumns(), [], {
             emptyMessage: t.noCandidates || 'No pending candidates.',
-            onReady: function (api) {
+            onReady: function (api, helper) {
                 inboxApi = api;
+                inboxHelper = helper || inboxHelper;
                 if (!inboxLoaded) loadInbox();
             },
             gridOptions: {
@@ -449,8 +464,9 @@
             eventName: 'quality-tab-activated',
             tabId: 'inbox',
             deferUntilVisible: true,
-            onTabActivated: function (api) {
+            onTabActivated: function (api, helper) {
                 inboxApi = api;
+                inboxHelper = helper || inboxHelper;
                 if (!inboxLoaded) loadInbox();
                 resizeApi(api);
             }

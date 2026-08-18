@@ -75,7 +75,7 @@ Constants: `Backoffice/scripts/imports/fdrs_sync_constants.py` → `FDRS_QUESTIO
 - Maps FDRS `document_type` → form items 923, 933, 1309, 1310.
 - Creates/updates `SubmittedDocument` with `source_url`, `file_pending=true`, `storage_path=NULL`.
 - Idempotency: `fdrs_import_key` (unique).
-- **File URLs return HTTP 403** from `https://data-api.ifrc.org/documents/…` — awaiting IFRC fix; then re-run sync to download bytes into storage.
+- **File URLs return HTTP 403** from `https://data-api.ifrc.org/documents/…` — awaiting IFRC fix; then re-run sync to download bytes into storage. A small subset of 403s are stale `_N` duplicate-filename suffixes from the API catalog; download retries once without that suffix.
 
 Migration: `add_fdrs_submitted_document_metadata.py` (`source_url`, `thumbnail_source_url`, `fdrs_import_key`, `file_pending`, nullable `storage_path`).
 

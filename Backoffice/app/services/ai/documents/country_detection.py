@@ -68,6 +68,9 @@ class CountryDetectionResult:
     """Result of multi-country detection."""
     countries: List[Tuple[int, str]]  # [(country_id, country_name), ...]
     scope: Optional[str] = None       # 'global', 'regional', 'cluster', or None
+    confidence: float = 1.0           # 0–1 keyword/LLM confidence
+    source: str = "keyword"           # 'keyword' | 'llm'
+    reason: str = ""
 
     @property
     def primary_country_id(self) -> Optional[int]:
@@ -78,12 +81,75 @@ class CountryDetectionResult:
         return self.countries[0][1] if self.countries else None
 
 
+# Publisher/HQ locations that often appear on IFRC covers without being the document country.
+_HQ_COUNTRY_NAMES = frozenset({
+    "switzerland",
+    "hungary",
+    "united states",
+    "united states of america",
+})
+
+
+def score_keyword_confidence(
+    *,
+    upl_hit: bool,
+    scope: Optional[str],
+    scope_source: Optional[str],
+    title_filename_countries: list[tuple[int, str]],
+    all_countries: list[tuple[int, str]],
+    strong_global: bool,
+    had_text: bool,
+) -> tuple[float, str]:
+    """Return (confidence, reason) for the keyword pass."""
+    if upl_hit:
+        return 0.95, "upl_iso2"
+    if strong_global and scope == SCOPE_GLOBAL:
+        return 0.9, "strong_global_keyword"
+    if len(title_filename_countries) == 1 and not scope:
+        return 0.82, "filename_or_title_country"
+    if scope == SCOPE_GLOBAL and not all_countries and scope_source in ("content", "title_or_filename"):
+        return 0.72, "global_keyword"
+    names = {_fold(name) for _cid, name in (all_countries or [])}
+    hq_only = bool(names) and names <= _HQ_COUNTRY_NAMES
+    if not scope and not all_countries:
+        return (0.12 if had_text else 0.22), "empty"
+    if not scope and hq_only:
+        return 0.25, "possible_hq_false_positive"
+    if not scope and all_countries and not title_filename_countries:
+        return 0.38, "body_countries_only"
+    if not scope and all_countries:
+        return 0.55, "countries_no_scope"
+    if scope == SCOPE_GLOBAL and all_countries:
+        return 0.5, "global_plus_countries_ambiguous"
+    if scope in (SCOPE_REGIONAL, SCOPE_CLUSTER) and len(all_countries) >= _MULTI_COUNTRY_THRESHOLD:
+        return 0.68, "multi_country_scope"
+    if scope in (SCOPE_REGIONAL, SCOPE_CLUSTER):
+        return 0.64, "region_or_cluster_keyword"
+    return 0.45, "mixed"
+
+
 # ---------------------------------------------------------------------------
 # Keywords that hint at global or IFRC regional scope
 # ---------------------------------------------------------------------------
+# Scope matching folds text then keeps letters/digits from any script (not just ASCII).
+# English-only keywords miss FR/ES/AR editions of the same IFRC publication (e.g. Strategy 2030).
 _GLOBAL_KEYWORDS = [
     "global", "worldwide", "all countries",
     "cross country", "multi country", "multicountry",
+    # French / Spanish / Portuguese
+    "mondial", "mondiale", "mondiaux",
+    "mundial", "mundiales",
+    "a nivel mundial", "a l echelle mondiale",
+    "tous les pays", "todos los paises",
+    # Arabic / Chinese / Russian / Hindi
+    "عالمي", "عالمية", "عالميا",
+    "العالمي", "العالمية",
+    "على الصعيد العالمي", "على المستوى العالمي",
+    "جميع البلدان",
+    "全球", "全世界",
+    "глобальный", "глобальная", "глобальное",
+    "во всем мире",
+    "वैश्विक", "विश्वव्यापी",
 ]
 # IFRC statutory regions and common phrasing (Africa, MENA, Asia Pacific, Americas, Europe, Central Asia).
 # Do NOT use generic words like "regional" / "region" alone — those are not IFRC regional scope.
@@ -124,6 +190,11 @@ _IFRC_REGION_SCOPE_KEYWORDS = [
 _STRONG_GLOBAL_KEYWORDS = [
     "worldwide",
     "all countries",
+    "tous les pays",
+    "todos los paises",
+    "جميع البلدان",
+    "全世界",
+    "во всем мире",
 ]
 
 # Minimum number of distinct countries detected to auto-infer multi-country
@@ -139,7 +210,9 @@ def _fold(s: str) -> str:
     return s.lower()
 
 
-_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+# Keep letters/digits from any script so Arabic/Chinese/Cyrillic country names and
+# scope keywords survive normalization. Underscore is dropped like other punctuation.
+_NON_ALNUM_RE = re.compile(r"[^\w]+", re.UNICODE)
 
 # UPL codes often embed ISO2 after "MAA", e.g. UPL-2025-MAASS001 -> ISO2 "SS"
 _UPL_MAA_ISO2_RE = re.compile(r"\bUPL-\d{4}-MAA([A-Z]{2})[A-Z0-9]*\b", re.IGNORECASE)
@@ -409,6 +482,7 @@ def detect_countries(
     title: str | None,
     text: str | None,
     max_text_chars: int = 60000,
+    use_llm: bool | None = None,
 ) -> CountryDetectionResult:
     """
     Detect countries and geographic scope for a document.
@@ -417,7 +491,9 @@ def detect_countries(
     """
     candidates = _build_candidates()
     if not candidates:
-        return CountryDetectionResult(countries=[], scope=None)
+        return CountryDetectionResult(
+            countries=[], scope=None, confidence=0.1, source="keyword", reason="no_country_table"
+        )
 
     detected_scope: Optional[str] = None
     scope_source: str | None = None
@@ -550,18 +626,49 @@ def detect_countries(
             detected_scope = target_scope
             scope_source = "multi_country_default_ifrc" if ifrc_region else "multi_country_default_cluster"
 
+    combined_hay = _norm_space_text(
+        f"{title or ''} {filename or ''} {(text or '')[: max(0, int(max_text_chars or 0))]}"
+    )
+    strong_global = _has_strong_global_signal(combined_hay)
+    confidence, reason = score_keyword_confidence(
+        upl_hit=bool(upl_country),
+        scope=detected_scope,
+        scope_source=scope_source,
+        title_filename_countries=title_filename_countries,
+        all_countries=all_countries,
+        strong_global=strong_global,
+        had_text=bool(text and str(text).strip()),
+    )
+
     logger.info(
-        "country_detection:final primary=%r countries=%s scope=%r scope_source=%r",
+        "country_detection:final primary=%r countries=%s scope=%r scope_source=%r confidence=%.2f reason=%s",
         (all_countries[0][1] if all_countries else None),
         [name for _cid, name in all_countries],
         detected_scope,
         scope_source,
+        confidence,
+        reason,
     )
 
-    return CountryDetectionResult(
+    keyword_result = CountryDetectionResult(
         countries=all_countries,
         scope=detected_scope,
+        confidence=confidence,
+        source="keyword",
+        reason=reason,
     )
+    try:
+        from app.services.ai.documents.country_detection_llm import refine_if_needed
+        return refine_if_needed(
+            keyword_result,
+            filename=filename,
+            title=title,
+            text=text,
+            use_llm=use_llm,
+        )
+    except Exception as e:
+        logger.debug("country_detection: LLM refine skipped: %s", e)
+        return keyword_result
 
 
 def detect_country_id_and_name(

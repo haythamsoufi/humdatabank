@@ -307,10 +307,11 @@
                             <i class="fas fa-file-upload text-3xl text-gray-400 mb-2"></i>
                             <p class="text-sm font-medium text-gray-700 mb-1">{{ _('Drag and drop files here, or click to select') }}</p>
                             <p class="text-xs text-gray-500">{{ _('Supported: PDF, Word, Excel, Text, Markdown, HTML') }}</p>
-                            <input type="file" id="fileInput" name="file" class="sr-only" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.html">
+                            <input type="file" id="fileInput" name="file" class="sr-only" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.html" multiple>
                         </label>
+                        <ul id="selectedFilesList" class="hidden mt-3 text-left text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto" aria-live="polite"></ul>
                         <div class="mt-4 flex flex-wrap items-center gap-3">
-                            <input type="text" name="title" id="docTitle" placeholder="{{ _('Document title (optional)')|forceescape }}" class="flex-1 min-w-[200px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm">
+                            <input type="text" name="title" id="docTitle" placeholder="{{ _('Document title (optional)')|forceescape }}" class="flex-1 min-w-[200px] border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm disabled:bg-gray-100 disabled:text-gray-500">
                             <label class="flex items-center cursor-pointer">
                                 <input type="checkbox" name="is_public" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                 <span class="ml-2 text-sm text-gray-600">{{ _('Public') }}</span>
@@ -468,6 +469,14 @@
                     <i class="fas fa-tags"></i>
                     <span id="bulkReprocessMetaBtnLabel">{{ _('Reprocess metadata') }}</span>
                 </button>
+                <button type="button" id="bulkMineTerminologyBtn" class="btn btn-primary btn-sm" disabled title="{{ _('Extract English terms with the model, retrieve matching target-language chunks, and keep a pair only when the target wording is attested. Needs an English file plus another language.')|forceescape }}">
+                    <i class="fas fa-book"></i>
+                    <span id="bulkMineTerminologyBtnLabel">{{ _('Mine terminology') }}</span>
+                </button>
+                <button type="button" id="bulkMarkSamePublicationBtn" class="btn btn-primary btn-sm" disabled title="{{ _('Mark the selection as the same publication in different languages. Creates deferred language pairs for terminology mining. Sentence-level translation memory stays off.')|forceescape }}">
+                    <i class="fas fa-language"></i>
+                    <span id="bulkMarkSamePublicationBtnLabel">{{ _('Mark as same publication') }}</span>
+                </button>
                 <button type="button" id="bulkDeleteBtn" class="btn btn-danger btn-sm" disabled>
                     <i class="fas fa-trash"></i>
                     <span id="bulkDeleteBtnLabel">{{ _('Delete') }}</span>
@@ -546,7 +555,9 @@ window.aiDocumentsConfig.urls = {
   importSystemBulkStatus: {{ url_for('ai_management.import_system_bulk_status', job_id='__JOB__')|tojson }},
   importSystemBulkCancel: {{ url_for('ai_management.import_system_bulk_cancel', job_id='__JOB__')|tojson }},
   documentsList: {{ url_for('ai_documents.list_documents')|tojson }},
-  activeJobs: {{ url_for('ai_management.ai_documents_active_jobs')|tojson }}
+  activeJobs: {{ url_for('ai_management.ai_documents_active_jobs')|tojson }},
+  mineTerminology: {{ url_for('ai_management.mine_document_terminology')|tojson }},
+  markTranslationGroup: {{ url_for('ai_management.mark_translation_document_group')|tojson }}
 };
 window.aiDocumentsConfig.t = {
   ai_import_eca697b5: {{ _('AI import')|tojson }},
@@ -559,6 +570,7 @@ window.aiDocumentsConfig.t = {
   category_3adbdb3a: {{ _('Category')|tojson }},
   chunks_58fce280: {{ _('Chunks')|tojson }},
   click_to_change_category_a21f96b3: {{ _('Click to change category')|tojson }},
+  click_to_change_country_or_scope_39b04e99: {{ _('Click to change country or scope')|tojson }},
   click_to_make_not_public_1466b6c5: {{ _('Click to make not public')|tojson }},
   click_to_make_public_f00ad0b7: {{ _('Click to make public')|tojson }},
   cluster_249694a4: {{ _('Cluster')|tojson }},
@@ -605,6 +617,7 @@ window.aiDocumentsConfig.t = {
   failed_to_start_metadata_reprocess_801da98c: {{ _('Failed to start metadata reprocess.')|tojson }},
   failed_to_update_0ff78b34: {{ _('Failed to update.')|tojson }},
   failed_to_update_category_e480510f: {{ _('Failed to update category.')|tojson }},
+  failed_to_update_country_or_scope_d89f7be8: {{ _('Failed to update country or scope.')|tojson }},
   file_url_available_8e4f2a1b: {{ _('Available')|tojson }},
   file_url_empty_9c3d1e7a: {{ _('No URL')|tojson }},
   file_url_error_5d0c7f2e: {{ _('URL error')|tojson }},
@@ -624,6 +637,16 @@ window.aiDocumentsConfig.t = {
   importing_documents_8a49fe5a: {{ _('Importing documents')|tojson }},
   importing_fa072aec: {{ _('Importing...')|tojson }},
   language_4994a8ff: {{ _('Language')|tojson }},
+  mark_as_same_publication_c4e8a1b2: {{ _('Mark as same publication')|tojson }},
+  mark_same_publication_confirm_d7f2c9e1: {{ _('Mark these documents as the same publication in different languages?')|tojson }},
+  mark_same_publication_failed_f1a2b3c4: {{ _('Could not mark documents as the same publication')|tojson }},
+  mine_terminology_8c2f1a4d: {{ _('Mine terminology')|tojson }},
+  mining_terminology_4d8e2a11: {{ _('Mining terminology')|tojson }},
+  mining_scanning_chunks_7b1c9e02: {{ _('Reading chunks and comparing languages...')|tojson }},
+  mining_complete_3a6f8c14: {{ _('Terminology mining complete')|tojson }},
+  mining_failed_e5f6a7b8: {{ _('Terminology mining failed')|tojson }},
+  select_at_least_two_documents_b8d1e4c3: {{ _('Select at least two documents')|tojson }},
+  same_language_warning_a9c3d2e1: {{ _('Every selected file has the same detected language. Reprocess metadata first if these are different language versions.')|tojson }},
   metadata_reprocess_cancelled_3e89b850: {{ _('Metadata reprocess cancelled')|tojson }},
   metadata_reprocess_complete_87ff8292: {{ _('Metadata reprocess complete')|tojson }},
   n_a_382b0f51: {{ _('N/A')|tojson }},
@@ -645,6 +668,7 @@ window.aiDocumentsConfig.t = {
   pending_2d13df6f: {{ _('Pending')|tojson }},
   plan_0b6cbdf7: {{ _('Plan')|tojson }},
   please_enter_a_query_4ad9a6c1: {{ _('Please enter a query.')|tojson }},
+  count_files_selected_305e0882: {{ _('{count} files selected')|tojson }},
   please_select_a_file_b3d4e2bc: {{ _('Please select a file')|tojson }},
   please_select_at_least_one_document_db0de074: {{ _('Please select at least one document')|tojson }},
   policy_51359e8b: {{ _('Policy')|tojson }},
@@ -688,6 +712,7 @@ window.aiDocumentsConfig.t = {
   import_footer_none_selected_a4c8e2b1: {{ _('Select documents in the grid')|tojson }},
   import_footer_selected_count_b7d3f9a2: {{ _('{count} selected')|tojson }},
   selected_91b442d3: {{ _('Selected')|tojson }},
+  select_country_8b144ffc: {{ _('Select country')|tojson }},
   show_details_3f7a2d18: {{ _('Show details')|tojson }},
   showing_count_of_total_8f3c1a2b: {{ _('Showing {returned} of {total} matching documents. Refine search to see more.')|tojson }},
   situation_report_eb2802e8: {{ _('Situation Report')|tojson }},
@@ -720,6 +745,8 @@ window.aiDocumentsConfig.t = {
   upload_date_4f2a9c1e: {{ _('Upload Date')|tojson }},
   uploaded_by_8e3c7a2d: {{ _('Uploaded By')|tojson }},
   uploaded_fe8d588f: {{ _('Uploaded')|tojson }},
+  title_applies_to_a_single_file_only_a075be65: {{ _('Title applies to a single file only')|tojson }},
+  uploading_current_of_total_a2e8f4f8: {{ _('Uploading {current} of {total}')|tojson }},
   uploading_f2870421: {{ _('Uploading...')|tojson }},
   view_or_download_9e34181d: {{ _('View or download')|tojson }},
   work_plan_2a21b46b: {{ _('Work Plan')|tojson }},

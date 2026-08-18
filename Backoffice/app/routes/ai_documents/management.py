@@ -10,7 +10,7 @@ from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db, limiter
-from app.models import AIDocument, AIDocumentChunk
+from app.models import AIDocument, AIDocumentChunk, Country
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_bad_request, json_forbidden, json_not_found, json_ok, json_server_error
@@ -26,6 +26,115 @@ from .helpers import (
 )
 
 logger = logging.getLogger(__name__)
+
+_ALLOWED_GEOGRAPHIC_SCOPES = (None, "global", "regional", "cluster")
+
+
+def _parse_optional_int(value):
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return False
+
+
+def _replace_document_countries(doc: AIDocument, country_ids: list[int]) -> list:
+    """Replace M2M countries and return the resolved Country rows (primary first)."""
+    seen: set[int] = set()
+    ordered_ids: list[int] = []
+    for cid in country_ids:
+        try:
+            n = int(cid)
+        except (TypeError, ValueError):
+            continue
+        if n in seen:
+            continue
+        seen.add(n)
+        ordered_ids.append(n)
+
+    countries = []
+    if ordered_ids:
+        found = {
+            int(c.id): c
+            for c in Country.query.filter(Country.id.in_(ordered_ids)).all()
+        }
+        countries = [found[cid] for cid in ordered_ids if cid in found]
+
+    doc.countries = countries
+    return countries
+
+
+def _apply_document_geography(doc: AIDocument, data: dict):
+    """
+    Apply geographic_scope / country_id / country_ids from a PATCH payload.
+
+    geographic_scope: 'global' | 'regional' | 'cluster' | null (country-specific or unset)
+    country_id: primary country (null clears)
+    country_ids: optional full M2M list; defaults to [country_id] when only country_id is sent
+    """
+    touching_scope = "geographic_scope" in data
+    touching_country = "country_id" in data or "country_ids" in data
+    if not touching_scope and not touching_country:
+        return None
+
+    scope = doc.geographic_scope
+    if touching_scope:
+        raw_scope = data.get("geographic_scope")
+        if isinstance(raw_scope, str):
+            raw_scope = raw_scope.strip().lower() or None
+        if raw_scope not in _ALLOWED_GEOGRAPHIC_SCOPES:
+            return json_bad_request(
+                f"Invalid geographic_scope. Allowed: global, regional, cluster, or empty"
+            )
+        scope = raw_scope
+
+    country_ids: list[int] | None = None
+    if "country_ids" in data:
+        raw_ids = data.get("country_ids")
+        if raw_ids is None:
+            country_ids = []
+        elif not isinstance(raw_ids, (list, tuple)):
+            return json_bad_request("country_ids must be a list")
+        else:
+            parsed: list[int] = []
+            for item in raw_ids:
+                n = _parse_optional_int(item)
+                if n is False:
+                    return json_bad_request("country_ids must contain integers")
+                if n is not None:
+                    parsed.append(n)
+            country_ids = parsed
+    elif "country_id" in data:
+        n = _parse_optional_int(data.get("country_id"))
+        if n is False:
+            return json_bad_request("country_id must be an integer")
+        country_ids = [] if n is None else [n]
+
+    if scope == "global":
+        country_ids = []
+    elif country_ids is None and scope in ("regional", "cluster"):
+        country_ids = [c.id for c in (doc.countries or [])]
+    elif country_ids is None and touching_scope and scope is None:
+        country_ids = []
+
+    if country_ids is not None:
+        countries = _replace_document_countries(doc, country_ids)
+        requested = []
+        seen_req: set[int] = set()
+        for cid in country_ids:
+            if cid in seen_req:
+                continue
+            seen_req.add(cid)
+            requested.append(cid)
+        if requested and len(countries) != len(requested):
+            return json_bad_request("Unknown country_id")
+        primary = countries[0] if countries else None
+        doc.country_id = primary.id if primary else None
+        doc.country_name = primary.name if primary else None
+
+    doc.geographic_scope = scope
+    return None
 
 
 @ai_docs_bp.route('/', methods=['GET'])
@@ -141,7 +250,7 @@ def get_document(document_id: int):
 @login_required
 @limiter.limit("60 per minute")
 def update_document(document_id: int):
-    """Update document metadata (e.g. is_public). Only admins can set is_public to True."""
+    """Update document metadata (is_public, category, country/scope). Only admins can set is_public to True."""
     try:
         doc = AIDocument.query.get_or_404(document_id)
 
@@ -173,6 +282,10 @@ def update_document(document_id: int):
             if cat is not None and cat not in DOCUMENT_CATEGORIES:
                 return json_bad_request(f'Invalid category. Allowed: {", ".join(DOCUMENT_CATEGORIES)}')
             doc.document_category = cat
+
+        geo_error = _apply_document_geography(doc, data)
+        if geo_error is not None:
+            return geo_error
 
         db.session.commit()
         return json_ok(document=doc.to_dict())

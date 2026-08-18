@@ -393,7 +393,7 @@ class EditAssignmentDetailsForm(FlaskForm):
 def manage_assignments():
     assignments = AssignedForm.query.options(
         db.joinedload(AssignedForm.template),
-    ).order_by(AssignedForm.is_active.desc(), AssignedForm.period_name.desc()).all()
+    ).order_by(AssignedForm.assigned_at.desc(), AssignedForm.id.desc()).all()
 
     # Return JSON for API requests (mobile app)
     if is_json_request():

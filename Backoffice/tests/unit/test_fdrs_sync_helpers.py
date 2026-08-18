@@ -21,6 +21,7 @@ from fdrs_documents_sync import (  # noqa: E402
     build_document_import_plan,
     encode_fdrs_document_url,
     fetch_fdrs_document_bytes,
+    fdrs_url_without_duplicate_suffix,
     _resolve_download_outcome,
     _should_attempt_download,
 )
@@ -755,6 +756,65 @@ def test_fetch_fdrs_document_bytes_403(monkeypatch):
 
     monkeypatch.setattr("fdrs_documents_sync.urllib.request.urlopen", _raise)
     data, status = fetch_fdrs_document_bytes("https://example.test/doc/forbidden.pdf")
+    assert status == 403
+    assert data is None
+
+
+def test_fdrs_url_without_duplicate_suffix():
+    paraguay = (
+        "https://data-api.ifrc.org/documents/PY/"
+        "audited Financial Statement_Paraguay_2016_es_1.pdf"
+    )
+    assert fdrs_url_without_duplicate_suffix(paraguay) == (
+        "https://data-api.ifrc.org/documents/PY/"
+        "audited Financial Statement_Paraguay_2016_es.pdf"
+    )
+    assert fdrs_url_without_duplicate_suffix("https://x/a_12.docx") == "https://x/a.docx"
+    assert fdrs_url_without_duplicate_suffix("https://x/a_2016_es.pdf") is None
+    assert fdrs_url_without_duplicate_suffix("https://x/Statutes_Gambia_0.doc") is None
+    assert fdrs_url_without_duplicate_suffix("https://x/file.pdf") is None
+
+
+def test_fetch_fdrs_document_bytes_retries_without_duplicate_suffix(monkeypatch):
+    import urllib.error
+
+    class FakeResp:
+        status = 200
+
+        def read(self):
+            return b"%PDF-1.4"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    calls = []
+
+    def _open(req, timeout=120):
+        calls.append(req.full_url)
+        if req.full_url.endswith("_1.pdf"):
+            raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", hdrs=None, fp=None)
+        return FakeResp()
+
+    monkeypatch.setattr("fdrs_documents_sync.urllib.request.urlopen", _open)
+    data, status = fetch_fdrs_document_bytes("https://example.test/doc/file_es_1.pdf")
+    assert status == 200
+    assert data == b"%PDF-1.4"
+    assert len(calls) == 2
+    assert calls[0].endswith("file_es_1.pdf")
+    assert calls[1].endswith("file_es.pdf")
+
+
+def test_fetch_fdrs_document_bytes_keeps_403_when_suffix_retry_fails(monkeypatch):
+    import urllib.error
+
+    def _raise(req, timeout=120):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", hdrs=None, fp=None)
+
+    monkeypatch.setattr("fdrs_documents_sync.urllib.request.urlopen", _raise)
+    data, status = fetch_fdrs_document_bytes("https://example.test/doc/file_es_1.pdf")
     assert status == 403
     assert data is None
 

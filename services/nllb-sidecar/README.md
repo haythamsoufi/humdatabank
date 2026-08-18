@@ -1,9 +1,8 @@
-# NLLB sidecar (long-tail languages only)
+# NLLB sidecar
 
-Self-hosted machine translation for National Society languages the hosted IFRC/Azure engine does
-not cover (Amharic, Swahili, Nepali, ...). It is **not** a replacement for the hosted engine on
-`en, fr, es, ar, ru, zh, hi` -- those stay on the primary engine (`app/services/translation/auto_translator.py`
--> `IFRCTranslationService` / `GoogleTranslateService`); this sidecar's own API rejects them (`409`).
+Self-hosted machine translation (CTranslate2 + NLLB-200). IFRC/Azure remains the **default**
+Backoffice engine. When NLLB is selected in the UI, it translates every mapped language,
+including the core seven (`en, fr, es, ar, ru, zh, hi`).
 
 ## How it works
 
@@ -35,12 +34,12 @@ curl -X POST http://localhost:9100/api/translate \
 # {"text": "...", "engine": "nllb", "deferred": false}
 ```
 
-Core languages are rejected by design:
+Core languages are valid targets too:
 
 ```bash
 curl -X POST http://localhost:9100/api/translate \
   -H "Content-Type: application/json" -d '{"Text": "hello", "From": "en", "To": "fr"}'
-# 409 - "Use the hosted IFRC/Azure engine for core languages ..."
+# {"text": "...", "engine": "nllb", "deferred": false}
 ```
 
 ## Using it from the Backoffice
@@ -55,8 +54,8 @@ NLLB_SIDECAR_API_KEY=   # optional, must match the sidecar's NLLB_SIDECAR_API_KE
 
 Once set, `NLLBTranslationService` registers as the `nllb` engine in
 `app/services/translation/auto_translator.py` and shows up in the auto-translate service picker
-(`/admin/api/translation_services`) and the quality dashboard. It is never the *default* engine --
-it's tried for languages the hosted engine doesn't serve, or when explicitly selected in the UI.
+(`/admin/api/translation_services`) and the quality dashboard. It is never the *default* engine.
+Selecting it in the UI uses NLLB for every target language.
 The Backoffice already protects `[variables]`, `%(name)s`, and Jinja `{{ }}` tokens before calling
 any engine (`AutoTranslator._protect_variables`); this sidecar's own `/api/translate` reproduces the
 same contract independently for direct callers (Website, Mobile, curl).
@@ -64,9 +63,8 @@ same contract independently for direct callers (Website, Mobile, curl).
 ## Language coverage
 
 `GET /languages` lists the ISO 639-1 codes this sidecar maps to a FLORES-200 code (see
-`ISO1_TO_FLORES200` in `app.py`) -- currently ~115 languages beyond the core seven, covering most of
-NLLB-200's practical range for National Society reporting languages. Codes not in that table (or not
-one of NLLB's ~200 languages) return `400`.
+`ISO1_TO_FLORES200` in `app.py`) -- core languages plus ~115 others. Codes not in that table
+return `400`.
 
 ## Configuration (env vars)
 

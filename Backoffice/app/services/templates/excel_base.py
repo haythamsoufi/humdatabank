@@ -71,6 +71,7 @@ class TemplateExcelBase(object):
         'label': 'label_translations',
         'definition': 'definition_translations',
         'description': 'description_translations',
+        'validation_message': 'validation_message_translations',
     }
 
     TEMPLATE_SHEET_ROW_HEADERS = ['field', 'value']
@@ -81,7 +82,7 @@ class TemplateExcelBase(object):
 
     SECTION_TRANSLATABLE_FIELDS = ['name']
 
-    ITEM_TRANSLATABLE_FIELDS = ['label', 'definition', 'description']
+    ITEM_TRANSLATABLE_FIELDS = ['label', 'definition', 'description', 'validation_message']
 
     TEMPLATE_BASE_COLUMNS = [
         'name',
@@ -164,6 +165,7 @@ class TemplateExcelBase(object):
         'definition', 'options_json', 'lookup_list_id', 'list_display_column',
         'list_filters_json', 'label_translations', 'definition_translations',
         'options_translations', 'description_translations', 'description',
+        'validation_message_translations',
     ]
 
     JSON_EXPORT_COLUMNS = frozenset({
@@ -183,6 +185,7 @@ class TemplateExcelBase(object):
         'label_translations',
         'definition_translations',
         'description_translations',
+        'validation_message_translations',
     })
 
     @classmethod
@@ -369,7 +372,7 @@ class TemplateExcelBase(object):
             'Template': ['name_translations'],
             'Pages': ['name_translations'],
             'Sections': ['name_translations'],
-            'Items': ['label_translations', 'definition_translations', 'description_translations'],
+            'Items': ['label_translations', 'definition_translations', 'description_translations', 'validation_message_translations'],
         }.get(sheet_name, [])
         return any(col in header_set for col in legacy_json_cols)
 

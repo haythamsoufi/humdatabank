@@ -1,6 +1,34 @@
 // Utilities for form serialization and prefix mapping used by item-modal
 import { serializeRule } from './rule-builder-helpers.js';
 
+/** Unwrap a rule stored as JSON, or as a JSON string of JSON (legacy double-encoding). */
+export function unwrapStoredRuleJson(raw) {
+    if (raw == null) return '';
+    let value = String(raw).trim();
+    if (!value || value === 'null' || value === '{}') return '';
+    for (let i = 0; i < 3; i++) {
+        try {
+            const parsed = JSON.parse(value);
+            if (typeof parsed === 'string') {
+                value = parsed.trim();
+                continue;
+            }
+            if (
+                parsed
+                && typeof parsed === 'object'
+                && Array.isArray(parsed.conditions)
+                && parsed.conditions.length > 0
+            ) {
+                return JSON.stringify(parsed);
+            }
+            return '';
+        } catch (_e) {
+            return value;
+        }
+    }
+    return '';
+}
+
 // Serialize a rule builder element into a string suitable for submit
 // Ensures no double-encoding and returns '' when empty/non-meaningful
 export function serializeRuleForSubmit(ruleBuilderElement) {

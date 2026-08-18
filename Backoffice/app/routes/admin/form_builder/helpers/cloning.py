@@ -224,6 +224,7 @@ def _clone_template_structure(template_id: int, source_version_id: int, target_v
             new_it.definition_translations = _deep_copy_json_value(getattr(it, 'definition_translations', None))
             new_it.options_translations = _deep_copy_json_value(getattr(it, 'options_translations', None))
             new_it.description_translations = _deep_copy_json_value(getattr(it, 'description_translations', None))
+            new_it.validation_message_translations = _deep_copy_json_value(getattr(it, 'validation_message_translations', None))
             new_it.description = getattr(it, 'description', None)
             new_it.archived = getattr(it, 'archived', False)
             # Matrix/plugin configs are within config already
@@ -420,6 +421,7 @@ def _clone_template_structure_between_templates(*, source_template_id: int, sour
             new_it.definition_translations = _deep_copy_json_value(getattr(it, 'definition_translations', None))
             new_it.options_translations = _deep_copy_json_value(getattr(it, 'options_translations', None))
             new_it.description_translations = _deep_copy_json_value(getattr(it, 'description_translations', None))
+            new_it.validation_message_translations = _deep_copy_json_value(getattr(it, 'validation_message_translations', None))
             new_it.description = getattr(it, 'description', None)
             new_it.archived = getattr(it, 'archived', False)
         if not it.stable_key:

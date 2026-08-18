@@ -136,6 +136,8 @@ class TestApiTranslationServices:
         mock_tr.get_available_services.return_value = services
         mock_tr.get_default_service.return_value = default
         mock_tr.check_service_status.return_value = statuses
+        mock_tr.wait_for_fresh_status.return_value = statuses
+        mock_tr.has_status_cache.return_value = True
         return mock_tr
 
     def test_returns_services_list(self, logged_in_client, db_session):
@@ -261,3 +263,24 @@ class TestApiTranslationServices:
         assert by_value["libre"]["label"] == "LibreTranslate AI"
         assert by_value["google"]["label"] == "Google Translate"
         assert by_value["libre"]["is_default"] is True
+
+    def test_refresh_waits_for_verified_status(self, logged_in_client, db_session):
+        mock_tr = self._mock_translator(
+            services=["libre"],
+            default="libre",
+            statuses={"libre": False},
+        )
+        mock_tr.check_service_status.return_value = {"libre": True}
+        mock_tr.wait_for_fresh_status.return_value = {"libre": False}
+        with patch(
+            "app.routes.admin.utilities.csrf.get_auto_translator",
+            return_value=mock_tr,
+        ):
+            resp = logged_in_client.get("/admin/api/translation_services?refresh=1")
+
+        assert resp.status_code == 200
+        data = _json(resp)
+        assert data["verified"] is True
+        assert data["services"][0]["is_available"] is False
+        mock_tr.wait_for_fresh_status.assert_called_once()
+        mock_tr.check_service_status.assert_not_called()

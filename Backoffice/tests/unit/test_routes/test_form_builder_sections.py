@@ -290,6 +290,8 @@ class TestEditTemplateSection:
         """POST with empty relevance_condition clears it."""
         template = _make_owned_template(db_session, admin_user)
         section = _make_section(db_session, template)
+        section.relevance_condition = '{"logic":"AND","conditions":[{"item_id":"assignment_period","condition_type":"equal_to","value":"2026"}]}'
+        db_session.commit()
         with patch('app.routes.admin.form_builder.sections.log_admin_action'):
             resp = logged_in_client.post(
                 f'/admin/sections/edit/{section.id}',
@@ -300,6 +302,28 @@ class TestEditTemplateSection:
                 follow_redirects=False,
             )
         assert resp.status_code == 302
+        db_session.refresh(section)
+        assert section.relevance_condition is None
+
+    def test_edit_section_unwraps_double_encoded_relevance(self, logged_in_client, db_session, admin_user, app):
+        """Legacy double-encoded JSON is stored as a single JSON object string."""
+        from app.models import FormSection
+        template = _make_owned_template(db_session, admin_user)
+        section = _make_section(db_session, template)
+        rule = {"logic": "AND", "conditions": [{"item_id": "assignment_period", "condition_type": "equal_to", "value": "2026"}]}
+        double_encoded = json.dumps(json.dumps(rule))
+        with patch('app.routes.admin.form_builder.sections.log_admin_action'):
+            resp = logged_in_client.post(
+                f'/admin/sections/edit/{section.id}',
+                data={
+                    'section-name': section.name,
+                    'relevance_condition': _b64(double_encoded),
+                },
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        stored = db_session.get(FormSection, section.id)
+        assert json.loads(stored.relevance_condition) == rule
 
     def test_edit_section_with_invalid_parent_returns_redirect(self, logged_in_client, db_session, admin_user, app):
         """POST with non-existent parent flashes warning and redirects."""

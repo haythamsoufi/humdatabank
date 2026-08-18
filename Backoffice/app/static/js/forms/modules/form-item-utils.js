@@ -13,6 +13,20 @@
 import { debugLog, debugWarn, debugError } from './debug.js';
 
 /**
+ * Strip item-type prefixes so lookups work whether the caller has a bare
+ * entry-form id ("961") or a preview/condition id ("question_961",
+ * "indicator_961", "document_field_961"). Only `indicator_` used to be
+ * stripped; defaulting conditions to `question_<id>` then made
+ * getCurrentFieldValue miss `indicator_<id>_total_value`.
+ */
+export function normalizeFormItemId(fieldId) {
+    return String(fieldId ?? '')
+        .replace(/^indicator_/, '')
+        .replace(/^question_/, '')
+        .replace(/^document_field_/, '');
+}
+
+/**
  * Unified field value retrieval that works across all contexts
  * @param {string} fieldId - The field ID to get value for
  * @param {string} mode - Disaggregation mode ('total', 'sex', 'age', 'sex_age')
@@ -48,7 +62,7 @@ export function getUnifiedFieldValue(fieldId, mode = 'total', preferCurrent = fa
         }
     }
 
-    const normalizedFieldId = rawId.replace(/^indicator_/, '');
+    const normalizedFieldId = normalizeFormItemId(rawId);
 
     // Check if field is disabled by data availability
     if (isFieldDisabledByDataAvailability(normalizedFieldId)) {
@@ -70,7 +84,7 @@ export function getUnifiedFieldValue(fieldId, mode = 'total', preferCurrent = fa
  * @returns {*} Current DOM value or null
  */
 function getCurrentDOMValue(fieldId, mode) {
-    const normalizedFieldId = fieldId.toString().replace(/^indicator_/, '');
+    const normalizedFieldId = normalizeFormItemId(fieldId);
 
     // Try multiple field patterns for different contexts
     const fieldPatterns = [
@@ -120,7 +134,7 @@ function getCurrentDOMValue(fieldId, mode) {
  * @returns {*} Existing data value or null
  */
 function getExistingDataValue(fieldId, mode) {
-    const normalizedFieldId = fieldId.toString().replace(/^indicator_/, '');
+    const normalizedFieldId = normalizeFormItemId(fieldId);
     const dataKey = `field_value[${normalizedFieldId}]`;
 
     if (!window.existingData || !Object.prototype.hasOwnProperty.call(window.existingData, dataKey)) {
@@ -165,6 +179,7 @@ function isFieldDisabledByDataAvailability(normalizedFieldId) {
     // Prefer exact name matches (fast). Substring matches across the whole DOM can become
     // expensive on large forms with many dynamic indicators.
     const id = String(normalizedFieldId);
+    const fieldContainer = document.querySelector(`.form-item-block[data-item-id="${id}"]`);
 
     const exactNames = [
         `indicator_${id}_data_not_available`,
@@ -177,17 +192,22 @@ function isFieldDisabledByDataAvailability(normalizedFieldId) {
         const group = document.getElementsByName(name);
         if (!group || !group.length) continue;
         for (const el of group) {
-            if (el && el.type === 'checkbox' && el.checked) return true;
+            if (!el || el.type !== 'checkbox' || !el.checked) continue;
+            // Ignore checked boxes in hidden repeat/excel clones that are not
+            // the live entry-form block for this item.
+            if (fieldContainer && !fieldContainer.contains(el)) continue;
+            return true;
         }
     }
 
     // Fallback for repeat entries which include "_field_<id>_" segments.
+    const fallbackRoot = fieldContainer || document;
     const fallbackSelectors = [
         `input[type="checkbox"]:checked[name*="_field_${id}_"][name$="_data_not_available"]`,
         `input[type="checkbox"]:checked[name*="_field_${id}_"][name$="_not_applicable"]`
     ];
     for (const sel of fallbackSelectors) {
-        if (document.querySelector(sel)) return true;
+        if (fallbackRoot.querySelector(sel)) return true;
     }
 
     return false;
@@ -253,33 +273,38 @@ function getYesNoCheckboxValue(pattern, fieldId, normalizedFieldId) {
  * @returns {Element|null} Input element or null
  */
 function findFieldInput(fieldId, normalizedFieldId) {
-    // Try direct ID lookup first
-    let input = document.getElementById(`field-${fieldId}`) || document.getElementById(`field-${normalizedFieldId}`);
+    const namedValueSelector = [
+        `input[name="indicator_${normalizedFieldId}_total_value"]`,
+        `input[name="dynamic_${normalizedFieldId}_total_value"]`,
+        `#indicator-total-${normalizedFieldId}`,
+        `input[name="indicator_${normalizedFieldId}_standard_value"]`,
+        `input[name="dynamic_${normalizedFieldId}_standard_value"]`,
+    ].join(', ');
 
-    if (!input) {
-        // Try the named value inputs before falling back to any first input in the block,
-        // to avoid accidentally picking up a checkbox (e.g. data_not_available).
-        const valueInput = document.querySelector(
-            `input[name="indicator_${normalizedFieldId}_total_value"], ` +
-            `input[name="indicator_${normalizedFieldId}_standard_value"], ` +
-            `input[name="dynamic_${normalizedFieldId}_total_value"], ` +
-            `input[name="dynamic_${normalizedFieldId}_standard_value"]`
-        );
-        if (valueInput) return valueInput;
+    // Entry form: data-item-id is the bare FormItem id. Prefer the value input
+    // inside that block so a leftover #field-<id> wrapper / hidden clone cannot
+    // hide indicator_<id>_total_value (validation then compared null to null).
+    const fieldContainer = document.querySelector(`.form-item-block[data-item-id="${fieldId}"]`) ||
+                          document.querySelector(`.form-item-block[data-item-id="${normalizedFieldId}"]`) ||
+                          document.querySelector(`[data-item-id="${fieldId}"]`) ||
+                          document.querySelector(`[data-item-id="${normalizedFieldId}"]`);
+    if (fieldContainer) {
+        const named = fieldContainer.querySelector(namedValueSelector) ||
+            fieldContainer.querySelector('input[name*="_total_value"], input[name*="_standard_value"]');
+        if (named) return named;
+        const generic = fieldContainer.querySelector('input:not([type="checkbox"]):not([type="radio"]), select, textarea');
+        if (generic) return generic;
     }
 
-    if (!input) {
-        // Try finding field container and get its value input (not a checkbox)
-        const fieldContainer = document.querySelector(`[data-item-id="${fieldId}"]`) ||
-                              document.querySelector(`[data-item-id="${normalizedFieldId}"]`);
-        if (fieldContainer) {
-            input = fieldContainer.querySelector(
-                'input[name*="_total_value"], input[name*="_standard_value"]'
-            ) || fieldContainer.querySelector('input:not([type="checkbox"]), select, textarea');
-        }
+    const namedGlobal = document.querySelector(namedValueSelector);
+    if (namedGlobal) return namedGlobal;
+
+    const byId = document.getElementById(`field-${fieldId}`) || document.getElementById(`field-${normalizedFieldId}`);
+    if (byId && /^(INPUT|SELECT|TEXTAREA)$/.test(byId.tagName)) {
+        return byId;
     }
 
-    return input;
+    return null;
 }
 
 /**
@@ -398,6 +423,16 @@ function getDataAttributeValue(fieldId, normalizedFieldId) {
 export function getInputValue(element) {
     if (!element) return null;
 
+    // numeric-formatting.js converts type="number" inputs to type="text" (marked
+    // data-numeric="true") so it can display thousands separators, e.g. "1,200".
+    // Handle these before the type switch: otherwise they fall through to the
+    // `default` case and return the formatted string as-is, and callers that
+    // parseFloat() it for numeric comparisons (relevance/validation conditions,
+    // totals) silently get the wrong number — parseFloat("1,200") === 1, not 1200.
+    if (element.dataset && element.dataset.numeric === 'true') {
+        return unformatNumericInputValue(element.value);
+    }
+
     switch (element.type) {
         case 'checkbox':
             // For yes/no pairs, return the checked value in the group
@@ -431,6 +466,26 @@ export function getInputValue(element) {
 }
 
 /**
+ * Strip locale thousands-separator formatting (e.g. "1,200" -> "1200") from a
+ * numeric-formatting.js display value and parse it to a real number.
+ * @param {string} rawValue - Current `.value` of a data-numeric="true" input
+ * @returns {number|null} Parsed number, or null when empty/non-numeric
+ */
+function unformatNumericInputValue(rawValue) {
+    if (rawValue === '' || rawValue === null || rawValue === undefined) return null;
+    const raw = String(rawValue);
+    let unformatted = typeof window.__numericUnformat === 'function'
+        ? window.__numericUnformat(raw)
+        : raw.replace(/,/g, '').replace(/'/g, '');
+    if (unformatted === '') {
+        unformatted = raw.replace(/,/g, '').replace(/'/g, '').trim();
+    }
+    if (unformatted === '') return null;
+    const numValue = parseFloat(unformatted);
+    return isNaN(numValue) ? null : numValue;
+}
+
+/**
  * Set value for a field across all contexts
  * @param {string} fieldId - Field ID
  * @param {*} value - Value to set
@@ -438,7 +493,7 @@ export function getInputValue(element) {
  * @param {Element} container - Optional container to search within
  */
 export function setUnifiedFieldValue(fieldId, value, mode = 'total', container = document) {
-    const normalizedFieldId = fieldId.toString().replace(/^indicator_/, '');
+    const normalizedFieldId = normalizeFormItemId(fieldId);
 
     // Find the field input
     let input = container.querySelector(`#field-${fieldId}`) ||

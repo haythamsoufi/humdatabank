@@ -478,6 +478,46 @@ function attachMatrixSearchPlaceholderModal() {
   });
 }
 
+function attachItemValidationMessageModal() {
+  if (!window.TranslationModal || !document.getElementById('item-validation-message-translations-btn')) return;
+  window.TranslationModal.attach({
+    openButtonId: 'item-validation-message-translations-btn',
+    modalId: 'item-validation-message-translation-modal',
+    cssPrefix: 'item-validation-message',
+    resolveEnglishText: () => (document.getElementById('item-validation-message')?.value || ''),
+    onSaveHiddenFields: (collected) => {
+      const input = document.getElementById('item-validation-message-translations');
+      if (input) input.value = JSON.stringify(collected || {});
+      const btn = document.getElementById('item-validation-message-translations-btn');
+      if (btn) {
+        const originalNodes = Array.from(btn.childNodes).map(n => n.cloneNode(true));
+        const restore = () => {
+          btn.replaceChildren(...originalNodes.map(n => n.cloneNode(true)));
+        };
+        btn.replaceChildren();
+        {
+          const icon = document.createElement('i');
+          icon.className = 'fas fa-check w-4 h-4 mr-1';
+          btn.append(icon, document.createTextNode('Saved'));
+        }
+        btn.classList.add('text-green-600');
+        setTimeout(() => { restore(); btn.classList.remove('text-green-600'); }, 2000);
+      }
+    },
+    autoTranslateType: 'form_item',
+    onModalOpen: () => {
+      const input = document.getElementById('item-validation-message-translations');
+      let translations = {};
+      if (input && input.value) {
+        try { translations = JSON.parse(input.value); } catch (e) {}
+      }
+      if (window.TranslationModalUtils) {
+        window.TranslationModalUtils.populateFields('item-validation-message', translations);
+      }
+    }
+  });
+}
+
 function attachItemEntryFormHintModal() {
   const defaultHintText =
     'Number format: Use "." for decimals and "," for thousands (e.g. 1,234.56). Values are rounded to each column\'s allowed decimal places.';
@@ -1143,6 +1183,7 @@ export function attachFormBuilderTranslation() {
     attachMatrixLabelModal();
     attachMatrixLegendTextModal();
     attachMatrixSearchPlaceholderModal();
+    attachItemValidationMessageModal();
     attachItemEntryFormHintModal();
     attachMatrixVariableTooltipLabelModals();
     attachMatrixColumnHeadersModal();

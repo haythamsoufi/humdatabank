@@ -282,6 +282,76 @@ a.close-modal:not(.btn) {
   border-left-color: var(--btn-secondary-border, #d1d5db);
 }
 
+/* Split Auto Translate: main action + chevron to switch the preferred service */
+.auto-translate-split {
+  position: relative;
+}
+.auto-translate-split > .js-auto-translate-service-toggle {
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
+}
+/* Only the main action button — not offline items inside the service menu. */
+.auto-translate-split:has(> button.btn:disabled:not(.js-auto-translate-service-toggle))
+  > .js-auto-translate-service-toggle {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.auto-translate-service-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.25rem);
+  z-index: 80;
+  min-width: 15.5rem;
+  max-width: 20rem;
+  padding: 0.25rem 0;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+.auto-translate-service-menu-heading {
+  padding: 0.375rem 0.75rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+.auto-translate-service-menu-status {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+.auto-translate-service-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: #111827;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.auto-translate-service-menu-item:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+.auto-translate-service-menu-item[aria-selected="true"] {
+  background: #fff7ed;
+  color: #9a3412;
+}
+.auto-translate-service-menu-item:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+.auto-translate-service-menu-item .fa-check {
+  color: #c2410c;
+  font-size: 0.75rem;
+}
+
 /* End unified button system */
 
 /* Flash Message Styles */
@@ -1145,4 +1215,31 @@ button.entity-status-chip.status-label,
 .executive-page-header .title-text-group:has(.assignment-status-pipeline-container:focus-within) {
     position: relative;
     z-index: 30;
+}
+
+/* ==========================================================================
+   FORM CONTROLS
+   @tailwindcss/forms paints native inputs/selects with gray-500 / currentColor
+   borders that read as hard black. Beat that plugin (and leftover rounded
+   corners) so text boxes and dropdowns match the button system:
+   light gray (#d1d5db), sharp corners, teal focus.
+   ========================================================================== */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="image"]):not([type="reset"]):not([type="color"]),
+select,
+textarea,
+.form-input,
+.form-select {
+  border: 1px solid #d1d5db;
+  border-radius: 0 !important;
+  box-shadow: none;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="image"]):not([type="reset"]):not([type="color"]):focus,
+select:focus,
+textarea:focus,
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
 }

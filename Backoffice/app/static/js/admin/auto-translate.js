@@ -74,10 +74,13 @@
         // Load available translation services
         function loadTranslationServices() {
             servicesLoaded = true;
-            const _fetchFn = (window.getFetch && window.getFetch()) || fetch;
-            window.apiFetch(cfg.urls.translationServices)
+            const loader = (window.AutoTranslateService && typeof window.AutoTranslateService.loadServices === 'function')
+                ? window.AutoTranslateService.loadServices({ refresh: true })
+                : window.apiFetch((cfg.urls.translationServices || '/admin/api/translation_services') +
+                    ((cfg.urls.translationServices || '').indexOf('?') === -1 ? '?' : '&') + 'refresh=1');
+            loader
                 .then(data => {
-                    if (data.success) {
+                    if (data && (data.success || Array.isArray(data.services))) {
                         populateServiceDropdown(data.services, data.default_service);
                     } else {
                         const failedToLoadMsg = cfg.t.failed_to_load_translation_services_61e422b0;
@@ -133,6 +136,10 @@
             // Clear existing options
             select.innerHTML = '';
 
+            const preferred = (window.AutoTranslateService && typeof window.AutoTranslateService.getPreferredService === 'function')
+                ? window.AutoTranslateService.getPreferredService()
+                : '';
+
             // Add options for each service
             services.forEach(service => {
                 const option = document.createElement('option');
@@ -148,11 +155,12 @@
 
                 option.textContent = label;
 
-                // Select default service if it's available, otherwise select first available service
-                if (service.is_default && service.is_available) {
+                // Prefer the user's stored service, then server default, then first available
+                if (service.is_available && preferred && service.value === preferred) {
+                    option.selected = true;
+                } else if (service.is_default && service.is_available && !preferred) {
                     option.selected = true;
                 } else if (service.is_available && !select.value) {
-                    // Select first available service if no default is selected
                     option.selected = true;
                 }
 
@@ -730,6 +738,9 @@
             } else {
                 // Remove warning if service is available
                 jQuery('.service-warning').remove();
+                if (selectedValue && window.AutoTranslateService && typeof window.AutoTranslateService.setPreferredService === 'function') {
+                    window.AutoTranslateService.setPreferredService(selectedValue);
+                }
             }
 
             updateEstimatedTime();

@@ -29,11 +29,6 @@ export const FormPopulationMixin = {
             if (validationBuilderEl) {
                 attachRuleData(validationBuilderEl, itemData.validation_condition, 'validation');
             }
-            const validationMsgInput = this.modalElement.querySelector('#item-validation-message');
-            if (validationMsgInput) {
-                validationMsgInput.value = itemData.validation_message || '';
-            }
-
             setTimeout(() => this.autoShowRuleSections(itemData), 0);
         } else {
             switch (this.currentItemType) {
@@ -73,10 +68,6 @@ export const FormPopulationMixin = {
         if (validationBuilderEl) {
             attachRuleData(validationBuilderEl, itemData.validation_condition, 'validation');
         }
-        const validationMsgInput = this.modalElement.querySelector('#item-validation-message');
-        if (validationMsgInput) {
-            validationMsgInput.value = itemData.validation_message || '';
-        }
         setTimeout(() => this.autoShowRuleSections(itemData), 200);
     },
 
@@ -108,10 +99,6 @@ export const FormPopulationMixin = {
         const optionsTranslationsInput = this.modalElement.querySelector('#item-question-options-translations-json');
         if (optionsTranslationsInput && itemData.options_translations) {
             optionsTranslationsInput.value = JSON.stringify(itemData.options_translations);
-        }
-        const validationMsgInputQ = this.modalElement.querySelector('#item-validation-message');
-        if (validationMsgInputQ) {
-            validationMsgInputQ.value = itemData.validation_message || '';
         }
         this.autoShowRuleSections(itemData);
     },
@@ -153,11 +140,6 @@ export const FormPopulationMixin = {
         if (validationBuilderElDoc) {
             attachRuleData(validationBuilderElDoc, itemData.validation_condition, 'validation');
         }
-        const validationMsgInputDoc = this.modalElement.querySelector('#item-validation-message');
-        if (validationMsgInputDoc) {
-            validationMsgInputDoc.value = itemData.validation_message || '';
-        }
-
         this.autoShowRuleSections(itemData);
     },
 
@@ -256,6 +238,18 @@ export const FormPopulationMixin = {
             this.currentItemType,
             this.currentQuestionType || (this.modalElement?.querySelector('#item-question-type-select')?.value)
         );
+        const validationMsgInput = this.modalElement.querySelector('#item-validation-message');
+        const validationMsgTranslationsInput = this.modalElement.querySelector('#item-validation-message-translations');
+        if (validationMsgInput) {
+            validationMsgInput.value = (!isDisplayOnly && itemData.validation_message) ? itemData.validation_message : '';
+        }
+        if (validationMsgTranslationsInput) {
+            const translations = (!isDisplayOnly && itemData.validation_message_translations)
+                ? itemData.validation_message_translations
+                : {};
+            validationMsgTranslationsInput.value = JSON.stringify(translations || {});
+        }
+
         const requiredCheckbox = this.modalElement.querySelector('#item-required');
         const orderInput = this.modalElement.querySelector('#item-order');
         const dataNotAvailableCheckbox = this.modalElement.querySelector('#item-allow-data-not-available');

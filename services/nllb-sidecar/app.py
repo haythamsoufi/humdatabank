@@ -6,9 +6,9 @@ Hugging Face, converts it to a quantized CTranslate2 model (cached under
 serves translations over HTTP using that local model. No external translation
 API is called at request time.
 
-Does **not** replace the hosted IFRC/Azure engine for the core seven languages
-(en, fr, es, ar, ru, zh, hi) -- see README.md. Requests targeting a core
-language are rejected (409) so callers fall back to the primary engine.
+When selected in the Backoffice it translates any mapped language, including
+the core seven (en, fr, es, ar, ru, zh, hi). IFRC/Azure remains the default
+engine unless the caller asks for NLLB.
 
 The service reproduces the Backoffice placeholder contract: ``[variables]``,
 ``%(name)s``/``%s``, and Jinja ``{{ }}``/``{% %}`` tokens are protected before
@@ -85,8 +85,7 @@ app = FastAPI(title="IFRC NLLB sidecar", version="1.0.0")
 # Source: https://github.com/facebookresearch/flores/blob/main/flores200/README.md
 # ---------------------------------------------------------------------------
 ISO1_TO_FLORES200: Dict[str, str] = {
-    # Core seven (kept for completeness / the "From" side; "To" is gated by
-    # CORE_LANGS above regardless of whether a mapping exists here).
+    # Core seven (also valid "To" targets when NLLB is selected).
     "en": "eng_Latn",
     "fr": "fra_Latn",
     "es": "spa_Latn",
@@ -469,8 +468,8 @@ class TranslateOut(BaseModel):
     text: str
     engine: str = "nllb"
     # True when the source text was returned unchanged because it could not
-    # be translated (core language, unsupported code, or empty input) -- only
-    # meaningful on the batch endpoint, which never raises per-item.
+    # be translated (unsupported code, empty input, or model not ready) --
+    # only meaningful on the batch endpoint, which never raises per-item.
     deferred: bool = False
 
 
@@ -499,9 +498,9 @@ def health():
 def languages():
     return {
         "core_azure": sorted(CORE_LANGS),
-        "sidecar_supported": sorted(ISO1_TO_FLORES200.keys() - CORE_LANGS),
+        "sidecar_supported": sorted(ISO1_TO_FLORES200.keys()),
         "model": MODEL_NAME,
-        "note": "sidecar serves long-tail languages only; core languages are rejected (409)",
+        "note": "NLLB translates any mapped language, including the core seven",
     }
 
 
@@ -509,13 +508,6 @@ def _translate_payload(body: TranslateIn) -> TranslateOut:
     text = (body.Text or "").strip()
     if not text:
         return TranslateOut(text=body.Text or "", deferred=True)
-
-    target = (body.To or "").strip().lower()
-    if target in CORE_LANGS and target != "en":
-        raise HTTPException(
-            status_code=409,
-            detail="Use the hosted IFRC/Azure engine for core languages (en, fr, es, ar, ru, zh, hi).",
-        )
 
     src_flores = resolve_flores_code(body.From)
     tgt_flores = resolve_flores_code(body.To)
@@ -545,9 +537,9 @@ def translate(body: TranslateIn, x_api_key: Optional[str] = Header(default=None)
 
 @app.post("/api/translate/batch", response_model=List[TranslateOut])
 def translate_batch(items: List[TranslateIn], x_api_key: Optional[str] = Header(default=None)):
-    """Translate a batch. Unlike /api/translate, a single bad item (core
-    language, unsupported code) does not fail the whole batch -- it comes
-    back with ``deferred=True`` and the source text unchanged.
+    """Translate a batch. Unlike /api/translate, a single bad item
+    (unsupported code or model not ready) does not fail the whole batch --
+    it comes back with ``deferred=True`` and the source text unchanged.
     """
     _require_key(x_api_key)
     out: List[TranslateOut] = []

@@ -9,9 +9,15 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
   debugError: vi.fn(),
 }));
 
+let loadedTeardown = null;
+
 async function loadProgress() {
+  loadedTeardown?.();
+  loadedTeardown = null;
   vi.resetModules();
-  return import('../../../app/static/js/forms/modules/entry-form-progress.js');
+  const mod = await import('../../../app/static/js/forms/modules/entry-form-progress.js');
+  loadedTeardown = mod.teardownCompletionRateRefresh;
+  return mod;
 }
 
 function jsonResponse(body, { ok = true, status = 200, contentType = 'application/json' } = {}) {
@@ -93,7 +99,10 @@ describe('entry-form-progress', () => {
     delete window.getApiFetch;
     delete window.responseAsResult;
     delete window.collectHiddenFieldsForSubmission;
+    loadedTeardown?.();
+    loadedTeardown = null;
     delete document.body.dataset.completionRateRefreshInit;
+    delete document.body.dataset.completionRateFromSave;
     document.body.innerHTML = '';
   });
 
@@ -104,14 +113,21 @@ describe('entry-form-progress', () => {
       expect(applyCompletionRate(50)).toBe(false);
     });
 
-    it('returns false when the rate is not a number', async () => {
+    it('returns false when the rate is not numeric', async () => {
       setupProgressDom();
       const { applyCompletionRate } = await loadProgress();
-      expect(applyCompletionRate('50')).toBe(false);
+      expect(applyCompletionRate('x')).toBe(false);
       expect(applyCompletionRate(null)).toBe(false);
       expect(applyCompletionRate(undefined)).toBe(false);
       expect(applyCompletionRate({})).toBe(false);
       expect(displayEl().textContent).toBe('');
+    });
+
+    it('accepts numeric strings', async () => {
+      setupProgressDom();
+      const { applyCompletionRate } = await loadProgress();
+      expect(applyCompletionRate('50')).toBe(true);
+      expect(displayEl().textContent).toBe('50.0%');
     });
 
     it('formats 0% in red and keeps the gap button enabled', async () => {
@@ -234,8 +250,17 @@ describe('entry-form-progress', () => {
 
       applyEntryFormProgress(null);
       applyEntryFormProgress('x');
-      applyEntryFormProgress({ completion_rate: '50' });
+      applyEntryFormProgress({ completion_rate: 'nope' });
       expect(displayEl().textContent).toBe('');
+    });
+
+    it('applies a numeric-string completion_rate from the save payload', async () => {
+      setupProgressDom();
+      const { applyEntryFormProgress } = await loadProgress();
+
+      applyEntryFormProgress({ completion_rate: '55.5' });
+      expect(displayEl().textContent).toBe('55.5%');
+      expect(document.body.dataset.completionRateFromSave).toBe('1');
     });
 
     it('clears active gap highlights when a new progress payload arrives', async () => {
@@ -333,6 +358,7 @@ describe('entry-form-progress', () => {
         '/api/forms/assignment/7/completion-rate',
         expect.objectContaining({
           credentials: 'same-origin',
+          cache: 'no-store',
           headers: expect.objectContaining({ Accept: 'application/json' }),
         }),
       );
@@ -390,6 +416,30 @@ describe('entry-form-progress', () => {
       await vi.advanceTimersByTimeAsync(300);
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(fetch.mock.calls[0][0]).toBe('/api/forms/assignment/5/completion-rate');
+      expect(displayEl().textContent).toBe('40.0%');
+    });
+
+    it('does not refetch after a save-applied rate while relevance is settling', async () => {
+      vi.useFakeTimers();
+      setupProgressDom();
+      fetch.mockResolvedValue(jsonResponse({ completion_rate: 40 }));
+      const { initCompletionRateRefresh, applyEntryFormProgress } = await loadProgress();
+
+      initCompletionRateRefresh(5);
+      applyEntryFormProgress({ completion_rate: 80 });
+      expect(displayEl().textContent).toBe('80.0%');
+      expect(document.body.dataset.completionRateFromSave).toBe('1');
+
+      document.dispatchEvent(new CustomEvent('ifrc:relevance-settled'));
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(displayEl().textContent).toBe('80.0%');
+
+      await vi.advanceTimersByTimeAsync(1000);
+      document.dispatchEvent(new CustomEvent('ifrc:relevance-settled'));
+      await vi.advanceTimersByTimeAsync(300);
+      expect(fetch).toHaveBeenCalledTimes(1);
       expect(displayEl().textContent).toBe('40.0%');
     });
   });

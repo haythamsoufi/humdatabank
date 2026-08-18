@@ -532,6 +532,32 @@ class TestGetLocalizedNameFromTranslations:
         assert result == "Name"
 
 
+class TestGetLocalizedValidationMessage:
+    def test_locale_match(self, app_ctx):
+        from app.utils.form_localization import get_localized_validation_message
+        item = MagicMock()
+        item.validation_message = "Must be greater than zero"
+        item.validation_message_translations = {
+            "fr": "Doit être supérieur à zéro",
+            "en": "Must be greater than zero",
+        }
+        with patch("app.utils.form_localization.get_translation_key", return_value="fr"):
+            assert get_localized_validation_message(item) == "Doit être supérieur à zéro"
+
+    def test_falls_back_to_english_default(self, app_ctx):
+        from app.utils.form_localization import get_localized_validation_message
+        item = MagicMock()
+        item.validation_message = "Must be greater than zero"
+        item.validation_message_translations = None
+        with patch("app.utils.form_localization.get_translation_key", return_value="ar"):
+            assert get_localized_validation_message(item) == "Must be greater than zero"
+
+    def test_none_item(self, app_ctx):
+        from app.utils.form_localization import get_localized_validation_message
+        with _NO_LOCALE:
+            assert get_localized_validation_message(None) == ""
+
+
 # ---------------------------------------------------------------------------
 # get_localized_sector_name / subsector_name
 # ---------------------------------------------------------------------------

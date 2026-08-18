@@ -1,10 +1,11 @@
 """Tests for non-blocking translation service status checks.
 
 Regression coverage for the 2026-07-16 gateway-504 incident:
-/admin/api/translation_services must answer immediately from cache (or an
-optimistic default) and never run service probes on the request thread; the
-probes themselves must be cheap calls bounded by STATUS_PROBE_TIMEOUT_SECONDS,
-never real translations with production timeouts/retries.
+/admin/api/translation_services must answer immediately from cache (or
+unavailable when never probed) and never run service probes on the request
+thread; the probes themselves must be cheap calls bounded by
+STATUS_PROBE_TIMEOUT_SECONDS, never real translations with production
+timeouts/retries.
 """
 
 import threading
@@ -56,14 +57,14 @@ def _wait_for_cache(tr, timeout=5.0):
 
 
 class TestCheckServiceStatusNonBlocking:
-    def test_cold_cache_returns_optimistic_immediately(self):
+    def test_cold_cache_returns_unverified_unavailable_immediately(self):
         tr = _make_translator({'ifrc': _service(healthy=False, delay=0.4)})
 
         t0 = time.monotonic()
         result = tr.check_service_status()
         elapsed = time.monotonic() - t0
 
-        assert result == {'ifrc': True}  # optimistic while probing
+        assert result == {'ifrc': False}  # never available until probed
         assert elapsed < 0.3, f'check_service_status blocked for {elapsed:.2f}s'
 
     def test_background_refresh_populates_cache(self):
@@ -112,10 +113,26 @@ class TestCheckServiceStatusNonBlocking:
             ) as mock_thread:
                 result = tr.check_service_status()
             mock_thread.assert_not_called()
-            assert result == {'ifrc': True}
+            assert result == {'ifrc': False}
             svc.check_health.assert_not_called()
         finally:
             tr._status_probe_lock.release()
+
+    def test_wait_for_fresh_status_probes_when_cold(self):
+        svc = _service(healthy=False)
+        tr = _make_translator({'libre': svc})
+
+        assert tr.wait_for_fresh_status() == {'libre': False}
+        svc.check_health.assert_called_once()
+        assert tr.has_status_cache() is True
+
+    def test_wait_for_fresh_status_reuses_fresh_cache(self):
+        svc = _service(healthy=True)
+        tr = _make_translator({'libre': svc})
+        tr._status_cache = (time.monotonic(), {'libre': False})
+
+        assert tr.wait_for_fresh_status() == {'libre': False}
+        svc.check_health.assert_not_called()
 
     def test_use_cache_false_probes_synchronously(self):
         svc = _service(healthy=False)

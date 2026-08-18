@@ -20,6 +20,7 @@ field_parsing = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(field_parsing)
 get_field_value = field_parsing.get_field_value
 make_field_reader = field_parsing.make_field_reader
+parse_translations_json = field_parsing.parse_translations_json
 
 pytestmark = pytest.mark.unit
 
@@ -57,3 +58,18 @@ def test_make_field_reader_honours_default_prefix_and_override():
     read = make_field_reader(data, 'add_ind_modal-')
     assert read('order') == '1'
     assert read('order', '') == '9'
+
+
+def test_parse_translations_json_filters_supported_codes():
+    raw = '{"fr": "Bonjour", "xx": "Nope", "es": "Hola"}'
+    assert parse_translations_json(raw, ['en', 'fr', 'es']) == {'fr': 'Bonjour', 'es': 'Hola'}
+
+
+def test_parse_translations_json_accepts_dict_and_strips():
+    assert parse_translations_json({'fr': '  Oui  ', 'es': ''}, ['fr', 'es']) == {'fr': 'Oui'}
+
+
+def test_parse_translations_json_invalid_returns_none():
+    assert parse_translations_json('not-json', ['fr']) is None
+    assert parse_translations_json('', ['fr']) is None
+    assert parse_translations_json(None, ['fr']) is None

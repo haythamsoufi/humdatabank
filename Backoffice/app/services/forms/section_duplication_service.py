@@ -327,6 +327,7 @@ class SectionDuplicationService:
             definition_translations = None
             options_translations = None
             description_translations = None
+            validation_message_translations = None
 
             if source_item.label_translations:
                 try:
@@ -355,6 +356,13 @@ class SectionDuplicationService:
                 except Exception as e:
                     logger.debug("_duplicate_section_items: description_translations copy failed: %s", e)
                     description_translations = copy.deepcopy(source_item.description_translations) if hasattr(copy, 'deepcopy') else source_item.description_translations
+
+            if hasattr(source_item, 'validation_message_translations') and source_item.validation_message_translations:
+                try:
+                    validation_message_translations = json.loads(json.dumps(source_item.validation_message_translations))
+                except Exception as e:
+                    logger.debug("_duplicate_section_items: validation_message_translations copy failed: %s", e)
+                    validation_message_translations = copy.deepcopy(source_item.validation_message_translations) if hasattr(copy, 'deepcopy') else source_item.validation_message_translations
 
             # Copy options_json
             new_options_json = None
@@ -404,6 +412,7 @@ class SectionDuplicationService:
                 definition_translations=definition_translations,
                 options_translations=options_translations,
                 description_translations=description_translations,
+                validation_message_translations=validation_message_translations,
                 description=getattr(source_item, 'description', None),
                 archived=False  # New items are never archived
             )

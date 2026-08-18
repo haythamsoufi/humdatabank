@@ -157,17 +157,20 @@
                             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
                             {% set _assigned = assignment_status.assigned_form if assignment_status else none %}
                             {% set _aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
-                            {% set _use_upr_country_reporting_excel = _assigned and _assigned.enable_upr_country_reporting_excel and _aes_id %}
-                            {% set _use_unified_country_plan_excel = _assigned and _assigned.enable_unified_country_plan_excel and _aes_id %}
-                            {% set _use_export_excel = _assigned and _assigned.enable_export_excel and _aes_id %}
-                            {% set _use_import_excel = _assigned and _assigned.enable_import_excel and _aes_id %}
-                            {% if _use_export_excel or _use_import_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel %}
+                            {% set _excel_mode = form_features.excelMode if form_features is defined else none %}
+                            {% set _show_export = form_features.excelShowExport if form_features is defined else false %}
+                            {% set _show_import = form_features.excelShowImport if form_features is defined else false %}
+                            {% set _use_upr_country_reporting_excel = _aes_id and _excel_mode == 'upr' %}
+                            {% set _use_unified_country_plan_excel = _aes_id and _excel_mode == 'ucp' %}
+                            {% set _use_export_excel = _aes_id and _excel_mode == 'generic' and _show_export %}
+                            {% set _use_import_excel = _aes_id and _excel_mode == 'generic' and _show_import %}
+                            {% if _aes_id and (_show_export or _show_import) %}
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">
                                 <i class="fas fa-file-excel"></i>
                                 <span>
-                                    {% if (_use_export_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel) and (_use_import_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel) %}
+                                    {% if _show_export and _show_import %}
                                         {{ _('Excel Import/Export') }}
-                                    {% elif _use_export_excel or _use_upr_country_reporting_excel or _use_unified_country_plan_excel %}
+                                    {% elif _show_export %}
                                         {{ _('Excel Export') }}
                                     {% else %}
                                         {{ _('Excel Import') }}
@@ -863,7 +866,7 @@
                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
+                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}>
                                                         <div class="flex items-start justify-between">
                                                             <div class="flex-1 pr-2">
                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
@@ -1004,7 +1007,7 @@
                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}
+                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}
                                                          {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}" data-indicator-bank-id="{{ field.indicator_bank_id or (field.source_indicator_from_bank.id if field.source_indicator_from_bank else '') }}"{% endif %}>
                                                          <div class="flex items-start justify-between">
                                                             <div class="flex-1 pr-2">
@@ -1828,7 +1831,7 @@
                                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
+                                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}>
                                                                         <div class="flex items-start justify-between">
                                                                             <div class="flex-1 pr-2">
                                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
@@ -1956,7 +1959,7 @@
                                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}
+                                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}
                                                                          {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}" data-indicator-bank-id="{{ field.indicator_bank_id or (field.source_indicator_from_bank.id if field.source_indicator_from_bank else '') }}"{% endif %}>
                                                                 <div class="flex items-start justify-between">
                                                                     <div class="flex-1 pr-2">
@@ -2641,12 +2644,13 @@
             {% set tmpl = assignment_status.assigned_form.template if assignment_status and assignment_status.assigned_form else None %}
             {% set aes_id = assignment_status.id if assignment_status and assignment_status.id is not none and assignment_status.id != 0 else none %}
             {% set _assigned = assignment_status.assigned_form if assignment_status else none %}
-            {% set _use_upr_country_reporting_excel = _assigned and _assigned.enable_upr_country_reporting_excel and aes_id %}
-            {% set _use_unified_country_plan_excel = _assigned and _assigned.enable_unified_country_plan_excel and aes_id %}
-            {% set _use_export_excel = _assigned and _assigned.enable_export_excel and aes_id %}
-            {% set _use_import_excel = _assigned and _assigned.enable_import_excel and aes_id %}
-            {% set _show_export = aes_id and (_use_upr_country_reporting_excel or _use_unified_country_plan_excel or _use_export_excel) %}
-            {% set _show_import = aes_id and (_use_upr_country_reporting_excel or _use_unified_country_plan_excel or _use_import_excel) %}
+            {% set _excel_mode = form_features.excelMode if form_features is defined else none %}
+            {% set _use_upr_country_reporting_excel = aes_id and _excel_mode == 'upr' %}
+            {% set _use_unified_country_plan_excel = aes_id and _excel_mode == 'ucp' %}
+            {% set _use_export_excel = aes_id and _excel_mode == 'generic' and (form_features.excelShowExport if form_features is defined else false) %}
+            {% set _use_import_excel = aes_id and _excel_mode == 'generic' and (form_features.excelShowImport if form_features is defined else false) %}
+            {% set _show_export = aes_id and form_features is defined and form_features.excelShowExport %}
+            {% set _show_import = aes_id and form_features is defined and form_features.excelShowImport %}
             {% if _use_upr_country_reporting_excel %}
                 {% set excel_title %}<i class="fas fa-file-excel w-6 h-6 mr-2 text-green-600"></i> {{ _('UPR Country Reporting') }}{% endset %}
             {% elif _use_unified_country_plan_excel %}

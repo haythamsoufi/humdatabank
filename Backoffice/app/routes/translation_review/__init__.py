@@ -274,9 +274,22 @@ def decide_glossary_candidate(candidate_id):
         return json_bad_request(_('JSON request required'))
     data = get_request_data() or {}
     accept = bool(data.get('accept'))
+    source_term = data.get('source_term')
+    target_term = data.get('target_term')
+    if accept:
+        if source_term is not None and not str(source_term).strip():
+            return json_bad_request(_('Source term is required'))
+        if target_term is not None and not str(target_term).strip():
+            return json_bad_request(_('Target term is required'))
     from app.services.translation.glossary_mining import decide_candidate
 
-    ok = decide_candidate(candidate_id, accept=accept, tier=data.get('tier'))
+    ok = decide_candidate(
+        candidate_id,
+        accept=accept,
+        tier=data.get('tier'),
+        source_term=str(source_term).strip() if source_term is not None else None,
+        target_term=str(target_term).strip() if target_term is not None else None,
+    )
     if not ok:
         return json_bad_request(_('Candidate not found or already reviewed'))
     return json_ok(accepted=accept)

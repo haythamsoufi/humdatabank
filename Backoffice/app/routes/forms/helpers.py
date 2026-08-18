@@ -375,15 +375,11 @@ def build_entry_form_features(all_sections, form_template=None, assigned_form=No
         for f in fields
     )
 
-    enable_export_excel = bool(getattr(assigned_form, 'enable_export_excel', False)) if assigned_form else False
-    enable_import_excel = bool(getattr(assigned_form, 'enable_import_excel', False)) if assigned_form else False
     enable_export_pdf = bool(getattr(assigned_form, 'enable_export_pdf', False)) if assigned_form else False
     has_discussion_section = 'discussion' in section_types
     enable_discussion = bool(getattr(form_template, 'enable_discussion', False)) if form_template else False
-    from app.services.upr.country_reporting_excel_service import assignment_uses_upr_country_reporting_excel
-    from app.services.upr.unified_country_plan_excel_service import assignment_uses_unified_country_plan_excel
-    upr_country_reporting_excel = assignment_uses_upr_country_reporting_excel(assigned_form)
-    unified_country_plan_excel = assignment_uses_unified_country_plan_excel(assigned_form)
+    from app.services.imports.assignment_excel_access import resolve_assignment_excel_ui
+    excel_ui = resolve_assignment_excel_ui(assigned_form)
 
     return {
         'matrix': has_matrix_fields,
@@ -392,13 +388,22 @@ def build_entry_form_features(all_sections, form_template=None, assigned_form=No
         'documents': has_document_fields,
         'calculatedLists': has_calculated_list_fields,
         'pdfExport': enable_export_pdf,
-        'excelExport': enable_export_excel or enable_import_excel or upr_country_reporting_excel or unified_country_plan_excel,
+        'excelExport': bool(excel_ui['mode']),
+        'excelMode': excel_ui['mode'],
+        'excelShowExport': excel_ui['show_export'],
+        'excelShowImport': excel_ui['show_import'],
         'discussion': enable_discussion or has_discussion_section,
     }
 
 
-def calculate_section_completion_status(all_sections, existing_data_processed, existing_submitted_documents_dict):
+def calculate_section_completion_status(
+    all_sections,
+    existing_data_processed,
+    existing_submitted_documents_dict,
+    skip_field_ids: set[int] | None = None,
+):
     """Calculate completion status for sections - returns dict format expected by template."""
+    skip_ids = set(skip_field_ids or ())
     section_statuses = {}
     for section in all_sections:
         if getattr(section, 'section_type', None) == 'discussion':
@@ -414,6 +419,8 @@ def calculate_section_completion_status(all_sections, existing_data_processed, e
                     continue
                 field_config = getattr(field, 'config', None) or {}
                 if field_config.get('exclude_from_completion_rate'):
+                    continue
+                if getattr(field, 'id', None) in skip_ids:
                     continue
 
                 total_items_in_section +=1
@@ -520,8 +527,19 @@ def compute_entry_form_progress_metrics(
     existing_submitted_documents_dict = build_submitted_documents_dict(
         assignment_entity_status.id
     )
+    skip_field_ids = set(hidden_field_ids or ())
+    published_version_id = getattr(form_template, 'published_version_id', None)
+    if getattr(assignment_entity_status, 'id', None) and published_version_id:
+        skip_field_ids |= AssignmentCompletionService._empty_option_list_ids_for_assignment(
+            assignment_entity_status.id,
+            form_template.id,
+            published_version_id,
+        )
     section_statuses_by_name = calculate_section_completion_status(
-        all_sections, existing_data_processed, existing_submitted_documents_dict
+        all_sections,
+        existing_data_processed,
+        existing_submitted_documents_dict,
+        skip_field_ids=skip_field_ids,
     )
     section_statuses = {
         str(section.id): section_statuses_by_name.get(section.name, 'Not Started')

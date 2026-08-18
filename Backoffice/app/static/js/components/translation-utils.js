@@ -64,6 +64,7 @@ export const TranslationUtils = (() => {
     }
     button.classList.add('bg-red-600', 'hover:bg-red-700');
     button.classList.remove('bg-green-600', 'hover:bg-green-700');
+    button.disabled = false;
     setTimeout(() => {
       restore();
       button.disabled = false;

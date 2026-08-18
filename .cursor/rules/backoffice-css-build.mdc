@@ -1,0 +1,15 @@
+---
+description: Rebuild Backoffice Tailwind after template or JS class changes
+alwaysApply: true
+---
+
+# Backoffice CSS compile
+
+`Backoffice/app/static/css/output.css` is generated. New Tailwind utilities in Jinja templates (`app/templates/`) or `app/static/js/` are missing from the page until you rebuild.
+
+After adding or changing utility classes (including `md:grid-cols-*`, `flex-1`, arbitrary values):
+
+1. Run `npm run build:css` from `Backoffice/` (or keep `npm run watch:css` running).
+2. Do **not** work around a broken layout with page-local CSS just because a class did not appear.
+
+A full page refresh alone is not enough. Playwright MCP: `browser_close` then reopen after the rebuild so isolated Chrome is not serving the old bundle.

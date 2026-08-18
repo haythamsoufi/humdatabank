@@ -10,7 +10,7 @@ from typing import Any, Optional
 
 from app.services.forms.reporting_period_service import period_chronology_sort_key
 
-from app.utils.form_localization import get_localized_indicator_name
+from app.utils.form_localization import get_localized_indicator_name, get_localized_validation_message
 from app.utils.api_formatting import format_answer_value
 from app.utils.api_helpers import extract_numeric_value
 from flask import current_app
@@ -1018,7 +1018,7 @@ def format_form_item_info(form_item, section=None, template=None, assignment=Non
             'is_sub_indicator': form_item.is_sub_item,
             'allowed_disaggregation_options': form_item.allowed_disaggregation_options,
             'validation_condition': form_item.validation_condition,
-            'validation_message': form_item.validation_message,
+            'validation_message': get_localized_validation_message(form_item) or form_item.validation_message,
             'allow_data_not_available': form_item.allow_data_not_available,
             'allow_not_applicable': form_item.allow_not_applicable,
             'allow_disability_questions': form_item.allow_disability_questions,

@@ -173,7 +173,7 @@
                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
+                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}>
                                                         <div class="flex items-start justify-between">
                                                             <div class="flex-1 pr-2">
                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
@@ -314,7 +314,7 @@
                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}
+                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}
                                                          {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}" data-indicator-bank-id="{{ field.indicator_bank_id or (field.source_indicator_from_bank.id if field.source_indicator_from_bank else '') }}"{% endif %}>
                                                          <div class="flex items-start justify-between">
                                                             <div class="flex-1 pr-2">
@@ -1269,7 +1269,7 @@
                                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
+                                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}>
                                                                         <div class="flex items-start justify-between">
                                                                             <div class="flex-1 pr-2">
                                                                                 {% set field_display_label = field._display_label_resolved if hasattr(field, '_display_label_resolved') and field._display_label_resolved else field.display_label %}
@@ -1397,7 +1397,7 @@
                                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
                                                                          {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-                                                                         {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}
+                                                                         {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}
                                                                          {% if is_dynamic_indicator %}data-assignment-id="{{ field.dynamic_assignment_id }}" data-indicator-bank-id="{{ field.indicator_bank_id or (field.source_indicator_from_bank.id if field.source_indicator_from_bank else '') }}"{% endif %}>
                                                                 <div class="flex items-start justify-between">
                                                                     <div class="flex-1 pr-2">

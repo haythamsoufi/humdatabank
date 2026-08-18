@@ -32,7 +32,12 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
 from app.routes.admin.shared import admin_required, permission_required
 from app.utils.request_utils import is_json_request
-from app.utils.data_quality_constants import UPR_PLANNING_TEMPLATE_ID, UPR_REPORTING_TEMPLATE_ID
+from app.services.imports.assignment_excel_access import (
+    assignment_uses_unified_country_plan_excel,
+    assignment_uses_upr_country_reporting_excel,
+    populate_standard_excel_flags_from_legacy,
+    sync_assignment_custom_excel_flags,
+)
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import joinedload
@@ -341,14 +346,6 @@ class EditAssignmentDetailsForm(FlaskForm):
         "Require delegation review before final submission",
         default=False,
     )
-    enable_upr_country_reporting_excel = BooleanField(
-        "Enable UPR Country Reporting Excel import/export",
-        default=False,
-    )
-    enable_unified_country_plan_excel = BooleanField(
-        "Enable Unified Country Plan Excel import/export",
-        default=False,
-    )
     enable_export_excel = BooleanField(
         "Enable Export Excel button",
         default=False,
@@ -430,8 +427,8 @@ def manage_assignments():
                 'public_url': public_url,
                 'public_submission_count': public_submission_count,
                 'requires_delegation_review': bool(getattr(assignment, 'requires_delegation_review', False)),
-                'enable_upr_country_reporting_excel': bool(getattr(assignment, 'enable_upr_country_reporting_excel', False)),
-                'enable_unified_country_plan_excel': bool(getattr(assignment, 'enable_unified_country_plan_excel', False)),
+                'enable_upr_country_reporting_excel': assignment_uses_upr_country_reporting_excel(assignment),
+                'enable_unified_country_plan_excel': assignment_uses_unified_country_plan_excel(assignment),
                 'enable_export_excel': bool(getattr(assignment, 'enable_export_excel', False)),
                 'enable_import_excel': bool(getattr(assignment, 'enable_import_excel', False)),
                 'enable_export_pdf': bool(getattr(assignment, 'enable_export_pdf', False)),
@@ -582,8 +579,6 @@ def new_assignment():
                                      get_localized_country_name=get_localized_country_name,
                                      enabled_entity_types=enabled_entity_groups,
                                      submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
-                                     UPR_REPORTING_TEMPLATE_ID=UPR_REPORTING_TEMPLATE_ID,
-                                     UPR_PLANNING_TEMPLATE_ID=UPR_PLANNING_TEMPLATE_ID,
                                      **_manage_assignment_country_context())
 
             # Duplicate guard: never auto-reactivate. Require explicit confirmation to create a duplicate.
@@ -614,14 +609,13 @@ def new_assignment():
                 expiry_date=form.expiry_date.data if form.expiry_date.data else None,
                 data_owner_id=form.data_owner_id.data or None,
                 requires_delegation_review=bool(form.requires_delegation_review.data),
-                enable_upr_country_reporting_excel=bool(form.enable_upr_country_reporting_excel.data),
-                enable_unified_country_plan_excel=bool(form.enable_unified_country_plan_excel.data),
                 enable_export_excel=bool(form.enable_export_excel.data),
                 enable_import_excel=bool(form.enable_import_excel.data),
                 enable_export_pdf=bool(form.enable_export_pdf.data),
                 activated_by_user_id=current_user.id,
             )
             _apply_submission_review_recipient_from_form(new_assignment, form)
+            sync_assignment_custom_excel_flags(new_assignment)
             sync_assigned_form_reporting_period(new_assignment)
 
             # Warn if active and no data owner (soft enforcement)
@@ -765,8 +759,6 @@ def new_assignment():
                          get_localized_country_name=get_localized_country_name,
                          enabled_entity_types=enabled_entity_groups,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
-                         UPR_REPORTING_TEMPLATE_ID=UPR_REPORTING_TEMPLATE_ID,
-                         UPR_PLANNING_TEMPLATE_ID=UPR_PLANNING_TEMPLATE_ID,
                          **_manage_assignment_country_context())
 
 
@@ -1062,6 +1054,7 @@ def edit_assignment(assignment_id):
         form.submission_review_recipient_user_ids.data = (
             assignment.submission_review_recipient_user_ids_csv
         )
+        populate_standard_excel_flags_from_legacy(assignment, form)
     enabled_entity_groups = get_enabled_entity_groups()
 
     if form.validate_on_submit():
@@ -1074,11 +1067,10 @@ def edit_assignment(assignment_id):
             assignment.expiry_date = form.expiry_date.data if form.expiry_date.data else None
             assignment.data_owner_id = form.data_owner_id.data or None
             assignment.requires_delegation_review = bool(form.requires_delegation_review.data)
-            assignment.enable_upr_country_reporting_excel = bool(form.enable_upr_country_reporting_excel.data)
-            assignment.enable_unified_country_plan_excel = bool(form.enable_unified_country_plan_excel.data)
             assignment.enable_export_excel = bool(form.enable_export_excel.data)
             assignment.enable_import_excel = bool(form.enable_import_excel.data)
             assignment.enable_export_pdf = bool(form.enable_export_pdf.data)
+            sync_assignment_custom_excel_flags(assignment)
             _apply_submission_review_recipient_from_form(assignment, form)
 
             # Warn if active assignment has no data owner
@@ -1154,8 +1146,6 @@ def edit_assignment(assignment_id):
                          title=f"Edit Assignment: {assignment.period_name}",
                          enabled_entity_types=enabled_entity_groups,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment),
-                         UPR_REPORTING_TEMPLATE_ID=UPR_REPORTING_TEMPLATE_ID,
-                         UPR_PLANNING_TEMPLATE_ID=UPR_PLANNING_TEMPLATE_ID,
                          **_manage_assignment_country_context())
 
 @bp.route("/assignments/edit/<int:assignment_id>/add_countries", methods=["POST"])

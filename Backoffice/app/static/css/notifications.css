@@ -608,7 +608,7 @@
 .form-select,
 .form-input {
     border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
+    border-radius: 0;
     font-size: 0.875rem;
     color: #374151;
     background-color: white;
@@ -628,8 +628,8 @@
 .form-select:focus,
 .form-input:focus {
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: #14b8a6;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
 }
 
 .form-checkbox {

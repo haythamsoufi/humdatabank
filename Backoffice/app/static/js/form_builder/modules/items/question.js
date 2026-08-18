@@ -54,6 +54,8 @@ export const QuestionItem = {
         appendRuleToFormData(formData, 'relevance_condition', relevanceRuleBuilder);
         appendRuleToFormData(formData, 'validation_condition', validationRuleBuilder);
         if (validationMessageInput) formData.append('validation_message', validationMessageInput.value);
+        const validationMessageTranslationsInput = Utils.getElementById('item-validation-message-translations');
+        if (validationMessageTranslationsInput) formData.append('validation_message_translations', validationMessageTranslationsInput.value || '{}');
         const translationsInput = Utils.getElementById('item-modal-translations');
         if (translationsInput) formData.append(`${formPrefix}label_translations`, translationsInput.value);
         const definitionTranslationsInput = Utils.getElementById('item-modal-definition-translations');

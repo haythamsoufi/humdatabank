@@ -1,6 +1,5 @@
 import { debugLog } from './debug.js';
 import { evaluateConditions } from './conditions.js';
-import { getCurrentFieldValue } from './field-management.js';
 import { closeEntryFormMobileNav } from './sidebar-collapse.js';
 
 const MODULE_NAME = 'form_validation';
@@ -18,6 +17,23 @@ function parseValidationConditionToObject(raw) {
         try { parsed = JSON.parse(parsed); } catch (_) { return null; }
     }
     return parsed && typeof parsed === 'object' ? parsed : null;
+}
+
+/**
+ * Parse a numeric field's current value to a real number.
+ *
+ * numeric-formatting.js converts type="number" inputs to type="text" (data-numeric="true")
+ * and displays thousands separators once the field has been blurred (e.g. "1,200"). A bare
+ * `parseFloat(field.value)` on that display string silently truncates at the comma
+ * (parseFloat("1,200") === 1), which broke percentage-over-100 checks for values >= 1000.
+ */
+function parseNumericFieldValue(field) {
+    const raw = field?.value;
+    if (raw === undefined || raw === null || raw === '') return NaN;
+    const unformatted = typeof window.__numericUnformat === 'function'
+        ? window.__numericUnformat(raw)
+        : String(raw).replace(/,/g, '').replace(/'/g, '');
+    return parseFloat(unformatted);
 }
 
 class FormValidator {
@@ -174,7 +190,7 @@ class FormValidator {
             return;
         }
 
-        const value = parseFloat(field.value);
+        const value = parseNumericFieldValue(field);
 
         // Only validate if there's a value
         if (isNaN(value) || field.value.trim() === '') {
@@ -255,7 +271,7 @@ class FormValidator {
                 return;
             }
 
-            const value = parseFloat(field.value);
+            const value = parseNumericFieldValue(field);
 
             // Only check if there's a value
             if (isNaN(value) || field.value.trim() === '') {
@@ -576,8 +592,11 @@ class FormValidator {
             if (!this.isFieldHidden(field) && field.value && field.value.trim() !== '') {
                 const value = field.value.trim();
 
-                // Check if it's a valid number
-                if (isNaN(value) || value === '') {
+                // Check if it's a valid number. `isNaN()`/`Number()` reject thousands
+                // separators, so a numeric-formatting.js display value like "1,200"
+                // (reach counts are frequently >= 1000) would be misreported as invalid
+                // unless we unformat it first (see parseNumericFieldValue).
+                if (isNaN(parseNumericFieldValue(field)) || value === '') {
                     const label = this.getFieldLabel(field) || _t('Indirect reach');
                     this.errors.push({
                         field: field,
@@ -603,7 +622,7 @@ class FormValidator {
                 return;
             }
 
-            const value = parseFloat(field.value);
+            const value = parseNumericFieldValue(field);
 
             // Only validate if there's a value
             if (isNaN(value) || field.value.trim() === '') {

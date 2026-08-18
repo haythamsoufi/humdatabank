@@ -54,16 +54,6 @@ class AssignedFormForm(BaseForm):
         default=False,
     )
 
-    enable_upr_country_reporting_excel = BooleanField(
-        "Enable UPR Country Reporting Excel import/export",
-        default=False,
-    )
-
-    enable_unified_country_plan_excel = BooleanField(
-        "Enable Unified Country Plan Excel import/export",
-        default=False,
-    )
-
     enable_export_excel = BooleanField(
         "Enable Export Excel button",
         default=False,

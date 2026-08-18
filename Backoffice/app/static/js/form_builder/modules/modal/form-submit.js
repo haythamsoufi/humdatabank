@@ -92,8 +92,10 @@ export const FormSubmitMixin = {
                 if (isDisplayOnly) {
                     const validationCondition = form.querySelector('[name="validation_condition"]');
                     const validationMessage = form.querySelector('[name="validation_message"]');
+                    const validationMessageTranslations = form.querySelector('[name="validation_message_translations"]');
                     if (validationCondition) validationCondition.value = '';
                     if (validationMessage) validationMessage.value = '';
+                    if (validationMessageTranslations) validationMessageTranslations.value = '{}';
                 } else {
                     setHiddenRuleField(form, 'validation_condition', validationBuilder);
                 }
@@ -213,8 +215,10 @@ export const FormSubmitMixin = {
         if (isDisplayOnly) {
             const validationCondition = form.querySelector('[name="validation_condition"]');
             const validationMessage = form.querySelector('[name="validation_message"]');
+            const validationMessageTranslations = form.querySelector('[name="validation_message_translations"]');
             if (validationCondition) validationCondition.value = '';
             if (validationMessage) validationMessage.value = '';
+            if (validationMessageTranslations) validationMessageTranslations.value = '{}';
         } else {
             setHiddenRuleField(form, 'validation_condition', validationBuilder);
         }
@@ -222,6 +226,10 @@ export const FormSubmitMixin = {
         const validationMessageInput = this.modalElement.querySelector('#item-validation-message');
         if (validationMessageInput && !isDisplayOnly) {
             setHiddenField(form, 'validation_message', validationMessageInput.value);
+        }
+        const validationMessageTranslationsInput = this.modalElement.querySelector('#item-validation-message-translations');
+        if (validationMessageTranslationsInput && !isDisplayOnly) {
+            setHiddenField(form, 'validation_message_translations', validationMessageTranslationsInput.value || '{}');
         }
 
         if (this.currentItemType === 'matrix') {

@@ -79,7 +79,11 @@ async function initializeEntryForm() {
         })()
             .then((data) => {
                 window.__entryBootstrap = (data && typeof data === 'object') ? data : null;
-                if (typeof data?.completion_rate === 'number') {
+                // Do not overwrite a rate already applied from a completed save.
+                if (
+                    typeof data?.completion_rate === 'number'
+                    && document.body.dataset.completionRateFromSave !== '1'
+                ) {
                     applyCompletionRate(data.completion_rate);
                 }
                 return data;
@@ -288,7 +292,8 @@ async function initializeEntryForm() {
         debugLog('main', initErrors.length ? '⚠️ Form initialization completed with errors' : '✅ Form initialization completed successfully');
     }
 
-    // Refresh completion rate after save; skip fetch when server already rendered it.
+    // Apply the server-rendered rate on load when the header is still pending.
+    // After save, ajax-save applies the recalculated rate from the save response.
     const completionDisplay = document.getElementById('completion-rate-display');
     const gapBtn = document.getElementById('completion-gap-btn');
     if (completionDisplay && gapBtn && gapBtn.dataset.aesId) {

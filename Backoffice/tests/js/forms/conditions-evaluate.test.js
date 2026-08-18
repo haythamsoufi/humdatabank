@@ -42,6 +42,17 @@ function yesNoBlockHtml(id, { prefix = 'question', checked } = {}) {
     </div>`;
 }
 
+function numericQuestionBlockHtml(id, value = '', { prefix = 'question' } = {}) {
+  const itemId = `${prefix}_${id}`;
+  // Mirrors what numeric-formatting.js does to a type="number" input once it has
+  // been blurred: swap to type="text", mark data-numeric="true", and (for values
+  // >= 1000) render thousands separators, e.g. "1200" -> "1,200".
+  return `
+    <div class="form-item-block" data-item-id="${itemId}">
+      <input id="field-${itemId}" name="field_value[${id}]" data-numeric="true" value="${value}">
+    </div>`;
+}
+
 function payload(conditions, logic = 'AND') {
   return { logic, conditions };
 }
@@ -108,14 +119,13 @@ describe('evaluateConditions', () => {
       expect(evaluateConditions(JSON.stringify(obj))).toBe(true);
     });
 
-    it('returns true for a double-encoded JSON string (single parse only)', async () => {
-      // evaluateConditions JSON.parse()s a string once. A double-encoded payload
-      // parses to a string, which has no .conditions array → default visible.
-      // (parseConditionPayloadMaybe used by init can unwrap 2–3 encodings; this path does not.)
-      document.body.innerHTML = questionBlockHtml(10, '42');
+    it('unwraps a double-encoded JSON string and evaluates it', async () => {
+      document.body.innerHTML = questionBlockHtml(10, '99');
       const { evaluateConditions } = await loadConditions();
       const inner = JSON.stringify(payload([cond(10, 'equals', '42')]));
       const doubleEncoded = JSON.stringify(inner);
+      expect(evaluateConditions(doubleEncoded)).toBe(false);
+      document.body.innerHTML = questionBlockHtml(10, '42');
       expect(evaluateConditions(doubleEncoded)).toBe(true);
     });
   });
@@ -171,6 +181,46 @@ describe('evaluateConditions', () => {
       document.body.innerHTML = questionBlockHtml(10, '99', { prefix: 'indicator' });
       const { evaluateConditions } = await loadConditions();
       expect(evaluateConditions(payload([cond(10, 'equals', '99')]))).toBe(true);
+    });
+
+    // Entry form renders data-item-id="{{ field.id }}" (bare number) and
+    // name="indicator_<id>_total_value". Defaulting that to question_<id> made
+    // getCurrentFieldValue miss the input, so greater_than/less_than always
+    // compared null and validation fired even when the rule was satisfied.
+    it('reads indicator_<id>_total_value even when a leftover #field-<id> exists', async () => {
+      document.body.innerHTML = `
+        <div id="field-961"></div>
+        <div class="form-item-block" data-item-id="961" data-item-type="indicator">
+          <input name="indicator_961_total_value" id="indicator-total-961" data-numeric="true" value="12">
+        </div>
+        <div id="field-963"></div>
+        <div class="form-item-block" data-item-id="963" data-item-type="indicator">
+          <input name="indicator_963_total_value" id="indicator-total-963" data-numeric="true" value="123">
+        </div>`;
+      const { evaluateConditions } = await loadConditions();
+      expect(evaluateConditions(payload([
+        cond(961, 'less_than', null, { value_field_id: 963 }),
+      ]))).toBe(true);
+      expect(evaluateConditions(payload([
+        cond(963, 'greater_than', null, { value_field_id: 961 }),
+      ]))).toBe(true);
+    });
+
+    it('resolves numeric item_id to a bare data-item-id (entry form)', async () => {
+      document.body.innerHTML = `
+        <div class="form-item-block" data-item-id="961">
+          <input name="indicator_961_total_value" value="500">
+        </div>
+        <div class="form-item-block" data-item-id="963">
+          <input name="indicator_963_total_value" value="1200">
+        </div>`;
+      const { evaluateConditions } = await loadConditions();
+      expect(evaluateConditions(payload([
+        cond(961, 'less_than', null, { value_field_id: 963 }),
+      ]))).toBe(true);
+      expect(evaluateConditions(payload([
+        cond(963, 'greater_than', null, { value_field_id: 961 }),
+      ]))).toBe(true);
     });
 
     it('keeps a numeric id when a .plugin-field-container[data-field-id] exists', async () => {
@@ -318,6 +368,18 @@ describe('evaluateConditions', () => {
       document.querySelector('#field-question_10').value = '8';
       expect(evaluateConditions(payload([cond(10, 'greater_than', 'nope')]))).toBe(false);
     });
+
+    // Regression test: numeric-formatting.js renders data-numeric="true" inputs with
+    // thousands separators once their value reaches four digits (e.g. "1,200"). A bare
+    // parseFloat("1,200") stops at the comma and returns 1, which used to make this
+    // condition wrongly evaluate to false even though 1200 > 999.
+    it('handles comma-formatted (thousands separator) values correctly', async () => {
+      document.body.innerHTML = numericQuestionBlockHtml(10, '1,200');
+      const { evaluateConditions } = await loadConditions();
+      expect(evaluateConditions(payload([cond(10, 'greater_than', '999')]))).toBe(true);
+      expect(evaluateConditions(payload([cond(10, 'less_than', '999')]))).toBe(false);
+      expect(evaluateConditions(payload([cond(10, 'equals', '1200')]))).toBe(true);
+    });
   });
 
   describe('value_field_id', () => {
@@ -332,6 +394,24 @@ describe('evaluateConditions', () => {
       ]))).toBe(false);
       expect(evaluateConditions(payload([
         cond(10, 'greater_than_or_equal_to', null, { value_field_id: 5 }),
+      ]))).toBe(true);
+    });
+
+    // Regression test for the reported bug: two cross-referencing indicator fields
+    // (e.g. item 961 "less_than" value_field_id 963, and its mirror 963 "greater_than"
+    // value_field_id 961) where one side's value crosses the 1000 thousands-separator
+    // threshold. Before the fix, "1,200" parsed via parseFloat() truncated to 1, so
+    // 963 (1200) was never seen as greater_than 961 (500) and the validation rule
+    // incorrectly appeared violated.
+    it('compares comma-formatted field A to plain field B via value_field_id (500 < 1,200)', async () => {
+      document.body.innerHTML =
+        numericQuestionBlockHtml(961, '500') + numericQuestionBlockHtml(963, '1,200');
+      const { evaluateConditions } = await loadConditions();
+      expect(evaluateConditions(payload([
+        cond(961, 'less_than', null, { value_field_id: 963 }),
+      ]))).toBe(true);
+      expect(evaluateConditions(payload([
+        cond(963, 'greater_than', null, { value_field_id: 961 }),
       ]))).toBe(true);
     });
   });

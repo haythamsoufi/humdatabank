@@ -13,6 +13,31 @@
 
 {% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 
+{# Split Auto Translate button: main action + chevron to switch the preferred service. #}
+{% macro auto_translate_split_button(button_id, label, title) -%}
+<div class="btn-group auto-translate-split js-auto-translate-split relative"
+     data-i18n-loading="{{ _('Loading services...')|forceescape }}"
+     data-i18n-empty="{{ _('No translation services configured')|forceescape }}"
+     data-i18n-offline="{{ _('(offline)')|forceescape }}"
+     data-i18n-heading="{{ _('Translation service')|forceescape }}">
+    <button type="button" id="{{ button_id }}" class="btn btn-warning" title="{{ title|forceescape }}">
+        <i class="fas fa-magic"></i>
+        {{ label }}
+    </button>
+    <button type="button"
+            class="btn btn-warning js-auto-translate-service-toggle"
+            title="{{ _('Translation service')|forceescape }}"
+            aria-label="{{ _('Choose translation service')|forceescape }}"
+            aria-haspopup="listbox"
+            aria-expanded="false">
+        <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
+    </button>
+    <div class="js-auto-translate-service-menu auto-translate-service-menu hidden"
+         role="listbox"
+         aria-label="{{ _('Translation service')|forceescape }}"></div>
+</div>
+{%- endmacro %}
+
 {% macro translation_modal(modal_id, modal_title, description=None, context='general', tabs=None, show_auto_translate=true, css_prefix=None, auto_translate_permission_context=None, auto_translate_permission_code=None, enable_variables=false) -%}
 {% set css_prefix = css_prefix or modal_id %}
 {% set has_tabs = tabs and tabs|length > 0 %}
@@ -87,10 +112,7 @@
             <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
                 {% if show_auto_translate %}
                 <div class="flex gap-2">
-                    <button type="button" id="auto-translate-{{ css_prefix }}-btn" class="btn btn-warning" title="Uses AI to automatically translate text">
-                        <i class="fas fa-magic"></i>
-                        Auto Translate
-                    </button>
+                    {{ auto_translate_split_button('auto-translate-' ~ css_prefix ~ '-btn', 'Auto Translate', 'Uses AI to automatically translate text') }}
                     <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
                         <i class="fas fa-trash"></i>
                         Clear
@@ -206,10 +228,7 @@
             <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
                 {% if show_auto_translate %}
                 <div class="flex gap-2">
-                    <button type="button" id="auto-translate-{{ css_prefix }}-btn" class="btn btn-warning" title="Uses AI to automatically translate all items">
-                        <i class="fas fa-magic"></i>
-                        Auto Translate All
-                    </button>
+                    {{ auto_translate_split_button('auto-translate-' ~ css_prefix ~ '-btn', 'Auto Translate All', 'Uses AI to automatically translate all items') }}
                     <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
                         <i class="fas fa-trash"></i>
                         Clear All

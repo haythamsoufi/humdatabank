@@ -103,7 +103,7 @@
      data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
      {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
      {% if field.validation_condition %}data-validation-condition='{{ field.validation_condition|tojson }}'{% endif %}
-     {% if field.validation_message %}data-validation-message='{{ field.validation_message|tojson }}'{% endif %}>
+     {% set _val_msg = get_localized_validation_message(field) %}{% if _val_msg %}data-validation-message='{{ _val_msg|tojson }}'{% endif %}>
     <div class="flex items-start justify-between">
         <div class="flex-1 pr-2">
             <label {{ entry_form_field_label_binding(field, is_document=true) }} class="block text-md font-semibold text-gray-800 mb-1">

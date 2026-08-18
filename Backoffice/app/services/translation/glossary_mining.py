@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from flask_login import current_user
 
@@ -103,18 +103,19 @@ def _existing_rejected() -> Set[tuple]:
     return {(r.source_term.lower(), r.target_term.lower(), r.target_lang) for r in rows}
 
 
-def _existing_glossary() -> Set[tuple]:
+def _existing_glossary() -> Dict[Tuple[str, str], str]:
     from app.models.translation_quality import TranslationGlossaryTerm
 
     rows = TranslationGlossaryTerm.query.filter_by(is_active=True).all()
-    return {(r.source_term.lower(), r.target_lang) for r in rows}
+    return {(r.source_term.lower(), r.target_lang): r.target_term for r in rows}
 
 
-def mine_selected_documents(document_ids: List[int], *, cap: int = 80) -> Dict[str, int]:
+def mine_selected_documents(document_ids: List[int], *, cap: int = 150) -> Dict[str, int]:
     """Run extractors on selected completed documents. Everything is a candidate."""
     from app.models.embeddings import AIDocument
     from app.models.enums import AIDocumentProcessingStatusValue
     from app.models.translation_quality import TranslationGlossaryCandidate
+    from app.services.translation.glossary_llm import classify_against_glossary
 
     ids = [int(x) for x in (document_ids or []) if x]
     raw_docs = AIDocument.query.filter(AIDocument.id.in_(ids)).all() if ids else []
@@ -176,7 +177,8 @@ def mine_selected_documents(document_ids: List[int], *, cap: int = 80) -> Dict[s
                 continue
             target_expansion = max(hits, key=lambda h: h["trust"])["expansion"]
             key = (en_expansion.lower(), lang)
-            if key in already:
+            overlap = classify_against_glossary(en_expansion, target_expansion, lang, already)
+            if overlap == "same":
                 continue
             if (en_expansion.lower(), target_expansion.lower(), lang) in rejected:
                 continue
@@ -197,6 +199,10 @@ def mine_selected_documents(document_ids: List[int], *, cap: int = 80) -> Dict[s
                     for h in (en_hits[:2] + hits[:2])
                 ],
             }
+            if overlap == "conflict":
+                evidence["conflict"] = True
+                evidence["official_term"] = already.get(key) or ""
+                evidence["note"] = "Document form differs from the approved glossary."
             db.session.add(
                 TranslationGlossaryCandidate(
                     source_term=en_expansion,
@@ -251,7 +257,7 @@ def mine_selected_documents(document_ids: List[int], *, cap: int = 80) -> Dict[s
 
 def _mine_frequency_conflicts(
     by_lang: Dict[str, List[Any]],
-    already: Set[tuple],
+    already: Dict[Tuple[str, str], str],
     rejected: Set[tuple],
     remaining: int,
 ) -> int:
@@ -272,8 +278,6 @@ def _mine_frequency_conflicts(
         # Surface when the English source term appears but the approved target does not.
         source_mentions = len(re.findall(re.escape(term.source_term), blob, flags=re.IGNORECASE))
         if source_mentions >= 3 and count_approved == 0:
-            if (term.source_term.lower(), term.target_lang) in already:
-                continue
             db.session.add(
                 TranslationGlossaryCandidate(
                     source_term=term.source_term,
@@ -299,12 +303,26 @@ def _mine_frequency_conflicts(
     return created
 
 
-def decide_candidate(candidate_id: int, *, accept: bool, tier: Optional[str] = None) -> bool:
+def decide_candidate(
+    candidate_id: int,
+    *,
+    accept: bool,
+    tier: Optional[str] = None,
+    source_term: Optional[str] = None,
+    target_term: Optional[str] = None,
+) -> bool:
     from app.models.translation_quality import TranslationGlossaryCandidate, TranslationGlossaryTerm
 
     row = TranslationGlossaryCandidate.query.get(int(candidate_id))
     if row is None or row.status != "pending":
         return False
+    if accept:
+        src = " ".join((source_term if source_term is not None else row.source_term or "").split())
+        tgt = " ".join((target_term if target_term is not None else row.target_term or "").split())
+        if not src or not tgt:
+            return False
+        row.source_term = src[:500]
+        row.target_term = tgt[:500]
     row.status = "accepted" if accept else "rejected"
     row.reviewed_at = utcnow()
     try:

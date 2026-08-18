@@ -489,6 +489,9 @@ class TestComputeEntryFormProgressMetrics:
                 "app.routes.forms.helpers.calculate_section_completion_status",
                 return_value={"Governance": "in_progress"},
             ), patch(
+                "app.routes.forms.helpers.AssignmentCompletionService._empty_option_list_ids_for_assignment",
+                return_value=frozenset(),
+            ), patch(
                 "app.routes.forms.helpers.AssignmentCompletionService.refresh_and_persist",
                 return_value=66.7,
             ) as mock_refresh:
@@ -519,6 +522,9 @@ class TestComputeEntryFormProgressMetrics:
             ), patch(
                 "app.routes.forms.helpers.calculate_section_completion_status",
                 return_value={},
+            ), patch(
+                "app.routes.forms.helpers.AssignmentCompletionService._empty_option_list_ids_for_assignment",
+                return_value=frozenset(),
             ), patch(
                 "app.routes.forms.helpers.AssignmentCompletionService.refresh_and_persist",
                 return_value=100.0,
@@ -1004,6 +1010,16 @@ class TestCalculateSectionCompletionStatus:
         assert result["S1"] == "Completed"
         assert result["S2"] == "Not Started"
 
+    def test_skip_field_ids_are_not_counted(self):
+        missing_matrix = self._make_field(960, is_indicator=False, is_matrix=True)
+        filled = self._make_field(1)
+        section = self._make_section("Reach", [missing_matrix, filled])
+        data = {"field_value[1]": "yes"}
+        result = calculate_section_completion_status(
+            [section], data, {}, skip_field_ids={960},
+        )
+        assert result["Reach"] == "Completed"
+
 
 # ---------------------------------------------------------------------------
 # build_entry_form_features
@@ -1055,6 +1071,7 @@ class TestBuildEntryFormFeatures:
     def test_excel_export_follows_assignment_generic_flags(self):
         template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
         assigned_form = SimpleNamespace(
+            template_id=21,
             enable_upr_country_reporting_excel=False,
             enable_unified_country_plan_excel=False,
             enable_export_excel=True,
@@ -1062,10 +1079,27 @@ class TestBuildEntryFormFeatures:
         )
         features = build_entry_form_features([], template, assigned_form=assigned_form)
         assert features['excelExport'] is True
+        assert features['excelMode'] == 'generic'
+        assert features['excelShowExport'] is True
+        assert features['excelShowImport'] is False
 
-    def test_excel_export_follows_assignment_upr_flag(self):
+    def test_excel_export_uses_upr_workbook_for_template_33(self):
         template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
         assigned_form = SimpleNamespace(
+            template_id=33,
+            enable_upr_country_reporting_excel=False,
+            enable_unified_country_plan_excel=False,
+            enable_export_excel=True,
+            enable_import_excel=True,
+        )
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
+        assert features['excelExport'] is True
+        assert features['excelMode'] == 'upr'
+
+    def test_excel_export_follows_assignment_upr_legacy_flag(self):
+        template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
+        assigned_form = SimpleNamespace(
+            template_id=33,
             enable_upr_country_reporting_excel=True,
             enable_unified_country_plan_excel=False,
             enable_export_excel=False,
@@ -1073,10 +1107,25 @@ class TestBuildEntryFormFeatures:
         )
         features = build_entry_form_features([], template, assigned_form=assigned_form)
         assert features['excelExport'] is True
+        assert features['excelMode'] == 'upr'
 
-    def test_excel_export_follows_assignment_ucp_flag(self):
+    def test_excel_export_uses_ucp_workbook_for_template_24(self):
         template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
         assigned_form = SimpleNamespace(
+            template_id=24,
+            enable_upr_country_reporting_excel=False,
+            enable_unified_country_plan_excel=False,
+            enable_export_excel=True,
+            enable_import_excel=False,
+        )
+        features = build_entry_form_features([], template, assigned_form=assigned_form)
+        assert features['excelExport'] is True
+        assert features['excelMode'] == 'ucp'
+
+    def test_excel_export_follows_assignment_ucp_legacy_flag(self):
+        template = SimpleNamespace(enable_export_excel=False, enable_import_excel=False)
+        assigned_form = SimpleNamespace(
+            template_id=24,
             enable_upr_country_reporting_excel=False,
             enable_unified_country_plan_excel=True,
             enable_export_excel=False,
@@ -1084,6 +1133,7 @@ class TestBuildEntryFormFeatures:
         )
         features = build_entry_form_features([], template, assigned_form=assigned_form)
         assert features['excelExport'] is True
+        assert features['excelMode'] == 'ucp'
 
     def test_excel_export_disabled_without_assignment_flags(self):
         template = SimpleNamespace(enable_export_excel=True, enable_import_excel=True)

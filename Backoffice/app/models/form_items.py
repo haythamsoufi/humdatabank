@@ -58,6 +58,7 @@ class FormItem(db.Model):
     indicator_unit_id = Column(Integer, ForeignKey('indicator_bank_unit.id'), nullable=True)
     validation_condition = db.Column(db.Text, nullable=True)
     validation_message = db.Column(db.Text, nullable=True)
+    validation_message_translations = Column(JSON, nullable=True)
 
     # Question-specific fields (nullable for non-question types)
     definition = db.Column(db.Text, nullable=True)
@@ -1016,6 +1017,21 @@ class FormItem(db.Model):
             self.description_translations[language] = text.strip()
         elif language in self.description_translations:
             del self.description_translations[language]
+
+    def get_validation_message_translation(self, language):
+        """Get validation message translation for a specific language."""
+        if not self.validation_message_translations:
+            return None
+        return self.validation_message_translations.get(language)
+
+    def set_validation_message_translation(self, language, text):
+        """Set validation message translation for a specific language."""
+        if self.validation_message_translations is None:
+            self.validation_message_translations = {}
+        if text and str(text).strip():
+            self.validation_message_translations[language] = str(text).strip()
+        elif language in self.validation_message_translations:
+            del self.validation_message_translations[language]
 
     def __repr__(self):
         section_name = self.form_section.name if self.form_section else "N/A"

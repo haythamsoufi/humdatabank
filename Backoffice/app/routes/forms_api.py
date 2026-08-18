@@ -1042,7 +1042,9 @@ def api_assignment_completion_rate(aes_id):
 
         completion_rate = AssignmentCompletionService.stored_rate_for(aes)
         response = json_ok(completion_rate=completion_rate)
-        response.headers['Cache-Control'] = 'private, max-age=30'
+        # Must not be cached: save recalculates the stored rate, then numeric
+        # restore `change` events refetch this URL and would snap the header back.
+        response.headers['Cache-Control'] = 'private, no-store'
         return response
     except Exception as e:
         return handle_json_view_exception(e, 'Failed to compute completion rate', status_code=500)
@@ -1305,7 +1307,9 @@ def api_assignment_entry_bootstrap(aes_id):
             resolve_assignment_level_variables,
         )
 
-        completion_rate = AssignmentCompletionService.stored_rate_for(aes)
+        # Recompute on form open so country-empty list-backed matrices (e.g. no GO
+        # emergencies) drop out of the denominator without requiring a save first.
+        completion_rate = AssignmentCompletionService.refresh_and_persist(aes.id)
 
         template_version = FormTemplateVersion.query.get(published_version_id)
         variable_configs = (template_version.variables if template_version else None) or {}

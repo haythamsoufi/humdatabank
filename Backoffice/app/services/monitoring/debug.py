@@ -228,7 +228,6 @@ class DebugManager:
 
         # Translation services log every string at DEBUG (plus urllib3 HTTP lines).
         logging.getLogger('app.services.translation.auto_translator').setLevel(logging.INFO)
-        logging.getLogger('app.services.translation.ifrc_service').setLevel(logging.INFO)
         for _noisy_http in ('urllib3', 'urllib3.connectionpool', 'requests'):
             logging.getLogger(_noisy_http).setLevel(logging.WARNING)
 

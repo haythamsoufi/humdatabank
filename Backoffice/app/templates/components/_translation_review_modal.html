@@ -2,13 +2,18 @@
 
 {% call modal_shell('translation-review-modal', _('Edit Translation'), max_width='max-w-3xl', z_index=1200) %}
 <div class="space-y-4">
+    <p id="translation-review-provenance" class="text-xs text-gray-500"></p>
     <div>
         <label class="translation-review-field-label" for="translation-review-english">{{ _('English (source, read-only)') }}</label>
         <textarea id="translation-review-english" class="translation-review-readonly" readonly rows="3"></textarea>
     </div>
     <div>
+        <label class="translation-review-field-label" for="translation-review-machine">{{ _('Machine suggestion (read-only)') }}</label>
+        <textarea id="translation-review-machine" class="translation-review-readonly" readonly rows="3"></textarea>
+    </div>
+    <div>
         <label class="translation-review-field-label" for="translation-review-editor">
-            <span id="translation-review-locale-label">{{ _('Translation') }}</span>
+            <span id="translation-review-locale-label">{{ _('Official translation') }}</span>
         </label>
         <div id="translation-review-editor" class="translation-review-editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
         <p class="text-xs text-gray-500 mt-2">{{ _('Placeholders (e.g. %%(name)s, %%(count)s, %%s, %%d) are protected and cannot be removed or changed.') }}</p>
@@ -17,7 +22,7 @@
     <div class="translation-review-actions">
         <button type="button" class="professional-action-btn close-modal" id="translation-review-cancel">{{ _('Cancel') }}</button>
         <button type="button" class="professional-action-btn professional-action-btn-green" id="translation-review-save" disabled>
-            <i class="fas fa-save mr-1"></i>{{ _('Save') }}
+            <i class="fas fa-save mr-1"></i>{{ _('Approve official') }}
         </button>
     </div>
 </div>

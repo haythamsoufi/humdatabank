@@ -24,17 +24,12 @@ def translation_po_dir(app, monkeypatch):
 
         import app.routes.admin.utilities.helpers as helpers_module
         import app.routes.admin.utilities.translations as translations_module
+        import app.routes.translation_review as review_module
 
-        monkeypatch.setattr(
-            helpers_module,
-            '_translations_po_path',
-            lambda locale: os.path.join(tmp, locale, 'LC_MESSAGES', 'messages.po'),
-        )
-        monkeypatch.setattr(
-            translations_module,
-            '_translations_po_path',
-            lambda locale: os.path.join(tmp, locale, 'LC_MESSAGES', 'messages.po'),
-        )
+        po_for = lambda locale: os.path.join(tmp, locale, 'LC_MESSAGES', 'messages.po')
+        monkeypatch.setattr(helpers_module, '_translations_po_path', po_for)
+        monkeypatch.setattr(translations_module, '_translations_po_path', po_for)
+        monkeypatch.setattr(review_module, '_translations_po_path', po_for)
         app.config['SUPPORTED_LANGUAGES'] = ['en', 'fr']
         app.config['TRANSLATABLE_LANGUAGES'] = ['fr']
         yield tmp

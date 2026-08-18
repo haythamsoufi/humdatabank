@@ -875,19 +875,28 @@
                 return;
             }
 
-            const translation = translations[index];
+            const BATCH = 25;
+            const slice = translations.slice(index, index + BATCH);
             const service = selectedService || 'ifrc';
+            const translation = slice[0];
 
-            // Call the translation API
+            // Call the translation API in batches (one POST for many strings).
             const translationPayload = {
-                type: 'translation', // Use 'translation' type for translation API
+                type: 'translation',
                 permission_context: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_context) ? window.autoTranslateModal.config.permission_context : 'translations',
                 permission_code: (window.autoTranslateModal && window.autoTranslateModal.config && window.autoTranslateModal.config.permission_code) ? window.autoTranslateModal.config.permission_code : 'admin.translations.manage',
-                id: translation.id, // Message ID is required for translation type
+                id: translation.id,
                 text: translation.text,
                 definition: translation.definition,
                 target_languages: [translation.language],
-                translation_service: service
+                translation_service: service,
+                items: slice.map(function (row) {
+                    return {
+                        id: row.id,
+                        text: row.text,
+                        target_languages: [row.language]
+                    };
+                })
             };
             // Intentionally no payload debug logging here; can spam + may contain large strings.
 
@@ -910,7 +919,7 @@
 
             Promise.resolve(reqPromise)
             .then(data => {
-                window.autoTranslateModal.translationState.processedItems++;
+                window.autoTranslateModal.translationState.processedItems += slice.length;
 
                 if (data.success && data.untranslated) {
                     // The service responded but returned the text unchanged — it is a proper
@@ -921,25 +930,45 @@
                         `${cfg.t.skipped} ${translation.language} ${cfg.t.translationFor} ${translation.id} — ${cfg.t.properNounOrTech}`,
                         'warning'
                     );
-                } else if (data.success && data.translations && data.updated_count > 0) {
-                    // Update the grid cell with the new translation
-                    if (window.gridApi && data.translations && data.translations.label_translations && data.translations.label_translations[translation.language]) {
-                        window.gridApi.forEachNode(function(node) {
-                            if (node.data && node.data.msgid === translation.id) {
-                                // Get locale code for the language
-                                const langToLocaleMap = Object.fromEntries(
-                                    Object.entries(getTranslationLangMap()).map(([locale, key]) => [key, locale])
-                                );
-                                const localeCode = langToLocaleMap[translation.language];
-                                if (localeCode) {
-                                    node.setDataValue(localeCode, data.translations.label_translations[translation.language]);
+                } else if (data.success && !data.updated_count && data.skipped_protected > 0) {
+                    // Every string in this batch is already human-approved; the server
+                    // deliberately refused to overwrite it with a machine translation.
+                    window.autoTranslateModal.translationState.skippedCount =
+                        (window.autoTranslateModal.translationState.skippedCount || 0) + data.skipped_protected;
+                    window.autoTranslateModal.logProgress(
+                        `${cfg.t.skipped} ${data.skipped_protected} ${cfg.t.translationFor} ${translation.id} — ${cfg.t.alreadyHumanApproved}`,
+                        'warning'
+                    );
+                } else if (data.success && data.updated_count > 0) {
+                    const langToLocaleMap = Object.fromEntries(
+                        Object.entries(getTranslationLangMap()).map(([locale, key]) => [key, locale])
+                    );
+                    const resultRows = Array.isArray(data.results) && data.results.length
+                        ? data.results
+                        : [{ id: translation.id, language: translation.language, translation: (data.translations && data.translations.label_translations && data.translations.label_translations[translation.language]) || '' }];
+                    resultRows.forEach(function (row) {
+                        if (window.gridApi && row.translation) {
+                            window.gridApi.forEachNode(function(node) {
+                                if (node.data && node.data.msgid === row.id) {
+                                    const localeCode = langToLocaleMap[row.language] || row.language;
+                                    if (localeCode) {
+                                        node.setDataValue(localeCode, row.translation);
+                                    }
                                 }
-                            }
-                        });
-                    }
+                            });
+                        }
+                    });
 
-                    window.autoTranslateModal.translationState.successCount++;
-                    window.autoTranslateModal.logProgress(`${cfg.t.translated} ${translation.language} ${cfg.t.translationFor} ${translation.id}`, 'success');
+                    window.autoTranslateModal.translationState.successCount += resultRows.length;
+                    window.autoTranslateModal.logProgress(`${cfg.t.translated} ${resultRows.length} ${cfg.t.translationFor} batch`, 'success');
+                    if (data.skipped_protected > 0) {
+                        window.autoTranslateModal.translationState.skippedCount =
+                            (window.autoTranslateModal.translationState.skippedCount || 0) + data.skipped_protected;
+                        window.autoTranslateModal.logProgress(
+                            `${cfg.t.skipped} ${data.skipped_protected} ${cfg.t.translationFor} batch — ${cfg.t.alreadyHumanApproved}`,
+                            'warning'
+                        );
+                    }
                 } else {
                     window.autoTranslateModal.translationState.errorCount++;
                     const unknownError = cfg.t.unknownError;
@@ -952,13 +981,13 @@
                 window.autoTranslateModal.updateProgress();
                 // Skip scheduling the next iteration if stop was requested while this call was in-flight.
                 if (!window.autoTranslateModal.translationState.shouldStop) {
-                    setTimeout(() => processNextTranslation(translations, index + 1, selectedLanguages, selectedService), 100);
+                    setTimeout(() => processNextTranslation(translations, index + slice.length, selectedLanguages, selectedService), 100);
                 } else {
                     processNextTranslation(translations, translations.length, selectedLanguages, selectedService);
                 }
             })
             .catch(error => {
-                window.autoTranslateModal.translationState.processedItems++;
+                window.autoTranslateModal.translationState.processedItems += slice.length;
                 window.autoTranslateModal.translationState.errorCount++;
                 const em = (error && error.message) ? String(error.message) : '';
                 const looksLikeWaf = em.includes('403') || em.toLowerCase().includes('application-gateway') || em.toLowerCase().includes('waf');
@@ -972,7 +1001,7 @@
 
                 // Skip scheduling the next iteration if stop was requested while this call was in-flight.
                 if (!window.autoTranslateModal.translationState.shouldStop) {
-                    setTimeout(() => processNextTranslation(translations, index + 1, selectedLanguages, selectedService), 100);
+                    setTimeout(() => processNextTranslation(translations, index + slice.length, selectedLanguages, selectedService), 100);
                 } else {
                     processNextTranslation(translations, translations.length, selectedLanguages, selectedService);
                 }

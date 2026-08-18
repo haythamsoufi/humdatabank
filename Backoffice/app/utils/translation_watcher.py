@@ -146,10 +146,15 @@ class TranslationWatcher:
         sentinel = self._sentinel_path()
 
         # Seed last-seen mtime for the sentinel (and fallback files) so we
-        # don't trigger a spurious reload on startup.
-        self._last_mtime[str(sentinel)] = self._mtime(sentinel)
-        for f in self._fallback_files():
-            self._last_mtime[str(f)] = self._mtime(f)
+        # don't trigger a spurious reload on startup.  A transient filesystem
+        # error here must not kill the daemon thread permanently — log and
+        # let the loop below retry on its next tick instead.
+        try:
+            self._last_mtime[str(sentinel)] = self._mtime(sentinel)
+            for f in self._fallback_files():
+                self._last_mtime[str(f)] = self._mtime(f)
+        except Exception as exc:
+            self.app.logger.error("TranslationWatcher: seed failed: %s", exc)
 
         while self.watching:
             try:

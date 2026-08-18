@@ -64,7 +64,8 @@ def api_translation_services():
         service_display_names = {
             'ifrc': 'Hosted translation API',
             'libre': 'LibreTranslate AI',
-            'google': 'Google Translate'
+            'google': 'Google Translate',
+            'nllb': 'NLLB (long-tail languages)',
         }
 
         services = []

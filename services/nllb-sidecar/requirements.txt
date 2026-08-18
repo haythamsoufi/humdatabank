@@ -1,0 +1,12 @@
+# torch (CPU-only wheel) is installed separately in the Dockerfile via
+# https://download.pytorch.org/whl/cpu -- it is NOT listed here so that a
+# plain `pip install -r requirements.txt` never accidentally pulls the much
+# larger CUDA-enabled build from PyPI. torch is only needed the first time a
+# model is downloaded/converted (see app.py::_load_model); it is not required
+# to import this module or run it with NLLB_DISABLE_MODEL_LOAD=true.
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.0
+ctranslate2>=4.3,<5
+transformers>=4.40,<5
+sentencepiece>=0.2.0

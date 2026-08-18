@@ -123,6 +123,16 @@ from .plugin_data import (
     PluginData,
 )
 
+from .translation_quality import (
+    TranslationString,
+    TranslationEntityProvenance,
+    TranslationResultCache,
+    TranslationGlossaryTerm,
+    TranslationGlossaryCandidate,
+    TranslationMemoryEntry,
+    TranslationDocumentPair,
+)
+
 from .reports import (
     ReportDefinition,
     ReportDefinitionRevision,
@@ -310,6 +320,15 @@ __all__ = [
 
     # Plugin data
     'PluginData',
+
+    # Translation quality
+    'TranslationString',
+    'TranslationEntityProvenance',
+    'TranslationResultCache',
+    'TranslationGlossaryTerm',
+    'TranslationGlossaryCandidate',
+    'TranslationMemoryEntry',
+    'TranslationDocumentPair',
 
     # Report builder
     'ReportDefinition',

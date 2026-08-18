@@ -52,6 +52,27 @@ services:
       - LT_LOAD_ONLY=en,fr,es,ar,zh,ru,hi
     restart: unless-stopped
 
+  # NLLB sidecar is conditional (long-tail languages Azure/IFRC doesn't cover).
+  # First boot downloads + converts facebook/nllb-200-1.3B (int8) -- allow
+  # 10-30+ minutes and ~6GB of disk on the nllb_models volume; `docker compose
+  # --profile nllb logs -f nllb` to watch progress, `/health` to check status.
+  #   docker compose --profile nllb up -d
+  nllb:
+    build: ./services/nllb-sidecar
+    container_name: nllb-sidecar
+    profiles: ["nllb"]
+    ports:
+      - "9100:9100"
+    environment:
+      - NLLB_SIDECAR_API_KEY=${NLLB_SIDECAR_API_KEY:-}
+      # Override to trade quality/speed/memory, e.g. the smaller distilled model:
+      # - NLLB_MODEL_NAME=facebook/nllb-200-distilled-600M
+      - NLLB_MODEL_NAME=${NLLB_MODEL_NAME:-facebook/nllb-200-1.3B}
+      - NLLB_QUANTIZATION=${NLLB_QUANTIZATION:-int8}
+    volumes:
+      - nllb_models:/models  # persists downloaded + converted model across restarts
+    restart: unless-stopped
+
   backoffice:
     build: ./Backoffice
     container_name: databank-backoffice
@@ -81,6 +102,8 @@ services:
       # - EMAIL_API_KEY_STG=${EMAIL_API_KEY_STG:-}
       # - IFRC_TRANSLATE_API_KEY=${IFRC_TRANSLATE_API_KEY:-}  # optional hosted translation (env name retained)
       # - LIBRE_TRANSLATE_URL=http://libretranslate:5000  # Uncomment when using: docker compose --profile translate up -d
+      # - NLLB_SIDECAR_URL=http://nllb:9100  # Uncomment when using: docker compose --profile nllb up -d
+      # - NLLB_SIDECAR_API_KEY=${NLLB_SIDECAR_API_KEY:-}  # only needed if the sidecar enforces one
       - TRANSLATIONS_PERSISTENT_PATH=/app/translations  # persist translations across rebuilds
     volumes:
       - ./Backoffice/app:/app/app
@@ -121,3 +144,4 @@ volumes:
   pgdata_test:
   libretranslate_data:
   translations_data:
+  nllb_models:

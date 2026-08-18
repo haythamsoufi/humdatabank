@@ -410,6 +410,7 @@
         if (params.text != null) bodyObj.text = String(params.text);
         if (params.definition != null) bodyObj.definition = String(params.definition);
         if (params.id != null) bodyObj.id = String(params.id);
+        if (Array.isArray(params.items)) bodyObj.items = params.items;
 
         // Wrap payload to avoid WAF false positives on rich strings (HTML, "--", quotes, etc.)
         const payloadB64 = btoa(unescape(encodeURIComponent(JSON.stringify(bodyObj))));

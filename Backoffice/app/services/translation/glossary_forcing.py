@@ -45,18 +45,39 @@ def terms_for_target(
     return sorted(rows, key=lambda kv: len(kv[0]), reverse=True)
 
 
+def _english_term_variants(term: str) -> List[str]:
+    """Singular/plural English surfaces for a glossary source term."""
+    text = " ".join((term or "").split())
+    if not text:
+        return []
+    words = text.split()
+    last = words[-1]
+    variants = [text]
+    if last.endswith("ies") and len(last) > 3:
+        variants.append(" ".join(words[:-1] + [last[:-3] + "y"]))
+    elif last.endswith("s") and not last.endswith("ss") and len(last) > 1:
+        variants.append(" ".join(words[:-1] + [last[:-1]]))
+    elif last.endswith("y") and len(last) > 1 and last[-2].lower() not in "aeiou":
+        variants.append(" ".join(words[:-1] + [last[:-1] + "ies"]))
+    else:
+        variants.append(" ".join(words[:-1] + [last + "s"]))
+    uniq: List[str] = []
+    for item in variants:
+        if item and item not in uniq:
+            uniq.append(item)
+    uniq.sort(key=len, reverse=True)
+    return uniq
+
+
 def _are_related_terms(left: str, right: str) -> bool:
     a = (left or "").lower().strip()
     b = (right or "").lower().strip()
-    if not a or not b or a == b:
-        return bool(a) and a == b
-    if a + "s" == b or b + "s" == a:
+    if not a or not b:
+        return False
+    if a == b:
         return True
-    if a.endswith("y") and b == a[:-1] + "ies":
-        return True
-    if b.endswith("y") and a == b[:-1] + "ies":
-        return True
-    return False
+    left_vars = {item.lower() for item in _english_term_variants(a)}
+    return b in left_vars
 
 
 def source_has_must_terms(
@@ -78,12 +99,15 @@ def _source_terms_in_text(
     for src, official in terms_for_target(target_lang, terms=terms):
         if not src:
             continue
-        for match in re.finditer(rf"(?<!\w){re.escape(src)}(?!\w)", source_text, flags=re.IGNORECASE):
-            if any(occupied[i] for i in range(match.start(), match.end())):
-                continue
-            for i in range(match.start(), match.end()):
-                occupied[i] = True
-            hits.append((src, official))
+        for variant in _english_term_variants(src):
+            for match in re.finditer(
+                rf"(?<!\w){re.escape(variant)}(?!\w)", source_text, flags=re.IGNORECASE
+            ):
+                if any(occupied[i] for i in range(match.start(), match.end())):
+                    continue
+                for i in range(match.start(), match.end()):
+                    occupied[i] = True
+                hits.append((src, official))
     return hits
 
 
@@ -104,29 +128,62 @@ def _arabic_match_definiteness(official: str, unofficial: str) -> str:
     return " ".join(parts)
 
 
+# Arabic broken-plural number pairs. Language morphology, not house-term aliases.
+_AR_NUMBER_PAIRS = (
+    ("نقطة", "نقاط"),
+    ("النقطة", "النقاط"),
+)
+
+
+def _arabic_number_variants(text: str) -> List[str]:
+    """نقطة↔نقاط so isolated singular MT still matches in-sentence plurals."""
+    seed = (text or "").strip()
+    if not seed:
+        return []
+    found = [seed]
+    for singular, plural in _AR_NUMBER_PAIRS:
+        if singular in seed:
+            found.append(seed.replace(singular, plural))
+        if plural in seed:
+            found.append(seed.replace(plural, singular))
+    uniq: List[str] = []
+    for item in found:
+        if item and item not in uniq:
+            uniq.append(item)
+    return uniq
+
+
+def _arabic_definiteness_surfaces(text: str) -> List[str]:
+    found = [text]
+    if text.startswith("ال") and len(text) > 3:
+        found.append(text[2:])
+        return found
+    found.append("ال" + text)
+    parts = text.split()
+    if len(parts) < 2:
+        return found
+    all_def = [(p if p.startswith("ال") else "ال" + p) for p in parts]
+    found.append(" ".join(all_def))
+    last_def = list(parts)
+    if not last_def[-1].startswith("ال"):
+        last_def[-1] = "ال" + last_def[-1]
+    found.append(" ".join(last_def))
+    first_def = list(parts)
+    if not first_def[0].startswith("ال"):
+        first_def[0] = "ال" + first_def[0]
+    found.append(" ".join(first_def))
+    return found
+
+
 def _surfaces_to_find(unofficial: str, lang: str) -> List[str]:
     text = (unofficial or "").strip()
     if len(text) < 2:
         return []
-    found = [text]
     if lang != "ar":
-        return found
-    if text.startswith("ال") and len(text) > 3:
-        found.append(text[2:])
-    else:
-        found.append("ال" + text)
-        parts = text.split()
-        if len(parts) >= 2:
-            all_def = [(p if p.startswith("ال") else "ال" + p) for p in parts]
-            found.append(" ".join(all_def))
-            last_def = list(parts)
-            if not last_def[-1].startswith("ال"):
-                last_def[-1] = "ال" + last_def[-1]
-            found.append(" ".join(last_def))
-            first_def = list(parts)
-            if not first_def[0].startswith("ال"):
-                first_def[0] = "ال" + first_def[0]
-            found.append(" ".join(first_def))
+        return [text]
+    found: List[str] = []
+    for seed in _arabic_number_variants(text):
+        found.extend(_arabic_definiteness_surfaces(seed))
     # Longest first so we do not splice inside a longer definite NP.
     uniq: List[str] = []
     for surface in found:
@@ -171,6 +228,11 @@ def enforce_glossary_terms(
         for other_src, other_off in all_terms:
             if other_src != src and _are_related_terms(src, other_src):
                 related.append((other_src, other_off))
+        seen_src = {item[0] for item in related}
+        for variant in _english_term_variants(src):
+            if variant not in seen_src:
+                related.append((variant, official))
+                seen_src.add(variant)
 
         replacements: List[Tuple[str, str]] = []
         for rel_src, rel_official in related:

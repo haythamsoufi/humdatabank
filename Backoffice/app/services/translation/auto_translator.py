@@ -16,9 +16,36 @@ import requests
 import re
 import threading
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Union, Tuple
 from flask import current_app
 import time
+
+# IFRC and Libre have no true multi-text endpoint; fan out single-text calls.
+# Keep this modest so Azure 429s stay rare.
+_ENGINE_BATCH_WORKERS = 6
+
+
+def _translate_texts_parallel(translate_one, texts: List[str], target_language: str, source_language: str) -> List[Optional[str]]:
+    if not texts:
+        return []
+    if len(texts) == 1:
+        return [translate_one(texts[0], target_language, source_language)]
+    results: List[Optional[str]] = [None] * len(texts)
+    workers = max(1, min(_ENGINE_BATCH_WORKERS, len(texts)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(translate_one, text, target_language, source_language): i
+            for i, text in enumerate(texts)
+        }
+        for fut in as_completed(futures):
+            i = futures[fut]
+            try:
+                results[i] = fut.result()
+            except Exception as e:
+                logger.debug("parallel engine batch item failed: %s", e)
+                results[i] = None
+    return results
 
 logger = logging.getLogger(__name__)
 
@@ -540,12 +567,8 @@ class LibreTranslateService(TranslationService):
         return response.status_code in (200, 429)
 
     def translate_batch(self, texts: List[str], target_language: str, source_language: str = 'en') -> List[Optional[str]]:
-        """Translate multiple texts using LibreTranslate"""
-        results = []
-        for text in texts:
-            result = self.translate_text(text, target_language, source_language)
-            results.append(result)
-        return results
+        """Translate multiple texts using LibreTranslate (parallel single-text calls)."""
+        return _translate_texts_parallel(self.translate_text, texts, target_language, source_language)
 
 
 class IFRCTranslationService(TranslationService):
@@ -630,16 +653,8 @@ class IFRCTranslationService(TranslationService):
         return None
 
     def translate_batch(self, texts: List[str], target_language: str, source_language: str = 'en') -> List[Optional[str]]:
-        """Translate multiple texts using IFRC Translation API"""
-        if not texts:
-            return []
-
-        results = []
-        for text in texts:
-            result = self.translate_text(text, target_language, source_language)
-            results.append(result)
-
-        return results
+        """Translate multiple texts using IFRC (parallel single-text calls)."""
+        return _translate_texts_parallel(self.translate_text, texts, target_language, source_language)
 
     def check_health(self) -> bool:
         """Minimal one-word translate with a tight timeout (API has no status endpoint).
@@ -1175,6 +1190,54 @@ class AutoTranslator:
             logger.debug("glossary enforcement skipped", exc_info=True)
             return translated
 
+    def _enforce_cached_translation(
+        self,
+        source_text: str,
+        cached: str,
+        target_code: str,
+        source_code: str,
+        service_name: Optional[str],
+    ) -> str:
+        """Re-apply must-terms to a cache hit so glossary edits take effect."""
+        try:
+            from app.services.translation.glossary_forcing import source_has_must_terms
+
+            if not source_has_must_terms(source_text, target_code):
+                return cached
+        except Exception:
+            logger.debug("glossary cache precheck skipped", exc_info=True)
+            return cached
+
+        svc = self._get_service(service_name)
+        if svc is None:
+            tried = self._ordered_services_to_try(service_name)
+            svc = tried[0] if tried else None
+        if not svc:
+            return cached
+
+        enforced = self._apply_glossary_enforcement(
+            source_text,
+            cached,
+            target_code,
+            self._glossary_term_translator(svc, target_code, source_code, {}),
+        )
+        if not enforced:
+            return cached
+        if enforced != cached:
+            try:
+                from app.services.translation.result_cache import put_cached
+
+                put_cached(
+                    source_text,
+                    source_code,
+                    target_code,
+                    self._result_cache_engine(service_name, svc=svc),
+                    enforced,
+                )
+            except Exception as e:
+                logger.debug("result cache rewrite after glossary skipped: %s", e)
+        return enforced
+
     def translate_text(self, text: str, target_language: str, source_language: str = 'en',
                       service_name: str = None) -> Optional[str]:
         """Translate a single text, preserving template variables."""
@@ -1194,7 +1257,9 @@ class AutoTranslator:
 
             cached = get_cached(original_text, source_code, target_code, cache_engine)
             if cached:
-                return cached
+                return self._enforce_cached_translation(
+                    original_text, cached, target_code, source_code, service_name
+                )
         except Exception as e:
             logger.debug("result cache read skipped: %s", e)
 
@@ -1338,7 +1403,9 @@ class AutoTranslator:
                     self._result_cache_engine(service_name),
                 )
                 if cached:
-                    out[i] = cached
+                    out[i] = self._enforce_cached_translation(
+                        original, cached, target_code, source_code, service_name
+                    )
                     should_translate[i] = False
         except Exception as e:
             logger.debug("batch result cache read skipped: %s", e)

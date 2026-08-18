@@ -80,6 +80,38 @@ def test_enforce_glossary_needs_unofficial_from_engine_not_code_aliases():
     assert out == "%(org)s أسماء النقاط المحورية"
 
 
+def test_enforce_glossary_matches_english_plural_source():
+    def mt(term):
+        if term == "Focal Points":
+            return "points centraux"
+        if term == "Focal Point":
+            return "point central"
+        return None
+
+    out = enforce_glossary_terms(
+        "Assign Focal Points to the country",
+        "Assigner des points centraux au pays",
+        "fr",
+        mt,
+        terms=[("Focal Point", "point focal")],
+    )
+    assert "point focal" in out.lower()
+    assert "points centraux" not in out.lower()
+
+
+def test_enforce_glossary_arabic_number_from_singular_isolated_mt():
+    """Isolated 'Focal Point' is singular; in-sentence MT is often plural + definite."""
+    out = enforce_glossary_terms(
+        "%(org)s focal point names",
+        "%(org)s أسماء النقاط المحورية",
+        "ar",
+        lambda term: "نقطة محورية" if term == "Focal Point" else None,
+        terms=[("Focal Point", "نقاط الاتصال")],
+    )
+    assert out == "%(org)s أسماء نقاط الاتصال"
+    assert "المحورية" not in out
+
+
 def test_enforce_glossary_leaves_unrelated_text():
     out = enforce_glossary_terms(
         "Hello world",
@@ -246,6 +278,86 @@ def test_msgid_missing_from_pot_is_removed():
     active, removed = classify_catalog_msgids(["Save"], ["Save", "Old label"])
     assert "Save" in active
     assert removed == {"Old label"}
+
+
+def test_purge_removed_deletes_db_and_live_po_leftovers(db_session, monkeypatch, tmp_path):
+    import polib
+
+    from app.models.translation_quality import TranslationString
+    from app.services.translation import catalog_service as catalog_mod
+    from app.services.translation.catalog_service import msgid_hash, purge_removed_strings
+
+    monkeypatch.setattr(catalog_mod, "load_pot_msgids", lambda: ({"Save"}, {}))
+    monkeypatch.setattr(catalog_mod, "_catalog_locales", lambda: ["fr"])
+
+    po_path = tmp_path / "messages.po"
+    po = polib.POFile()
+    po.append(polib.POEntry(msgid="Save", msgstr="Enregistrer"))
+    po.append(polib.POEntry(msgid="Old label", msgstr="Ancien"))
+    po.save(str(po_path))
+    monkeypatch.setattr(
+        "app.routes.admin.utilities.helpers._translations_po_path",
+        lambda _lang: str(po_path),
+    )
+
+    db_session.add(
+        TranslationString(
+            locale="fr",
+            msgid="Old label",
+            msgid_hash=msgid_hash("Old label"),
+            msgstr="Ancien",
+        )
+    )
+    db_session.add(
+        TranslationString(
+            locale="fr",
+            msgid="Save",
+            msgid_hash=msgid_hash("Save"),
+            msgstr="Enregistrer",
+        )
+    )
+    db_session.commit()
+
+    result = purge_removed_strings()
+    assert result["file_errors"] == []
+    assert result["db_rows"] == 1
+    assert result["entries_removed"] == 1
+    assert TranslationString.query.filter_by(msgid="Old label").count() == 0
+    assert TranslationString.query.filter_by(msgid="Save").count() == 1
+    assert [entry.msgid for entry in polib.pofile(str(po_path))] == ["Save"]
+
+
+def test_purge_removed_single_skips_active_pot_msgid(db_session, monkeypatch, tmp_path):
+    import polib
+
+    from app.models.translation_quality import TranslationString
+    from app.services.translation import catalog_service as catalog_mod
+    from app.services.translation.catalog_service import msgid_hash, purge_removed_strings
+
+    monkeypatch.setattr(catalog_mod, "load_pot_msgids", lambda: ({"Save"}, {}))
+    monkeypatch.setattr(catalog_mod, "_catalog_locales", lambda: ["fr"])
+    po_path = tmp_path / "messages.po"
+    po = polib.POFile()
+    po.append(polib.POEntry(msgid="Save", msgstr="Enregistrer"))
+    po.save(str(po_path))
+    monkeypatch.setattr(
+        "app.routes.admin.utilities.helpers._translations_po_path",
+        lambda _lang: str(po_path),
+    )
+    db_session.add(
+        TranslationString(
+            locale="fr",
+            msgid="Save",
+            msgid_hash=msgid_hash("Save"),
+            msgstr="Enregistrer",
+        )
+    )
+    db_session.commit()
+
+    result = purge_removed_strings(msgid="Save")
+    assert result["db_rows"] == 0
+    assert result["entries_removed"] == 0
+    assert TranslationString.query.filter_by(msgid="Save").count() == 1
 
 
 def test_chr_f_prefers_closer_hypothesis():

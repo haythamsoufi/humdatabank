@@ -329,6 +329,7 @@ def _glossary_term_error_response(exc: Exception):
             "invalid_tier": _("Tier must be Must or Preferred."),
             "not_found": _("Glossary term not found."),
             "duplicate": _("A term with this English source and language already exists."),
+            "invalid_bulk": _("Select at least one row and a bulk action."),
         }
         return json_bad_request(messages.get(str(exc), _("Could not save this glossary term.")))
     logger.exception("glossary term API failed")
@@ -406,6 +407,45 @@ def api_create_glossary_term():
     except Exception as exc:
         return _glossary_term_error_response(exc)
     return json_ok(term=term)
+
+
+@bp.route("/translations/api/glossary-terms/bulk", methods=["POST"])
+@permission_required("admin.translations.manage")
+@limiter.limit("20 per minute")
+def api_bulk_update_glossary_terms():
+    if not is_json_request():
+        return json_bad_request(_("JSON request required"))
+    data = get_request_data() or {}
+    try:
+        from app.services.translation.glossary_terms import bulk_update_glossary_terms
+
+        kwargs = {}
+        if "is_active" in data:
+            kwargs["is_active"] = bool(data.get("is_active"))
+        if "tier" in data:
+            kwargs["tier"] = data.get("tier")
+        payload = bulk_update_glossary_terms(data.get("ids"), **kwargs)
+    except Exception as exc:
+        return _glossary_term_error_response(exc)
+    return json_ok(**payload)
+
+
+@bp.route("/translations/api/glossary-candidates/bulk", methods=["POST"])
+@permission_required("admin.translations.manage")
+@limiter.limit("20 per minute")
+def api_bulk_decide_glossary_candidates():
+    if not is_json_request():
+        return json_bad_request(_("JSON request required"))
+    data = get_request_data() or {}
+    accept = bool(data.get("accept"))
+    items = data.get("items")
+    if not items:
+        items = [{"id": item_id} for item_id in (data.get("ids") or [])]
+    if not items:
+        return json_bad_request(_("Select at least one row and a bulk action."))
+    from app.services.translation.glossary_mining import decide_candidates_bulk
+
+    return json_ok(**decide_candidates_bulk(items, accept=accept))
 
 
 @bp.route("/translations/api/glossary-terms/<int:term_id>", methods=["POST"])

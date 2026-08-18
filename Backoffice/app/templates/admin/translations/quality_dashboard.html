@@ -216,6 +216,13 @@
                 </form>
             </div>
     </div>
+        <div id="glossary-terms-bulk" class="hidden items-center gap-2 flex-wrap mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <span data-role="selected-count" class="text-sm font-semibold text-gray-800">{{ _('0 selected') }}</span>
+            <button type="button" class="btn btn-success btn-sm" data-bulk="activate">{{ _('Activate') }}</button>
+            <button type="button" class="btn btn-danger btn-sm" data-bulk="deactivate">{{ _('Deactivate') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-bulk="tier-must">{{ _('Set Must') }}</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-bulk="tier-preferred">{{ _('Set Preferred') }}</button>
+        </div>
         {{ ag_grid_container('glossaryTermsGrid', loading_text=_('Loading glossary…'), include_card=false, grid_height='560px', placeholder_id='glossaryTermsGrid-colvis', empty_message=_('No approved glossary terms yet.')) }}
 </div>
     </div>{# /panel-glossary #}
@@ -281,6 +288,11 @@
                 <div class="font-medium text-gray-900" data-role="pending-count">{{ ngettext('%(count)s pending', '%(count)s pending', candidate_total or 0, count=candidate_total or 0) }}</div>
             </div>
         </div>
+        <div id="glossary-inbox-bulk" class="hidden items-center gap-2 flex-wrap mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <span data-role="selected-count" class="text-sm font-semibold text-gray-800">{{ _('0 selected') }}</span>
+            <button type="button" class="btn btn-success btn-sm" data-bulk="accept">{{ _('Accept') }}</button>
+            <button type="button" class="btn btn-danger btn-sm" data-bulk="reject">{{ _('Reject') }}</button>
+        </div>
         {{ ag_grid_container('glossaryInboxGrid', loading_text=_('Loading candidates…'), include_card=false, grid_height='560px', placeholder_id='glossaryInboxGrid-colvis', empty_message=_('No pending candidates.')) }}
     </div>
     </div>{# /panel-inbox #}
@@ -330,8 +342,10 @@
     'termsUrl': url_for('utilities.api_list_glossary_terms'),
     'termCreateUrl': url_for('utilities.api_create_glossary_term'),
     'termUpdateUrl': url_for('utilities.api_update_glossary_term', term_id=999999),
+    'termBulkUrl': url_for('utilities.api_bulk_update_glossary_terms'),
     'candidatesUrl': url_for('utilities.api_list_glossary_candidates'),
     'candidateDecideUrl': url_for('utilities.api_decide_glossary_candidate', candidate_id=999999),
+    'candidateBulkUrl': url_for('utilities.api_bulk_decide_glossary_candidates'),
     'languageNames': language_names,
     'translations': {
         'source': _('Source'),
@@ -360,6 +374,9 @@
         'emptyTerm': _('Enter both the English source and the translation.'),
         'pendingOne': _('1 pending'),
         'pendingMany': _('{count} pending'),
+        'selectedOne': _('1 selected'),
+        'selectedMany': _('{count} selected'),
+        'bulkFailed': _('Could not update the selected rows. Try again.'),
     }
 } %}
 {{ ag_grid_page_config('translationQualityGridConfig', 'TRANSLATION_QUALITY_GRID_TRANSLATIONS', quality_grid_bootstrap) }}

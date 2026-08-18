@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 VALID_TIERS = ("must", "preferred")
 LIST_LIMIT = 10000
+BULK_LIMIT = 2000
 
 
 class GlossaryTermError(ValueError):
@@ -217,3 +218,47 @@ def update_glossary_term(
         raise GlossaryTermError("duplicate")
     db.session.commit()
     return serialize_term(row)
+
+
+def _parse_ids(raw: Any) -> List[int]:
+    ids: List[int] = []
+    seen = set()
+    for value in raw or []:
+        try:
+            item_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if item_id <= 0 or item_id in seen:
+            continue
+        seen.add(item_id)
+        ids.append(item_id)
+        if len(ids) >= BULK_LIMIT:
+            break
+    return ids
+
+
+def bulk_update_glossary_terms(
+    ids: Any,
+    *,
+    is_active: Optional[bool] = None,
+    tier: Optional[str] = None,
+) -> Dict[str, Any]:
+    term_ids = _parse_ids(ids)
+    if not term_ids:
+        raise GlossaryTermError("invalid_bulk")
+    if is_active is None and tier is None:
+        raise GlossaryTermError("invalid_bulk")
+    from app.models.translation_quality import TranslationGlossaryTerm
+
+    rows = TranslationGlossaryTerm.query.filter(TranslationGlossaryTerm.id.in_(term_ids)).all()
+    clean_tier = _clean_tier(tier) if tier is not None else None
+    for row in rows:
+        if is_active is not None:
+            row.is_active = bool(is_active)
+        if clean_tier is not None:
+            row.tier = clean_tier
+    db.session.commit()
+    return {
+        "updated": len(rows),
+        "items": [serialize_term(row) for row in rows],
+    }

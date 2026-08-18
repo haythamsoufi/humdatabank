@@ -310,6 +310,7 @@ def decide_candidate(
     tier: Optional[str] = None,
     source_term: Optional[str] = None,
     target_term: Optional[str] = None,
+    commit: bool = True,
 ) -> bool:
     from app.models.translation_quality import TranslationGlossaryCandidate, TranslationGlossaryTerm
 
@@ -352,5 +353,33 @@ def decide_candidate(
             existing.target_term = row.target_term
             existing.tier = tier or row.proposed_tier or existing.tier
             existing.is_active = True
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return True
+
+
+def decide_candidates_bulk(items: List[Any], *, accept: bool) -> Dict[str, Any]:
+    """Accept or reject many pending candidates in one transaction."""
+    updated = 0
+    skipped = 0
+    for raw in items or []:
+        payload = raw if isinstance(raw, dict) else {"id": raw}
+        try:
+            cid = int(payload.get("id"))
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        ok = decide_candidate(
+            cid,
+            accept=accept,
+            tier=payload.get("tier") or payload.get("proposed_tier"),
+            source_term=payload.get("source_term"),
+            target_term=payload.get("target_term"),
+            commit=False,
+        )
+        if ok:
+            updated += 1
+        else:
+            skipped += 1
+    db.session.commit()
+    return {"updated": updated, "skipped": skipped, "accepted": bool(accept)}

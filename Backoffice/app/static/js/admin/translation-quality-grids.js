@@ -82,6 +82,42 @@
     var termsApi = null;
     var inboxApi = null;
     var saving = {};
+    var bulkBusy = false;
+
+    function selectedRows(api) {
+        if (!api || typeof api.getSelectedRows !== 'function') return [];
+        return api.getSelectedRows() || [];
+    }
+
+    function selectedLabel(count) {
+        if (count === 1) return t.selectedOne || '1 selected';
+        return (t.selectedMany || '{count} selected').replace('{count}', String(count));
+    }
+
+    function syncBulkBar(barId, api) {
+        var bar = document.getElementById(barId);
+        if (!bar) return;
+        var rows = selectedRows(api);
+        var count = rows.length;
+        var countEl = bar.querySelector('[data-role="selected-count"]');
+        if (countEl) countEl.textContent = selectedLabel(count);
+        if (count > 0) {
+            bar.classList.remove('hidden');
+            bar.classList.add('flex');
+        } else {
+            bar.classList.add('hidden');
+            bar.classList.remove('flex');
+        }
+    }
+
+    function setBulkBusy(barId, busy) {
+        bulkBusy = busy;
+        var bar = document.getElementById(barId);
+        if (!bar) return;
+        bar.querySelectorAll('button[data-bulk]').forEach(function (btn) {
+            btn.disabled = busy;
+        });
+    }
 
     function loadTerms() {
         var url = cfg.termsUrl + (cfg.termsUrl.indexOf('?') === -1 ? '?' : '&') + 'include_inactive=1';
@@ -342,6 +378,9 @@
                 paginationPageSize: 50,
                 stopEditingWhenCellsLoseFocus: true,
                 getRowId: function (params) { return String(params.data.id); },
+                onSelectionChanged: function () {
+                    syncBulkBar('glossary-terms-bulk', termsApi);
+                },
                 onCellValueChanged: function (ev) {
                     if (!ev.data || ev.colDef.field === 'is_active') return;
                     saveTerm(ev.data, {
@@ -386,6 +425,9 @@
                 paginationPageSize: 50,
                 stopEditingWhenCellsLoseFocus: true,
                 getRowId: function (params) { return String(params.data.id); },
+                onSelectionChanged: function () {
+                    syncBulkBar('glossary-inbox-bulk', inboxApi);
+                },
                 onCellClicked: function (ev) {
                     var target = ev.event && ev.event.target;
                     var btn = target && target.closest('[data-action]');
@@ -495,7 +537,82 @@
         });
     }
 
+    function bindBulkActions() {
+        var termsBar = document.getElementById('glossary-terms-bulk');
+        if (termsBar) {
+            termsBar.addEventListener('click', function (ev) {
+                var btn = ev.target && ev.target.closest('[data-bulk]');
+                if (!btn || bulkBusy) return;
+                var rows = selectedRows(termsApi);
+                var ids = rows.map(function (row) { return row && row.id; }).filter(Boolean);
+                if (!ids.length) return;
+                var action = btn.getAttribute('data-bulk');
+                var payload = { ids: ids };
+                if (action === 'activate') payload.is_active = true;
+                else if (action === 'deactivate') payload.is_active = false;
+                else if (action === 'tier-must') payload.tier = 'must';
+                else if (action === 'tier-preferred') payload.tier = 'preferred';
+                else return;
+                setBulkBusy('glossary-terms-bulk', true);
+                jsonFetch(cfg.termBulkUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                }).then(function (data) {
+                    var items = (data && data.items) || [];
+                    if (termsApi && items.length) {
+                        termsApi.applyTransaction({ update: items });
+                        if (typeof termsApi.deselectAll === 'function') termsApi.deselectAll();
+                    }
+                    updateTermCounts(countRows(termsApi, function (item) { return item.is_active; }));
+                    syncBulkBar('glossary-terms-bulk', termsApi);
+                }).catch(function (err) {
+                    if (window.showAlert) window.showAlert(err.message || t.bulkFailed, 'error');
+                }).finally(function () {
+                    setBulkBusy('glossary-terms-bulk', false);
+                });
+            });
+        }
+
+        var inboxBar = document.getElementById('glossary-inbox-bulk');
+        if (inboxBar) {
+            inboxBar.addEventListener('click', function (ev) {
+                var btn = ev.target && ev.target.closest('[data-bulk]');
+                if (!btn || bulkBusy) return;
+                var rows = selectedRows(inboxApi);
+                if (!rows.length) return;
+                var accept = btn.getAttribute('data-bulk') === 'accept';
+                if (btn.getAttribute('data-bulk') !== 'accept' && btn.getAttribute('data-bulk') !== 'reject') return;
+                var items = rows.map(function (row) {
+                    return {
+                        id: row.id,
+                        source_term: row.source_term,
+                        target_term: row.target_term,
+                        tier: row.proposed_tier
+                    };
+                });
+                setBulkBusy('glossary-inbox-bulk', true);
+                jsonFetch(cfg.candidateBulkUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ accept: accept, items: items })
+                }).then(function () {
+                    if (inboxApi) {
+                        inboxApi.applyTransaction({ remove: rows });
+                        if (typeof inboxApi.deselectAll === 'function') inboxApi.deselectAll();
+                    }
+                    updateInboxCounts(countRows(inboxApi));
+                    syncBulkBar('glossary-inbox-bulk', inboxApi);
+                    if (accept && termsApi) loadTerms();
+                }).catch(function (err) {
+                    if (window.showAlert) window.showAlert(err.message || t.bulkFailed, 'error');
+                }).finally(function () {
+                    setBulkBusy('glossary-inbox-bulk', false);
+                });
+            });
+        }
+    }
+
     initTermsGrid();
     initInboxGrid();
     bindAddForm();
+    bindBulkActions();
 })();

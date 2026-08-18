@@ -150,6 +150,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
 
+      - name: Translation catalog is current and compiles
+        working-directory: Backoffice
+        run: python scripts/ci/check_translations_current.py
+
       - name: Run tests
         working-directory: Backoffice
         env:

@@ -247,9 +247,11 @@ Entity answers are stored in three data tables, all keyed by either `assignment_
 - Configure database URL, API keys, translation services
 
 ### Translation Services
-- LibreTranslate integration for automatic translation
-- Supports 7 languages: EN, FR, ES, AR, RU, ZH, HI
-- Gettext catalogs live in `Backoffice/translations/` (compiled to `.mo` at runtime)
+- Hosted IFRC/Azure translation is the default engine for EN, FR, ES, AR, RU, ZH, HI. LibreTranslate remains a local-dev fallback. A self-hosted NLLB sidecar (`services/nllb-sidecar`, compose profile `nllb`; CTranslate2 + `facebook/nllb-200-1.3B`, no external API) covers long-tail National Society languages the hosted engine doesn't (Amharic, Swahili, Nepali, ...); it rejects the core seven with `409` so the hosted engine stays authoritative there. Opt in from the Backoffice with `NLLB_SIDECAR_URL` (see `services/nllb-sidecar/README.md`).
+- Gettext **values** live in `translation_string` (provenance, engine, status). `pybabel extract` / `.pot` stay the msgid source. Compiled `.mo` files remain the runtime path.
+- Import existing catalogs with `flask translations import-catalog` (backfill `unknown_presumed_machine`), then `flask translations recover-provenance` to mark audited human edits. Seed must-terms with `flask translations seed-glossary`.
+- Quality dashboard: `/admin/translations/quality`. Engine eval (gated on a filled gold set): `python Backoffice/scripts/i18n/eval_translation_engines.py`.
+- Knowledge Base language versions: on `/admin/ai/documents`, select the completed files for one publication → **Mark as same publication** (records deferred pairs; sentence-level TM stays off) → **Mine terminology**. Mining first joins shared `(ACRONYM)` expansions, then asks OpenAI to extract English glossary heads and pair them using embedding retrieval in each target document. A pair is stored only when the target wording appears in those retrieved chunks. Review/accept candidates on `/admin/translations/quality`.
 
 ### Inline Translation Review (in-context editor)
 Human translators can review UI strings directly on live pages without opening the admin translation grid.
@@ -272,18 +274,18 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 **How it works**
 1. Translator toggles the floating **Translate** FAB (session flag `translation_review_mode`; page reload).
 2. When review mode is active, Flask-Babel gettext output is wrapped with invisible Unicode markers encoding the English `msgid` (`app/services/translation_review/marker.py`).
-3. Pointer mode scans DOM text/attributes for markers; click opens a modal with read-only English + editable target locale.
+3. Pointer mode scans DOM text/attributes for markers; click opens a modal with source, machine suggestion, and official text.
 4. Placeholders (`%(name)s`, `%s`, `%d`, …) are protected client-side (chips) and validated server-side (`app/services/translation/placeholder_validator.py`).
-5. Save writes the locale `.po` file, compiles `.mo`, calls `flask_babel.refresh()`, and logs `translation_review_edit` to `admin_action_log`.
+5. **Approve official** writes `translation_string` with `provenance=human`, syncs the `.po` artifact, compiles `.mo`, calls `flask_babel.refresh()`, and logs `translation_review_edit` to `admin_action_log`.
 
 **Key modules**
-- Routes: `app/routes/translation_review/` (`/translation-review/toggle`, `/translation-review/api/string`)
+- Routes: `app/routes/translation_review/` (`/translation-review/toggle`, `/translation-review/api/string`, `/api/queue`, `/api/glossary-candidates`)
 - Hooks: `app/services/translation_review/hooks.py` (wraps Jinja + `Domain.gettext`; strips markers from non-HTML responses)
 - Frontend: `app/static/js/translation_review/core.js`, `app/static/css/translation-review.css`, included from `core/layout.html`
 - Production propagation: `app/utils/translation_watcher.py` polls shared `translations/` in all environments so every Gunicorn worker refreshes catalogs after PO/MO changes
 
 **Deploy notes**
-- Run migrations: `add_rbac_language_scope`, `add_translation_review_tool_toggle`
+- Run migrations: `add_rbac_language_scope`, `add_translation_review_tool_toggle`, `add_translation_quality`
 - Seed RBAC: `python -m flask rbac seed`
 - Ensure persistent translations volume is mounted (see `Backoffice/docs/setup/persistent-translations.md`)
 

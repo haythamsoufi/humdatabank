@@ -116,7 +116,19 @@ def get_review_string():
         return json_forbidden(_('You do not have permission to edit translations for this language'))
 
     english = msgid
-    current_translation = _read_po_msgstr(msgid, locale)
+    from app.services.translation.catalog_service import get_row, get_msgstr
+
+    row = get_row(msgid, locale)
+    current_translation = get_msgstr(msgid, locale) or _read_po_msgstr(msgid, locale)
+    machine_suggestion = ''
+    try:
+        from app.services.translation.result_cache import get_cached
+
+        machine_suggestion = get_cached(msgid, 'en', locale, 'ifrc') or get_cached(msgid, 'en', locale, 'google') or ''
+        if row and row.provenance == 'machine' and row.msgstr:
+            machine_suggestion = machine_suggestion or row.msgstr
+    except Exception:
+        current_app.logger.debug('review machine suggestion skipped', exc_info=True)
     from config import Config
 
     language_display_names = getattr(Config, 'LANGUAGE_DISPLAY_NAMES', {}) or {}
@@ -126,6 +138,9 @@ def get_review_string():
         english=english,
         locale=locale,
         current_translation=current_translation,
+        machine_suggestion=machine_suggestion,
+        provenance=getattr(row, 'provenance', None) or 'unknown_presumed_machine',
+        status=getattr(row, 'status', None) or 'unreviewed',
         placeholders=extract_placeholders(msgid),
         language_display_name=language_display_names.get(locale) or locale.upper(),
     )
@@ -162,8 +177,12 @@ def save_review_string():
     if not validation.get('valid'):
         return json_bad_request(localized_validation_message(validation))
 
-    old_value = _read_po_msgstr(msgid, locale)
-    updated_count, updated_langs = _update_po_translations(msgid, {locale: translation})
+    from app.services.translation.catalog_service import PROVENANCE_HUMAN, get_msgstr
+
+    old_value = get_msgstr(msgid, locale) or _read_po_msgstr(msgid, locale)
+    updated_count, updated_langs = _update_po_translations(
+        msgid, {locale: translation}, provenance=PROVENANCE_HUMAN
+    )
     if updated_count <= 0:
         return json_bad_request(_('No translations were updated'))
 
@@ -181,6 +200,86 @@ def save_review_string():
         updated_languages=updated_langs,
         msgid_hash=hashlib.sha256(msgid.encode('utf-8')).hexdigest()[:16],
     )
+
+
+@bp.route('/api/queue', methods=['GET'])
+@login_required
+def review_queue():
+    denied = _require_review_access()
+    if denied:
+        return denied
+    locale = _resolve_locale(request.args.get('locale'))
+    if not locale or locale == 'en':
+        return json_bad_request(_('A non-English locale is required'))
+    if not user_can_edit_locale(current_user, locale):
+        return json_forbidden(_('You do not have permission to edit translations for this language'))
+    from app.services.translation.catalog_service import list_unreviewed
+
+    rows = list_unreviewed(locale, limit=int(request.args.get('limit') or 50))
+    return json_ok(
+        locale=locale,
+        items=[
+            {
+                'msgid': r.msgid,
+                'msgstr': r.msgstr,
+                'provenance': r.provenance,
+                'status': r.status,
+                'engine': r.engine,
+            }
+            for r in rows
+        ],
+    )
+
+
+@bp.route('/api/glossary-candidates', methods=['GET'])
+@login_required
+def list_glossary_candidates():
+    denied = _require_review_access()
+    if denied:
+        return denied
+    from app.models.translation_quality import TranslationGlossaryCandidate
+
+    locale = _resolve_locale(request.args.get('locale'))
+    q = TranslationGlossaryCandidate.query.filter_by(status='pending')
+    if locale and locale != 'en':
+        q = q.filter_by(target_lang=locale)
+    rows = q.order_by(TranslationGlossaryCandidate.confidence.desc()).limit(80).all()
+    return json_ok(
+        items=[
+            {
+                'id': r.id,
+                'source_term': r.source_term,
+                'target_term': r.target_term,
+                'target_lang': r.target_lang,
+                'extractor': r.extractor,
+                'confidence': r.confidence,
+                'proposed_tier': r.proposed_tier,
+                'occurrence_count': r.occurrence_count,
+                'evidence': r.evidence,
+                'example_sentences': r.example_sentences,
+            }
+            for r in rows
+        ]
+    )
+
+
+@bp.route('/api/glossary-candidates/<int:candidate_id>', methods=['POST'])
+@login_required
+@limiter.limit('60 per minute')
+def decide_glossary_candidate(candidate_id):
+    denied = _require_review_access()
+    if denied:
+        return denied
+    if not is_json_request():
+        return json_bad_request(_('JSON request required'))
+    data = get_request_data() or {}
+    accept = bool(data.get('accept'))
+    from app.services.translation.glossary_mining import decide_candidate
+
+    ok = decide_candidate(candidate_id, accept=accept, tier=data.get('tier'))
+    if not ok:
+        return json_bad_request(_('Candidate not found or already reviewed'))
+    return json_ok(accepted=accept)
 
 
 @bp.route('/status', methods=['GET'])

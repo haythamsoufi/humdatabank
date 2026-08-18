@@ -9,7 +9,7 @@ import logging
 
 from flask import request, flash, redirect, url_for, current_app, render_template, send_file
 from flask_login import current_user
-from flask_babel import _
+from flask_babel import _, ngettext
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side, Protection
 from openpyxl.utils import get_column_letter
@@ -143,44 +143,20 @@ def ensure_language_catalogs(languages: list[str]) -> list[str]:
     return created
 
 
-def _update_po_translations(msgid, lang_to_msgstr):
-    """Update PO translation files for the given msgid across languages.
+def _update_po_translations(msgid, lang_to_msgstr, *, provenance=None, engine=None):
+    """Update catalog rows (DB source of truth) and keep .po/.mo artifacts in sync.
 
     For each (lang, msgstr) pair: update the existing entry or create a new one
     (new entries are only created when msgstr is non-empty).
     Returns (count, list of language codes whose translation value changed).
     """
-    try:
-        import polib  # type: ignore
-    except ImportError:
-        current_app.logger.warning("polib not available - translation file updates will be skipped")
-        return 0, []
+    from app.services.translation.catalog_service import (
+        PROVENANCE_HUMAN,
+        upsert_many,
+    )
 
-    updated_langs = []
-    for lang, msgstr in lang_to_msgstr.items():
-        po_file_path = _translations_po_path(lang)
-        if not os.path.exists(po_file_path):
-            continue
-        try:
-            with po_file_lock(po_file_path):
-                po = polib.pofile(po_file_path)
-                entry = po.find(msgid)
-                changed = False
-                if entry is None:
-                    if str(msgstr).strip():
-                        po.append(polib.POEntry(msgid=msgid, msgstr=msgstr))
-                        changed = True
-                elif entry.msgstr != msgstr:
-                    entry.msgstr = msgstr
-                    changed = True
-                if changed:
-                    po.save(po_file_path)
-                    updated_langs.append(lang)
-        except Exception as e:
-            current_app.logger.error("Failed to update translation for %s: %s", lang, e)
-    if updated_langs:
-        finalize_translation_writes(updated_langs, refresh=True)
-    return len(updated_langs), updated_langs
+    resolved = provenance or PROVENANCE_HUMAN
+    return upsert_many(msgid, lang_to_msgstr, provenance=resolved, engine=engine)
 
 
 def _decode_translation_payload(data):
@@ -232,158 +208,23 @@ def manage_translations():
     languages = current_app.config.get('SUPPORTED_LANGUAGES', Config.LANGUAGES)
     language_names = Config.LANGUAGE_DISPLAY_NAMES
 
-    # Get all translation files (robustly via polib)
-    translation_data = {}
-    all_msgids = set()
-    obsolete_msgids = set()   # msgids marked #~ in PO files
-    msgid_sources = {}
-
-    # Try to import polib, but make it optional
     try:
         import polib  # type: ignore
     except ImportError:
         current_app.logger.warning("polib not available - translation file management will be limited")
         polib = None
-        # Show a flash message to the user about the missing dependency
         flash(_("Warning: polib package not available. Translation file management will be limited. Install with: pip install polib"), "warning")
 
-    # Build msgid_sources from the POT file first (authoritative source of #: references).
-    # PO files may lack occurrences for manually-added entries or stale sync states.
-    if polib:
-        pot_path = _translations_pot_path()
-        if os.path.exists(pot_path):
-            with suppress(Exception):
-                pot = polib.pofile(pot_path)
-                for entry in pot:
-                    if not entry.msgid or entry.obsolete:
-                        continue
-                    if entry.occurrences and entry.msgid not in msgid_sources:
-                        src_path, _ = entry.occurrences[0]
-                        msgid_sources[entry.msgid] = _extract_page_name(src_path)
+    from app.services.translation.catalog_service import load_catalog_grid
 
-    for lang in languages:
-        po_file_path = _translations_po_path(lang)
-        translations = {}
-        if os.path.exists(po_file_path) and polib:
-            with suppress(Exception):
-                po = polib.pofile(po_file_path)
-                for entry in po:
-                    if not entry.msgid or entry.msgid == "":
-                        continue
-
-                    # Collect obsolete entries separately so they display in the grid
-                    # with a "removed" indicator rather than being silently hidden.
-                    if entry.obsolete:
-                        obsolete_msgids.add(entry.msgid)
-                        if entry.msgid not in msgid_sources:
-                            # Prefer the tagged translator comment "[Removed] was: <ref>"
-                            # (stored in tcomment = plain "# " lines by polib)
-                            raw_tcomment = getattr(entry, 'tcomment', '') or ''
-                            if '[Removed]' in raw_tcomment and 'was:' in raw_tcomment:
-                                ref = raw_tcomment.split('was:', 1)[-1].strip()
-                                page_name = _extract_page_name(ref)
-                            elif entry.occurrences:
-                                src_path, _ = entry.occurrences[0]
-                                page_name = _extract_page_name(src_path)
-                            else:
-                                page_name = None
-                            if page_name:
-                                msgid_sources[entry.msgid] = '\x00' + page_name  # \x00 prefix = removed
-                        # Carry existing translation so it's still visible in the grid
-                        if entry.msgid not in translations:
-                            if entry.msgstr:
-                                translations[entry.msgid] = entry.msgstr
-                            elif hasattr(entry, 'msgstr_plural') and entry.msgstr_plural:
-                                first_plural = (entry.msgstr_plural.get(0, '')
-                                               or next(iter(entry.msgstr_plural.values()), ''))
-                                translations[entry.msgid] = first_plural
-                            else:
-                                translations[entry.msgid] = ''
-                        continue
-
-                    # Skip PO file metadata entries
-                    msgid_lower = entry.msgid.lower()
-                    metadata_keys = [
-                        'project-id-version', 'report-msgid-bugs-to', 'pot-creation-date',
-                        'po-revision-date', 'last-translator', 'language-team', 'mime-version',
-                        'content-type', 'content-transfer-encoding', 'plural-forms', 'generated-by'
-                    ]
-                    if sum(1 for k in metadata_keys if k in msgid_lower) >= 3:
-                        continue
-
-                    all_msgids.add(entry.msgid)
-
-                    if entry.msgstr:
-                        translations[entry.msgid] = entry.msgstr
-                    elif hasattr(entry, 'msgstr_plural') and entry.msgstr_plural:
-                        first_plural = entry.msgstr_plural.get(0, '') or (list(entry.msgstr_plural.values())[0] if entry.msgstr_plural else '')
-                        translations[entry.msgid] = first_plural
-                    else:
-                        # Guard: a duplicate empty entry (e.g. the original plural entry from
-                        # pybabel extraction appearing after an auto-translate non-plural entry)
-                        # must never overwrite a translation already found earlier in this file.
-                        existing = translations.get(entry.msgid, '')
-                        if not existing:
-                            translations[entry.msgid] = ""
-
-                    # Fallback: capture source from PO if POT didn't have it
-                    if entry.occurrences and entry.msgid not in msgid_sources:
-                        src_path, _ = entry.occurrences[0]
-                        msgid_sources[entry.msgid] = _extract_page_name(src_path)
-        translation_data[lang] = {
-            'name': language_names.get(lang, lang.upper()),
-            'translations': translations
-        }
-
-    # Merge obsolete msgids into the full list so they appear in the grid.
-    # Active entries always take precedence over obsolete ones with the same msgid.
-    all_msgids.update(obsolete_msgids - all_msgids)
-
-    # Sort all message IDs for consistent display
-    all_msgids = sorted(list(all_msgids))
-    # Active-only msgids for bulk auto-translate (exclude removed/obsolete entries)
-    active_translation_msgids = [m for m in all_msgids if m not in obsolete_msgids]
-
-    # Count empty translations for each language (for frontend auto-translate)
-    empty_translation_counts = {}
-    empty_translation_msgids = {}  # Store the actual msgids that need translation
-    for lang in languages:
-        if lang == 'en':  # Skip English as it's the source language
-            continue
-        empty_count = 0
-        empty_msgids = []
-        lang_translations = translation_data.get(lang, {}).get('translations', {})
-        po_file_path = _translations_po_path(lang)
-        po_cache = None
-        if polib and os.path.exists(po_file_path):
-            with suppress(Exception):
-                po_cache = polib.pofile(po_file_path)
-
-        for msgid in all_msgids:
-            # Obsolete (#~) strings are kept in the grid for visibility but should not
-            # count as "missing" for auto-translate or per-locale empty tallies.
-            if msgid in obsolete_msgids:
-                continue
-            translation = lang_translations.get(msgid, '').strip()
-
-            # If translation appears empty, check if it's a plural form in the PO file
-            if not translation and po_cache:
-                with suppress(Exception):  # If we can't find the entry, fall back to checking the dict
-                    entry = po_cache.find(msgid)
-                    if entry and hasattr(entry, 'msgstr_plural') and entry.msgstr_plural:
-                        # Check if any plural form has a non-empty translation
-                        has_plural_translation = any(
-                            v and str(v).strip()
-                            for v in entry.msgstr_plural.values()
-                        )
-                        if has_plural_translation:
-                            translation = "PLURAL_FORM"  # Mark as having translation
-
-            if not translation:  # Count empty or whitespace-only translations
-                empty_count += 1
-                empty_msgids.append(msgid)
-        empty_translation_counts[lang] = empty_count
-        empty_translation_msgids[lang] = empty_msgids
+    grid = load_catalog_grid(languages, language_names)
+    translation_data = grid["translation_data"]
+    all_msgids = grid["all_msgids"]
+    active_translation_msgids = grid["active_translation_msgids"]
+    obsolete_msgids = grid["obsolete_msgids"]
+    msgid_sources = grid["msgid_sources"]
+    empty_translation_counts = grid["empty_translation_counts"]
+    empty_translation_msgids = grid["empty_translation_msgids"]
 
     # Add variables needed by JavaScript auto-translate functionality
     from config import Config
@@ -435,6 +276,46 @@ def manage_translations():
                          empty_translation_counts=empty_translation_counts,
                          empty_translation_msgids=empty_translation_msgids,
                          polib_available=polib is not None)
+
+
+@bp.route("/translations/quality", methods=["GET"])
+@permission_required("admin.translations.manage")
+def translation_quality_dashboard():
+    """Glossary, provenance, and coverage dashboard."""
+    from app.models.translation_quality import TranslationGlossaryCandidate
+    from app.services.translation.quality_metrics import quality_dashboard_payload
+
+    from config import Config
+
+    payload = quality_dashboard_payload()
+    language_names = Config.LANGUAGE_DISPLAY_NAMES
+    supported = current_app.config.get("SUPPORTED_LANGUAGES", Config.LANGUAGES) or []
+    translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or [
+        code for code in supported if code != "en"
+    ]
+    requested = (request.args.get("locale") or "").strip().lower()
+    locale = requested or ("fr" if "fr" in translatable else (translatable[0] if translatable else "fr"))
+    queue_locales = list(translatable)
+    if locale not in queue_locales:
+        queue_locales = [locale] + queue_locales
+    candidates = (
+        TranslationGlossaryCandidate.query.filter_by(status="pending")
+        .order_by(TranslationGlossaryCandidate.confidence.desc())
+        .limit(80)
+        .all()
+    )
+    from app.services.translation.catalog_service import list_unreviewed
+
+    queue = list_unreviewed(locale, limit=40)
+    return render_template(
+        "admin/translations/quality_dashboard.html",
+        metrics=payload,
+        candidates=candidates,
+        queue=queue,
+        queue_locale=locale,
+        queue_locales=queue_locales,
+        language_names=language_names,
+    )
 
 
 @bp.route("/translations/export", methods=["GET"])
@@ -733,6 +614,7 @@ def import_translations():
         updated = 0
         skipped_missing = 0
         skipped_empty = 0
+        applied: dict[str, str] = {}
 
         for inc in incoming:
             if getattr(inc, "obsolete", False):
@@ -769,17 +651,20 @@ def import_translations():
                         if (only_non_empty or (not allow_clear)) and (v is None or not str(v).strip()):
                             continue
                         cur.msgstr_plural[int(k)] = "" if (v is None) else str(v)
+                    applied[inc.msgid] = cur.msgstr_plural.get(0) or inc_singular or ""
                     updated += 1
                 else:
                     if allow_clear or (inc_singular and str(inc_singular).strip()) or (not only_non_empty and inc_singular is not None):
                         cur.msgstr_plural[0] = "" if (inc_singular is None) else str(inc_singular)
+                        applied[inc.msgid] = cur.msgstr_plural.get(0) or ""
                         updated += 1
             else:
                 if allow_clear or (inc_singular and str(inc_singular).strip()) or (not only_non_empty and inc_singular is not None):
                     cur.msgstr = "" if (inc_singular is None) else str(inc_singular)
+                    applied[inc.msgid] = cur.msgstr
                     updated += 1
 
-        return updated, skipped_missing, skipped_empty
+        return updated, skipped_missing, skipped_empty, applied
 
     if fmt == "po-zip":
         # Import a ZIP containing multiple locales: <lang>/LC_MESSAGES/messages.po
@@ -848,7 +733,7 @@ def import_translations():
                     incoming = polib.pofile(temp_po_path)
                     with po_file_lock(po_path):
                         current = polib.pofile(po_path)
-                        updated, skipped_missing, skipped_empty = _apply_incoming_po(current, incoming)
+                        updated, skipped_missing, skipped_empty, applied = _apply_incoming_po(current, incoming)
                         per_lang[lang] = {
                             "updated": updated,
                             "skipped_missing": skipped_missing,
@@ -858,6 +743,9 @@ def import_translations():
                             _backup(po_path)
                             current.save(po_path)
                             modified_locales.append(lang)
+                            from app.services.translation.catalog_service import apply_imported_updates
+
+                            apply_imported_updates(lang, applied)
 
                     processed_locales += 1
                     total_updated += updated
@@ -933,10 +821,13 @@ def import_translations():
             incoming = polib.pofile(temp_path)
             with po_file_lock(po_path):
                 current = polib.pofile(po_path)
-                updated, skipped_missing, skipped_empty = _apply_incoming_po(current, incoming)
+                updated, skipped_missing, skipped_empty, applied = _apply_incoming_po(current, incoming)
                 if updated > 0:
                     _backup(po_path)
                     current.save(po_path)
+                    from app.services.translation.catalog_service import apply_imported_updates
+
+                    apply_imported_updates(lang, applied)
                     finalize_translation_writes([lang], refresh=True)
 
             flash(
@@ -1072,6 +963,9 @@ def import_translations():
                     _backup(po_path)
                     po.save(po_path)
                     modified_locales.append(lang)
+                    from app.services.translation.catalog_service import apply_imported_updates
+
+                    apply_imported_updates(lang, updates)
 
             total_updated += updated_lang
             total_missing += missing_lang
@@ -1493,6 +1387,53 @@ def reload_translations():
 
     return redirect(url_for('utilities.manage_translations'))
 
+
+@bp.route("/translations/import-catalog", methods=["POST"])
+@permission_required("admin.translations.manage")
+def import_catalog_from_po():
+    """Load current .po catalogs into translation_string (idempotent)."""
+    try:
+        from app.services.translation.catalog_service import (
+            PROVENANCE_UNKNOWN,
+            import_from_po_files,
+        )
+
+        counts = import_from_po_files(provenance=PROVENANCE_UNKNOWN)
+        inserted = counts.get("_total_inserted") or 0
+        filled = counts.get("_total_filled") or 0
+        flash(
+            _(
+                "Catalog synced from .po files. New rows: %(inserted)d. Empty rows filled: %(filled)d.",
+                inserted=inserted,
+                filled=filled,
+            ),
+            "success",
+        )
+    except Exception:
+        current_app.logger.exception("import-catalog from manage UI failed")
+        flash(_("An error occurred. Please try again."), "danger")
+    return redirect(url_for("utilities.manage_translations"))
+
+
+@bp.route("/translations/seed-glossary", methods=["POST"])
+@permission_required("admin.translations.manage")
+def seed_translation_glossary():
+    """Insert must-terms from Indicator Bank and Common Words."""
+    try:
+        from app.services.translation.glossary_seed import seed_from_indicator_bank
+
+        result = seed_from_indicator_bank()
+        added = (result or {}).get("added") or 0
+        flash(
+            _("Glossary seed finished. New must-terms: %(added)d.", added=added),
+            "success",
+        )
+    except Exception:
+        current_app.logger.exception("seed-glossary from manage UI failed")
+        flash(_("An error occurred. Please try again."), "danger")
+    return redirect(url_for("utilities.manage_translations"))
+
+
 @bp.route("/translations/extract-update", methods=["POST"])
 @permission_required("admin.translations.manage")
 def extract_update_translations():
@@ -1534,6 +1475,16 @@ def extract_update_translations():
             touch_translation_sentinel(_translations_dir())
 
             # Build success message
+            try:
+                from app.services.translation.catalog_service import (
+                    PROVENANCE_UNKNOWN,
+                    import_from_po_files,
+                )
+
+                import_from_po_files(provenance=PROVENANCE_UNKNOWN)
+            except Exception:
+                current_app.logger.exception("catalog import after extract failed")
+
             success_msg = _('Translations extracted and updated successfully!')
             if obsolete_info:
                 success_msg += ' ' + ' '.join(obsolete_info[:3])  # Show first 3 locales
@@ -1720,7 +1671,8 @@ def api_auto_translate():
         translation_service = data.get('translation_service', 'ifrc')  # Default hosted service (internal id "ifrc")
         service_name = translation_service  # Map to existing parameter for backward compatibility
 
-        if not text:
+        batch_items = data.get('items') if isinstance(data.get('items'), list) else None
+        if not text and not batch_items:
             return json_bad_request(_('Text is required'))
 
         auto_translator = get_auto_translator()
@@ -1845,158 +1797,147 @@ def api_auto_translate():
             )
 
         elif translation_type == 'translation':
-            # Translate a translation file entry (msgid to other languages)
+            from app.services.translation.auto_translator import translate_batch as auto_translate_batch
             from app.services.translation.auto_translator import translate_text as auto_translate_text
-            from config import Config
-
-            # Try to import polib, but make it optional
-            try:
-                import polib  # type: ignore
-            except ImportError:
-                current_app.logger.warning("polib not available - translation file updates will be skipped")
-                polib = None
-
-            # Get message ID for the translation (exact string; do not strip — gettext msgids are exact)
-            _mid = data.get('id')
-            if _mid is None:
-                return json_bad_request(_('Message ID is required for translation type'))
-            message_id = _mid if isinstance(_mid, str) else str(_mid)
-            if not message_id.strip():
-                return json_bad_request(_('Message ID is required for translation type'))
-
-            # Check if polib is available for file updates
-            if polib is None:
-                return json_bad_request(_('Translation file updates are not available. Please install polib package.'))
-
-            # Translate the text to the target languages
-            translations = {}
-            success_count = 0
-            skipped_untranslatable = 0
-            modified_locales = []
-
+            from app.services.translation.catalog_service import PROVENANCE_MACHINE, upsert_batch
             from config import Config as _TransCfg
+
             _supported_locales = set(current_app.config.get('SUPPORTED_LANGUAGES', _TransCfg.LANGUAGES))
 
-            for lang in target_languages:
-                try:
-                    # ISO codes only (accept regional variants like fr_FR)
+            work_items = []
+            if batch_items:
+                for raw in batch_items[:200]:
+                    if not isinstance(raw, dict):
+                        continue
+                    mid = raw.get('id')
+                    src = raw.get('text')
+                    langs = raw.get('target_languages') or target_languages
+                    if mid is None or not src:
+                        continue
+                    work_items.append({
+                        'id': mid if isinstance(mid, str) else str(mid),
+                        'text': src if isinstance(src, str) else str(src),
+                        'target_languages': langs,
+                    })
+            else:
+                _mid = data.get('id')
+                if _mid is None:
+                    return json_bad_request(_('Message ID is required for translation type'))
+                message_id = _mid if isinstance(_mid, str) else str(_mid)
+                if not message_id.strip():
+                    return json_bad_request(_('Message ID is required for translation type'))
+                work_items.append({
+                    'id': message_id,
+                    'text': text,
+                    'target_languages': target_languages,
+                })
+
+            translations = {}
+            results = []
+            success_count = 0
+            skipped_untranslatable = 0
+
+            # Group by target language so we can use translate_batch.
+            by_lang = {}
+            for item in work_items:
+                for lang in item['target_languages'] or []:
                     target_locale = str(lang or '').strip()
                     if '_' in target_locale:
                         target_locale = target_locale.split('_', 1)[0]
                     target_locale = target_locale.lower()
-                    if target_locale == 'en':
-                        continue  # Skip English as source language
-                    # Validate against supported languages to prevent path injection
-                    if target_locale not in _supported_locales:
-                        logger.warning("Skipping unsupported locale for translation: %s", target_locale)
+                    if target_locale == 'en' or target_locale not in _supported_locales:
                         continue
+                    by_lang.setdefault(target_locale, []).append(item)
 
-                    # Translate the text
-                    translated_text = auto_translate_text(
-                        text=text,
+            # Collect every (msgid, locale, translated_text) triple across ALL
+            # target languages first, then persist them in one upsert_batch call.
+            # This keeps PO file I/O at O(distinct locales) instead of O(items),
+            # which matters for large bulk runs (up to 200 items x N languages)
+            # especially on network-backed translation volumes (Azure Files SMB).
+            pending_writes = []  # (msgid, locale, translated_text)
+            translated_by_pair = {}
+            for target_locale, items_for_lang in by_lang.items():
+                texts = [it['text'] for it in items_for_lang]
+                if len(texts) == 1:
+                    outs = [auto_translate_text(
+                        text=texts[0],
                         target_language=target_locale,
-                        service_name=service_name
+                        service_name=service_name,
+                    )]
+                else:
+                    outs = auto_translate_batch(
+                        texts=texts,
+                        target_language=target_locale,
+                        service_name=service_name,
                     )
-
-                    if not translated_text or not translated_text.strip():
-                        # Service responded but returned no usable translation (e.g. proper
-                        # noun / acronym / technical term that the API left unchanged and the
-                        # untranslated-output heuristic rejected). This is not a server error.
+                for item, translated_text in zip(items_for_lang, outs):
+                    if not translated_text or not str(translated_text).strip():
                         skipped_untranslatable += 1
                         continue
+                    pending_writes.append((item['id'], target_locale, translated_text))
+                    translated_by_pair[(target_locale, item['id'])] = (item['id'], target_locale, translated_text)
 
-                    if translated_text and translated_text.strip():
-                        translations[target_locale] = translated_text
-
-                        po_file_path = _translations_po_path(target_locale)
-                        try:
-                            # Ensure directory exists
-                            po_dir = os.path.dirname(po_file_path)
-                            with suppress(Exception):
-                                os.makedirs(po_dir, exist_ok=True)
-
-                            with po_file_lock(po_file_path):
-                                # Load existing PO or create a new one
-                                if os.path.exists(po_file_path):
-                                    po = polib.pofile(po_file_path)
-                                else:
-                                    po = polib.POFile()
-                                    en_po_path = _translations_po_path('en')
-                                    if os.path.exists(en_po_path):
-                                        with suppress(Exception):
-                                            en_po = polib.pofile(en_po_path)
-                                            if getattr(en_po, "metadata", None):
-                                                po.metadata = dict(en_po.metadata)
-                                    # Minimal metadata fallback
-                                    if not getattr(po, "metadata", None):
-                                        po.metadata = {}
-                                    po.metadata.setdefault('Content-Type', 'text/plain; charset=utf-8')
-                                    po.metadata.setdefault('Content-Transfer-Encoding', '8bit')
-                                    po.metadata.setdefault('Language', target_locale)
-
-                                entry = po.find(message_id)
-                                if entry:
-                                    # Update existing entry (plural or non-plural)
-                                    if hasattr(entry, 'msgid_plural') and entry.msgid_plural:
-                                        if not hasattr(entry, 'msgstr_plural') or not entry.msgstr_plural:
-                                            entry.msgstr_plural = {}
-                                        entry.msgstr_plural[0] = translated_text
-                                        # If plural forms exist, mirror into second form as a simple fallback
-                                        if len(entry.msgstr_plural) > 1:
-                                            entry.msgstr_plural[1] = translated_text
-                                    else:
-                                        entry.msgstr = translated_text
-                                else:
-                                    en_po_path = _translations_po_path('en')
-                                    is_plural = False
-                                    msgid_plural = None
-                                    if os.path.exists(en_po_path):
-                                        with suppress(Exception):
-                                            en_po = polib.pofile(en_po_path)
-                                            en_entry = en_po.find(message_id)
-                                            if en_entry and hasattr(en_entry, 'msgid_plural') and en_entry.msgid_plural:
-                                                is_plural = True
-                                                msgid_plural = en_entry.msgid_plural
-
-                                    if is_plural:
-                                        entry = polib.POEntry(msgid=message_id, msgid_plural=msgid_plural or message_id)
-                                        entry.msgstr_plural = {0: translated_text, 1: translated_text}
-                                    else:
-                                        entry = polib.POEntry(msgid=message_id, msgstr=translated_text)
-                                    po.append(entry)
-
-                                po.save(po_file_path)
-                            success_count += 1
-                            modified_locales.append(target_locale)
-                        except Exception as e:
-                            current_app.logger.error(f"Error updating/creating po file for {target_locale}: {e}", exc_info=True)
-
-                except Exception as e:
-                    current_app.logger.error(f"Error translating to {lang}: {e}", exc_info=True)
-                    continue
+            skipped_protected = 0
+            if pending_writes:
+                batch_result = upsert_batch(
+                    pending_writes,
+                    provenance=PROVENANCE_MACHINE,
+                    engine=service_name,
+                )
+                skipped_protected = batch_result.get('skipped_protected', 0)
+                for locale, msgid in batch_result.get('updated_pairs', []):
+                    triple = translated_by_pair.get((locale, msgid))
+                    if not triple:
+                        continue
+                    item_id, target_locale, translated_text = triple
+                    success_count += 1
+                    translations[target_locale] = translated_text
+                    results.append({
+                        'id': item_id,
+                        'language': target_locale,
+                        'translation': translated_text,
+                    })
 
             if success_count > 0:
-                finalize_translation_writes(modified_locales, refresh=True)
-                return json_ok(
+                response_kwargs = dict(
                     translations={'label_translations': translations},
+                    results=results,
                     updated_count=success_count,
                     service_used=service_name,
                 )
-            elif skipped_untranslatable > 0:
-                # The translation API responded successfully but the text could not be
-                # translated (e.g. proper noun, technical term, or acronym returned
-                # unchanged). This is not an error — return a soft 200 so
-                # the UI can show an informational message rather than "Network error".
+                if skipped_protected:
+                    response_kwargs['skipped_protected'] = skipped_protected
+                    response_kwargs['message'] = ngettext(
+                        '%(count)s string was skipped because it is already human-approved.',
+                        '%(count)s strings were skipped because they are already human-approved.',
+                        skipped_protected,
+                        count=skipped_protected,
+                    )
+                return json_ok(**response_kwargs)
+            if skipped_protected > 0 and skipped_untranslatable == 0:
+                return json_ok(
+                    translations={},
+                    updated_count=0,
+                    skipped_protected=skipped_protected,
+                    service_used=service_name,
+                    message=ngettext(
+                        '%(count)s string was skipped because it is already human-approved.',
+                        '%(count)s strings were skipped because they are already human-approved.',
+                        skipped_protected,
+                        count=skipped_protected,
+                    ),
+                )
+            if skipped_untranslatable > 0:
                 return json_ok(
                     translations={},
                     updated_count=0,
                     skipped_untranslatable=skipped_untranslatable,
+                    skipped_protected=skipped_protected,
                     service_used=service_name,
                     untranslated=True,
                     message='No translation available: the text may be a proper noun or technical term that does not require translation.',
                 )
-            else:
-                return json_server_error('Failed to translate or update translation files')
+            return json_server_error('Failed to translate or update translation files')
 
         else:
             return json_bad_request(_('Invalid translation type'))

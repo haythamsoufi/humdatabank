@@ -34,6 +34,8 @@
     const fab        = document.getElementById('translationReviewFAB');
     const modal      = document.getElementById('translation-review-modal');
     const englishField = document.getElementById('translation-review-english');
+    const machineField = document.getElementById('translation-review-machine');
+    const provenanceEl = document.getElementById('translation-review-provenance');
     const editor     = document.getElementById('translation-review-editor');
     const localeLabel  = document.getElementById('translation-review-locale-label');
     const errorBox   = document.getElementById('translation-review-error');
@@ -342,6 +344,12 @@
                     throw new Error((data && data.message) || 'Failed to load translation');
                 if (localeLabel && data.language_display_name)
                     localeLabel.textContent = data.language_display_name;
+                if (machineField) machineField.value = data.machine_suggestion || '';
+                if (provenanceEl) {
+                    const prov = data.provenance || 'unknown';
+                    const st = data.status || 'unreviewed';
+                    provenanceEl.textContent = 'Provenance: ' + prov + ' · Status: ' + st + ' · Save marks this official (human-approved).';
+                }
                 renderEditor(data.current_translation || '', requiredPlaceholders);
                 if (modal) modal.classList.remove('hidden');
             })

@@ -54,7 +54,7 @@
             background: #fff;
             border: 1px solid #e5e7eb;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
-            min-width: 210px;
+            min-width: 260px;
             z-index: 200;
         }
         .action-dropdown-menu.hidden {
@@ -111,7 +111,7 @@
     <button type="button"
             class="professional-action-btn professional-action-btn-blue"
             id="build-apply-btn"
-            title="{{ _('Extract, compile, and reload translation files')|forceescape }}"
+            title="{{ _('Extract strings, compile .mo files, sync the database catalog, and seed the glossary')|forceescape }}"
             aria-haspopup="true"
             aria-expanded="false">
         <i class="fas fa-tools"></i>
@@ -142,6 +142,23 @@
                 <span>{{ _('Reload Translations') }}</span>
             </button>
         </form>
+        <div class="action-dropdown-divider"></div>
+        <form action="{{ url_for('utilities.import_catalog_from_po') }}" method="POST" style="display:contents;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="action-dropdown-item" role="menuitem"
+                    title="{{ _('Load live .po translations into the database catalog. Safe to run again: existing human-approved rows are not overwritten.')|forceescape }}">
+                <i class="fas fa-database"></i>
+                <span>{{ _('Sync catalog from .po') }}</span>
+            </button>
+        </form>
+        <form action="{{ url_for('utilities.seed_translation_glossary') }}" method="POST" style="display:contents;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="action-dropdown-item" role="menuitem"
+                    title="{{ _('Add must-terms from Indicator Bank names, sectors, units, SPEF, and Common Words. Existing glossary terms are left unchanged.')|forceescape }}">
+                <i class="fas fa-book"></i>
+                <span>{{ _('Seed glossary') }}</span>
+            </button>
+        </form>
     </div>
 </div>
 {% endset %}
@@ -155,6 +172,13 @@
         ],
         info_tooltip=_('Manage translations for the') + ' ' + ORG_NAME + '. ' + _('You can add, edit, and delete translations for all supported languages. After making changes, remember to compile the translations to apply them.'),
         actions=[
+            {
+                'type': 'link',
+                'text': _('Quality'),
+                'icon': 'fas fa-chart-line',
+                'url': url_for('utilities.translation_quality_dashboard'),
+                'classes': 'professional-action-btn',
+            },
             {
                 'type': 'button',
                 'text': _('Import/Export'),
@@ -189,8 +213,8 @@
                         <p class="font-semibold mb-1">{{ _('Removed translation strings') }}</p>
                         <p class="mb-0 text-amber-800">
                             {{ ngettext(
-                                '%(count)s string was removed from the source code and can be permanently deleted from .po files.',
-                                '%(count)s strings were removed from the source code and can be permanently deleted from .po files.',
+                                '%(count)s string is not in the current source catalog (.pot) and can be deleted.',
+                                '%(count)s strings are not in the current source catalog (.pot) and can be deleted.',
                                 removed_count,
                                 count=removed_count
                             ) }}
@@ -674,6 +698,7 @@ window.manageTranslationsConfig = {
         skipped: {{ _('Skipped')|tojson }},
         translationFor: {{ _('translation for')|tojson }},
         properNounOrTech: {{ _('proper noun or technical term, no translation available')|tojson }},
+        alreadyHumanApproved: {{ _('already human-approved, not overwritten')|tojson }},
         translated: {{ _('Translated')|tojson }},
         failedToTranslate: {{ _('Failed to translate')|tojson }},
         toText: {{ _('to')|tojson }},

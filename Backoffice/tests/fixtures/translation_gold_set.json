@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "count": 4,
+  "locales": ["fr", "es", "ar"],
+  "commissioning_note": "Sample scaffold only. Commission 300-500 human references per locale before any engine claim. Run: flask translations sample-gold-set",
+  "segments": [
+    {
+      "msgid": "Focal Point",
+      "source_en": "Focal Point",
+      "gold": {"fr": "", "es": "", "ar": ""},
+      "domain": "ui",
+      "status": "needs_human"
+    },
+    {
+      "msgid": "National Society",
+      "source_en": "National Society",
+      "gold": {"fr": "", "es": "", "ar": ""},
+      "domain": "ui",
+      "status": "needs_human"
+    },
+    {
+      "msgid": "Cash and voucher assistance",
+      "source_en": "Cash and voucher assistance",
+      "gold": {"fr": "", "es": "", "ar": ""},
+      "domain": "ui",
+      "status": "needs_human"
+    },
+    {
+      "msgid": "People reached with disaster risk reduction",
+      "source_en": "People reached with disaster risk reduction",
+      "gold": {"fr": "", "es": "", "ar": ""},
+      "domain": "prose",
+      "status": "needs_human"
+    }
+  ]
+}

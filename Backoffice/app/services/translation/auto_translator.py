@@ -4,7 +4,10 @@ Automatic Translation Utility
 This module provides automatic translation functionality for the platform.
 It supports multiple translation services and can be used in translation modals and other places.
 
-Supported languages: English, French, Spanish, Arabic, Chinese, Russian, Hindi
+Core languages (English, French, Spanish, Arabic, Chinese, Russian, Hindi) are served by the
+hosted IFRC/Google engines. Additional "long-tail" National Society languages (e.g. Amharic,
+Swahili, Nepali) can be served by the self-hosted NLLB sidecar (see NLLBTranslationService and
+services/nllb-sidecar/README.md) once configured.
 """
 
 import os
@@ -657,6 +660,168 @@ class IFRCTranslationService(TranslationService):
 
 
 
+class NLLBTranslationService(TranslationService):
+    """Self-hosted NLLB sidecar (``services/nllb-sidecar``) -- long-tail languages only.
+
+    Not a general-purpose default: the sidecar itself rejects the core seven
+    languages (en, fr, es, ar, ru, zh, hi) with 409 so the hosted IFRC/Azure
+    engine stays authoritative for those. This service exists for National
+    Society languages the core engine does not cover (Amharic, Swahili,
+    Nepali, ...). See ``services/nllb-sidecar/README.md``.
+    """
+
+    # After a connection failure, stop retrying the host for this many seconds.
+    # (Mirrors LibreTranslateService; a 503 "model still loading" response does
+    # NOT trip this -- the host is reachable, just not ready yet, and first-boot
+    # model conversion can take 10-30+ minutes.)
+    _CIRCUIT_OPEN_COOLDOWN_SECONDS: int = 300  # 5 minutes
+
+    def __init__(self, api_key: Optional[str] = None, base_url: str = "http://nllb:9100"):
+        super().__init__(api_key)
+        self.service_name = "nllb"
+        self.base_url = base_url.rstrip('/')
+        self._circuit_open_until: float = 0.0
+
+    def _is_circuit_open(self) -> bool:
+        return time.time() < self._circuit_open_until
+
+    def _trip_circuit(self) -> None:
+        self._circuit_open_until = time.time() + self._CIRCUIT_OPEN_COOLDOWN_SECONDS
+        logger.debug(
+            "NLLB sidecar circuit open for %ds (host unreachable at %s)",
+            self._CIRCUIT_OPEN_COOLDOWN_SECONDS,
+            self.base_url,
+        )
+
+    def _headers(self) -> Dict[str, str]:
+        headers = {'Content-Type': 'application/json'}
+        if self.api_key:
+            headers['x-api-key'] = self.api_key
+        return headers
+
+    def translate_text(self, text: str, target_language: str, source_language: str = 'en') -> Optional[str]:
+        """Translate text using the self-hosted NLLB sidecar."""
+        if self._is_circuit_open():
+            return None
+
+        source_norm = _normalize_language_code(source_language, default="en")
+        target_norm = _normalize_language_code(target_language, default="en")
+        if source_norm == target_norm:
+            return None
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/translate",
+                headers=self._headers(),
+                data=json.dumps({"Text": text, "From": source_norm, "To": target_norm}),
+                timeout=30,
+            )
+        except requests.exceptions.ConnectionError as e:
+            self._trip_circuit()
+            logger.debug(f"NLLB sidecar connection error for '{text[:50]}...': {e} -- circuit open for {self._CIRCUIT_OPEN_COOLDOWN_SECONDS}s")
+            return None
+        except Exception as e:
+            logger.debug(f"NLLB sidecar request failed for '{text[:50]}...': {e}")
+            return None
+
+        if response.status_code == 200:
+            try:
+                data = response.json()
+            except ValueError as e:
+                logger.warning(f"NLLB sidecar returned non-JSON response: {e}")
+                return None
+            if data.get('deferred'):
+                # Model still loading, or the sidecar could not translate this
+                # item -- let the caller fall back to another service.
+                return None
+            return data.get('text')
+        if response.status_code == 409:
+            # Core language -- by design, the hosted engine owns these.
+            logger.debug(f"NLLB sidecar declined core language {source_norm}->{target_norm} (409)")
+            return None
+        if response.status_code == 503:
+            logger.debug(f"NLLB sidecar model not ready yet (503) for {source_norm}->{target_norm}")
+            return None
+        if response.status_code == 400:
+            logger.debug(f"NLLB sidecar: unsupported language code {source_norm}->{target_norm} (400)")
+            return None
+        if response.status_code == 401:
+            logger.warning("NLLB sidecar rejected request: invalid API key (401)")
+            return None
+        logger.warning(f"NLLB sidecar error {response.status_code} for '{text[:50]}...': {response.text[:200]}")
+        return None
+
+    def translate_batch(self, texts: List[str], target_language: str, source_language: str = 'en') -> List[Optional[str]]:
+        """Translate multiple texts using the self-hosted NLLB sidecar's batch endpoint."""
+        if not texts:
+            return []
+        if self._is_circuit_open():
+            return [None] * len(texts)
+
+        source_norm = _normalize_language_code(source_language, default="en")
+        target_norm = _normalize_language_code(target_language, default="en")
+        if source_norm == target_norm:
+            return [None] * len(texts)
+
+        payload = [{"Text": t, "From": source_norm, "To": target_norm} for t in texts]
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/translate/batch",
+                headers=self._headers(),
+                data=json.dumps(payload),
+                timeout=60,
+            )
+        except requests.exceptions.ConnectionError as e:
+            self._trip_circuit()
+            logger.debug(f"NLLB sidecar batch connection error: {e} -- circuit open for {self._CIRCUIT_OPEN_COOLDOWN_SECONDS}s")
+            return [None] * len(texts)
+        except Exception as e:
+            logger.debug(f"NLLB sidecar batch request failed: {e}")
+            return [None] * len(texts)
+
+        if response.status_code != 200:
+            logger.warning(f"NLLB sidecar batch error {response.status_code}: {response.text[:200]}")
+            return [None] * len(texts)
+
+        try:
+            data = response.json()
+        except ValueError as e:
+            logger.warning(f"NLLB sidecar batch returned non-JSON response: {e}")
+            return [None] * len(texts)
+
+        if not isinstance(data, list) or len(data) != len(texts):
+            logger.warning("NLLB sidecar batch response shape mismatch")
+            return [None] * len(texts)
+
+        return [None if item.get('deferred') else item.get('text') for item in data]
+
+    def check_health(self) -> bool:
+        """Probe /health and require the model to actually be loaded (``ok=true``).
+
+        Unlike Google/Libre, the sidecar's /health always answers 200 (even
+        while the model is still downloading/converting on first boot) --
+        readiness is signalled by the ``ok`` field, which we must inspect.
+        """
+        if self._is_circuit_open():
+            return False
+        try:
+            response = requests.get(
+                f"{self.base_url}/health",
+                timeout=STATUS_PROBE_TIMEOUT_SECONDS,
+            )
+        except requests.exceptions.ConnectionError:
+            self._trip_circuit()
+            return False
+        except Exception:
+            return False
+        if response.status_code != 200:
+            return False
+        try:
+            return bool(response.json().get('ok'))
+        except ValueError:
+            return False
+
+
 class AutoTranslator:
     """Main automatic translation class"""
 
@@ -703,17 +868,29 @@ class AutoTranslator:
         else:
             logger.warning("IFRC_TRANSLATE_API_KEY not set; IFRC translation service disabled")
 
+        # Initialize NLLB sidecar (self-hosted, long-tail languages only) - opt-in.
+        # Only enable if explicitly pointed at a sidecar URL (docker-compose
+        # profile "nllb", or an external deployment).
+        nllb_api_key = os.getenv('NLLB_SIDECAR_API_KEY')
+        nllb_url = os.getenv('NLLB_SIDECAR_URL')
+        if nllb_url:
+            self.services['nllb'] = NLLBTranslationService(nllb_api_key, nllb_url)
+
         # Set default service
         if service_name and service_name in self.services:
             self.default_service = service_name
         elif not self.default_service:
-            # Prefer IFRC API (official IFRC service), then Google, then LibreTranslate
+            # Prefer IFRC API (official IFRC service), then Google, then LibreTranslate.
+            # NLLB is last: it is a supplementary engine for long-tail languages the
+            # others don't cover, not a general-purpose default.
             if 'ifrc' in self.services:
                 self.default_service = 'ifrc'
             elif 'google' in self.services:
                 self.default_service = 'google'
             elif 'libre' in self.services:
                 self.default_service = 'libre'
+            elif 'nllb' in self.services:
+                self.default_service = 'nllb'
             else:
                 self.default_service = None
 
@@ -977,6 +1154,27 @@ class AutoTranslator:
         target_code = _normalize_language_code(target_language, default="en")
         source_code = _normalize_language_code(source_language, default="en")
 
+        glossary_map: Dict[str, str] = {}
+        try:
+            from app.services.translation.glossary_forcing import protect_glossary_terms
+
+            protected_text, glossary_map, _hits = protect_glossary_terms(protected_text, target_code)
+            token_map = {**token_map, **glossary_map}
+        except Exception as e:
+            logger.debug("glossary forcing skipped: %s", e)
+
+        cache_engine = service_name or self.default_service or "default"
+        try:
+            from app.services.translation.result_cache import get_cached
+
+            # Skip cache when glossary tokens were injected so new must-terms take effect.
+            if not glossary_map:
+                cached = get_cached(original_text, source_code, target_code, cache_engine)
+                if cached:
+                    return cached
+        except Exception as e:
+            logger.debug("result cache read skipped: %s", e)
+
         # If protection removed all meaningful text (e.g., text is only placeholders/punctuation),
         # skip calling the translation service to avoid placeholder churn.
         if not _is_meaningful_after_protection(protected_text, token_map):
@@ -1084,6 +1282,18 @@ class AutoTranslator:
                     f"[auto_translate_debug] svc={getattr(svc,'service_name','?')} "
                     f"{source_code}->{target_code} ok text={original_text[:120]!r} out={restored[:120]!r}"
                 )
+            try:
+                from app.services.translation.result_cache import put_cached
+
+                put_cached(
+                    original_text,
+                    source_code,
+                    target_code,
+                    getattr(svc, "service_name", None) or cache_engine,
+                    restored,
+                )
+            except Exception as e:
+                logger.debug("result cache write skipped: %s", e)
             return restored
 
         return None
@@ -1106,6 +1316,13 @@ class AutoTranslator:
         for t in texts:
             original = "" if t is None else str(t)
             protected, vmap = self._protect_variables(original)
+            try:
+                from app.services.translation.glossary_forcing import protect_glossary_terms
+
+                protected, gmap, _hits = protect_glossary_terms(protected, target_code)
+                vmap = {**vmap, **gmap}
+            except Exception as e:
+                logger.debug("batch glossary forcing skipped: %s", e)
             protected_texts.append(protected)
             variable_maps.append(vmap)
             originals.append(original)
@@ -1113,8 +1330,19 @@ class AutoTranslator:
 
         # Prepare output list.
         out: list[Optional[str]] = [None] * len(texts)
+        cache_engine = service_name or self.default_service or "default"
+        try:
+            from app.services.translation.result_cache import get_cached
+
+            for i, original in enumerate(originals):
+                cached = get_cached(original, source_code, target_code, cache_engine)
+                if cached:
+                    out[i] = cached
+                    should_translate[i] = False
+        except Exception as e:
+            logger.debug("batch result cache read skipped: %s", e)
         for i, ok in enumerate(should_translate):
-            if not ok:
+            if not ok and out[i] is None:
                 out[i] = originals[i]
 
         # Build ordered list of services to try (same rules as translate_text).
@@ -1191,6 +1419,18 @@ class AutoTranslator:
                     continue
 
                 out[i] = restored
+                try:
+                    from app.services.translation.result_cache import put_cached
+
+                    put_cached(
+                        originals[i],
+                        source_code,
+                        target_code,
+                        getattr(svc, "service_name", None) or cache_engine,
+                        restored,
+                    )
+                except Exception as e:
+                    logger.debug("batch result cache write skipped: %s", e)
 
         return out
 
@@ -1655,6 +1895,12 @@ def translate_text(text: str, target_language: str, source_language: str = 'en',
                   service_name: str = None) -> Optional[str]:
     """Convenience function to translate text"""
     return auto_translator.translate_text(text, target_language, source_language, service_name)
+
+
+def translate_batch(texts: List[str], target_language: str, source_language: str = 'en',
+                    service_name: str = None) -> List[Optional[str]]:
+    """Convenience function to translate a batch of texts."""
+    return auto_translator.translate_batch(texts, target_language, source_language, service_name)
 
 def translate_form_item_auto(label: str, definition: str = None,
                             target_languages: List[str] = None,

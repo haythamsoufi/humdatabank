@@ -293,6 +293,7 @@ def stream_entity_translation_events(
     success_count = 0
     error_count = 0
 
+    pending_jobs = []
     for entity in entities:
         for source_attr, translations_attr in entity_translation_field_pairs(entity, fields, fields_for_entity):
             source_value = getattr(entity, source_attr, None)
@@ -305,64 +306,96 @@ def stream_entity_translation_events(
                     continue
                 if lang_code in translations and str(translations.get(lang_code, '')).strip():
                     continue
+                pending_jobs.append((entity, source_attr, translations_attr, source_value, lang_code))
 
-                translated = resolve_field_translation(
-                    entity,
-                    source_attr,
-                    source_value,
-                    lang_code,
-                    auto_translator,
-                    translation_service,
+    by_lang = {}
+    for job in pending_jobs:
+        by_lang.setdefault(job[4], []).append(job)
+
+    translated_by_key = {}
+    for lang_code, jobs in by_lang.items():
+        texts = [j[3] for j in jobs]
+        try:
+            outs = auto_translator.translate_batch(
+                texts, lang_code, 'en', translation_service
+            )
+        except Exception:
+            outs = [
+                resolve_field_translation(
+                    j[0], j[1], j[3], lang_code, auto_translator, translation_service
+                )
+                for j in jobs
+            ]
+        for job, translated in zip(jobs, outs):
+            translated_by_key[(id(job[0]), job[1], lang_code)] = translated
+
+    for entity, source_attr, translations_attr, source_value, lang_code in pending_jobs:
+        translated = translated_by_key.get((id(entity), source_attr, lang_code))
+
+        if translated:
+            if not getattr(entity, translations_attr, None):
+                setattr(entity, translations_attr, {})
+            current_translations = normalize_translations_dict(getattr(entity, translations_attr, None))
+            current_translations[lang_code] = translated
+            setattr(entity, translations_attr, current_translations)
+            flag_modified(entity, translations_attr)
+            try:
+                from app.services.translation.catalog_service import (
+                    PROVENANCE_MACHINE,
+                    record_entity_provenance,
                 )
 
-                if translated:
-                    if not getattr(entity, translations_attr, None):
-                        setattr(entity, translations_attr, {})
-                    current_translations = normalize_translations_dict(getattr(entity, translations_attr, None))
-                    current_translations[lang_code] = translated
-                    setattr(entity, translations_attr, current_translations)
-                    flag_modified(entity, translations_attr)
+                record_entity_provenance(
+                    entity_type=entity_type_label,
+                    entity_id=int(entity.id),
+                    field_name=translations_attr,
+                    locale=lang_code,
+                    provenance=PROVENANCE_MACHINE,
+                    engine=translation_service,
+                )
+            except Exception:
+                current_app.logger.debug("entity provenance write skipped", exc_info=True)
 
-                    result = {
-                        'success': True,
-                        'entity_type': entity_type_label,
-                        'entity_id': entity.id,
-                        'language': lang_code,
-                        'field': source_attr,
-                    }
-                    success_count += 1
-                else:
-                    result = {
-                        'success': False,
-                        'entity_type': entity_type_label,
-                        'entity_id': entity.id,
-                        'language': lang_code,
-                        'field': source_attr,
-                        'error': 'Translation service returned no result',
-                    }
-                    error_count += 1
+            result = {
+                'success': True,
+                'entity_type': entity_type_label,
+                'entity_id': entity.id,
+                'language': lang_code,
+                'field': source_attr,
+            }
+            success_count += 1
+        else:
+            result = {
+                'success': False,
+                'entity_type': entity_type_label,
+                'entity_id': entity.id,
+                'language': lang_code,
+                'field': source_attr,
+                'error': 'Translation service returned no result',
+            }
+            error_count += 1
 
-                processed_count += 1
+        processed_count += 1
 
-                try:
-                    commit_translation_entity(entity)
-                except Exception as e:
-                    request_transaction_rollback()
-                    current_app.logger.error(
-                        "Error committing translation for %s %s field %s, language %s: %s",
-                        entity_type_label,
-                        entity.id,
-                        source_attr,
-                        lang_code,
-                        e,
-                    )
-                    result['success'] = False
-                    result['error'] = GENERIC_ERROR_MESSAGE
-                    error_count += 1
-                    if success_count > 0 and translated:
-                        success_count -= 1
+        try:
+            commit_translation_entity(entity)
+        except Exception as e:
+            request_transaction_rollback()
+            current_app.logger.error(
+                "Error committing translation for %s %s field %s, language %s: %s",
+                entity_type_label,
+                entity.id,
+                source_attr,
+                lang_code,
+                e,
+            )
+            result['success'] = False
+            result['error'] = GENERIC_ERROR_MESSAGE
+            error_count += 1
+            if success_count > 0 and translated:
+                success_count -= 1
 
-                yield f"data: {json.dumps({'type': 'progress', 'result': result, 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
+        yield f"data: {json.dumps({'type': 'progress', 'result': result, 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
 
     if emit_complete:
         yield f"data: {json.dumps({'type': 'complete', 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"

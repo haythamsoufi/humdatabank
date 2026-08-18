@@ -56,21 +56,52 @@ except ImportError:  # pragma: no cover
     _filelock_available = False
     LockTimeout = Exception
 
+# ``filelock`` is a hard-pinned dependency (see requirements.txt) — this branch
+# should only ever trigger if a deployed environment's installed packages have
+# drifted from requirements.txt (e.g. a stale venv/image). Log loudly, but only
+# once per process so a busy translation workload doesn't spam the error log.
+_missing_filelock_warned = False
+
+
+def filelock_protection_status() -> dict:
+    """Report whether PO writes are actually protected by an OS-level lock.
+
+    Surfaced in `catalog_hygiene.hygiene_report()` so a requirements/environment
+    drift (filelock pinned but not actually installed) is visible operationally
+    instead of only showing up as an occasional lost-update race under load.
+    """
+    if _filelock_available:
+        return {"available": True, "message": "filelock is installed; PO writes are lock-protected."}
+    return {
+        "available": False,
+        "message": (
+            "filelock is NOT installed — PO writes are unprotected from concurrent "
+            "Gunicorn worker races. filelock is pinned in requirements.txt; reinstall "
+            "dependencies (pip install -r requirements.txt)."
+        ),
+    }
+
 
 @contextmanager
 def po_file_lock(po_path: str, timeout: int = LOCK_TIMEOUT_SECONDS):
     """Acquire an exclusive advisory lock for *po_path*.
 
     Creates a ``.po.lock`` sidecar file next to the PO file.  Falls back to a
-    no-op (with a one-time warning) when ``filelock`` is not installed.
+    no-op (logged once per process at error level) when ``filelock`` is not
+    installed — this should not happen in a correctly provisioned environment
+    since filelock is a hard-pinned dependency; see filelock_protection_status().
 
     Raises ``RuntimeError`` if the lock cannot be acquired within *timeout* s.
     """
     if not _filelock_available:
-        logger.warning(
-            "filelock is not installed — PO writes are NOT protected from "
-            "concurrent Gunicorn workers.  Run: pip install filelock"
-        )
+        global _missing_filelock_warned
+        if not _missing_filelock_warned:
+            _missing_filelock_warned = True
+            logger.error(
+                "filelock is not installed — PO writes are NOT protected from "
+                "concurrent Gunicorn workers. filelock is a pinned dependency; "
+                "run: pip install -r requirements.txt"
+            )
         yield
         return
 

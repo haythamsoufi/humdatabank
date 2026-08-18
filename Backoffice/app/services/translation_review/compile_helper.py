@@ -7,6 +7,8 @@ import os
 
 from flask import current_app
 
+from app.utils.po_lock import po_file_lock
+
 logger = logging.getLogger(__name__)
 
 

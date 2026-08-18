@@ -54,6 +54,27 @@ describe('AutoTranslateService preferred service picker', () => {
     expect(payload.translation_service).toBe('google');
   });
 
+  it('forwards batch items on translate()', async () => {
+    const fetchMock = vi.fn(async () => mockJsonResponse({ success: true, updated_count: 2, results: [] }));
+    window.getFetch = () => fetchMock;
+
+    const items = [
+      { id: 'Hello', text: 'Hello', target_languages: ['fr'] },
+      { id: 'Save', text: 'Save', target_languages: ['fr'] }
+    ];
+    await window.AutoTranslateService.translate({
+      type: 'translation',
+      id: 'Hello',
+      text: 'Hello',
+      target_languages: ['fr'],
+      items
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const payload = JSON.parse(decodeURIComponent(escape(atob(body.payload))));
+    expect(payload.items).toEqual(items);
+  });
+
   it('loads services on chevron click and selecting one updates the default', async () => {
     document.body.innerHTML = `
       <div class="js-auto-translate-split"

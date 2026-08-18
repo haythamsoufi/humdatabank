@@ -239,3 +239,46 @@ class TestServiceHealthProbes:
             return_value=self._response(503),
         ):
             assert svc.check_health() is False
+
+
+class TestEngineBatchParallel:
+    def test_ifrc_batch_preserves_order(self):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+
+        def fake(text, target_language, source_language='en'):
+            return f"{text}:{target_language}"
+
+        svc.translate_text = fake
+        assert svc.translate_batch(['Hello', 'Save', 'Cancel'], 'fr') == [
+            'Hello:fr',
+            'Save:fr',
+            'Cancel:fr',
+        ]
+
+    def test_ifrc_batch_runs_concurrently(self):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        started = threading.Event()
+        release = threading.Event()
+        inflight = 0
+        lock = threading.Lock()
+        peak = 0
+
+        def fake(text, target_language, source_language='en'):
+            nonlocal inflight, peak
+            with lock:
+                inflight += 1
+                peak = max(peak, inflight)
+                if inflight >= 2:
+                    started.set()
+            assert release.wait(timeout=2)
+            with lock:
+                inflight -= 1
+            return text
+
+        svc.translate_text = fake
+        worker = threading.Thread(target=lambda: svc.translate_batch(['a', 'b', 'c', 'd'], 'es'))
+        worker.start()
+        assert started.wait(timeout=2)
+        release.set()
+        worker.join(timeout=2)
+        assert peak >= 2

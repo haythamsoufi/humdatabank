@@ -959,8 +959,14 @@
                         }
                     });
 
-                    window.autoTranslateModal.translationState.successCount += resultRows.length;
-                    window.autoTranslateModal.logProgress(`${cfg.t.translated} ${resultRows.length} ${cfg.t.translationFor} batch`, 'success');
+                    const translatedCount = (typeof data.updated_count === 'number' && data.updated_count > 0)
+                        ? data.updated_count
+                        : resultRows.length;
+                    window.autoTranslateModal.translationState.successCount += translatedCount;
+                    window.autoTranslateModal.logProgress(
+                        `${cfg.t.translated} ${translatedCount} ${cfg.t.translationFor} batch`,
+                        'success'
+                    );
                     if (data.skipped_protected > 0) {
                         window.autoTranslateModal.translationState.skippedCount =
                             (window.autoTranslateModal.translationState.skippedCount || 0) + data.skipped_protected;

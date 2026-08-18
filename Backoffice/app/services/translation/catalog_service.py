@@ -518,6 +518,127 @@ def load_catalog_grid(languages: Iterable[str], language_names: Dict[str, str]) 
     }
 
 
+def _catalog_locales() -> List[str]:
+    locales = current_app.config.get("SUPPORTED_LANGUAGES") or ["en", "fr", "es", "ar", "ru", "zh"]
+    return [str(loc).strip().lower() for loc in locales if loc]
+
+
+def catalog_removed_msgids() -> set:
+    """Msgids the manage-translations grid treats as removed (not in the current .pot)."""
+    from app.models.translation_quality import TranslationString
+    from app.routes.admin.utilities.helpers import _translations_po_path
+
+    pot_ids, _sources = load_pot_msgids()
+    if not pot_ids:
+        return set()
+
+    extra_ids: set = set()
+    for (msgid,) in (
+        TranslationString.query.with_entities(TranslationString.msgid).distinct().all()
+    ):
+        if msgid:
+            extra_ids.add(msgid)
+
+    import polib
+
+    for locale in _catalog_locales():
+        po_path = _translations_po_path(locale)
+        if not os.path.exists(po_path):
+            continue
+        try:
+            po = polib.pofile(po_path)
+        except Exception:
+            logger.debug("catalog_removed_msgids: failed to read %s", po_path, exc_info=True)
+            continue
+        for entry in po:
+            if entry.msgid:
+                extra_ids.add(entry.msgid)
+
+    _active, removed = classify_catalog_msgids(pot_ids, extra_ids)
+    return removed
+
+
+def purge_removed_strings(msgid: Optional[str] = None) -> Dict[str, Any]:
+    """Delete grid-removed strings from the DB and locale catalogs.
+
+    A string is removed when it is not in the current .pot — including leftover
+    live .po entries and ``translation_string`` rows. Active .pot msgids are
+    never deleted, even if a stale #~ copy exists.
+    """
+    from app.models.translation_quality import TranslationString
+    from app.routes.admin.utilities.helpers import _translations_po_path
+    from app.utils.po_lock import po_file_lock
+    from app.utils.po_persistence import finalize_translation_writes
+
+    removed_ids = catalog_removed_msgids()
+    if msgid is not None:
+        targets = {msgid} if msgid in removed_ids else set()
+    else:
+        targets = set(removed_ids)
+
+    if not targets:
+        return {
+            "db_rows": 0,
+            "files_updated": 0,
+            "entries_removed": 0,
+            "file_errors": [],
+        }
+
+    db_rows = (
+        TranslationString.query.filter(TranslationString.msgid.in_(list(targets)))
+        .delete(synchronize_session=False)
+    )
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.exception("purge_removed_strings: catalog delete failed")
+        return {
+            "db_rows": 0,
+            "files_updated": 0,
+            "entries_removed": 0,
+            "file_errors": ["db"],
+        }
+
+    import polib
+
+    files_updated = 0
+    entries_removed = 0
+    file_errors: List[str] = []
+    modified_langs: List[str] = []
+
+    for locale in _catalog_locales():
+        po_path = _translations_po_path(locale)
+        if not os.path.exists(po_path):
+            continue
+        try:
+            with po_file_lock(po_path):
+                po = polib.pofile(po_path)
+                removed_here = 0
+                for entry in list(po):
+                    if entry.msgid in targets:
+                        po.remove(entry)
+                        removed_here += 1
+                if removed_here:
+                    po.save(po_path)
+                    files_updated += 1
+                    entries_removed += removed_here
+                    modified_langs.append(locale)
+        except Exception:
+            logger.warning("purge_removed_strings failed for %s", po_path, exc_info=True)
+            file_errors.append(locale)
+
+    if modified_langs:
+        finalize_translation_writes(modified_langs, refresh=True)
+
+    return {
+        "db_rows": int(db_rows or 0),
+        "files_updated": files_updated,
+        "entries_removed": entries_removed,
+        "file_errors": file_errors,
+    }
+
+
 def import_from_po_files(
     locales: Optional[Iterable[str]] = None,
     *,

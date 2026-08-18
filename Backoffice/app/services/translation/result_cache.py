@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Bump when post-processing changes (e.g. glossary enforce vs token-splice)
 # so stale rows are not reused.
-RESULT_CACHE_GENERATION = "v2"
+RESULT_CACHE_GENERATION = "v3"
 
 
 def source_hash(text: str) -> str:

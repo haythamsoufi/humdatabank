@@ -1381,7 +1381,7 @@ def _purge_obsolete_po_entries(msgid=None):
 @bp.route("/translations/delete-removed", methods=["POST"])
 @permission_required("admin.translations.manage")
 def delete_removed_translation():
-    """Remove obsolete (#~) PO entries for a msgid from all locale files (active entries are never deleted)."""
+    """Delete one grid-removed msgid from the catalog and locale files."""
     if not request.is_json:
         return json_bad_request(_("Expected JSON body"))
 
@@ -1394,16 +1394,22 @@ def delete_removed_translation():
     if not msgid:
         return json_bad_request(_("msgid is required"))
 
-    files_updated, entries_removed, file_errors = _purge_obsolete_po_entries(msgid=msgid)
+    from app.services.translation.catalog_service import purge_removed_strings
 
-    if entries_removed == 0:
+    result = purge_removed_strings(msgid=msgid)
+    files_updated = result.get("files_updated") or 0
+    entries_removed = result.get("entries_removed") or 0
+    db_rows = result.get("db_rows") or 0
+    file_errors = result.get("file_errors") or []
+
+    if db_rows == 0 and entries_removed == 0:
         if file_errors:
             return json_server_error(_("Could not update translation files."))
         return json_bad_request(
             _("No removed (obsolete) entries found for this message. Try refreshing the page."),
         )
 
-    message = _("Removed obsolete translation entries from %(count)d file(s)", count=files_updated)
+    message = _("Removed obsolete translation entries from %(count)d file(s)", count=max(files_updated, 1 if db_rows else 0))
     if file_errors:
         message = message + " " + _(
             "Some languages could not be updated: %(langs)s",
@@ -1421,13 +1427,20 @@ def delete_removed_translation():
 @bp.route("/translations/delete-all-removed", methods=["POST"])
 @permission_required("admin.translations.manage")
 def delete_all_removed_translations():
-    """Remove every obsolete (#~) PO entry from all locale files."""
+    """Delete every grid-removed msgid from the catalog and locale files."""
     if not request.is_json:
         return json_bad_request(_("Expected JSON body"))
 
-    files_updated, entries_removed, file_errors = _purge_obsolete_po_entries()
+    from app.services.translation.catalog_service import purge_removed_strings
 
-    if entries_removed == 0:
+    result = purge_removed_strings()
+    files_updated = result.get("files_updated") or 0
+    entries_removed = result.get("entries_removed") or 0
+    db_rows = result.get("db_rows") or 0
+    file_errors = result.get("file_errors") or []
+    deleted_count = max(db_rows, entries_removed)
+
+    if deleted_count == 0:
         if file_errors:
             return json_server_error(_("Could not update translation files."))
         return json_bad_request(
@@ -1436,8 +1449,8 @@ def delete_all_removed_translations():
 
     message = _(
         "Removed %(entries)d obsolete translation entries from %(count)d file(s)",
-        entries=entries_removed,
-        count=files_updated,
+        entries=deleted_count,
+        count=max(files_updated, 1 if db_rows else 0),
     )
     if file_errors:
         message = message + " " + _(

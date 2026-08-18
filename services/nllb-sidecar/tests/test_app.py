@@ -111,15 +111,17 @@ class TestHealthAndLanguagesEndpoints:
         assert set(body["core_azure"]) == {"en", "fr", "es", "ar", "ru", "zh", "hi"}
         assert "am" in body["sidecar_supported"]
         assert "sw" in body["sidecar_supported"]
-        assert "en" not in body["sidecar_supported"]  # core languages excluded from the long-tail list
+        assert "fr" in body["sidecar_supported"]
+        assert "en" in body["sidecar_supported"]
 
 
 class TestTranslateEndpointValidation:
-    def test_core_language_target_rejected_before_readiness_check(self, client):
-        # Core-language rejection must fire even while the model is "disabled"/loading --
-        # it's a routing decision, not a readiness one.
+    def test_core_language_target_reaches_readiness_check(self, client):
+        # Core languages are valid NLLB targets; while the model is not ready
+        # they get the same 503 as long-tail languages.
         resp = client.post("/api/translate", json={"Text": "hello", "From": "en", "To": "fr"})
-        assert resp.status_code == 409
+        assert resp.status_code == 503
+        assert "Retry-After" in resp.headers
 
     def test_unsupported_language_code_returns_400(self, client):
         resp = client.post("/api/translate", json={"Text": "hello", "From": "en", "To": "zz"})
@@ -163,7 +165,7 @@ class TestBatchEndpointGracefulDegradation:
         resp = client.post(
             "/api/translate/batch",
             json=[
-                {"Text": "hello", "From": "en", "To": "fr"},  # core language -> deferred
+                {"Text": "hello", "From": "en", "To": "fr"},  # model not ready -> deferred
                 {"Text": "hello", "From": "en", "To": "am"},  # model not ready -> deferred
             ],
         )

@@ -59,6 +59,7 @@ export const PropertiesMixin = {
         const validationBuilder = this.modalElement.querySelector('#item-validation-rule-builder');
         const validationConditionInput = this.modalElement.querySelector('#item-validation-condition');
         const validationMessageInput = this.modalElement.querySelector('#item-validation-message');
+        const validationMessageTranslationsInput = this.modalElement.querySelector('#item-validation-message-translations');
 
         if (validationRuleToggle) {
             validationRuleToggle.style.display = hide ? 'none' : '';
@@ -72,6 +73,7 @@ export const PropertiesMixin = {
             }
             if (validationConditionInput) validationConditionInput.value = '';
             if (validationMessageInput) validationMessageInput.value = '';
+            if (validationMessageTranslationsInput) validationMessageTranslationsInput.value = '{}';
             const validationButton = this.modalElement.querySelector('[data-target="#item-validation-rule-section"]');
             if (validationButton && typeof this.renderRuleToggleButton === 'function') {
                 this.renderRuleToggleButton(validationButton, 'add');

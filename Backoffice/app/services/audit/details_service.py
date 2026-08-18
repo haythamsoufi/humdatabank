@@ -214,6 +214,7 @@ _FORM_ITEM_AUDIT_FIELD_LABELS = {
     "relevance_condition": "Relevance condition",
     "validation_condition": "Validation condition",
     "validation_message": "Validation message",
+    "validation_message_translations": "Validation message translations",
     "config": "Configuration",
     "indicator_bank_id": "Indicator bank",
     "definition": "Definition",

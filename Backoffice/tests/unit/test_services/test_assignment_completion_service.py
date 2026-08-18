@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+from types import SimpleNamespace
+
 from app.services.assignments.completion_service import (
     AssignmentCompletionService,
     CompletionMetrics,
@@ -10,7 +12,11 @@ from app.services.assignments.completion_service import (
     _countable_form_item_filter,
     _published_filters_single,
     completion_rate_percent,
+    emergency_operations_option_count,
     matrix_entry_is_filled,
+    matrix_has_manual_rows,
+    matrix_is_list_backed,
+    resolved_list_option_count,
 )
 
 
@@ -98,6 +104,10 @@ def test_list_missing_items_returns_unfilled_only():
         AssignmentCompletionService,
         '_matrix_fill_state_by_item_id',
         return_value={},
+    ), patch.object(
+        AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset(),
     ), patch('app.services.assignments.completion_service.db.session.query', return_value=query):
         missing = AssignmentCompletionService.list_missing_items(5, 21, 99)
 
@@ -129,6 +139,10 @@ def test_list_missing_items_excludes_hidden_fields():
         AssignmentCompletionService,
         '_matrix_fill_state_by_item_id',
         return_value={},
+    ), patch.object(
+        AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset(),
     ), patch('app.services.assignments.completion_service.db.session.query', return_value=query):
         missing = AssignmentCompletionService.list_missing_items(
             5, 21, 99, hidden_field_ids={2},
@@ -143,6 +157,10 @@ def test_compute_for_assignment_excludes_hidden_from_total():
         AssignmentCompletionService,
         '_relevance_hidden_ids_for_assignment',
         return_value=(frozenset(), frozenset()),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset(),
     ), patch.object(
         AssignmentCompletionService,
         '_count_template_total_items',
@@ -170,6 +188,10 @@ def test_compute_for_assignment_merges_relevance_hidden_ids():
         return_value=(frozenset({99}), frozenset({262})),
     ), patch.object(
         AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset(),
+    ), patch.object(
+        AssignmentCompletionService,
         '_count_template_total_items',
         return_value=6,
     ) as count_total, patch.object(
@@ -194,6 +216,10 @@ def test_compute_for_assignment_no_client_hidden_ids_still_applies_relevance():
         AssignmentCompletionService,
         '_relevance_hidden_ids_for_assignment',
         return_value=(frozenset(), frozenset({262})),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset(),
     ), patch.object(
         AssignmentCompletionService,
         '_count_template_total_items',
@@ -282,6 +308,10 @@ def test_backfill_persisted_rates_batches_updates(app, db_session):
             return_value=(frozenset(), frozenset()),
         ), patch.object(
             AssignmentCompletionService,
+            '_empty_option_list_ids_for_assignment',
+            return_value=frozenset(),
+        ), patch.object(
+            AssignmentCompletionService,
             '_count_template_total_items',
             return_value=5,
         ) as count_total, patch.object(
@@ -328,6 +358,10 @@ def test_backfill_persisted_rates_bypasses_total_cache_when_relevance_hidden(app
             AssignmentCompletionService,
             '_relevance_hidden_ids_for_assignment',
             return_value=(frozenset(), frozenset({262})),
+        ), patch.object(
+            AssignmentCompletionService,
+            '_empty_option_list_ids_for_assignment',
+            return_value=frozenset(),
         ), patch.object(
             AssignmentCompletionService,
             '_count_template_total_items',
@@ -504,3 +538,298 @@ def test_refresh_for_template_with_existing_rates_only_targets_non_zero_rows():
     assert count == 2
     refresh.assert_any_call(11)
     refresh.assert_any_call(12)
+
+
+def _list_backed_matrix_item(item_id=960, row_mode='list_library', rows=None, plugin_config=None):
+    return SimpleNamespace(
+        id=item_id,
+        lookup_list_id='emergency_operations',
+        list_filters_json=None,
+        config={
+            'matrix_config': {
+                'row_mode': row_mode,
+                'lookup_list_id': 'emergency_operations',
+                'rows': rows or [],
+                'plugin_config': plugin_config or {
+                    'emops_operation_types': ['Emergency Appeal'],
+                },
+            },
+        },
+    )
+
+
+def test_matrix_is_list_backed_for_library_and_hybrid():
+    assert matrix_is_list_backed(_list_backed_matrix_item()) is True
+    assert matrix_is_list_backed(_list_backed_matrix_item(row_mode='hybrid')) is True
+    assert matrix_is_list_backed(SimpleNamespace(
+        lookup_list_id=None,
+        config={'matrix_config': {'row_mode': 'manual', 'rows': ['A']}},
+    )) is False
+
+
+def test_matrix_has_manual_rows_detects_static_hybrid_rows():
+    assert matrix_has_manual_rows(_list_backed_matrix_item(rows=[{'name': 'Static'}])) is True
+    assert matrix_has_manual_rows(_list_backed_matrix_item(rows=[])) is False
+
+
+def test_emergency_operations_option_count_unknown_when_cache_cold():
+    item = _list_backed_matrix_item()
+    with patch(
+        'app.services.assignments.completion_service._emergency_operations_cache_is_warm',
+        return_value=False,
+    ), patch(
+        'app.services.forms.emergency_section_binding._country_iso_for_aes',
+        return_value='BGR',
+    ):
+        assert emergency_operations_option_count(item, SimpleNamespace()) is None
+
+
+def test_emergency_operations_cache_is_warm_requires_nonempty_results():
+    from app.services.assignments.completion_service import _emergency_operations_cache_is_warm
+
+    # Missing file → cold
+    with patch(
+        'plugins.emergency_operations.data_store.get_data_store',
+    ) as mock_store:
+        mock_store.return_value.load_cached.return_value = None
+        assert _emergency_operations_cache_is_warm() is False
+
+    # File exists but results=[] → cold (cannot distinguish from a failed refresh)
+    with patch(
+        'plugins.emergency_operations.data_store.get_data_store',
+    ) as mock_store:
+        mock_store.return_value.load_cached.return_value = {'results': [], 'fetched_at': '2026-01-01T00:00:00Z'}
+        assert _emergency_operations_cache_is_warm() is False
+
+    # File exists with actual results → warm
+    with patch(
+        'plugins.emergency_operations.data_store.get_data_store',
+    ) as mock_store:
+        mock_store.return_value.load_cached.return_value = {'results': [{'code': 'MDRBG001'}]}
+        assert _emergency_operations_cache_is_warm() is True
+
+
+def test_emergency_operations_option_count_zero_when_cache_warm_and_empty():
+    from app.services.assignments import completion_service as completion_mod
+
+    item = _list_backed_matrix_item()
+    completion_mod._eo_option_count_cache.clear()
+    with patch(
+        'app.services.assignments.completion_service._emergency_operations_cache_is_warm',
+        return_value=True,
+    ), patch(
+        'app.services.forms.emergency_section_binding._country_iso_for_aes',
+        return_value='BGR',
+    ), patch(
+        'app.services.forms.emergency_section_binding._assignment_period_for_aes',
+        return_value='Annual 2024',
+    ), patch(
+        'plugins.emergency_operations.routes.get_emergency_operations_data',
+        return_value=[],
+    ):
+        assert emergency_operations_option_count(item, SimpleNamespace()) == 0
+
+
+def test_resolved_list_option_count_delegates_to_emergency_operations():
+    item = _list_backed_matrix_item()
+    with patch(
+        'app.services.assignments.completion_service.emergency_operations_option_count',
+        return_value=0,
+    ) as eo_count:
+        assert resolved_list_option_count(item, SimpleNamespace()) == 0
+    eo_count.assert_called_once()
+
+
+def test_empty_option_list_ids_excludes_empty_list_library_matrix():
+    item = _list_backed_matrix_item()
+    query = MagicMock()
+    query.join.return_value = query
+    query.filter.return_value = query
+    query.all.return_value = [item]
+
+    with patch(
+        'app.services.assignments.completion_service.db.session.query',
+        return_value=query,
+    ), patch(
+        'app.services.assignments.completion_service.db.session.get',
+        return_value=SimpleNamespace(id=4397),
+    ), patch(
+        'app.services.assignments.completion_service.resolved_list_option_count',
+        return_value=0,
+    ):
+        empty = AssignmentCompletionService._empty_option_list_ids_for_assignment(4397, 24, 99)
+
+    assert empty == frozenset({960})
+
+
+def test_empty_option_list_ids_keeps_matrix_when_options_exist():
+    item = _list_backed_matrix_item()
+    query = MagicMock()
+    query.join.return_value = query
+    query.filter.return_value = query
+    query.all.return_value = [item]
+
+    with patch(
+        'app.services.assignments.completion_service.db.session.query',
+        return_value=query,
+    ), patch(
+        'app.services.assignments.completion_service.db.session.get',
+        return_value=SimpleNamespace(id=4397),
+    ), patch(
+        'app.services.assignments.completion_service.resolved_list_option_count',
+        return_value=3,
+    ):
+        empty = AssignmentCompletionService._empty_option_list_ids_for_assignment(4397, 24, 99)
+
+    assert empty == frozenset()
+
+
+def test_empty_option_list_ids_keeps_hybrid_with_static_rows():
+    item = _list_backed_matrix_item(row_mode='hybrid', rows=[{'name': 'Static'}])
+    query = MagicMock()
+    query.join.return_value = query
+    query.filter.return_value = query
+    query.all.return_value = [item]
+
+    with patch(
+        'app.services.assignments.completion_service.db.session.query',
+        return_value=query,
+    ), patch(
+        'app.services.assignments.completion_service.db.session.get',
+        return_value=SimpleNamespace(id=4397),
+    ), patch(
+        'app.services.assignments.completion_service.resolved_list_option_count',
+        return_value=0,
+    ) as option_count:
+        empty = AssignmentCompletionService._empty_option_list_ids_for_assignment(4397, 24, 99)
+
+    option_count.assert_not_called()
+    assert empty == frozenset()
+
+
+def test_empty_option_list_ids_keeps_matrix_when_count_unknown():
+    item = _list_backed_matrix_item()
+    query = MagicMock()
+    query.join.return_value = query
+    query.filter.return_value = query
+    query.all.return_value = [item]
+
+    with patch(
+        'app.services.assignments.completion_service.db.session.query',
+        return_value=query,
+    ), patch(
+        'app.services.assignments.completion_service.db.session.get',
+        return_value=SimpleNamespace(id=4397),
+    ), patch(
+        'app.services.assignments.completion_service.resolved_list_option_count',
+        return_value=None,
+    ):
+        empty = AssignmentCompletionService._empty_option_list_ids_for_assignment(4397, 24, 99)
+
+    assert empty == frozenset()
+
+
+def test_compute_for_assignment_excludes_empty_option_list_items():
+    with patch.object(
+        AssignmentCompletionService,
+        '_relevance_hidden_ids_for_assignment',
+        return_value=(frozenset(), frozenset()),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset({960}),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_count_template_total_items',
+        return_value=10,
+    ) as count_total, patch.object(
+        AssignmentCompletionService,
+        '_count_filled_items',
+        return_value=10,
+    ) as count_filled:
+        metrics = AssignmentCompletionService.compute_for_assignment(4397, 24, 99)
+
+    count_total.assert_called_once_with(24, 99, {960}, set())
+    count_filled.assert_called_once_with(4397, 24, 99, {960}, set())
+    assert metrics.completion_rate == 100.0
+
+
+def test_list_missing_items_skips_empty_option_list_matrices():
+    rows = [
+        (960, 10, 'matrix', 'Emergency Appeals', None),
+        (2, 10, 'indicator', 'Visible missing', None),
+    ]
+
+    query = MagicMock()
+    query.join.return_value = query
+    query.filter.return_value = query
+    query.order_by.return_value = query
+    query.all.side_effect = [
+        rows,
+        [],
+    ]
+    query.distinct.return_value = query
+
+    with patch.object(
+        AssignmentCompletionService,
+        '_filled_non_matrix_form_item_ids',
+        return_value=set(),
+    ), patch.object(
+        AssignmentCompletionService,
+        '_matrix_fill_state_by_item_id',
+        return_value={},
+    ), patch.object(
+        AssignmentCompletionService,
+        '_empty_option_list_ids_for_assignment',
+        return_value=frozenset({960}),
+    ), patch('app.services.assignments.completion_service.db.session.query', return_value=query):
+        missing = AssignmentCompletionService.list_missing_items(4397, 24, 99)
+
+    assert [item.form_item_id for item in missing] == [2]
+
+
+def test_backfill_persisted_rates_bypasses_total_cache_when_empty_option_list(app, db_session):
+    rows = [(1, 10, 20)]
+
+    def _query_side_effect(*_args, **_kwargs):
+        chain = MagicMock()
+        chain.join.return_value = chain
+        chain.filter.return_value = chain
+        chain.order_by.return_value = chain
+        chain.limit.return_value = chain
+        if not hasattr(_query_side_effect, "calls"):
+            _query_side_effect.calls = 0
+        _query_side_effect.calls += 1
+        chain.all.return_value = rows if _query_side_effect.calls == 1 else []
+        return chain
+
+    with app.app_context():
+        with patch(
+            'app.services.assignments.completion_service.db.session.query',
+            side_effect=_query_side_effect,
+        ), patch.object(
+            AssignmentCompletionService,
+            '_relevance_hidden_ids_for_assignment',
+            return_value=(frozenset(), frozenset()),
+        ), patch.object(
+            AssignmentCompletionService,
+            '_empty_option_list_ids_for_assignment',
+            return_value=frozenset({960}),
+        ), patch.object(
+            AssignmentCompletionService,
+            '_count_template_total_items',
+            return_value=9,
+        ) as count_total, patch.object(
+            AssignmentCompletionService,
+            '_count_filled_items',
+            return_value=9,
+        ) as count_filled, patch(
+            'app.services.assignments.completion_service.db.session.bulk_update_mappings',
+        ), patch(
+            'app.services.assignments.completion_service.db.session.commit',
+        ):
+            updated = AssignmentCompletionService.backfill_persisted_rates(batch_size=2)
+
+    assert updated == 1
+    count_total.assert_called_once_with(10, 20, {960}, frozenset())
+    count_filled.assert_called_once_with(1, 10, 20, {960}, frozenset())

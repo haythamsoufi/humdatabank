@@ -298,24 +298,141 @@ def translation_quality_dashboard():
     queue_locales = list(translatable)
     if locale not in queue_locales:
         queue_locales = [locale] + queue_locales
-    candidates = (
-        TranslationGlossaryCandidate.query.filter_by(status="pending")
-        .order_by(TranslationGlossaryCandidate.confidence.desc())
-        .limit(80)
-        .all()
-    )
     from app.services.translation.catalog_service import list_unreviewed
 
+    candidate_total = TranslationGlossaryCandidate.query.filter_by(status="pending").count()
     queue = list_unreviewed(locale, limit=40)
+    quality_tabs = ("overview", "glossary", "inbox", "review")
+    active_tab = (request.args.get("tab") or "").strip().lower()
+    if active_tab not in quality_tabs:
+        active_tab = "review" if requested else "overview"
     return render_template(
         "admin/translations/quality_dashboard.html",
         metrics=payload,
-        candidates=candidates,
+        candidate_total=candidate_total,
         queue=queue,
         queue_locale=locale,
         queue_locales=queue_locales,
         language_names=language_names,
+        active_tab=active_tab,
     )
+
+
+def _glossary_term_error_response(exc: Exception):
+    from app.services.translation.glossary_terms import GlossaryTermError
+
+    if isinstance(exc, GlossaryTermError):
+        messages = {
+            "invalid_source": _("Enter a valid English source term."),
+            "invalid_target": _("Enter a valid target term."),
+            "invalid_lang": _("Choose a target language."),
+            "invalid_tier": _("Tier must be Must or Preferred."),
+            "not_found": _("Glossary term not found."),
+            "duplicate": _("A term with this English source and language already exists."),
+        }
+        return json_bad_request(messages.get(str(exc), _("Could not save this glossary term.")))
+    logger.exception("glossary term API failed")
+    return json_server_error(_("An error occurred. Please try again."))
+
+
+@bp.route("/translations/api/glossary-terms", methods=["GET"])
+@permission_required("admin.translations.manage")
+def api_list_glossary_terms():
+    from app.services.translation.glossary_terms import list_glossary_terms
+
+    include_inactive = (request.args.get("include_inactive") or "").strip() in ("1", "true", "on")
+    payload = list_glossary_terms(
+        target_lang=(request.args.get("target_lang") or "").strip() or None,
+        search=(request.args.get("q") or "").strip() or None,
+        include_inactive=include_inactive,
+    )
+    return json_ok(**payload)
+
+
+@bp.route("/translations/api/glossary-candidates", methods=["GET"])
+@permission_required("admin.translations.manage")
+def api_list_glossary_candidates():
+    from app.services.translation.glossary_terms import list_glossary_candidates
+
+    return json_ok(**list_glossary_candidates())
+
+
+@bp.route("/translations/api/glossary-candidates/<int:candidate_id>", methods=["POST"])
+@permission_required("admin.translations.manage")
+@limiter.limit("60 per minute")
+def api_decide_glossary_candidate(candidate_id):
+    if not is_json_request():
+        return json_bad_request(_("JSON request required"))
+    data = get_request_data() or {}
+    accept = bool(data.get("accept"))
+    source_term = data.get("source_term")
+    target_term = data.get("target_term")
+    if accept:
+        if source_term is not None and not str(source_term).strip():
+            return json_bad_request(_("Source term is required"))
+        if target_term is not None and not str(target_term).strip():
+            return json_bad_request(_("Target term is required"))
+    from app.services.translation.glossary_mining import decide_candidate
+
+    ok = decide_candidate(
+        candidate_id,
+        accept=accept,
+        tier=data.get("tier"),
+        source_term=str(source_term).strip() if source_term is not None else None,
+        target_term=str(target_term).strip() if target_term is not None else None,
+    )
+    if not ok:
+        return json_bad_request(_("Candidate not found or already reviewed"))
+    return json_ok(accepted=accept)
+
+
+@bp.route("/translations/api/glossary-terms", methods=["POST"])
+@permission_required("admin.translations.manage")
+@limiter.limit("60 per minute")
+def api_create_glossary_term():
+    if not is_json_request():
+        return json_bad_request(_("JSON request required"))
+    data = get_request_data() or {}
+    try:
+        from app.services.translation.glossary_terms import upsert_glossary_term
+
+        term = upsert_glossary_term(
+            source_term=data.get("source_term") or "",
+            target_term=data.get("target_term") or "",
+            target_lang=data.get("target_lang") or "",
+            tier=data.get("tier") or "must",
+            origin="manual",
+        )
+    except Exception as exc:
+        return _glossary_term_error_response(exc)
+    return json_ok(term=term)
+
+
+@bp.route("/translations/api/glossary-terms/<int:term_id>", methods=["POST"])
+@permission_required("admin.translations.manage")
+@limiter.limit("60 per minute")
+def api_update_glossary_term(term_id):
+    if not is_json_request():
+        return json_bad_request(_("JSON request required"))
+    data = get_request_data() or {}
+    try:
+        from app.services.translation.glossary_terms import update_glossary_term
+
+        kwargs = {}
+        if "source_term" in data:
+            kwargs["source_term"] = data.get("source_term")
+        if "target_term" in data:
+            kwargs["target_term"] = data.get("target_term")
+        if "target_lang" in data:
+            kwargs["target_lang"] = data.get("target_lang")
+        if "tier" in data:
+            kwargs["tier"] = data.get("tier")
+        if "is_active" in data:
+            kwargs["is_active"] = bool(data.get("is_active"))
+        term = update_glossary_term(term_id, **kwargs)
+    except Exception as exc:
+        return _glossary_term_error_response(exc)
+    return json_ok(term=term)
 
 
 @bp.route("/translations/export", methods=["GET"])
@@ -1431,6 +1548,8 @@ def seed_translation_glossary():
     except Exception:
         current_app.logger.exception("seed-glossary from manage UI failed")
         flash(_("An error occurred. Please try again."), "danger")
+    if (request.form.get("next") or "").strip() == "quality":
+        return redirect(url_for("utilities.translation_quality_dashboard", tab="glossary"))
     return redirect(url_for("utilities.manage_translations"))
 
 
@@ -1668,8 +1787,11 @@ def api_auto_translate():
             # Fallback defaults (language codes) from runtime config
             configured = current_app.config.get('TRANSLATABLE_LANGUAGES') or []
             target_languages = [lc for lc in (configured or []) if lc != 'en']
-        translation_service = data.get('translation_service', 'ifrc')  # Default hosted service (internal id "ifrc")
-        service_name = translation_service  # Map to existing parameter for backward compatibility
+        # An explicit service disables engine fallbacks. Omit or blank → default
+        # engine first, then the remaining configured services (skips a down
+        # LibreTranslate instance instead of failing the whole request).
+        raw_service = data.get('translation_service')
+        service_name = str(raw_service).strip() if raw_service else None
 
         batch_items = data.get('items') if isinstance(data.get('items'), list) else None
         if not text and not batch_items:
@@ -1682,10 +1804,24 @@ def api_auto_translate():
         if not available_services:
             return json_bad_request(_('No translation service available. Please configure translation API keys.'))
 
-        # If a specific service was requested but is not available, try to use a fallback
+        # Configured != reachable. An explicit service disables engine fallbacks, so
+        # drop a requested engine that is known-down (e.g. LibreTranslate offline)
+        # and let the translator use the default plus remaining services.
+        service_status = auto_translator.check_service_status() or {}
+        reachable_services = [
+            name for name in available_services if service_status.get(name) is not False
+        ]
+        reachable_label = ", ".join(reachable_services) if reachable_services else "none reachable"
         if service_name and service_name not in available_services:
             logger.warning(f"Requested translation service '{service_name}' is not available. Available services: {available_services}. Using fallback.")
-            service_name = None  # Let it use the default service
+            service_name = None
+        elif service_name and service_status.get(service_name) is False:
+            logger.warning(
+                "Requested translation service '%s' is currently unavailable. Status: %s. Using fallback.",
+                service_name,
+                service_status,
+            )
+            service_name = None
 
         if translation_type == 'form_item':
             # Translate form item (label and definition)
@@ -1699,7 +1835,13 @@ def api_auto_translate():
             if result and (result.get('label_translations') or result.get('definition_translations')):
                 return json_ok(translations=result, service_used=auto_translator.get_default_service())
             else:
-                return json_bad_request(f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.')
+                logger.warning(
+                    "Auto-translate empty result type=form_item service=%s langs=%s status=%s",
+                    service_name, target_languages, service_status,
+                )
+                return json_bad_request(
+                    f'Translation failed. No translations were generated. Reachable services: {reachable_label}.'
+                )
 
         elif translation_type == 'document_field':
             # Translate document field (label only; descriptions are optional)
@@ -1712,7 +1854,13 @@ def api_auto_translate():
             if result and result.get('label_translations'):
                 return json_ok(translations=result, service_used=auto_translator.get_default_service())
             else:
-                return json_bad_request(f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.')
+                logger.warning(
+                    "Auto-translate empty result type=document_field service=%s langs=%s status=%s",
+                    service_name, target_languages, service_status,
+                )
+                return json_bad_request(
+                    f'Translation failed. No translations were generated. Reachable services: {reachable_label}.'
+                )
         elif translation_type == 'section_name':
             # Translate section name only
             result = translate_section_name_auto(
@@ -1726,8 +1874,12 @@ def api_auto_translate():
             else:
                 # Return partial success if some translations failed but we have at least one
                 # This allows the frontend to show successful translations even if some languages failed
+                logger.warning(
+                    "Auto-translate empty result type=section_name service=%s langs=%s status=%s",
+                    service_name, target_languages, service_status,
+                )
                 return json_error(
-                    f'Translation failed for some languages. Available services: {", ".join(available_services)}. Some translations may have failed due to service limitations.',
+                    f'Translation failed for some languages. Reachable services: {reachable_label}.',
                     200,
                     success=False,
                     translations=result or {},
@@ -1744,7 +1896,7 @@ def api_auto_translate():
             if result and len(result) > 0:
                 return json_ok(translations=result, service_used=auto_translator.get_default_service())
             else:
-                return json_bad_request(f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.')
+                return json_bad_request(f'Translation failed. No translations were generated. Reachable services: {reachable_label}.')
 
         elif translation_type == 'page_name':
             # Translate page name only
@@ -1757,7 +1909,7 @@ def api_auto_translate():
             if result and len(result) > 0:
                 return json_ok(translations=result, service_used=auto_translator.get_default_service())
             else:
-                return json_bad_request(f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.')
+                return json_bad_request(f'Translation failed. No translations were generated. Reachable services: {reachable_label}.')
 
         elif translation_type == 'template_name':
             # Translate template name only
@@ -1781,7 +1933,7 @@ def api_auto_translate():
                         untranslated=True,
                         message='No translation available; original text returned.',
                     )
-                return json_bad_request(f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.')
+                return json_bad_request(f'Translation failed. No translations were generated. Reachable services: {reachable_label}.')
 
         elif translation_type == 'email_template_html':
             # English HTML email body; Jinja {{ }} / {% %} preserved in auto_translator
@@ -1793,7 +1945,7 @@ def api_auto_translate():
             if result and len(result) > 0:
                 return json_ok(translations=result, service_used=auto_translator.get_default_service())
             return json_bad_request(
-                f'Translation failed. No translations were generated. Available services: {", ".join(available_services)}. Please check your API keys and try again.'
+                f'Translation failed. No translations were generated. Reachable services: {reachable_label}.'
             )
 
         elif translation_type == 'translation':
@@ -2151,6 +2303,15 @@ def api_bulk_update_translations():
 
                         if 'options_translations' in translations:
                             form_item.options_translations = translations['options_translations']
+
+                        if 'validation_message_translations' in translations:
+                            if not form_item.validation_message_translations:
+                                form_item.validation_message_translations = {}
+                            existing_translations = form_item.validation_message_translations.copy()
+                            new_translations = translations['validation_message_translations']
+                            if isinstance(new_translations, dict):
+                                existing_translations.update(new_translations)
+                            form_item.validation_message_translations = existing_translations or None
 
                     elif item_type == 'section':
                         # Find the section

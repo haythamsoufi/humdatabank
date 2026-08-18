@@ -23,12 +23,38 @@ def normalize_span(text: str) -> str:
     return _MULTI_SPACE.sub(" ", (text or "").replace("\u00a0", " ")).strip().lower()
 
 
+def _has_rtl(text: str) -> bool:
+    # Quick check: Arabic/Hebrew Unicode blocks
+    return any("\u0600" <= ch <= "\u06ff" or "\u0590" <= ch <= "\u05ff" for ch in text)
+
+
 def term_is_attested(term: str, corpus: str) -> bool:
     needle = normalize_span(term)
     hay = normalize_span(corpus)
     if len(needle) < 2 or len(hay) < 2:
         return False
-    return needle in hay
+    if needle in hay:
+        return True
+    # For RTL scripts, allow partial-token match: all words ≥4 chars of needle appear in hay.
+    if _has_rtl(needle):
+        words = [w for w in needle.split() if len(w) >= 4]
+        return bool(words) and all(w in hay for w in words)
+    return False
+
+
+def classify_against_glossary(
+    source: str,
+    target: str,
+    lang: str,
+    glossary: Dict[tuple, str],
+) -> str:
+    """Return 'new', 'same', or 'conflict' versus an approved glossary map."""
+    official = glossary.get(((source or "").strip().lower(), lang))
+    if not official:
+        return "new"
+    if normalize_span(official) == normalize_span(target or ""):
+        return "same"
+    return "conflict"
 
 
 def usable_glossary_term(term: str, *, max_words: int = 12, max_chars: int = 100) -> Optional[str]:
@@ -110,7 +136,7 @@ def ground_pairs(
     return grounded
 
 
-def _openai_json(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+def _openai_json(messages: List[Dict[str, str]], *, max_tokens: int = 2400) -> Dict[str, Any]:
     from openai import OpenAI
 
     from app.routes.ai_documents.helpers import _coerce_json_object, _openai_chat_completions_create
@@ -124,11 +150,11 @@ def _openai_json(messages: List[Dict[str, str]]) -> Dict[str, Any]:
         or current_app.config.get("OPENAI_QUERY_PLANNER_MODEL")
         or "gpt-4o-mini"
     )
-    client = OpenAI(api_key=key, timeout=90)
+    client = OpenAI(api_key=key, timeout=120)
     kwargs: Dict[str, Any] = {
         "messages": messages,
         "response_format": {"type": "json_object"},
-        "max_completion_tokens": 1800,
+        "max_completion_tokens": max_tokens,
     }
     response = _openai_chat_completions_create(client, model_name=model, **kwargs)
     content = ""
@@ -139,7 +165,7 @@ def _openai_json(messages: List[Dict[str, str]]) -> Dict[str, Any]:
     return _coerce_json_object(content) or {}
 
 
-def _chunk_batches(chunks: Sequence[Any], *, max_chars: int = 10000) -> List[List[Any]]:
+def _chunk_batches(chunks: Sequence[Any], *, max_chars: int = 12000, max_batches: int = 10) -> List[List[Any]]:
     batches: List[List[Any]] = []
     current: List[Any] = []
     size = 0
@@ -155,7 +181,7 @@ def _chunk_batches(chunks: Sequence[Any], *, max_chars: int = 10000) -> List[Lis
         size += len(text)
     if current:
         batches.append(current)
-    return batches[:4]
+    return batches[:max_batches]
 
 
 def _format_extract_batch(chunks: Sequence[Any]) -> str:
@@ -167,7 +193,20 @@ def _format_extract_batch(chunks: Sequence[Any]) -> str:
     return "\n\n".join(parts)
 
 
-def extract_source_terms_from_chunks(chunks: Sequence[Any], *, cap: int = 20) -> List[Dict[str, Any]]:
+_EXTRACT_SYSTEM = (
+    "Extract official humanitarian / IFRC terminology from the document excerpts.\n"
+    "Identify short, reusable glossary heads (1-8 words): programme names, institutional names, "
+    "technical terms, Fundamental Principles, strategic goals, approaches.\n"
+    "Skip: author names, page labels, copyright lines, full sentences, generic words (people, change, data).\n"
+    "Each term MUST appear verbatim in the excerpts. Copy a short evidence span that contains it.\n"
+    "tier = 'must' for proper-name terms (institution names, named programmes), 'preferred' otherwise.\n"
+    "Return JSON only: {\"terms\": [{\"term\": \"\", \"evidence\": \"\", \"tier\": \"must|preferred\"}]}\n"
+    "At most 15 terms per call. If none, return {\"terms\": []}."
+)
+
+
+def extract_source_terms_from_chunks(chunks: Sequence[Any], *, cap: int = 50) -> List[Dict[str, Any]]:
+    corpus = "\n".join((getattr(c, "content", None) or "") for c in chunks)
     collected: List[Dict[str, Any]] = []
     for batch in _chunk_batches(chunks):
         blob = _format_extract_batch(batch)
@@ -175,26 +214,12 @@ def extract_source_terms_from_chunks(chunks: Sequence[Any], *, cap: int = 20) ->
             continue
         payload = _openai_json(
             [
-                {
-                    "role": "system",
-                    "content": (
-                        "Extract official humanitarian / IFRC terminology from the excerpts.\n"
-                        "Keep short glossary heads (1-8 words): institution names, programme names, "
-                        "principles, goals, recurring technical terms.\n"
-                        "Skip authors, page labels, copyright lines, and full sentences.\n"
-                        "Each term MUST appear verbatim in the excerpts. Copy a short evidence span "
-                        "that contains the term.\n"
-                        "Return JSON only: {\"terms\": [{\"term\": \"\", \"evidence\": \"\", "
-                        "\"tier\": \"must|preferred\"}]}\n"
-                        "At most 8 terms. If none, return {\"terms\": []}."
-                    ),
-                },
+                {"role": "system", "content": _EXTRACT_SYSTEM},
                 {"role": "user", "content": blob},
-            ]
+            ],
+            max_tokens=2400,
         )
         collected.extend(payload.get("terms") or [])
-    # Keep only terms attested in the source batches we actually sent.
-    corpus = "\n".join((getattr(c, "content", None) or "") for c in chunks)
     attested = []
     for row in collected:
         term = usable_glossary_term(str(row.get("term") or ""))
@@ -202,8 +227,6 @@ def extract_source_terms_from_chunks(chunks: Sequence[Any], *, cap: int = 20) ->
         if not term:
             continue
         if not term_is_attested(term, corpus):
-            continue
-        if evidence and not term_is_attested(term, evidence) and not term_is_attested(term, corpus):
             continue
         attested.append({"term": term, "evidence": evidence, "tier": row.get("tier") or "preferred"})
     return dedupe_source_terms(attested, cap=cap)
@@ -214,7 +237,7 @@ def retrieve_target_excerpts(
     evidence: str,
     target_document_ids: Sequence[int],
     *,
-    top_k: int = 3,
+    top_k: int = 5,
 ) -> Tuple[str, List[Dict[str, Any]]]:
     from app.services.ai.documents.vector_store import AIVectorStore, VectorStoreError
 
@@ -249,10 +272,21 @@ def retrieve_target_excerpts(
     excerpts = []
     for hit in unique:
         page = hit.get("page_number") or "?"
-        text = _MULTI_SPACE.sub(" ", (hit.get("content") or "").strip())[:700]
+        text = _MULTI_SPACE.sub(" ", (hit.get("content") or "").strip())[:800]
         if text:
             excerpts.append(f"[page {page}] {text}")
     return "\n".join(excerpts), unique
+
+
+_PAIR_SYSTEM = (
+    "Find the official target-language equivalent of each English glossary term.\n"
+    "Use ONLY wording that appears verbatim in TARGET_EXCERPTS. Do not translate freely.\n"
+    "target_term must be a short phrase (1-10 words), NOT a full sentence.\n"
+    "Copy a short target_evidence span (≤ 30 words) that contains the target_term.\n"
+    "Omit any term whose equivalent is not found in TARGET_EXCERPTS.\n"
+    "Return JSON only: {\"pairs\": [{\"source_term\": \"\", \"target_term\": \"\", "
+    "\"target_evidence\": \"\", \"confidence\": 0.0}]}"
+)
 
 
 def pair_terms_for_language(
@@ -260,45 +294,48 @@ def pair_terms_for_language(
     excerpts_by_source: Dict[str, str],
     *,
     target_lang: str,
+    batch_size: int = 8,
 ) -> List[Dict[str, Any]]:
     if not terms:
         return []
-    blocks = []
+    # Build blocks only for terms that have retrieved excerpts.
+    term_blocks: List[Tuple[str, str]] = []
     for row in terms:
         term = row["term"]
-        excerpts = excerpts_by_source.get(term) or ""
+        excerpts = excerpts_by_source.get(term) or excerpts_by_source.get(normalize_span(term)) or ""
         if not excerpts.strip():
             continue
-        blocks.append(
-            f"SOURCE: {term}\nEN_EVIDENCE: {row.get('evidence') or ''}\n"
+        block = (
+            f"SOURCE: {term}\n"
+            f"EN_EVIDENCE: {(row.get('evidence') or '')[:240]}\n"
             f"TARGET_EXCERPTS ({target_lang}):\n{excerpts}"
         )
-    if not blocks:
+        term_blocks.append((term, block))
+
+    if not term_blocks:
         return []
-    payload = _openai_json(
-        [
-            {
-                "role": "system",
-                "content": (
-                    f"Find the official {target_lang} equivalent of each English glossary term.\n"
-                    "Use ONLY wording that appears in TARGET_EXCERPTS. Do not translate freely.\n"
-                    "If the equivalent is not attested, omit that term.\n"
-                    "target_term must be a short phrase (not a paragraph).\n"
-                    "Return JSON only: {\"pairs\": [{\"source_term\": \"\", \"target_term\": \"\", "
-                    "\"target_evidence\": \"\", \"confidence\": 0.0}]}"
-                ),
-            },
-            {"role": "user", "content": "\n\n".join(blocks)},
-        ]
-    )
+
     keyed = {normalize_span(k): v for k, v in excerpts_by_source.items()}
     keyed.update(excerpts_by_source)
-    return ground_pairs(payload.get("pairs") or [], keyed, target_lang=target_lang)
+
+    all_pairs: List[Dict[str, Any]] = []
+    for i in range(0, len(term_blocks), batch_size):
+        sub = term_blocks[i : i + batch_size]
+        payload = _openai_json(
+            [
+                {"role": "system", "content": f"Target language: {target_lang}.\n{_PAIR_SYSTEM}"},
+                {"role": "user", "content": "\n\n".join(block for _, block in sub)},
+            ],
+            max_tokens=2400,
+        )
+        all_pairs.extend(ground_pairs(payload.get("pairs") or [], keyed, target_lang=target_lang))
+
+    return all_pairs
 
 
 def mine_llm_pairs(
     by_lang: Dict[str, List[Any]],
-    already: Set[tuple],
+    already: Dict[tuple, str],
     rejected: Set[tuple],
     remaining: int,
     *,
@@ -322,8 +359,10 @@ def mine_llm_pairs(
         return 0, "openai_unavailable"
 
     en_chunks = chunks_for([d.id for d in en_docs])
+    per_lang_cap = max(15, remaining // max(1, len(target_langs)))
+    source_cap = min(50, per_lang_cap * len(target_langs))
     try:
-        source_terms = extract_source_terms_from_chunks(en_chunks, cap=min(20, remaining))
+        source_terms = extract_source_terms_from_chunks(en_chunks, cap=source_cap)
     except RuntimeError as exc:
         if "openai_unavailable" in str(exc):
             return 0, "openai_unavailable"
@@ -355,7 +394,10 @@ def mine_llm_pairs(
             if created >= remaining:
                 break
             key_existing = (pair["source_term"].lower(), lang)
-            if key_existing in already:
+            overlap = classify_against_glossary(
+                pair["source_term"], pair["target_term"], lang, already
+            )
+            if overlap == "same":
                 continue
             if (pair["source_term"].lower(), pair["target_term"].lower(), lang) in rejected:
                 continue
@@ -370,6 +412,18 @@ def mine_llm_pairs(
                     existing.target_term = pair["target_term"]
                 continue
             src_row = next((t for t in source_terms if t["term"] == pair["source_term"]), {})
+            evidence = {
+                "en_evidence": src_row.get("evidence") or "",
+                "target_evidence": pair.get("target_evidence") or "",
+                "note": "Grounded LLM pair: target wording attested in retrieved target-language chunks.",
+            }
+            if overlap == "conflict":
+                evidence["conflict"] = True
+                evidence["official_term"] = already.get(key_existing) or ""
+                evidence["note"] = (
+                    "Document proposes a different form than the approved glossary. "
+                    "Accept replaces the official term."
+                )
             db.session.add(
                 TranslationGlossaryCandidate(
                     source_term=pair["source_term"],
@@ -380,11 +434,7 @@ def mine_llm_pairs(
                     confidence=pair["confidence"],
                     proposed_tier=src_row.get("tier") or "preferred",
                     status="pending",
-                    evidence={
-                        "en_evidence": src_row.get("evidence") or "",
-                        "target_evidence": pair.get("target_evidence") or "",
-                        "note": "Grounded LLM pair: target wording attested in retrieved target-language chunks.",
-                    },
+                    evidence=evidence,
                     occurrence_count=1,
                     example_sentences=[
                         src_row.get("evidence") or "",
@@ -392,7 +442,7 @@ def mine_llm_pairs(
                     ],
                 )
             )
-            already.add(key_existing)
+            already[key_existing] = pair["target_term"]
             created += 1
 
     if created == 0:

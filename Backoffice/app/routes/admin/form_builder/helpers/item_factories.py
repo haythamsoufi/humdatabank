@@ -8,8 +8,17 @@ from app.utils.transactions import request_transaction_rollback
 from config.config import Config
 from .item_updaters import is_conditions_meaningful, sanitize_blank_body_html
 from .item_config_fields import build_create_config_base
-from .field_parsing import make_field_reader
+from .field_parsing import make_field_reader, parse_translations_json
 import json
+
+
+def _apply_validation_message_translations(form_item, raw, *, clear=False):
+    """Persist validation_message_translations from form JSON, or clear them."""
+    if clear:
+        form_item.validation_message_translations = None
+        return
+    supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
+    form_item.validation_message_translations = parse_translations_json(raw, supported_codes)
 
 
 def _create_form_item(template, section, form_data, item_type):
@@ -139,6 +148,7 @@ def _create_indicator_form_item(template, section, form_data, default_order):
     form_item.relevance_condition = _rel if is_conditions_meaningful(_rel) else None
     form_item.validation_condition = _val if is_conditions_meaningful(_val) else None
     form_item.validation_message = _msg if _msg else None
+    _apply_validation_message_translations(form_item, get_field_value('validation_message_translations', ''))
 
     # Save translations if provided
     with suppress(Exception):
@@ -324,11 +334,13 @@ def _create_question_form_item(template, section, form_data, default_order):
     if question_type.value == 'blank':
         form_item.validation_condition = None
         form_item.validation_message = None
+        _apply_validation_message_translations(form_item, None, clear=True)
     else:
         _val = get_field_value('validation_condition', '') or ''
         _msg = get_field_value('validation_message', '') or ''
         form_item.validation_condition = _val if is_conditions_meaningful(_val) else None
         form_item.validation_message = _msg if _msg else None
+        _apply_validation_message_translations(form_item, get_field_value('validation_message_translations', ''))
 
     # Persist label and definition translations submitted with the creation form
     supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
@@ -688,6 +700,7 @@ def _create_plugin_form_item(template, section, form_data, item_type, default_or
             form_item.relevance_condition = _rel if is_conditions_meaningful(_rel) else None
             form_item.validation_condition = _val if is_conditions_meaningful(_val) else None
             form_item.validation_message = _msg if _msg else None
+            _apply_validation_message_translations(form_item, form_data.get('validation_message_translations'))
 
         # Add to database
         db.session.add(form_item)

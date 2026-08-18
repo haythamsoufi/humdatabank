@@ -172,6 +172,7 @@ def _build_section_data_for_js(section_obj, all_sections):
             'relevance_condition': form_item_obj.relevance_condition,
             'validation_condition': form_item_obj.validation_condition,
             'validation_message': form_item_obj.validation_message,
+            'validation_message_translations': getattr(form_item_obj, 'validation_message_translations', None),
             'definition': getattr(form_item_obj, 'definition', None) or getattr(form_item_obj, 'description', None),
             'label_translations': getattr(form_item_obj, 'label_translations', None),
             'definition_translations': getattr(form_item_obj, 'definition_translations', None) or getattr(form_item_obj, 'description_translations', None),
@@ -194,6 +195,7 @@ def _build_section_data_for_js(section_obj, all_sections):
                 'relevance_condition': form_item_obj.relevance_condition,
                 'validation_condition': form_item_obj.validation_condition,
                 'validation_message': form_item_obj.validation_message,
+                'validation_message_translations': form_item_obj.validation_message_translations,
                 'definition': form_item_obj.definition,
                 'label_translations': form_item_obj.label_translations,
                 'definition_translations': form_item_obj.definition_translations,
@@ -213,6 +215,7 @@ def _build_section_data_for_js(section_obj, all_sections):
                 'relevance_condition': form_item_obj.relevance_condition,
                 'validation_condition': form_item_obj.validation_condition,
                 'validation_message': form_item_obj.validation_message,
+                'validation_message_translations': form_item_obj.validation_message_translations,
                 'item_model': 'question'
             })
         elif form_item_obj.is_document_field:
@@ -378,6 +381,11 @@ def _build_section_items_for_template(section_obj, all_sections, all_template_it
             description_translations = form_item_obj.description_translations
 
         item_data['description_translations'] = description_translations if isinstance(description_translations, dict) else {}
+        validation_message_translations = getattr(form_item_obj, 'validation_message_translations', None)
+        item_data['validation_message'] = form_item_obj.validation_message
+        item_data['validation_message_translations'] = (
+            validation_message_translations if isinstance(validation_message_translations, dict) else {}
+        )
 
         all_template_items_for_js.append(item_data)
 

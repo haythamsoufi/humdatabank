@@ -457,6 +457,15 @@ handleRemoveRowClick(button) {
                 }
             });
 
+            // Also remove the GO-unmatched sentinel flag for this row (format:
+            // "row_go_unmatched|<rowId>"). __parseMatrixCellKey uses the
+            // "rowId_columnName" convention and returns null for pipe-separated
+            // keys, so the sentinel is never caught by the loop above.
+            const unmatchedFlagKey = `${ROW_GO_UNMATCHED_PREFIX}${rowId}`;
+            if (unmatchedFlagKey in matrix.data) {
+                cellKeysToRemove.push(unmatchedFlagKey);
+            }
+
             // Remove all cell keys for this row
             cellKeysToRemove.forEach(cellKey => {
                 delete matrix.data[cellKey];

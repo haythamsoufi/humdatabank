@@ -273,8 +273,19 @@ def get_localized_indicator_definition(indicator_bank) -> str:
     return getattr(indicator_bank, "definition", "") or ""
 
 
+def get_localized_validation_message(item, locale: Optional[str] = None) -> str:
+    """Localized custom validation message, falling back to English then the default text."""
+    return get_localized_name_from_translations(
+        item,
+        name_attr='validation_message',
+        translations_attr='validation_message_translations',
+        locale=locale,
+    )
+
+
 def get_localized_name_from_translations(
-    entity, name_attr: str = 'name', translations_attr: str = 'name_translations'
+    entity, name_attr: str = 'name', translations_attr: str = 'name_translations',
+    locale: Optional[str] = None,
 ) -> str:
     """
     Get localized name for an entity from session language.
@@ -283,7 +294,7 @@ def get_localized_name_from_translations(
     """
     if not entity:
         return ''
-    lang = get_translation_key()
+    lang = get_translation_key(locale)
     translations = getattr(entity, translations_attr, None)
     if isinstance(translations, dict):
         val = translations.get(lang)

@@ -494,34 +494,6 @@
                 </div>
                 {% endif %}
 
-                {% if form.enable_upr_country_reporting_excel is defined %}
-                <div class="border-t border-gray-200 pt-3" id="upr-country-reporting-excel-row-create">
-                    <div class="flex items-start gap-3">
-                        <div class="pt-0.5">
-                            {{ form.enable_upr_country_reporting_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_upr_country_reporting_excel") }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            {{ form.enable_upr_country_reporting_excel.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured UPR Country Reporting workbook on the entry form (export template and import saved data). For template 33 reporting assignments.') }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if form.enable_unified_country_plan_excel is defined %}
-                <div class="border-t border-gray-200 pt-3" id="unified-country-plan-excel-row-create">
-                    <div class="flex items-start gap-3">
-                        <div class="pt-0.5">
-                            {{ form.enable_unified_country_plan_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_unified_country_plan_excel") }}
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            {{ form.enable_unified_country_plan_excel.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured Unified Country Plan workbook on the entry form (export template and import saved data). For template 24 planning assignments.') }}</p>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
                 {% if form.enable_export_excel is defined %}
                 <div class="border-t border-gray-200 pt-3" id="assignment-export-excel-row-create">
                     <div class="flex items-start gap-3">
@@ -530,7 +502,7 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             {{ form.enable_export_excel.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel export button on the entry form (flat item-row workbook).') }}</p>
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel export button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
                         </div>
                     </div>
                 </div>
@@ -544,7 +516,7 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             {{ form.enable_import_excel.label(class="text-sm font-medium text-gray-800") }}
-                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel import button on the entry form (flat item-row workbook).') }}</p>
+                            <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel import button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
                         </div>
                     </div>
                 </div>
@@ -581,30 +553,6 @@
             </div>
             {% endif %}
 
-            {% if form.enable_upr_country_reporting_excel is defined %}
-            <div class="flex items-start gap-3" id="upr-country-reporting-excel-row">
-                <div class="pt-0.5">
-                    {{ form.enable_upr_country_reporting_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_upr_country_reporting_excel") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_upr_country_reporting_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured UPR Country Reporting workbook on the entry form (export template and import saved data). For template 33 reporting assignments.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
-            {% if form.enable_unified_country_plan_excel is defined %}
-            <div class="flex items-start gap-3" id="unified-country-plan-excel-row">
-                <div class="pt-0.5">
-                    {{ form.enable_unified_country_plan_excel(class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded", id="enable_unified_country_plan_excel") }}
-                </div>
-                <div class="min-w-0 flex-1">
-                    {{ form.enable_unified_country_plan_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the structured Unified Country Plan workbook on the entry form (export template and import saved data). For template 24 planning assignments.') }}</p>
-                </div>
-            </div>
-            {% endif %}
-
             {% if form.enable_export_excel is defined %}
             <div class="flex items-start gap-3" id="assignment-export-excel-row">
                 <div class="pt-0.5">
@@ -612,7 +560,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     {{ form.enable_export_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel export button on the entry form (flat item-row workbook).') }}</p>
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel export button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
                 </div>
             </div>
             {% endif %}
@@ -624,7 +572,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     {{ form.enable_import_excel.label(class="text-sm font-medium text-gray-800") }}
-                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the generic Excel import button on the entry form (flat item-row workbook).') }}</p>
+                    <p class="mt-0.5 text-xs text-gray-500">{{ _('Show the Excel import button on the entry form. UPR Country Reporting and Unified Country Plan assignments use their structured workbooks; other templates use the generic item-row workbook.') }}</p>
                 </div>
             </div>
             {% endif %}
@@ -1269,8 +1217,6 @@ window.manageAssignmentConfig = {
         {%- endif -%}
     ],
     isNew: {{ 'true' if not assignment else 'false' }},
-    uprReportingTemplateId: {{ UPR_REPORTING_TEMPLATE_ID|default(33)|tojson }},
-    uprPlanningTemplateId: {{ UPR_PLANNING_TEMPLATE_ID|default(24)|tojson }},
     periodName: {{ (assignment.period_name if assignment and assignment.period_name else none)|tojson }},
     hasPublicUrl: {{ (assignment.has_public_url() if assignment else false)|tojson }},
     assignmentCountryIds: [

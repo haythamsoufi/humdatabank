@@ -224,6 +224,7 @@ class TestItemDuplicationServiceDuplicateItemObject:
         source.label_translations = {"fr": "Question en Français"}
         source.definition_translations = {"fr": "Définition"}
         source.options_translations = {"fr": [{"label": "Oui"}]}
+        source.validation_message_translations = {"fr": "Ceci est obligatoire"}
         db_session.commit()
 
         new_item = ItemDuplicationService._duplicate_item_object(
@@ -240,6 +241,7 @@ class TestItemDuplicationServiceDuplicateItemObject:
         assert new_item.label_translations == {"fr": "Question en Français"}
         assert new_item.definition_translations == {"fr": "Définition"}
         assert new_item.options_translations == {"fr": [{"label": "Oui"}]}
+        assert new_item.validation_message_translations == {"fr": "Ceci est obligatoire"}
 
     def test_copies_options_json(self, db_session):
         template = create_test_template(db_session, name="ItemObj Template Options")

@@ -4,10 +4,9 @@ Automatic Translation Utility
 This module provides automatic translation functionality for the platform.
 It supports multiple translation services and can be used in translation modals and other places.
 
-Core languages (English, French, Spanish, Arabic, Chinese, Russian, Hindi) are served by the
-hosted IFRC/Google engines. Additional "long-tail" National Society languages (e.g. Amharic,
-Swahili, Nepali) can be served by the self-hosted NLLB sidecar (see NLLBTranslationService and
-services/nllb-sidecar/README.md) once configured.
+Hosted IFRC/Google engines are the default for core languages (English, French, Spanish,
+Arabic, Chinese, Russian, Hindi). The self-hosted NLLB sidecar (see NLLBTranslationService
+and services/nllb-sidecar/README.md) can translate any mapped language when selected.
 """
 
 import os
@@ -661,13 +660,11 @@ class IFRCTranslationService(TranslationService):
 
 
 class NLLBTranslationService(TranslationService):
-    """Self-hosted NLLB sidecar (``services/nllb-sidecar``) -- long-tail languages only.
+    """Self-hosted NLLB sidecar (``services/nllb-sidecar``).
 
-    Not a general-purpose default: the sidecar itself rejects the core seven
-    languages (en, fr, es, ar, ru, zh, hi) with 409 so the hosted IFRC/Azure
-    engine stays authoritative for those. This service exists for National
-    Society languages the core engine does not cover (Amharic, Swahili,
-    Nepali, ...). See ``services/nllb-sidecar/README.md``.
+    Not the default engine (IFRC/Azure stays default for core languages).
+    When the user explicitly selects NLLB, it translates every requested
+    language including the core seven. See ``services/nllb-sidecar/README.md``.
     """
 
     # After a connection failure, stop retrying the host for this many seconds.
@@ -736,14 +733,13 @@ class NLLBTranslationService(TranslationService):
                 return None
             return data.get('text')
         if response.status_code == 409:
-            # Core language -- by design, the hosted engine owns these.
-            logger.debug(f"NLLB sidecar declined core language {source_norm}->{target_norm} (409)")
+            logger.warning("NLLB sidecar declined %s->%s (409): %s", source_norm, target_norm, (response.text or "")[:200])
             return None
         if response.status_code == 503:
-            logger.debug(f"NLLB sidecar model not ready yet (503) for {source_norm}->{target_norm}")
+            logger.warning("NLLB sidecar not ready (503) for %s->%s", source_norm, target_norm)
             return None
         if response.status_code == 400:
-            logger.debug(f"NLLB sidecar: unsupported language code {source_norm}->{target_norm} (400)")
+            logger.warning("NLLB sidecar unsupported language %s->%s (400)", source_norm, target_norm)
             return None
         if response.status_code == 401:
             logger.warning("NLLB sidecar rejected request: invalid API key (401)")
@@ -1141,6 +1137,44 @@ class AutoTranslator:
 
         return restored
 
+    def _result_cache_engine(self, service_name: Optional[str], svc=None) -> str:
+        return (getattr(svc, "service_name", None) if svc else None) or service_name or self.default_service or "default"
+
+    @staticmethod
+    def _glossary_term_translator(svc, target_code: str, source_code: str, cache: Dict[str, Optional[str]]):
+        def translate_term(term: str) -> Optional[str]:
+            key = (term or "").strip()
+            if not key:
+                return None
+            if key in cache:
+                return cache[key]
+            try:
+                out = svc.translate_text(key, target_code, source_code)
+            except Exception:
+                logger.debug("glossary term MT failed for %r", key, exc_info=True)
+                out = None
+            cache[key] = out
+            return out
+
+        return translate_term
+
+    @staticmethod
+    def _apply_glossary_enforcement(
+        source_text: str,
+        translated: Optional[str],
+        target_code: str,
+        translate_term,
+    ) -> Optional[str]:
+        if not translated:
+            return translated
+        try:
+            from app.services.translation.glossary_forcing import enforce_glossary_terms
+
+            return enforce_glossary_terms(source_text, translated, target_code, translate_term)
+        except Exception:
+            logger.debug("glossary enforcement skipped", exc_info=True)
+            return translated
+
     def translate_text(self, text: str, target_language: str, source_language: str = 'en',
                       service_name: str = None) -> Optional[str]:
         """Translate a single text, preserving template variables."""
@@ -1154,24 +1188,13 @@ class AutoTranslator:
         target_code = _normalize_language_code(target_language, default="en")
         source_code = _normalize_language_code(source_language, default="en")
 
-        glossary_map: Dict[str, str] = {}
-        try:
-            from app.services.translation.glossary_forcing import protect_glossary_terms
-
-            protected_text, glossary_map, _hits = protect_glossary_terms(protected_text, target_code)
-            token_map = {**token_map, **glossary_map}
-        except Exception as e:
-            logger.debug("glossary forcing skipped: %s", e)
-
-        cache_engine = service_name or self.default_service or "default"
+        cache_engine = self._result_cache_engine(service_name)
         try:
             from app.services.translation.result_cache import get_cached
 
-            # Skip cache when glossary tokens were injected so new must-terms take effect.
-            if not glossary_map:
-                cached = get_cached(original_text, source_code, target_code, cache_engine)
-                if cached:
-                    return cached
+            cached = get_cached(original_text, source_code, target_code, cache_engine)
+            if cached:
+                return cached
         except Exception as e:
             logger.debug("result cache read skipped: %s", e)
 
@@ -1189,32 +1212,7 @@ class AutoTranslator:
             except Exception as e:
                 logger.debug("AutoTranslator: placeholder debug log failed: %s", e)
 
-        # Build ordered list of services to try.
-        #
-        # When the caller explicitly names a service (e.g. the user selected IFRC in the
-        # auto-translate modal), we use ONLY that service — no automatic fallbacks.
-        # Falling back to a different service when one was explicitly chosen silently
-        # ignores the user's selection and can produce unexpected results (e.g. trying a
-        # dead LibreTranslate instance after IFRC returned an unchanged-but-correct string).
-        #
-        # When no service is named we use the default, then the rest as fallbacks.
-        services_to_try: list[TranslationService] = []
-
-        if service_name:
-            requested = (self.services or {}).get(service_name)
-            if requested and requested.service_name != 'mock':
-                services_to_try = [requested]
-            # If the name is invalid fall through to default logic below.
-
-        if not services_to_try:
-            default_service = self._get_service()
-            if default_service and default_service.service_name != 'mock':
-                services_to_try.append(default_service)
-            for _, svc in (self.services or {}).items():
-                if not svc or getattr(svc, "service_name", None) == 'mock':
-                    continue
-                if svc not in services_to_try:
-                    services_to_try.append(svc)
+        services_to_try = self._ordered_services_to_try(service_name)
 
         debug = _debug_translation_enabled()
         for svc_idx, svc in enumerate(services_to_try):
@@ -1256,6 +1254,12 @@ class AutoTranslator:
                     continue
 
             restored = self._finalize_protected_translation(original_text, translated, token_map)
+            restored = self._apply_glossary_enforcement(
+                original_text,
+                restored,
+                target_code,
+                self._glossary_term_translator(svc, target_code, source_code, {}),
+            )
             if token_map and restored is None:
                 if debug:
                     logger.info(
@@ -1289,7 +1293,7 @@ class AutoTranslator:
                     original_text,
                     source_code,
                     target_code,
-                    getattr(svc, "service_name", None) or cache_engine,
+                    self._result_cache_engine(service_name, svc=svc),
                     restored,
                 )
             except Exception as e:
@@ -1316,13 +1320,6 @@ class AutoTranslator:
         for t in texts:
             original = "" if t is None else str(t)
             protected, vmap = self._protect_variables(original)
-            try:
-                from app.services.translation.glossary_forcing import protect_glossary_terms
-
-                protected, gmap, _hits = protect_glossary_terms(protected, target_code)
-                vmap = {**vmap, **gmap}
-            except Exception as e:
-                logger.debug("batch glossary forcing skipped: %s", e)
             protected_texts.append(protected)
             variable_maps.append(vmap)
             originals.append(original)
@@ -1330,12 +1327,16 @@ class AutoTranslator:
 
         # Prepare output list.
         out: list[Optional[str]] = [None] * len(texts)
-        cache_engine = service_name or self.default_service or "default"
         try:
             from app.services.translation.result_cache import get_cached
 
             for i, original in enumerate(originals):
-                cached = get_cached(original, source_code, target_code, cache_engine)
+                cached = get_cached(
+                    original,
+                    source_code,
+                    target_code,
+                    self._result_cache_engine(service_name),
+                )
                 if cached:
                     out[i] = cached
                     should_translate[i] = False
@@ -1345,26 +1346,11 @@ class AutoTranslator:
             if not ok and out[i] is None:
                 out[i] = originals[i]
 
-        # Build ordered list of services to try (same rules as translate_text).
-        # Explicit service_name → only that service, no fallbacks.
-        services_to_try: list[TranslationService] = []
-        if service_name:
-            requested = (self.services or {}).get(service_name)
-            if requested and requested.service_name != "mock":
-                services_to_try = [requested]
-
-        if not services_to_try:
-            default_service = self._get_service()
-            if default_service and default_service.service_name != "mock":
-                services_to_try.append(default_service)
-            for _, svc in (self.services or {}).items():
-                if not svc or getattr(svc, "service_name", None) == "mock":
-                    continue
-                if svc not in services_to_try:
-                    services_to_try.append(svc)
+        services_to_try = self._ordered_services_to_try(service_name)
 
         # Try services, filling missing items as we go (per-item fallback).
         for svc_idx, svc in enumerate(services_to_try):
+            term_mt_cache: Dict[str, Optional[str]] = {}
             # Indices that still need translation and should be sent.
             pending = [i for i in range(len(out)) if out[i] is None and should_translate[i]]
             if not pending:
@@ -1406,6 +1392,12 @@ class AutoTranslator:
                     translated,
                     variable_maps[i],
                 )
+                restored = self._apply_glossary_enforcement(
+                    originals[i],
+                    restored,
+                    target_code,
+                    self._glossary_term_translator(svc, target_code, source_code, term_mt_cache),
+                )
                 if variable_maps[i] and restored is None:
                     continue
                 if not restored:
@@ -1426,7 +1418,7 @@ class AutoTranslator:
                         originals[i],
                         source_code,
                         target_code,
-                        getattr(svc, "service_name", None) or cache_engine,
+                        self._result_cache_engine(service_name, svc=svc),
                         restored,
                     )
                 except Exception as e:
@@ -1771,6 +1763,29 @@ class AutoTranslator:
             str(html), target_languages, service_name=service_name
         )
 
+    def _ordered_services_to_try(self, service_name: Optional[str] = None) -> List[TranslationService]:
+        """Return engines to try, in order, for one translate call.
+
+        An explicit service (including NLLB) is exclusive — no fallbacks.
+        Selecting NLLB in the UI means NLLB for every target language,
+        including the core seven. When no service is named, use the default
+        then the remaining configured engines.
+        """
+        requested = (self.services or {}).get(service_name) if service_name else None
+        if requested and getattr(requested, "service_name", None) != "mock":
+            return [requested]
+
+        services_to_try: list[TranslationService] = []
+        default_service = self._get_service()
+        if default_service and getattr(default_service, "service_name", None) != "mock":
+            services_to_try.append(default_service)
+        for _, svc in (self.services or {}).items():
+            if not svc or getattr(svc, "service_name", None) == "mock":
+                continue
+            if svc not in services_to_try:
+                services_to_try.append(svc)
+        return services_to_try
+
     def _get_service(self, service_name: str = None) -> Optional[TranslationService]:
         """Get translation service by name"""
         if service_name and service_name in self.services:
@@ -1791,18 +1806,26 @@ class AutoTranslator:
         """Get the default translation service name"""
         return self.default_service or 'mock'
 
+    def _unverified_status(self) -> Dict[str, bool]:
+        """Unprobed services are unavailable until a health check succeeds."""
+        return {name: False for name in self.services}
+
+    def has_status_cache(self) -> bool:
+        return self._status_cache is not None
+
     def check_service_status(self, service_name: str = None, *, use_cache: bool = True) -> Dict[str, bool]:
         """Check the status of translation services without ever blocking the caller.
 
         Full-status results are cached for _STATUS_CACHE_TTL_SECONDS. On a cache
-        miss (or stale cache) the caller gets the last-known result — or an
-        optimistic default when nothing was ever probed — immediately, and the
+        miss (or stale cache) the caller gets the last-known result — or
+        unavailable when nothing was ever probed — immediately, and the
         actual probing happens on a single background thread. Inline probing
         used to pin Gunicorn worker threads for 15-339s per request via
         /admin/api/translation_services (prod gateway-504 incident, 2026-07-16).
 
         ``use_cache=False`` forces a synchronous refresh; it is for tooling and
-        tests only and must not be used on a request path.
+        tests only and must not be used on a request path. Prefer
+        :meth:`wait_for_fresh_status` when a UI needs a verified snapshot.
         """
         status = {}
 
@@ -1825,19 +1848,51 @@ class AutoTranslator:
             cached = self._status_cache  # another thread just finished probing
             if cached is not None:
                 return dict(cached[1])
-            return {name: True for name in self.services}
+            return self._unverified_status()
 
         # Stale or empty cache: refresh in the background and answer now.
         self._start_status_refresh_in_background()
         if cached is not None:
             return dict(cached[1])
-        return {name: True for name in self.services}
+        return self._unverified_status()
 
-    def _refresh_status_blocking(self) -> Optional[Dict[str, bool]]:
-        """Probe all services now; returns None when a probe is already in flight."""
-        if not self._status_probe_lock.acquire(blocking=False):
+    def wait_for_fresh_status(self) -> Dict[str, bool]:
+        """Return a verified snapshot, probing when the cache is empty or stale.
+
+        Used when the service list is opened. Fresh cache is returned immediately;
+        otherwise this waits for the cheap health probes (bounded by
+        STATUS_PROBE_TIMEOUT_SECONDS per service).
+        """
+        now = time.monotonic()
+        cached = self._status_cache
+        if cached is not None and now - cached[0] < self._STATUS_CACHE_TTL_SECONDS:
+            return dict(cached[1])
+
+        refreshed = self._refresh_status_blocking(wait=True)
+        if refreshed is not None:
+            return refreshed
+        cached = self._status_cache
+        if cached is not None:
+            return dict(cached[1])
+        return self._unverified_status()
+
+    def _refresh_status_blocking(self, *, wait: bool = False) -> Optional[Dict[str, bool]]:
+        """Probe all services now; returns None when a probe is already in flight.
+
+        ``wait=True`` blocks until the in-flight probe finishes (or times out),
+        then reuses a fresh cache if another thread filled it.
+        """
+        if wait:
+            timeout = STATUS_PROBE_TIMEOUT_SECONDS * max(1, len(self.services)) + 2
+            acquired = self._status_probe_lock.acquire(timeout=timeout)
+        else:
+            acquired = self._status_probe_lock.acquire(blocking=False)
+        if not acquired:
             return None
         try:
+            cached = self._status_cache
+            if cached is not None and time.monotonic() - cached[0] < self._STATUS_CACHE_TTL_SECONDS:
+                return dict(cached[1])
             return self._probe_all_services()
         finally:
             self._status_probe_lock.release()

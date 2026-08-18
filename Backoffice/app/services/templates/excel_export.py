@@ -367,6 +367,7 @@ class TemplateExcelExportMixin(TemplateExcelBase):
                     'label': item.label_translations,
                     'definition': item.definition_translations,
                     'description': item.description_translations,
+                    'validation_message': item.validation_message_translations,
                 },
             )
             cls._write_data_row(sheet, row_idx, headers, row_data)

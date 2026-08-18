@@ -157,6 +157,7 @@
       data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
       data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
       data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+      data-validation-message-translations='{{ (item_instance.validation_message_translations | tojson | e) if item_instance.validation_message_translations else "{}" }}'
       data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
       data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
       data-allow-disability-questions="{{ item_instance.allow_disability_questions | default(false) }}"
@@ -191,6 +192,7 @@
       data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
       data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
       data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+      data-validation-message-translations='{{ (item_instance.validation_message_translations | tojson | e) if item_instance.validation_message_translations else "{}" }}'
       data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
       data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
       data-allow-disability-questions="{{ item_instance.allow_disability_questions | default(false) }}"
@@ -270,6 +272,7 @@
       data-relevance-condition='{{ item_instance.relevance_condition if item_instance.relevance_condition else "{}" }}'
       data-validation-condition='{{ item_instance.validation_condition if item_instance.validation_condition else "{}" }}'
       data-validation-message="{{ item_instance.validation_message | default('', true) | e }}"
+      data-validation-message-translations='{{ (item_instance.validation_message_translations | tojson | e) if item_instance.validation_message_translations else "{}" }}'
       data-allow-data-not-available="{{ item_instance.allow_data_not_available | default(false) }}"
       data-allow-not-applicable="{{ item_instance.allow_not_applicable | default(false) }}"
       data-allow-disability-questions="{{ item_instance.allow_disability_questions | default(false) }}"

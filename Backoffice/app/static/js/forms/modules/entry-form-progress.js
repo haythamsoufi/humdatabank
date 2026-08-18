@@ -21,6 +21,23 @@ let gapsActive = false;
 let gapsLoading = false;
 let lastGapsPayload = null;
 let refreshCompletionTimer = null;
+let suppressRefreshUntil = 0;
+let refreshAbort = null;
+
+function cancelPendingCompletionRefresh() {
+    if (refreshCompletionTimer) {
+        clearTimeout(refreshCompletionTimer);
+        refreshCompletionTimer = null;
+    }
+}
+
+function markSaveAppliedProgress() {
+    cancelPendingCompletionRefresh();
+    suppressRefreshUntil = Date.now() + 1000;
+    try {
+        document.body.dataset.completionRateFromSave = '1';
+    } catch (_) { /* no-op */ }
+}
 
 function collectHiddenCompletionQueryString(extraParams = {}) {
     if (typeof window.collectHiddenFieldsForSubmission === 'function') {
@@ -51,6 +68,19 @@ function collectHiddenCompletionQueryString(extraParams = {}) {
 
     const qs = params.toString();
     return qs ? `?${qs}` : '';
+}
+
+export function coerceCompletionRate(value) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+            return parsed;
+        }
+    }
+    return null;
 }
 
 function completionColorClass(rate) {
@@ -108,18 +138,19 @@ function updateGapButtonState(completionRate) {
  */
 export function applyCompletionRate(completionRate) {
     const completionDisplay = getCompletionDisplay();
-    if (!completionDisplay || typeof completionRate !== 'number') {
+    const rate = coerceCompletionRate(completionRate);
+    if (!completionDisplay || rate === null) {
         return false;
     }
-    completionDisplay.textContent = `${completionRate.toFixed(1)}%`;
+    completionDisplay.textContent = `${rate.toFixed(1)}%`;
     completionDisplay.classList.remove(...COMPLETION_COLOR_CLASSES);
-    completionDisplay.classList.add('font-medium', ...completionColorClass(completionRate).split(/\s+/));
+    completionDisplay.classList.add('font-medium', ...completionColorClass(rate).split(/\s+/));
 
     const btn = getGapButton();
     if (btn) {
-        btn.dataset.completionRate = String(completionRate);
+        btn.dataset.completionRate = String(rate);
     }
-    updateGapButtonState(completionRate);
+    updateGapButtonState(rate);
     return true;
 }
 
@@ -407,7 +438,9 @@ async function toggleCompletionGapHighlights() {
  * to what AssignmentCompletionService.compute_for_assignment returns for the
  * dashboard — all template items, no relevance-visibility filtering.
  *
- * Called on page load (main.js) and on every ifrc:relevance-settled event.
+ * Called on page load (main.js) and on ifrc:relevance-settled (debounced).
+ * After a save, the header is updated from the save payload instead — a
+ * relevance refetch in that window would race and can show a stale cached rate.
  * The completion-gaps callback must NOT call applyCompletionRate because the
  * gaps endpoint computes the rate with hidden fields excluded, which would
  * diverge from the dashboard value.
@@ -419,6 +452,7 @@ export async function refreshVisibleCompletionRate(aesId) {
     const response = await fetchFn(`/api/forms/assignment/${aesId}/completion-rate`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         credentials: 'same-origin',
+        cache: 'no-store',
     });
     let data;
     if (window.responseAsResult) {
@@ -437,8 +471,9 @@ export async function refreshVisibleCompletionRate(aesId) {
         }
         data = await response.json();
     }
-    if (typeof data?.completion_rate === 'number') {
-        applyCompletionRate(data.completion_rate);
+    const rate = coerceCompletionRate(data?.completion_rate);
+    if (rate !== null) {
+        applyCompletionRate(rate);
     }
     return data;
 }
@@ -454,15 +489,35 @@ export function initCompletionRateRefresh(aesId) {
     document.body.dataset.completionRateRefreshInit = '1';
 
     const debouncedRefresh = () => {
-        if (refreshCompletionTimer) {
-            clearTimeout(refreshCompletionTimer);
+        if (Date.now() < suppressRefreshUntil) {
+            return;
         }
+        cancelPendingCompletionRefresh();
         refreshCompletionTimer = setTimeout(() => {
+            if (Date.now() < suppressRefreshUntil) {
+                return;
+            }
             refreshVisibleCompletionRate(aesId).catch(() => { /* ignore */ });
         }, 300);
     };
 
-    document.addEventListener('ifrc:relevance-settled', debouncedRefresh);
+    refreshAbort?.abort();
+    refreshAbort = new AbortController();
+    document.addEventListener('ifrc:relevance-settled', debouncedRefresh, {
+        signal: refreshAbort.signal,
+    });
+}
+
+/** Remove the relevance-settled listener and pending refresh (tests / teardown). */
+export function teardownCompletionRateRefresh() {
+    refreshAbort?.abort();
+    refreshAbort = null;
+    cancelPendingCompletionRefresh();
+    suppressRefreshUntil = 0;
+    try {
+        delete document.body.dataset.completionRateRefreshInit;
+        delete document.body.dataset.completionRateFromSave;
+    } catch (_) { /* no-op */ }
 }
 
 /**
@@ -491,8 +546,10 @@ export function applyEntryFormProgress(data) {
     if (!data || typeof data !== 'object') {
         return;
     }
-    if (typeof data.completion_rate === 'number') {
-        applyCompletionRate(data.completion_rate);
+    const rate = coerceCompletionRate(data.completion_rate ?? data.data?.completion_rate);
+    if (rate !== null) {
+        applyCompletionRate(rate);
+        markSaveAppliedProgress();
     }
     if (data.section_statuses) {
         updateSectionStatusIcons(data.section_statuses);

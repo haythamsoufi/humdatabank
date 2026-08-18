@@ -47,6 +47,44 @@ function isPluginFieldId(rawId) {
     }
 }
 
+/**
+ * Map a numeric condition item_id / value_field_id to the data-item-id used in the DOM.
+ *
+ * The entry form renders `data-item-id="{{ field.id }}"` (bare number). Form-builder
+ * preview and some tests use `question_<id>` / `indicator_<id>` / `document_field_<id>`.
+ * Prefer the first match that actually exists so getCurrentFieldValue is called with
+ * an ID it can resolve — `question_961` will not find `indicator_961_total_value`.
+ */
+function resolveNumericFieldId(rawId) {
+    const raw = (rawId === null || rawId === undefined) ? '' : String(rawId);
+    const numericId = parseInt(raw, 10);
+    if (!Number.isFinite(numericId)) return raw;
+
+    const possibleIds = [
+        raw,
+        `question_${numericId}`,
+        `indicator_${numericId}`,
+        `document_field_${numericId}`,
+    ];
+
+    for (const possibleId of possibleIds) {
+        if (document.querySelector(`[data-item-id="${possibleId}"]`)) {
+            return possibleId;
+        }
+    }
+
+    for (const possibleId of possibleIds) {
+        const testValue = getCurrentFieldValue(possibleId);
+        if (testValue !== null && testValue !== undefined) {
+            return possibleId;
+        }
+    }
+
+    // Last resort: keep the bare numeric id. getCurrentFieldValue("961") looks up
+    // indicator_961_total_value; defaulting to question_961 does not.
+    return raw;
+}
+
 function requestRelevanceRecheck(reason = 'unspecified') {
     __pendingCheckAll = true;
     if (__scheduledCheckAll) return;
@@ -642,23 +680,23 @@ function evaluateSingleConditionQuietly(condition) {
             return actualValue !== null && actualValue !== undefined && String(actualValue).toLowerCase().trim() === 'no';
 
         case 'greater_than':
-            const actualNum = parseFloat(actualValue);
-            const expectedNum = parseFloat(resolvedExpectedValue);
+            const actualNum = parseComparableNumber(actualValue);
+            const expectedNum = parseComparableNumber(resolvedExpectedValue);
             return !isNaN(actualNum) && !isNaN(expectedNum) && actualNum > expectedNum;
 
         case 'less_than':
-            const actualNumLT = parseFloat(actualValue);
-            const expectedNumLT = parseFloat(resolvedExpectedValue);
+            const actualNumLT = parseComparableNumber(actualValue);
+            const expectedNumLT = parseComparableNumber(resolvedExpectedValue);
             return !isNaN(actualNumLT) && !isNaN(expectedNumLT) && actualNumLT < expectedNumLT;
 
         case 'greater_than_or_equal_to':
-            const actualNumGTE = parseFloat(actualValue);
-            const expectedNumGTE = parseFloat(resolvedExpectedValue);
+            const actualNumGTE = parseComparableNumber(actualValue);
+            const expectedNumGTE = parseComparableNumber(resolvedExpectedValue);
             return !isNaN(actualNumGTE) && !isNaN(expectedNumGTE) && actualNumGTE >= expectedNumGTE;
 
         case 'less_than_or_equal_to':
-            const actualNumLTE = parseFloat(actualValue);
-            const expectedNumLTE = parseFloat(resolvedExpectedValue);
+            const actualNumLTE = parseComparableNumber(actualValue);
+            const expectedNumLTE = parseComparableNumber(resolvedExpectedValue);
             return !isNaN(actualNumLTE) && !isNaN(expectedNumLTE) && actualNumLTE <= expectedNumLTE;
 
         default:
@@ -1311,19 +1349,10 @@ export function evaluateConditions(conditionData) {
     debugLog(MODULE_NAME, `🔍 evaluateConditions called with:`, conditionData);
     debugLog(MODULE_NAME, `   Type: ${typeof conditionData}`);
 
-    // Parse JSON if it's a string, otherwise use as-is
-    let parsedData;
-    try {
-        if (typeof conditionData === 'string') {
-            parsedData = JSON.parse(conditionData);
-            debugLog(MODULE_NAME, `   Parsed from string:`, parsedData);
-        } else {
-            parsedData = conditionData;
-            debugLog(MODULE_NAME, `   Using as-is (not a string):`, parsedData);
-        }
-    } catch (e) {
-        debugLog(MODULE_NAME, `❌ JSON parse failed:`, e.message);
-        return true; // Default to visible on parse error
+    const parsedData = parseConditionPayloadMaybe(conditionData);
+    if (!parsedData) {
+        debugLog(MODULE_NAME, '❌ Condition payload could not be normalized; defaulting to visible');
+        return true;
     }
 
     debugLog(MODULE_NAME, `   parsedData:`, parsedData);
@@ -1376,40 +1405,11 @@ function evaluateSingleCondition(condition) {
         fieldId = _rawItemIdStr;
         debugLog(MODULE_NAME, `    🔌 Numeric ID ${item_id} matches a plugin field; skipping prefix conversion.`);
     } else if (_isNumericItemId) {
-        // Numeric ID - try to find the field in DOM with different prefixes
-        const numericId = parseInt(item_id, 10);
-        const possibleIds = [
-            `question_${numericId}`,
-            `indicator_${numericId}`,
-            `document_field_${numericId}`
-        ];
-
-        // Try to find in DOM first
-        for (const possibleId of possibleIds) {
-            const fieldElement = document.querySelector(`[data-item-id="${possibleId}"]`);
-            if (fieldElement) {
-                fieldId = possibleId;
-                debugLog(MODULE_NAME, `    🔄 Converted numeric ID ${item_id} to prefixed format: ${fieldId}`);
-                break;
-            }
-        }
-
-        // If not found in DOM, try using getCurrentFieldValue to test each format
-        if (fieldId === item_id) {
-            for (const possibleId of possibleIds) {
-                const testValue = getCurrentFieldValue(possibleId);
-                if (testValue !== null && testValue !== undefined) {
-                    fieldId = possibleId;
-                    debugLog(MODULE_NAME, `    🔄 Converted numeric ID ${item_id} to prefixed format: ${fieldId} (via value lookup)`);
-                    break;
-                }
-            }
-        }
-
-        // If still not found, default to question_ prefix (most common)
-        if (fieldId === item_id) {
-            fieldId = `question_${numericId}`;
-            debugLog(MODULE_NAME, `    ⚠️ Could not determine prefix for ID ${item_id}, defaulting to: ${fieldId}`);
+        fieldId = resolveNumericFieldId(item_id);
+        if (fieldId !== _rawItemIdStr) {
+            debugLog(MODULE_NAME, `    🔄 Converted numeric ID ${item_id} to: ${fieldId}`);
+        } else {
+            debugLog(MODULE_NAME, `    🔄 Using bare numeric ID ${item_id} (entry-form data-item-id)`);
         }
     } else {
         const parsedMeasure = parsePluginMeasureId(item_id);
@@ -1436,46 +1436,9 @@ function evaluateSingleCondition(condition) {
     // Resolve expected value: either from field reference or static value
     let resolvedExpectedValue = expectedValue;
     if (value_field_id !== null && value_field_id !== undefined) {
-        // This is a field reference - get the value from the referenced field
-        // Try to find the field by converting numeric ID to prefixed formats
-        let refFieldId = null;
-        const numericId = parseInt(value_field_id, 10);
-
-        // Try different prefixed formats
-        const possibleIds = [
-            `question_${numericId}`,
-            `indicator_${numericId}`,
-            `document_field_${numericId}`
-        ];
-
-        // First, try to find in DOM
-        for (const possibleId of possibleIds) {
-            const fieldElement = document.querySelector(`[data-item-id="${possibleId}"]`);
-            if (fieldElement) {
-                refFieldId = possibleId;
-                break;
-            }
-        }
-
-        // If not found in DOM, try using the ID directly (getCurrentFieldValue might handle it)
-        if (!refFieldId) {
-            // Try each possible format
-            for (const possibleId of possibleIds) {
-                const testValue = getCurrentFieldValue(possibleId);
-                if (testValue !== null && testValue !== undefined) {
-                    refFieldId = possibleId;
-                    break;
-                }
-            }
-        }
-
-        if (refFieldId) {
-            resolvedExpectedValue = getCurrentFieldValue(refFieldId);
-            debugLog(MODULE_NAME, `    🔗 Field reference: using value from field ${refFieldId} (ID: ${value_field_id}) = "${resolvedExpectedValue}"`);
-        } else {
-            debugWarn(MODULE_NAME, `    ⚠️ Field reference ${value_field_id} not found - tried: ${possibleIds.join(', ')}`);
-            resolvedExpectedValue = null;
-        }
+        const refFieldId = resolveNumericFieldId(value_field_id);
+        resolvedExpectedValue = getCurrentFieldValue(refFieldId);
+        debugLog(MODULE_NAME, `    🔗 Field reference: using value from field ${refFieldId} (ID: ${value_field_id}) = "${resolvedExpectedValue}"`);
     }
 
     // Support plugin variables like [SOME_VAR] in relevance condition "value" fields
@@ -1517,29 +1480,29 @@ function evaluateSingleCondition(condition) {
             return isNo;
 
         case 'greater_than':
-            const actualNum = parseFloat(actualValue);
-            const expectedNum = parseFloat(resolvedExpectedValue);
+            const actualNum = parseComparableNumber(actualValue);
+            const expectedNum = parseComparableNumber(resolvedExpectedValue);
             const greater = !isNaN(actualNum) && !isNaN(expectedNum) && actualNum > expectedNum;
             debugLog(MODULE_NAME, `    ✅ greater_than check: ${actualNum} > ${expectedNum} -> ${greater}`);
             return greater;
 
         case 'less_than':
-            const actualNumLT = parseFloat(actualValue);
-            const expectedNumLT = parseFloat(resolvedExpectedValue);
+            const actualNumLT = parseComparableNumber(actualValue);
+            const expectedNumLT = parseComparableNumber(resolvedExpectedValue);
             const less = !isNaN(actualNumLT) && !isNaN(expectedNumLT) && actualNumLT < expectedNumLT;
             debugLog(MODULE_NAME, `    ✅ less_than check: ${actualNumLT} < ${expectedNumLT} -> ${less}`);
             return less;
 
         case 'greater_than_or_equal_to':
-            const actualNumGTE = parseFloat(actualValue);
-            const expectedNumGTE = parseFloat(resolvedExpectedValue);
+            const actualNumGTE = parseComparableNumber(actualValue);
+            const expectedNumGTE = parseComparableNumber(resolvedExpectedValue);
             const greaterEqual = !isNaN(actualNumGTE) && !isNaN(expectedNumGTE) && actualNumGTE >= expectedNumGTE;
             debugLog(MODULE_NAME, `    ✅ greater_than_or_equal_to check: ${actualNumGTE} >= ${expectedNumGTE} -> ${greaterEqual}`);
             return greaterEqual;
 
         case 'less_than_or_equal_to':
-            const actualNumLTE = parseFloat(actualValue);
-            const expectedNumLTE = parseFloat(resolvedExpectedValue);
+            const actualNumLTE = parseComparableNumber(actualValue);
+            const expectedNumLTE = parseComparableNumber(resolvedExpectedValue);
             const lessEqual = !isNaN(actualNumLTE) && !isNaN(expectedNumLTE) && actualNumLTE <= expectedNumLTE;
             debugLog(MODULE_NAME, `    ✅ less_than_or_equal_to check: ${actualNumLTE} <= ${expectedNumLTE} -> ${lessEqual}`);
             return lessEqual;
@@ -1553,6 +1516,26 @@ function evaluateSingleCondition(condition) {
 function comparableConditionValue(value) {
     if (value === null || value === undefined) return '';
     return String(value).trim();
+}
+
+/**
+ * Parse a condition operand to a number for greater_than/less_than-style comparisons.
+ *
+ * Values read from numeric-formatting.js-managed inputs can still carry thousands
+ * separators (e.g. "1,200") depending on the source (existingData, plugin variables,
+ * a field mid-transition). A bare `parseFloat("1,200")` silently returns `1`, which
+ * would make cross-field comparisons (e.g. value_field_id) wrong instead of just
+ * failing loudly, so strip grouping separators the same way the input formatter does.
+ */
+function parseComparableNumber(value) {
+    if (value === null || value === undefined) return NaN;
+    if (typeof value === 'number') return value;
+    const str = String(value).trim();
+    if (str === '') return NaN;
+    const unformatted = typeof window.__numericUnformat === 'function'
+        ? window.__numericUnformat(str)
+        : str.replace(/,/g, '').replace(/'/g, '');
+    return parseFloat(unformatted);
 }
 
 function isValueEmpty(value) {

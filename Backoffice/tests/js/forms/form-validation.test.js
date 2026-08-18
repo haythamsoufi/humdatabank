@@ -245,6 +245,20 @@ describe('form-validation', () => {
     expect(asString.validateForm()).toBe(true);
   });
 
+  // Regression test: numeric-formatting.js renders data-numeric="true" inputs with
+  // thousands separators once the value reaches four digits (e.g. "1,500"). A bare
+  // parseFloat("1,500") used to stop at the comma and return 1, silently letting an
+  // over-100% value through instead of flagging it.
+  it('rejects a comma-formatted percentage over 100 (data-numeric="true")', async () => {
+    const validator = await createValidator(`
+      <div class="form-item-block" data-item-id="13">
+        <input data-field-type="percentage" data-numeric="true" name="pct" value="1,500"
+               data-field-config='{"allow_over_100":false}'>
+      </div>`);
+    expect(validator.validateForm()).toBe(false);
+    expect(errorTypes(validator)).toContain('percentage_max_validation');
+  });
+
   it('skips hidden and disabled percentage fields', async () => {
     const validator = await createValidator(`
       <div class="form-item-block relevance-hidden" data-item-id="13">
@@ -275,6 +289,53 @@ describe('form-validation', () => {
 
   it('skips a validation condition when the value_field_id target is empty', async () => {
     const validator = await createValidator(conditionFields({ branchesValue: '100', unitsValue: '' }));
+    expect(validator.validateForm()).toBe(true);
+    expect(errorTypes(validator)).not.toContain('validation_condition');
+  });
+
+  // Entry form uses data-item-id="961" (bare), not question_961. evaluateConditions
+  // used to rewrite the id to question_961, read null for both sides, and flag a
+  // violation even when 500 < 1200.
+  it('does not flag validation_condition for entry-form bare numeric item ids', async () => {
+    const validator = await createValidator(`
+      <div class="form-item-block" data-item-id="963"
+           data-validation-condition='${JSON.stringify({
+             logic: 'AND',
+             conditions: [{ condition_type: 'greater_than', item_id: '963', value_field_id: 961 }],
+           })}'
+           data-validation-message="Field 963 must be greater than field 961">
+        <input name="indicator_963_total_value" value="1200">
+      </div>
+      <div class="form-item-block" data-item-id="961"
+           data-validation-condition='${JSON.stringify({
+             logic: 'AND',
+             conditions: [{ condition_type: 'less_than', item_id: '961', value_field_id: 963 }],
+           })}'
+           data-validation-message="Field 961 must be less than field 963">
+        <input name="indicator_961_total_value" value="500">
+      </div>`);
+    expect(validator.validateForm()).toBe(true);
+    expect(errorTypes(validator)).not.toContain('validation_condition');
+  });
+
+  // Regression test for the reported bug: field 963 ("greater_than" value_field_id 961)
+  // holds a comma-formatted value (data-numeric="true", set by numeric-formatting.js once
+  // a number reaches four digits). A bare parseFloat("1,200") used to truncate to 1, so
+  // 1200 was never seen as greater_than 500 and the rule appeared violated even though it
+  // wasn't.
+  it('does not flag validation_condition when the compared value is comma-formatted', async () => {
+    const validator = await createValidator(`
+      <div class="form-item-block" data-item-id="963"
+           data-validation-condition='${JSON.stringify({
+             logic: 'AND',
+             conditions: [{ condition_type: 'greater_than', item_id: 963, value_field_id: 961 }],
+           })}'
+           data-validation-message="Field 963 must be greater than field 961">
+        <input id="field-963" name="indicator_963_total_value" type="text" data-numeric="true" value="1,200">
+      </div>
+      <div class="form-item-block" data-item-id="961">
+        <input id="field-961" name="indicator_961_total_value" type="number" value="500">
+      </div>`);
     expect(validator.validateForm()).toBe(true);
     expect(errorTypes(validator)).not.toContain('validation_condition');
   });
@@ -345,6 +406,20 @@ describe('form-validation', () => {
       </div>`);
     expect(valid.validateForm()).toBe(true);
     expect(errorTypes(valid)).not.toContain('indirect_reach_validation');
+  });
+
+  // Regression test: indirect reach counts are frequently >= 1000, so numeric-formatting.js
+  // renders the input's value with thousands separators (data-numeric="true", e.g. "1,200").
+  // `isNaN("1,200")` is true (Number() rejects grouping separators), so this used to reject a
+  // perfectly valid reach count as "not a valid number".
+  it('accepts a comma-formatted (data-numeric) indirect reach value', async () => {
+    const validator = await createValidator(`
+      <div class="form-item-block" data-item-id="40">
+        <label>Indirect reach</label>
+        <input name="indicator_40_indirect_reach" data-numeric="true" value="1,200">
+      </div>`);
+    expect(validator.validateForm()).toBe(true);
+    expect(errorTypes(validator)).not.toContain('indirect_reach_validation');
   });
 
   it('skips a direct required field inside a modal dialog', async () => {

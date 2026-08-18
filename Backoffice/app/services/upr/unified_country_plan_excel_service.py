@@ -10,12 +10,11 @@ from typing import Any, Dict, Tuple
 
 from flask import current_app
 
+from app.services.imports.assignment_excel_access import (  # noqa: F401
+    assignment_uses_unified_country_plan_excel,
+)
+
 UNIFIED_COUNTRY_PLAN_LABEL = "Unified Country Plan"
-
-
-def assignment_uses_unified_country_plan_excel(assigned_form) -> bool:
-    """Return True when this assignment has Unified Country Plan Excel enabled."""
-    return bool(getattr(assigned_form, "enable_unified_country_plan_excel", False))
 
 
 _SCRIPTS_DIR: str | None = None

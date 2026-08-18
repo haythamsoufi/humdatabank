@@ -79,6 +79,23 @@ class TestInitServicesWiring:
         assert tr.default_service == "ifrc"
         assert "nllb" in tr.services  # still registered, just not default
 
+    def test_explicit_nllb_stays_exclusive(self, monkeypatch):
+        """Selecting NLLB uses only NLLB, including for core languages."""
+        self._clean_env(monkeypatch)
+        monkeypatch.setenv("NLLB_SIDECAR_URL", "http://nllb:9100")
+        monkeypatch.setenv("IFRC_TRANSLATE_API_KEY", "ifrc-key")
+        tr = AutoTranslator()
+        names = [getattr(s, "service_name", None) for s in tr._ordered_services_to_try("nllb")]
+        assert names == ["nllb"]
+
+    def test_explicit_ifrc_stays_exclusive(self, monkeypatch):
+        self._clean_env(monkeypatch)
+        monkeypatch.setenv("NLLB_SIDECAR_URL", "http://nllb:9100")
+        monkeypatch.setenv("IFRC_TRANSLATE_API_KEY", "ifrc-key")
+        tr = AutoTranslator()
+        names = [getattr(s, "service_name", None) for s in tr._ordered_services_to_try("ifrc")]
+        assert names == ["ifrc"]
+
 
 class TestNLLBTranslateText:
     def test_successful_translation(self):

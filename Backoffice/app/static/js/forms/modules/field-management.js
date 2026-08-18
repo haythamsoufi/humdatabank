@@ -138,6 +138,20 @@ function isFieldDisabledByDataAvailability(normalizedFieldId) {
 function getInputValue(element) {
     if (!element) return null;
 
+    // numeric-formatting.js converts type="number" inputs to type="text" (marked
+    // data-numeric="true") to display thousands separators, e.g. "1,200". Unformat
+    // before parsing so callers get a real number instead of a comma-truncated
+    // parseFloat() result (parseFloat("1,200") === 1, not 1200).
+    if (element.dataset && element.dataset.numeric === 'true') {
+        if (element.value === '') return null;
+        const unformatted = typeof window.__numericUnformat === 'function'
+            ? window.__numericUnformat(element.value)
+            : String(element.value).replace(/,/g, '').replace(/'/g, '');
+        if (unformatted === '') return null;
+        const numValue = parseFloat(unformatted);
+        return isNaN(numValue) ? null : numValue;
+    }
+
     switch (element.type) {
         case 'checkbox':
             // For yes/no pairs (or any checkbox group sharing the same name) return the checked value in the group.

@@ -9,7 +9,13 @@ vi.mock('../../../app/static/js/forms/modules/debug.js', () => ({
 
 vi.mock('../../../app/static/js/forms/modules/entry-form-progress.js', () => ({
   applyEntryFormProgress: vi.fn(),
+  coerceCompletionRate: (value) => (
+    typeof value === 'number' && Number.isFinite(value) ? value : null
+  ),
+  refreshVisibleCompletionRate: vi.fn().mockResolvedValue(undefined),
 }));
+
+import { applyEntryFormProgress, refreshVisibleCompletionRate } from '../../../app/static/js/forms/modules/entry-form-progress.js';
 
 function mockFetchResponse({ ok, status, contentType = 'application/json', body = { success: true } }) {
   return {
@@ -42,6 +48,8 @@ async function loadAjaxSave() {
 describe('ajax-save', () => {
   beforeEach(() => {
     setupSaveForm();
+    applyEntryFormProgress.mockClear();
+    refreshVisibleCompletionRate.mockClear();
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -54,7 +62,11 @@ describe('ajax-save', () => {
   });
 
   it('dispatches formSubmitted on successful save', async () => {
-    fetch.mockResolvedValue(mockFetchResponse({ ok: true, status: 200 }));
+    fetch.mockResolvedValue(mockFetchResponse({
+      ok: true,
+      status: 200,
+      body: { success: true, completion_rate: 55.5, section_statuses: { 7: 'in_progress' } },
+    }));
 
     const handler = vi.fn();
     document.addEventListener('formSubmitted', handler);
@@ -65,6 +77,28 @@ describe('ajax-save', () => {
 
     expect(handler).toHaveBeenCalled();
     expect(handler.mock.calls[0][0].detail.action).toBe('save');
+    expect(applyEntryFormProgress).toHaveBeenCalledWith(expect.objectContaining({
+      success: true,
+      completion_rate: 55.5,
+      section_statuses: { 7: 'in_progress' },
+    }));
+    expect(refreshVisibleCompletionRate).not.toHaveBeenCalled();
+  });
+
+  it('refetches completion rate when the save response omits it', async () => {
+    document.body.innerHTML += '<button id="completion-gap-btn" data-aes-id="9"></button>';
+    fetch.mockResolvedValue(mockFetchResponse({
+      ok: true,
+      status: 200,
+      body: { success: true },
+    }));
+
+    const mod = await loadAjaxSave();
+    mod.initAjaxSave();
+    await mod.saveFormBeforeSubmit({ toast: false, buttonState: false });
+
+    expect(applyEntryFormProgress).toHaveBeenCalled();
+    expect(refreshVisibleCompletionRate).toHaveBeenCalledWith('9');
   });
 
   it('saves draft on 401 without dispatching formSubmitted', async () => {

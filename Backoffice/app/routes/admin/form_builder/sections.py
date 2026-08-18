@@ -17,7 +17,7 @@ from app.utils.api_responses import json_ok, json_server_error, json_bad_request
 from app.services.forms.section_duplication_service import SectionDuplicationService
 from config.config import Config
 from .helpers import (_update_version_timestamp, _ensure_template_access_or_redirect,
-    _get_descendant_section_ids, _delete_or_archive_one_section)
+    _get_descendant_section_ids, _delete_or_archive_one_section, is_conditions_meaningful)
 import json
 import base64
 
@@ -37,6 +37,27 @@ def _b64_decode_field(value):
         return base64.b64decode(value.encode('utf-8')).decode('utf-8')
     except Exception:
         return value
+
+
+def _normalize_relevance_condition(raw):
+    """Return a single-encoded JSON rule string, or None when empty/invalid.
+
+    Legacy rows were sometimes saved as a JSON string of a JSON string. Unwrap
+    those so the builder and entry form can parse the rule.
+    """
+    value = _b64_decode_field(raw)
+    for _ in range(3):
+        if isinstance(value, dict):
+            break
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return None
+    if not is_conditions_meaningful(value):
+        return None
+    return json.dumps(value, separators=(',', ':'))
 
 
 def _parse_entry_label_item_id(section, raw_value):
@@ -365,14 +386,7 @@ def new_template_section(template_id):
             # The section modal HTML sends relevance_condition / name_translations without the
             # WTForms "section-" prefix, so form.*.data is None. Read directly from data and
             # decode the WAF-safe base64 encoding applied by the JS submit handler.
-            new_relevance_condition_raw = _b64_decode_field(data.get('relevance_condition'))
-            new_relevance_condition = None
-            if new_relevance_condition_raw and str(new_relevance_condition_raw).strip():
-                try:
-                    json.loads(new_relevance_condition_raw)
-                    new_relevance_condition = new_relevance_condition_raw
-                except (json.JSONDecodeError, TypeError) as rc_err:
-                    current_app.logger.error(f"Invalid relevance_condition for new section: {rc_err}")
+            new_relevance_condition = _normalize_relevance_condition(data.get('relevance_condition'))
 
             new_section = FormSection(
                 name=form.name.data,
@@ -573,21 +587,13 @@ def edit_template_section(section_id):
 
         _apply_section_entry_display_config(section, data)
 
-        relevance_condition = _b64_decode_field(data.get("relevance_condition"))
+        relevance_condition = _normalize_relevance_condition(data.get("relevance_condition"))
         current_app.logger.debug(f"Edit section - form data keys: {list(data.keys())}")
         current_app.logger.debug(f"Edit section - relevance_condition value: '{relevance_condition}'")
-
-        if relevance_condition and str(relevance_condition).strip():
-            try:
-                json.loads(relevance_condition)
-                section.relevance_condition = relevance_condition
-                current_app.logger.debug(f"Edit section - set relevance_condition to: {relevance_condition}")
-            except (json.JSONDecodeError, TypeError) as e:
-                current_app.logger.error(f"Error parsing section relevance condition: {e}")
-                flash("Invalid relevance condition format. Skip logic not saved.", "warning")
-                section.relevance_condition = None
+        section.relevance_condition = relevance_condition
+        if relevance_condition:
+            current_app.logger.debug(f"Edit section - set relevance_condition to: {relevance_condition}")
         else:
-            section.relevance_condition = None
             current_app.logger.debug("Edit section - cleared relevance_condition (empty or None)")
 
         _update_version_timestamp(section.version_id)

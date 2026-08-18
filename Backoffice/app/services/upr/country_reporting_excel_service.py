@@ -10,12 +10,11 @@ from typing import Any, Dict, Tuple
 
 from flask import current_app
 
+from app.services.imports.assignment_excel_access import (  # noqa: F401
+    assignment_uses_upr_country_reporting_excel,
+)
+
 UPR_COUNTRY_REPORTING_LABEL = "UPR Country Reporting"
-
-
-def assignment_uses_upr_country_reporting_excel(assigned_form) -> bool:
-    """Return True when this assignment has UPR Country Reporting Excel enabled."""
-    return bool(getattr(assigned_form, "enable_upr_country_reporting_excel", False))
 
 _SCRIPTS_DIR: str | None = None
 

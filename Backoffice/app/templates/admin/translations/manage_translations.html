@@ -550,11 +550,28 @@
 
                     <div class="flex justify-between items-center gap-2 pt-6 border-t border-gray-200">
                         <div class="flex gap-2">
-                            <button type="button" id="modal-auto-translate-btn" class="btn btn-warning" title="{{ _('Automatically translate blank fields using AI')|forceescape }}">
-                                <i class="fas fa-magic" id="modal-auto-translate-icon"></i>
-                                <i class="fas fa-spinner fa-spin hidden" id="modal-auto-translate-spinner"></i>
-                                <span id="modal-auto-translate-text">{{ _('Auto Translate') }}</span>
-                            </button>
+                            <div class="btn-group auto-translate-split js-auto-translate-split relative"
+                                 data-i18n-loading="{{ _('Loading services...')|forceescape }}"
+                                 data-i18n-empty="{{ _('No translation services configured')|forceescape }}"
+                                 data-i18n-offline="{{ _('(offline)')|forceescape }}"
+                                 data-i18n-heading="{{ _('Translation service')|forceescape }}">
+                                <button type="button" id="modal-auto-translate-btn" class="btn btn-warning" title="{{ _('Automatically translate blank fields using AI')|forceescape }}">
+                                    <i class="fas fa-magic" id="modal-auto-translate-icon"></i>
+                                    <i class="fas fa-spinner fa-spin hidden" id="modal-auto-translate-spinner"></i>
+                                    <span id="modal-auto-translate-text">{{ _('Auto Translate') }}</span>
+                                </button>
+                                <button type="button"
+                                        class="btn btn-warning js-auto-translate-service-toggle"
+                                        title="{{ _('Translation service')|forceescape }}"
+                                        aria-label="{{ _('Choose translation service')|forceescape }}"
+                                        aria-haspopup="listbox"
+                                        aria-expanded="false">
+                                    <i class="fas fa-chevron-down text-xs" aria-hidden="true"></i>
+                                </button>
+                                <div class="js-auto-translate-service-menu auto-translate-service-menu hidden"
+                                     role="listbox"
+                                     aria-label="{{ _('Translation service')|forceescape }}"></div>
+                            </div>
                             <button type="button" id="modal-clear-translations-btn" class="btn btn-ghost-danger" title="{{ _('Clear all translation fields except English')|forceescape }}">
                                 <i class="fas fa-eraser"></i>
                                 {{ _('Clear Translations') }}

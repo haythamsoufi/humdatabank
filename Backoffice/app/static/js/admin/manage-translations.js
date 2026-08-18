@@ -1116,13 +1116,6 @@
             return getLangDisplayName(langCode) + ' (' + langCode + '): ' + validation.message;
         }
 
-        function fieldNeedsAutoTranslate(msgid, field) {
-            if (!field) return false;
-            const value = field.value.trim();
-            if (!value) return true;
-            return !validatePlaceholders(msgid, value).valid;
-        }
-
         let editModalLoadToken = 0;
 
         function getGridRowData(msgid) {
@@ -1551,8 +1544,7 @@
                     const targetLanguages = Array.from(document.querySelectorAll('#edit-translation-modal [id^="msgstr_"]'))
                         .map(el => el.id.replace(/^msgstr_/, '').trim())
                         .filter(code => code && code !== 'en')
-                        .filter((code, idx, arr) => arr.indexOf(code) === idx)
-                        .filter(code => fieldNeedsAutoTranslate(msgid, document.getElementById('msgstr_' + code)));
+                        .filter((code, idx, arr) => arr.indexOf(code) === idx);
 
                     if (!targetLanguages.length) {
                         if (window.showAlert) window.showAlert(cfg.t.nothingToTranslate, 'info');
@@ -1564,8 +1556,7 @@
                         permission_context: 'translations',
                         permission_code: 'admin.translations.manage',
                         text: baseText,
-                        target_languages: targetLanguages,
-                        translation_service: 'ifrc'
+                        target_languages: targetLanguages
                     });
 
                     if (data.translations) {
@@ -1573,7 +1564,7 @@
                         const skipped = [];
                         Object.entries(data.translations).forEach(([code, value]) => {
                             const field = document.getElementById('msgstr_' + code);
-                            if (field && fieldNeedsAutoTranslate(msgid, field)) {
+                            if (field) {
                                 if (value && String(value).trim()) {
                                     field.value = value;
                                     if (isRTL(code)) {

@@ -8,9 +8,18 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Bump when post-processing changes (e.g. glossary enforce vs token-splice)
+# so stale rows are not reused.
+RESULT_CACHE_GENERATION = "v2"
+
 
 def source_hash(text: str) -> str:
     return hashlib.sha256((text or "").encode("utf-8")).hexdigest()
+
+
+def _engine_key(engine: str) -> str:
+    base = (engine or "default").strip() or "default"
+    return f"{base}:{RESULT_CACHE_GENERATION}"
 
 
 def get_cached(text: str, source_lang: str, target_lang: str, engine: str) -> Optional[str]:
@@ -21,7 +30,7 @@ def get_cached(text: str, source_lang: str, target_lang: str, engine: str) -> Op
             source_hash=source_hash(text),
             source_lang=source_lang,
             target_lang=target_lang,
-            engine=engine,
+            engine=_engine_key(engine),
         ).first()
         if row:
             return row.translated_text
@@ -38,11 +47,12 @@ def put_cached(text: str, source_lang: str, target_lang: str, engine: str, trans
         from app.models.translation_quality import TranslationResultCache
 
         digest = source_hash(text)
+        engine_key = _engine_key(engine)
         row = TranslationResultCache.query.filter_by(
             source_hash=digest,
             source_lang=source_lang,
             target_lang=target_lang,
-            engine=engine,
+            engine=engine_key,
         ).first()
         if row:
             row.translated_text = translated
@@ -52,7 +62,7 @@ def put_cached(text: str, source_lang: str, target_lang: str, engine: str, trans
                     source_hash=digest,
                     source_lang=source_lang,
                     target_lang=target_lang,
-                    engine=engine,
+                    engine=engine_key,
                     source_text=text[:8000],
                     translated_text=translated,
                 )

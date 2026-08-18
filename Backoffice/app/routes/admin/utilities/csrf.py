@@ -1,3 +1,4 @@
+from flask import request
 from flask_wtf import csrf
 from app.extensions import limiter
 from app.routes.admin.shared import admin_required, permission_required_any
@@ -50,22 +51,29 @@ def refresh_csrf_token_get():
 def api_translation_services():
     """Get available translation services status.
 
-    check_service_status() never probes on the request thread (it serves
-    cached/optimistic results and refreshes in the background), so this route
-    is bounded — inline probing pinned workers for 15-339s in the 2026-07-16
-    gateway-504 incident.
+    Default GET serves the last cached probe (unverified services are
+    unavailable — never optimistic-up). ``?refresh=1`` waits for a cheap
+    health check when the cache is empty or stale; use that when the
+    service list is opened. Inline translation probes used to pin workers
+    for 15-339s in the 2026-07-16 gateway-504 incident.
     """
     try:
         auto_translator = get_auto_translator()
         available_services = auto_translator.get_available_services()
         default_service = auto_translator.get_default_service()
-        service_status = auto_translator.check_service_status()
+        refresh = (request.args.get("refresh") or "").strip().lower() in ("1", "true", "yes")
+        if refresh:
+            service_status = auto_translator.wait_for_fresh_status()
+            verified = True
+        else:
+            service_status = auto_translator.check_service_status() or {}
+            verified = auto_translator.has_status_cache()
 
         service_display_names = {
             'ifrc': 'Hosted translation API',
             'libre': 'LibreTranslate AI',
             'google': 'Google Translate',
-            'nllb': 'NLLB (long-tail languages)',
+            'nllb': 'NLLB',
         }
 
         services = []
@@ -78,7 +86,7 @@ def api_translation_services():
                 'is_available': is_available
             })
 
-        return json_ok(services=services, default_service=default_service)
+        return json_ok(services=services, default_service=default_service, verified=verified)
 
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)

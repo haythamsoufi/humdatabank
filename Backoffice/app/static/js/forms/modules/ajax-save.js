@@ -1,6 +1,6 @@
 // AJAX Save Module - Handle form saving without page reload
 import { debugLog } from './debug.js';
-import { applyEntryFormProgress } from './entry-form-progress.js';
+import { applyEntryFormProgress, coerceCompletionRate, refreshVisibleCompletionRate } from './entry-form-progress.js';
 
 const MODULE_NAME = 'ajax-save';
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
@@ -305,6 +305,13 @@ async function saveFormOnce(options = {}) {
                 updateFormData(result.data);
             }
             applyEntryFormProgress(result);
+            if (coerceCompletionRate(result?.completion_rate ?? result?.data?.completion_rate) === null) {
+                debugLog(MODULE_NAME, 'Save response had no completion_rate; refetching header');
+                const aesId = document.getElementById('completion-gap-btn')?.dataset?.aesId;
+                if (aesId) {
+                    refreshVisibleCompletionRate(aesId).catch(() => { /* ignore */ });
+                }
+            }
 
             const isPresave = options && options.presave === true;
             if (!isPresave) {

@@ -925,6 +925,18 @@
     auto_translate_permission_code='admin.templates.edit'
 ) }}
 
+{# Validation Message Translation Modal #}
+{{ translation_modal(
+    modal_id='item-validation-message-translation-modal',
+    modal_title=_('Validation Message Translations'),
+    description=_('Add translations for this validation message in different languages. You can also override the English text here if needed.'),
+    context='form_item',
+    show_auto_translate=true,
+    css_prefix='item-validation-message',
+    auto_translate_permission_context='templates',
+    auto_translate_permission_code='admin.templates.edit'
+) }}
+
 {# Entry Form Hint Translation Modal #}
 {{ translation_modal(
     modal_id='item-entry-form-hint-text-translation-modal',

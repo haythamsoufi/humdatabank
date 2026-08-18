@@ -3607,28 +3607,14 @@
     // Pre-fill data owner from template's owned_by when template selection changes
     const templateSelect = document.querySelector('select[name="template_id"]');
     const dataOwnerSelect = document.getElementById('data_owner_id_select');
-    const uprExcelCheckbox = document.getElementById('enable_upr_country_reporting_excel');
-    const ucpExcelCheckbox = document.getElementById('enable_unified_country_plan_excel');
     const exportExcelCheckbox = document.getElementById('enable_export_excel');
     const importExcelCheckbox = document.getElementById('enable_import_excel');
     const exportPdfCheckbox = document.getElementById('enable_export_pdf');
     if (!templateSelect) return;
 
-    let uprExcelUserTouched = uprExcelCheckbox ? uprExcelCheckbox.checked : false;
-    let ucpExcelUserTouched = ucpExcelCheckbox ? ucpExcelCheckbox.checked : false;
     let exportExcelUserTouched = exportExcelCheckbox ? exportExcelCheckbox.checked : false;
     let importExcelUserTouched = importExcelCheckbox ? importExcelCheckbox.checked : false;
     let exportPdfUserTouched = exportPdfCheckbox ? exportPdfCheckbox.checked : false;
-    if (uprExcelCheckbox) {
-        uprExcelCheckbox.addEventListener('change', function () {
-            uprExcelUserTouched = true;
-        });
-    }
-    if (ucpExcelCheckbox) {
-        ucpExcelCheckbox.addEventListener('change', function () {
-            ucpExcelUserTouched = true;
-        });
-    }
     if (exportExcelCheckbox) {
         exportExcelCheckbox.addEventListener('change', function () {
             exportExcelUserTouched = true;
@@ -3660,21 +3646,6 @@
         }
     }
 
-    function syncCustomExcelDefaults(templateId) {
-        if (cfg.isNew !== true && cfg.isNew !== 'true') {
-            return;
-        }
-        const selectedId = parseInt(templateId, 10);
-        const uprTemplateId = parseInt(cfg.uprReportingTemplateId, 10);
-        const ucpTemplateId = parseInt(cfg.uprPlanningTemplateId, 10);
-        if (uprExcelCheckbox && !uprExcelUserTouched) {
-            uprExcelCheckbox.checked = Number.isFinite(uprTemplateId) && selectedId === uprTemplateId;
-        }
-        if (ucpExcelCheckbox && !ucpExcelUserTouched) {
-            ucpExcelCheckbox.checked = Number.isFinite(ucpTemplateId) && selectedId === ucpTemplateId;
-        }
-    }
-
     const TEMPLATES_API = cfg.urls.adminBase;
 
     async function prefillDataOwnerFromTemplate(templateId) {
@@ -3702,7 +3673,6 @@
     // On template change (new assignment form)
     templateSelect.addEventListener('change', function () {
         prefillDataOwnerFromTemplate(this.value);
-        syncCustomExcelDefaults(this.value);
     });
 
     // Auto-trigger on page load for new assignments with a pre-selected template: keeps
@@ -3711,7 +3681,6 @@
         if (templateSelect.value) {
             prefillDataOwnerFromTemplate(templateSelect.value);
         }
-        syncCustomExcelDefaults(templateSelect.value);
     }
 })();
 

@@ -25,6 +25,7 @@ from app.models import (
 )
 from app.models.enums import EntityType
 from app.services.organization.entity_service import EntityService
+from app.services.assignments.completion_service import AssignmentCompletionService
 from app.services.forms.data_service import FormDataService
 from app.services.forms.processing_service import get_form_items_for_section, slugify_age_group, _create_dynamic_indicator_object
 from app.services.monitoring.debug import debug_manager, performance_monitor
@@ -1004,15 +1005,29 @@ def handle_assignment_form(aes_id):
                             for ch in (submission_result.get('field_changes') or [])
                             if ch.get('submitted_document_id')
                         ]
+                        previous_rate = None
+                        raw_previous = getattr(assignment_entity_status, 'completion_rate', None)
+                        try:
+                            if raw_previous is not None:
+                                previous_rate = float(raw_previous)
+                        except (TypeError, ValueError):
+                            previous_rate = None
                         progress = compute_entry_form_progress_metrics(
                             assignment_entity_status,
                             form_template,
                             all_sections,
                         )
+                        current_app.logger.info(
+                            "Entry form save returning completion_rate for aes_id=%s: "
+                            "previous=%s new=%s",
+                            assignment_entity_status.id,
+                            previous_rate,
+                            progress['completion_rate'],
+                        )
                         return json_ok(
                             message="Progress saved successfully.",
                             uploaded_documents=uploaded_documents,
-                            completion_rate=progress['completion_rate'],
+                            completion_rate=float(progress['completion_rate']),
                             section_statuses=progress['section_statuses'],
                         )
                     else:
@@ -1044,7 +1059,17 @@ def handle_assignment_form(aes_id):
 
     template_structure = form_template
 
-    section_statuses = calculate_section_completion_status(all_sections, existing_data_processed, existing_submitted_documents_dict)
+    empty_option_ids = AssignmentCompletionService._empty_option_list_ids_for_assignment(
+        assignment_entity_status.id,
+        form_template.id,
+        form_template.published_version_id,
+    ) if form_template.published_version_id else frozenset()
+    section_statuses = calculate_section_completion_status(
+        all_sections,
+        existing_data_processed,
+        existing_submitted_documents_dict,
+        skip_field_ids=empty_option_ids,
+    )
     _entry_lap("section_statuses")
 
     for section in all_sections:

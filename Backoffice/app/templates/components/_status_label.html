@@ -1,8 +1,8 @@
 {# Centralized status labels — styles in app/static/css/components.css (.status-label) #}
 {# JS equivalent: StatusLabels.render() in app/static/js/components/status-labels.js #}
 
-{% macro status_label(text, variant='neutral', extra_class='') %}
-<span class="status-label status-label--{{ variant }}{% if extra_class %} {{ extra_class }}{% endif %}">{{ text }}</span>
+{% macro status_label(text, variant='neutral', extra_class='', title='') %}
+<span class="status-label status-label--{{ variant }}{% if extra_class %} {{ extra_class }}{% endif %}"{% if title %} title="{{ title|e }}"{% endif %}>{{ text }}</span>
 {% endmacro %}
 
 {% macro assignment_status_key(status) -%}

@@ -24,6 +24,8 @@ from .helpers import (_create_form_item, _update_indicator_fields, _update_quest
     _update_document_field_fields, _update_matrix_fields, _update_image_fields, _update_plugin_fields,
     _update_item_config, _update_version_timestamp, _ensure_template_access_or_redirect,
     is_conditions_meaningful)
+from .helpers.field_parsing import parse_translations_json
+from config.config import Config
 import json
 
 from app.services.assignments.completion_service import AssignmentCompletionService
@@ -95,6 +97,7 @@ def _form_item_audit_snapshot(form_item):
         'relevance_condition': form_item.relevance_condition,
         'validation_condition': form_item.validation_condition,
         'validation_message': form_item.validation_message,
+        'validation_message_translations': _jsonish(form_item.validation_message_translations),
         'config': cfg,
         'indicator_bank_id': form_item.indicator_bank_id,
         'definition': form_item.definition,
@@ -466,12 +469,17 @@ def edit_item(item_id):
                 submitted_item_type == 'image'
                 or (submitted_item_type == 'question' and getattr(form_item, 'type', None) == 'blank')
             )
+            supported_codes = current_app.config.get('SUPPORTED_LANGUAGES', getattr(Config, 'LANGUAGES', ['en']))
             if is_display_only:
                 form_item.validation_condition = None
                 form_item.validation_message = None
+                form_item.validation_message_translations = None
             else:
                 form_item.validation_condition = val_json if is_conditions_meaningful(val_json) else None
                 form_item.validation_message = val_msg if val_msg else None
+                form_item.validation_message_translations = parse_translations_json(
+                    data.get('validation_message_translations'), supported_codes
+                )
 
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(form_item, 'config')

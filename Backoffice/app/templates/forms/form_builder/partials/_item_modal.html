@@ -1386,8 +1386,12 @@
                             <div class="flex items-center gap-2 flex-wrap mb-2">
                                 <label for="item-validation-message" class="text-gray-700 text-sm font-semibold">{{ _('Validation Message') }}</label>
                                 {{ field_help(_('Message to display to the user if the validation rule is not met.')) }}
+                                <button type="button" id="item-validation-message-translations-btn" class="inline-flex items-center justify-center p-1.5 text-sm text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md transition shrink-0" title="{{ _('Add translations')|forceescape }}" aria-label="{{ _('Add translations')|forceescape }}">
+                                    <i class="fas fa-language w-4 h-4" aria-hidden="true"></i>
+                                </button>
                             </div>
                             <textarea name="validation_message" id="item-validation-message" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md" rows="2" placeholder="{{ _('Message to show if validation fails')|forceescape }}"></textarea>
+                            <input type="hidden" name="validation_message_translations" id="item-validation-message-translations" value="{}">
                         </div>
                     </div>
                 </div>

@@ -726,6 +726,16 @@ class TestCreatePluginFormItem:
         assert item.validation_condition == cond
         assert item.validation_message == 'Must be filled'
 
+    def test_validation_message_translations_set(self, app, mock_db):
+        template, section = _mock_template(), _mock_section()
+        form_data = ImmutableMultiDict([
+            ('validation_message', 'Must be filled'),
+            ('validation_message_translations', json.dumps({'fr': 'Doit être rempli'})),
+        ])
+        item = _create_plugin_form_item(template, section, form_data, 'plugin_text', 1)
+        assert item.validation_message == 'Must be filled'
+        assert item.validation_message_translations == {'fr': 'Doit être rempli'}
+
     def test_order_from_form(self, app, mock_db):
         template, section = _mock_template(), _mock_section()
         form_data = ImmutableMultiDict([('order', '8')])

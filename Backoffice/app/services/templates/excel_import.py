@@ -1721,6 +1721,7 @@ class TemplateExcelImportMixin(TemplateExcelMatrixMixin):
                 definition_translations=getattr(it, 'definition_translations', None),
                 options_translations=getattr(it, 'options_translations', None),
                 description_translations=getattr(it, 'description_translations', None),
+                validation_message_translations=getattr(it, 'validation_message_translations', None),
                 description=getattr(it, 'description', None)
             )
             db.session.add(new_it)

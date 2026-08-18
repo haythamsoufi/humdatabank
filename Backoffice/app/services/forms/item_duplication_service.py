@@ -127,6 +127,9 @@ class ItemDuplicationService:
         description_translations = ItemDuplicationService._deep_copy_json_field(
             getattr(source_item, 'description_translations', None)
         )
+        validation_message_translations = ItemDuplicationService._deep_copy_json_field(
+            getattr(source_item, 'validation_message_translations', None)
+        )
 
         # Copy options_json
         new_options_json = ItemDuplicationService._deep_copy_json_field(
@@ -162,6 +165,7 @@ class ItemDuplicationService:
             definition_translations=definition_translations,
             options_translations=options_translations,
             description_translations=description_translations,
+            validation_message_translations=validation_message_translations,
             description=getattr(source_item, 'description', None),
             archived=False  # New items are never archived
         )

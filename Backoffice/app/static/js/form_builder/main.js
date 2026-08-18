@@ -9,7 +9,7 @@ import { DataManager } from './modules/data-manager.js';
 import { ItemModal } from './modules/modal/item-modal.js';
 import { CalculatedLists } from './modules/calculated-lists.js';
 import RuleBuilder from './modules/rules/conditions.js';
-import { serializeRuleForSubmit } from './modules/rules/form-serialization.js';
+import { serializeRuleForSubmit, unwrapStoredRuleJson } from './modules/rules/form-serialization.js';
 import { DynamicSections } from './modules/dynamic-sections.js';
 import { FormSubmitUI } from './modules/form-submit-ui.js';
 import { initFormBuilderDebug } from './modules/debug.js';
@@ -681,6 +681,12 @@ function initializeSectionManagement() {
             };
 
             try {
+                const relevanceRuleBuilder = document.querySelector('#section-relevance-rule-builder');
+                const relevanceConditionInput = document.getElementById('section-relevance-condition');
+                if (relevanceRuleBuilder && relevanceConditionInput) {
+                    // Must run before formDataToJson — the other submit listener is too late.
+                    relevanceConditionInput.value = serializeRuleForSubmit(relevanceRuleBuilder) || '';
+                }
                 const payload = window.formDataToJson ? window.formDataToJson(sectionForm) : null;
                 // WAF: Base64-encode fields whose values can contain JSON operators (AND/OR/==)
                 // that Azure OWASP CRS rules (e.g. 942100/942150) misread as SQL injection.
@@ -788,7 +794,7 @@ function initializeSectionManagement() {
                     show_entries_in_navigation: showEntriesInNavigation,
                     hide_section_header: hideSectionHeader,
                     name_translations: nameTranslations,
-                    relevance_condition: relevanceCondition
+                    relevance_condition: unwrapStoredRuleJson(relevanceCondition)
                 });
                 return;
             }
@@ -860,6 +866,7 @@ function initializeItemManagement() {
                     relevance_condition: dataset.relevanceCondition,
                     validation_condition: dataset.validationCondition,
                     validation_message: dataset.validationMessage,
+                    validation_message_translations: dataset.validationMessageTranslations ? JSON.parse(dataset.validationMessageTranslations) : {},
                     allow_data_not_available: ['true','1','yes'].includes((dataset.allowDataNotAvailable || '').toLowerCase()),
                     allow_not_applicable: ['true','1','yes'].includes((dataset.allowNotApplicable || '').toLowerCase()),
                     allow_disability_questions: ['true','1','yes'].includes((dataset.allowDisabilityQuestions || '').toLowerCase()),
@@ -894,6 +901,7 @@ function initializeItemManagement() {
                     relevance_condition: dataset.relevanceCondition,
                     validation_condition: dataset.validationCondition,
                     validation_message: dataset.validationMessage,
+                    validation_message_translations: dataset.validationMessageTranslations ? JSON.parse(dataset.validationMessageTranslations) : {},
                     allow_data_not_available: ['true','1','yes'].includes((dataset.allowDataNotAvailable || '').toLowerCase()),
                     allow_not_applicable: ['true','1','yes'].includes((dataset.allowNotApplicable || '').toLowerCase()),
                     allow_disability_questions: ['true','1','yes'].includes((dataset.allowDisabilityQuestions || '').toLowerCase()),
@@ -952,6 +960,7 @@ function initializeItemManagement() {
                     relevance_condition: dataset.relevanceCondition,
                     validation_condition: dataset.validationCondition,
                     validation_message: dataset.validationMessage,
+                    validation_message_translations: dataset.validationMessageTranslations ? JSON.parse(dataset.validationMessageTranslations) : {},
                     allow_data_not_available: ['true','1','yes'].includes((dataset.allowDataNotAvailable || '').toLowerCase()),
                     allow_not_applicable: ['true','1','yes'].includes((dataset.allowNotApplicable || '').toLowerCase()),
                     allow_disability_questions: ['true','1','yes'].includes((dataset.allowDisabilityQuestions || '').toLowerCase()),

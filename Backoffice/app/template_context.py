@@ -32,10 +32,12 @@ def register_template_context(app, config_class):
         from app.utils.form_localization import (
             get_indicator_bank_type_display,
             get_indicator_bank_unit_display,
+            get_localized_validation_message,
         )
 
         app.jinja_env.globals['get_indicator_bank_type_display'] = get_indicator_bank_type_display
         app.jinja_env.globals['get_indicator_bank_unit_display'] = get_indicator_bank_unit_display
+        app.jinja_env.globals['get_localized_validation_message'] = get_localized_validation_message
     except Exception as e:
         app.logger.debug("Failed to register indicator bank Jinja display helpers: %s", e)
 

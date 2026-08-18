@@ -1703,7 +1703,20 @@
                 if (!el) {
                     return false;
                 }
-                var width = el.clientWidth || el.getBoundingClientRect().width;
+                // ag_grid_container keeps #{id} inside display:none until create()
+                // reveals it — measure the visible wrap/panel, not the hidden grid.
+                var panel = el.closest('.settings-panel');
+                if (panel && panel.classList.contains('hidden')) {
+                    return false;
+                }
+                if (panel && !panel.classList.contains('hidden')) {
+                    var panelWidth = panel.clientWidth || panel.getBoundingClientRect().width;
+                    if (panelWidth >= minWidth) {
+                        return true;
+                    }
+                }
+                var measure = el.closest('.ag-grid-body-wrap') || el.parentElement || el;
+                var width = measure.clientWidth || measure.getBoundingClientRect().width;
                 return width >= minWidth;
             }
 
@@ -1713,11 +1726,11 @@
                 }
             }
 
-            function initGrid() {
+            function initGrid(force) {
                 if (initialized) {
                     return result;
                 }
-                if (tabConfig.deferUntilVisible && !isGridVisibleEnough()) {
+                if (!force && tabConfig.deferUntilVisible && !isGridVisibleEnough()) {
                     return result;
                 }
                 initialized = true;
@@ -1732,7 +1745,9 @@
                     return;
                 }
                 if (!initialized) {
-                    initGrid();
+                    // Tab show is the visibility signal; the grid node may still
+                    // be display:none inside ag_grid_container until create().
+                    initGrid(true);
                 }
                 runTabActivatedCallback();
             }

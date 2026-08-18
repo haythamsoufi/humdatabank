@@ -11,6 +11,8 @@ import time
 from app.services.imports.assignment_excel_access import (
     assignment_uses_export_excel,
     assignment_uses_import_excel,
+    assignment_uses_unified_country_plan_excel,
+    assignment_uses_upr_country_reporting_excel,
 )
 from app.services.imports.excel_service import ExcelService
 from app.services.upr.country_reporting_excel_service import (
@@ -273,7 +275,7 @@ def _validate_upr_country_reporting_assignment(aes_id, *, is_ajax: bool):
         return None, redirect(url_for("main.dashboard"))
 
     assigned = getattr(aes, "assigned_form", None)
-    if not assigned or not getattr(assigned, "enable_upr_country_reporting_excel", False):
+    if not assigned or not assignment_uses_upr_country_reporting_excel(assigned):
         error_msg = (
             f"{UPR_COUNTRY_REPORTING_LABEL} export/import is not enabled for this assignment."
         )
@@ -495,7 +497,7 @@ def _validate_unified_country_plan_assignment(aes_id, *, is_ajax: bool):
         return None, redirect(url_for("main.dashboard"))
 
     assigned = getattr(aes, "assigned_form", None)
-    if not assigned or not getattr(assigned, "enable_unified_country_plan_excel", False):
+    if not assigned or not assignment_uses_unified_country_plan_excel(assigned):
         error_msg = f"{UNIFIED_COUNTRY_PLAN_LABEL} export/import is not enabled for this assignment."
         flash(error_msg, "warning")
         if is_ajax:

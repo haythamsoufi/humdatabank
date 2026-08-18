@@ -22,6 +22,7 @@ from app.models import (
     SubmittedDocument,
 )
 from app.utils.matrix_activity import matrix_cell_display_value
+from app.utils.api_serialization import _is_matrix_metadata_key
 
 
 def _matrix_cell_has_value(raw: Any) -> bool:
@@ -38,6 +39,9 @@ def matrix_entry_is_filled(disagg, not_applicable) -> bool:
     """A matrix table counts as one filled item when N/A or any cell has data.
 
     Only one non-empty cell is required — the whole matrix does not need to be complete.
+    Metadata/sentinel keys (``row_go_unmatched|*``, ``col_header|*``, etc.) are skipped
+    so that a disagg_data containing only orphaned sentinels (e.g. from a deleted row
+    whose flag was not cleaned up by the JS) does not falsely count as filled.
     """
     if not_applicable:
         return True
@@ -46,7 +50,7 @@ def matrix_entry_is_filled(disagg, not_applicable) -> bool:
     return any(
         _matrix_cell_has_value(v)
         for k, v in disagg.items()
-        if not str(k).startswith('_')
+        if not str(k).startswith('_') and not _is_matrix_metadata_key(k)
     )
 
 
@@ -93,7 +97,7 @@ def explain_matrix_entry_fill(
             'detail': f'Expected object, got {type(effective).__name__}.',
         }
 
-    cell_keys = [k for k in effective if not str(k).startswith('_')]
+    cell_keys = [k for k in effective if not str(k).startswith('_') and not _is_matrix_metadata_key(k)]
     filled_cells = [k for k in cell_keys if _matrix_cell_has_value(effective.get(k))]
     if filled_cells:
         return {
@@ -192,6 +196,140 @@ def _visibility_filters(
     if hidden_section_ids:
         filters.append(~FormItem.section_id.in_(list(hidden_section_ids)))
     return tuple(filters)
+
+
+def _form_item_matrix_config(form_item) -> dict:
+    cfg = form_item.config if isinstance(getattr(form_item, 'config', None), dict) else {}
+    mc = cfg.get('matrix_config')
+    return mc if isinstance(mc, dict) else {}
+
+
+def _matrix_lookup_list_id(form_item) -> str:
+    mc = _form_item_matrix_config(form_item)
+    raw = getattr(form_item, 'lookup_list_id', None) or mc.get('lookup_list_id') or ''
+    return str(raw).strip()
+
+
+def matrix_is_list_backed(form_item) -> bool:
+    """True when matrix rows come from a lookup/plugin list (list_library or hybrid)."""
+    mc = _form_item_matrix_config(form_item)
+    row_mode = str(mc.get('row_mode') or '').strip().lower()
+    if row_mode not in ('list_library', 'hybrid'):
+        return False
+    return bool(_matrix_lookup_list_id(form_item))
+
+
+def matrix_has_manual_rows(form_item) -> bool:
+    """True when the matrix config still has at least one static/manual row to fill."""
+    rows = _form_item_matrix_config(form_item).get('rows') or []
+    if not isinstance(rows, list):
+        return False
+    for row in rows:
+        if isinstance(row, dict):
+            label = row.get('name') or row.get('label') or row.get('id')
+            if label is not None and str(label).strip():
+                return True
+        elif row is not None and str(row).strip():
+            return True
+    return False
+
+
+_eo_option_count_cache: dict[tuple, tuple[float, int | None]] = {}
+_eo_option_count_cache_lock = threading.Lock()
+_EO_OPTION_COUNT_CACHE_TTL = 60.0
+_EO_OPTION_COUNT_CACHE_MAX = 500
+
+
+def _emergency_operations_cache_is_warm() -> bool:
+    """True only when the EmOps file cache is populated with actual GO data.
+
+    A cache file that exists but has an empty ``results`` list (e.g. from a
+    failed or incomplete refresh) is *not* considered warm — filtering from an
+    empty global list would yield 0 for every country and incorrectly exclude
+    all list-backed matrices from the completion denominator.
+    """
+    try:
+        from plugins.emergency_operations.data_store import get_data_store
+        cached = get_data_store().load_cached()
+        return isinstance(cached, dict) and bool(cached.get('results'))
+    except Exception:
+        return False
+
+
+def emergency_operations_option_count(form_item, aes) -> int | None:
+    """Country-filtered GO appeal count, or None when the count cannot be proven.
+
+    Returns None (do not exclude the item) when the country is unknown, the
+    EmOps cache is cold, or the lookup fails — an empty list must be certain
+    before we drop the matrix from the completion denominator.
+    """
+    from app.services.forms.emergency_section_binding import (
+        _assignment_period_for_aes,
+        _country_iso_for_aes,
+        _filters_hash,
+        _normalize_emops_config,
+    )
+
+    iso = _country_iso_for_aes(aes)
+    if not iso or not _emergency_operations_cache_is_warm():
+        return None
+
+    mc = _form_item_matrix_config(form_item)
+    raw_cfg = mc.get('plugin_config') if isinstance(mc.get('plugin_config'), dict) else {}
+    period = _assignment_period_for_aes(aes)
+    cache_key = (iso, _filters_hash(iso, raw_cfg, period))
+    now = time.time()
+    with _eo_option_count_cache_lock:
+        cached = _eo_option_count_cache.get(cache_key)
+    if cached and cached[0] > now:
+        return cached[1]
+
+    try:
+        from plugins.emergency_operations.routes import get_emergency_operations_data
+        ops = get_emergency_operations_data(
+            country_iso=iso,
+            config=_normalize_emops_config(raw_cfg, period),
+        )
+        count = len(ops or [])
+    except Exception:
+        count = None
+
+    with _eo_option_count_cache_lock:
+        if cache_key not in _eo_option_count_cache and len(_eo_option_count_cache) >= _EO_OPTION_COUNT_CACHE_MAX:
+            oldest = next(iter(_eo_option_count_cache))
+            _eo_option_count_cache.pop(oldest, None)
+        _eo_option_count_cache[cache_key] = (now + _EO_OPTION_COUNT_CACHE_TTL, count)
+    return count
+
+
+def resolved_list_option_count(form_item, aes) -> int | None:
+    """Option count for a list-backed matrix, or None when it cannot be proven."""
+    list_id = _matrix_lookup_list_id(form_item)
+    if not list_id:
+        return None
+    if list_id == 'emergency_operations':
+        return emergency_operations_option_count(form_item, aes)
+    if list_id == 'country_map':
+        from app.models.core import Country
+        return int(Country.query.count() or 0)
+    if list_id == 'national_society':
+        from app.models.organization import NationalSociety
+        return int(NationalSociety.query.count() or 0)
+    if list_id == 'indicator_bank':
+        from app.models.indicator_bank import IndicatorBank
+        return int(IndicatorBank.query.count() or 0)
+    if list_id.isdigit():
+        mc = _form_item_matrix_config(form_item)
+        filters = getattr(form_item, 'list_filters_json', None)
+        if filters in (None, '', '[]', 'null'):
+            filters = mc.get('list_filters')
+        if isinstance(filters, list) and filters:
+            return None
+        if isinstance(filters, str) and filters.strip() not in ('', '[]', 'null'):
+            return None
+        from app.models import LookupListRow
+        return int(LookupListRow.query.filter_by(lookup_list_id=int(list_id)).count() or 0)
+    return None
 
 
 # ── Short-TTL cache for "which sections/items have a metadata-resolvable relevance
@@ -778,6 +916,14 @@ class AssignmentCompletionService:
         if not rows:
             return []
 
+        empty_option_fields = AssignmentCompletionService._empty_option_list_ids_for_assignment(
+            assignment_entity_status_id, template_id, version_id,
+        )
+        if empty_option_fields:
+            rows = [row for row in rows if row[0] not in empty_option_fields]
+            if not rows:
+                return []
+
         filled_non_matrix = AssignmentCompletionService._filled_non_matrix_form_item_ids(
             assignment_entity_status_id,
             template_id,
@@ -902,6 +1048,46 @@ class AssignmentCompletionService:
         return hidden_fields, hidden_sections
 
     @staticmethod
+    def _empty_option_list_ids_for_assignment(
+        assignment_entity_status_id: int,
+        template_id: int,
+        version_id: int,
+    ) -> frozenset[int]:
+        """Matrices whose add-from-list has no selectable options for this assignment.
+
+        A list-backed matrix (GO emergency appeals, empty lookup list, …) should not
+        reduce completion when the country/context has nothing to pick. Only exclude
+        when the option count is proven to be zero — unknown/failed lookups stay in
+        the denominator. Hybrid matrices that still have static rows stay countable.
+        """
+        try:
+            items = (
+                db.session.query(FormItem)
+                .join(FormSection, FormItem.section_id == FormSection.id)
+                .filter(
+                    *_published_filters_single(template_id, version_id),
+                    FormItem.item_type == 'matrix',
+                    _countable_form_item_filter(),
+                )
+                .all()
+            )
+            list_backed = [item for item in items if matrix_is_list_backed(item)]
+            if not list_backed:
+                return frozenset()
+            aes = db.session.get(AssignmentEntityStatus, assignment_entity_status_id)
+            if not aes:
+                return frozenset()
+            empty_ids = []
+            for item in list_backed:
+                if matrix_has_manual_rows(item):
+                    continue
+                if resolved_list_option_count(item, aes) == 0:
+                    empty_ids.append(item.id)
+            return frozenset(empty_ids)
+        except Exception:
+            return frozenset()
+
+    @staticmethod
     def compute_for_assignment(
         assignment_entity_status_id: int,
         template_id: int,
@@ -915,7 +1101,12 @@ class AssignmentCompletionService:
                 assignment_entity_status_id, template_id, version_id,
             )
         )
-        effective_hidden_fields = set(hidden_field_ids or ()) | relevance_hidden_fields
+        empty_option_fields = AssignmentCompletionService._empty_option_list_ids_for_assignment(
+            assignment_entity_status_id, template_id, version_id,
+        )
+        effective_hidden_fields = (
+            set(hidden_field_ids or ()) | relevance_hidden_fields | empty_option_fields
+        )
         effective_hidden_sections = set(hidden_section_ids or ()) | relevance_hidden_sections
 
         total_items = AssignmentCompletionService._count_template_total_items(
@@ -1005,12 +1196,19 @@ class AssignmentCompletionService:
                             aes_id, template_id, published_version_id,
                         )
                     )
-                    if relevance_hidden_fields or relevance_hidden_sections:
-                        # Relevance-hidden totals vary per assignment (e.g. period-gated
-                        # sections), so they can't share the per-template-version cache.
+                    empty_option_fields = (
+                        AssignmentCompletionService._empty_option_list_ids_for_assignment(
+                            aes_id, template_id, published_version_id,
+                        )
+                    )
+                    hidden_fields = set(relevance_hidden_fields) | empty_option_fields
+                    if hidden_fields or relevance_hidden_sections:
+                        # Hidden totals vary per assignment (period-gated sections or
+                        # country-empty list-backed matrices), so they can't share the
+                        # per-template-version cache.
                         total_items = AssignmentCompletionService._count_template_total_items(
                             template_id, published_version_id,
-                            relevance_hidden_fields, relevance_hidden_sections,
+                            hidden_fields, relevance_hidden_sections,
                         )
                     else:
                         cache_key = (template_id, published_version_id)
@@ -1023,7 +1221,7 @@ class AssignmentCompletionService:
                         total_items = total_items_cache[cache_key]
                     filled_items = AssignmentCompletionService._count_filled_items(
                         aes_id, template_id, published_version_id,
-                        relevance_hidden_fields, relevance_hidden_sections,
+                        hidden_fields, relevance_hidden_sections,
                     )
                     rate = round(completion_rate_percent(filled_items, total_items), 1)
 
@@ -1045,7 +1243,10 @@ class AssignmentCompletionService:
         if not aes:
             return 0.0
 
+        previous = float(aes.completion_rate) if aes.completion_rate is not None else None
         context = AssignmentCompletionService._template_context_for_aes(assignment_entity_status_id)
+        filled_items = 0
+        total_items = 0
         if not context:
             rate = 0.0
         else:
@@ -1055,11 +1256,52 @@ class AssignmentCompletionService:
                 template_id,
                 published_version_id,
             )
-            rate = round(metrics.completion_rate, 1)
+            filled_items = int(metrics.filled_items)
+            total_items = int(metrics.total_items)
+            rate = float(round(metrics.completion_rate, 1))
 
         aes.completion_rate = rate
         db.session.flush()
+        AssignmentCompletionService._log_refresh(
+            assignment_entity_status_id,
+            previous=previous,
+            rate=rate,
+            filled_items=filled_items,
+            total_items=total_items,
+            context=context,
+        )
         return rate
+
+    @staticmethod
+    def _log_refresh(
+        assignment_entity_status_id: int,
+        *,
+        previous: float | None,
+        rate: float,
+        filled_items: int,
+        total_items: int,
+        context: tuple[int, int] | None,
+    ) -> None:
+        try:
+            from flask import current_app, has_app_context
+            if not has_app_context():
+                return
+            template_id, version_id = context if context else (None, None)
+            changed = previous != rate
+            current_app.logger.info(
+                "Recalculated completion_rate for aes_id=%s: %s -> %s "
+                "(%s/%s filled, template_id=%s version_id=%s, changed=%s)",
+                assignment_entity_status_id,
+                previous,
+                rate,
+                filled_items,
+                total_items,
+                template_id,
+                version_id,
+                changed,
+            )
+        except Exception:
+            pass
 
     @staticmethod
     def stored_rate_for(assignment_entity_status: AssignmentEntityStatus) -> float:

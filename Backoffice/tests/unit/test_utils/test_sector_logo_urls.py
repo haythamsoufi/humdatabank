@@ -39,8 +39,27 @@ def test_sector_logo_url_falls_back_to_admin_route(app, client):
     assert url.endswith("/admin/sectors/7/logo")
 
 
-def test_sector_logo_url_none_without_logo(app):
-    from app.utils.sector_logo_urls import sector_logo_url
+def test_spef_icon_url_falls_back_to_admin_route(app, client):
+    from app.utils.sector_logo_urls import spef_icon_url
 
-    sector = _LogoEntity(entity_id=1, logo_filename=None)
-    assert sector_logo_url(sector) is None
+    class _Spef:
+        id = 4
+        icon_filename = "SP1.png"
+        updated_at = None
+
+    app.config["STATIC_CDN_URL"] = ""
+    app.config["UPLOAD_STORAGE_PROVIDER"] = "filesystem"
+
+    with app.test_request_context("/"):
+        url = spef_icon_url(_Spef())
+    assert url.endswith("/admin/indicator-bank/spef-lookups/4/icon")
+
+
+def test_spef_icon_url_none_without_icon(app):
+    from app.utils.sector_logo_urls import spef_icon_url
+
+    class _Spef:
+        id = 1
+        icon_filename = None
+
+    assert spef_icon_url(_Spef()) is None

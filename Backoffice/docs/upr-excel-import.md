@@ -42,7 +42,7 @@ Sync planning and reporting data from **UPR Master.xlsx** (sheet `UPR Data`) int
 | `Section` | Logical section: `NS Data`, `Funding`, `Reach`, `Support`, `Comments`, `Staff` |
 | `Entity` | Who owns the value: `HNS`, `IFRC Secretariat`, `PNS`, `All-PNS` |
 | `NS` | Name of the specific National Society (critical for PNS rows) |
-| `Source` | Legacy/metadata: which column `ValueNum` reflects (`Country Data`, `PNS Data`, `Mix Data`). **Not used for import routing** — use `Country Value` / `PNS Value` instead |
+| `Source` | Which column `ValueNum` reflects (`Country Data`, `PNS Data`, `Mix Data`). Planning funding uses `Country Value` / `PNS Value` instead. **Reporting T23** imports Funding rows where `Source = PNS Data` and uses `ValueNum`. |
 | `Area` | SP1–SP5, EFs, EA1–EA3, EAs, or Total |
 | `Attribute` | Row type: `SP Breakdown`, `Total`, `SubTotal` |
 | `Indicator` | Indicator label |
@@ -130,14 +130,16 @@ Built once per import run by `build_import_context()`. Caches all DB lookups so 
 | `ns_name_to_id` | `{ns_name_lower: NationalSociety.id}` — for bilateral support and PNS funding rows |
 | `ns_home_country_iso3` | `{ns_name_lower: Country.iso3}` — maps PNS name to its home country for template 22 AES lookup |
 | `country_id_by_iso3` | `{ISO3: Country.id}` — row key for `country_map` list_library matrices (template 22) |
-| `emergency_matrix_plugin_config` | Plugin config from item 960 (filters passed to GO API) |
+| `emergency_matrix_plugin_config` | Plugin config from the published T24 Emergency Appeals matrix |
 | `emergency_ops_by_iso` / `_ordered_by_iso` | Lazy GO-API cache per country |
-| `staff_matrix_item_id` | Fixed `FormItem.id` **1367** (`PNS staff contributions` matrix on template 22) |
+| `staff_matrix_item_id` | Published T22 `PNS staff contributions` matrix (currently **1314**, resolved by label) |
 | `iso3_to_hns_id` | `{ISO3: NationalSociety.id}` — host country's primary active NS; row key for T22 Staff and T23 Funding |
 | `percentage_bank_ids` | Indicator bank ids whose `IndicatorBank.type` is Percentage — used to sanity-check resolved values against the 0-100 range **and** to scale 0–1 source values (Excel `%` cells / past-round unit interval) to stored 0–100 |
 | `percentage_allow_over_100_bank_ids` | Subset of `percentage_bank_ids` where a live `FormItem.config.allow_over_100` explicitly permits values above 100 (cumulative/ratio indicators) |
 | `percentage_unit_interval_keys` | `(indicator_bank_id, ROUND)` pairs whose percentage `ValueNum`s in this import are all in `(0, 1]` — `1` is treated as 100% only for those keys, so a genuine 1% next to 45% is left as 1 |
 | `warnings` | Accumulated warnings (deduplicated for display) |
+
+Special matrix/scalar items (T22 funding/staff, T23 funding, T24 reach/support/hybrids, T33 funding/expenditure/support) are **resolved from the published version** at context build time (label, section, or columns). Numeric ids in this doc are the current published snapshot, not write targets. If resolution fails, those rows are skipped.
 
 ---
 
@@ -232,7 +234,7 @@ Each cell is a **structured dict**, not a plain number:
 
 **Import rule when `PNS reported = Yes` on a row:** the T22 cell uses **`PNS Value` only**. If `PNS Value` is blank but `Country Value` is present, the PNS cleared the looked-up figure → `{ original: country_val, modified: "", isModified: true }`. Country Value is **never** copied to T22 as the submitted amount when `PNS reported = Yes`.
 
-After import, PNS assignments (templates **22** and **23**) in the selected round(s) with **no** `PNS reported = Yes` rows are reset to workflow status **`pending`**, and any **UPR-imported `form_data`** on those assignments (T22 item 1303 + staff matrix; T23 item 952) is **deleted**. The status date (`status_timestamp`) is set to the parent assignment’s **`assigned_at`** date (when the round was assigned), and submission/review metadata is cleared. Variable consumer matrices are refreshed when source funding rows are removed. Assignments where the PNS reported at least once are left unchanged.
+After import, PNS assignments (templates **22** and **23**) in the selected round(s) with **no** matching self-report in Excel are reset to workflow status **`pending`**, and any **UPR-imported `form_data`** on those assignments (T22 item 1303 + staff matrix; T23 published funding matrix) is **deleted**. Planning (T22) uses **`PNS reported = Yes`**; reporting (T23) uses **`Source = PNS Data`**. The status date (`status_timestamp`) is set to the parent assignment’s **`assigned_at`** date (when the round was assigned), and submission/review metadata is cleared. Variable consumer matrices are refreshed when source funding rows are removed. Assignments where the PNS reported at least once are left unchanged.
 
 **Worked example — Netherlands Red Cross × Uganda (P26):**
 
@@ -310,7 +312,7 @@ Unknown `Comments_*` slugs are title-cased automatically.
 
 - Section `Staff`, `Entity = PNS`, non-zero `ValueNum` only
 - Imported **only** when the same `(PNS assignment, host ISO3)` has **`PNS reported = Yes`** on at least one Funding row in the workbook (see §6.2)
-- Target: **item 1367** (`PNS staff contributions` matrix — fixed ID)
+- Target: published **PNS staff contributions** matrix (currently item **1314**, resolved by label — not 1367)
 - AES resolved by **PNS home country ISO3** (same path as PNS Funding, via `ns_name → ns_home_country_iso3`)
 - Row key: **host country's `NationalSociety.id`** (`iso3_to_hns_id[host_ISO3]`) — the HNS receiving staff
 - Column key: indicator string mapped via `STAFF_INDICATOR_COLUMNS`
@@ -391,11 +393,14 @@ Unknown `Comments_*` slugs are title-cased automatically.
 - `Entity = Other sources` → row `HNS other sources`
 - Single column `NS 2025 Total Funding`; cell key = `{row_name}_NS 2025 Total Funding`
 
-**Template 23 — PNS-reported Funding (matrix, item 952):**
-- Imported **only** when **`PNS reported = Yes`** on the matching Funding row (`Entity = PNS`, same host ISO3)
-- `Entity = PNS`, NS name → home country ISO3 → template 23 AES
+**Template 23 — PNS-reported Funding (published untitled matrix, currently item 1433):**
+- T23 has a **single published version**. The funding matrix often has an **empty label**; resolve it by columns `Total Funding` + `Total Expenditure`. There is **no item 952**.
+- Reporting is **PNS-only** (no country/PNS mix). Rows with **`Source = PNS Data`**, `Entity = PNS`; the amount is **`ValueNum`**
+- Do **not** use the planning `PNS reported` column or `PNS Value` / `Country Value` for T23
+- NS name → home country ISO3 → template 23 AES (`period_name` `2025` / `2025 Annual` / `AR25` all match AR25)
 - Row key: `iso3_to_hns_id[host_ISO3]` (the host country's primary NS)
 - Columns: `Total Funding` (iid 733), `Total Expenditure` (iid 734), `Total Transferred to HNS` (iid 5, from `00005`)
+- Upsert only writes published item ids. If the matrix cannot be resolved, T23 rows are skipped.
 - `Funding Requirement` (iid 2, `00002`) is pre-filled from planning (variable/readonly) — skipped
 
 ---
@@ -454,7 +459,7 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 | 960 Emergency Appeals | `{name} ({code})` | `Total People to be reached` | `Afghanistan - Earthquake (MDRAF019)_Total People to be reached` |
 | 967/968/974 T24 planning funding (hybrid) | `HNS` / `IFRC Secretariat` (static row text) or `NationalSociety.id` (PNS) | SP/EFs or EA1–EA3 | `HNS_SP1`, `IFRC Secretariat_EFs`, `140_SP3`, `IFRC Secretariat_EA1` + `col_header\|EA1` |
 | 1303 PNS funding tpl22 | `Country.id` (host country) | SP/EFs | `184_SP2` — value is `{"original":616508,"modified":439311,"isModified":true}` |
-| 1367 Staff | host `NationalSociety.id` (HNS) | column name | `49_intl_delegates_hns` |
+| 1314 Staff | host `NationalSociety.id` (HNS) | column name | `49_intl_delegates_hns` |
 | 956 Comments | — | — | plain text scalar |
 
 ### Reporting
@@ -465,7 +470,7 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 | 1405 Reporting SP/EF breakdown | manual row label | `Funding (CHF)` / `Expenditure (CHF)` | `Resilience - Climate and environment_Funding (CHF)` |
 | 1403 Reporting Total Funding | row name string | `NS 2025 Total Funding` | `PNSs_NS 2025 Total Funding` |
 | 1407 Reporting Received Support | `NationalSociety.id` (PNS) | `{area} Supported` | `49_SP1 Supported` |
-| 952 T23 PNS Funding | host `NationalSociety.id` (HNS) | column name | `49_Total Funding` |
+| T23 PNS Funding (published matrix, e.g. 1433) | host `NationalSociety.id` (HNS) | column name | `49_Total Funding` |
 
 ---
 
@@ -587,7 +592,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 - [x] Template 24: Reach — SP1–SP5 → item 954; EA1–EA3 → item 960 via EA Code + GO API fallback
 - [x] Template 24: Support — bilateral tick marks → item 955
 - [x] Template 24: Comments — human-readable labels, `Value` column, single-newline join → item 956
-- [x] Template 22: Staff — AES via PNS home country ISO3; row key = host `NationalSociety.id` → item 1367
+- [x] Template 22: Staff — AES via PNS home country ISO3; row key = host `NationalSociety.id` → published staff matrix (currently item 1314)
 
 ### Reporting (rounds AR*, MYR*)
 - [x] Template 33: NS Data scalars (bank IDs 723/724/727/1117); `Data_EO1–3` / `Data_MDR1–3` → emergency repeat slot metadata
@@ -595,7 +600,7 @@ Re-importing after a logic fix (e.g. period lookup, `isModified` rules) overwrit
 - [x] Template 33: Core indicators + Other indicators → scalar by `indicator_bank_id`; `is_data_not_available` flag written when Excel marks row as unavailable
 - [x] Template 33: Funding — HNS Expenditure total → item 1404 (scalar, `Attribute = Total`); SP/EF breakdown → item 1405 (matrix, `Attribute = SP Breakdown`); IFRC/PNS/Other by Funding Source rows → item 1403 (manual matrix)
 - [x] Template 33: Support — bilateral ticks → item 1407 `{area} Supported` columns
-- [x] Template 23: Funding — PNS totals (Funding/Expenditure/Transferred) → item 952; row = host `NationalSociety.id`; AES via PNS home country
+- [x] Template 23: Funding — PNS totals (Funding/Expenditure/Transferred) → published funding matrix (currently item 1433); row = host `NationalSociety.id`; AES via PNS home country
 - [x] Form UI: variable matrix cells honour `modified: ""` as cleared (not fallback to `original`)
 
 ---

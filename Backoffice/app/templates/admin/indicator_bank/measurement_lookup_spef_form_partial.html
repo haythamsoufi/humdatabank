@@ -105,7 +105,7 @@
     {{ _('The code field is locked while this entry is still in use.') }}
   </p>
   {% endif %}
-  <form method="POST" action="{{ form_action_url }}" class="ml-spef-form" data-modal="{{ 'true' if modal else 'false' }}">
+  <form method="POST" action="{{ form_action_url }}" class="ml-spef-form" data-modal="{{ 'true' if modal else 'false' }}" enctype="multipart/form-data">
     {{ form.hidden_tag() }}
     <div class="form-section">
       <div class="section-title">{{ _('SP/EF code') }}</div>
@@ -124,6 +124,26 @@
           <label for="{{ form.is_active.id }}" class="text-sm text-gray-700 m-0">{{ form.is_active.label.text }}</label>
         </div>
         <p class="ml-measurement-meta__hint text-xs text-gray-500">{{ _('IFRC Strategy 2030 area code (e.g. EF2, SP3).') }}</p>
+      </div>
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="{{ form.icon_file.id }}">{{ form.icon_file.label.text }}</label>
+        {% if is_edit and icon_url %}
+        <div class="mb-2">
+          <img src="{{ icon_url }}" alt="" class="js-spef-icon-current w-12 h-12 object-contain rounded border border-gray-200 bg-white">
+        </div>
+        {% endif %}
+        {{ form.icon_file(class_='w-full border border-gray-300 rounded px-3 py-2 text-sm js-spef-icon-file', accept='image/png,image/jpeg,image/gif,image/webp') }}
+        {% for e in form.icon_file.errors %}<p class="text-red-600 text-xs mt-1">{{ e }}</p>{% endfor %}
+        <p class="text-xs text-gray-500 mt-1">{{ _('PNG, JPG, GIF, or WEBP. Used in the SP/EF catalog and reports.') }}</p>
+        <div class="js-spef-icon-preview mt-2 hidden">
+          <img src="" alt="" class="w-12 h-12 object-contain rounded border border-gray-200 bg-white">
+        </div>
+        {% if is_edit and row and row.icon_filename %}
+        <label class="mt-2 flex items-center gap-2 text-sm text-gray-700">
+          {{ form.remove_icon() }}
+          <span>{{ form.remove_icon.label.text }}</span>
+        </label>
+        {% endif %}
       </div>
     </div>
     <div class="form-section">

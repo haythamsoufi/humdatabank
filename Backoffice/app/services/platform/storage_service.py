@@ -657,14 +657,18 @@ def unpublish_system_logo_from_cdn(subdir: str, filename: str) -> None:
 
 
 def sync_all_system_logos_to_cdn() -> int:
-    """Backfill all sector logos to the public CDN. Returns count mirrored."""
+    """Backfill sector logos and SP/EF icons to the public CDN. Returns count mirrored."""
     if not public_cdn_enabled():
         return 0
-    from app.models.indicator_bank import Sector
+    from app.models.indicator_bank import IndicatorBankSpef, Sector
 
     count = 0
     for sector in Sector.query.filter(Sector.logo_filename.isnot(None)).all():
         if sector.logo_filename:
             publish_system_logo_to_cdn("sectors", sector.logo_filename)
+            count += 1
+    for row in IndicatorBankSpef.query.filter(IndicatorBankSpef.icon_filename.isnot(None)).all():
+        if row.icon_filename:
+            publish_system_logo_to_cdn("spef", row.icon_filename)
             count += 1
     return count

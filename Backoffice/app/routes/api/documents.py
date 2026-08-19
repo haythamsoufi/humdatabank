@@ -171,6 +171,20 @@ def serve_sector_logo(filename):
         abort(404)
 
 
+@api_bp.route('/uploads/spef/<path:filename>', methods=['GET'])
+def serve_spef_icon(filename):
+    """Serve SP/EF catalog icon files."""
+    try:
+        safe_name = os.path.basename(filename)
+        return storage.stream_response(
+            storage.SYSTEM, f"spef/{safe_name}",
+            filename=safe_name, as_attachment=False,
+        )
+    except Exception as e:
+        current_app.logger.error("Error serving SP/EF icon %s: %s", filename, e)
+        abort(404)
+
+
 @api_bp.route('/uploads/branding/<path:filename>', methods=['GET'])
 def serve_branding_asset(filename):
     """Serve organization logo/favicon uploaded from System Configuration (branding tab)."""

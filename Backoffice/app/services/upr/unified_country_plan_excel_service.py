@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import os
-import sys
 import tempfile
 from typing import Any, Dict, Tuple
 
@@ -13,23 +12,9 @@ from flask import current_app
 from app.services.imports.assignment_excel_access import (  # noqa: F401
     assignment_uses_unified_country_plan_excel,
 )
+from app.services.upr._scripts_path import ensure_scripts_in_path as _ensure_scripts_in_path
 
 UNIFIED_COUNTRY_PLAN_LABEL = "Unified Country Plan"
-
-
-_SCRIPTS_DIR: str | None = None
-
-
-def _ensure_scripts_in_path() -> None:
-    global _SCRIPTS_DIR
-    if _SCRIPTS_DIR is not None:
-        return
-    scripts_dir = os.path.normpath(os.path.join(current_app.root_path, "..", "scripts"))
-    imports_dir = os.path.join(scripts_dir, "imports")
-    for path in (imports_dir, scripts_dir):
-        if path not in sys.path:
-            sys.path.insert(0, path)
-    _SCRIPTS_DIR = imports_dir
 
 
 class UnifiedCountryPlanExcelService:

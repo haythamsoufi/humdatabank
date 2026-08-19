@@ -220,15 +220,19 @@ def save_submission_document(
 
 _ALLOWED_LOGO_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 _MAX_LOGO_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+_LOGO_SUBDIR_RE = re.compile(r"^[a-z0-9_-]+$")
 
 
-def save_sector_logo(file_storage, item_name: str) -> str:
-    """Save a sector logo and return the filename.
+def save_system_logo(file_storage, item_name: str, subdir: str = "sectors") -> str:
+    """Save a system image (sector logo or SP/EF icon) and return the filename.
 
-    Storage path is ``sectors/<filename>``; the basename is the sanitized display
+    Storage path is ``<subdir>/<filename>``; the basename is the sanitized display
     name plus the uploaded file's extension.
     """
     from werkzeug.utils import secure_filename
+
+    if not _LOGO_SUBDIR_RE.match(subdir or ""):
+        raise ValueError("Invalid logo subdirectory")
 
     if not file_storage or not file_storage.filename:
         return None
@@ -253,6 +257,11 @@ def save_sector_logo(file_storage, item_name: str) -> str:
     stored_filename = f"{secure_filename(item_name)}{ext}"
 
     from app.services.platform import storage_service as _ss
-    _ss.upload(_ss.SYSTEM, f"sectors/{stored_filename}", file_storage)
-    _ss.publish_system_logo_to_cdn("sectors", stored_filename)
+    _ss.upload(_ss.SYSTEM, f"{subdir}/{stored_filename}", file_storage)
+    _ss.publish_system_logo_to_cdn(subdir, stored_filename)
     return stored_filename
+
+
+def save_sector_logo(file_storage, item_name: str) -> str:
+    """Save a sector logo and return the filename."""
+    return save_system_logo(file_storage, item_name, subdir="sectors")

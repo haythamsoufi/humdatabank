@@ -541,6 +541,29 @@ def user_analytics(user_id):
         desc(UserLoginLog.timestamp)
     ).limit(20).all()
 
+    # Recent user activities (noise-filtered, same exclusions as the audit trail)
+    recent_activities_limit = 25
+    activities_query = UserActivityLog.query.filter(
+        UserActivityLog.user_id == user_id,
+        UserActivityLog.timestamp >= from_date,
+    )
+    activities_query = apply_audit_trail_user_activity_noise_filters(activities_query)
+    total_activities_count = activities_query.count()
+    recent_activities = activities_query.order_by(
+        desc(UserActivityLog.timestamp)
+    ).limit(recent_activities_limit).all()
+
+    for _act in recent_activities:
+        _act.display_description = create_consistent_description(
+            'activity',
+            _act.activity_type,
+            None,
+            _act.activity_description,
+            _act.endpoint,
+            _act.context_data,
+            http_method=_act.http_method,
+        )
+
     partial = request.args.get('partial', '0') == '1'
     template = 'admin/analytics/_user_detail_partial.html' if partial else 'admin/analytics/user_detail.html'
     return render_template(
@@ -553,6 +576,8 @@ def user_analytics(user_id):
         total_active_time_minutes=total_active_time_minutes,
         total_page_views=total_page_views,
         recent_logins=recent_logins,
+        recent_activities=recent_activities,
+        total_activities_count=total_activities_count,
         selected_days=days
     )
 

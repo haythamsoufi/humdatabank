@@ -17,7 +17,8 @@ _UPR_ONLY_QUERY_RE = re.compile(
     r"\bupl[-\s]?\d{4}\b|"
     r"\bupl\b|"
     r"\bupr\b|"
-    r"up\s*plan"
+    r"(?<!-)up\s+plan"  # (?<!-): excludes "follow-up plan", "clean-up plan", etc. —
+    # the hyphen makes "up" its own regex "word", so a bare \b before it isn't enough.
     r")\b",
     re.IGNORECASE,
 )

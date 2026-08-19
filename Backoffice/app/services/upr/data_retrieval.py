@@ -71,6 +71,40 @@ def _user_allowed_country_ids():
     return user_allowed_country_ids()
 
 
+def _resolve_upr_block_year(upr: Dict[str, Any], doc: Any) -> Optional[int]:
+    """Best-effort year for a UPR visual block: filename token, then ``upr_context.year``,
+    then a defensive ``year=`` token inside the ``extraction`` string.
+
+    Real extraction tags from ``visual_chunking.py`` are bare method names (e.g.
+    ``"label_proximity_v2"``) with no ``year=`` token, so that last branch normally
+    doesn't match anything today — it's kept only as a cheap defensive fallback in case
+    a future/legacy extractor embeds one. Does NOT fall back to document timestamps;
+    callers that need *some* year no matter what (e.g. time-series bucketing) should
+    apply their own last-resort after calling this.
+    """
+    # Digit boundaries, not \b: "_" counts as a word char, so \b fails on the common
+    # underscore-delimited filename convention (e.g. "INP_2023_Foo.pdf") — see the
+    # same fix already applied in visual_chunking.py's _years_from().
+    fname_years = re.findall(r'(?<!\d)(19\d{2}|20\d{2})(?!\d)', getattr(doc, "filename", None) or "")
+    if fname_years:
+        return max(int(y) for y in fname_years)
+
+    upr_ctx = upr.get("upr_context") if isinstance(upr.get("upr_context"), dict) else {}
+    if upr_ctx.get("year"):
+        try:
+            return int(upr_ctx["year"])
+        except (ValueError, TypeError):
+            pass
+
+    extraction = (upr.get("extraction") or "").strip()
+    if extraction:
+        m_yr = re.search(r'year\s*=\s*(\d{4})', extraction, re.IGNORECASE)
+        if m_yr:
+            return int(m_yr.group(1))
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Metric normalisation (shared across all three functions)
 # ---------------------------------------------------------------------------
@@ -102,10 +136,13 @@ def get_upr_kpi_value(
         if metric_norm not in _VALID_METRICS:
             return service_error(f"Unsupported metric: {metric}", metric=metric)
 
-        from app.services.data_retrieval.country import resolve_country
+        from app.services.data_retrieval.country import check_country_access, resolve_country
         country = resolve_country(country_identifier)
         if not country or not getattr(country, "id", None):
             return service_error(f"Country not found: {country_identifier}")
+
+        if not check_country_access(int(country.id)):
+            return service_error("Access denied for this country")
 
         ns_name = None
         try:
@@ -208,8 +245,8 @@ def get_upr_kpi_value(
                 conf_f = None
 
             extraction = (upr.get("extraction") or "").strip() or None
-            meta = _parse_upr_extraction_meta(extraction)
-            yr = meta.get("year")
+            yr = _resolve_upr_block_year(upr, doc)
+            report_type = _parse_upr_extraction_meta(extraction).get("report_type")
             year_match = bool(prefer_year and yr and int(yr) == int(prefer_year))
             try:
                 processed_ts = getattr(doc, "processed_at", None) or getattr(doc, "created_at", None)
@@ -227,7 +264,7 @@ def get_upr_kpi_value(
                 "upr_society": (upr.get("society") or "").strip() or None,
                 "extraction": extraction,
                 "year": yr,
-                "report_type": meta.get("report_type"),
+                "report_type": report_type,
                 "chunk_id": int(chunk.id),
                 "document_id": int(doc.id),
                 "document_title": doc.title,
@@ -293,10 +330,13 @@ def get_upr_kpi_timeseries(
             "staff": "Number of staff",
         }
 
-        from app.services.data_retrieval.country import resolve_country
+        from app.services.data_retrieval.country import check_country_access, resolve_country
         country = resolve_country(country_identifier)
         if not country or not getattr(country, "id", None):
             return service_error(f"Country not found: {country_identifier}", series=[])
+
+        if not check_country_access(int(country.id)):
+            return service_error("Access denied for this country", series=[])
 
         ns_name = None
         try:
@@ -400,26 +440,12 @@ def get_upr_kpi_timeseries(
             except (ValueError, TypeError):
                 continue
 
-            year = None
-            fname_years = re.findall(r'\b(19\d{2}|20\d{2})\b', doc.filename or "")
-            if fname_years:
-                year = max(int(y) for y in fname_years)
+            year = _resolve_upr_block_year(upr, doc)
 
             if not year:
-                upr_ctx = upr.get("upr_context") if isinstance(upr.get("upr_context"), dict) else {}
-                if upr_ctx.get("year"):
-                    try:
-                        year = int(upr_ctx["year"])
-                    except (ValueError, TypeError):
-                        pass
-
-            if not year:
-                extraction = (upr.get("extraction") or "").strip()
-                m_yr = re.search(r'year\s*=\s*(\d{4})', extraction, re.IGNORECASE)
-                if m_yr:
-                    year = int(m_yr.group(1))
-
-            if not year:
+                # Time-series points must have *some* year to bucket by — fall back to
+                # when the document was processed (only get_upr_kpi_timeseries needs this;
+                # get_upr_kpi_value tolerates a missing year).
                 try:
                     ts = getattr(doc, "processed_at", None) or getattr(doc, "created_at", None)
                     if ts:

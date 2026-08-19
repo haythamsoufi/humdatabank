@@ -1,4 +1,4 @@
-from app.utils.file_paths import save_sector_logo
+from app.utils.file_paths import save_sector_logo, save_system_logo
 from app.services.platform import storage_service as storage
 from flask import current_app, flash
 from datetime import datetime
@@ -24,22 +24,24 @@ def _safe_logo_mimetype(filename: str) -> str:
     return _SAFE_LOGO_MIMETYPES.get(ext, 'application/octet-stream')
 
 
-def _save_logo_file(file_storage, item_name):
-    """Save a sector logo file."""
+def _save_logo_file(file_storage, item_name, subdir="sectors"):
+    """Save a sector logo or SP/EF icon file."""
     try:
         if not file_storage or not file_storage.filename:
             return None
-        return save_sector_logo(file_storage, item_name)
+        if subdir == "sectors":
+            return save_sector_logo(file_storage, item_name)
+        return save_system_logo(file_storage, item_name, subdir=subdir)
     except Exception as e:
         current_app.logger.exception("Error saving logo file: %s", e)
         return None
 
 
-def _delete_logo_file(filename):
-    """Delete a sector logo file."""
+def _delete_logo_file(filename, subdir="sectors"):
+    """Delete a sector logo or SP/EF icon file."""
     try:
-        storage.unpublish_system_logo_from_cdn("sectors", filename)
-        storage.delete(storage.SYSTEM, f"sectors/{filename}")
+        storage.unpublish_system_logo_from_cdn(subdir, filename)
+        storage.delete(storage.SYSTEM, f"{subdir}/{filename}")
     except Exception as e:
         current_app.logger.exception("Error deleting logo file: %s", e)
 

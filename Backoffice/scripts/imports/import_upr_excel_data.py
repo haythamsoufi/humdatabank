@@ -30,6 +30,7 @@ import os
 import pickle
 import re
 import sys
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
@@ -69,7 +70,9 @@ from upr_import_warnings import make_import_warning, summarize_warnings  # noqa:
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 5
+TRANSFORM_CACHE_VERSION = 9
+_ROWS_CACHE_LOCKS: Dict[str, threading.Lock] = {}
+_ROWS_CACHE_LOCKS_GUARD = threading.Lock()
 
 UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     # ── Planning ──────────────────────────────────────────────────────────────
@@ -118,7 +121,8 @@ STAFF_INDICATOR_COLUMNS: Dict[str, str] = {
 
 STAFF_MATRIX_LABEL = "PNS staff contributions"
 
-# Template 24 planning funding — one hybrid matrix per year offset (static HNS/IFRC rows + PNS list rows).
+# Last-known published item ids (local snapshot). Live import overwrites these from the
+# published form in build_import_context; never write an id that did not resolve.
 FUNDING_MATRIX_BY_YEAR_OFFSET: Dict[int, int] = {
     0: 967,
     1: 968,
@@ -128,8 +132,12 @@ FUNDING_MATRIX_BY_YEAR_OFFSET: Dict[int, int] = {
 ITEM_LONGER_TERM_PROGRAMMES = 954
 ITEM_EMERGENCY_APPEALS = 960
 ITEM_BILATERAL_SUPPORT = 955
-ITEM_COMMENTS = 956  # Legacy textarea item; comments now import into discussion panel
-ITEM_FUNDING_REQUIREMENTS_T22 = 1303  # Template 22 – Funding Requirements (rows=country_map)
+ITEM_COMMENTS = 956  # Legacy textarea; comments now import into the discussion panel
+ITEM_FUNDING_REQUIREMENTS_T22 = 1303  # T22 Funding Requirements (rows=country_map)
+T24_LONGER_TERM_LABELS: Tuple[str, ...] = ("longer term programme",)
+T24_EMERGENCY_LABELS: Tuple[str, ...] = ("emergency appeal",)
+T24_BILATERAL_LABELS: Tuple[str, ...] = ("supporting bilaterally", "list national societies")
+T22_FUNDING_LABELS: Tuple[str, ...] = ("funding requirements",)
 T22_ROW_TOTAL_COLUMN = "Total"  # matrix row-total cell suffix (row_total_manual_enabled)
 # Item 1303 variable columns (Excel Area names) — overridden when PNS reports totals only.
 T22_BREAKDOWN_AREAS: Tuple[str, ...] = ("SP1", "SP2", "SP3", "SP4", "SP5", "EFs")
@@ -145,20 +153,34 @@ REPORTING_COUNTRY_TEMPLATE_ID = 33
 
 # Label needles for version-aware item resolution (substring match, case-insensitive).
 REPORTING_SPECIAL_ITEM_LABELS: Dict[str, Tuple[str, ...]] = {
-    "funding": ("ns total funding", "ns 2025 total funding", "ns 2026 total funding"),
-    "expenditure": ("ns total expenditure", "ns 2025 total expenditure", "ns 2026 total expenditure"),
+    "funding": (
+        "ns total funding",
+        "ns 2025 total funding",
+        "ns 2026 total funding",
+        "assignment_year] funding",
+        "funding (chf)",
+    ),
+    "expenditure": (
+        "ns total expenditure",
+        "ns 2025 total expenditure",
+        "ns 2026 total expenditure",
+        "assignment_year] expenditure",
+        "expenditure (chf)",
+    ),
     "sp_breakdown": ("optional breakdown by sp/ef",),
     "support": ("received support",),
 }
 T22_STAFF_MATRIX_LABELS: Tuple[str, ...] = ("pns staff contributions",)
 T23_PNS_FUNDING_LABELS: Tuple[str, ...] = ("pns funding", "funding matrix")
+T23_PNS_FUNDING_REQUIRED_COLUMNS = frozenset({"total funding", "total expenditure"})
 
-# Fallback item ids when label lookup fails on the published version.
+# Last-known published T33 special items (tests / docs). Live import does not write these
+# unless they resolve on the published version.
 ITEM_REPORTING_COUNTRY_FUNDING = 1403
 ITEM_REPORTING_COUNTRY_EXPENDITURE = 1404
 ITEM_REPORTING_COUNTRY_SP_BREAKDOWN = 1405
 ITEM_REPORTING_COUNTRY_SUPPORT = 1407
-ITEM_REPORTING_PNS_FUNDING = 952
+REPORTING_EXPENDITURE_BANK_ID = 734
 
 # Row names in country-reporting Total Funding matrix.
 REPORTING_FUNDING_ROW_IFRC = "IFRC Secretariat"
@@ -207,7 +229,7 @@ REPORTING_EXCEL_AREA_TO_SECTION: Dict[str, str] = {
     "EF4": "Accountability and agility",
 }
 
-# Normalized indicatorId → T23 item 952 column name for PNS-reported funding
+# Normalized indicatorId → published T23 funding-matrix column name
 T23_PNS_FUNDING_COLUMNS: Dict[int, str] = {
     733: "Total Funding",
     734: "Total Expenditure",
@@ -253,8 +275,15 @@ class UprImportContext:
     emergency_slot_meta: Dict[Tuple[int, int], Dict[str, str]] = field(default_factory=dict)
     dynamic_indicator_entries: List[Dict[str, Any]] = field(default_factory=list)
     discussion_comment_entries: List[Dict[str, Any]] = field(default_factory=list)
-    staff_matrix_item_id: int = 1314  # fallback when label lookup fails (prod T22)
-    pns_funding_item_id: int = ITEM_REPORTING_PNS_FUNDING
+    staff_matrix_item_id: int = 1314  # last-known T22 staff matrix; live import overwrites
+    t22_funding_item_id: int = ITEM_FUNDING_REQUIREMENTS_T22
+    t24_bilateral_item_id: int = ITEM_BILATERAL_SUPPORT
+    t24_longer_term_item_id: int = ITEM_LONGER_TERM_PROGRAMMES
+    t24_emergency_item_id: int = ITEM_EMERGENCY_APPEALS
+    t24_funding_by_offset: Dict[int, int] = field(
+        default_factory=lambda: dict(FUNDING_MATRIX_BY_YEAR_OFFSET)
+    )
+    pns_funding_item_id: int = 0  # published T23 funding matrix; 0 until resolved
     ns_name_to_id: Dict[str, int] = field(default_factory=dict)
     # NS name (lower) → home country ISO3 (for PNS funding → template 22 lookup)
     ns_home_country_iso3: Dict[str, str] = field(default_factory=dict)
@@ -305,6 +334,54 @@ def round_to_period(round_code: str) -> Optional[str]:
     return None
 
 
+def _period_year_token(period_name: str) -> Optional[int]:
+    for token in (period_name or "").replace("-", " ").split():
+        if token.isdigit() and len(token) == 4:
+            year = int(token)
+            if 1990 <= year <= 2100:
+                return year
+    return None
+
+
+def canonical_upr_period(period_name: str) -> Optional[str]:
+    """Map an assignment period_name to the importer's canonical period.
+
+    ``AR25`` / ``2025`` / ``2025 Annual`` → ``2025``.
+    ``MYR26`` / ``Jan-Jun 2026`` / ``2026 Midyear`` → ``Jan-Jun 2026``.
+    ``P26`` / ``2026`` → ``2026``.
+    """
+    raw = (period_name or "").strip()
+    if not raw:
+        return None
+    mapped = round_to_period(raw)
+    if mapped:
+        return mapped
+    lower = raw.lower()
+    year = _period_year_token(raw)
+    if year is None:
+        return None
+    if any(token in lower for token in ("jan-jun", "midyear", "mid-year", "mid year")):
+        return f"Jan-Jun {year}"
+    return str(year)
+
+
+def _ensure_canonical_assignment_keys(ctx: "UprImportContext") -> None:
+    """Index assignments under canonical periods so AR25 finds ``2025 Annual``."""
+    if getattr(ctx, "_canonical_assignment_keys", False):
+        return
+    for tpl_map in ctx.assignment_by_template.values():
+        extras: Dict[Tuple[str, str], int] = {}
+        for (pn, iso3), aes_id in tpl_map.items():
+            canon = canonical_upr_period(str(pn or ""))
+            if not canon or canon == pn:
+                continue
+            key = (canon, iso3)
+            if key not in tpl_map and key not in extras:
+                extras[key] = aes_id
+        tpl_map.update(extras)
+    ctx._canonical_assignment_keys = True
+
+
 FUNDING_REQUIREMENT_BANK_ID = 2
 
 
@@ -345,6 +422,7 @@ def parse_value_num(raw: Any) -> Optional[float]:
 
 
 COL_PNS_REPORTED = "PNS reported"
+COL_SOURCE = "Source"
 
 
 def parse_pns_reported_yes(row: Dict[str, Any]) -> bool:
@@ -355,6 +433,19 @@ def parse_pns_reported_yes(row: Dict[str, Any]) -> bool:
     return str(raw).strip().lower() in ("yes", "y", "1", "true")
 
 
+def parse_upr_source(row: Dict[str, Any]) -> str:
+    """Normalised UPR Master ``Source`` value (``pns data``, ``country data``, ``mix data``)."""
+    raw = row.get(COL_SOURCE)
+    if raw is None or raw == "":
+        return ""
+    return str(raw).strip().lower()
+
+
+def is_pns_data_source(row: Dict[str, Any]) -> bool:
+    """True when ``Source`` is PNS Data — reporting PNS self-report (ValueNum)."""
+    return parse_upr_source(row) == "pns data"
+
+
 def _build_pns_reported_yes_sets(
     rows: List[Dict[str, Any]],
     ctx: UprImportContext,
@@ -362,7 +453,11 @@ def _build_pns_reported_yes_sets(
     *,
     rounds: Optional[Set[str]] = None,
 ) -> Tuple[Set[Tuple[int, str]], Set[Tuple[int, str]]]:
-    """Collect ``(pns_aes_id, host_iso3)`` pairs where Excel ``PNS reported`` is Yes."""
+    """Collect ``(pns_aes_id, host_iso3)`` pairs for PNS self-report rows.
+
+    Planning (T22): Excel ``PNS reported = Yes``.
+    Reporting (T23): ``Source = PNS Data`` (ValueNum is the amount; no country/PNS mix).
+    """
     t22_yes: Set[Tuple[int, str]] = set()
     t23_yes: Set[Tuple[int, str]] = set()
     if 22 not in template_ids and 23 not in template_ids:
@@ -372,18 +467,11 @@ def _build_pns_reported_yes_sets(
         rnd = str(row.get("Round") or "").strip().upper()
         if rounds and rnd not in rounds:
             continue
-        if not parse_pns_reported_yes(row):
-            continue
         if str(row.get("Section") or "").strip() != "Funding":
             continue
         if str(row.get("Entity") or "").strip().upper() != "PNS":
             continue
-        if str(row.get("Round") or "").strip().upper().startswith("P") and not is_planning_funding_requirement_row(
-            row
-        ):
-            continue
         iso3 = str(row.get("ISO3") or "").strip().upper()
-        rnd = str(row.get("Round") or "").strip().upper()
         period = round_to_period(rnd)
         ns_name = str(row.get("NS") or "").strip()
         if not iso3 or not period or not ns_name or ns_name.lower() == "country":
@@ -392,10 +480,16 @@ def _build_pns_reported_yes_sets(
         if not pns_iso3:
             continue
         if rnd.startswith("P") and 22 in template_ids:
+            if not parse_pns_reported_yes(row):
+                continue
+            if not is_planning_funding_requirement_row(row):
+                continue
             pns_aes = ctx.assignment_by_template.get(22, {}).get((period, pns_iso3))
             if pns_aes:
                 t22_yes.add((pns_aes, iso3))
         elif (rnd.startswith("AR") or rnd.startswith("MYR")) and 23 in template_ids:
+            if not is_pns_data_source(row):
+                continue
             pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
             if pns_aes:
                 t23_yes.add((pns_aes, iso3))
@@ -441,9 +535,15 @@ def plan_non_reported_pns_aes_by_template(
 def upr_pns_import_item_ids(ctx: UprImportContext, template_id: int) -> Set[int]:
     """Form item ids written by the UPR Excel import for a PNS template."""
     if template_id == 22:
-        return {ITEM_FUNDING_REQUIREMENTS_T22, int(ctx.staff_matrix_item_id)}
+        ids: Set[int] = set()
+        if ctx.t22_funding_item_id:
+            ids.add(int(ctx.t22_funding_item_id))
+        if ctx.staff_matrix_item_id:
+            ids.add(int(ctx.staff_matrix_item_id))
+        return ids
     if template_id == 23:
-        return {int(ctx.pns_funding_item_id)}
+        item_id = int(ctx.pns_funding_item_id or 0)
+        return {item_id} if item_id else set()
     return set()
 
 
@@ -1153,11 +1253,24 @@ def rows_cache_path(path: str) -> str:
     return f"{path}.rows.v{ROWS_CACHE_VERSION}.pkl"
 
 
+def summary_cache_path(path: str) -> str:
+    return f"{path}.summary.v{ROWS_CACHE_VERSION}.json"
+
+
+def _rows_cache_lock(path: str) -> threading.Lock:
+    with _ROWS_CACHE_LOCKS_GUARD:
+        lock = _ROWS_CACHE_LOCKS.get(path)
+        if lock is None:
+            lock = threading.Lock()
+            _ROWS_CACHE_LOCKS[path] = lock
+        return lock
+
+
 def clear_upr_import_caches(path: Optional[str]) -> None:
     """Remove on-disk row/transform caches for an uploaded workbook path."""
     if not path:
         return
-    for suffix in (rows_cache_path(path),):
+    for suffix in (rows_cache_path(path), summary_cache_path(path)):
         if os.path.isfile(suffix):
             try:
                 os.remove(suffix)
@@ -1213,22 +1326,23 @@ def load_upr_data_sheet_cached(path: str, *, use_cache: bool = True) -> Tuple[Li
     """Load UPR Data rows, reusing a pickle cache keyed by file mtime/size."""
     cache_path = rows_cache_path(path)
     fingerprint = _file_fingerprint(path)
-    if use_cache and os.path.isfile(cache_path):
-        try:
-            with open(cache_path, "rb") as fh:
-                cached_fp, headers, rows = pickle.load(fh)
-            if cached_fp == fingerprint:
-                return headers, rows
-        except Exception as exc:
-            logger.debug("UPR rows cache read failed: %s", exc)
+    with _rows_cache_lock(path):
+        if use_cache and os.path.isfile(cache_path):
+            try:
+                with open(cache_path, "rb") as fh:
+                    cached_fp, headers, rows = pickle.load(fh)
+                if cached_fp == fingerprint:
+                    return headers, rows
+            except Exception as exc:
+                logger.debug("UPR rows cache read failed: %s", exc)
 
-    headers, rows = load_upr_data_sheet(path)
-    try:
-        with open(cache_path, "wb") as fh:
-            pickle.dump((fingerprint, headers, rows), fh, protocol=pickle.HIGHEST_PROTOCOL)
-    except Exception as exc:
-        logger.debug("UPR rows cache write failed: %s", exc)
-    return headers, rows
+        headers, rows = load_upr_data_sheet(path)
+        try:
+            with open(cache_path, "wb") as fh:
+                pickle.dump((fingerprint, headers, rows), fh, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception as exc:
+            logger.debug("UPR rows cache write failed: %s", exc)
+        return headers, rows
 
 
 def summarize_workbook_from_rows(headers: List[str], rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -1280,10 +1394,45 @@ def summarize_workbook_from_rows(headers: List[str], rows: List[Dict[str, Any]])
     }
 
 
+def _fingerprint_json(fingerprint: Tuple[int, int]) -> List[int]:
+    return [int(fingerprint[0]), int(fingerprint[1])]
+
+
+def load_workbook_summary_cached(path: str) -> Optional[Dict[str, Any]]:
+    """Return a previously written analyze summary when the file fingerprint still matches."""
+    summary_path = summary_cache_path(path)
+    if not os.path.isfile(summary_path):
+        return None
+    try:
+        with open(summary_path, "r", encoding="utf-8") as fh:
+            payload = json.load(fh)
+        cached_fp = payload.get("fingerprint")
+        if cached_fp != _fingerprint_json(_file_fingerprint(path)):
+            return None
+        summary = payload.get("summary")
+        if isinstance(summary, dict) and summary.get("success"):
+            return summary
+    except Exception as exc:
+        logger.debug("UPR summary cache read failed: %s", exc)
+    return None
+
+
 def analyze_workbook(path: str, *, use_cache: bool = True) -> Dict[str, Any]:
     """Summarize workbook for the import wizard."""
+    cached = load_workbook_summary_cached(path) if use_cache else None
+    if cached:
+        return cached
     headers, rows = load_upr_data_sheet_cached(path, use_cache=use_cache)
-    return summarize_workbook_from_rows(headers, rows)
+    summary = summarize_workbook_from_rows(headers, rows)
+    try:
+        with open(summary_cache_path(path), "w", encoding="utf-8") as fh:
+            json.dump(
+                {"fingerprint": _fingerprint_json(_file_fingerprint(path)), "summary": summary},
+                fh,
+            )
+    except Exception as exc:
+        logger.debug("UPR summary cache write failed: %s", exc)
+    return summary
 
 
 def _normalize_round_set(rounds: Optional[List[str]]) -> Optional[Set[str]]:
@@ -1293,12 +1442,30 @@ def _normalize_round_set(rounds: Optional[List[str]]) -> Optional[Set[str]]:
     return out or None
 
 
-def _transform_cache_key(path: str, template_ids: List[int], rounds: Optional[Set[str]]) -> str:
+def _assignment_fingerprint(template_ids: List[int]) -> str:
+    """Hash of current template assignments so transform cache invalidates after new AES."""
+    try:
+        by_template = _load_assignment_map(template_ids)
+    except Exception:
+        return ""
+    parts = []
+    for tid in sorted(by_template):
+        for (pn, iso3), aes_id in sorted(by_template[tid].items()):
+            parts.append(f"{tid}|{pn}|{iso3}|{aes_id}")
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()[:16]
+
+
+def _transform_cache_key(
+    path: str,
+    template_ids: List[int],
+    rounds: Optional[Set[str]],
+    assignment_fingerprint: str = "",
+) -> str:
     fingerprint = _file_fingerprint(path)
     tids = ",".join(str(t) for t in sorted(template_ids))
     rnd = ",".join(sorted(rounds)) if rounds else "*"
     digest = hashlib.sha256(
-        f"{TRANSFORM_CACHE_VERSION}|{fingerprint}|{tids}|{rnd}".encode()
+        f"{TRANSFORM_CACHE_VERSION}|{fingerprint}|{tids}|{rnd}|{assignment_fingerprint}".encode()
     ).hexdigest()
     return digest[:20]
 
@@ -1313,8 +1480,9 @@ def _write_transform_cache(
     rounds: Optional[Set[str]],
     import_rows: List[Dict[str, str]],
     ctx: "UprImportContext",
+    assignment_fingerprint: str = "",
 ) -> None:
-    cache_key = _transform_cache_key(path, template_ids, rounds)
+    cache_key = _transform_cache_key(path, template_ids, rounds, assignment_fingerprint)
     cache_path = transform_cache_path(path, cache_key)
     try:
         with open(cache_path, "wb") as fh:
@@ -1338,8 +1506,9 @@ def load_transform_cache(
     path: str,
     template_ids: List[int],
     rounds: Optional[Set[str]],
+    assignment_fingerprint: str = "",
 ) -> Optional[Tuple[List[Dict[str, str]], "UprImportContext"]]:
-    cache_key = _transform_cache_key(path, template_ids, rounds)
+    cache_key = _transform_cache_key(path, template_ids, rounds, assignment_fingerprint)
     cache_path = transform_cache_path(path, cache_key)
     if not os.path.isfile(cache_path):
         return None
@@ -1379,9 +1548,10 @@ def prepare_upr_transform(
     """Load workbook rows, build context, and transform to import rows."""
     tids = [int(t) for t in template_ids]
     round_set = _normalize_round_set(rounds)
+    assignment_fp = _assignment_fingerprint(tids) if (use_transform_cache or save_transform_cache) else ""
 
     if use_transform_cache:
-        cached = load_transform_cache(input_path, tids, round_set)
+        cached = load_transform_cache(input_path, tids, round_set, assignment_fp)
         if cached:
             return cached[0], cached[1], True
 
@@ -1390,7 +1560,9 @@ def prepare_upr_transform(
     import_rows = transform_to_import_rows(rows, ctx, template_ids=tids, rounds=round_set)
 
     if save_transform_cache:
-        _write_transform_cache(input_path, tids, round_set, import_rows, ctx)
+        _write_transform_cache(
+            input_path, tids, round_set, import_rows, ctx, assignment_fingerprint=assignment_fp
+        )
 
     return import_rows, ctx, False
 
@@ -1466,11 +1638,13 @@ def _active_emergency_go_config(ctx: UprImportContext) -> Dict[str, Any]:
     return ctx.emergency_go_plugin_config or ctx.emergency_matrix_plugin_config
 
 
-def _load_emergency_matrix_plugin_config(template_id: int = 24) -> Dict[str, Any]:
-    """Plugin filter config from the Emergency Appeals matrix (item 960)."""
+def _load_emergency_matrix_plugin_config(
+    template_id: int = 24, item_id: Optional[int] = None
+) -> Dict[str, Any]:
+    """Plugin filter config from the published Emergency Appeals matrix."""
     from app.models.form_items import FormItem
 
-    item = FormItem.query.get(ITEM_EMERGENCY_APPEALS)
+    item = FormItem.query.get(int(item_id)) if item_id else None
     if not item or int(item.template_id or 0) != template_id:
         return {}
     matrix_cfg = (item.config or {}).get("matrix_config") or {}
@@ -1824,22 +1998,186 @@ def _load_assignment_map(template_ids: List[int]) -> Dict[int, Dict[Tuple[str, s
         iso3 = (iso3_raw or "").strip().upper()
         if pn and iso3 and aes_id is not None and tid in by_template:
             by_template[tid][(pn, iso3)] = int(aes_id)
+            canon = canonical_upr_period(pn)
+            if canon and canon != pn and (canon, iso3) not in by_template[tid]:
+                by_template[tid][(canon, iso3)] = int(aes_id)
     return by_template
 
 
 def _matrix_column_name_from_form_item(item) -> Optional[str]:
     """Return the first matrix column ``name`` from a FormItem config, if defined."""
+    names = _form_item_matrix_column_names(item)
+    return names[0] if names else None
+
+
+def _form_item_matrix_column_names(item) -> List[str]:
+    """Return matrix column names from a FormItem config."""
     if not item or not isinstance(getattr(item, "config", None), dict):
-        return None
+        return []
     matrix_cfg = item.config.get("matrix_config") or item.config
     if not isinstance(matrix_cfg, dict):
+        return []
+    names: List[str] = []
+    for col in matrix_cfg.get("columns") or []:
+        name = col.get("name") if isinstance(col, dict) else col
+        if name:
+            names.append(str(name))
+    return names
+
+
+def t23_matrix_has_funding_columns(item) -> bool:
+    """True when a matrix has the T23 PNS total funding/expenditure columns."""
+    names = {name.strip().lower() for name in _form_item_matrix_column_names(item)}
+    return T23_PNS_FUNDING_REQUIRED_COLUMNS <= names
+
+
+def t24_funding_offset_from_section(section_name: str) -> Optional[int]:
+    """Map a T24 funding-section name to year offset 0/1/2."""
+    text = (section_name or "").lower()
+    if not text:
         return None
-    columns = matrix_cfg.get("columns") or []
-    if not columns:
+    if "+2" in text or "year 3" in text:
+        return 2
+    if "+1" in text or "year 2" in text:
+        return 1
+    if "funding requirement" in text:
+        return 0
+    return None
+
+
+def _warn_once(ctx: "UprImportContext", message: str) -> None:
+    if message not in ctx.warnings:
+        ctx.warnings.append(message)
+
+
+def _matrix_row_mode(item) -> str:
+    if not item or not isinstance(getattr(item, "config", None), dict):
+        return ""
+    matrix_cfg = item.config.get("matrix_config") or {}
+    if not isinstance(matrix_cfg, dict):
+        return ""
+    return str(matrix_cfg.get("row_mode") or "").strip().lower()
+
+
+def _load_published_form_items(template_id: int, version_id: int, *, item_type: Optional[str] = None):
+    from app.models.form_items import FormItem
+
+    query = FormItem.query.filter(
+        FormItem.template_id == int(template_id),
+        FormItem.version_id == int(version_id),
+        FormItem.archived == False,
+    )
+    if item_type:
+        query = query.filter(FormItem.item_type == item_type)
+    return query.all()
+
+
+def _resolve_labeled_published_item(
+    ctx: "UprImportContext",
+    template_id: int,
+    *needles: str,
+    item_type: Optional[str] = None,
+) -> Optional[int]:
+    labels = ctx.item_ids_by_label.get(int(template_id), {})
+    if item_type is None:
+        found = find_item_by_label(labels, *needles)
+        return int(found) if found else None
+    pub_vid = ctx.published_version_ids.get(int(template_id))
+    if not pub_vid:
         return None
-    first = columns[0]
-    name = first.get("name") if isinstance(first, dict) else first
-    return str(name) if name else None
+    items = _load_published_form_items(int(template_id), int(pub_vid), item_type=item_type)
+    typed_labels = {
+        (item.label or "").strip().lower(): int(item.id)
+        for item in items
+        if (item.label or "").strip()
+    }
+    found = find_item_by_label(typed_labels, *needles)
+    return int(found) if found else None
+
+
+def _resolve_t22_funding_item_id(ctx: "UprImportContext") -> Optional[int]:
+    """Published T22 funding matrix — exact label, else SP/EF columns (not staff)."""
+    pub_vid = ctx.published_version_ids.get(22)
+    if not pub_vid:
+        return None
+    items = _load_published_form_items(22, int(pub_vid), item_type="matrix")
+    exact = [
+        item for item in items
+        if (item.label or "").strip().lower() == "funding requirements"
+    ]
+    if len(exact) == 1:
+        return int(exact[0].id)
+    for item in items:
+        names = {name.strip().lower() for name in _form_item_matrix_column_names(item)}
+        if {"sp1", "efs"} <= names and "intl_delegates_hns" not in names:
+            return int(item.id)
+    return None
+
+
+def _resolve_t24_funding_by_offset(ctx: "UprImportContext") -> Dict[int, int]:
+    """Published T24 hybrid funding matrices, keyed by year offset 0/1/2."""
+    pub_vid = ctx.published_version_ids.get(24)
+    if not pub_vid:
+        return {}
+    items = _load_published_form_items(24, int(pub_vid), item_type="matrix")
+    out: Dict[int, int] = {}
+    for item in items:
+        if _matrix_row_mode(item) != "hybrid":
+            continue
+        section = item.form_section.name if item.form_section else ""
+        offset = t24_funding_offset_from_section(section)
+        if offset is None:
+            names = {name.strip().lower() for name in _form_item_matrix_column_names(item)}
+            if "ea1" in names:
+                offset = 0
+        if offset is not None and offset not in out:
+            out[offset] = int(item.id)
+    return out
+
+
+def _resolve_t33_funding_matrix_item_id(ctx: "UprImportContext") -> Optional[int]:
+    """Published T33 funding-by-source matrix (not the SP/EF breakdown)."""
+    pub_vid = ctx.published_version_ids.get(REPORTING_COUNTRY_TEMPLATE_ID)
+    if not pub_vid:
+        return None
+    items = _load_published_form_items(
+        REPORTING_COUNTRY_TEMPLATE_ID, int(pub_vid), item_type="matrix"
+    )
+    for item in items:
+        names = {name.strip().lower() for name in _form_item_matrix_column_names(item)}
+        if {"funding (chf)", "expenditure (chf)"} <= names:
+            continue
+        section = ((item.form_section.name if item.form_section else "") or "").lower()
+        if "funding" in section and _matrix_row_mode(item) == "manual":
+            return int(item.id)
+    return None
+
+
+def _resolve_t23_pns_funding_item_id(ctx: "UprImportContext") -> Optional[int]:
+    """Published T23 funding matrix — label match, else columns Total Funding + Total Expenditure.
+
+    The published form has a single untitled funding matrix (columns Total Funding
+    and Total Expenditure). There is no legacy item 952 on the published version.
+    """
+    from app.models.form_items import FormItem
+
+    pns_id = find_item_by_label(ctx.item_ids_by_label.get(23, {}), *T23_PNS_FUNDING_LABELS)
+    if pns_id:
+        return int(pns_id)
+
+    pub_vid = ctx.published_version_ids.get(23)
+    if not pub_vid:
+        return None
+    items = FormItem.query.filter(
+        FormItem.template_id == 23,
+        FormItem.version_id == int(pub_vid),
+        FormItem.item_type == "matrix",
+        FormItem.archived == False,
+    ).all()
+    for item in items:
+        if t23_matrix_has_funding_columns(item):
+            return int(item.id)
+    return None
 
 
 def _published_funding_matrix_item(template_id: int):
@@ -1862,7 +2200,7 @@ def _published_funding_matrix_item(template_id: int):
         item = query.filter(FormItem.label.ilike(f"%{needle}%")).first()
         if item:
             return item
-    return query.first()
+    return None
 
 
 def _matrix_column_name_from_item_id(item_id: int) -> str:
@@ -2092,23 +2430,35 @@ def _load_published_item_indexes(
     return by_bank, by_bank_section, by_label
 
 
-def _build_reporting_special_items(labels: Dict[str, int]) -> Dict[str, Any]:
-    fallbacks = {
-        "funding": ITEM_REPORTING_COUNTRY_FUNDING,
-        "expenditure": ITEM_REPORTING_COUNTRY_EXPENDITURE,
-        "sp_breakdown": ITEM_REPORTING_COUNTRY_SP_BREAKDOWN,
-        "support": ITEM_REPORTING_COUNTRY_SUPPORT,
-    }
+def _build_reporting_special_items(ctx: "UprImportContext") -> Dict[str, Any]:
+    labels = ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
     special: Dict[str, Any] = {}
     for key, needles in REPORTING_SPECIAL_ITEM_LABELS.items():
-        item_id = find_item_by_label(labels, *needles) or fallbacks.get(key)
+        item_id = find_item_by_label(labels, *needles)
         if item_id:
             special[key] = int(item_id)
+    if "expenditure" not in special:
+        bank_exp = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(
+            REPORTING_EXPENDITURE_BANK_ID
+        )
+        if bank_exp:
+            special["expenditure"] = int(bank_exp)
+    if "funding" not in special:
+        fund_id = _resolve_t33_funding_matrix_item_id(ctx)
+        if fund_id:
+            special["funding"] = int(fund_id)
     funding_id = special.get("funding")
     if funding_id:
         special["funding_col"] = _matrix_column_name_from_item_id(int(funding_id))
     else:
         special["funding_col"] = REPORTING_FUNDING_MATRIX_COLUMN
+        ctx.warnings.append(
+            "Could not resolve template 33 funding-by-source matrix on the published version"
+        )
+    if "expenditure" not in special:
+        ctx.warnings.append(
+            "Could not resolve template 33 expenditure item on the published version"
+        )
     return special
 
 
@@ -2346,8 +2696,8 @@ def reporting_special_item(
     *,
     template_id: int = REPORTING_COUNTRY_TEMPLATE_ID,
 ) -> Optional[int]:
-    special = ctx.reporting_special_items.get(int(template_id), {})
-    item_id = special.get(key)
+    special = getattr(ctx, "reporting_special_items", None) or {}
+    item_id = special.get(int(template_id), {}).get(key) if isinstance(special, dict) else None
     return int(item_id) if item_id else None
 
 
@@ -2356,8 +2706,9 @@ def reporting_funding_matrix_column(
     *,
     template_id: int = REPORTING_COUNTRY_TEMPLATE_ID,
 ) -> str:
-    special = ctx.reporting_special_items.get(int(template_id), {})
-    return str(special.get("funding_col") or REPORTING_FUNDING_MATRIX_COLUMN)
+    special = getattr(ctx, "reporting_special_items", None) or {}
+    bucket = special.get(int(template_id), {}) if isinstance(special, dict) else {}
+    return str(bucket.get("funding_col") or REPORTING_FUNDING_MATRIX_COLUMN)
 
 
 def _resolve_item_by_bank_and_area(
@@ -2618,9 +2969,7 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
         ctx.percentage_bank_ids
     )
     if REPORTING_COUNTRY_TEMPLATE_ID in ids:
-        ctx.reporting_special_items[REPORTING_COUNTRY_TEMPLATE_ID] = _build_reporting_special_items(
-            ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
-        )
+        ctx.reporting_special_items[REPORTING_COUNTRY_TEMPLATE_ID] = _build_reporting_special_items(ctx)
         ctx.other_indicators_section_id = _load_other_indicators_section_id()
         ctx.yes_no_bank_ids = _load_yes_no_bank_ids()
         reporting_aes_ids = set(
@@ -2650,17 +2999,65 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
                     ctx.emergency_choice_item_id
                 )
     if 22 in ids:
-        staff_id = find_item_by_label(ctx.item_ids_by_label.get(22, {}), *T22_STAFF_MATRIX_LABELS)
-        if staff_id:
-            ctx.staff_matrix_item_id = int(staff_id)
+        staff_id = _resolve_labeled_published_item(
+            ctx, 22, *T22_STAFF_MATRIX_LABELS, item_type="matrix"
+        )
+        ctx.staff_matrix_item_id = int(staff_id) if staff_id else 0
+        fund_id = _resolve_t22_funding_item_id(ctx)
+        ctx.t22_funding_item_id = int(fund_id) if fund_id else 0
+        if not ctx.staff_matrix_item_id:
+            ctx.warnings.append(
+                "Could not resolve template 22 PNS staff contributions matrix on the published version"
+            )
+        if not ctx.t22_funding_item_id:
+            ctx.warnings.append(
+                "Could not resolve template 22 Funding Requirements matrix on the published version"
+            )
     if 23 in ids:
-        pns_id = find_item_by_label(ctx.item_ids_by_label.get(23, {}), *T23_PNS_FUNDING_LABELS)
+        pns_id = _resolve_t23_pns_funding_item_id(ctx)
         if pns_id:
             ctx.pns_funding_item_id = int(pns_id)
+        else:
+            ctx.pns_funding_item_id = 0
+            ctx.warnings.append(
+                "Could not resolve template 23 PNS funding matrix "
+                "(need published columns Total Funding and Total Expenditure)"
+            )
+    if 24 in ids:
+        ctx.t24_funding_by_offset = _resolve_t24_funding_by_offset(ctx)
+        longer_id = _resolve_labeled_published_item(
+            ctx, 24, *T24_LONGER_TERM_LABELS, item_type="matrix"
+        )
+        ea_id = _resolve_labeled_published_item(
+            ctx, 24, *T24_EMERGENCY_LABELS, item_type="matrix"
+        )
+        bilateral_id = _resolve_labeled_published_item(
+            ctx, 24, *T24_BILATERAL_LABELS, item_type="matrix"
+        )
+        ctx.t24_longer_term_item_id = int(longer_id) if longer_id else 0
+        ctx.t24_emergency_item_id = int(ea_id) if ea_id else 0
+        ctx.t24_bilateral_item_id = int(bilateral_id) if bilateral_id else 0
+        if not ctx.t24_funding_by_offset:
+            ctx.warnings.append(
+                "Could not resolve template 24 hybrid funding matrices on the published version"
+            )
+        if not ctx.t24_longer_term_item_id:
+            ctx.warnings.append(
+                "Could not resolve template 24 longer-term reach matrix on the published version"
+            )
+        if not ctx.t24_emergency_item_id:
+            ctx.warnings.append(
+                "Could not resolve template 24 Emergency Appeals matrix on the published version"
+            )
+        if not ctx.t24_bilateral_item_id:
+            ctx.warnings.append(
+                "Could not resolve template 24 bilateral support matrix on the published version"
+            )
+        ctx.emergency_matrix_plugin_config = _load_emergency_matrix_plugin_config(
+            24, ctx.t24_emergency_item_id
+        )
     ctx.ns_name_to_id = _build_ns_name_index()
     ctx.ns_home_country_iso3, ctx.country_id_by_iso3, ctx.iso3_to_hns_id = _build_ns_home_country_index()
-    if 24 in ids:
-        ctx.emergency_matrix_plugin_config = _load_emergency_matrix_plugin_config(24)
     return ctx
 
 
@@ -2880,6 +3277,7 @@ def transform_to_import_rows(
 ) -> List[Dict[str, str]]:
     """Transform UPR Excel rows into ready-to-import form_data rows."""
     tids = template_ids or ctx.template_ids
+    _ensure_canonical_assignment_keys(ctx)
     filtered = _filter_rows(rows, template_ids=tids, rounds=rounds)
     ctx.percentage_unit_interval_keys = collect_percentage_unit_interval_keys(
         filtered, ctx.percentage_bank_ids, ctx.yes_no_bank_ids
@@ -2989,7 +3387,13 @@ def transform_to_import_rows(
             ns_id = _resolve_ns_row_id(ctx, ns_name)
             if not aes_id or ns_id is None:
                 continue
-            matrix_cells[(aes_id, ITEM_BILATERAL_SUPPORT)][f"{ns_id}_{area}"] = 1
+            if not ctx.t24_bilateral_item_id:
+                _warn_once(
+                    ctx,
+                    "Skipping template 24 bilateral support rows: published matrix was not resolved",
+                )
+                continue
+            matrix_cells[(aes_id, ctx.t24_bilateral_item_id)][f"{ns_id}_{area}"] = 1
             continue
 
         # --- Funding (T24: HNS/IFRC/PNS Country-Value; T22: PNS-reported) ---
@@ -3057,7 +3461,7 @@ def transform_to_import_rows(
                 aes_id = ctx.assignment_by_template.get(24, {}).get((period, iso3))
                 if not aes_id:
                     continue
-                funding_item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+                funding_item_id = ctx.t24_funding_by_offset.get(offset)
                 if not funding_item_id:
                     continue
                 if area in PLANNING_EA_FUNDING_AREAS:
@@ -3084,7 +3488,7 @@ def transform_to_import_rows(
             # Country Value → template 24 hybrid funding matrix (same item as HNS/IFRC above)
             if country_val and 24 in tids:
                 t24_aes = ctx.assignment_by_template.get(24, {}).get((period, iso3))
-                funding_item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+                funding_item_id = ctx.t24_funding_by_offset.get(offset)
                 if t24_aes and funding_item_id:
                     ns_id = _resolve_ns_row_id(ctx, ns_name)
                     if ns_id is not None:
@@ -3153,13 +3557,25 @@ def transform_to_import_rows(
                 )
                 if not ea_cells:
                     continue
-                matrix_cells[(aes_id, ITEM_EMERGENCY_APPEALS)].update(ea_cells)
+                if not ctx.t24_emergency_item_id:
+                    _warn_once(
+                        ctx,
+                        "Skipping template 24 Emergency Appeals rows: published matrix was not resolved",
+                    )
+                    continue
+                matrix_cells[(aes_id, ctx.t24_emergency_item_id)].update(ea_cells)
             elif area.startswith("SP"):
                 if year_val in (None, ""):
                     ctx.warnings.append(f"Reach row missing Year for {iso3} {rnd} {area}")
                     continue
+                if not ctx.t24_longer_term_item_id:
+                    _warn_once(
+                        ctx,
+                        "Skipping template 24 longer-term reach rows: published matrix was not resolved",
+                    )
+                    continue
                 row_year = str(int(float(str(year_val)))) if str(year_val).strip() else ""
-                matrix_cells[(aes_id, ITEM_LONGER_TERM_PROGRAMMES)][f"{row_year}_{area}"] = value_num
+                matrix_cells[(aes_id, ctx.t24_longer_term_item_id)][f"{row_year}_{area}"] = value_num
             continue
 
         # --- Template 22: Staff ---
@@ -3183,6 +3599,12 @@ def transform_to_import_rows(
             host_ns_id = ctx.iso3_to_hns_id.get(iso3)
             if not host_ns_id:
                 ctx.warnings.append(f"No active NS found for host country: {iso3!r}")
+                continue
+            if not ctx.staff_matrix_item_id:
+                _warn_once(
+                    ctx,
+                    "Skipping template 22 staff rows: published PNS staff matrix was not resolved",
+                )
                 continue
             matrix_cells[(pns_aes, ctx.staff_matrix_item_id)][f"{host_ns_id}_{col_name}"] = value_num
             continue
@@ -3371,7 +3793,7 @@ def transform_to_import_rows(
                 )
             continue
 
-        # --- Reporting Funding (T33 items 1403 + 1404 + 1405; T23 item 952) ---
+        # --- Reporting Funding (T33 items 1403 + 1404 + 1405; T23 published funding matrix) ---
         if sec == "Funding" and rnd_is_reporting:
             if value_num is None:
                 continue
@@ -3454,25 +3876,35 @@ def transform_to_import_rows(
                         elif ent_upper == "OTHER SOURCES":
                             reporting_funding_staging[(aes_id, funding_item, REPORTING_FUNDING_ROW_OTHER)] += value_num
 
-            # ── T23: PNS-reported Funding / Expenditure / Transferred → item 952 ──
+            # ── T23: PNS self-report Funding / Expenditure / Transferred ──
+            # Reporting is PNS-only: Source=PNS Data, amount is ValueNum (not Country/PNS Value).
             # AES is keyed by PNS home country ISO3; row is the host country's NS id.
-            if 23 in tids and ent_upper == "PNS":
-                col_name = T23_PNS_FUNDING_COLUMNS.get(indicator_id)
-                if col_name and ns_name and ns_name.lower() not in ("country", ""):
-                    pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
-                    if not pns_iso3:
-                        ctx.warnings.append(f"Cannot resolve home country for NS: {ns_name!r}")
-                    else:
-                        pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
-                        if pns_aes:
-                            if (pns_aes, iso3) not in pns_t23_reported_yes:
-                                continue
-                            host_ns_id = ctx.iso3_to_hns_id.get(iso3)
-                            if host_ns_id:
-                                cell_key = f"{host_ns_id}_{col_name}"
-                                matrix_cells[(pns_aes, ctx.pns_funding_item_id)][cell_key] = value_num
-                            else:
-                                ctx.warnings.append(f"No active NS found for host country: {iso3!r}")
+            if 23 in tids and ent_upper == "PNS" and is_pns_data_source(row):
+                if not ctx.pns_funding_item_id:
+                    skip_msg = (
+                        "Skipping template 23 funding rows: published PNS funding matrix was not resolved"
+                    )
+                    if skip_msg not in ctx.warnings:
+                        ctx.warnings.append(skip_msg)
+                else:
+                    col_name = T23_PNS_FUNDING_COLUMNS.get(indicator_id)
+                    if col_name and ns_name and ns_name.lower() not in ("country", ""):
+                        pns_iso3 = ctx.ns_home_country_iso3.get(ns_name.lower())
+                        if not pns_iso3:
+                            ctx.warnings.append(f"Cannot resolve home country for NS: {ns_name!r}")
+                        else:
+                            pns_aes = ctx.assignment_by_template.get(23, {}).get((period, pns_iso3))
+                            if not pns_aes:
+                                ctx.warnings.append(
+                                    f"No template 23 assignment for {pns_iso3} {period} (NS: {ns_name!r})"
+                                )
+                            elif (pns_aes, iso3) in pns_t23_reported_yes:
+                                host_ns_id = ctx.iso3_to_hns_id.get(iso3)
+                                if host_ns_id:
+                                    cell_key = f"{host_ns_id}_{col_name}"
+                                    matrix_cells[(pns_aes, ctx.pns_funding_item_id)][cell_key] = value_num
+                                else:
+                                    ctx.warnings.append(f"No active NS found for host country: {iso3!r}")
             continue
 
         # --- Template 33: Support (Received Support) ---
@@ -3502,40 +3934,41 @@ def transform_to_import_rows(
             continue
 
     # ── Post-loop: T22 PNS funding → submitted cells (PNS Value only when reported) ──
-    for (pns_aes, host_cid, area), (cv, pv) in pns_t22_staging.items():
-        host_iso3 = iso3_by_host_cid.get(host_cid)
-        if not host_iso3 or (pns_aes, host_iso3) not in pns_t22_reported_yes:
-            continue
-        cell = _t22_pns_import_cell_value(cv, pv)
-        if cell is not None:
-            matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)][f"{host_cid}_{area}"] = cell
+    if ctx.t22_funding_item_id:
+        for (pns_aes, host_cid, area), (cv, pv) in pns_t22_staging.items():
+            host_iso3 = iso3_by_host_cid.get(host_cid)
+            if not host_iso3 or (pns_aes, host_iso3) not in pns_t22_reported_yes:
+                continue
+            cell = _t22_pns_import_cell_value(cv, pv)
+            if cell is not None:
+                matrix_cells[(pns_aes, ctx.t22_funding_item_id)][f"{host_cid}_{area}"] = cell
 
-    # ── Post-loop: T22 PNS Total (Excel Area=Total) → row-total column ──
-    for (pns_aes, host_cid), (cv, pv) in pns_t22_total_staging.items():
-        host_iso3 = iso3_by_host_cid.get(host_cid)
-        pns_reported = bool(host_iso3 and (pns_aes, host_iso3) in pns_t22_reported_yes)
-        if not pns_reported:
-            continue
-        cell = _t22_pns_import_cell_value(cv, pv)
-        if cell is not None:
-            item_cells = matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)]
-            item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = cell
-        # PNS reported row totals only (no SP/EF breakdown) — blank breakdown cells
-        # where country reported amounts but PNS did not provide SP/EF values.
-        has_pns_breakdown = any(
-            k[0] == pns_aes
-            and k[1] == host_cid
-            and pns_t22_staging[k][1] is not None
-            for k in pns_t22_staging
-        )
-        if not has_pns_breakdown:
-            item_cells = matrix_cells[(pns_aes, ITEM_FUNDING_REQUIREMENTS_T22)]
-            for area in T22_BREAKDOWN_AREAS:
-                breakdown_cell = _t22_total_only_breakdown_cell(
-                    pns_t22_staging, pns_aes, host_cid, area
-                )
-                if breakdown_cell is not None:
-                    item_cells[f"{host_cid}_{area}"] = breakdown_cell
+        # ── Post-loop: T22 PNS Total (Excel Area=Total) → row-total column ──
+        for (pns_aes, host_cid), (cv, pv) in pns_t22_total_staging.items():
+            host_iso3 = iso3_by_host_cid.get(host_cid)
+            pns_reported = bool(host_iso3 and (pns_aes, host_iso3) in pns_t22_reported_yes)
+            if not pns_reported:
+                continue
+            cell = _t22_pns_import_cell_value(cv, pv)
+            if cell is not None:
+                item_cells = matrix_cells[(pns_aes, ctx.t22_funding_item_id)]
+                item_cells[f"{host_cid}_{T22_ROW_TOTAL_COLUMN}"] = cell
+            # PNS reported row totals only (no SP/EF breakdown) — blank breakdown cells
+            # where country reported amounts but PNS did not provide SP/EF values.
+            has_pns_breakdown = any(
+                k[0] == pns_aes
+                and k[1] == host_cid
+                and pns_t22_staging[k][1] is not None
+                for k in pns_t22_staging
+            )
+            if not has_pns_breakdown:
+                item_cells = matrix_cells[(pns_aes, ctx.t22_funding_item_id)]
+                for area in T22_BREAKDOWN_AREAS:
+                    breakdown_cell = _t22_total_only_breakdown_cell(
+                        pns_t22_staging, pns_aes, host_cid, area
+                    )
+                    if breakdown_cell is not None:
+                        item_cells[f"{host_cid}_{area}"] = breakdown_cell
 
     # ── Post-loop: reporting country funding staging → item 1403 matrix cells ──
     reporting_funding_col = reporting_funding_matrix_column(ctx)

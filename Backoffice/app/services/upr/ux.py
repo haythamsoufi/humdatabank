@@ -51,6 +51,13 @@ def step_display_message_get_upr_kpi_value(tool_args: Dict[str, Any]) -> str:
     country = (tool_args or {}).get("country_identifier") or ""
     metric = (tool_args or {}).get("metric") or ""
     metric_short = (metric[:30] + ("…" if len(metric) > 30 else "")) if metric else ""
+    year = (tool_args or {}).get("year")
+    year_str = str(year).strip() if year else ""
+    if country and metric and year_str:
+        return _(
+            "Reading %(metric)s from the %(year)s Unified Plans and Reports for %(country)s…",
+            metric=metric_short, year=year_str, country=country,
+        )
     if country and metric:
         return _("Reading %(metric)s from Unified Plans and Reports for %(country)s…", metric=metric_short, country=country)
     if country:

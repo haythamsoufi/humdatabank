@@ -196,6 +196,118 @@
         </div>
     </div>
 
+    {% set recent_activities = recent_activities|default([]) %}
+    {% set total_activities_count = total_activities_count|default(recent_activities|length) %}
+    <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-3">
+            <h3 class="text-sm font-semibold text-gray-800">
+                <i class="fas fa-clipboard-list mr-2 text-blue-600"></i>{{ _('Recent activities') }}
+            </h3>
+            <div class="flex items-center gap-3 shrink-0">
+                {% if total_activities_count > recent_activities|length %}
+                <span class="text-xs text-gray-500">{{ _('Showing %(shown)s of %(total)s', shown=recent_activities|length, total=total_activities_count) }}</span>
+                {% endif %}
+                <a href="{{ url_for('analytics.activity_logs', user=user.email) }}"
+                   class="text-xs font-medium text-blue-600 hover:text-blue-800"
+                   {% if user_analytics_embedded %}target="_blank" rel="noopener noreferrer"{% endif %}>
+                    {{ _('View all') }} <i class="fas fa-external-link-alt ml-0.5" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+        <div class="p-0">
+            {% if recent_activities %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Timestamp') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Activity') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Description') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Endpoint') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('IP address') }}</th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ _('Response') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for log in recent_activities %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {{ log.timestamp|datetime_local('datetime', 'text-sm text-gray-900') }}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% set at = log.activity_type or '' %}
+                                {% if at == 'page_view' %}
+                                {{ status_label(_('Page view'), 'info') }}
+                                {% elif at in ['form_submit', 'form_submitted'] %}
+                                {{ status_label(_('Form submit'), 'success') }}
+                                {% elif at in ['form_save', 'form_saved'] %}
+                                {{ status_label(_('Form save'), 'info') }}
+                                {% elif at in ['file_upload', 'file_uploaded'] %}
+                                {{ status_label(_('File upload'), 'info') }}
+                                {% elif at == 'data_export' %}
+                                {{ status_label(_('Data export'), 'warning') }}
+                                {% elif at == 'data_modified' %}
+                                {{ status_label(_('Data modified'), 'warning') }}
+                                {% elif at == 'data_deleted' %}
+                                {{ status_label(_('Data deleted'), 'danger') }}
+                                {% elif at == 'admin_action' or at.startswith('admin_') %}
+                                {{ status_label(_('Admin action'), 'danger') }}
+                                {% else %}
+                                {{ status_label(at.replace('_', ' ')|title, 'neutral') }}
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3">
+                                {% set desc = log.display_description if log.display_description is defined and log.display_description else log.activity_description %}
+                                {% if desc %}
+                                <div class="text-sm text-gray-900 max-w-xs truncate" title="{{ desc }}">
+                                    {{ desc }}
+                                </div>
+                                {% else %}
+                                <span class="text-sm text-gray-500">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if log.endpoint %}
+                                <div class="text-sm text-gray-900 font-mono">{{ log.endpoint }}</div>
+                                {% if log.http_method %}
+                                <div class="text-xs text-gray-500">{{ log.http_method }}</div>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-sm text-gray-500">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <div class="text-sm text-gray-900 font-mono">{{ log.ip_address or '—' }}</div>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if log.response_status_code %}
+                                    {% if log.response_status_code < 300 %}
+                                    {{ status_label(log.response_status_code, 'success') }}
+                                    {% elif log.response_status_code < 400 %}
+                                    {{ status_label(log.response_status_code, 'info') }}
+                                    {% elif log.response_status_code < 500 %}
+                                    {{ status_label(log.response_status_code, 'warning') }}
+                                    {% else %}
+                                    {{ status_label(log.response_status_code, 'danger') }}
+                                    {% endif %}
+                                    {% if log.response_time_ms %}
+                                    <div class="text-xs text-gray-500 mt-1">{{ log.response_time_ms }}ms</div>
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-sm text-gray-500">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            {{ empty_state(icon="fas fa-clipboard-list", title=_('No recent activities found.')) }}
+            {% endif %}
+        </div>
+    </div>
+
     <div class="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h3 class="text-sm font-semibold text-gray-800">

@@ -322,13 +322,15 @@ def run_unified_plans_focus_fastpath(
         f"**{excluded_no_mentions}** plans excluded for no target-area mentions."
         + (f"  Table shows most recent plan per country ({table_count} rows)." if latest_by_country else "")
     )
-    area_counts_line = (
-        f"\n\nCounts - Cash: {int(counts.get('cash') or 0)} | "
-        f"CEA: {int(counts.get('cea') or 0)} | "
-        f"Livelihoods: {int(counts.get('livelihoods') or 0)} | "
-        f"Social Protection: {int(counts.get('social_protection') or 0)} "
-        f"({analyzed} plans analysed)"
-    )
+    # Built dynamically (not hardcoded to the 4 built-in areas): "areas" can be any
+    # free-text theme (see tool_specs.py), so counts must reflect whatever was actually
+    # requested/analyzed, otherwise a custom-area query (e.g. "migration", "climate")
+    # would show a meaningless "Cash: 0 | CEA: 0 | ..." line instead of its own counts.
+    if counts:
+        counts_parts = " | ".join(f"{_area_key_to_label(k)}: {int(v or 0)}" for k, v in counts.items())
+        area_counts_line = f"\n\nCounts - {counts_parts} ({analyzed} plans analysed)"
+    else:
+        area_counts_line = ""
 
     quality_warnings: List[str] = []
     if total > 0 and analyzed < total * 0.25:
@@ -336,12 +338,9 @@ def run_unified_plans_focus_fastpath(
             f"Low match rate ({analyzed}/{total} plans). "
             "The semantic similarity thresholds may be too strict, or the documents may use different terminology."
         )
-    zero_areas = [
-        k for k in (counts or {})
-        if int(counts.get(k) or 0) == 0 and k in ("cash", "cea", "livelihoods", "social_protection")
-    ]
+    zero_areas = [k for k in (counts or {}) if int(counts.get(k) or 0) == 0]
     if zero_areas:
-        labels = ", ".join(zero_areas)
+        labels = ", ".join(_area_key_to_label(k) for k in zero_areas)
         quality_warnings.append(
             f"Zero matches for: {labels}. "
             "These areas may be described using alternative terminology not yet covered by the detection patterns."

@@ -59,6 +59,11 @@ from pathlib import Path
 import re
 from typing import Any, Dict, List, Optional, Callable
 
+from app.services.upr.pns_parsing import (
+    PARTICIPATING_NS_HEADER_RE as _PARTICIPATING_NS_RE,
+    parse_participating_national_societies_lines,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +76,6 @@ _PEOPLE_REACHED_HEADER_RE = re.compile(
 _FIN_OVERVIEW_RE = re.compile(r"^\s*FINANCIAL\s+OVERVIEW\s*$", re.IGNORECASE)
 _FUNDING_REQUIREMENTS_RE = re.compile(r"\bfunding\s+requirements?\b", re.IGNORECASE)
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
-_PARTICIPATING_NS_RE = re.compile(r"^\s*participating\s+national\s+societies\s*$", re.IGNORECASE)
 _HAZARDS_HEADER_RE = re.compile(r"^\s*hazards\s*$", re.IGNORECASE)
 _PNS_BILATERAL_SUPPORT_RE = re.compile(
     r"participating\s+national\s+societies\s+bilateral\s+support\s+for\s+(\d{4})",
@@ -2096,142 +2100,6 @@ def extract_funding_requirements(pages: Optional[List[Dict[str, Any]]]) -> List[
             out.pop("items", None)
         return out
 
-    def parse_participating_national_societies(panel_lines: List[str]) -> Dict[str, Any]:
-        """
-        Parse the optional "Participating National Societies" list.
-
-        Convention used in Planning visuals:
-        - Names with "*" are considered multilateral (through IFRC)
-        - Names without "*" are considered bilateral
-        """
-        # Find header line (robust to OCR splits and multi-column noise).
-        start = None
-        for i, ln in enumerate(panel_lines):
-            s = (ln or "").strip()
-            low = s.lower()
-            # Exact match
-            if _PARTICIPATING_NS_RE.match(s):
-                start = i + 1
-                break
-            # Split across two lines: "Participating" / "National Societies"
-            if low == "participating" and i + 1 < len(panel_lines):
-                nxt = (panel_lines[i + 1] or "").strip().lower()
-                if nxt == "national societies":
-                    start = i + 2
-                    break
-            # Noisy split across columns:
-            # e.g. "IFRC network Funding ... Participating ... IFRC Appeal codes" then next line contains "National Societies"
-            if "participating" in low and i + 1 < len(panel_lines):
-                nxt = (panel_lines[i + 1] or "").strip().lower()
-                if "national societies" in nxt:
-                    start = i + 2
-                    break
-            if "national societies" in low and i - 1 >= 0:
-                prv = (panel_lines[i - 1] or "").strip().lower()
-                if "participating" in prv:
-                    start = i + 1
-                    break
-        if start is None:
-            return {}
-
-        # Collect the panel body
-        body_lines: List[str] = []
-        for ln in panel_lines[start:]:
-            s = (ln or "").strip()
-            if not s:
-                continue
-            low = s.lower()
-            # Stop at common next panels / footnotes
-            if ("hazards" in low) or ("ifrc country delegation" in low):
-                break
-            if "national societies" in low and "contributed" in low and "multilateral" in low:
-                break
-            # Don't stop on "funding requirements" because it can appear in another column while the NS list continues.
-            if ("ifrc" in low and "breakdown" in low):
-                break
-            # Skip separator-like lines (OCR sometimes produces underscores/dashes)
-            if re.fullmatch(r"[-_—–]{2,}", s):
-                continue
-            body_lines.append(s)
-
-        if not body_lines:
-            return {}
-
-        # Parse names from multi-column OCR:
-        # - Split each line into "cells" by 2+ spaces
-        # - Take the cell that contains "Red Cross"/"Red Crescent"
-        # - Handle OCR splitting "... National Red" + "Cross*" across lines
-        names_raw: List[str] = []
-        pending_prefix: Optional[str] = None
-
-        def add_name(name: str):
-            nm = (name or "").strip()
-            if not nm:
-                return
-            names_raw.append(nm)
-
-        for line in body_lines:
-            # Cells split by multi-space (column separators)
-            cells = [c.strip() for c in re.split(r"\s{2,}", line) if c.strip()]
-            if not cells:
-                continue
-
-            # If we have a pending "... Red" prefix, try to complete it with a "Cross" cell
-            if pending_prefix:
-                for c in cells:
-                    cl = c.lower()
-                    if cl in {"cross", "cross*", "crescent", "crescent*"}:
-                        add_name(pending_prefix + " " + c)
-                        pending_prefix = None
-                        break
-
-            for c in cells:
-                cl = c.lower()
-                # Ignore obvious non-name cells
-                if "mdr" in cl:
-                    continue
-                if ("total" in cl and "chf" in cl) or ("projected funding requirements" in cl):
-                    continue
-                if cl.startswith("emergency appeal") or cl.startswith("longer-term needs") or cl.startswith("longer term needs"):
-                    continue
-
-                if ("red cross" in cl) or ("red crescent" in cl):
-                    add_name(c)
-                    continue
-
-                # Capture split prefix like "The Republic of Korea National Red"
-                if cl.endswith(" red") and ("national red" in cl or cl.endswith("national red")):
-                    pending_prefix = c
-
-        if not names_raw:
-            return {}
-
-        # Normalize + de-dupe preserving order
-        seen: set[str] = set()
-        bilateral: List[str] = []
-        multilateral: List[str] = []
-        raw_out: List[str] = []
-        for n in names_raw:
-            n2 = (n or "").strip()
-            if not n2:
-                continue
-            starred = n2.endswith("*")
-            clean = n2[:-1].rstrip() if starred else n2
-            clean = clean.rstrip(" ,.;")
-            if not clean:
-                continue
-            key = clean.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            raw_out.append(clean + ("*" if starred else ""))
-            if starred:
-                multilateral.append(clean)
-            else:
-                bilateral.append(clean)
-
-        return {"bilateral": bilateral, "multilateral": multilateral, "raw": raw_out}
-
     # Avoid emitting duplicate single-year fallback blocks (some layouts repeat the callout).
     seen_single_year: set[tuple[str, str]] = set()
 
@@ -2467,8 +2335,9 @@ def extract_funding_requirements(pages: Optional[List[Dict[str, Any]]]) -> List[
                     stop = j
                     break
             panel_lines = window_lines[pns_idx:stop]
-            participating_national_societies = parse_participating_national_societies(panel_lines)
+            participating_national_societies = parse_participating_national_societies_lines(panel_lines)
 
+        single_year_fallback = False
         if not totals_by_year:
             # Fallback: single-year "Funding Requirement CHF X" callout with no year columns.
             # If we can find an amount and we have a document year, attach it as totals_by_year[doc_year].
@@ -2482,21 +2351,26 @@ def extract_funding_requirements(pages: Optional[List[Dict[str, Any]]]) -> List[
                 amt = None
             if amt and doc_year:
                 totals_by_year = {str(int(doc_year)): amt}
-                extraction_tag = "funding_requirements_single_year_v0"
-                conf = 0.68
+                single_year_fallback = True
             else:
                 continue
 
         raw_window = window_text.strip()
-        # Confidence heuristic
-        conf = 0.75
-        if len(totals_by_year) >= 2:
-            conf = 0.82
-        if breakdown_by_year:
-            conf = max(conf, 0.86)
-        if is_fullpage_variant:
-            conf = max(conf, 0.85)
-        extraction_tag = locals().get("extraction_tag") or ("funding_requirements_fullpage_v1" if is_fullpage_variant else "funding_requirements_v1")
+        if single_year_fallback:
+            # Weakest extraction path (single regex callout, no year columns) — keep its
+            # own lower confidence instead of letting the heuristic below overwrite it.
+            extraction_tag = "funding_requirements_single_year_v0"
+            conf = 0.68
+        else:
+            # Confidence heuristic
+            conf = 0.75
+            if len(totals_by_year) >= 2:
+                conf = 0.82
+            if breakdown_by_year:
+                conf = max(conf, 0.86)
+            if is_fullpage_variant:
+                conf = max(conf, 0.85)
+            extraction_tag = "funding_requirements_fullpage_v1" if is_fullpage_variant else "funding_requirements_v1"
 
         block = {
             "template": "UPR",

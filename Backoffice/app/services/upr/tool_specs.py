@@ -40,7 +40,7 @@ UPR_TOOL_SPECS = [
         "type": "function",
         "function": {
             "name": "get_upr_kpi_value",
-            "description": "Get UPR KPI values from document-extracted metadata (branches, local_units, volunteers, staff). Use for single-country 'how many' questions when the user allows documents. Do NOT use if the user asked for 'databank only', 'database only', 'indicator bank only', or 'not documents' — use get_indicator_value instead.",
+            "description": "Get UPR KPI values from document-extracted metadata (branches, local_units, volunteers, staff). Use for single-country 'how many' questions when the user allows documents. Do NOT use if the user asked for 'databank only', 'database only', 'indicator bank only', or 'not documents' — use get_indicator_value instead. If the user names a specific year/report (e.g. 'in the 2023 Unified Plan', 'from the 2024 annual report'), pass it as 'year' so that document is preferred over higher-confidence documents from other years.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -51,6 +51,10 @@ UPR_TOOL_SPECS = [
                     "metric": {
                         "type": "string",
                         "description": "One of: 'branches', 'local_units', 'volunteers', 'staff' (best-effort normalization applied)"
+                    },
+                    "year": {
+                        "type": "integer",
+                        "description": "Optional 4-digit calendar year (e.g. 2024) to prefer when the user asks about a specific Plan/Midyear/Annual report. Omit to get the best-available (highest-confidence, most recent) value instead."
                     }
                 },
                 "required": ["country_identifier", "metric"]

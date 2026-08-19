@@ -22,6 +22,10 @@
 {% endif %}
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
+{% set show_upr_visuals_assets = (not is_public_submission) and (not is_preview_mode|default(false)) and template_structure and template_structure.id in [24, 33] %}
+{% if show_upr_visuals_assets %}
+<link rel="stylesheet" href="{{ url_for('upr_visuals.static_file', filename='css/upr-visuals.css') }}">
+{% endif %}
 {% if is_preview_mode %}<link rel="stylesheet" href="{{ static_url('css/year-picker.css') }}">{% endif %}
 <script nonce="{{ csp_nonce() }}">
     // Gate the entry-form UI ASAP (prevents "half-rendered" form when modules fail to load)
@@ -164,6 +168,16 @@
                             {% set _use_unified_country_plan_excel = _aes_id and _excel_mode == 'ucp' %}
                             {% set _use_export_excel = _aes_id and _excel_mode == 'generic' and _show_export %}
                             {% set _use_import_excel = _aes_id and _excel_mode == 'generic' and _show_import %}
+                            {% if tmpl and tmpl.id in [24, 33] and _aes_id %}
+                            <button type="button"
+                                    id="upr-visuals-toggle"
+                                    class="professional-action-btn"
+                                    aria-pressed="false"
+                                    aria-controls="upr-visuals-panel">
+                                <i class="fas fa-chart-pie" aria-hidden="true"></i>
+                                <span>{{ _('Visuals') }}</span>
+                            </button>
+                            {% endif %}
                             {% if _aes_id and (_show_export or _show_import) %}
                             <button type="button" id="excel-options-btn" class="professional-action-btn professional-action-btn-green">
                                 <i class="fas fa-file-excel"></i>
@@ -661,6 +675,10 @@
 
             {# Main Form Area - Adjusts width based on sidebar state #}
             <div class="lg:flex-1 transition-all duration-300 min-w-0" id="main-form-area">
+                    {% set show_upr_visuals = (not is_public_submission) and (not is_preview_mode|default(false)) and template_structure and template_structure.id in [24, 33] and assignment_status and assignment_status.id %}
+                    {% if show_upr_visuals %}
+                        {% include "plugins/upr_visuals/upr_visuals/assignment_panel.html" ignore missing %}
+                    {% endif %}
 
                     <div id="sections-container" class="space-y-4 sm:space-y-8 mb-6 sm:mb-8 min-w-0" data-is-paginated="{{ template_structure.is_paginated|lower }}">
                         {% if is_public_submission %}
@@ -3111,6 +3129,9 @@
 
 {% block extra_js %}
 <script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
+{% if (not is_public_submission) and (not is_preview_mode|default(false)) and template_structure and template_structure.id in [24, 33] %}
+<script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-assignment.js') }}"></script>
+{% endif %}
 {% if is_preview_mode %}
     {% include "forms/entry_form/partials/_preview_banner_js.html" %}
 {% endif %}

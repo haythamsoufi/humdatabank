@@ -46,10 +46,7 @@ from import_fdrs_form_data import (  # noqa: E402
     upsert_form_data_rows,
 )
 from import_upr_excel_data import (  # noqa: E402
-    ITEM_REPORTING_COUNTRY_EXPENDITURE,
     ITEM_REPORTING_COUNTRY_FUNDING,
-    ITEM_REPORTING_COUNTRY_SP_BREAKDOWN,
-    ITEM_REPORTING_COUNTRY_SUPPORT,
     REPORTING_COUNTRY_TEMPLATE_ID,
     REPORTING_FUNDING_ROW_IFRC,
     REPORTING_FUNDING_ROW_OTHER,
@@ -2274,11 +2271,13 @@ def _autoload_tick_column_names(matrix_config: Dict[str, Any], template_variable
     return names
 
 
-def _resolve_autoloaded_bilateral_ns_ids(aes, form_item_id: int) -> Set[int]:
+def _resolve_autoloaded_bilateral_ns_ids(aes, form_item_id: Optional[int]) -> Set[int]:
     """
     NS ids that the reporting bilateral matrix auto-loads from the country plan assignment.
     Mirrors /api/v1/matrix/auto-load-entities without tick filtering when no tick columns exist.
     """
+    if not form_item_id:
+        return set()
     from app.models.assignments import AssignedForm
     from app.models.form_items import FormItem
     from app.models.forms import FormData, FormTemplateVersion
@@ -2447,7 +2446,9 @@ def _export_bilateral_support(wb, ctx: UprImportContext, support_cells: Dict[str
     Ignores template PlannedActivities formulas (year-specific); NS names come from assignment data.
     """
     ticks_by_ns = _parse_support_matrix_ticks(support_cells)
-    autoloaded_ids = _resolve_autoloaded_bilateral_ns_ids(aes, ITEM_REPORTING_COUNTRY_SUPPORT)
+    autoloaded_ids = _resolve_autoloaded_bilateral_ns_ids(
+        aes, reporting_special_item(ctx, "support")
+    )
     reported_ids = _parse_support_matrix_ns_ids(support_cells)
     all_ns_ids = autoloaded_ids | reported_ids | set(ticks_by_ns.keys())
     if not all_ns_ids:
@@ -3344,9 +3345,9 @@ def transform_upr_country_reporting_to_import_rows(
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = {}
     dynamic_order: Dict[int, float] = {}
     items_by_bank = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
-    funding_item = reporting_special_item(ctx, "funding") or ITEM_REPORTING_COUNTRY_FUNDING
-    sp_breakdown_item = reporting_special_item(ctx, "sp_breakdown") or ITEM_REPORTING_COUNTRY_SP_BREAKDOWN
-    support_item = reporting_special_item(ctx, "support") or ITEM_REPORTING_COUNTRY_SUPPORT
+    funding_item = reporting_special_item(ctx, "funding")
+    sp_breakdown_item = reporting_special_item(ctx, "sp_breakdown")
+    support_item = reporting_special_item(ctx, "support")
     kpi_lookup = build_kpi_lookup(wb)
     kpi_display = _build_kpi_display_map(wb)
     yes_no_bank_ids = _load_workbook_yes_no_bank_ids(wb, kpi_lookup)
@@ -3486,62 +3487,65 @@ def transform_upr_country_reporting_to_import_rows(
             if built:
                 import_rows.append(built)
 
-    # Funding (IFRC / PNS / HNS rows → item 1403 matrix column from published FormItem config)
+    # Funding (IFRC / PNS / HNS rows → published T33 funding matrix)
     funding = parse_funding(wb)
     funding_matrix_col = reporting_funding_matrix_column(ctx)
-    for row_name, amount in funding.get("sources", {}).items():
-        if amount:
-            cell_key = f"{row_name}_{funding_matrix_col}"
-            key_warning = _matrix_key_warning(
-                item_id=funding_item, cell_key=cell_key, column_name=funding_matrix_col,
-                row_name=row_name, context=iso3,
-            )
-            if key_warning:
-                ctx.warnings.append(key_warning)
-            matrix_cells.setdefault((aes_id, funding_item), {})[cell_key] = amount
-
-    total_exp = funding.get("total_expenditure")
-    if total_exp is not None:
-        exp_item = items_by_bank.get(734) or reporting_special_item(ctx, "expenditure")
-        item_id = exp_item or ITEM_REPORTING_COUNTRY_EXPENDITURE
-        built = _scalar_row(
-            aes_id=aes_id,
-            item_id=item_id,
-            value=total_exp,
-            iso3=iso3,
-            period=period,
-            debug_kpi="Reporting_Expenditure",
-        )
-        if built:
-            import_rows.append(built)
-
-    for row_name, cols in funding.get("breakdown", {}).items():
-        for col_name, amount in cols.items():
-            if amount is not None:
-                cell_key = f"{row_name}_{col_name}"
+    if funding_item:
+        for row_name, amount in funding.get("sources", {}).items():
+            if amount:
+                cell_key = f"{row_name}_{funding_matrix_col}"
                 key_warning = _matrix_key_warning(
-                    item_id=sp_breakdown_item, cell_key=cell_key, column_name=col_name,
+                    item_id=funding_item, cell_key=cell_key, column_name=funding_matrix_col,
                     row_name=row_name, context=iso3,
                 )
                 if key_warning:
                     ctx.warnings.append(key_warning)
-                matrix_cells.setdefault((aes_id, sp_breakdown_item), {})[cell_key] = amount
+                matrix_cells.setdefault((aes_id, funding_item), {})[cell_key] = amount
+
+    total_exp = funding.get("total_expenditure")
+    if total_exp is not None:
+        exp_item = items_by_bank.get(734) or reporting_special_item(ctx, "expenditure")
+        if exp_item:
+            built = _scalar_row(
+                aes_id=aes_id,
+                item_id=exp_item,
+                value=total_exp,
+                iso3=iso3,
+                period=period,
+                debug_kpi="Reporting_Expenditure",
+            )
+            if built:
+                import_rows.append(built)
+
+    if sp_breakdown_item:
+        for row_name, cols in funding.get("breakdown", {}).items():
+            for col_name, amount in cols.items():
+                if amount is not None:
+                    cell_key = f"{row_name}_{col_name}"
+                    key_warning = _matrix_key_warning(
+                        item_id=sp_breakdown_item, cell_key=cell_key, column_name=col_name,
+                        row_name=row_name, context=iso3,
+                    )
+                    if key_warning:
+                        ctx.warnings.append(key_warning)
+                    matrix_cells.setdefault((aes_id, sp_breakdown_item), {})[cell_key] = amount
 
     # Bilateral support
-    for row in parse_bilateral_support(wb):
-        ns_id = _resolve_ns_row_id(ctx, row["ns_name"])
-        if ns_id is None:
-            continue
-        for area in row["areas"]:
-            column_name = f"{area} Supported"
-            cell_key = f"{ns_id}_{column_name}"
-            key_warning = _matrix_key_warning(
-                item_id=support_item, cell_key=cell_key, column_name=column_name,
-                context=f"{row['ns_name']}, {iso3}",
-            )
-            if key_warning:
-                ctx.warnings.append(key_warning)
-            matrix_cells.setdefault((aes_id, support_item), {})[cell_key] = 1
+    if support_item:
+        for row in parse_bilateral_support(wb):
+            ns_id = _resolve_ns_row_id(ctx, row["ns_name"])
+            if ns_id is None:
+                continue
+            for area in row["areas"]:
+                column_name = f"{area} Supported"
+                cell_key = f"{ns_id}_{column_name}"
+                key_warning = _matrix_key_warning(
+                    item_id=support_item, cell_key=cell_key, column_name=column_name,
+                    context=f"{row['ns_name']}, {iso3}",
+                )
+                if key_warning:
+                    ctx.warnings.append(key_warning)
+                matrix_cells.setdefault((aes_id, support_item), {})[cell_key] = 1
 
     # Comments (T33) → discussion panel (historical import, no author)
     comments = parse_comments(wb)
@@ -3769,10 +3773,14 @@ def build_upr_country_reporting_export(aes_id: int, template_path: str, output_p
     from app.models.forms import FormTemplateVersion
 
     skip_item_ids = {
-        ITEM_REPORTING_COUNTRY_FUNDING,
-        ITEM_REPORTING_COUNTRY_EXPENDITURE,
-        ITEM_REPORTING_COUNTRY_SP_BREAKDOWN,
-        ITEM_REPORTING_COUNTRY_SUPPORT,
+        item_id
+        for item_id in (
+            reporting_special_item(ctx, "funding"),
+            reporting_special_item(ctx, "expenditure"),
+            reporting_special_item(ctx, "sp_breakdown"),
+            reporting_special_item(ctx, "support"),
+        )
+        if item_id
     }
     # Key Data scalars are written to named cells above — skip only those four items.
     for bank_id in NS_DATA_BANK_IDS.values():
@@ -3896,7 +3904,8 @@ def build_upr_country_reporting_export(aes_id: int, template_path: str, output_p
     # Funding
     funding_col = _funding_column_name(wb).strip()
     exp_header = "NS 2026 Total\nExpenditure"
-    funding_entry = entries.get(ITEM_REPORTING_COUNTRY_FUNDING)
+    funding_item_id = reporting_special_item(ctx, "funding")
+    funding_entry = entries.get(funding_item_id) if funding_item_id else None
     funding_cells = _matrix_cells(funding_entry)
 
     def _funding_amount_for_row(row_name: str) -> Optional[float]:
@@ -3928,7 +3937,8 @@ def build_upr_country_reporting_export(aes_id: int, template_path: str, output_p
                 write_table_cell(wb, "Funding", "Data_funding1", idx, funding_header, total_funding)
                 break
 
-    exp_entry = entries.get(ITEM_REPORTING_COUNTRY_EXPENDITURE)
+    exp_item_id = reporting_special_item(ctx, "expenditure")
+    exp_entry = entries.get(exp_item_id) if exp_item_id else None
     exp_val = _scalar_value(exp_entry)
     if exp_val is not None:
         _, funding_rows = read_named_table(wb, "Funding", "Data_funding1")
@@ -3937,11 +3947,13 @@ def build_upr_country_reporting_export(aes_id: int, template_path: str, output_p
                 write_table_cell(wb, "Funding", "Data_funding1", idx, exp_header, exp_val)
                 break
 
-    breakdown_entry = entries.get(ITEM_REPORTING_COUNTRY_SP_BREAKDOWN)
+    breakdown_item_id = reporting_special_item(ctx, "sp_breakdown")
+    breakdown_entry = entries.get(breakdown_item_id) if breakdown_item_id else None
     _export_funding_breakdown(wb, _matrix_cells(breakdown_entry))
 
     # Bilateral support
-    support_entry = entries.get(ITEM_REPORTING_COUNTRY_SUPPORT)
+    support_item_id = reporting_special_item(ctx, "support")
+    support_entry = entries.get(support_item_id) if support_item_id else None
     support_cells = _matrix_cells(support_entry)
     _export_bilateral_support(wb, ctx, support_cells, aes)
 

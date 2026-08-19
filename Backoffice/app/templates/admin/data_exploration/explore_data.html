@@ -779,7 +779,8 @@
         if (domCache.tabCompliance && domCache.tabCompliance.getAttribute('aria-selected') === 'true') return 'compliance';
         if (domCache.tabReports && domCache.tabReports.getAttribute('aria-selected') === 'true') return 'reports';
         if (domCache.tabPbProgress && domCache.tabPbProgress.getAttribute('aria-selected') === 'true') return 'pb-progress';
-        return '';
+        const selected = document.querySelector('#explore-data-tabs .settings-tab[aria-selected="true"]');
+        return selected ? (selected.getAttribute('data-tab') || '') : '';
     }
 
     // Restore parameter form and optional tab from URL; if any data params present, load data
@@ -813,6 +814,10 @@
                 else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
                 else if (tabId === 'reports' && domCache.tabReports && CAN_ACCESS_REPORTS) switchMainTabFn(domCache.tabReports);
                 else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
+                else {
+                    const extTab = document.getElementById('tab-' + tabId);
+                    if (extTab) switchMainTabFn(extTab);
+                }
             }
             const activeTabId = tabId || getActiveMainTabId();
             if (activeTabId === 'pb-progress') {
@@ -3505,6 +3510,14 @@
                 applyParamsToUrl();
             });
         }
+        document.querySelectorAll('#explore-data-tabs .settings-tab[data-tab]').forEach(function(tabBtn) {
+            const tabId = tabBtn.getAttribute('data-tab');
+            if (['data-table', 'disaggregation', 'compliance', 'reports', 'pb-progress'].indexOf(tabId) !== -1) return;
+            tabBtn.addEventListener('click', function() {
+                switchMainTab(tabBtn);
+                applyParamsToUrl();
+            });
+        });
 
         // Refresh compliance data button
         if (domCache.refreshComplianceBtn) {

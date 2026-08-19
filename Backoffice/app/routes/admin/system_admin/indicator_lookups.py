@@ -12,13 +12,22 @@ from app import db
 from app.utils.api_helpers import get_json_safe
 from app.utils.api_responses import json_bad_request, json_ok, require_json_data
 from app.utils.request_utils import is_json_request
+from app.utils.sector_logo_urls import spef_icon_url
 from app.forms.system.indicator_lookup_forms import IndicatorBankTypeForm, IndicatorBankUnitForm
 from app.forms.system.indicator_spef_forms import IndicatorBankSpefForm
 from app.models import FormItem, IndicatorBank, IndicatorBankSpef, IndicatorBankType, IndicatorBankUnit
-from app.routes.admin.shared import permission_required
+from app.routes.admin.shared import permission_required, rbac_guard_audit_exempt
 from app.routes.admin.system_admin import bp
+from app.routes.admin.system_admin.helpers import (
+    _delete_logo_file,
+    _safe_logo_mimetype,
+    _save_logo_file,
+)
+from app.services.platform import storage_service as storage
 from app.utils.transactions import request_transaction_rollback
 from config import Config
+
+SPEF_ICON_SUBDIR = "spef"
 
 
 def _type_usage_count(tid: int) -> int:
@@ -723,6 +732,21 @@ def batch_spef_usage_counts(ids: list[int]) -> dict[int, int]:
     return counts
 
 
+def _apply_spef_icon(row: IndicatorBankSpef, form: IndicatorBankSpefForm) -> None:
+    if form.remove_icon.data and row.icon_filename:
+        _delete_logo_file(row.icon_filename, subdir=SPEF_ICON_SUBDIR)
+        row.icon_filename = None
+        return
+    file_storage = form.icon_file.data
+    if not file_storage or not getattr(file_storage, "filename", None):
+        return
+    if row.icon_filename:
+        _delete_logo_file(row.icon_filename, subdir=SPEF_ICON_SUBDIR)
+    saved = _save_logo_file(file_storage, row.code or "spef", subdir=SPEF_ICON_SUBDIR)
+    if saved:
+        row.icon_filename = saved
+
+
 def _spef_partial(
     form,
     *,
@@ -741,6 +765,7 @@ def _spef_partial(
         modal=True,
         form_action_url=form_action_url,
         delete_url=delete_url,
+        icon_url=spef_icon_url(row) if row else None,
     )
 
 
@@ -828,6 +853,8 @@ def new_spef_lookup():
             if field is not None:
                 row.set_name_translation(lang, field.data or "")
         db.session.add(row)
+        db.session.flush()
+        _apply_spef_icon(row, form)
         db.session.commit()
         if _wants_json_post():
             return json_ok(message=_("SP/EF entry created."))
@@ -897,6 +924,7 @@ def edit_spef_lookup(sid: int):
         row.name = (form.name.data or "").strip()
         row.sort_order = form.sort_order.data or 0
         row.is_active = form.is_active.data
+        _apply_spef_icon(row, form)
         langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or getattr(
             Config, "TRANSLATABLE_LANGUAGES", []
         ) or []
@@ -936,6 +964,8 @@ def delete_spef_lookup(sid: int):
         flash(_("This SP/EF code is still used by one or more indicators and cannot be deleted."), "danger")
         return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
     try:
+        if row.icon_filename:
+            _delete_logo_file(row.icon_filename, subdir=SPEF_ICON_SUBDIR)
         db.session.delete(row)
         db.session.commit()
         if is_json_request():
@@ -949,3 +979,19 @@ def delete_spef_lookup(sid: int):
         flash(_("Could not delete SP/EF entry."), "danger")
         return redirect(url_for("system_admin.manage_indicator_bank", tab="spef", edit_spef=sid))
     return redirect(url_for("system_admin.manage_indicator_bank", tab="spef"))
+
+
+@bp.route("/indicator-bank/spef-lookups/<int:sid>/icon", methods=["GET"])
+@rbac_guard_audit_exempt("Intentionally public to allow SP/EF icon rendering without admin session.")
+def spef_icon(sid: int):
+    row = IndicatorBankSpef.query.get_or_404(sid)
+    if not row.icon_filename:
+        return ("", 404)
+    rel_path = f"{SPEF_ICON_SUBDIR}/{row.icon_filename}"
+    if not storage.exists(storage.SYSTEM, rel_path):
+        return ("", 404)
+    return storage.stream_response(
+        storage.SYSTEM, rel_path,
+        filename=row.icon_filename, as_attachment=False,
+        mimetype=_safe_logo_mimetype(row.icon_filename),
+    )

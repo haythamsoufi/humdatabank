@@ -22,7 +22,10 @@ from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-_YEAR_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+# Digit boundaries, not \b: "_" counts as a word char, so \b misses years in the
+# common underscore-delimited filename convention (e.g. "INP_2023_Foo.pdf") — this
+# regex is applied to document titles/filenames below, so that case matters here.
+_YEAR_RE = re.compile(r"(?<!\d)(19\d{2}|20\d{2})(?!\d)")
 _NUMBER_TOKEN_RE = re.compile(r"[-+]?\d[\d,\u00A0\u202F ]*(?:\.\d+)?")
 
 

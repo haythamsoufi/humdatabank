@@ -1,0 +1,23 @@
+{# Live UPR visuals panel on Unified Plan / Report assignment pages. #}
+<div id="upr-visuals-panel" class="bg-white p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6"
+     data-aes-id="{{ assignment_status.id }}">
+    <div class="upr-visuals-embed__toolbar">
+        <div id="upr-visuals-tabs" class="upr-visuals-embed__tabs" role="tablist" aria-label="{{ _('UPR visuals')|forceescape }}"></div>
+        <div class="upr-visuals-download">
+            <button type="button" id="upr-visuals-download" class="btn btn-icon btn-sm btn-secondary"
+                    title="{{ _('Download')|forceescape }}"
+                    aria-label="{{ _('Download')|forceescape }}"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    aria-controls="upr-visuals-download-menu">
+                <i class="fas fa-download" aria-hidden="true"></i>
+            </button>
+            <div id="upr-visuals-download-menu" class="upr-visuals-download__menu" role="menu">
+                <button type="button" role="menuitem" data-format="png">{{ _('PNG') }}</button>
+                <button type="button" role="menuitem" data-format="pdf">{{ _('PDF') }}</button>
+            </div>
+        </div>
+    </div>
+    <p id="upr-visuals-status" class="text-sm text-gray-500 mb-2"></p>
+    <div id="upr-visuals-body" class="upr-visual-report__body"></div>
+</div>

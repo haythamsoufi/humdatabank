@@ -112,18 +112,44 @@ class TestServiceScriptPaths:
 
             UprExcelImportService._upload_dir  # touch class; ensure app context
             from app.services.upr import excel_import_service as svc
+            from app.services.upr import _scripts_path
 
-            svc._SCRIPTS_DIR = None
+            _scripts_path._SCRIPTS_DIR = None
             svc._ensure_scripts_in_path()
             import import_upr_excel_data  # noqa: F401
 
     def test_country_reporting_service_resolves_imports(self, app):
         with app.app_context():
             from app.services.upr import country_reporting_excel_service as svc
+            from app.services.upr import _scripts_path
 
-            svc._SCRIPTS_DIR = None
+            _scripts_path._SCRIPTS_DIR = None
             svc._ensure_scripts_in_path()
             import upr_country_reporting_excel_template  # noqa: F401
+
+    def test_unified_country_plan_service_resolves_imports(self, app):
+        with app.app_context():
+            from app.services.upr import unified_country_plan_excel_service as svc
+            from app.services.upr import _scripts_path
+
+            _scripts_path._SCRIPTS_DIR = None
+            svc._ensure_scripts_in_path()
+            import unified_country_plan_excel_template  # noqa: F401
+
+    def test_scripts_path_helper_is_shared_across_services(self, app):
+        """All three UPR Flask-facing services must resolve scripts/imports via the
+        single shared helper (no per-module duplicate implementations)."""
+        with app.app_context():
+            from app.services.upr import (
+                excel_import_service,
+                unified_country_plan_excel_service,
+                country_reporting_excel_service,
+                _scripts_path,
+            )
+
+            assert excel_import_service._ensure_scripts_in_path is _scripts_path.ensure_scripts_in_path
+            assert unified_country_plan_excel_service._ensure_scripts_in_path is _scripts_path.ensure_scripts_in_path
+            assert country_reporting_excel_service._ensure_scripts_in_path is _scripts_path.ensure_scripts_in_path
 
     def test_data_sync_finds_fdrs_import_script(self, app):
         with app.app_context():

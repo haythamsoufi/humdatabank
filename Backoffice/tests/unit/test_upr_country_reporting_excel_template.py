@@ -1063,7 +1063,8 @@ def test_parse_indicators_yes_no_dna_preserves_data_not_available():
 
 
 def test_parse_indicators_blank_applicable_is_not_applicable():
-    """A blank Applicable cell must import as Not Applicable, not Yes/No or skip."""
+    """A blank Applicable cell imports as Not Applicable only when the caller
+    opts in (i.e. the destination FormItem has allow_not_applicable=True)."""
     import openpyxl
 
     if not os.path.isfile(TEMPLATE_PATH):
@@ -1081,7 +1082,7 @@ def test_parse_indicators_blank_applicable_is_not_applicable():
         rows = parse_indicators(wb, yes_no_bank_ids={bank_id}, kpi_lookup={})
         target = next(r for r in rows if r.get("bank_id") == bank_id)
         value, is_dna, _disagg, should_import, is_na = _resolve_indicator_import_value(
-            target, bank_id, {bank_id}
+            target, bank_id, {bank_id}, blank_is_not_applicable=True
         )
 
         assert target["applicable_text"] == ""
@@ -1113,7 +1114,24 @@ def test_resolve_indicator_import_value_yes_no():
         "value": None,
         "disagg": None,
     }
+
+    # Default (blank_is_not_applicable=False): destination has no Not
+    # Applicable state to record, so a blank cell keeps its historical
+    # meaning of "no" rather than being skipped or mis-mapped. This is what
+    # every dynamic Other-indicator / Emergency Appeal row uses, since most
+    # blank rows there just mean "not selected for this operation".
     value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(blank_row, 999, {999})
+    assert value == "no"
+    assert not is_dna
+    assert not is_na
+    assert disagg is None
+    assert should_import
+
+    # Opt-in (blank_is_not_applicable=True): only passed by callers for a
+    # destination FormItem that actually has allow_not_applicable=True.
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
+        blank_row, 999, {999}, blank_is_not_applicable=True
+    )
     assert value is None
     assert not is_dna
     assert is_na
@@ -1129,7 +1147,9 @@ def test_resolve_indicator_import_value_yes_no():
         "value": None,
         "disagg": None,
     }
-    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(dna_row, 999, {999})
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
+        dna_row, 999, {999}, blank_is_not_applicable=True
+    )
     assert value is None
     assert is_dna
     assert not is_na
@@ -1147,19 +1167,48 @@ def test_resolve_indicator_import_value_yes_no():
     assert not should_import
     assert not is_na
 
-    numeric_blank = {
+    # Regression test: a real value present must never be discarded in favor
+    # of Not Applicable just because the Applicable/DNA cell is blank — that
+    # column is unrelated to the numeric answer cell for non-Yes/No indicators.
+    numeric_blank_with_value = {
         "data_not_available": False,
         "applicable_text": "  ",
         "value": 12,
         "disagg": None,
     }
     value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
-        numeric_blank, 123, {999}
+        numeric_blank_with_value, 123, {999}, blank_is_not_applicable=True
+    )
+    assert value == 12
+    assert not is_dna
+    assert not is_na
+    assert should_import
+
+    # A genuinely empty numeric row (no value, no disagg) with the opt-in set
+    # imports as Not Applicable instead of being silently skipped.
+    numeric_blank_empty = {
+        "data_not_available": False,
+        "applicable_text": "  ",
+        "value": None,
+        "disagg": None,
+    }
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
+        numeric_blank_empty, 123, {999}, blank_is_not_applicable=True
     )
     assert value is None
     assert not is_dna
     assert is_na
     assert should_import
+
+    # Same empty numeric row without the opt-in: skipped, exactly like before
+    # Not Applicable existed — this is what dynamic Other-indicator / Emergency
+    # Appeal rows (and static items without allow_not_applicable) still get.
+    value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
+        numeric_blank_empty, 123, {999}
+    )
+    assert value is None
+    assert not should_import
+    assert not is_na
 
 
 def test_reporting_funding_matrix_column_matches_form_item(app):

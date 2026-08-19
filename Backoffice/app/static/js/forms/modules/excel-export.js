@@ -3,7 +3,7 @@
  * Handles Excel import/export functionality including modal management
  */
 
-import { debugLog } from './debug.js';
+import { debugLog, isDebugEnabled } from './debug.js';
 import { initExcelImportDropzone } from '../../components/excel-import-dropzone.js';
 import { getScrollableContainer } from '../../core/scroll-container.js';
 
@@ -21,7 +21,9 @@ export class ExcelExportManager {
         this.importForm = null;
         this.overlay = null;
         this.instanceId = Math.random().toString(36).slice(2, 8);
-        this.debug = (window.DEBUG_EXCEL_EXPORT === true) || (localStorage.getItem('DEBUG_EXCEL_EXPORT') === '1');
+        this.debug = isDebugEnabled('excel-export')
+            || (window.DEBUG_EXCEL_EXPORT === true)
+            || (localStorage.getItem('DEBUG_EXCEL_EXPORT') === '1');
         this._importValidationPassed = false;
         this._importHasWarnings = false;
         this._warningsAcknowledged = false;
@@ -380,6 +382,7 @@ export class ExcelExportManager {
 
         const submitButton = this.importForm.querySelector('button[type="submit"]');
         const formAction = this.importForm.action;
+        this.log('import submit', { fileName: file.name, fileSize: file.size, formAction });
 
         const _efetch = (window.getFetch && window.getFetch()) || fetch;
         _efetch(formAction, {
@@ -429,6 +432,17 @@ export class ExcelExportManager {
 
             // Stage-only UPR import — apply to form DOM, do not reload
             if (data && data.success && data.stage_only && data.payload) {
+                this.log('import response', {
+                    success: data.success,
+                    stage_only: data.stage_only,
+                    updated_count: data.updated_count,
+                    warning_count: (data.warning_items || data.warnings || []).length,
+                    payload_keys: data.payload ? Object.keys(data.payload) : [],
+                    field_count: Object.keys(data.payload?.fields || {}).length,
+                    matrix_count: Object.keys(data.payload?.matrices || {}).length,
+                    dynamic_count: (data.payload?.dynamic_indicators || []).length,
+                    repeat_slot_count: (data.payload?.repeat_slots || []).length,
+                });
                 this.hideImportLoading(submitButton);
                 try {
                     const { applyUprExcelImportPayload } = await import('./upr-excel-import-apply.js');
@@ -439,6 +453,11 @@ export class ExcelExportManager {
                             : (data.warnings || [])),
                         ...(applyResult.warnings || []),
                     ]);
+                    this.log('import apply result', {
+                        applied: applyResult.applied,
+                        warning_count: allWarnings.length,
+                        warnings: allWarnings,
+                    });
                     this.hideModal();
                     this.showPageImportNotice({
                         message: data.message,

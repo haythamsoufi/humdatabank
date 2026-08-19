@@ -832,22 +832,39 @@ def _resolve_indicator_import_value(
     row: Dict[str, Any],
     bank_id: Optional[int],
     yes_no_bank_ids: Set[int],
+    *,
+    blank_is_not_applicable: bool = False,
 ) -> Tuple[Optional[Any], bool, Optional[Dict[str, Any]], bool, bool]:
     """Return (value, data_not_available, disagg, should_import, not_applicable).
 
-    A blank Applicable / Data not available cell means Not Applicable — not
-    "No" and not a skipped row. DNA is checked first so "Data not available"
-    is never collapsed into N/A or a Yes/No answer.
+    ``blank_is_not_applicable`` must only be passed True when the destination
+    field actually has a Not Applicable state to record — the caller checks
+    this (e.g. FormItem.allow_not_applicable) before calling. When it is
+    False (the default), a blank Applicable/DNA cell keeps its historical
+    meaning: a Yes/No indicator defaults to "no", and a plain numeric/
+    disaggregated indicator with nothing else present is skipped rather than
+    forced into a state the form has nowhere to store. This matters most for
+    the free-form "Other indicators" / Emergency Appeal dynamic tables, where
+    most KPI-list rows are blank simply because the operation never selected
+    that indicator — not because someone explicitly marked it Not Applicable.
+
+    DNA is checked first so "Data not available" is never collapsed into N/A
+    or a Yes/No answer. A real value/disagg present in the row always wins
+    over a blank Applicable cell — Not Applicable never overwrites actual data.
     """
     if row.get("data_not_available"):
         return None, True, None, True, False
-    if _workbook_applicable_is_blank(row.get("applicable_text")):
-        return None, False, None, True, True
     if bank_id and bank_id in yes_no_bank_ids:
+        if blank_is_not_applicable and _workbook_applicable_is_blank(row.get("applicable_text")):
+            return None, False, None, True, True
         return _workbook_yes_no_value(row.get("applicable_text", "")), False, None, True, False
     disagg = row.get("disagg")
     value = row.get("value")
-    return value, False, disagg, bool(disagg or value is not None), False
+    if disagg or value is not None:
+        return value, False, disagg, True, False
+    if blank_is_not_applicable and _workbook_applicable_is_blank(row.get("applicable_text")):
+        return None, False, None, True, True
+    return value, False, disagg, False, False
 
 
 def _write_indicator_applicable_cell(
@@ -1986,8 +2003,12 @@ def parse_indicators(
                 # above) instead of forcing it to False — a Yes/No indicator marked
                 # "Data not available" in Excel must import as DNA, not silently
                 # coerce to a "No" answer (a materially different, false claim).
-                # A blank Applicable cell is Not Applicable, not "No".
-                if is_dna or not applicable:
+                # Whether a blank Applicable cell means Not Applicable or "no" is a
+                # destination-aware decision made downstream by
+                # _resolve_indicator_import_value (it depends on whether the target
+                # field even supports Not Applicable) — this raw parse just reports
+                # the literal reading, so a blank cell is "no" here.
+                if is_dna:
                     value = None
                 else:
                     value = "yes" if "applicable" in applicable else "no"
@@ -3331,7 +3352,12 @@ def transform_upr_country_reporting_to_import_rows(
                 kpi_lookup,
             )
         value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
-            row, bank_id, yes_no_bank_ids
+            row, bank_id, yes_no_bank_ids,
+            # Only core/other *static* items can render a Not Applicable
+            # checkbox — dynamic Other-indicator rows (item_id is None here)
+            # never get blank_is_not_applicable, matching
+            # _collect_workbook_dynamic_indicator_entries.
+            blank_is_not_applicable=bool(item_id) and item_id in ctx.not_applicable_item_ids,
         )
         if not should_import:
             continue
@@ -3344,7 +3370,7 @@ def transform_upr_country_reporting_to_import_rows(
         if row.get("disagg_warning"):
             ctx.warnings.append(row["disagg_warning"])
         if not item_id:
-            if bank_id and (is_dna or is_na or value is not None or disagg):
+            if bank_id and (is_dna or value is not None or disagg):
                 _queue_other_dynamic_indicator(
                     ctx,
                     aes_id=aes_id,

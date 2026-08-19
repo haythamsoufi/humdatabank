@@ -66,6 +66,7 @@
             {% endfor %}
             sort_order: {{ s.sort_order|default(0)|tojson|safe }},
             is_active: {{ s.is_active|tojson|safe }},
+            icon_url: {{ (spef_icon_url(s) or "")|tojson|safe }},
             usage: {{ spef_usage.get(s.id, 0)|tojson|safe }},
             edit_url: {{ url_for("system_admin.edit_spef_lookup", sid=s.id)|tojson|safe }}
         }{% if not loop.last %},{% endif %}
@@ -78,7 +79,46 @@
         return '—';
     }
 
+    function renderSpefIcon(iconUrl, code) {
+        if (iconUrl) {
+            return '<img src="' + AgGridRenderers.escapeHtmlAttr(iconUrl) +
+                '" alt="" class="w-8 h-8 object-contain rounded bg-white">';
+        }
+        var label = String(code || '');
+        return '<span class="inline-flex items-center justify-center w-8 h-8 rounded bg-gray-100 text-gray-500 text-xs font-mono">' +
+            AgGridRenderers.escapeHtml(label) + '</span>';
+    }
+
+    function bindSpefIconPreview(form) {
+        var input = form && form.querySelector('.js-spef-icon-file');
+        var previewWrap = form && form.querySelector('.js-spef-icon-preview');
+        var previewImg = previewWrap && previewWrap.querySelector('img');
+        var currentImg = form && form.querySelector('.js-spef-icon-current');
+        if (!input || !previewWrap || !previewImg) return;
+
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (!file) {
+                previewWrap.classList.add('hidden');
+                previewImg.removeAttribute('src');
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                previewImg.src = ev.target.result;
+                previewWrap.classList.remove('hidden');
+                if (currentImg) currentImg.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
     var columnDefs = [
+        { field: 'icon_url', headerName: {{ _("Icon")|js }}, width: 80, sortable: false, filter: false,
+          cellRenderer: function (p) {
+            return renderSpefIcon(p.value, p.data && p.data.code);
+          }
+        },
         { field: 'code', headerName: {{ _("Code")|js }}, minWidth: 90, flex: 1, filter: 'agTextColumnFilter', sortable: true,
           cellClass: 'font-mono text-xs' },
         { field: 'name', headerName: {{ _("Label (English)")|js }}, minWidth: 160, flex: 2, filter: 'agTextColumnFilter', sortable: true },
@@ -283,6 +323,7 @@
         var form = modalBody && modalBody.querySelector('.ml-spef-form');
         if (!form) return;
         bindSpefTranslation(form);
+        bindSpefIconPreview(form);
         var cancel = modalBody.querySelector('.js-ml-spef-cancel');
         if (cancel) cancel.addEventListener('click', closeSpefModal);
         var del = modalBody.querySelector('.js-ml-spef-delete');

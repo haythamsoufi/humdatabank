@@ -84,7 +84,7 @@ def get_upr_prompt_section() -> str:
         "\n"
         "Tool routing – UPR KPIs:\n"
         "- Query structured data from the database (Indicator Bank, form submissions, UPR metadata)\n"
-        "- get_upr_kpi_value: for UPR KPIs (branches, local_units, volunteers, staff) — structured metadata from document visual blocks.\n"
+        "- get_upr_kpi_value: for UPR KPIs (branches, local_units, volunteers, staff) — structured metadata from document visual blocks. If the user names a specific year/report (e.g. \"in the 2023 Unified Plan\", \"per the 2024 annual report\"), pass that year via the 'year' argument — otherwise the tool returns its best-available (highest-confidence, most recent) value, which may be from a different year than asked.\n"
         "- For factual value questions (number of X, how many Y in country Z) that are NOT form/assignment data: you MUST call ALL relevant tools before saying \"not found\":\n"
         "  (1) get_indicator_value with period=None (returns most recent).\n"
         "  (2) search_documents with a short query (e.g. \"branches Myanmar\").\n"

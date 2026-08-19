@@ -8,6 +8,7 @@ from app.utils.api_responses import (
     json_bad_request, json_forbidden, json_ok, json_ok_result,
     json_server_error, json_form_errors, require_json_data,
 )
+from app.utils.sector_logo_urls import spef_icon_url
 from flask import (
     render_template, request, flash, redirect, url_for,
     current_app, make_response, send_file,
@@ -115,6 +116,7 @@ def _wizard_spef_areas():
             'code': row.code,
             'label': row.name,
             'sort_order': row.sort_order,
+            'icon_url': spef_icon_url(row) or '',
         }
         for row in spef_rows
         if row.code
@@ -140,6 +142,7 @@ def _wizard_spef_areas():
             'code': normalized_code,
             'label': label or normalized_code,
             'sort_order': next_sort_order,
+            'icon_url': '',
         })
         known_codes.add(normalized_code.upper())
         next_sort_order += 1

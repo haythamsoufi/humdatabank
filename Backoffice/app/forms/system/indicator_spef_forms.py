@@ -3,11 +3,12 @@ import re
 
 from wtforms import BooleanField, IntegerField, StringField, SubmitField
 from wtforms.validators import DataRequired, Length, Optional, ValidationError
+from flask_wtf.file import FileField, FileAllowed
 
 from app.extensions import db
 from app.models import IndicatorBankSpef
 
-from ..base import BaseForm, MultilingualFieldsMixin
+from ..base import FileUploadForm, MultilingualFieldsMixin
 
 _SPEF_CODE_RE = re.compile(r"^[A-Za-z]{2}\d{1,2}$")
 
@@ -21,7 +22,7 @@ def _normalize_spef_code(code: str) -> str:
     return c
 
 
-class IndicatorBankSpefForm(BaseForm, MultilingualFieldsMixin):
+class IndicatorBankSpefForm(FileUploadForm, MultilingualFieldsMixin):
     code = StringField(
         "Code",
         validators=[DataRequired(), Length(max=16)],
@@ -30,6 +31,17 @@ class IndicatorBankSpefForm(BaseForm, MultilingualFieldsMixin):
     name = StringField("English label", validators=[DataRequired(), Length(max=200)])
     sort_order = IntegerField("Display order", default=0, validators=[Optional()])
     is_active = BooleanField("Active", default=True)
+    icon_file = FileField(
+        "Icon image",
+        validators=[
+            Optional(),
+            FileAllowed(
+                ["jpg", "jpeg", "png", "gif", "webp"],
+                "Allowed image types: JPG, PNG, GIF, WEBP",
+            ),
+        ],
+    )
+    remove_icon = BooleanField("Remove current icon", default=False)
     submit = SubmitField("Save")
 
     def __init__(self, *args, editing_id=None, **kwargs):

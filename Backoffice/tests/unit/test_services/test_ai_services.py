@@ -224,6 +224,47 @@ class TestAIToolsRegistry:
             tools_registry.execute_tool('unknown_tool')
 
 
+class TestGetUprKpiValueYearArg:
+    """AIToolsRegistry.get_upr_kpi_value — optional 'year' tool arg (added so chat
+    users asking about a specific Plan/Midyear/Annual report can influence the UPR
+    KPI ranking, not just the internal form-suggestion caller). Verifies the wrapper
+    coerces it to int and forwards it as data_retrieval.get_upr_kpi_value's
+    prefer_year kwarg; see also app/services/upr/tool_specs.py for the JSON schema."""
+
+    @pytest.fixture
+    def tools_registry(self, app):
+        with app.app_context():
+            with patch('app.services.ai.tools.registry.AIVectorStore'):
+                from app.services.ai.tools import AIToolsRegistry
+                return AIToolsRegistry()
+
+    def test_year_forwarded_as_prefer_year(self, app, tools_registry):
+        with app.app_context(), patch('app.services.ai.tools.registry.get_upr_kpi_value_service') as mock_svc:
+            mock_svc.return_value = {'success': True}
+            tools_registry.get_upr_kpi_value(country_identifier='Kenya', metric='volunteers', year=2023)
+        mock_svc.assert_called_once_with(country_identifier='Kenya', metric='volunteers', prefer_year=2023)
+
+    def test_no_year_forwards_none(self, app, tools_registry):
+        with app.app_context(), patch('app.services.ai.tools.registry.get_upr_kpi_value_service') as mock_svc:
+            mock_svc.return_value = {'success': True}
+            tools_registry.get_upr_kpi_value(country_identifier='Kenya', metric='volunteers')
+        mock_svc.assert_called_once_with(country_identifier='Kenya', metric='volunteers', prefer_year=None)
+
+    def test_string_year_is_coerced_to_int(self, app, tools_registry):
+        with app.app_context(), patch('app.services.ai.tools.registry.get_upr_kpi_value_service') as mock_svc:
+            mock_svc.return_value = {'success': True}
+            tools_registry.get_upr_kpi_value(country_identifier='Kenya', metric='volunteers', year='2023')
+        mock_svc.assert_called_once_with(country_identifier='Kenya', metric='volunteers', prefer_year=2023)
+
+    def test_non_numeric_year_falls_back_to_none(self, app, tools_registry):
+        """A malformed year from the LLM must not blow up the tool call — it should
+        just be dropped so the tool falls back to best-available ranking."""
+        with app.app_context(), patch('app.services.ai.tools.registry.get_upr_kpi_value_service') as mock_svc:
+            mock_svc.return_value = {'success': True}
+            tools_registry.get_upr_kpi_value(country_identifier='Kenya', metric='volunteers', year='not-a-year')
+        mock_svc.assert_called_once_with(country_identifier='Kenya', metric='volunteers', prefer_year=None)
+
+
 # ============================================================================
 # Test platform scope heuristics (out-of-scope gate before agent)
 # ============================================================================

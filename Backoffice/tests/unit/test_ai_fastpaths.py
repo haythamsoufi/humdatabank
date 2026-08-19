@@ -90,3 +90,40 @@ class TestRunUnifiedPlansFocusFastpath:
         assert result is not None
         assert isinstance(result, dict)
         registry.execute_tool.assert_called_once()
+
+    def test_area_counts_line_reflects_custom_areas_not_hardcoded_defaults(self, app):
+        """Regression: the "Counts - ..." line and "Zero matches for" warning must be
+        built from whatever areas were actually requested/analyzed. They used to be
+        hardcoded to Cash/CEA/Livelihoods/Social Protection, so a custom-area request
+        (e.g. "migration"/"climate" — both explicitly supported by the tool spec) showed
+        fabricated "Cash: 0 | CEA: 0 | ..." zeros instead of the real counts."""
+        from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath
+
+        registry = MagicMock()
+        registry.get_tool_definitions_openai.return_value = [
+            {"function": {"name": "analyze_unified_plans_focus_areas"}},
+        ]
+        registry.execute_tool.return_value = {
+            "success": True,
+            "result": {
+                "plans": [{"country": "Nepal"}],
+                "countries_grouped": [],
+                "most_recent_plan_per_country": [],
+                "counts_by_area": {"migration": 3, "climate": 0},
+                "plans_analyzed": 1,
+                "total_plans": 1,
+            },
+        }
+        with app.app_context():
+            result = run_unified_plans_focus_fastpath(
+                query=self._MATCHING_QUERY,
+                tool_args={"areas": ["migration", "climate"]},
+                **self._kwargs(registry=registry),
+            )
+        assert result is not None
+        answer = result["answer"]
+        assert "Migration: 3" in answer
+        assert "Climate: 0" in answer
+        assert "Zero matches for: Climate" in answer
+        for builtin_label in ("Cash:", "CEA:", "Livelihoods:", "Social Protection:"):
+            assert builtin_label not in answer

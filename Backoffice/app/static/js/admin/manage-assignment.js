@@ -1297,16 +1297,20 @@
                     const targetPanelId = btn.getAttribute('data-tabs-target');
                     // Remove # prefix for comparison
                     const panelId = targetPanelId ? targetPanelId.replace('#', '') : '';
+                    const isActive = panelId === tabId;
                     window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Button', btn.id, 'targets panel', panelId, 'comparing with', tabId);
-                    if (panelId === tabId) {
-                        btn.classList.add('text-blue-600', 'border-blue-600');
-                        btn.classList.remove('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                        btn.setAttribute('aria-selected', 'true');
-                        window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Activated button', btn.id);
+                    if (window.AdminUnderlineTabs) {
+                        window.AdminUnderlineTabs.setStripButtonActive(btn, isActive);
+                    } else if (isActive) {
+                        btn.classList.add('text-blue-600', 'border-blue-500');
+                        btn.classList.remove('border-transparent', 'text-gray-500');
                     } else {
-                        btn.classList.remove('text-blue-600', 'border-blue-600');
-                        btn.classList.add('border-transparent', 'hover:text-gray-600', 'hover:border-gray-300');
-                        btn.setAttribute('aria-selected', 'false');
+                        btn.classList.remove('text-blue-600', 'border-blue-500');
+                        btn.classList.add('border-transparent', 'text-gray-500');
+                    }
+                    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    if (isActive) {
+                        window.__clientLog && window.__clientLog('[DEBUG] activateEntityTab: Activated button', btn.id);
                     }
                 });
             } else {

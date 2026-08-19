@@ -701,3 +701,108 @@ class TestEditSpefLookup:
                 "fr": "Priorité stratégique 8",
                 "es": "Prioridad estratégica 8",
             }
+
+    def test_post_saves_icon_file(self, logged_in_client, db_session, app):
+        from io import BytesIO
+
+        with app.app_context():
+            row = _create_spef(db_session, "SP91", "Strategy Priority 91")
+            row_id = row.id
+
+        with patch(
+            "app.routes.admin.system_admin.indicator_lookups._save_logo_file",
+            return_value="SP91.png",
+        ):
+            resp = logged_in_client.post(
+                f"/admin/indicator-bank/spef-lookups/{row_id}/edit",
+                data={
+                    "code": "SP91",
+                    "name": "Strategy Priority 91",
+                    "sort_order": "10",
+                    "is_active": "y",
+                    "icon_file": (BytesIO(b"\x89PNG\r\n\x1a\n"), "icon.png"),
+                },
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            refreshed = IndicatorBankSpef.query.get(row_id)
+            assert refreshed.icon_filename == "SP91.png"
+
+    def test_post_removes_icon_file(self, logged_in_client, db_session, app):
+        with app.app_context():
+            row = _create_spef(db_session, "EF91", "Enabling Function 91")
+            row.icon_filename = "EF91.png"
+            db_session.add(row)
+            db_session.commit()
+            row_id = row.id
+
+        with patch(
+            "app.routes.admin.system_admin.indicator_lookups._delete_logo_file"
+        ) as mock_del:
+            resp = logged_in_client.post(
+                f"/admin/indicator-bank/spef-lookups/{row_id}/edit",
+                data={
+                    "code": "EF91",
+                    "name": "Enabling Function 91",
+                    "sort_order": "10",
+                    "is_active": "y",
+                    "remove_icon": "y",
+                },
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        mock_del.assert_called_once()
+
+        with app.app_context():
+            refreshed = IndicatorBankSpef.query.get(row_id)
+            assert refreshed.icon_filename is None
+
+    def test_get_partial_includes_icon_url(self, logged_in_client, db_session, app):
+        with app.app_context():
+            row = _create_spef(db_session, "SP92", "Strategy Priority 92")
+            row.icon_filename = "SP92.png"
+            db_session.add(row)
+            db_session.commit()
+            row_id = row.id
+
+        with _mock_render() as mock_rt:
+            resp = logged_in_client.get(
+                f"/admin/indicator-bank/spef-lookups/{row_id}/edit?partial=1",
+            )
+        assert resp.status_code == 200
+        mock_rt.assert_called()
+        kwargs = mock_rt.call_args.kwargs or mock_rt.call_args[1]
+        assert kwargs.get("icon_url")
+
+
+# ---------------------------------------------------------------------------
+# POST /admin/indicator-bank/spef-lookups/new
+# ---------------------------------------------------------------------------
+
+class TestNewSpefLookup:
+    def test_post_creates_with_icon_file(self, logged_in_client, db_session, app):
+        from io import BytesIO
+
+        with patch(
+            "app.routes.admin.system_admin.indicator_lookups._save_logo_file",
+            return_value="SP93.png",
+        ):
+            resp = logged_in_client.post(
+                "/admin/indicator-bank/spef-lookups/new",
+                data={
+                    "code": "SP93",
+                    "name": "Strategy Priority 93",
+                    "sort_order": "50",
+                    "is_active": "y",
+                    "icon_file": (BytesIO(b"\x89PNG\r\n\x1a\n"), "icon.png"),
+                },
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        with app.app_context():
+            row = IndicatorBankSpef.query.filter_by(code="SP93").first()
+            assert row is not None
+            assert row.icon_filename == "SP93.png"
+

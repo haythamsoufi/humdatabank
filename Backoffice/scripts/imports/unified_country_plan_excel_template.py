@@ -29,11 +29,6 @@ if "FLASK_CONFIG" not in os.environ:
 from import_fdrs_form_data import upsert_form_data_rows  # noqa: E402
 from import_upr_excel_data import (  # noqa: E402
     EMERGENCY_APPEALS_COLUMN,
-    FUNDING_MATRIX_BY_YEAR_OFFSET,
-    ITEM_BILATERAL_SUPPORT,
-    ITEM_COMMENTS,
-    ITEM_EMERGENCY_APPEALS,
-    ITEM_LONGER_TERM_PROGRAMMES,
     PLANNING_EA_FUNDING_AREAS,
     build_import_context,
     parse_value_num,
@@ -513,7 +508,7 @@ def _import_funding_cells_for_row(
         amount = parse_value_num(row.get(header))
         if amount is None:
             continue
-        item_id = FUNDING_MATRIX_BY_YEAR_OFFSET.get(offset)
+        item_id = ctx.t24_funding_by_offset.get(offset)
         if not item_id:
             continue
         if area in PLANNING_EA_FUNDING_AREAS:
@@ -537,13 +532,14 @@ def _import_funding_cells_for_row(
 
 def _ensure_funding_pns_rows_in_matrices(
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]],
+    ctx,
     *,
     aes_id: int,
     ns_id: int,
 ) -> None:
     """Ensure hybrid funding matrices include a PNS row (mirrors bilateral-driven Excel rows)."""
     row_prefix = f"{ns_id}_"
-    for item_id in FUNDING_MATRIX_BY_YEAR_OFFSET.values():
+    for item_id in ctx.t24_funding_by_offset.values():
         cells = matrix_cells[(aes_id, item_id)]
         if any(k.startswith(row_prefix) for k in cells if not k.startswith("col_header|")):
             continue
@@ -729,9 +725,9 @@ def _import_reach_matrices(
             continue
         for area in SP_AREAS:
             amount = parse_value_num(row.get(area))
-            if amount is None:
+            if amount is None or not ctx.t24_longer_term_item_id:
                 continue
-            matrices[ITEM_LONGER_TERM_PROGRAMMES][f"{row_year}_{area}"] = amount
+            matrices[ctx.t24_longer_term_item_id][f"{row_year}_{area}"] = amount
 
     for (reach_name, mdr_name, ea_name, area) in EA_SLOT_NAMED_CELLS:
         amount_raw = read_named_cell(wb, reach_name)
@@ -751,7 +747,9 @@ def _import_reach_matrices(
         if not ea_cells:
             warnings.append(f"Could not resolve emergency appeal row for {area} on Reach sheet.")
             continue
-        matrices[ITEM_EMERGENCY_APPEALS].update(ea_cells)
+        if not ctx.t24_emergency_item_id:
+            continue
+        matrices[ctx.t24_emergency_item_id].update(ea_cells)
         code_text = str(ea_code or "").strip().upper()
         if code_text:
             reach_ea_codes[(iso3, rnd, area)] = code_text
@@ -907,7 +905,7 @@ def _import_funding_matrices(
     matrix_cells: Dict[Tuple[int, int], Dict[str, Any]] = defaultdict(dict)
     bilateral_names = _collect_bilateral_support_ns_names(wb)
 
-    for funding_item_id in FUNDING_MATRIX_BY_YEAR_OFFSET.values():
+    for funding_item_id in ctx.t24_funding_by_offset.values():
         for area in sorted(PLANNING_EA_FUNDING_AREAS):
             _ensure_funding_ea_col_header(
                 matrix_cells,
@@ -965,7 +963,7 @@ def _import_funding_matrices(
             reach_ea_names=reach_ea_names,
             warnings=warnings,
         )
-        _ensure_funding_pns_rows_in_matrices(matrix_cells, aes_id=aes_id, ns_id=ns_id)
+        _ensure_funding_pns_rows_in_matrices(matrix_cells, ctx, aes_id=aes_id, ns_id=ns_id)
 
     for (aid, item_id), cells in matrix_cells.items():
         if aid == aes_id and cells:
@@ -978,7 +976,7 @@ def _resolve_comments_item_id(ctx) -> Optional[int]:
     for key, item_id in labels.items():
         if "comment" in str(key).lower():
             return int(item_id)
-    return ITEM_COMMENTS
+    return None
 
 
 def _resolve_comment_named_cell(wb) -> Optional[str]:
@@ -1052,8 +1050,8 @@ def _workbook_matrices_from_payload(
     for item_id, cells in reach.items():
         if cells:
             matrices[item_id] = dict(cells)
-    if support:
-        matrices[ITEM_BILATERAL_SUPPORT] = support
+    if support and ctx.t24_bilateral_item_id:
+        matrices[ctx.t24_bilateral_item_id] = support
     for item_id, cells in funding.items():
         if cells:
             matrices[item_id] = dict(cells)
@@ -1166,7 +1164,7 @@ def _export_support_to_workbook(wb, entry_955, ctx) -> None:
 def _export_funding_to_workbook(wb, entries, period: str, ctx) -> None:
     headers, rows = read_named_table(wb, FUNDING_SHEET, FUNDING_TABLE)
     funding_headers = [h for h in headers if parse_funding_column_header(h)]
-    for offset, item_id in FUNDING_MATRIX_BY_YEAR_OFFSET.items():
+    for offset, item_id in ctx.t24_funding_by_offset.items():
         cells = _normalize_matrix_cells(_matrix_cells(entries.get(item_id)))
         if not cells:
             continue
@@ -1224,14 +1222,20 @@ def build_unified_country_plan_export(aes_id: int, template_path: str, output_pa
 
     _export_reach_to_workbook(
         wb,
-        entries.get(ITEM_LONGER_TERM_PROGRAMMES),
-        entries.get(ITEM_EMERGENCY_APPEALS),
+        entries.get(ctx.t24_longer_term_item_id) if ctx.t24_longer_term_item_id else None,
+        entries.get(ctx.t24_emergency_item_id) if ctx.t24_emergency_item_id else None,
     )
-    _export_support_to_workbook(wb, entries.get(ITEM_BILATERAL_SUPPORT), ctx)
+    _export_support_to_workbook(
+        wb,
+        entries.get(ctx.t24_bilateral_item_id) if ctx.t24_bilateral_item_id else None,
+        ctx,
+    )
     _refresh_funding_pns_array_formula(wb)
     _export_funding_to_workbook(wb, entries, period, ctx)
     comments_item_id = _resolve_comments_item_id(ctx)
-    _export_comment_to_workbook(wb, entries.get(comments_item_id))
+    _export_comment_to_workbook(
+        wb, entries.get(comments_item_id) if comments_item_id else None
+    )
 
     _ensure_workbook_recalculates_on_open(wb)
     with _quiet_openpyxl_io():

@@ -1,0 +1,29 @@
+<style nonce="{{ csp_nonce() }}">
+.upr-visuals-explorer-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+</style>
+
+<div id="panel-upr-visuals"
+     class="explore-panel{% if explore_first_tab != 'upr-visuals' %} hidden{% endif %}"
+     role="tabpanel"
+     aria-labelledby="tab-upr-visuals">
+    <div class="p-4 sm:p-6 space-y-4">
+        <p class="text-sm text-gray-600">
+            {{ _('Live Unified Plan and Report visuals built from assignment data (templates 24 and 33). Open an assignment to preview, or generate PNG bundles for design files.') }}
+        </p>
+        <div class="upr-visuals-explorer-actions">
+            <a href="{{ url_for('assignment_management.manage_assignments') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-file-alt mr-1"></i>{{ _('Open assignments') }}
+            </a>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-600">
+            <p class="font-medium text-gray-800 mb-1">{{ _('On each Unified Plan or Report assignment') }}</p>
+            <p>{{ _('Use the Visuals button in the assignment header to see the live country visual. It refreshes after you save.') }}</p>
+        </div>
+        {% if can_manage_upr_visuals %}
+            {% include "plugins/upr_visuals/upr_visuals/_manage_tools.html" %}
+        {% endif %}
+    </div>
+</div>
+{% if can_manage_upr_visuals %}
+<script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-admin.js') }}"></script>
+{% endif %}

@@ -5,7 +5,17 @@ Covers:
   - app.services.upr.validation       (upr_kpi_applicable, upr_document_label,
                                         upr_suggestion_reason, format_ifrc_upr_extraction,
                                         _parse_int_number private helper)
+  - app.services.upr.pns_parsing      (parse_participating_national_societies_lines,
+                                        shared by visual_chunking.py and document_answering.py)
+  - app.services.upr.data_retrieval   (get_upr_kpi_value / get_upr_kpi_timeseries —
+                                        country-level ACL gate, mocked at the
+                                        resolve_country/check_country_access boundary
+                                        so no database is needed)
+  - app.services.upr.ux               (step_display_message_get_upr_kpi_value)
 """
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 
@@ -42,6 +52,19 @@ class TestQueryPrefersUprDocuments:
 
     def test_up_plan_abbreviated_matches(self):
         assert self._fn("up plan 2025 KPIs") is True
+
+    def test_hyphenated_phrasal_verb_plan_does_not_false_positive(self):
+        # Regression: "up plan" alone must not match "up" as the tail of an unrelated
+        # hyphenated compound like "follow-up"/"clean-up" — the hyphen gives it a regex
+        # \b even though it isn't a standalone "up" token in the intended sense.
+        assert self._fn("What is the follow-up plan for Nepal?") is False
+        assert self._fn("Show me the clean-up plan after the flood response") is False
+        assert self._fn("the wrap-up plan for this response") is False
+
+    def test_backup_plan_does_not_match(self):
+        # No hyphen and no boundary before "up" inside "backup" — never matched, but
+        # kept as an explicit regression guard alongside the hyphenated cases above.
+        assert self._fn("What is the backup plan if funding falls short?") is False
 
     def test_annual_report_negative_flag(self):
         assert self._fn("UPR annual report 2022") is False
@@ -145,8 +168,13 @@ class TestUprDocumentLabel:
         assert self._fn(doc) == "UPR Plan 2024"
 
     def test_year_extracted_from_filename_when_title_missing(self):
-        # Year token must sit on a word boundary (e.g. space-separated, not _2023)
         doc = {"source": {"document_filename": "nepal upr 2023.pdf"}}
+        assert self._fn(doc) == "UPR Plan 2023"
+
+    def test_year_extracted_from_underscore_delimited_filename(self):
+        # _YEAR_RE uses digit-boundary lookarounds (not \b) so this common naming
+        # convention resolves too — "_" is a word char, so \b alone would miss it.
+        doc = {"source": {"document_filename": "INP_2023_Nepal.pdf"}}
         assert self._fn(doc) == "UPR Plan 2023"
 
     def test_year_extracted_from_long_title(self):
@@ -294,3 +322,378 @@ class TestParseIntNumber:
     def test_narrow_no_break_space_separator(self):
         result = self._fn("10\u202F000")
         assert result == 10_000
+
+
+# ---------------------------------------------------------------------------
+# parse_participating_national_societies_lines (shared by visual_chunking.py
+# and document_answering.py — see app.services.upr.pns_parsing)
+# ---------------------------------------------------------------------------
+
+class TestParseParticipatingNationalSocietiesLines:
+    """Shared "Participating National Societies" OCR-panel parser."""
+
+    def _fn(self, lines):
+        from app.services.upr.pns_parsing import parse_participating_national_societies_lines
+        return parse_participating_national_societies_lines(lines)
+
+    def test_no_header_returns_empty_dict(self):
+        assert self._fn(["Some unrelated panel", "with random lines"]) == {}
+
+    def test_empty_lines_returns_empty_dict(self):
+        assert self._fn([]) == {}
+
+    def test_splits_starred_names_as_multilateral(self):
+        lines = [
+            "Participating National Societies",
+            "Netherlands Red Cross*",
+            "Norwegian Red Cross",
+            "British Red Cross*",
+            "Hazards",
+            "Conflict",
+        ]
+        result = self._fn(lines)
+        assert result["bilateral"] == ["Norwegian Red Cross"]
+        assert result["multilateral"] == ["Netherlands Red Cross", "British Red Cross"]
+        assert result["raw"] == ["Netherlands Red Cross*", "Norwegian Red Cross", "British Red Cross*"]
+
+    def test_header_split_across_two_lines(self):
+        lines = [
+            "Participating",
+            "National Societies",
+            "Danish Red Cross",
+            "Hazards",
+        ]
+        result = self._fn(lines)
+        assert result["bilateral"] == ["Danish Red Cross"]
+
+    def test_stops_at_hazards_panel(self):
+        lines = [
+            "Participating National Societies",
+            "Danish Red Cross",
+            "Hazards",
+            "French Red Cross",  # must NOT be picked up — belongs to the next panel
+        ]
+        result = self._fn(lines)
+        assert result["bilateral"] == ["Danish Red Cross"]
+
+    def test_stops_at_ifrc_breakdown_panel(self):
+        lines = [
+            "Participating National Societies",
+            "Danish Red Cross",
+            "IFRC Breakdown",
+            "Ongoing emergency operations",
+        ]
+        result = self._fn(lines)
+        assert result["bilateral"] == ["Danish Red Cross"]
+
+    def test_stops_at_multilateral_contributed_footnote(self):
+        lines = [
+            "Participating National Societies",
+            "Danish Red Cross*",
+            "National societies which have contributed on a multilateral basis",
+            "Spanish Red Cross*",  # must NOT be picked up
+        ]
+        result = self._fn(lines)
+        assert result["multilateral"] == ["Danish Red Cross"]
+
+    def test_split_prefix_national_red_cross_continuation(self):
+        # OCR sometimes wraps "... National Red" and "Cross*" onto separate lines/cells.
+        lines = [
+            "Participating National Societies",
+            "Republic of Korea National Red",
+            "Cross*",
+            "Hazards",
+        ]
+        result = self._fn(lines)
+        assert result["multilateral"] == ["Republic of Korea National Red Cross"]
+
+    def test_ignores_mdr_and_total_chf_cells(self):
+        lines = [
+            "Participating National Societies",
+            "MDR00001  Danish Red Cross  Total CHF 500,000",
+            "Hazards",
+        ]
+        result = self._fn(lines)
+        assert result["bilateral"] == ["Danish Red Cross"]
+
+    def test_dedupes_case_insensitively_preserving_first_seen(self):
+        lines = [
+            "Participating National Societies",
+            "Danish Red Cross",
+            "danish red cross",
+            "Hazards",
+        ]
+        result = self._fn(lines)
+        assert result["bilateral"] == ["Danish Red Cross"]
+
+    def test_no_names_found_returns_empty_dict(self):
+        lines = [
+            "Participating National Societies",
+            "Hazards",
+        ]
+        assert self._fn(lines) == {}
+
+    def test_noisy_column_split_header(self):
+        lines = [
+            "IFRC network Funding Requirements  Participating  IFRC Appeal codes",
+            "National Societies",
+            "Belgian Red Cross*",
+            "Hazards",
+        ]
+        result = self._fn(lines)
+        assert result["multilateral"] == ["Belgian Red Cross"]
+
+
+# ---------------------------------------------------------------------------
+# document_answering._extract_participating_national_societies — thin string-based
+# wrapper around parse_participating_national_societies_lines (None on no match).
+# ---------------------------------------------------------------------------
+
+class TestDocumentAnsweringExtractParticipatingNationalSocieties:
+    def _fn(self, content):
+        from app.services.upr.document_answering import _extract_participating_national_societies
+        return _extract_participating_national_societies(content)
+
+    def test_empty_content_returns_none(self):
+        assert self._fn("") is None
+        assert self._fn(None) is None  # type: ignore[arg-type]
+
+    def test_no_header_returns_none(self):
+        assert self._fn("Just some random OCR text\nwith no NS panel") is None
+
+    def test_valid_panel_returns_dict(self):
+        content = "Participating National Societies\nDanish Red Cross\nSwedish Red Cross*\nHazards\n"
+        result = self._fn(content)
+        assert result == {
+            "bilateral": ["Danish Red Cross"],
+            "multilateral": ["Swedish Red Cross"],
+            "raw": ["Danish Red Cross", "Swedish Red Cross*"],
+        }
+
+
+# ---------------------------------------------------------------------------
+# get_upr_kpi_value / get_upr_kpi_timeseries — country-level ACL enforcement
+# (app.services.upr.data_retrieval). Mocked at the resolve_country /
+# check_country_access boundary (both imported lazily inside the functions),
+# so these run with no database or Flask app context, matching the check used
+# by the analogous FDRS lookup in app.services.ai.data.form_retrieval.
+# ---------------------------------------------------------------------------
+
+class TestUprKpiCountryAccessControl:
+    @staticmethod
+    def _fake_country(country_id=99):
+        return SimpleNamespace(id=country_id, name="Fakeland", iso3="FAK", primary_national_society=None)
+
+    def test_get_upr_kpi_value_denies_inaccessible_country(self):
+        from app.services.upr.data_retrieval import get_upr_kpi_value
+
+        with patch("app.services.data_retrieval.country.resolve_country", return_value=self._fake_country()), \
+                patch("app.services.data_retrieval.country.check_country_access", return_value=False) as mock_check:
+            result = get_upr_kpi_value(country_identifier="Fakeland", metric="volunteers")
+
+        mock_check.assert_called_once_with(99)
+        assert result == {"success": False, "error": "Access denied for this country"}
+
+    def test_get_upr_kpi_timeseries_denies_inaccessible_country(self):
+        from app.services.upr.data_retrieval import get_upr_kpi_timeseries
+
+        with patch("app.services.data_retrieval.country.resolve_country", return_value=self._fake_country()), \
+                patch("app.services.data_retrieval.country.check_country_access", return_value=False) as mock_check:
+            result = get_upr_kpi_timeseries(country_identifier="Fakeland", metric="volunteers")
+
+        mock_check.assert_called_once_with(99)
+        assert result == {"success": False, "error": "Access denied for this country", "series": []}
+
+    def test_get_upr_kpi_value_missing_country_short_circuits_before_acl_check(self):
+        """Country-not-found must return before the ACL check even runs (no country id to check)."""
+        from app.services.upr.data_retrieval import get_upr_kpi_value
+
+        with patch("app.services.data_retrieval.country.resolve_country", return_value=None), \
+                patch("app.services.data_retrieval.country.check_country_access") as mock_check:
+            result = get_upr_kpi_value(country_identifier="Nowhere", metric="volunteers")
+
+        mock_check.assert_not_called()
+        assert result == {"success": False, "error": "Country not found: Nowhere"}
+
+    def test_get_upr_kpi_value_unsupported_metric_short_circuits_before_country_lookup(self):
+        from app.services.upr.data_retrieval import get_upr_kpi_value
+
+        with patch("app.services.data_retrieval.country.resolve_country") as mock_resolve:
+            result = get_upr_kpi_value(country_identifier="Fakeland", metric="donations")
+
+        mock_resolve.assert_not_called()
+        assert result["success"] is False
+        assert "Unsupported metric" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# _resolve_upr_block_year (app.services.upr.data_retrieval) — shared year
+# resolution used by both get_upr_kpi_value's prefer_year ranking and
+# get_upr_kpi_timeseries's year bucketing.
+# ---------------------------------------------------------------------------
+
+class TestResolveUprBlockYear:
+    def _fn(self, upr, doc):
+        from app.services.upr.data_retrieval import _resolve_upr_block_year
+        return _resolve_upr_block_year(upr, doc)
+
+    @staticmethod
+    def _doc(filename=None):
+        return SimpleNamespace(filename=filename)
+
+    def test_year_from_filename_wins_first(self):
+        # Deliberately underscore-delimited (the real naming convention, e.g.
+        # "INP_2023_Foo.pdf") — regex must use digit-boundary lookarounds, not \b,
+        # since "_" is a word char and \b alone would miss this year token entirely.
+        upr = {"upr_context": {"year": 2020}, "extraction": "year=2019"}
+        assert self._fn(upr, self._doc("AR_2023_Fakeland.pdf")) == 2023
+
+    def test_multiple_filename_years_uses_max(self):
+        # e.g. a multi-year plan filename mentioning a range
+        assert self._fn({}, self._doc("INP_2025_2027_Fakeland.pdf")) == 2027
+
+    def test_year_ignored_when_part_of_a_longer_digit_run(self):
+        # Digit-boundary lookarounds must still reject "20231" etc. as a 4-digit year.
+        assert self._fn({}, self._doc("Report_20231_Fakeland.pdf")) is None
+
+    def test_falls_back_to_upr_context_year_when_no_filename_year(self):
+        upr = {"upr_context": {"year": 2022}}
+        assert self._fn(upr, self._doc("Fakeland-plan.pdf")) == 2022
+
+    def test_falls_back_to_extraction_year_token_when_no_context(self):
+        # Defensive fallback only — no current extractor emits this format.
+        upr = {"extraction": "pe=annual_report; year=2021 - volunteers: 100"}
+        assert self._fn(upr, self._doc("Fakeland-plan.pdf")) == 2021
+
+    def test_bare_extraction_tag_has_no_year_token(self):
+        upr = {"extraction": "label_proximity_v2"}
+        assert self._fn(upr, self._doc("Fakeland-plan.pdf")) is None
+
+    def test_no_signals_returns_none(self):
+        assert self._fn({}, self._doc(None)) is None
+
+    def test_non_dict_upr_context_ignored(self):
+        upr = {"upr_context": "not-a-dict", "extraction": "year=2021"}
+        assert self._fn(upr, self._doc(None)) == 2021
+
+
+# ---------------------------------------------------------------------------
+# get_upr_kpi_value — prefer_year ranking (end-to-end over a mocked DB query).
+#
+# Regression coverage for a bug where prefer_year never actually mattered:
+# ranking used to derive `year` via _parse_upr_extraction_meta(extraction),
+# which only recognizes a `pe=`/`ype=`/`year=` token format that no current
+# extractor emits, so year_match was always False and results were ranked by
+# confidence/recency only. Fixed by resolving year via _resolve_upr_block_year
+# (filename / upr_context.year) before ranking.
+# ---------------------------------------------------------------------------
+
+class TestGetUprKpiValuePreferYearRanking:
+    @staticmethod
+    def _fake_country(country_id=99):
+        return SimpleNamespace(id=country_id, name="Fakeland", iso3="FAK", primary_national_society=None)
+
+    @staticmethod
+    def _chunk(chunk_id, extra_metadata, page_number=1):
+        return SimpleNamespace(id=chunk_id, extra_metadata=extra_metadata, page_number=page_number)
+
+    @staticmethod
+    def _doc(doc_id, filename, is_public=True):
+        return SimpleNamespace(
+            id=doc_id, filename=filename, title=f"Doc {doc_id}",
+            is_public=is_public, allowed_roles=None, user_id=None,
+            processed_at=None, created_at=None,
+        )
+
+    def _mock_db_returning(self, rows):
+        mock_query = MagicMock()
+        mock_query.join.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = rows
+        mock_db = MagicMock()
+        mock_db.session.query.return_value = mock_query
+        mock_db.engine.dialect.name = "sqlite"  # anything != "postgresql"
+        return mock_db
+
+    def test_prefer_year_outranks_higher_confidence_wrong_year(self):
+        from app.services.upr.data_retrieval import get_upr_kpi_value
+
+        row_high_conf_wrong_year = (
+            self._chunk(1, {"upr": {"block": "in_support_kpis", "kpis": {"volunteers": "1000"},
+                                     "confidence": 0.95, "extraction": "label_proximity_v2"}}),
+            self._doc(1, "AR_2023_Fakeland.pdf"),
+        )
+        row_lower_conf_right_year = (
+            self._chunk(2, {"upr": {"block": "in_support_kpis", "kpis": {"volunteers": "2000"},
+                                     "confidence": 0.80, "extraction": "label_proximity_v2"}}),
+            self._doc(2, "AR_2024_Fakeland.pdf"),
+        )
+        mock_db = self._mock_db_returning([row_high_conf_wrong_year, row_lower_conf_right_year])
+
+        with patch("app.services.data_retrieval.country.resolve_country", return_value=self._fake_country()), \
+                patch("app.services.data_retrieval.country.check_country_access", return_value=True), \
+                patch("app.services.upr.data_retrieval.db", mock_db):
+            result = get_upr_kpi_value(country_identifier="Fakeland", metric="volunteers", prefer_year=2024)
+
+        assert result["success"] is True
+        assert result["value"] == "2000"
+        assert result["source"]["year"] == 2024
+
+    def test_without_prefer_year_falls_back_to_confidence(self):
+        """Same rows, no prefer_year: highest-confidence candidate should win instead."""
+        from app.services.upr.data_retrieval import get_upr_kpi_value
+
+        row_high_conf = (
+            self._chunk(1, {"upr": {"block": "in_support_kpis", "kpis": {"volunteers": "1000"},
+                                     "confidence": 0.95, "extraction": "label_proximity_v2"}}),
+            self._doc(1, "AR_2023_Fakeland.pdf"),
+        )
+        row_low_conf = (
+            self._chunk(2, {"upr": {"block": "in_support_kpis", "kpis": {"volunteers": "2000"},
+                                     "confidence": 0.80, "extraction": "label_proximity_v2"}}),
+            self._doc(2, "AR_2024_Fakeland.pdf"),
+        )
+        mock_db = self._mock_db_returning([row_high_conf, row_low_conf])
+
+        with patch("app.services.data_retrieval.country.resolve_country", return_value=self._fake_country()), \
+                patch("app.services.data_retrieval.country.check_country_access", return_value=True), \
+                patch("app.services.upr.data_retrieval.db", mock_db):
+            result = get_upr_kpi_value(country_identifier="Fakeland", metric="volunteers")
+
+        assert result["success"] is True
+        assert result["value"] == "1000"
+        assert result["source"]["year"] == 2023
+
+
+# ---------------------------------------------------------------------------
+# step_display_message_get_upr_kpi_value (app.services.upr.ux) — step line shown
+# while the get_upr_kpi_value tool runs; must surface the optional "year" tool arg
+# now that the chat-facing tool spec/registry wrapper accept one (see tool_specs.py
+# / app/services/ai/tools/registry.py).
+# ---------------------------------------------------------------------------
+
+class TestStepDisplayMessageGetUprKpiValue:
+    def _fn(self, tool_args):
+        from app.services.upr.ux import step_display_message_get_upr_kpi_value
+        return step_display_message_get_upr_kpi_value(tool_args)
+
+    def test_no_args_returns_generic_message(self):
+        assert self._fn({}) == "Reading Unified Plans and Reports…"
+
+    def test_country_only(self):
+        assert self._fn({"country_identifier": "Kenya"}) == "Reading Unified Plans and Reports for Kenya…"
+
+    def test_country_and_metric_without_year(self):
+        result = self._fn({"country_identifier": "Kenya", "metric": "volunteers"})
+        assert result == "Reading volunteers from Unified Plans and Reports for Kenya…"
+
+    def test_country_metric_and_year_mentions_year(self):
+        result = self._fn({"country_identifier": "Kenya", "metric": "volunteers", "year": 2023})
+        assert result == "Reading volunteers from the 2023 Unified Plans and Reports for Kenya…"
+
+    def test_year_ignored_when_metric_missing(self):
+        # Year-aware phrasing requires country + metric + year together.
+        result = self._fn({"country_identifier": "Kenya", "year": 2023})
+        assert result == "Reading Unified Plans and Reports for Kenya…"

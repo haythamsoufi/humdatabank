@@ -515,20 +515,36 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
               }
 
-              // Step B: analyze
-              setPending({{ _("Analyzing workbook\u2026")|tojson|safe }});
-              return postJSON(analyzeUrl, {}).then(function (aData) {
-                if (!aData.success) {
-                  renderValidationStatus({
-                    valid: false,
-                    message: aData.message || {{ _("Analysis failed. Check that the file contains the UPR Data sheet.")|tojson|safe }}
-                  });
-                  return;
-                }
-                analyzeLoaded = true;
-                analyzeData   = aData;
-                renderValidationStatus({ valid: true, preview: aData });
-              });
+              // Step B: analyze (polls while the workbook parses in the background)
+              setPending({{ _("Analyzing workbook\u2026 this can take a minute on first upload")|tojson|safe }});
+              var analyzeDeadline = Date.now() + 5 * 60 * 1000;
+              function pollAnalyze() {
+                return postJSON(analyzeUrl, {}).then(function (aData) {
+                  if (aData && aData.pending) {
+                    if (Date.now() > analyzeDeadline) {
+                      renderValidationStatus({
+                        valid: false,
+                        message: {{ _("Workbook analysis timed out. Please try uploading again.")|tojson|safe }}
+                      });
+                      return;
+                    }
+                    return new Promise(function (resolve) {
+                      setTimeout(function () { resolve(pollAnalyze()); }, 1000);
+                    });
+                  }
+                  if (!aData || !aData.success) {
+                    renderValidationStatus({
+                      valid: false,
+                      message: (aData && aData.message) || {{ _("Analysis failed. Check that the file contains the UPR Data sheet.")|tojson|safe }}
+                    });
+                    return;
+                  }
+                  analyzeLoaded = true;
+                  analyzeData   = aData;
+                  renderValidationStatus({ valid: true, preview: aData });
+                });
+              }
+              return pollAnalyze();
             })
             .catch(function (err) {
               renderValidationStatus({

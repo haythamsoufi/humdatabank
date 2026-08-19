@@ -64,8 +64,13 @@ class IndicatorBankSpef(db.Model):
     name_translations = db.Column(JSONB, nullable=True)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
+    icon_filename = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+    @property
+    def has_icon(self):
+        return bool(self.icon_filename)
 
     def get_name_translation(self, language: str):
         lang = (language or "").strip().lower().split("_", 1)[0].split("-", 1)[0]

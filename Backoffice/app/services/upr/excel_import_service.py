@@ -2,29 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 import os
-import sys
 import tempfile
+import threading
 import uuid
 from typing import Any, Dict, List, Optional
 
 from flask import current_app, session
 
-# Cached resolved scripts directory; set on first use inside an app context.
-_SCRIPTS_DIR: Optional[str] = None
+from app.services.upr._scripts_path import ensure_scripts_in_path as _ensure_scripts_in_path
 
-
-def _ensure_scripts_in_path() -> None:
-    """Insert scripts/imports on sys.path for UPR Excel import modules."""
-    global _SCRIPTS_DIR
-    if _SCRIPTS_DIR is not None:
-        return
-    scripts_dir = os.path.normpath(os.path.join(current_app.root_path, "..", "scripts"))
-    imports_dir = os.path.join(scripts_dir, "imports")
-    for path in (imports_dir, scripts_dir):
-        if path not in sys.path:
-            sys.path.insert(0, path)
-    _SCRIPTS_DIR = imports_dir
+logger = logging.getLogger(__name__)
+_ANALYZE_LOCK = threading.Lock()
+_ANALYZE_RUNNING: set[str] = set()
+_ANALYZE_ERRORS: Dict[str, str] = {}
 
 
 class UprExcelImportService:
@@ -52,6 +44,7 @@ class UprExcelImportService:
             clear_upr_import_caches(old_path)
         session[cls.SESSION_FILE_KEY] = tmp_path
         session[cls.SESSION_ID_KEY] = file_id
+        cls.start_background_analyze(tmp_path)
         return file_id
 
     @classmethod
@@ -62,20 +55,70 @@ class UprExcelImportService:
         return None
 
     @classmethod
+    def start_background_analyze(cls, path: str) -> None:
+        """Parse the workbook off the request thread so /analyze can poll."""
+        if not path or current_app.config.get("TESTING"):
+            return
+        _ensure_scripts_in_path()
+        from import_upr_excel_data import load_workbook_summary_cached
+
+        if load_workbook_summary_cached(path):
+            return
+        with _ANALYZE_LOCK:
+            if path in _ANALYZE_RUNNING:
+                return
+            _ANALYZE_RUNNING.add(path)
+            _ANALYZE_ERRORS.pop(path, None)
+
+        def _worker(workbook_path: str = path) -> None:
+            try:
+                from import_upr_excel_data import analyze_workbook
+
+                analyze_workbook(workbook_path, use_cache=True)
+            except Exception as exc:
+                logger.exception("UPR background analyze failed for %s", workbook_path)
+                with _ANALYZE_LOCK:
+                    _ANALYZE_ERRORS[workbook_path] = str(exc)
+            finally:
+                with _ANALYZE_LOCK:
+                    _ANALYZE_RUNNING.discard(workbook_path)
+
+        threading.Thread(target=_worker, daemon=True, name="upr-excel-analyze").start()
+
+    @classmethod
     def analyze_stored(cls) -> Dict[str, Any]:
         path = cls.stored_path()
         if not path:
             return {"success": False, "message": "No uploaded file in session. Upload again."}
         _ensure_scripts_in_path()
-        from import_upr_excel_data import analyze_workbook
+        from import_upr_excel_data import analyze_workbook, load_workbook_summary_cached
 
-        try:
-            summary = analyze_workbook(path, use_cache=True)
-            summary["file_id"] = session.get(cls.SESSION_ID_KEY)
-            return summary
-        except Exception as exc:
-            current_app.logger.error("UPR analyze failed: %s", exc, exc_info=True)
-            return {"success": False, "message": str(exc)}
+        cached = load_workbook_summary_cached(path)
+        if cached:
+            cached["file_id"] = session.get(cls.SESSION_ID_KEY)
+            cached["pending"] = False
+            return cached
+
+        with _ANALYZE_LOCK:
+            error = _ANALYZE_ERRORS.get(path)
+        if error:
+            return {"success": False, "message": error}
+
+        if current_app.config.get("TESTING"):
+            try:
+                summary = analyze_workbook(path, use_cache=True)
+                summary["file_id"] = session.get(cls.SESSION_ID_KEY)
+                summary["pending"] = False
+                return summary
+            except Exception as exc:
+                current_app.logger.error("UPR analyze failed: %s", exc, exc_info=True)
+                return {"success": False, "message": str(exc)}
+
+        with _ANALYZE_LOCK:
+            running = path in _ANALYZE_RUNNING
+        if not running:
+            cls.start_background_analyze(path)
+        return {"success": True, "pending": True, "file_id": session.get(cls.SESSION_ID_KEY)}
 
     @classmethod
     def preview(

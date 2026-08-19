@@ -17,10 +17,13 @@ from import_upr_excel_data import (  # noqa: E402
     _build_pns_reported_yes_sets,
     _pns_pending_reset_needs_update,
     _t22_pns_import_cell_value,
+    canonical_upr_period,
     is_planning_funding_requirement_row,
+    is_pns_data_source,
     parse_pns_reported_yes,
     plan_non_reported_pns_aes_by_template,
     plan_pns_assignment_status_updates,
+    t23_matrix_has_funding_columns,
     transform_to_import_rows,
     upr_pns_import_item_ids,
 )
@@ -216,8 +219,9 @@ class TestNonReportedPnsPlanning:
         ctx = UprImportContext(template_ids=[22, 23])
         ctx.pns_t22_reported_aes = {3221}
         ctx.pns_t23_reported_aes = set()
-        ctx.staff_matrix_item_id = 1367
-        ctx.pns_funding_item_id = 952
+        ctx.staff_matrix_item_id = 1314
+        ctx.t22_funding_item_id = 1303
+        ctx.pns_funding_item_id = 1433
         ctx.assignment_by_template = {
             22: {("2026", "GBR"): 3221, ("2026", "NLD"): 3208},
             23: {("2026", "NLD"): 5001},
@@ -225,8 +229,8 @@ class TestNonReportedPnsPlanning:
         by_tpl = plan_non_reported_pns_aes_by_template(ctx, [22, 23], periods={"2026"})
         assert by_tpl[22] == {3208}
         assert by_tpl[23] == {5001}
-        assert upr_pns_import_item_ids(ctx, 22) == {1303, 1367}
-        assert upr_pns_import_item_ids(ctx, 23) == {952}
+        assert upr_pns_import_item_ids(ctx, 22) == {1303, 1314}
+        assert upr_pns_import_item_ids(ctx, 23) == {1433}
 
 
 class TestPnsPendingResetMetadata:
@@ -265,3 +269,152 @@ class TestPnsPendingResetMetadata:
         assert aes.approved_by_user_id is None
         assert aes.sent_for_review_by_user_id is None
         assert aes.sent_for_review_at is None
+
+
+def _ar25_pns_funding_row(**overrides):
+    base = {
+        "ISO3": "BFA",
+        "Round": "AR25",
+        "Section": "Funding",
+        "Entity": "PNS",
+        "NS": "British Red Cross",
+        "Area": "Total",
+        "Year": 2025,
+        "Indicator": "Funding",
+        "indicatorId": 733,
+        "ValueNum": 100000,
+        "Source": "PNS Data",
+        "PNS reported": "",
+        "Attribute": "Funding Source",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestCanonicalUprPeriod:
+    def test_ar_and_annual_aliases(self):
+        assert canonical_upr_period("AR25") == "2025"
+        assert canonical_upr_period("2025") == "2025"
+        assert canonical_upr_period("2025 Annual") == "2025"
+        assert canonical_upr_period("Annual 2025") == "2025"
+
+    def test_midyear_aliases(self):
+        assert canonical_upr_period("MYR26") == "Jan-Jun 2026"
+        assert canonical_upr_period("Jan-Jun 2026") == "Jan-Jun 2026"
+        assert canonical_upr_period("2026 Midyear") == "Jan-Jun 2026"
+
+
+class TestT23ReportingPnsDataSource:
+    def _ctx(self, period_key="2025"):
+        ctx = UprImportContext(template_ids=[23])
+        ctx.ns_home_country_iso3 = {"british red cross": "GBR"}
+        ctx.iso3_to_hns_id = {"BFA": 77}
+        ctx.assignment_by_template = {23: {(period_key, "GBR"): 4001}}
+        ctx.pns_funding_item_id = 1433
+        return ctx
+
+    def test_is_pns_data_source(self):
+        assert is_pns_data_source({"Source": "PNS Data"}) is True
+        assert is_pns_data_source({"Source": "Country Data"}) is False
+        assert is_pns_data_source({}) is False
+
+    def test_collects_t23_from_source_not_pns_reported_column(self):
+        ctx = self._ctx()
+        t22_yes, t23_yes = _build_pns_reported_yes_sets(
+            [_ar25_pns_funding_row()], ctx, [23], rounds={"AR25"}
+        )
+        assert t22_yes == set()
+        assert t23_yes == {(4001, "BFA")}
+
+    def test_does_not_collect_country_data_even_if_pns_reported_yes(self):
+        ctx = self._ctx()
+        t22_yes, t23_yes = _build_pns_reported_yes_sets(
+            [_ar25_pns_funding_row(Source="Country Data", **{"PNS reported": "Yes"})],
+            ctx,
+            [23],
+            rounds={"AR25"},
+        )
+        assert t23_yes == set()
+
+    def test_imports_valuenum_when_source_pns_data(self):
+        ctx = self._ctx()
+        import_rows = transform_to_import_rows(
+            [_ar25_pns_funding_row()], ctx, template_ids=[23], rounds={"AR25"}
+        )
+        item_rows = [r for r in import_rows if r["item_id"] == "1433"]
+        assert len(item_rows) == 1
+        cells = json.loads(item_rows[0]["disagg_data"])
+        assert cells["77_Total Funding"] == 100000
+
+    def test_skips_country_data_source(self):
+        ctx = self._ctx()
+        import_rows = transform_to_import_rows(
+            [_ar25_pns_funding_row(Source="Country Data", ValueNum=100000, **{"PNS reported": "Yes"})],
+            ctx,
+            template_ids=[23],
+            rounds={"AR25"},
+        )
+        item_rows = [r for r in import_rows if r["item_id"] == "1433"]
+        assert item_rows == []
+
+    def test_skips_when_published_matrix_unresolved(self):
+        ctx = self._ctx()
+        ctx.pns_funding_item_id = 0
+        import_rows = transform_to_import_rows(
+            [_ar25_pns_funding_row()], ctx, template_ids=[23], rounds={"AR25"}
+        )
+        assert import_rows == []
+        assert any("published PNS funding matrix was not resolved" in w for w in ctx.warnings)
+
+    def test_matches_assignment_named_2025_annual(self):
+        ctx = self._ctx(period_key="2025 Annual")
+        import_rows = transform_to_import_rows(
+            [_ar25_pns_funding_row()], ctx, template_ids=[23], rounds={"AR25"}
+        )
+        item_rows = [r for r in import_rows if r["item_id"] == "1433"]
+        assert len(item_rows) == 1
+
+    def test_warns_when_t23_assignment_missing(self):
+        ctx = self._ctx()
+        ctx.assignment_by_template = {23: {}}
+        transform_to_import_rows(
+            [_ar25_pns_funding_row()], ctx, template_ids=[23], rounds={"AR25"}
+        )
+        assert any("No template 23 assignment" in w for w in ctx.warnings)
+
+
+class TestT23FundingMatrixColumns:
+    def test_matches_untitled_published_matrix(self):
+        item = type(
+            "Item",
+            (),
+            {
+                "config": {
+                    "matrix_config": {
+                        "columns": [
+                            {"name": "Funding Requirement"},
+                            {"name": "Total Funding"},
+                            {"name": "Total Expenditure"},
+                            {"name": "Total Transferred to HNS"},
+                        ]
+                    }
+                }
+            },
+        )()
+        assert t23_matrix_has_funding_columns(item) is True
+
+    def test_rejects_staff_matrix(self):
+        item = type(
+            "Item",
+            (),
+            {
+                "config": {
+                    "matrix_config": {
+                        "columns": [{"name": "intl_delegates_hns"}]
+                    }
+                }
+            },
+        )()
+        assert t23_matrix_has_funding_columns(item) is False
+
+

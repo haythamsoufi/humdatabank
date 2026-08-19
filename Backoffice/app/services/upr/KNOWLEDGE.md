@@ -137,7 +137,7 @@ Every block has:
 }
 ```
 
-- `extraction` encodes the method (e.g. `"fixed_4col_v1"`, `"vision_gpt4v"`, `"layout_v1"`, `"fullpage_multi_year_plan_2025"`)
+- `extraction` encodes the method that produced the block (e.g. `"label_proximity_v2"`, `"vision_openai_v1"`, `"funding_requirements_fullpage_v1"`) — see section 5 for the full, per-block-type list kept in sync with the extractor code
 - `confidence` is 0.0–1.0; values ≥ 0.9 are considered reliable
 - `doc_type`: `"plan"` | `"midyear_report"` | `"annual_report"` | `"unknown"`
 
@@ -263,28 +263,112 @@ Values are strings (may contain commas, magnitude suffixes like `1.4M`). Downstr
 
 ## 5. Extraction methods
 
-### Layout-based extraction (default, no vision LLM)
+Every extractor lives in `visual_chunking.py` and tags its output with an `extraction`
+value on the block. Methods for the same block type are tried in order (most reliable /
+most specific first) and the first one that produces a plausible result wins — the tag
+tells you which heuristic actually fired for a given block, which matters when debugging
+a wrong or missing value. **Keep this list in sync with the code** — grep the file for
+`"extraction":` when in doubt, since this is a common source of doc drift.
 
-- Parses OCR text from `pages[i]["text"]` using regex patterns and positional heuristics.
-- Methods: `fixed_4col_v1` (KPIs), `regex_v1`/`regex_v2` (people reached), `panel_v1`/`panel_v2` (financial overview), `fullpage_multi_year_plan_2025` (funding requirements).
-- Scoped to first 3 pages for most blocks; up to 5 pages for funding requirements.
-- Confidence typically 0.8–0.9 depending on OCR quality.
+### `in_support_kpis` (`extract_in_support_kpis`) — tried in this order
 
-### Vision LLM extraction (optional, requires `AI_UPR_VISION_KPI_ENABLED=True`)
+| Tag | Confidence | Approach |
+|---|---|---|
+| `vision_openai_v1` | 0.92 | Vision LLM on a cropped page image (see below). Only tried when `AI_UPR_VISION_KPI_ENABLED=true` and a clip render is available. |
+| `layout_words_v1` | 0.97 | Maps `pages[i]["words"]` (bounding boxes) to labels by x-position proximity. Only tried when `AI_UPR_LAYOUT_KPI_ENABLED=true` and word boxes are available. |
+| `kpi_cards_v3` | 0.94 | OCR text: finds 4 numbers near "national society" occurrences close to each label. |
+| `kpi_cluster_v3` | 0.93 | OCR text fallback: picks the best 4-number cluster on a line when OCR linearizes all KPI numbers into one row. |
+| `label_proximity_v2` | 0.90 | **Default/most common path.** Nearest number above/near each of the 4 labels, robust to Planning vs MYR label ordering. |
+| `label_proximity_partial_v2` | 0.75 | Same as above but only 3 of 4 labels matched — kept as better-than-nothing. |
+| `fixed_4col_v1` | 0.85 | Last resort: finds one line with exactly 4 numbers and maps them by label order found in text (or a default order). |
 
-- Creates a cropped top-of-page PNG at configured DPI.
-- Sends image to a vision model (e.g. GPT-4V) with a structured prompt.
+Vision and word-layout extraction are both **off by default** (see section 8) — layout-based
+OCR/regex heuristics (`label_proximity_v2` and friends) are what actually fires for most
+documents today.
+
+### `people_reached` / `people_to_be_reached` (`extract_people_reached`)
+
+- Single method, tag `fixed_6col_v1`, confidence 0.9.
+- Finds a 6-number row below the "PEOPLE (TO BE) REACHED" header (or accumulates numbers
+  across two adjacent OCR lines), and maps them in fixed category order. Requires all 6
+  category keywords (emergency/climate/disasters/health/migration/values) to appear in
+  the window, else the page is skipped.
+
+### `financial_overview` (`extract_financial_overview`)
+
+- Single method, tag `labeled_fields_v2`, confidence 0.72 (lowest of all block types —
+  this panel's OCR layout is the noisiest).
+- Parses IFRC network / IFRC Secretariat (longer-term + emergency ops) / PNS / HNS-other
+  sub-panels by section header + "funding requirement"/"funding"/"expenditure" label proximity.
+
+### `funding_requirements` (`extract_funding_requirements`)
+
+| Tag | Confidence | Approach |
+|---|---|---|
+| `funding_requirements_fullpage_v1` | 0.85–0.86 | Full-page multi-column layout (plans 2025+): year columns each with Total, funding sources, IFRC breakdown. |
+| `funding_requirements_v1` | 0.75–0.86 | Current Planning panel layout; scales up with more years found (≥2 years → 0.82) and a parsed source breakdown (→ 0.86). |
+| `funding_requirements_single_year_v0` | 0.68 | OCR text has a single "Funding Requirement CHF X" callout with no year columns; amount is attached to the inferred document year. |
+| `funding_requirements_single_year_words_v0` | 0.66 | Weakest path: OCR text is empty/unusable, so the single amount is recovered from `pages[i]["words"]` instead. |
+
+The optional "Participating National Societies" bilateral/multilateral name list and the
+PNS funding-source amount share parsing logic with `document_answering.py` via
+`app/services/upr/pns_parsing.py` (see section 4's `funding_requirements` payload).
+
+### `hazards` (`extract_hazards`)
+
+- Single method, tag `hazards_v1`, confidence 0.85. Matches known hazard keywords
+  (Conflict, Earthquakes, Displacement, Wildfires, Heatwaves, …) under a "Hazards" header.
+
+### `pns_bilateral_support` (`extract_pns_bilateral_support`)
+
+- Single method, tag `pns_bilateral_support_v1`, confidence 0.8. Parses the
+  "Participating National Societies bilateral support for YYYY" table (older country-plan
+  layout) into `{national_society, funding_requirement}` rows plus a total.
+
+### Vision LLM extraction detail (optional, requires `AI_UPR_VISION_KPI_ENABLED=true`)
+
+- Creates a cropped top-of-page PNG at the configured DPI (`AI_UPR_VISION_DPI`,
+  `AI_UPR_VISION_CLIP_TOP_FRAC`).
+- Sends the image to a vision model (`AI_UPR_VISION_MODEL`, default `gpt-4o-mini`) with a
+  structured prompt; requires `OPENAI_API_KEY`.
 - Returns JSON: `{"branches": "...", "local_units": "...", "volunteers": "...", "staff": "..."}`.
-- Method tag: `"vision_gpt4v"` (or model-specific).
-- Confidence typically 0.95+ when successful.
+- Tag: `vision_openai_v1`. See the `in_support_kpis` table above for confidence.
 
-### Extraction string format in data retrieval
+### Year / report-type resolution in data retrieval
 
-The `extraction` field is parsed for year and report type:
+`year` is **not** encoded in the `extraction` tag string — those tags are bare method names
+(e.g. `"label_proximity_v2"`), not `key=value` pairs. Both KPI lookup functions resolve year
+via the shared `_resolve_upr_block_year(upr, doc)` helper (`data_retrieval.py`):
 
-- Pattern: `<method>` optionally followed by year/type tokens.
-- `_parse_upr_extraction_meta(extraction_str)` returns `{"year": int, "report_type": str}`.
-- Report types: `"plan"`, `"midyear"`, `"annual"`, `"unknown"`.
+1. A 4-digit token in the document filename (max if several, e.g. a `"INP_2025_2027_..."`
+   range) — matched with digit-boundary lookarounds (`(?<!\d)(19\d{2}|20\d{2})(?!\d)`), **not**
+   `\b`, since `_` is a word character and `\b` alone would silently miss the common
+   underscore-delimited naming convention (`INP_2023_Foo.pdf`). The same fix is applied
+   independently in `visual_chunking.py`'s `_years_from()` and `validation.py`'s `_YEAR_RE`
+   (used for `upr_document_label`) — if you touch year-from-filename parsing, keep all three
+   consistent.
+2. `upr_context.year`.
+3. A `year=` token inside `extraction` (defensive fallback only — no current extractor emits
+   that format, so this branch is effectively dead today).
+
+- `get_upr_kpi_timeseries`: uses `_resolve_upr_block_year`, then falls back to
+  `doc.processed_at`/`created_at` if still unresolved (a time-series point needs *some* year
+  to bucket by). `doc_type`/report-type comes from `upr_context.doc_type` or a filename
+  heuristic (`_ar_`/annual → `annual_report`, `_myr_`/mid → `midyear_report`, else `plan`).
+- `get_upr_kpi_value`: ranks candidates by `(prefer_year match, confidence, recency)`, where
+  the year used for the `prefer_year` match is from `_resolve_upr_block_year` (fixed — this
+  used to go through `_parse_upr_extraction_meta(extraction)` instead, which only recognizes
+  `pe=`/`ype=`/`year=` tokens that no extractor emits, so `prefer_year` was silently a no-op).
+  The candidate's surfaced `report_type` field (`source.report_type` in the response) is
+  **still** sourced from `_parse_upr_extraction_meta(extraction).get("report_type")` and is
+  therefore still effectively always `None` in practice — a smaller, separate gap from the
+  `prefer_year` one (see section 12). It isn't part of the ranking key, so it doesn't affect
+  which candidate wins, only the informational value returned to the caller.
+- `prefer_year` reaches the chat AI too: the `get_upr_kpi_value` tool spec (`tool_specs.py`)
+  exposes an optional integer `year` argument, and the registry wrapper
+  (`app/services/ai/tools/registry.py`) forwards it as `prefer_year`. Before this it was only
+  reachable from the internal `retrieve_upr_kpi_reference()` caller (form-suggestions) — chat
+  users asking about a specific year had no way to influence ranking at all.
 
 ---
 
@@ -319,7 +403,7 @@ The `extraction` field is parsed for year and report type:
 
 | Tool | Purpose | Key params |
 |---|---|---|
-| `get_upr_kpi_value` | Single country, single metric from document metadata | `country_identifier`, `metric` |
+| `get_upr_kpi_value` | Single country, single metric from document metadata | `country_identifier`, `metric`, optional `year` |
 | `get_upr_kpi_timeseries` | Year-over-year series for one country | `country_identifier`, `metric` |
 | `get_upr_kpi_values_for_all_countries` | Bulk: one metric across all countries | `metric` |
 | `analyze_unified_plans_focus_areas` | Classify which plans mention a theme/focus area | `areas[]`, `limit` |
@@ -339,15 +423,21 @@ The `extraction` field is parsed for year and report type:
 
 ## 8. Configuration flags
 
+Read directly from `current_app.config` / `os.environ` at chunking time (not merged from
+the AI tab in System Configuration). Seed them in `env.example` / your `.env` if you need a
+non-default value. **Defaults below are the code's actual fallback values** — verify against
+`visual_chunking.py`'s `_cfg(...)` calls and `app/services/ai/documents/processor.py` before
+trusting this table blindly; it has drifted from the code before.
+
 | Env var / config key | Default | Purpose |
 |---|---|---|
-| `AI_UPR_VISUAL_CHUNKING_ENABLED` | `True` | Master switch for visual block extraction during PDF processing |
-| `AI_UPR_LAYOUT_KPI_ENABLED` | `True` | Enable layout-based (regex/OCR) KPI extraction |
-| `AI_UPR_VISION_KPI_ENABLED` | `False` | Enable vision LLM KPI extraction (requires vision model) |
-| `AI_UPR_VISION_MAX_PAGES` | `8` | Max pages to scan with vision model |
-| `AI_UPR_VISION_DPI` | `150` | DPI for page-to-image conversion |
-| `AI_UPR_VISION_CLIP_TOP_FRAC` | `0.0` | Fraction of page top to crop for vision (0.0 = no crop) |
-| `AI_UPR_VISION_MODEL` | `""` | Specific vision model override (empty = use default) |
+| `AI_UPR_VISUAL_CHUNKING_ENABLED` | `true` | Master switch for visual block extraction during PDF processing (`chunking.py`) |
+| `AI_UPR_LAYOUT_KPI_ENABLED` | `false` | Enable the `layout_words_v1` word-bbox KPI fallback (off by default — needs page word boxes) |
+| `AI_UPR_VISION_KPI_ENABLED` | `false` | Enable the `vision_openai_v1` vision-LLM KPI fallback (requires `OPENAI_API_KEY`) |
+| `AI_UPR_VISION_MODEL` | `gpt-4o-mini` | Vision model used by `AI_UPR_VISION_KPI_ENABLED` |
+| `AI_UPR_VISION_MAX_PAGES` | `1` | Max pages rendered to images for vision KPI extraction (`processor.py`) |
+| `AI_UPR_VISION_DPI` | `160` | DPI for page-to-image conversion for vision extraction (`processor.py`) |
+| `AI_UPR_VISION_CLIP_TOP_FRAC` | `0.42` | Fraction of page height cropped from the top before the vision crop (0.0 = no crop; `processor.py`) |
 
 ---
 
@@ -393,4 +483,6 @@ Currency is always **CHF** unless otherwise stated.
 - **Deterministic answering** currently supports `in_support_kpis` and `people_reached`/`people_to_be_reached` blocks; `financial_overview`, `funding_requirements`, `hazards`, and `pns_bilateral_support` fall back to text search.
 - **Vision extraction** is optional and disabled by default; layout-based extraction is the primary path.
 - **Year inference** is best-effort from filename/title; multi-year plans can be ambiguous.
+- **`get_upr_kpi_value(..., prefer_year=...)` `report_type` is not resolved** — the winning candidate's `source.report_type` in the response is sourced from `_parse_upr_extraction_meta(extraction)`, which parses `pe=`/`ype=`/`year=` tokens that no current extractor emits (see section 5), so it is effectively always `None`. This is purely informational (not part of the ranking key, unlike `year` — see next point), so it doesn't affect *which* candidate is returned, only a field on it. Fixing it would mean deriving `report_type` the same filename/`upr_context.doc_type` way `get_upr_kpi_timeseries` already does, via a shared helper.
+- ~~`get_upr_kpi_value(..., prefer_year=...)` does not actually prefer the requested year~~ — **fixed**: year for ranking now comes from the shared `_resolve_upr_block_year` helper (filename / `upr_context.year`), not from `_parse_upr_extraction_meta`.
 - UPR started in 2023 — documents before that year are not expected.

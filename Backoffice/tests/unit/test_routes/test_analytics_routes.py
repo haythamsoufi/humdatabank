@@ -319,6 +319,47 @@ class TestUserAnalytics:
         resp = logged_in_client.get("/admin/analytics/user/999999")
         _assert_status(resp, 404, 302)
 
+    def test_partial_includes_activity_table(self, logged_in_client, db_session, app, admin_user):
+        from app.models import UserActivityLog
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            user_id = admin_user.id
+            db_session.add(
+                UserActivityLog(
+                    user_id=user_id,
+                    activity_type="form_submitted",
+                    activity_description="Submitted a form",
+                    ip_address="127.0.0.1",
+                    endpoint="forms.submit_form",
+                    url_path="/forms/submit",
+                    http_method="POST",
+                    timestamp=utcnow(),
+                    response_status_code=200,
+                )
+            )
+            db_session.add(
+                UserActivityLog(
+                    user_id=user_id,
+                    activity_type="presence_heartbeat",
+                    activity_description="Heartbeat",
+                    ip_address="127.0.0.1",
+                    endpoint="forms_api.api_presence_heartbeat",
+                    url_path="/api/forms/presence/heartbeat",
+                    timestamp=utcnow(),
+                )
+            )
+            db_session.commit()
+
+        resp = logged_in_client.get(f"/admin/analytics/user/{user_id}?partial=1")
+        _assert_status(resp, 200, 302)
+        if resp.status_code != 200:
+            return
+        html = resp.get_data(as_text=True)
+        assert "Recent activities" in html
+        assert "Submitted a form" in html or "form_submitted" in html or "Form submit" in html
+        assert "Heartbeat" not in html
+
 
 # ---------------------------------------------------------------------------
 # chart_login_activity

@@ -476,6 +476,7 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 | Plugin contract | [`Backoffice/app/plugins/base.py`](Backoffice/app/plugins/base.py) (`BasePlugin`, optional admin hooks) |
 | Discovery & lifecycle | [`Backoffice/app/plugins/manager.py`](Backoffice/app/plugins/manager.py) (`PluginManager`) |
 | Example plugin | [`Backoffice/plugins/pb_progress/`](Backoffice/plugins/pb_progress/) |
+| UPR visuals plugin | [`Backoffice/plugins/upr_visuals/`](Backoffice/plugins/upr_visuals/) — live Unified Plan (template 24) / Report (template 33) dashboards on assignment pages, plus bulk PNG export on the Data Explorer **UPR visuals** tab (replaces Tableau `UPR Visuals.twb`) |
 | Standalone tool scripts | `Backoffice/plugins/<id>/visuals/` (or similar subfolder) |
 
 **To add a new admin-feature plugin:**

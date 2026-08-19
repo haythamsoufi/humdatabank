@@ -18,7 +18,7 @@
 
 {% block content %}
 {% from "components/_page_header.html" import page_header %}
-{% from "components/_scroll_tab_bar.html" import scroll_tab_bar %}
+{% from "components/_scroll_tab_bar.html" import scroll_tab_bar, admin_underline_tab_btn_classes %}
 {% from "macros/year_picker.html" import year_picker %}
 {% from "macros/part_of_filter_checkboxes.html" import part_of_filter_checkboxes %}
 {% from "components/ag_grid_includes.html" import ag_grid_header_toolbar, ag_grid_body_wrap %}
@@ -60,64 +60,54 @@
 {% set sub_tabs_count = (1 if has_countries else 0) + (1 if has_secretariat else 0) %}
 {% set show_add_entities_subtabs = sub_tabs_count > 1 %}
 
-{# Assignment details form and entity management in one card with main tabs #}
+{# Assignment details form and entity management in one card with main tabs
+   (same flush-tab pattern as System Configuration / manage_settings.html) #}
 {# Flash messages are handled in layout.html #}
-<div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-8">
+<div class="bg-white shadow-md border border-gray-200 mb-8">
     {% if show_main_tabs %}
-    {% call scroll_tab_bar(inner_tag='ul', inner_id='assignment-main-tabs', inner_class='list-none text-sm font-medium text-center', wrapper_class='mb-6', aria_label=_('Assignment sections')) %}
-            <li class="me-2" role="presentation">
-                <button class="inline-block p-4 border-b-2 rounded-t-lg text-blue-600 border-blue-600"
-                        id="assignment-details-tab"
-                        data-tabs-target="#assignment-details-panel"
-                        type="button"
-                        role="tab"
-                        aria-controls="assignment-details-panel"
-                        aria-selected="true">
-                    <i class="fas fa-file-alt mr-2"></i>{{ _('Assignment details') }}
-                </button>
-            </li>
+    {% call scroll_tab_bar(inner_id='assignment-main-tabs', aria_label=_('Assignment sections')) %}
+            <button type="button" role="tab"
+                    id="assignment-details-tab"
+                    data-tabs-target="#assignment-details-panel"
+                    class="{{ admin_underline_tab_btn_classes(true) }}"
+                    aria-controls="assignment-details-panel"
+                    aria-selected="true">
+                <i class="fas fa-file-alt mr-1.5"></i>{{ _('Assignment details') }}
+            </button>
             {% if assignment and assignment_entities %}
-            <li class="me-2" role="presentation">
-                <button class="inline-block p-4 border-b-2 rounded-t-lg border-transparent hover:text-gray-600 hover:border-gray-300"
-                        id="manage-entities-tab"
-                        data-tabs-target="#manage-entities-panel"
-                        type="button"
-                        role="tab"
-                        aria-controls="manage-entities-panel"
-                        aria-selected="false">
-                    <i class="fas fa-cog mr-2"></i>{{ _('Manage Existing Entities') }}
-                </button>
-            </li>
+            <button type="button" role="tab"
+                    id="manage-entities-tab"
+                    data-tabs-target="#manage-entities-panel"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="manage-entities-panel"
+                    aria-selected="false">
+                <i class="fas fa-cog mr-1.5"></i>{{ _('Manage Existing Entities') }}
+            </button>
             {% endif %}
             {% if has_countries or has_secretariat %}
-            <li class="me-2" role="presentation">
-                <button class="inline-block p-4 border-b-2 rounded-t-lg border-transparent hover:text-gray-600 hover:border-gray-300"
-                        id="add-entities-tab"
-                        data-tabs-target="#add-entities-panel"
-                        type="button"
-                        role="tab"
-                        aria-controls="add-entities-panel"
-                        aria-selected="false">
-                    <i class="fas fa-plus-circle mr-2"></i>{{ _('Add Entities') }}
-                </button>
-            </li>
+            <button type="button" role="tab"
+                    id="add-entities-tab"
+                    data-tabs-target="#add-entities-panel"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="add-entities-panel"
+                    aria-selected="false">
+                <i class="fas fa-plus-circle mr-1.5"></i>{{ _('Add Entities') }}
+            </button>
             {% endif %}
             {% if has_ns_structure %}
-            <li class="me-2" role="presentation">
-                <button class="inline-block p-4 border-b-2 rounded-t-lg border-transparent hover:text-gray-600 hover:border-gray-300"
-                        id="ns-structure-tab"
-                        data-tabs-target="#ns-structure-panel"
-                        type="button"
-                        role="tab"
-                        aria-controls="ns-structure-panel"
-                        aria-selected="false">
-                    <i class="fas fa-sitemap mr-2"></i>{{ _('NS Structure') }}
-                </button>
-            </li>
+            <button type="button" role="tab"
+                    id="ns-structure-tab"
+                    data-tabs-target="#ns-structure-panel"
+                    class="{{ admin_underline_tab_btn_classes(false) }}"
+                    aria-controls="ns-structure-panel"
+                    aria-selected="false">
+                <i class="fas fa-sitemap mr-1.5"></i>{{ _('NS Structure') }}
+            </button>
             {% endif %}
     {% endcall %}
     {% endif %}
 
+    <div class="p-6">
     <div id="assignment-main-tabs-content">
         <div id="assignment-details-panel" role="tabpanel" aria-labelledby="assignment-details-tab">
             <form id="manageAssignmentForm" method="POST" action="{{ url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if assignment else url_for('assignment_management.new_assignment') }}">
@@ -927,6 +917,7 @@
         </div> {# End of entity-assignments-content #}
         {% endif %}
     </div> {# End of assignment-main-tabs-content #}
+    </div> {# End of p-6 content wrapper #}
 </div> {# End of assignment card #}
 
 {# Modal for editing AssignmentEntityStatus - only for existing assignments #}

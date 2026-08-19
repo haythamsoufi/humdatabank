@@ -823,6 +823,7 @@ class AIToolsRegistry:
         self,
         country_identifier: str,
         metric: str,
+        year: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Get UPR-extracted KPI values (branches/local units/volunteers/staff) from document chunk metadata.
@@ -831,8 +832,15 @@ class AIToolsRegistry:
         Use it for questions like:
         - "Number of branches in Syria"
         - "How many volunteers does Afghanistan have?"
+        - "How many volunteers did Afghanistan report in the 2023 Unified Plan?" (pass year=2023)
         """
-        return get_upr_kpi_value_service(country_identifier=country_identifier, metric=metric)
+        prefer_year: Optional[int] = None
+        if year is not None:
+            try:
+                prefer_year = int(year)
+            except (TypeError, ValueError):
+                prefer_year = None
+        return get_upr_kpi_value_service(country_identifier=country_identifier, metric=metric, prefer_year=prefer_year)
 
     @tool_wrapper
     def get_upr_kpi_timeseries(

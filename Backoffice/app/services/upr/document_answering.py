@@ -22,6 +22,8 @@ import logging
 import re
 from typing import Any
 
+from app.services.upr.pns_parsing import parse_participating_national_societies_lines
+
 logger = logging.getLogger(__name__)
 
 
@@ -219,123 +221,16 @@ def _extract_participating_national_societies(content: str) -> dict | None:
     """
     Parse a Participating National Societies list from OCR text.
     Splits names into bilateral (no *) vs multilateral (with *).
+
+    Thin wrapper around the shared line-based parser (also used by
+    ``visual_chunking.py``) that adapts its ``{}``-means-"nothing found" contract
+    to this module's ``None``-means-"nothing found" contract.
     """
-    t = (content or "")
+    t = content or ""
     if not t.strip():
         return None
     lines = [ln.rstrip("\\n") for ln in t.splitlines()]
-
-    start = None
-    for i, ln in enumerate(lines):
-        s = (ln or "").strip()
-        low = s.lower()
-        if low == "participating national societies":
-            start = i + 1
-            break
-        if low == "participating" and i + 1 < len(lines):
-            nxt = (lines[i + 1] or "").strip().lower()
-            if nxt == "national societies":
-                start = i + 2
-                break
-        if "participating" in low and i + 1 < len(lines):
-            nxt = (lines[i + 1] or "").strip().lower()
-            if "national societies" in nxt:
-                start = i + 2
-                break
-        if "national societies" in low and i - 1 >= 0:
-            prv = (lines[i - 1] or "").strip().lower()
-            if "participating" in prv:
-                start = i + 1
-                break
-    if start is None:
-        return None
-
-    body: list[str] = []
-    for ln in lines[start:]:
-        s = (ln or "").strip()
-        if not s:
-            continue
-        low = s.lower()
-        if ("hazards" in low) or ("ifrc country delegation" in low):
-            break
-        if "national societies which have contributed" in low and "multilateral" in low:
-            break
-        if ("ifrc" in low and "breakdown" in low):
-            break
-        if re.fullmatch(r"[-_—–]{2,}", s):
-            continue
-        body.append(s)
-
-    if not body:
-        return None
-
-    names_raw: list[str] = []
-    pending_prefix: str | None = None
-
-    def add_name(name: str):
-        nm = (name or "").strip()
-        if nm:
-            names_raw.append(nm)
-
-    for line in body:
-        cells = [c.strip() for c in re.split(r"\s{2,}", line) if c.strip()]
-        if not cells:
-            continue
-
-        if pending_prefix:
-            for c in cells:
-                cl = c.lower()
-                if cl in {"cross", "cross*", "crescent", "crescent*"}:
-                    add_name(pending_prefix + " " + c)
-                    pending_prefix = None
-                    break
-
-        for c in cells:
-            cl = c.lower()
-            if "mdr" in cl:
-                continue
-            if ("total" in cl and "chf" in cl) or ("projected funding requirements" in cl):
-                continue
-            if cl.startswith("emergency appeal") or cl.startswith("longer-term needs") or cl.startswith("longer term needs"):
-                continue
-
-            if ("red cross" in cl) or ("red crescent" in cl):
-                add_name(c)
-                continue
-
-            if cl.endswith(" red") and ("national red" in cl or cl.endswith("national red")):
-                pending_prefix = c
-
-    if not names_raw:
-        return None
-
-    seen: set[str] = set()
-    bilateral: list[str] = []
-    multilateral: list[str] = []
-    raw_out: list[str] = []
-    for n in names_raw:
-        n2 = (n or "").strip()
-        if not n2:
-            continue
-        starred = n2.endswith("*")
-        clean = n2[:-1].rstrip() if starred else n2
-        clean = clean.rstrip(" ,.;")
-        if not clean:
-            continue
-        key = clean.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        raw_out.append(clean + ("*" if starred else ""))
-        if starred:
-            multilateral.append(clean)
-        else:
-            bilateral.append(clean)
-
-    if not bilateral and not multilateral:
-        return None
-
-    return {"bilateral": bilateral, "multilateral": multilateral, "raw": raw_out}
+    return parse_participating_national_societies_lines(lines) or None
 
 
 def extract_participating_national_societies(content: str) -> dict | None:

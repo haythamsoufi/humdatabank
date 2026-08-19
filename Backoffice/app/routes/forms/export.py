@@ -1204,7 +1204,6 @@ def _export_pdf_impl(aes_id):
                 font-size: 7pt;
                 line-height: 1.25;
                 overflow-wrap: anywhere;
-                word-break: break-word;
                 hyphens: auto;
                 vertical-align: top;
             }

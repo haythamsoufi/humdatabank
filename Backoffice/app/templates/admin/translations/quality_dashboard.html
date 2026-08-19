@@ -129,6 +129,14 @@
             {{ _('Hit-rate is counted on new machine-translation calls that match a must-term.') }}
         </p>
     </div>
+    {% if not metrics.catalog_imported %}
+    <div class="px-6 py-4 border-b border-amber-100 bg-amber-50">
+        <p class="text-sm text-amber-800">
+            {{ _('No target-language catalog rows yet. English is the source language and is not counted here.') }}
+            {{ _('Use Sync catalog from .po on Translation Management to import coverage data.') }}
+        </p>
+    </div>
+    {% endif %}
     {% if metrics.locales %}
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">

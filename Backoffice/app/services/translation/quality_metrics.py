@@ -4,8 +4,37 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from app.services.translation.catalog_service import PROVENANCE_HUMAN, STATUS_APPROVED
+from flask import current_app
+
+from app.services.translation.catalog_service import (
+    PROVENANCE_HUMAN,
+    STATUS_APPROVED,
+    is_source_locale,
+)
 from app.services.translation.result_cache import cache_stats
+
+
+def _empty_locale_bucket() -> Dict[str, Any]:
+    return {
+        "total": 0,
+        "translated": 0,
+        "human_approved": 0,
+        "machine": 0,
+        "unknown": 0,
+        "engines": {},
+    }
+
+
+def _configured_target_locales() -> list:
+    configured = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
+    if not configured:
+        supported = current_app.config.get("SUPPORTED_LANGUAGES") or []
+        configured = [code for code in supported if not is_source_locale(str(code))]
+    return [
+        str(code).strip().lower()
+        for code in configured
+        if code and not is_source_locale(str(code))
+    ]
 
 
 def quality_dashboard_payload() -> Dict[str, Any]:
@@ -15,20 +44,13 @@ def quality_dashboard_payload() -> Dict[str, Any]:
         TranslationString,
     )
 
-    locales = {}
+    locales = {loc: _empty_locale_bucket() for loc in _configured_target_locales()}
     rows = TranslationString.query.all()
     for row in rows:
-        bucket = locales.setdefault(
-            row.locale,
-            {
-                "total": 0,
-                "translated": 0,
-                "human_approved": 0,
-                "machine": 0,
-                "unknown": 0,
-                "engines": {},
-            },
-        )
+        loc = (row.locale or "").strip().lower()
+        if not loc or is_source_locale(loc):
+            continue
+        bucket = locales.setdefault(loc, _empty_locale_bucket())
         bucket["total"] += 1
         if (row.msgstr or "").strip():
             bucket["translated"] += 1
@@ -52,8 +74,11 @@ def quality_dashboard_payload() -> Dict[str, Any]:
 
     from app.services.translation.catalog_hygiene import filelock_status
 
+    catalog_imported = any(bucket["total"] for bucket in locales.values())
+
     return {
         "locales": locales,
+        "catalog_imported": catalog_imported,
         "glossary_terms": int(glossary_terms),
         "pending_candidates": int(pending_candidates),
         "human_approved_share_pct": human_share,

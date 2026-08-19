@@ -1789,7 +1789,6 @@ class NotificationService:
                 notification_types_enabled=[],
                 in_app_notification_types_enabled=[],
                 notification_frequency='instant',
-                sound_enabled=True,
                 push_notifications=True,
                 push_notification_types_enabled=[]
             )
@@ -1806,7 +1805,6 @@ class NotificationService:
         notification_types_enabled: Optional[Dict[str, bool]] = None,
         in_app_notification_types_enabled: Optional[List[str]] = None,
         notification_frequency: Optional[str] = None,
-        sound_enabled: Optional[bool] = None,
         push_notifications: Optional[bool] = None,
         push_notification_types_enabled: Optional[List[str]] = None,
         digest_day: Optional[str] = None,
@@ -1822,7 +1820,6 @@ class NotificationService:
             notification_types_enabled: Dict of notification types and their enabled status
             in_app_notification_types_enabled: List of notification types enabled in-app
             notification_frequency: Notification frequency ('instant', 'daily', 'weekly')
-            sound_enabled: Enable/disable sound notifications
             push_notifications: Enable/disable push notifications
             push_notification_types_enabled: List of notification types enabled for push
 
@@ -1860,9 +1857,6 @@ class NotificationService:
 
             if notification_frequency is not None:
                 preferences.notification_frequency = notification_frequency
-
-            if sound_enabled is not None:
-                preferences.sound_enabled = sound_enabled
 
             if push_notifications is not None:
                 preferences.push_notifications = push_notifications

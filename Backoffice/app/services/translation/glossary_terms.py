@@ -117,21 +117,31 @@ def serialize_candidate(row) -> Dict[str, Any]:
         "occurrence_count": int(row.occurrence_count or 1),
         "conflict": bool(evidence.get("conflict")),
         "official_term": evidence.get("official_term") or "",
+        # Raw fields kept alongside the conflict/official_term summary above so
+        # every consumer (admin quality dashboard, inline translation-review tool)
+        # can share this one serializer instead of hand-rolling its own dict.
+        "evidence": row.evidence,
+        "example_sentences": row.example_sentences,
     }
 
 
-def list_glossary_candidates(*, limit: int = LIST_LIMIT) -> Dict[str, Any]:
+def list_glossary_candidates(*, target_lang: Optional[str] = None, limit: int = LIST_LIMIT) -> Dict[str, Any]:
     from app.models.translation_quality import TranslationGlossaryCandidate
 
     q = TranslationGlossaryCandidate.query.filter_by(status="pending")
+    lang = (target_lang or "").strip().lower()
+    if lang and lang != "en":
+        q = q.filter_by(target_lang=lang)
     total = q.count()
-    rows = (
-        q.order_by(TranslationGlossaryCandidate.confidence.desc())
-        .limit(max(1, min(int(limit or LIST_LIMIT), LIST_LIMIT)))
-        .all()
-    )
+    # Fetch up to the hard cap (not the caller's smaller `limit`) so the conflict-first
+    # re-sort below sees every pending row, not just the top-N by confidence -- otherwise
+    # a low-confidence conflicting term could be cut off before it gets a chance to outrank
+    # a high-confidence non-conflicting one.
+    rows = q.order_by(TranslationGlossaryCandidate.confidence.desc()).limit(LIST_LIMIT).all()
     items = [serialize_candidate(r) for r in rows]
     items.sort(key=lambda item: (0 if item.get("conflict") else 1, -(item.get("confidence") or 0)))
+    capped = max(1, min(int(limit or LIST_LIMIT), LIST_LIMIT))
+    items = items[:capped]
     return {
         "items": items,
         "total": total,

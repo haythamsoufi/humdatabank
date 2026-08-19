@@ -842,6 +842,8 @@ Unified submission data endpoint. Returns fact arrays plus dimension tables in o
 
 **`include_calculated_totals`** (default `true`): request-wide override — pass `false` to strip calculated row/column/grand totals from `matrix_cells[]` / `bridge_disagg_values[]` / `disaggregation_data` for every matrix in the response. This can only *remove* totals, never force them back in. Independently, each matrix item's `matrix_config.include_calculated_totals_in_api` flag (set via the Form Builder's matrix Display properties) controls the *default* for that item — it decouples on-screen totals (`show_row_totals`/`show_column_totals`, always shown to people filling in the form) from API/export exposure, so a form author can show totals in the UI while keeping them out of every API response and data export for that matrix, without callers needing to remember `include_calculated_totals=false`.
 
+**Percentage values:** stored and entered as 0–100 (25 means 25%). The data-entry form shows a `%` suffix and warns if a value is between 0 and 1 exclusive (e.g. `0.2`), because that is often a mistaken fraction; it is **not** auto-converted to 20. `/api/v1/data` (flat and star) returns percentages as a **0–1 decimal** on `value` / `num_value` and in disaggregation / matrix cell numbers (25% → `0.25`, 100% → `1`). Counts and other numeric types are unchanged. Do not sum percentage `num_value`s across countries.
+
 **Examples**
 
 ```http

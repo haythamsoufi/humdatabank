@@ -361,15 +361,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- Notification sound preferences (in-memory cache) ---
-    // Populated lazily by cacheNotificationPreferences(); avoids re-parsing
-    // localStorage JSON on every sound-play call.
-    let _cachedNotifPrefs = null;
-    try {
-        const stored = localStorage.getItem('notification_preferences');
-        if (stored) _cachedNotifPrefs = JSON.parse(stored);
-    } catch (e) { /* localStorage unavailable or corrupt — ignore */ }
-
     // --- Mark-read / mark-unread button factories ---
     // Centralises button construction that was previously duplicated across
     // displayNotifications, markNotificationRead, markNotificationUnread,
@@ -1068,7 +1059,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Track last badge count for sound notification
+    // Track last badge count so polling can detect increases
     let lastBadgeCount = 0;
     let wsConnection = null;
     let reconnectAttempts = 0;
@@ -1079,18 +1070,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const MAX_RECONNECT_ATTEMPTS = 10;
     const INITIAL_RECONNECT_DELAY = 1000; // 1 second
     const WS_PING_INTERVAL_MS = 15000; // 15s keeps idle links alive better than 30s
-
-    // Play notification sound
-    function playNotificationSound() {
-        // Use in-memory cached prefs (populated once by cacheNotificationPreferences)
-        // to avoid re-parsing localStorage JSON on every notification.
-        if (_cachedNotifPrefs && _cachedNotifPrefs.sound_enabled) {
-            const soundUrl = (window.getStaticUrl && window.getStaticUrl('sounds/notification.mp3')) || '/static/sounds/notification.mp3';
-            const audio = new Audio(soundUrl);
-            audio.volume = 0.5;
-            audio.play().catch(e => console.debug('Sound play failed:', e));
-        }
-    }
 
     // Helper function to handle WebSocket connection errors with reconnection logic
     function handleWSError() {
@@ -1197,9 +1176,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (message.type === 'notification' && message.data) {
                         const data = message.data;
                         if (data.type === 'new_notification' && data.notification) {
-                            // Play sound if enabled
-                            playNotificationSound();
-
                             // Reload notifications if dropdown is open
                             if (notificationsDropdown && !notificationsDropdown.classList.contains('hidden')) {
                                 loadNotifications();
@@ -1497,11 +1473,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (data.success) {
                 const count = parseInt(data.unread_count) || 0;
-
-                if (count > lastBadgeCount && lastBadgeCount > 0 && !wsConnection) {
-                    playNotificationSound();
-                }
-
                 lastBadgeCount = count;
                 updateNotificationsBadge(count);
             }
@@ -1511,51 +1482,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Cache notification preferences for sound feature.
-    // Re-fetched at most once per TTL window (per browser tab/session) instead of
-    // unconditionally on every page load — this endpoint was found to be one of
-    // the top contributors to unnecessary server load (see gateway-504 runbook).
-    const NOTIFICATION_PREFS_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours (invalidated via forceRefreshNotificationPreferencesCache on save)
-    const NOTIFICATION_PREFS_CACHED_AT_KEY = 'notification_preferences_cached_at';
-
-    function cacheNotificationPreferences(force) {
-        const cachedAt = parseInt(localStorage.getItem(NOTIFICATION_PREFS_CACHED_AT_KEY), 10) || 0;
-        const isFresh = !force && (Date.now() - cachedAt) < NOTIFICATION_PREFS_CACHE_TTL_MS && localStorage.getItem('notification_preferences') !== null;
-        if (isFresh) {
-            // Populate in-memory cache from storage so playNotificationSound doesn't
-            // have to parse localStorage on every call.
-            try { _cachedNotifPrefs = JSON.parse(localStorage.getItem('notification_preferences')); } catch (e) { /* ignore */ }
-            return;
-        }
-
-        const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
-        if (!csrfTokenMeta) return;
-
-        _nfetch('/notifications/api/preferences', {
-            method: 'GET',
-            headers: {
-                'X-CSRFToken': csrfTokenMeta.getAttribute('content'),
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.preferences) {
-                _cachedNotifPrefs = data.preferences;
-                localStorage.setItem('notification_preferences', JSON.stringify(data.preferences));
-                localStorage.setItem(NOTIFICATION_PREFS_CACHED_AT_KEY, String(Date.now()));
-                console.info('[notif-prefs] fetched and cached (next fetch in ' + Math.round(NOTIFICATION_PREFS_CACHE_TTL_MS / 60000) + 'm)');
-            }
-        })
-        .catch(error => console.debug('Failed to cache preferences:', error));
-    }
-
-    // Preferences can change from the account settings page in another tab; let
-    // that page force a fresh fetch there via `window.forceRefreshNotificationPreferencesCache()`.
-    window.forceRefreshNotificationPreferencesCache = function() {
-        localStorage.removeItem(NOTIFICATION_PREFS_CACHED_AT_KEY);
-    };
-
     // Initial setup
     if (notificationsBellButton) {
         // Note: no special-cased immediate badge fetch here for the "WebSocket was
@@ -1563,9 +1489,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // checkWebSocketStatusOnce(), synchronously whenever NOTIFY_WS_ENABLED or a
         // cached status is available) now always fetches the badge count immediately
         // when entering polling, so a duplicate fetch here would just waste a request.
-
-        // Cache notification preferences for sound feature (only once on page load)
-        setTimeout(cacheNotificationPreferences, 2000);
 
         // Always check WebSocket status (even if previously disabled)
         // This allows picking up configuration changes (e.g., switching from Flask dev server to Waitress)

@@ -36,6 +36,41 @@ function parseNumericFieldValue(field) {
     return parseFloat(unformatted);
 }
 
+function percentageAllowsOver100(field) {
+    const configAttr = field?.getAttribute('data-field-config');
+    if (!configAttr) {
+        return false;
+    }
+    try {
+        const config = JSON.parse(configAttr);
+        return config.allow_over_100 === true
+            || config.allow_over_100 === 'true'
+            || config.allow_over_100 === 1
+            || config.allow_over_100 === '1';
+    } catch (e) {
+        return false;
+    }
+}
+
+function isFractionLikePercentage(value) {
+    return Number.isFinite(value) && value > 0 && value < 1;
+}
+
+function formatPercentageHintNumber(value) {
+    if (!Number.isFinite(value)) {
+        return String(value);
+    }
+    return String(parseFloat(value.toPrecision(12)));
+}
+
+function fractionPercentageWarningMessage(value) {
+    const entered = formatPercentageHintNumber(value);
+    const suggested = formatPercentageHintNumber(value * 100);
+    return _t('This will be saved as {entered}%. If you meant {suggested}%, enter {suggested}.')
+        .replaceAll('{entered}', entered)
+        .replaceAll('{suggested}', suggested);
+}
+
 class FormValidator {
     constructor() {
         this.errors = [];
@@ -47,7 +82,7 @@ class FormValidator {
         debugLog(MODULE_NAME, '🔍 FORM VALIDATION: Initializing form validation module');
         this.attachSubmitListeners();
         this.setupRealTimeValidation();
-        this.initializePercentageWarnings();
+        this.initializePercentageFields();
         this.initializeValidationConditions();
     }
 
@@ -184,7 +219,49 @@ class FormValidator {
         }, true);
     }
 
+    enhancePercentageInput(field) {
+        if (!field || field.getAttribute('data-field-type') !== 'percentage') {
+            return;
+        }
+        field.setAttribute('step', 'any');
+        field.setAttribute('inputmode', 'decimal');
+        this.ensurePercentageEntryHint();
+        const describedBy = field.getAttribute('aria-describedby') || '';
+        if (!describedBy.split(/\s+/).includes('percentage-entry-hint')) {
+            field.setAttribute(
+                'aria-describedby',
+                [describedBy, 'percentage-entry-hint'].filter(Boolean).join(' ').trim()
+            );
+        }
+    }
+
+    ensurePercentageEntryHint() {
+        if (document.getElementById('percentage-entry-hint')) {
+            return;
+        }
+        const form = document.getElementById('focalDataEntryForm');
+        if (!form) {
+            return;
+        }
+        const hint = document.createElement('p');
+        hint.id = 'percentage-entry-hint';
+        hint.className = 'sr-only';
+        hint.textContent = _t('Percentage fields use whole percents. Enter 20 for 20%, not 0.2.');
+        form.prepend(hint);
+    }
+
+    applyPercentageWarningStyle(field) {
+        field.classList.add('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
+        field.classList.remove('border-gray-300', 'border-red-500', 'focus:border-blue-500', 'focus:ring-blue-500', 'focus:border-red-500', 'focus:ring-red-500');
+    }
+
+    clearPercentageWarningStyle(field) {
+        field.classList.remove('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
+    }
+
     validatePercentageField(field) {
+        this.enhancePercentageInput(field);
+
         // Skip if field is hidden or disabled
         if (this.isFieldHidden(field) || field.disabled) {
             return;
@@ -198,29 +275,23 @@ class FormValidator {
             return;
         }
 
-        // Get field config from data attribute
-        let allowOver100 = false;
-        const configAttr = field.getAttribute('data-field-config');
-        if (configAttr) {
-            try {
-                const config = JSON.parse(configAttr);
-                allowOver100 = config.allow_over_100 === true || config.allow_over_100 === 'true' || config.allow_over_100 === 1 || config.allow_over_100 === '1';
-            } catch (e) {
-                // Config parsing failed, use default (false)
-            }
-        }
+        const allowOver100 = percentageAllowsOver100(field);
 
         // If allow_over_100 is false and value > 100, show warning (but allow input)
         if (!allowOver100 && value > 100) {
             this.showPercentageWarning(field, _t('Values above 100% are not allowed for this field. Please enter a value between 0 and 100.'));
-            field.classList.add('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
-            field.classList.remove('border-gray-300', 'border-red-500', 'focus:border-blue-500', 'focus:ring-blue-500', 'focus:border-red-500', 'focus:ring-red-500');
-            // Don't add to errorFields here - we'll validate on submit
-        } else {
-            // Value is valid, clear any warnings
-            this.clearPercentageWarning(field);
-            field.classList.remove('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
+            this.applyPercentageWarningStyle(field);
+            return;
         }
+
+        // 0.2 next to a "%" suffix is almost always "I meant 20%". Warn, don't convert.
+        if (isFractionLikePercentage(value)) {
+            this.showPercentageWarning(field, fractionPercentageWarningMessage(value));
+            this.applyPercentageWarningStyle(field);
+            return;
+        }
+
+        this.clearPercentageWarning(field);
     }
 
     showPercentageWarning(field, message) {
@@ -259,43 +330,12 @@ class FormValidator {
         if (warningDiv) {
             warningDiv.style.display = 'none';
         }
+        this.clearPercentageWarningStyle(field);
     }
 
-    initializePercentageWarnings() {
-        // Check all percentage fields on page load and show warnings for values > 100%
-        const percentageFields = document.querySelectorAll('input[data-field-type="percentage"]');
-
-        percentageFields.forEach(field => {
-            // Skip if field is hidden or disabled
-            if (this.isFieldHidden(field) || field.disabled) {
-                return;
-            }
-
-            const value = parseNumericFieldValue(field);
-
-            // Only check if there's a value
-            if (isNaN(value) || field.value.trim() === '') {
-                return;
-            }
-
-            // Get field config from data attribute
-            let allowOver100 = false;
-            const configAttr = field.getAttribute('data-field-config');
-            if (configAttr) {
-                try {
-                    const config = JSON.parse(configAttr);
-                    allowOver100 = config.allow_over_100 === true || config.allow_over_100 === 'true' || config.allow_over_100 === 1 || config.allow_over_100 === '1';
-                } catch (e) {
-                    // Config parsing failed, use default (false)
-                }
-            }
-
-            // If allow_over_100 is false and value > 100, show warning
-            if (!allowOver100 && value > 100) {
-                this.showPercentageWarning(field, _t('Values above 100% are not allowed for this field. Please enter a value between 0 and 100.'));
-                field.classList.add('border-yellow-500', 'focus:border-yellow-500', 'focus:ring-yellow-500');
-                field.classList.remove('border-gray-300', 'border-red-500', 'focus:border-blue-500', 'focus:ring-blue-500', 'focus:border-red-500', 'focus:ring-red-500');
-            }
+    initializePercentageFields() {
+        document.querySelectorAll('input[data-field-type="percentage"]').forEach((field) => {
+            this.validatePercentageField(field);
         });
     }
 
@@ -629,17 +669,7 @@ class FormValidator {
                 return;
             }
 
-            // Get field config from data attribute
-            let allowOver100 = false;
-            const configAttr = field.getAttribute('data-field-config');
-            if (configAttr) {
-                try {
-                    const config = JSON.parse(configAttr);
-                    allowOver100 = config.allow_over_100 === true || config.allow_over_100 === 'true' || config.allow_over_100 === 1 || config.allow_over_100 === '1';
-                } catch (e) {
-                    debugLog(MODULE_NAME, `❌ Error parsing field config for percentage field: ${e}`);
-                }
-            }
+            const allowOver100 = percentageAllowsOver100(field);
 
             // If allow_over_100 is false and value > 100, show error
             if (!allowOver100 && value > 100) {

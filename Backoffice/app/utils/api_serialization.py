@@ -13,6 +13,7 @@ from app.services.forms.reporting_period_service import period_chronology_sort_k
 from app.utils.form_localization import get_localized_indicator_name, get_localized_validation_message
 from app.utils.api_formatting import format_answer_value
 from app.utils.api_helpers import extract_numeric_value
+from app.utils.api_percentage import apply_api_percentage_scale
 from flask import current_app
 from sqlalchemy.orm import joinedload as _joinedload_impl
 from app.models import FormTemplate, AssignedForm
@@ -1567,7 +1568,10 @@ def serialize_assigned_data_item(
             assignment=assigned_form
         ) if data_item.form_item else None
 
-    return item_payload
+    return apply_api_percentage_scale(
+        item_payload,
+        form_item=data_item.form_item,
+    )
 
 
 def serialize_public_data_item(data_item, include_full_info=True, minimal_country_info=False):
@@ -1656,7 +1660,10 @@ def serialize_public_data_item(data_item, include_full_info=True, minimal_countr
             public_assignment=public_assignment
         ) if data_item.form_item else None
 
-    return item_payload
+    return apply_api_percentage_scale(
+        item_payload,
+        form_item=data_item.form_item,
+    )
 
 
 def serialize_dynamic_data_item(
@@ -1762,7 +1769,10 @@ def serialize_dynamic_data_item(
     else:
         payload['country_info'] = format_country_info(country)
 
-    return payload
+    return apply_api_percentage_scale(
+        payload,
+        indicator_bank=getattr(data_item, 'indicator_bank', None),
+    )
 
 
 def serialize_repeat_data_item(
@@ -1859,7 +1869,10 @@ def serialize_repeat_data_item(
     else:
         payload['country_info'] = format_country_info(country)
 
-    return payload
+    return apply_api_percentage_scale(
+        payload,
+        form_item=form_item,
+    )
 
 
 # ---------------------------------------------------------------------------

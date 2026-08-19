@@ -35,7 +35,6 @@ def preferences_for_client(preferences) -> Dict[str, Any]:
             preferences, 'in_app_notification_types_enabled', []
         ),
         'notification_frequency': preferences.notification_frequency,
-        'sound_enabled': preferences.sound_enabled,
         'push_notifications': getattr(preferences, 'push_notifications', True),
         'push_notification_types_enabled': getattr(
             preferences, 'push_notification_types_enabled', []

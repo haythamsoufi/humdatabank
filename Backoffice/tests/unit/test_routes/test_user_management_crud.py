@@ -850,7 +850,6 @@ class TestEditUser:
                     "name": "Notif User",
                     "notification_frequency": "daily",
                     "digest_time": "08:00",
-                    "sound_enabled": "on",
                 },
                 follow_redirects=False,
             )

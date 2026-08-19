@@ -508,7 +508,6 @@ class TestIsNotificationTypeEnabledForUser:
                 notification_types_enabled=[],
                 in_app_notification_types_enabled=[],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -533,7 +532,6 @@ class TestIsNotificationTypeEnabledForUser:
                 notification_types_enabled=['admin_message'],
                 in_app_notification_types_enabled=['admin_message'],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -558,7 +556,6 @@ class TestIsNotificationTypeEnabledForUser:
                 notification_types_enabled=['deadline_reminder'],
                 in_app_notification_types_enabled=['deadline_reminder'],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -583,7 +580,6 @@ class TestIsNotificationTypeEnabledForUser:
                 notification_types_enabled=['assignment_created'],
                 in_app_notification_types_enabled=['assignment_submitted'],
                 notification_frequency='instant',
-                sound_enabled=False,
             )
             db.session.add(pref)
             db.session.commit()
@@ -647,7 +643,6 @@ class TestGetUserPreferencesBatch:
                 notification_types_enabled=[],
                 in_app_notification_types_enabled=[],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -780,7 +775,6 @@ class TestCreateNotification:
                 email_notifications=True,
                 notification_types_enabled=['deadline_reminder'],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()

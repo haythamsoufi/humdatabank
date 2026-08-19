@@ -208,7 +208,8 @@ First decide whether the user means **submitted data** (numeric form values) or 
 ## Analysis rules
 
 - **Available data only:** include rows where `data_status` is exactly `"available"`.
-- **Totals:** sum `num_value` when present; otherwise parse `value` (strip commas).
+- **Totals:** sum `num_value` when present; otherwise parse `value` (strip commas). Do **not** sum percentage-type indicators across countries.
+- **Percentages:** when `form_items[].bank_details.type` (or `question_type`) is `percentage`, `value` / `num_value` are **0–1 decimals** (25% → `0.25`). Do not divide by 100 again.
 - **Dedupe:** for global trends, trust **`getGlobalTrend`** deduplication; do not re-sum raw `/data` pages for worldwide totals.
 - **Period names:** usually `Annual YYYY` for FDRS; UPR may use mid-year labels — use exact strings from API responses.
 - **Public data only:** never ask for API keys unless the user explicitly needs private or full internal datasets.

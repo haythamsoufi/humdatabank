@@ -447,6 +447,19 @@ class TestSerializeAssignedDataItem:
         assert result['value'] == 100
         assert result['data_status'] == 'available'
 
+    def test_percentage_form_item_returns_decimal(self, app):
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value=None):
+                item = self._make_item(value='25')
+                form_item = MagicMock()
+                form_item.type = 'percentage'
+                form_item.field_type_for_js = 'percentage'
+                form_item.indicator_bank = None
+                item.form_item = form_item
+                result = serialize_assigned_data_item(item)
+        assert result['value'] == 0.25
+        assert result['num_value'] == 0.25
+
     def test_data_not_available_sets_status(self, app):
         with app.test_request_context():
             with patch('app.utils.api_serialization.format_country_info', return_value=None):
@@ -713,6 +726,7 @@ class TestSerializeDynamicDataItem:
         item.prefilled_disagg_data = None
         item.imputed_disagg_data = None
         item.disagg_data = None
+        item.indicator_bank = None
 
         aes = MagicMock()
         aes.id = 88
@@ -743,6 +757,19 @@ class TestSerializeDynamicDataItem:
         assert result['repeat_instance_number'] is None
         assert result['repeat_instance_id'] is None
         assert result['iso2'] == 'AF'
+
+    def test_percentage_indicator_returns_decimal(self, app):
+        item = self._make_dynamic_item()
+        item.value = '25'
+        bank = MagicMock()
+        bank.type = 'percentage'
+        item.indicator_bank = bank
+        with app.test_request_context():
+            with patch('app.utils.api_serialization.format_country_info', return_value={'id': 7}), \
+                 patch('app.utils.api_serialization._country_for_aes', return_value=MagicMock(iso2='AF', iso3='AFG')):
+                result = serialize_dynamic_data_item(item)
+        assert result['value'] == 0.25
+        assert result['num_value'] == 0.25
 
     def test_repeat_scoped_dynamic_fields(self, app):
         item = self._make_dynamic_item(repeat_instance_number=2)
@@ -780,6 +807,9 @@ class TestSerializeRepeatDataItem:
 
         fi = MagicMock()
         fi.stable_key = 'item-uuid'
+        fi.type = 'yesno'
+        fi.field_type_for_js = 'yesno'
+        fi.indicator_bank = None
         item.form_item = fi
 
         instance = MagicMock()

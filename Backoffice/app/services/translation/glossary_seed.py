@@ -15,10 +15,12 @@ def _upsert_term(source: str, target: str, target_lang: str, origin: str) -> boo
 
     source = (source or "").strip()
     target = (target or "").strip()
-    if not source or not target or source.lower() == target.lower() and target_lang != "en":
-        if not source or not target:
-            return False
+    if not source or not target:
+        return False
     if target_lang == "en":
+        return False
+    if source.lower() == target.lower():
+        # Untranslated (target text identical to English source) -- not a usable term.
         return False
     row = TranslationGlossaryTerm.query.filter_by(
         source_term=source, source_lang="en", target_lang=target_lang

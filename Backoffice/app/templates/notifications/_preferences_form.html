@@ -2,16 +2,6 @@
 <div id="notification-preferences-form">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="pref-group">
-            <label class="flex items-center space-x-3 cursor-pointer">
-                <input type="checkbox" id="pref-sound-enabled"
-                       class="form-checkbox h-5 w-5 text-blue-600"
-                       {% if preferences.sound_enabled %}checked{% endif %}>
-                <span class="text-gray-700 font-medium">{{ _('Enable Sound') }}</span>
-            </label>
-            <p class="text-sm text-gray-500 mt-1 ml-8">{{ _('Play sound for new notifications') }}</p>
-        </div>
-
-        <div class="pref-group">
             <label for="pref-frequency" class="block text-gray-700 font-medium mb-2">
                 {{ _('Email Frequency') }}
             </label>

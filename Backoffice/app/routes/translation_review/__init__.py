@@ -18,7 +18,7 @@ from app.routes.admin.utilities.translations import _msgid_from_payload, _update
 from app.services.translation.placeholder_validator import (
     extract_placeholders,
     localized_validation_message,
-    validate_placeholders,
+    validate_placeholders_if_present,
 )
 from app.services.translation_review.assignment_service import (
     user_can_edit_locale,
@@ -173,7 +173,9 @@ def save_review_string():
     if translation is None:
         return json_bad_request(_('translation is required'))
 
-    validation = validate_placeholders(msgid, translation)
+    # Blank translations are allowed (they revert the string to untranslated) -- only
+    # a non-empty translation must preserve every source placeholder.
+    validation = validate_placeholders_if_present(msgid, translation)
     if not validation.get('valid'):
         return json_bad_request(localized_validation_message(validation))
 
@@ -237,30 +239,11 @@ def list_glossary_candidates():
     denied = _require_review_access()
     if denied:
         return denied
-    from app.models.translation_quality import TranslationGlossaryCandidate
+    from app.services.translation.glossary_terms import list_glossary_candidates as _list_candidates
 
     locale = _resolve_locale(request.args.get('locale'))
-    q = TranslationGlossaryCandidate.query.filter_by(status='pending')
-    if locale and locale != 'en':
-        q = q.filter_by(target_lang=locale)
-    rows = q.order_by(TranslationGlossaryCandidate.confidence.desc()).limit(80).all()
-    return json_ok(
-        items=[
-            {
-                'id': r.id,
-                'source_term': r.source_term,
-                'target_term': r.target_term,
-                'target_lang': r.target_lang,
-                'extractor': r.extractor,
-                'confidence': r.confidence,
-                'proposed_tier': r.proposed_tier,
-                'occurrence_count': r.occurrence_count,
-                'evidence': r.evidence,
-                'example_sentences': r.example_sentences,
-            }
-            for r in rows
-        ]
-    )
+    result = _list_candidates(target_lang=locale, limit=80)
+    return json_ok(items=result['items'])
 
 
 @bp.route('/api/glossary-candidates/<int:candidate_id>', methods=['POST'])

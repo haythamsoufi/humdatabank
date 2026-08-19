@@ -60,10 +60,13 @@ def _should_activate_translation_review() -> bool:
 
 
 def maybe_mark(msgid: str, rendered: str) -> str:
-    if not msgid or rendered is None:
+    # Marking an empty translation would make it non-empty (invisible marker chars
+    # only), so any caller doing `if not gettext(...):` to detect a missing/blank
+    # translation would see a false "present" result. Leave blanks unmarked.
+    if not msgid or not rendered:
         return rendered
     try:
-        from flask import g, has_request_context
+        from flask import has_request_context
 
         if not has_request_context():
             return rendered

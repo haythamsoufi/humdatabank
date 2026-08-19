@@ -50,9 +50,9 @@ class TestNotificationRoutes:
         prefs = MagicMock()
         prefs.email_notifications = True
         prefs.notification_frequency = 'daily'
-        prefs.sound_enabled = True
         prefs.push_notifications = True
         prefs.notification_types_enabled = ['info']
+        prefs.in_app_notification_types_enabled = ['info']
         prefs.push_notification_types_enabled = ['info']
         prefs.digest_day = 'monday'
         prefs.digest_time = '09:00'
@@ -65,5 +65,5 @@ class TestNotificationRoutes:
     @patch('app.services.notification.service.NotificationService.update_notification_preferences')
     def test_update_preferences(self, mock_update, client, jwt_headers, db_session):
         resp = client.post(f'{PREFIX}/notifications/preferences', headers=jwt_headers,
-                           json={'sound_enabled': False})
+                           json={'email_notifications': False})
         assert_mobile_ok(resp)

@@ -217,7 +217,6 @@ class NotificationPreferences(db.Model):
     notification_frequency = db.Column(db.String(20), default='instant', nullable=False)
     digest_day = db.Column(db.String(10), nullable=True)  # For weekly: 'monday', 'tuesday', etc.
     digest_time = db.Column(db.String(10), nullable=True)  # Time in HH:MM format (24-hour)
-    sound_enabled = db.Column(db.Boolean, default=False, nullable=False)
     push_notifications = db.Column(db.Boolean, default=True, nullable=False)
     push_notification_types_enabled = db.Column(db.JSON, default=list, nullable=False)
     timezone = db.Column(db.String(50), nullable=True)  # User's timezone (e.g., 'America/New_York', 'UTC')

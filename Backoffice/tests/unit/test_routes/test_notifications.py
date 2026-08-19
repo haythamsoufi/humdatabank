@@ -48,8 +48,8 @@ def _make_mock_prefs():
     prefs = MagicMock()
     prefs.email_notifications = True
     prefs.notification_types_enabled = []
+    prefs.in_app_notification_types_enabled = []
     prefs.notification_frequency = "instant"
-    prefs.sound_enabled = True
     prefs.push_notifications = True
     prefs.push_notification_types_enabled = []
     prefs.digest_day = None
@@ -515,7 +515,7 @@ class TestApiUpdateNotificationPreferences:
                    return_value=mock_prefs):
             resp = logged_in_client.post(
                 "/notifications/api/preferences",
-                json={"email_notifications": True, "sound_enabled": False},
+                json={"email_notifications": True},
                 content_type="application/json",
             )
         _assert_status(resp, 200)

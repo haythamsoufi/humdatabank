@@ -269,14 +269,27 @@ class DebugManager:
         # (pipeline steps + per-table glyph subsetting). They also attach
         # their own stderr handlers, which Azure Log Stream paints red even
         # though the records are INFO, not errors.
+        from app.logging_config import WeasyprintCssIgnoreFilter
+
         for _noisy_pdf in (
             "weasyprint",
             "weasyprint.progress",
             "fontTools",
             "fontTools.subset",
             "fontTools.ttLib",
+            "cairocffi",
+            "tinycss2",
+            "cssselect2",
+            "pydyf",
         ):
-            logging.getLogger(_noisy_pdf).setLevel(logging.WARNING)
+            pdf_logger = logging.getLogger(_noisy_pdf)
+            pdf_logger.setLevel(logging.WARNING)
+            if _noisy_pdf == "weasyprint":
+                existing_filters = getattr(pdf_logger, "filters", [])
+                if not isinstance(existing_filters, (list, tuple)):
+                    existing_filters = []
+                if not any(isinstance(f, WeasyprintCssIgnoreFilter) for f in existing_filters):
+                    pdf_logger.addFilter(WeasyprintCssIgnoreFilter())
 
         # PostgreSQL server NOTICEs (e.g. FTS tokens >2047 chars) via SQLAlchemy dialect.
         logging.getLogger("sqlalchemy.dialects.postgresql").setLevel(logging.WARNING)

@@ -1321,7 +1321,6 @@ flowchart LR
 | `notification_frequency` | `VARCHAR(20)` | no |  | — |
 | `digest_day` | `VARCHAR(10)` | yes |  | — |
 | `digest_time` | `VARCHAR(10)` | yes |  | — |
-| `sound_enabled` | `BOOLEAN` | no |  | — |
 | `push_notifications` | `BOOLEAN` | no |  | — |
 | `push_notification_types_enabled` | `JSON` | no |  | — |
 | `timezone` | `VARCHAR(50)` | yes |  | — |

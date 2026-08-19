@@ -23,6 +23,9 @@ from import_upr_excel_data import (  # noqa: E402
     _resolve_item_by_bank_and_area,
     _t22_pns_import_cell_value,
     _t22_total_only_breakdown_cell,
+    collect_percentage_unit_interval_keys,
+    normalize_imported_percentage_value,
+    scale_imported_percentage_payload,
 )
 
 
@@ -238,6 +241,56 @@ class TestPercentageRangeWarning:
     def test_none_value_never_flagged(self):
         ctx = _ctx(percentage_bank_ids={500})
         assert _percentage_scalar_range_warning(ctx, 500, None) is None
+
+    def test_unit_interval_fraction_is_scaled_to_stored_percent(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        assert _reporting_indicator_import_value(ctx, 500, 0.45, rnd="AR23") == 45
+        assert ctx.warnings == []
+
+    def test_already_whole_percent_is_unchanged(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        assert _reporting_indicator_import_value(ctx, 500, 45, rnd="AR25") == 45
+        assert ctx.warnings == []
+
+    def test_zero_and_one_percent_stay_when_round_is_0_100(self):
+        ctx = _ctx(percentage_bank_ids={500})
+        assert _reporting_indicator_import_value(ctx, 500, 0, rnd="AR25") == 0
+        assert _reporting_indicator_import_value(ctx, 500, 1, rnd="AR25") == 1
+        assert ctx.warnings == []
+
+    def test_one_becomes_100_when_the_round_is_unit_interval(self):
+        ctx = _ctx(
+            percentage_bank_ids={500},
+            percentage_unit_interval_keys={(500, "AR23")},
+        )
+        assert _reporting_indicator_import_value(ctx, 500, 1, rnd="AR23") == 100
+        assert _reporting_indicator_import_value(ctx, 500, 0.25, rnd="AR23") == 25
+
+
+class TestPercentageUnitIntervalDetection:
+    def test_past_round_0_1_is_unit_interval_even_when_later_round_is_0_100(self):
+        rows = [
+            {"indicatorId": 500, "Round": "AR23", "ValueNum": 0.25},
+            {"indicatorId": 500, "Round": "AR23", "ValueNum": 1},
+            {"indicatorId": 500, "Round": "AR25", "ValueNum": 45},
+        ]
+        keys = collect_percentage_unit_interval_keys(rows, {500})
+        assert (500, "AR23") in keys
+        assert (500, "AR25") not in keys
+
+    def test_normalize_scales_fractions_and_optional_one(self):
+        assert normalize_imported_percentage_value(0.2) == 20
+        assert normalize_imported_percentage_value(0.2, scale_one_to_hundred=True) == 20
+        assert normalize_imported_percentage_value(1) == 1
+        assert normalize_imported_percentage_value(1, scale_one_to_hundred=True) == 100
+        assert normalize_imported_percentage_value(45) == 45
+        assert normalize_imported_percentage_value(0) == 0
+
+    def test_scale_payload_walks_disagg_trees(self):
+        payload = {"mode": "sex", "values": {"male": 0.4, "female": 0.6}}
+        scaled = scale_imported_percentage_payload(payload, scale_one_to_hundred=False)
+        assert scaled["values"]["male"] == 40
+        assert scaled["values"]["female"] == 60
 
 
 class TestHasRealDisaggBreakdown:

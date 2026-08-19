@@ -702,7 +702,8 @@
                 minWidth: 200,
                 maxWidth: 500,
                 filter: 'agTextColumnFilter',
-                sortable: true
+                sortable: true,
+                cellRenderer: AgGridRenderers.link('assignment_url')
             },
             {
                 field: 'fds_member_name',
@@ -751,6 +752,36 @@
                 filterValueGetter: function(params) {
                     const match = statusChoices.find(function(c) { return c.value === params.data.status; });
                     return match ? match.label : params.data.status;
+                }
+            },
+            {
+                field: 'completion_rate',
+                headerName: (cfg.t && cfg.t.completionRate) || 'Completion Rate',
+                width: 150,
+                minWidth: 120,
+                maxWidth: 180,
+                filter: 'agNumberColumnFilter',
+                sortable: true,
+                type: 'numericColumn',
+                valueGetter: function(params) {
+                    var rate = params.data && params.data.completion_rate;
+                    return rate == null || rate === '' ? 0 : Number(rate);
+                },
+                valueFormatter: function(params) {
+                    var num = Number(params.value);
+                    if (!isFinite(num)) return '';
+                    return num.toFixed(1) + '%';
+                },
+                cellRenderer: function(params) {
+                    var num = Number(params.value);
+                    if (!isFinite(num)) {
+                        return '<span class="text-gray-400">—</span>';
+                    }
+                    // Color tiers match dashboard / entry-form completion rate.
+                    var cls = 'text-red-600 font-semibold';
+                    if (num >= 80) cls = 'text-green-700 font-semibold';
+                    else if (num >= 25) cls = 'text-amber-600 font-semibold';
+                    return '<span class="tabular-nums ' + cls + '">' + num.toFixed(1) + '%</span>';
                 }
             },
             {
@@ -822,7 +853,7 @@
 
             entityGridHelper = new AgGridHelper({
                 containerId: 'entityManagementGrid',
-                templateId: 'entity-management',
+                templateId: 'entity-management-v2',
                 columnDefs: entityColumnDefs,
                 rowData: entityManagementData,
                 options: {

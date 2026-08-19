@@ -538,9 +538,7 @@ def api_delete_notifications():
 def api_get_notification_preferences():
     """Get notification preferences for current user"""
     try:
-        # [NOTIF_PREFS_FETCH] confirms the client-side TTL cache (components.js) is
-        # working post-deploy: hit volume should drop sharply (from "every page
-        # load" to roughly once per 15 minutes per active user).
+        # Hit only from Account Settings / mobile preference screens (not every page load).
         logger.info("[NOTIF_PREFS_FETCH] served user_id=%s", current_user.id)
         preferences = NotificationService.get_notification_preferences(current_user.id)
 
@@ -607,7 +605,6 @@ def api_update_notification_preferences():
                 notification_types_enabled=data.get('notification_types_enabled'),
                 in_app_notification_types_enabled=data.get('in_app_notification_types_enabled'),
                 notification_frequency=data.get('notification_frequency'),
-                sound_enabled=data.get('sound_enabled'),
                 push_notifications=data.get('push_notifications'),
                 push_notification_types_enabled=data.get('push_notification_types_enabled'),
                 digest_day=data.get('digest_day'),  # Will be None if not provided or explicitly null

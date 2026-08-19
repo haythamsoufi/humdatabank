@@ -10,7 +10,6 @@ void main() {
         'notification_frequency': 'weekly',
         'digest_day': 'monday',
         'digest_time': '09:00',
-        'sound_enabled': true,
         'push_notifications': false,
         'push_notification_types_enabled': ['deadline'],
       };
@@ -22,7 +21,6 @@ void main() {
       expect(p.notificationFrequency, 'weekly');
       expect(p.digestDay, 'monday');
       expect(p.digestTime, '09:00');
-      expect(p.soundEnabled, true);
       expect(p.pushNotifications, false);
       expect(p.pushNotificationTypesEnabled, ['deadline']);
     });
@@ -35,7 +33,6 @@ void main() {
       expect(p.notificationFrequency, 'instant');
       expect(p.digestDay, isNull);
       expect(p.digestTime, isNull);
-      expect(p.soundEnabled, false);
       expect(p.pushNotifications, true);
       expect(p.pushNotificationTypesEnabled, isEmpty);
     });
@@ -64,7 +61,6 @@ void main() {
         notificationFrequency: 'daily',
         digestDay: 'friday',
         digestTime: '18:00',
-        soundEnabled: true,
         pushNotifications: true,
         pushNotificationTypesEnabled: ['approval', 'revision'],
       );
@@ -75,7 +71,7 @@ void main() {
       expect(json['notification_frequency'], 'daily');
       expect(json['digest_day'], 'friday');
       expect(json['digest_time'], '18:00');
-      expect(json['sound_enabled'], true);
+      expect(json.containsKey('sound_enabled'), false);
       expect(json['push_notifications'], true);
       expect(json['push_notification_types_enabled'], ['approval', 'revision']);
     });
@@ -85,7 +81,6 @@ void main() {
         emailNotifications: true,
         notificationTypesEnabled: [],
         notificationFrequency: 'instant',
-        soundEnabled: false,
         pushNotifications: true,
         pushNotificationTypesEnabled: [],
       );
@@ -106,7 +101,6 @@ void main() {
         'notification_frequency': 'weekly',
         'digest_day': 'tuesday',
         'digest_time': '08:30',
-        'sound_enabled': true,
         'push_notifications': false,
         'push_notification_types_enabled': ['assignment'],
       };
@@ -120,7 +114,6 @@ void main() {
       expect(p2.notificationFrequency, p1.notificationFrequency);
       expect(p2.digestDay, p1.digestDay);
       expect(p2.digestTime, p1.digestTime);
-      expect(p2.soundEnabled, p1.soundEnabled);
       expect(p2.pushNotifications, p1.pushNotifications);
       expect(
           p2.pushNotificationTypesEnabled, p1.pushNotificationTypesEnabled);
@@ -137,7 +130,6 @@ void main() {
         notificationFrequency: 'instant',
         digestDay: null,
         digestTime: null,
-        soundEnabled: false,
         pushNotifications: true,
         pushNotificationTypesEnabled: ['deadline'],
       );
@@ -149,7 +141,6 @@ void main() {
       expect(copy.emailNotifications, base.emailNotifications);
       expect(copy.notificationTypesEnabled, base.notificationTypesEnabled);
       expect(copy.notificationFrequency, base.notificationFrequency);
-      expect(copy.soundEnabled, base.soundEnabled);
       expect(copy.pushNotifications, base.pushNotifications);
     });
 
@@ -163,7 +154,6 @@ void main() {
       expect(copy.emailNotifications, false);
       expect(copy.notificationFrequency, 'weekly');
       expect(copy.digestDay, 'wednesday');
-      expect(copy.soundEnabled, base.soundEnabled);
       expect(copy.pushNotifications, base.pushNotifications);
       expect(copy.notificationTypesEnabled, base.notificationTypesEnabled);
     });

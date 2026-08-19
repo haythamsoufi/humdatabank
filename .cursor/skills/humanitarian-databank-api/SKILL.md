@@ -152,7 +152,7 @@ in the address bar.
 
 **Step 3 — you analyze pasted JSON:**
 - Filter `data[]` where `data_status == "available"`.
-- Group by `period_name`; sum `num_value` (or parse `value`) across all countries.
+- Group by `period_name`; sum `num_value` (or parse `value`) across all countries for **counts**. Percentage-type indicators use a **0–1 decimal** (`25` stored → `0.25`); do not divide again, and do not sum percentages.
 - Sort periods chronologically (e.g. "Annual 2020" … "Annual 2024").
 - Output a table and/or trend summary. Use `countries[]` only if country breakdown
   is requested.

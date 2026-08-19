@@ -7,14 +7,43 @@
  * - Force mobile mode: X button forces mobile behavior on large screens
  * - Admin sidebar integration: Adjusts button positions automatically
  * - State persistence: Remembers collapse state (but not force mobile mode)
+ * - Hover-visible splitter: drag (or arrow keys) to resize the sections pane
  */
 
 // Constants
 const BREAKPOINT_LARGE = 1100;
 const STORAGE_KEY = 'ifrc-sidebar-collapsed';
+export const SIDEBAR_WIDTH_STORAGE_KEY = 'ifrc-sidebar-width';
+const SIDEBAR_MIN_WIDTH_PX = 200;
+const SIDEBAR_MAX_WIDTH_PX = 560;
+const SIDEBAR_MAX_LAYOUT_RATIO = 0.5;
+const SIDEBAR_KEYBOARD_STEP_PX = 16;
 const RESIZE_DEBOUNCE_MS = 150;
 const POSITION_SYNC_DELAY_MS = 50;
 const FAB_SPACING = -5; // Negative spacing for seamless hover overlap
+
+/**
+ * Clamp a requested sections-pane width against the layout and hard limits.
+ * @param {number} widthPx
+ * @param {number} layoutWidthPx
+ * @returns {number}
+ */
+export function clampEntryFormSidebarWidth(widthPx, layoutWidthPx) {
+  const requested = Number(widthPx);
+  const layoutWidth = Number(layoutWidthPx);
+  if (!Number.isFinite(requested)) {
+    return SIDEBAR_MIN_WIDTH_PX;
+  }
+  const maxByLayout = Number.isFinite(layoutWidth)
+    ? Math.floor(layoutWidth * SIDEBAR_MAX_LAYOUT_RATIO)
+    : SIDEBAR_MAX_WIDTH_PX;
+  const max = Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(SIDEBAR_MAX_WIDTH_PX, maxByLayout));
+  return Math.round(Math.min(max, Math.max(SIDEBAR_MIN_WIDTH_PX, requested)));
+}
+
+function isRtlDocument() {
+  return (document.documentElement.getAttribute('dir') || '').toLowerCase() === 'rtl';
+}
 
 // DOM Element IDs
 const ELEMENT_IDS = {
@@ -27,7 +56,9 @@ const ELEMENT_IDS = {
   FAB_MENU: 'fab-menu',
   FAB_PIN: 'fab-pin-btn',
   ADMIN_SIDEBAR: 'adminSidebar',
-  ADMIN_TOGGLE: 'sidebarToggle'
+  ADMIN_TOGGLE: 'sidebarToggle',
+  RESIZER: 'entry-form-sidebar-resizer',
+  LAYOUT: 'entry-form-layout'
 };
 
 /**
@@ -38,6 +69,9 @@ class SidebarCollapseController {
     this.elements = {};
     this.isLargeScreen = () => window.innerWidth >= BREAKPOINT_LARGE;
     this.resizeTimeout = null;
+    this._resizePointerId = null;
+    this._resizeMoveHandler = null;
+    this._resizeUpHandler = null;
   }
 
   /**
@@ -51,6 +85,7 @@ class SidebarCollapseController {
     }
 
     this.initializeState();
+    this.applySavedSidebarWidth();
     this.attachEventHandlers();
     this.initializeFabTooltips();
     this.initSectionNavHoverExpand();
@@ -218,6 +253,7 @@ class SidebarCollapseController {
     }
 
     this.setFabMenuForceVisible(true);
+    this.clearSidebarWidthStyles();
 
     // Hide expand button
     if (this.elements.expandbutton) {
@@ -248,6 +284,7 @@ class SidebarCollapseController {
       this.elements.expandbutton.style.display = '';
     }
     this.setFabMenuForceVisible(false);
+    this.applySavedSidebarWidth();
   }
 
   /**
@@ -348,6 +385,9 @@ class SidebarCollapseController {
     this.setSidebarCollapsed(newState);
     this.updateExpandButtonVisibility(newState);
     this.updateCollapseToggle(newState);
+    if (!newState) {
+      this.applySavedSidebarWidth();
+    }
   }
 
   /**
@@ -357,6 +397,7 @@ class SidebarCollapseController {
     this.setSidebarCollapsed(false);
     this.updateExpandButtonVisibility(false);
     this.updateCollapseToggle(false);
+    this.applySavedSidebarWidth();
   }
 
   /**
@@ -385,18 +426,196 @@ class SidebarCollapseController {
           this.updateExpandButtonVisibility(isCollapsed);
         }
         this.closeMobileSidebar();
+        this.applySavedSidebarWidth();
       } else {
         this.setSidebarCollapsed(false);
         this.updateExpandButtonVisibility(false);
+        this.clearSidebarWidthStyles();
       }
       this.adjustFloatingButtonPosition();
     }, RESIZE_DEBOUNCE_MS);
   }
 
   /**
+   * True when the hover splitter can change the sections pane width.
+   */
+  canResizeSidebar() {
+    const { sidebar } = this.elements;
+    if (!sidebar || !this.isLargeScreen()) return false;
+    if (sidebar.classList.contains('force-mobile-mode')) return false;
+    return sidebar.getAttribute('data-collapsed') !== 'true';
+  }
+
+  getSidebarWidthPx() {
+    return this.elements.sidebar?.getBoundingClientRect().width || SIDEBAR_MIN_WIDTH_PX;
+  }
+
+  getLayoutWidthPx() {
+    return this.elements.layout?.getBoundingClientRect().width || window.innerWidth || 0;
+  }
+
+  syncResizerAria(widthPx) {
+    const { resizer, sidebar } = this.elements;
+    if (!resizer) return;
+    const layoutWidth = this.getLayoutWidthPx();
+    const maxByLayout = Math.floor(layoutWidth * SIDEBAR_MAX_LAYOUT_RATIO);
+    const max = Math.max(SIDEBAR_MIN_WIDTH_PX, Math.min(SIDEBAR_MAX_WIDTH_PX, maxByLayout));
+    const value = Math.round(widthPx ?? sidebar?.getBoundingClientRect().width ?? 0);
+    resizer.setAttribute('aria-valuemin', String(SIDEBAR_MIN_WIDTH_PX));
+    resizer.setAttribute('aria-valuemax', String(max));
+    if (value) {
+      resizer.setAttribute('aria-valuenow', String(value));
+    }
+  }
+
+  setSidebarWidthPx(widthPx, { persist } = {}) {
+    const { sidebar } = this.elements;
+    if (!sidebar) return 0;
+    const clamped = clampEntryFormSidebarWidth(widthPx, this.getLayoutWidthPx());
+    sidebar.style.width = `${clamped}px`;
+    sidebar.style.minWidth = `${clamped}px`;
+    sidebar.style.maxWidth = `${clamped}px`;
+    sidebar.style.flexShrink = '0';
+    this.syncResizerAria(clamped);
+    if (persist) {
+      try {
+        localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clamped));
+      } catch (e) {
+        /* ignore quota / private-mode failures */
+      }
+    }
+    return clamped;
+  }
+
+  clearSidebarWidthStyles() {
+    const { sidebar } = this.elements;
+    if (!sidebar) return;
+    sidebar.style.width = '';
+    sidebar.style.minWidth = '';
+    sidebar.style.maxWidth = '';
+    sidebar.style.flexShrink = '';
+  }
+
+  applySavedSidebarWidth() {
+    if (!this.canResizeSidebar()) return;
+    let raw = null;
+    try {
+      raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    } catch (e) {
+      return;
+    }
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+      this.syncResizerAria();
+      return;
+    }
+    this.setSidebarWidthPx(parsed, { persist: false });
+  }
+
+  resetSidebarWidth() {
+    this.clearSidebarWidthStyles();
+    try {
+      localStorage.removeItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    } catch (e) {
+      /* ignore */
+    }
+    this.syncResizerAria();
+  }
+
+  stopSidebarResize() {
+    if (this._resizeMoveHandler) {
+      window.removeEventListener('pointermove', this._resizeMoveHandler);
+    }
+    if (this._resizeUpHandler) {
+      window.removeEventListener('pointerup', this._resizeUpHandler);
+      window.removeEventListener('pointercancel', this._resizeUpHandler);
+    }
+    this._resizeMoveHandler = null;
+    this._resizeUpHandler = null;
+    document.body.classList.remove('entry-form-sidebar-resizing');
+    const { resizer } = this.elements;
+    if (resizer && this._resizePointerId != null) {
+      try {
+        resizer.releasePointerCapture(this._resizePointerId);
+      } catch (e) {
+        /* already released */
+      }
+    }
+    this._resizePointerId = null;
+  }
+
+  startSidebarResize(event) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (!this.canResizeSidebar()) return;
+    event.preventDefault();
+
+    const { sidebar, resizer } = this.elements;
+    if (!sidebar || !resizer) return;
+
+    this.stopSidebarResize();
+    this._resizePointerId = event.pointerId;
+    try {
+      resizer.setPointerCapture(event.pointerId);
+    } catch (e) {
+      /* setPointerCapture is optional */
+    }
+
+    const startX = event.clientX;
+    const startWidth = sidebar.getBoundingClientRect().width;
+    const rtl = isRtlDocument();
+    document.body.classList.add('entry-form-sidebar-resizing');
+
+    this._resizeMoveHandler = (moveEvent) => {
+      if (moveEvent.pointerId !== this._resizePointerId) return;
+      const delta = moveEvent.clientX - startX;
+      this.setSidebarWidthPx(startWidth + (rtl ? -delta : delta), { persist: false });
+    };
+    this._resizeUpHandler = (upEvent) => {
+      if (upEvent.pointerId !== this._resizePointerId) return;
+      this.stopSidebarResize();
+      this.setSidebarWidthPx(this.getSidebarWidthPx(), { persist: true });
+    };
+
+    window.addEventListener('pointermove', this._resizeMoveHandler);
+    window.addEventListener('pointerup', this._resizeUpHandler);
+    window.addEventListener('pointercancel', this._resizeUpHandler);
+  }
+
+  handleResizerKeydown(event) {
+    if (!this.canResizeSidebar()) return;
+    const rtl = isRtlDocument();
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const dir = event.key === 'ArrowRight' ? 1 : -1;
+      const delta = rtl ? -dir : dir;
+      this.setSidebarWidthPx(this.getSidebarWidthPx() + delta * SIDEBAR_KEYBOARD_STEP_PX, {
+        persist: true
+      });
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      this.resetSidebarWidth();
+    }
+  }
+
+  attachResizeHandlers() {
+    const { resizer } = this.elements;
+    if (!resizer) return;
+
+    resizer.addEventListener('pointerdown', (event) => this.startSidebarResize(event));
+    resizer.addEventListener('keydown', (event) => this.handleResizerKeydown(event));
+    resizer.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      this.resetSidebarWidth();
+    });
+    this.syncResizerAria();
+  }
+
+  /**
    * Attach all event handlers
    */
   attachEventHandlers() {
+    this.attachResizeHandlers();
+
     // Collapse toggle (large screens)
     if (this.elements.collapsetoggle) {
       this.elements.collapsetoggle.addEventListener('click', (e) => {

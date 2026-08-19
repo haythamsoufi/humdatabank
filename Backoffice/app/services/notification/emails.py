@@ -125,7 +125,6 @@ def _get_or_create_digest_preferences(user):
             email_notifications=True,
             notification_types_enabled=[],
             notification_frequency='instant',
-            sound_enabled=False,
         )
         db.session.add(preferences)
         db.session.commit()

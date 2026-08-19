@@ -396,6 +396,30 @@ class TestEditAssignment:
         resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
         assert resp.status_code in (200, 302)
 
+    def test_entity_grid_includes_completion_rate_and_assignment_url(
+        self, logged_in_client, db_session, app
+    ):
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            aes.completion_rate = 67.5
+            db_session.commit()
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+        resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="entity-management-data"' in html
+        marker = '<script type="application/json" id="entity-management-data">'
+        start = html.find(marker)
+        assert start != -1
+        json_start = start + len(marker)
+        json_end = html.find('</script>', json_start)
+        payload = json.loads(html[json_start:json_end].strip())
+        assert len(payload) == 1
+        assert payload[0]['completion_rate'] == 67.5
+        assert payload[0]['assignment_url'] == f'/forms/assignment/{aes_id}'
+
     def test_get_not_found(self, logged_in_client, db_session):
         resp = logged_in_client.get("/admin/assignments/edit/999999")
         assert resp.status_code in (404, 302)

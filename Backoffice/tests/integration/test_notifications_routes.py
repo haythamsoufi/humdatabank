@@ -9,7 +9,6 @@ class _Prefs:
     email_notifications: bool = True
     notification_types_enabled: list[str] = None
     notification_frequency: str = "immediate"
-    sound_enabled: bool = True
     push_notifications: bool = True
     push_notification_types_enabled: list[str] = None
     digest_day: str | None = None
@@ -114,7 +113,7 @@ class TestNotificationsRoutes:
 
     def test_preferences_get_and_update_contract(self, logged_in_client):
         prefs = _Prefs()
-        updated = _Prefs(email_notifications=False, sound_enabled=False)
+        updated = _Prefs(email_notifications=False)
 
         with patch("app.routes.notifications.NotificationService.get_notification_preferences", return_value=prefs), patch(
             "app.routes.notifications.NotificationService.update_notification_preferences", return_value=updated
@@ -132,12 +131,11 @@ class TestNotificationsRoutes:
 
             resp2 = logged_in_client.post(
                 "/notifications/api/preferences",
-                json={"email_notifications": False, "sound_enabled": False},
+                json={"email_notifications": False},
                 headers={"X-Mobile-Auth": "db-api-key-plaintext"},
             )
             assert resp2.status_code == 200
             data2 = resp2.get_json()
             assert data2["success"] is True
             assert data2["preferences"]["email_notifications"] is False
-            assert data2["preferences"]["sound_enabled"] is False
 

@@ -251,7 +251,6 @@ class TestCreateScheduledNotification:
                 email_notifications=True,
                 notification_types_enabled=['deadline_reminder'],  # not admin_message
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -336,14 +335,12 @@ class TestCreateScheduledNotification:
                 email_notifications=True,
                 notification_types_enabled=[],  # all enabled
                 notification_frequency='instant',
-                sound_enabled=False
             )
             pref2 = NotificationPreferences(
                 user_id=user2.id,
                 email_notifications=True,
                 notification_types_enabled=['deadline_reminder'],  # admin_message disabled
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add_all([pref1, pref2])
             db.session.commit()
@@ -420,7 +417,6 @@ class TestProcessScheduledNotifications:
                 email_notifications=True,
                 notification_types_enabled=['deadline_reminder'],  # admin_message disabled
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
 

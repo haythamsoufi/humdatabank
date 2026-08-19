@@ -74,6 +74,7 @@ from import_upr_excel_data import (  # noqa: E402
     upsert_dynamic_indicator_entries,
     _matrix_column_name_from_item_id,
     _queue_other_dynamic_indicator,
+    scale_imported_percentage_payload,
 )
 from upr_import_warnings import dedupe_upr_import_warnings, serialize_upr_import_warnings  # noqa: E402
 
@@ -690,6 +691,44 @@ def _iter_numeric_leaves(value: Any) -> Iterator[float]:
     if isinstance(value, (list, tuple)):
         for sub in value:
             yield from _iter_numeric_leaves(sub)
+
+
+def _workbook_percentage_unit_interval_bank_ids(
+    parsed_rows: List[Dict[str, Any]],
+    percentage_bank_ids: Set[int],
+    kpi_lookup: Optional[Dict[Tuple[str, str], int]] = None,
+) -> Set[int]:
+    """Bank ids whose workbook percentage values are all in (0, 1] (Excel % / 0-1 source)."""
+    if not percentage_bank_ids:
+        return set()
+    maxima: Dict[int, float] = {}
+    for row in parsed_rows:
+        bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
+        if not bank_id or bank_id not in percentage_bank_ids:
+            continue
+        for source in (row.get("value"), row.get("disagg")):
+            for leaf in _iter_numeric_leaves(source):
+                prev = maxima.get(bank_id)
+                maxima[bank_id] = leaf if prev is None else max(prev, leaf)
+    return {bank_id for bank_id, peak in maxima.items() if 0 < peak <= 1}
+
+
+def _scale_workbook_percentage_fields(
+    value: Any,
+    disagg: Optional[Dict[str, Any]],
+    bank_id: Optional[int],
+    percentage_bank_ids: Set[int],
+    unit_interval_ids: Set[int],
+) -> Tuple[Any, Optional[Dict[str, Any]]]:
+    if not bank_id or bank_id not in percentage_bank_ids:
+        return value, disagg
+    scale_one = bank_id in unit_interval_ids
+    return (
+        scale_imported_percentage_payload(value, scale_one_to_hundred=scale_one),
+        scale_imported_percentage_payload(disagg, scale_one_to_hundred=scale_one)
+        if disagg is not None
+        else disagg,
+    )
 
 
 def _percentage_range_warning(
@@ -2646,6 +2685,18 @@ def _collect_workbook_dynamic_indicator_entries(
         yes_no_bank_ids=yes_no_bank_ids,
         kpi_lookup=kpi_lookup,
     )
+    other_rows: List[Dict[str, Any]] = []
+    if other_dynamic and "Overall action Indicators" in wb.sheetnames:
+        if "Data_other" in wb["Overall action Indicators"].tables:
+            other_rows = parse_indicators(
+                wb,
+                tables=(("Overall action Indicators", "Data_other"),),
+                yes_no_bank_ids=yes_no_bank_ids,
+                kpi_lookup=kpi_lookup,
+            )
+    unit_interval_ids = _workbook_percentage_unit_interval_bank_ids(
+        ea_rows + other_rows, percentage_bank_ids, kpi_lookup
+    )
     for row in ea_rows:
         if not ea_dynamic:
             continue
@@ -2676,6 +2727,9 @@ def _collect_workbook_dynamic_indicator_entries(
         )
         if not should_import:
             continue
+        value, disagg = _scale_workbook_percentage_fields(
+            value, disagg, bank_id, percentage_bank_ids, unit_interval_ids
+        )
         range_warning = _percentage_range_warning(
             row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids
         )
@@ -2700,65 +2754,61 @@ def _collect_workbook_dynamic_indicator_entries(
             }
         )
 
-    if other_dynamic and "Overall action Indicators" in wb.sheetnames:
-        if "Data_other" in wb["Overall action Indicators"].tables:
-            other_rows = parse_indicators(
-                wb,
-                tables=(("Overall action Indicators", "Data_other"),),
-                yes_no_bank_ids=yes_no_bank_ids,
-                kpi_lookup=kpi_lookup,
+    if other_dynamic and other_rows:
+        for row in other_rows:
+            item_id = _resolve_item_by_section_and_indicator(
+                ctx,
+                section_label_map,
+                row["sp_ef"],
+                row["indicator"],
+                kpi_lookup,
             )
-            for row in other_rows:
-                item_id = _resolve_item_by_section_and_indicator(
-                    ctx,
-                    section_label_map,
-                    row["sp_ef"],
-                    row["indicator"],
-                    kpi_lookup,
+            if item_id:
+                continue
+            bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
+            if not bank_id:
+                continue
+            if not row.get("bank_id"):
+                ctx.warnings.append(
+                    f"Indicator {row['indicator']!r} ({row['sp_ef']!r}) had no ID in the "
+                    f"workbook — matched by name instead. Please verify this row wasn't "
+                    f"moved, copy-pasted, or edited in Excel."
                 )
-                if item_id:
-                    continue
-                bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
-                if not bank_id:
-                    continue
-                if not row.get("bank_id"):
-                    ctx.warnings.append(
-                        f"Indicator {row['indicator']!r} ({row['sp_ef']!r}) had no ID in the "
-                        f"workbook — matched by name instead. Please verify this row wasn't "
-                        f"moved, copy-pasted, or edited in Excel."
-                    )
-                else:
-                    integrity_warning = _bank_id_row_integrity_warning(row, bank_id, kpi_display)
-                    if integrity_warning:
-                        ctx.warnings.append(integrity_warning)
-                value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
-                    row, bank_id, yes_no_bank_ids
-                )
-                if not should_import:
-                    continue
-                range_warning = _percentage_range_warning(
-                    row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids
-                )
-                if range_warning:
-                    ctx.warnings.append(range_warning)
-                if row.get("disagg_warning"):
-                    ctx.warnings.append(row["disagg_warning"])
-                order += 1.0
-                entries.append(
-                    {
-                        "section_id": other_dynamic,
-                        "indicator_bank_id": bank_id,
-                        "repeat_instance_number": None,
-                        "value": value,
-                        "data_not_available": is_dna,
-                        "not_applicable": is_na,
-                        "disagg_data": disagg,
-                        "order": order,
-                        "existing_assignment_id": _lookup_existing_dynamic_assignment_id(
-                            aes_id, other_dynamic, bank_id, None
-                        ),
-                    }
-                )
+            else:
+                integrity_warning = _bank_id_row_integrity_warning(row, bank_id, kpi_display)
+                if integrity_warning:
+                    ctx.warnings.append(integrity_warning)
+            value, is_dna, disagg, should_import, is_na = _resolve_indicator_import_value(
+                row, bank_id, yes_no_bank_ids
+            )
+            if not should_import:
+                continue
+            value, disagg = _scale_workbook_percentage_fields(
+                value, disagg, bank_id, percentage_bank_ids, unit_interval_ids
+            )
+            range_warning = _percentage_range_warning(
+                row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids
+            )
+            if range_warning:
+                ctx.warnings.append(range_warning)
+            if row.get("disagg_warning"):
+                ctx.warnings.append(row["disagg_warning"])
+            order += 1.0
+            entries.append(
+                {
+                    "section_id": other_dynamic,
+                    "indicator_bank_id": bank_id,
+                    "repeat_instance_number": None,
+                    "value": value,
+                    "data_not_available": is_dna,
+                    "not_applicable": is_na,
+                    "disagg_data": disagg,
+                    "order": order,
+                    "existing_assignment_id": _lookup_existing_dynamic_assignment_id(
+                        aes_id, other_dynamic, bank_id, None
+                    ),
+                }
+            )
     return entries
 
 
@@ -3327,7 +3377,11 @@ def transform_upr_country_reporting_to_import_rows(
                 import_rows.append(built)
 
     # Indicators (Overall Action tables only — emergency tables use dynamic import).
-    for row in parse_indicators(wb, yes_no_bank_ids=yes_no_bank_ids, kpi_lookup=kpi_lookup):
+    indicator_rows = parse_indicators(wb, yes_no_bank_ids=yes_no_bank_ids, kpi_lookup=kpi_lookup)
+    unit_interval_ids = _workbook_percentage_unit_interval_bank_ids(
+        indicator_rows, percentage_bank_ids, kpi_lookup
+    )
+    for row in indicator_rows:
         bank_id = _resolve_workbook_indicator_bank_id(row, kpi_lookup)
         if bank_id and not row.get("bank_id"):
             ctx.warnings.append(
@@ -3361,6 +3415,9 @@ def transform_upr_country_reporting_to_import_rows(
         )
         if not should_import:
             continue
+        value, disagg = _scale_workbook_percentage_fields(
+            value, disagg, bank_id, percentage_bank_ids, unit_interval_ids
+        )
         range_warning = _percentage_range_warning(
             row, bank_id, value, disagg, percentage_bank_ids, percentage_allow_over_100_ids,
             context_label=iso3,

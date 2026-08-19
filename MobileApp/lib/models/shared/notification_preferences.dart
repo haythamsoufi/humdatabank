@@ -4,7 +4,6 @@ class NotificationPreferences {
   final String notificationFrequency; // 'instant', 'daily', 'weekly'
   final String? digestDay; // For weekly: 'monday', 'tuesday', etc.
   final String? digestTime; // Time in HH:MM format (24-hour)
-  final bool soundEnabled;
   final bool pushNotifications;
   final List<String> pushNotificationTypesEnabled;
 
@@ -14,7 +13,6 @@ class NotificationPreferences {
     required this.notificationFrequency,
     this.digestDay,
     this.digestTime,
-    required this.soundEnabled,
     required this.pushNotifications,
     required this.pushNotificationTypesEnabled,
   });
@@ -28,7 +26,6 @@ class NotificationPreferences {
       notificationFrequency: json['notification_frequency'] ?? 'instant',
       digestDay: json['digest_day'],
       digestTime: json['digest_time'],
-      soundEnabled: json['sound_enabled'] ?? false,
       pushNotifications: json['push_notifications'] ?? true,
       pushNotificationTypesEnabled:
           json['push_notification_types_enabled'] != null
@@ -42,7 +39,6 @@ class NotificationPreferences {
       'email_notifications': emailNotifications,
       'notification_types_enabled': notificationTypesEnabled,
       'notification_frequency': notificationFrequency,
-      'sound_enabled': soundEnabled,
       'push_notifications': pushNotifications,
       'push_notification_types_enabled': pushNotificationTypesEnabled,
     };
@@ -61,7 +57,6 @@ class NotificationPreferences {
     String? notificationFrequency,
     String? digestDay,
     String? digestTime,
-    bool? soundEnabled,
     bool? pushNotifications,
     List<String>? pushNotificationTypesEnabled,
   }) {
@@ -73,7 +68,6 @@ class NotificationPreferences {
           notificationFrequency ?? this.notificationFrequency,
       digestDay: digestDay ?? this.digestDay,
       digestTime: digestTime ?? this.digestTime,
-      soundEnabled: soundEnabled ?? this.soundEnabled,
       pushNotifications: pushNotifications ?? this.pushNotifications,
       pushNotificationTypesEnabled:
           pushNotificationTypesEnabled ?? this.pushNotificationTypesEnabled,

@@ -273,6 +273,60 @@ describe('form-validation', () => {
     expect(errorTypes(validator)).not.toContain('percentage_max_validation');
   });
 
+  it('warns when a percentage looks like a 0-1 fraction but still allows submit', async () => {
+    const validator = await createValidator(`
+      <div class="form-item-block" data-item-id="13">
+        <input data-field-type="percentage" id="field-pct" name="pct" value="0.2"
+               data-field-config='{"allow_over_100":false}'>
+      </div>`);
+    const warning = document.getElementById('warning-field-pct');
+    expect(warning).toBeTruthy();
+    expect(warning.style.display).not.toBe('none');
+    expect(warning.textContent).toContain('0.2%');
+    expect(warning.textContent).toContain('20%');
+    expect(validator.validateForm()).toBe(true);
+    expect(errorTypes(validator)).not.toContain('percentage_max_validation');
+  });
+
+  it('does not warn for 0, 1, or typical whole percents', async () => {
+    for (const value of ['0', '1', '20', '80']) {
+      await createValidator(`
+        <div class="form-item-block" data-item-id="13">
+          <input data-field-type="percentage" id="field-pct" name="pct" value="${value}"
+                 data-field-config='{"allow_over_100":false}'>
+        </div>`);
+      const warning = document.getElementById('warning-field-pct');
+      expect(!warning || warning.style.display === 'none').toBe(true);
+    }
+  });
+
+  it('clears the fraction warning when the value is corrected to a whole percent', async () => {
+    await createValidator(`
+      <div class="form-item-block" data-item-id="13">
+        <input data-field-type="percentage" id="field-pct" name="pct" value="0.2"
+               data-field-config='{"allow_over_100":false}'>
+      </div>`);
+    const field = document.getElementById('field-pct');
+    expect(document.getElementById('warning-field-pct').style.display).not.toBe('none');
+    field.value = '20';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(document.getElementById('warning-field-pct').style.display).toBe('none');
+  });
+
+  it('sets percentage input step and a screen-reader hint without placeholder or tooltip', async () => {
+    await createValidator(`
+      <div class="form-item-block" data-item-id="13">
+        <input data-field-type="percentage" id="field-pct" name="pct">
+      </div>`);
+    const field = document.getElementById('field-pct');
+    expect(field.getAttribute('placeholder')).toBeNull();
+    expect(field.getAttribute('title')).toBeNull();
+    expect(field.getAttribute('step')).toBe('any');
+    expect(field.getAttribute('inputmode')).toBe('decimal');
+    expect(field.getAttribute('aria-describedby')).toContain('percentage-entry-hint');
+    expect(document.getElementById('percentage-entry-hint')).toBeTruthy();
+  });
+
   it('reports validation_condition with the custom message when greater/less-than fails', async () => {
     const validator = await createValidator(conditionFields({ branchesValue: '100', unitsValue: '50' }));
     expect(validator.validateForm()).toBe(false);

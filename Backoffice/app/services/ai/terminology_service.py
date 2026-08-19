@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Set, Tuple, Optional
 from flask import current_app
 from sqlalchemy import text
 
+logger = logging.getLogger(__name__)
 
 _CACHE_LOCK = threading.Lock()
 _CACHE_TTL_SECONDS = 600
@@ -115,7 +116,7 @@ def _regex_word_match(haystack: str, phrase: str) -> bool:
     try:
         return bool(re.search(rf"\b{esc}\b", haystack, flags=re.IGNORECASE))
     except Exception as e:
-        logging.getLogger(__name__).debug("_regex_word_match: %s", e)
+        logger.debug("_regex_word_match: %s", e)
         return False
 
 
@@ -207,7 +208,7 @@ def _build_concept_aliases_from_indicator_bank() -> Dict[str, List[str]]:
                         if sid is not None and int(sid) in sector_names:
                             concept_aliases.setdefault(concept, []).append(sector_names[int(sid)])
                     except Exception as e:
-                        logging.getLogger(__name__).debug("sector alias lookup: %s", e)
+                        logger.debug("sector alias lookup: %s", e)
                         continue
             if isinstance(subsector_json, dict):
                 for lvl in ("primary", "secondary", "tertiary"):
@@ -216,7 +217,7 @@ def _build_concept_aliases_from_indicator_bank() -> Dict[str, List[str]]:
                         if ssid is not None and int(ssid) in subsector_names:
                             concept_aliases.setdefault(concept, []).append(subsector_names[int(ssid)])
                     except Exception as e:
-                        logging.getLogger(__name__).debug("subsector alias lookup: %s", e)
+                        logger.debug("subsector alias lookup: %s", e)
                         continue
 
     # Final cleanup and dedupe.
@@ -284,7 +285,7 @@ def _build_concept_aliases_from_indicator_bank_with_seed(
                             if sid is not None and int(sid) in sector_names:
                                 concept_aliases.setdefault(concept, []).append(sector_names[int(sid)])
                         except Exception as e:
-                            logging.getLogger(__name__).debug("sector alias lookup (seed): %s", e)
+                            logger.debug("sector alias lookup (seed): %s", e)
                             continue
                 if isinstance(subsector_json, dict):
                     for lvl in ("primary", "secondary", "tertiary"):
@@ -293,7 +294,7 @@ def _build_concept_aliases_from_indicator_bank_with_seed(
                             if ssid is not None and int(ssid) in subsector_names:
                                 concept_aliases.setdefault(concept, []).append(subsector_names[int(ssid)])
                         except Exception as e:
-                            logging.getLogger(__name__).debug("subsector alias lookup (seed): %s", e)
+                            logger.debug("subsector alias lookup (seed): %s", e)
                             continue
 
     for concept in list(concept_aliases.keys()):
@@ -460,7 +461,7 @@ def _maybe_sync_concept_embeddings(concept_aliases: Dict[str, List[str]]) -> Non
     try:
         _sync_concept_embeddings(concept_aliases)
     except Exception as e:
-        logging.getLogger(__name__).debug("_maybe_sync_concept_embeddings: %s", e)
+        logger.debug("_maybe_sync_concept_embeddings: %s", e)
         # Non-fatal; callers can fallback to lexical matching.
         return
 
@@ -498,7 +499,7 @@ def _semantic_concepts_for_query(query: str, *, top_k: int = 3, min_similarity: 
             if float(sim) >= float(min_similarity):
                 out.append(_norm(key))
         except Exception as e:
-            logging.getLogger(__name__).debug("_semantic_concepts_for_query similarity check: %s", e)
+            logger.debug("_semantic_concepts_for_query similarity check: %s", e)
             continue
     return [k for k in out if k]
 
@@ -721,14 +722,14 @@ def get_ifrc_concept_aliases() -> Dict[str, List[str]]:
     try:
         db_aliases = _build_concept_aliases_from_db()
     except Exception as e:
-        logging.getLogger(__name__).debug("_build_concept_aliases_from_db fallback: %s", e)
+        logger.debug("_build_concept_aliases_from_db fallback: %s", e)
         db_aliases = {}
 
     if db_aliases:
         try:
             built = _build_concept_aliases_from_indicator_bank_with_seed(db_aliases)
         except Exception as e:
-            logging.getLogger(__name__).debug("_build_concept_aliases_from_indicator_bank_with_seed fallback: %s", e)
+            logger.debug("_build_concept_aliases_from_indicator_bank_with_seed fallback: %s", e)
             built = db_aliases
     else:
         # Backward-compatible fallback when DB glossary is not set up yet.
@@ -741,7 +742,7 @@ def get_ifrc_concept_aliases() -> Dict[str, List[str]]:
     try:
         _maybe_sync_concept_embeddings(built)
     except Exception as e:
-        logging.getLogger(__name__).debug("get_ifrc_concept_aliases embed sync: %s", e)
+        logger.debug("get_ifrc_concept_aliases embed sync: %s", e)
     return dict(built)
 
 
@@ -764,7 +765,7 @@ def get_query_expansion_terms(query: str, *, max_terms: int = 10) -> List[str]:
     try:
         semantic_keys = _semantic_concepts_for_query(query, top_k=4)
     except Exception as e:
-        logging.getLogger(__name__).debug("get_query_expansion_terms semantic fallback: %s", e)
+        logger.debug("get_query_expansion_terms semantic fallback: %s", e)
         semantic_keys = []
     for ckey in semantic_keys:
         selected.append(ckey)
@@ -783,4 +784,3 @@ def get_query_expansion_terms(query: str, *, max_terms: int = 10) -> List[str]:
 
     # Deduplicate and cap
     return _dedupe_aliases(selected, max_items=max_terms)
-

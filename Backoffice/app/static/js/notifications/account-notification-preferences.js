@@ -56,9 +56,6 @@ class AccountNotificationPreferences {
     }
 
     populatePreferences(preferences) {
-        const soundEl = document.getElementById('pref-sound-enabled');
-        if (soundEl) soundEl.checked = preferences.sound_enabled;
-
         const frequency = preferences.notification_frequency || 'instant';
         const frequencyEl = document.getElementById('pref-frequency');
         if (frequencyEl) frequencyEl.value = frequency;
@@ -214,7 +211,6 @@ class AccountNotificationPreferences {
         const frequency = document.getElementById('pref-frequency').value;
         const preferences = {
             email_notifications: emailNotifications,
-            sound_enabled: document.getElementById('pref-sound-enabled').checked,
             notification_frequency: frequency,
             in_app_notification_types_enabled: inAppTypesToSend,
             notification_types_enabled: emailTypesToSend,
@@ -291,14 +287,6 @@ class AccountNotificationPreferences {
                 }
                 if (data.preferences) {
                     this.updateDigestPreview(data.preferences);
-                    // Keep the sound-preference cache (components.js) in sync so this tab
-                    // doesn't act on a stale preference until its TTL expires.
-                    try {
-                        localStorage.setItem('notification_preferences', JSON.stringify(data.preferences));
-                    } catch (e) { /* localStorage unavailable — ignore */ }
-                    if (typeof window.forceRefreshNotificationPreferencesCache === 'function') {
-                        window.forceRefreshNotificationPreferencesCache();
-                    }
                 }
             } else {
                 throw new Error(data.error || 'Failed to save preferences');

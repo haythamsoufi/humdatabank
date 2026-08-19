@@ -408,7 +408,7 @@ def query_repeat_group_data(
             joinedload(RepeatGroupData.repeat_instance).joinedload(
                 RepeatGroupInstance.section
             ),
-            joinedload(RepeatGroupData.form_item),
+            joinedload(RepeatGroupData.form_item).joinedload(FormItem.indicator_bank),
         )
         public_q = public_q.options(
             joinedload(RepeatGroupData.repeat_instance).joinedload(
@@ -417,7 +417,7 @@ def query_repeat_group_data(
             joinedload(RepeatGroupData.repeat_instance).joinedload(
                 RepeatGroupInstance.section
             ),
-            joinedload(RepeatGroupData.form_item),
+            joinedload(RepeatGroupData.form_item).joinedload(FormItem.indicator_bank),
         )
 
     # Privacy: apply the same public-only gate that query_form_data uses on FormData.form_item.

@@ -458,7 +458,7 @@ paths:
           description: Must stay false for GPT
       responses:
         "200":
-          description: Paginated data rows with num_value and data_status
+          description: Paginated data rows with num_value and data_status. Percentage indicators return 0-1 decimals (25% → 0.25).
 
   /public/reports/country:
     get:

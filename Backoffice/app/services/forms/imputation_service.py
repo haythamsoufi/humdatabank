@@ -28,12 +28,30 @@ class ImputationService:
     """Service methods for imputing data for special templates."""
 
     @staticmethod
-    def _format_imputed_value(value):
-        """Format carried-forward values consistently with existing imputation behavior."""
+    def _item_is_percentage(item) -> bool:
+        from app.utils.api_percentage import is_percentage_type, orm_item_is_percentage
+
+        if orm_item_is_percentage(item):
+            return True
+        bank = getattr(item, "indicator_bank", None)
+        return bool(bank is not None and is_percentage_type(getattr(bank, "type", None)))
+
+    @staticmethod
+    def _format_imputed_value(value, *, preserve_decimals: bool = False):
+        """Format carried-forward values consistently with existing imputation behavior.
+
+        Counts stay whole numbers. Percentage fields keep decimals so a stored
+        67.5% (or a 0-1 source that was scaled to 67.5) is not truncated to 67.
+        """
         try:
-            return int(float(value))
+            numeric = float(value)
         except (ValueError, TypeError):
             return str(value)
+        if preserve_decimals:
+            if numeric.is_integer():
+                return int(numeric)
+            return numeric
+        return int(numeric)
 
     @staticmethod
     def _copy_dynamic_indicator_imputations(
@@ -96,9 +114,12 @@ class ImputationService:
                     continue
 
             if source_value is not None:
+                preserve_decimals = ImputationService._item_is_percentage(current_row)
                 DynamicIndicatorData.sync_imputed_numeric_value(
                     current_row,
-                    ImputationService._format_imputed_value(source_value),
+                    ImputationService._format_imputed_value(
+                        source_value, preserve_decimals=preserve_decimals
+                    ),
                 )
             if source_disagg_data is not None:
                 current_row.imputed_disagg_data = source_disagg_data
@@ -332,10 +353,11 @@ class ImputationService:
 
                     # Format the imputed value based on type
                     if is_numeric:
-                        # For numeric values, always store as whole number
                         try:
-                            f = float(imputed_value)
-                            imputed_formatted = int(f)  # Always whole number
+                            imputed_formatted = ImputationService._format_imputed_value(
+                                imputed_value,
+                                preserve_decimals=ImputationService._item_is_percentage(form_item),
+                            )
                         except (ValueError, TypeError):
                             continue
                     else:
@@ -679,10 +701,11 @@ class ImputationService:
 
                     # Format the imputed value based on type
                     if is_numeric:
-                        # For numeric values, always store as whole number
                         try:
-                            f = float(imputed_value)
-                            imputed_formatted = int(f)  # Always whole number
+                            imputed_formatted = ImputationService._format_imputed_value(
+                                imputed_value,
+                                preserve_decimals=ImputationService._item_is_percentage(form_item),
+                            )
                         except (ValueError, TypeError):
                             continue
                     else:

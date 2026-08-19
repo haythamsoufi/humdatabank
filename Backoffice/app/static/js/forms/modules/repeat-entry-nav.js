@@ -63,21 +63,31 @@ function scrollToElement(elementId) {
     }
 }
 
+function defaultRepeatEntryLabel(repeatEntry) {
+    const instanceNumber = repeatEntry.getAttribute('data-repeat-instance') || '1';
+    return (window.REPEAT_SECTION_LABELS?.entry || 'Entry') + ' #' + instanceNumber;
+}
+
 function getRepeatEntryLabelText(repeatEntry) {
     const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
-    if (titleSelect && titleSelect.value) {
-        const selected = titleSelect.options[titleSelect.selectedIndex];
-        return selected ? selected.textContent.trim() : titleSelect.value;
+    if (titleSelect) {
+        // The title <select> lives inside .repeat-entry__label, so label textContent
+        // concatenates every <option>. Only the selected choice is the nav title.
+        if (titleSelect.value) {
+            const selected = titleSelect.options[titleSelect.selectedIndex];
+            const selectedText = selected ? selected.text.trim() : '';
+            return selectedText || titleSelect.value;
+        }
+        return defaultRepeatEntryLabel(repeatEntry);
     }
 
     const labelEl = repeatEntry.querySelector('.repeat-entry__label');
-    if (labelEl) {
+    if (labelEl && !labelEl.querySelector('select')) {
         const text = labelEl.textContent.trim();
         if (text) return text;
     }
 
-    const instanceNumber = repeatEntry.getAttribute('data-repeat-instance') || '1';
-    return (window.REPEAT_SECTION_LABELS?.entry || 'Entry') + ' #' + instanceNumber;
+    return defaultRepeatEntryLabel(repeatEntry);
 }
 
 function buildRepeatEntryNavLink(repeatEntry, sectionId) {

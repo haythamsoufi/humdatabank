@@ -355,6 +355,10 @@ Authenticated callers (API key / session) bypass these restrictions.
 | `"data_not_available"` | Marked unavailable |
 | `"not_applicable"` | Marked N/A |
 
+### Percentage values
+
+Indicators/questions with type `percentage` return **`value` and `num_value` as 0–1 decimals** (stored 25 → `0.25`, 100 → `1`). The same scale applies to disaggregation and matrix cell numbers. Counts and other numeric types are unchanged. Do not divide again, and do not sum percentages across countries.
+
 ### Star layout (`layout=star`)
 
 Returns `data.schema_version: "1.1"` with dimensional tables under

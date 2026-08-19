@@ -1103,7 +1103,6 @@ def edit_user(user_id):
             # email_notifications and push_notifications are determined by whether any types are selected
             frequency = request.form.get('notification_frequency', 'instant')
             preferences.email_notifications = all_email_selected or len(email_types) > 0
-            preferences.sound_enabled = request.form.get('sound_enabled') == 'on'
             preferences.notification_frequency = frequency
             if is_notifications_push_enabled():
                 preferences.push_notifications = all_push_selected or len(push_types) > 0

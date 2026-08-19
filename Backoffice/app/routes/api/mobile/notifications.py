@@ -124,7 +124,6 @@ def update_notification_preferences():
             notification_types_enabled=data.get('notification_types_enabled'),
             in_app_notification_types_enabled=data.get('in_app_notification_types_enabled'),
             notification_frequency=data.get('notification_frequency'),
-            sound_enabled=data.get('sound_enabled'),
             push_notifications=data.get('push_notifications'),
             push_notification_types_enabled=data.get('push_notification_types_enabled'),
             digest_day=data.get('digest_day'),

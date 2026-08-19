@@ -63,15 +63,17 @@ def _make_full_setup(
     template=None,
     period_start=None,
     period_end=None,
+    indicator_type="number",
 ):
     """Create country + template + section + indicator + item + aes + formdata."""
     country = create_test_country(db_session)
     template = template or create_test_template(db_session)
     section = create_test_section(db_session, template)
-    ind = _make_indicator(db_session, f"Test Indicator {id(db_session)}")
+    ind = _make_indicator(db_session, f"Test Indicator {id(db_session)}", type=indicator_type)
     item = create_test_item(
         db_session, section, template,
         item_type="indicator",
+        type=indicator_type,
         indicator_bank_id=ind.id,
     )
     # Set public privacy on item so unauthenticated queries return data

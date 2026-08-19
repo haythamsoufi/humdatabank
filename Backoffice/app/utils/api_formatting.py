@@ -250,4 +250,5 @@ def serialize_form_data_item(data_item, submission_type: str, aes_countries=None
             'created_at': submitted_at
         })
 
-    return base_data
+    from app.utils.api_percentage import apply_api_percentage_scale
+    return apply_api_percentage_scale(base_data, form_item=data_item.form_item)

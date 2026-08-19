@@ -1438,3 +1438,8 @@ html[dir="rtl"] #sidebar-collapse-toggle .fa-chevron-left {
 html[dir="rtl"] #section-navigation-sidebar[data-collapsed="true"] #sidebar-collapse-toggle i {
     transform: scaleX(-1) rotate(180deg);
 }
+
+html[dir="rtl"] #section-navigation-sidebar[data-collapsed="true"] {
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+}

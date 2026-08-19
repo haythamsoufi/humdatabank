@@ -108,7 +108,7 @@ def rewrite_document_search_query(query: str) -> Dict[str, str]:
     # Terminology expansion (IFRC glossary + Indicator Bank aliases)
     exp_terms: List[str] = []
     try:
-        from app.services.translation.terminology_service import get_query_expansion_terms
+        from app.services.ai.terminology_service import get_query_expansion_terms
 
         exp_terms = get_query_expansion_terms(raw, max_terms=10)
     except Exception as exc:

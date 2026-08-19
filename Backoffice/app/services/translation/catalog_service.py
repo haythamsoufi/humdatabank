@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from flask import current_app
 from flask_login import current_user
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.utils.datetime_helpers import utcnow
@@ -147,23 +148,54 @@ def upsert_string(
     if not locale or not msgid or is_source_locale(locale):
         return False
 
-    row = TranslationString.query.filter_by(locale=locale, msgid=msgid).first()
     new_msgstr = "" if msgstr is None else str(msgstr)
     actor = actor_user_id if actor_user_id is not None else _actor_user_id()
 
-    row, changed, protected = _apply_row_update(
-        row,
-        locale=locale,
-        msgid=msgid,
-        new_msgstr=new_msgstr,
-        provenance=provenance,
-        engine=engine,
-        status=status,
-        actor=actor,
-        is_plural=is_plural,
-        msgstr_plural=msgstr_plural,
-        force=force,
-    )
+    def _apply_once() -> Tuple[Any, bool, bool]:
+        row = TranslationString.query.filter_by(locale=locale, msgid=msgid).first()
+        return _apply_row_update(
+            row,
+            locale=locale,
+            msgid=msgid,
+            new_msgstr=new_msgstr,
+            provenance=provenance,
+            engine=engine,
+            status=status,
+            actor=actor,
+            is_plural=is_plural,
+            msgstr_plural=msgstr_plural,
+            force=force,
+        )
+
+    # begin_nested() itself unconditionally flushes any *existing* pending state to
+    # establish the SAVEPOINT's baseline -- so _apply_once() (which may add a new,
+    # not-yet-flushed row) must run *inside* the savepoint, not before it opens.
+    # Otherwise a conflicting INSERT flushes outside any savepoint and there is
+    # nothing to roll back to on failure.
+    savepoint = db.session.begin_nested()
+    try:
+        row, changed, protected = _apply_once()
+        if not protected and changed:
+            db.session.flush()
+    except IntegrityError:
+        # Unique (locale, msgid) race: another worker's INSERT committed between
+        # our SELECT and our flush. savepoint.rollback() (not db.session.rollback(),
+        # which SQLAlchemy 2.x always resolves to the outermost transaction) discards
+        # only this attempt, keeping the rest of the session's transaction intact --
+        # retry once as an update against the now-visible row instead of a 500.
+        savepoint.rollback()
+        logger.info(
+            "catalog_service.upsert_string: concurrent insert race for locale=%s msgid_hash=%s; retrying as update",
+            locale, msgid_hash(msgid),
+        )
+        row, changed, protected = _apply_once()
+        if not protected and changed:
+            db.session.flush()
+    except Exception:
+        savepoint.rollback()
+        raise
+    else:
+        savepoint.commit()
 
     if protected:
         logger.info(
@@ -173,7 +205,6 @@ def upsert_string(
         return False
 
     if changed:
-        db.session.flush()
         if sync_po:
             _sync_po_entry(locale, msgid, new_msgstr, is_plural=is_plural, msgstr_plural=msgstr_plural)
         if compile_after:
@@ -252,40 +283,75 @@ def upsert_batch(
             continue
         normalized.append((msgid, loc, "" if msgstr is None else str(msgstr)))
 
+    empty_result = {"updated": 0, "updated_locales": [], "updated_pairs": [], "skipped_protected": 0}
     if not normalized:
-        return {"updated": 0, "updated_locales": [], "updated_pairs": [], "skipped_protected": 0}
+        return empty_result
 
     locales_involved = sorted({loc for _mid, loc, _ms in normalized})
-    existing = {
-        (r.locale, r.msgid): r
-        for r in TranslationString.query.filter(TranslationString.locale.in_(locales_involved)).all()
-    }
     actor = _actor_user_id()
 
-    changed_by_locale: Dict[str, Dict[str, str]] = {}
-    updated_pairs: List[Tuple[str, str]] = []
-    skipped_protected = 0
+    def _apply_all() -> Tuple[Dict[str, Dict[str, str]], List[Tuple[str, str]], int]:
+        existing = {
+            (r.locale, r.msgid): r
+            for r in TranslationString.query.filter(TranslationString.locale.in_(locales_involved)).all()
+        }
+        changed_by_locale: Dict[str, Dict[str, str]] = {}
+        updated_pairs: List[Tuple[str, str]] = []
+        skipped = 0
+        for msgid, locale, msgstr in normalized:
+            row = existing.get((locale, msgid))
+            row, changed, protected = _apply_row_update(
+                row,
+                locale=locale,
+                msgid=msgid,
+                new_msgstr=msgstr,
+                provenance=provenance,
+                engine=engine,
+                status=status,
+                actor=actor,
+                force=force,
+            )
+            if protected:
+                skipped += 1
+                continue
+            existing[(locale, msgid)] = row
+            if changed:
+                changed_by_locale.setdefault(locale, {})[msgid] = msgstr
+                updated_pairs.append((locale, msgid))
+        return changed_by_locale, updated_pairs, skipped
 
-    for msgid, locale, msgstr in normalized:
-        row = existing.get((locale, msgid))
-        row, changed, protected = _apply_row_update(
-            row,
-            locale=locale,
-            msgid=msgid,
-            new_msgstr=msgstr,
-            provenance=provenance,
-            engine=engine,
-            status=status,
-            actor=actor,
-            force=force,
-        )
-        if protected:
-            skipped_protected += 1
-            continue
-        existing[(locale, msgid)] = row
-        if changed:
-            changed_by_locale.setdefault(locale, {})[msgid] = msgstr
-            updated_pairs.append((locale, msgid))
+    # begin_nested() itself unconditionally flushes any *existing* pending state to
+    # establish the SAVEPOINT's baseline -- so _apply_all() (which may add new,
+    # not-yet-flushed rows) must run *inside* the savepoint, not before it opens.
+    # Otherwise a conflicting INSERT flushes outside any savepoint and there is
+    # nothing to roll back to on failure.
+    savepoint = db.session.begin_nested()
+    try:
+        changed_by_locale, updated_pairs, skipped_protected = _apply_all()
+        if updated_pairs:
+            db.session.flush()
+    except IntegrityError:
+        # Unique (locale, msgid) race: a concurrent writer's INSERT for one of these
+        # rows committed between our prefetch and our flush. savepoint.rollback() (not
+        # db.session.rollback(), which SQLAlchemy 2.x always resolves to the outermost
+        # transaction) discards only this attempt -- redo the whole batch once so the
+        # retry's prefetch sees the now-committed row(s) and updates them instead of
+        # erroring out.
+        savepoint.rollback()
+        logger.info("catalog_service.upsert_batch: concurrent insert race detected; retrying batch once")
+        changed_by_locale, updated_pairs, skipped_protected = _apply_all()
+        if updated_pairs:
+            try:
+                db.session.flush()
+            except Exception:
+                db.session.rollback()
+                logger.exception("catalog_service.upsert_batch flush failed after retry")
+                return {**empty_result, "skipped_protected": skipped_protected}
+    except Exception:
+        savepoint.rollback()
+        raise
+    else:
+        savepoint.commit()
 
     if skipped_protected:
         logger.info("catalog_service.upsert_batch: skipped %d human-approved string(s) (provenance=%s)", skipped_protected, provenance)
@@ -295,15 +361,14 @@ def upsert_batch(
             db.session.commit()
         except Exception:
             db.session.rollback()
-        return {"updated": 0, "updated_locales": [], "updated_pairs": [], "skipped_protected": skipped_protected}
+        return {**empty_result, "skipped_protected": skipped_protected}
 
     try:
-        db.session.flush()
         db.session.commit()
     except Exception:
         db.session.rollback()
         logger.exception("catalog_service.upsert_batch commit failed")
-        return {"updated": 0, "updated_locales": [], "updated_pairs": [], "skipped_protected": skipped_protected}
+        return {**empty_result, "skipped_protected": skipped_protected}
 
     updated_locales = sorted(changed_by_locale.keys())
     for locale, msgid_map in changed_by_locale.items():

@@ -129,6 +129,12 @@ def _arabic_match_definiteness(official: str, unofficial: str) -> str:
 
 
 # Arabic broken-plural number pairs. Language morphology, not house-term aliases.
+#
+# TODO(scale): this is a narrow, hand-added patch (currently only "point"/"points",
+# added for the "Focal Point" glossary term) -- it does not generalize to other
+# glossary terms with irregular ("broken") Arabic plurals. If singular/plural
+# mismatches keep showing up for new must-terms, replace this with a real Arabic
+# morphological analyzer/stemmer instead of growing this tuple by hand.
 _AR_NUMBER_PAIRS = (
     ("نقطة", "نقاط"),
     ("النقطة", "النقاط"),

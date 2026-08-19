@@ -35,6 +35,7 @@ from app import db
 
 # Import utility functions
 from app.utils.api_helpers import json_response, json_data_response, api_error, extract_numeric_value
+from app.utils.api_percentage import orm_item_is_percentage, scale_percentage_rows
 from app.utils.api_serialization import (
     format_country_info,
     format_form_item_info,
@@ -113,8 +114,13 @@ _DATA_ARRAY_CATALOG = {
         'grain': 'submission × static form_item',
         'key_fields': [
             'id', 'form_item_id', 'country_id', 'submission_id', 'submission_type',
-            'template_id', 'period_name', 'value', 'num_value', 'data_status',
+            'template_id',             'period_name', 'value', 'num_value', 'data_status',
         ],
+        'notes': (
+            'Percentage-type indicators and questions return value/num_value on a '
+            '0–1 scale (25% → 0.25). Counts and other numeric types are unchanged. '
+            'Storage and form entry remain 0–100.'
+        ),
     },
     'dynamic_data': {
         'title': 'Dynamic indicator values',
@@ -2071,12 +2077,14 @@ def get_all_data():
                 FormItem.query.options(
                     joinedload(FormItem.form_section),
                     joinedload(FormItem.template),
+                    joinedload(FormItem.indicator_bank),
                 ),
                 FormItem.id,
                 list(form_item_ids),
             )
             # Sort in Python after loading (more efficient than DB sort for small sets)
             form_items_sorted = sorted(form_items, key=lambda fi: (fi.template_id or 0, fi.id or 0))
+            percentage_form_item_ids = set()
             for item in form_items_sorted:
                 form_items_table.append(
                     format_form_item_info(
@@ -2085,6 +2093,10 @@ def get_all_data():
                         template=item.template
                     )
                 )
+                if orm_item_is_percentage(item):
+                    percentage_form_item_ids.add(int(item.id))
+        else:
+            percentage_form_item_ids = set()
         if form_items_need_assignment_year_resolution(form_items_table):
             _assignment_year = _resolve_single_assignment_year(
                 submission_id=submission_id,
@@ -2093,6 +2105,11 @@ def get_all_data():
             )
             if _assignment_year:
                 resolve_assignment_year_placeholders(form_items_table, _assignment_year)
+        # Stored percentages are 0–100; API consumers get a 0–1 decimal.
+        # Dynamic/repeat rows are scaled in serialize_* (ORM type). Static rows
+        # are built inline above, so scale them here from form_items[].
+        if percentage_form_item_ids:
+            scale_percentage_rows(data_rows, form_item_ids=percentage_form_item_ids)
         public_slim = public_data_access and not include_dims
         extra_keys = {}
         if public_slim:

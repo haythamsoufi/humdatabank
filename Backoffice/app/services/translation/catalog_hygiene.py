@@ -9,7 +9,6 @@ from typing import Dict, List
 # Not in Config.DEFAULT_LANGUAGES / product language list.
 DEAD_GETTEXT_LOCALES = ("hu", "ja", "nl")
 
-REPO_ROOT = Path(__file__).resolve().parents[3].parent  # Humanitarian Databank
 # gold_eval uses parents[3] = Backoffice; this file is the same depth.
 BACKOFFICE_ROOT = Path(__file__).resolve().parents[3]
 

@@ -69,7 +69,7 @@ from upr_import_warnings import make_import_warning, summarize_warnings  # noqa:
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 4
+TRANSFORM_CACHE_VERSION = 5
 
 UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
     # ── Planning ──────────────────────────────────────────────────────────────
@@ -271,6 +271,9 @@ class UprImportContext:
     yes_no_bank_ids: Set[int] = field(default_factory=set)
     percentage_bank_ids: Set[int] = field(default_factory=set)
     percentage_allow_over_100_bank_ids: Set[int] = field(default_factory=set)
+    # (indicator_bank_id, ROUND) pairs whose percentage ValueNums in this import
+    # all lie in (0, 1] — Excel % cells / 0-1 source data for that past round.
+    percentage_unit_interval_keys: Set[Tuple[int, str]] = field(default_factory=set)
     indicator_bank_ids: Set[int] = field(default_factory=set)
     core_yes_no_item_ids: List[int] = field(default_factory=list)
     # Static form items where FormItem.allow_not_applicable is True — a blank
@@ -715,6 +718,80 @@ def _load_percentage_allow_over_100_bank_ids(bank_ids: Set[int]) -> Set[int]:
     return out
 
 
+def normalize_imported_percentage_value(
+    value: Optional[float],
+    *,
+    scale_one_to_hundred: bool = False,
+) -> Optional[float]:
+    """Map an incoming percentage onto stored 0-100.
+
+    Form storage is whole percents (25 means 25%). UPR Master / Excel ``%`` cells
+    and 0-1 source systems often store 0.25 for 25%. Values in ``(0, 1)`` are
+    always treated as that unit interval. ``1`` is only treated as 100% when
+    every percentage value for that indicator in the same round is also ``<= 1``
+    (so a genuine 1% next to 45% is left as 1).
+    """
+    if value is None:
+        return None
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return value  # type: ignore[return-value]
+    if 0 < num < 1:
+        return num * 100.0
+    if scale_one_to_hundred and num == 1:
+        return 100.0
+    return num
+
+
+def scale_imported_percentage_payload(value: Any, *, scale_one_to_hundred: bool = False) -> Any:
+    """Walk a scalar or nested disagg payload and scale unit-interval percentages."""
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, dict):
+        return {
+            key: scale_imported_percentage_payload(sub, scale_one_to_hundred=scale_one_to_hundred)
+            for key, sub in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [
+            scale_imported_percentage_payload(sub, scale_one_to_hundred=scale_one_to_hundred)
+            for sub in value
+        ]
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return value
+    return normalize_imported_percentage_value(num, scale_one_to_hundred=scale_one_to_hundred)
+
+
+def collect_percentage_unit_interval_keys(
+    rows: List[Dict[str, Any]],
+    percentage_bank_ids: Set[int],
+    yes_no_bank_ids: Optional[Set[int]] = None,
+) -> Set[Tuple[int, str]]:
+    """Return ``(bank_id, ROUND)`` keys whose percentage values are all in ``(0, 1]``.
+
+    Scoped per round so a past round stored as Excel percentages (0.25) is scaled
+    even when a later round of the same indicator is already 0-100.
+    """
+    if not percentage_bank_ids:
+        return set()
+    skip = yes_no_bank_ids or set()
+    maxima: Dict[Tuple[int, str], float] = {}
+    for row in rows:
+        bank_id = normalize_indicator_id(row.get("indicatorId"))
+        if not bank_id or bank_id not in percentage_bank_ids or bank_id in skip:
+            continue
+        value = parse_value_num(row.get("ValueNum"))
+        if value is None:
+            continue
+        key = (bank_id, str(row.get("Round") or "").strip().upper())
+        prev = maxima.get(key)
+        maxima[key] = value if prev is None else max(prev, value)
+    return {key for key, peak in maxima.items() if 0 < peak <= 1}
+
+
 def _percentage_scalar_range_warning(
     ctx: "UprImportContext",
     indicator_bank_id: Optional[int],
@@ -777,6 +854,12 @@ def _reporting_indicator_import_value(
 ) -> Any:
     if indicator_bank_id in ctx.yes_no_bank_ids:
         return _master_yes_no_value(value_num)
+    if value_num is not None and indicator_bank_id in ctx.percentage_bank_ids:
+        round_key = str(rnd or "").strip().upper()
+        value_num = normalize_imported_percentage_value(
+            value_num,
+            scale_one_to_hundred=(indicator_bank_id, round_key) in ctx.percentage_unit_interval_keys,
+        )
     warning = _percentage_scalar_range_warning(
         ctx, indicator_bank_id, value_num, iso3=iso3, rnd=rnd, label=label
     )
@@ -2530,16 +2613,16 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
     ctx.items_by_bank_id, ctx.items_by_bank_section, ctx.item_ids_by_label = _load_published_item_indexes(
         ids, ctx.published_version_ids
     )
+    ctx.percentage_bank_ids = _load_percentage_bank_ids()
+    ctx.percentage_allow_over_100_bank_ids = _load_percentage_allow_over_100_bank_ids(
+        ctx.percentage_bank_ids
+    )
     if REPORTING_COUNTRY_TEMPLATE_ID in ids:
         ctx.reporting_special_items[REPORTING_COUNTRY_TEMPLATE_ID] = _build_reporting_special_items(
             ctx.item_ids_by_label.get(REPORTING_COUNTRY_TEMPLATE_ID, {})
         )
         ctx.other_indicators_section_id = _load_other_indicators_section_id()
         ctx.yes_no_bank_ids = _load_yes_no_bank_ids()
-        ctx.percentage_bank_ids = _load_percentage_bank_ids()
-        ctx.percentage_allow_over_100_bank_ids = _load_percentage_allow_over_100_bank_ids(
-            ctx.percentage_bank_ids
-        )
         reporting_aes_ids = set(
             ctx.assignment_by_template.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).values()
         )
@@ -2798,6 +2881,9 @@ def transform_to_import_rows(
     """Transform UPR Excel rows into ready-to-import form_data rows."""
     tids = template_ids or ctx.template_ids
     filtered = _filter_rows(rows, template_ids=tids, rounds=rounds)
+    ctx.percentage_unit_interval_keys = collect_percentage_unit_interval_keys(
+        filtered, ctx.percentage_bank_ids, ctx.yes_no_bank_ids
+    )
     reach_ea_codes = _build_reach_ea_code_index(rows, rounds=rounds)
 
     pns_t22_reported_yes, pns_t23_reported_yes = _build_pns_reported_yes_sets(
@@ -2857,6 +2943,11 @@ def transform_to_import_rows(
             item_id = ctx.items_by_bank_id.get(24, {}).get(indicator_id)
             if not aes_id or not item_id or value_num is None:
                 continue
+            if indicator_id in ctx.percentage_bank_ids:
+                value_num = normalize_imported_percentage_value(
+                    value_num,
+                    scale_one_to_hundred=(indicator_id, rnd) in ctx.percentage_unit_interval_keys,
+                )
             built = _scalar_row(
                 aes_id=aes_id,
                 item_id=item_id,
@@ -3118,6 +3209,11 @@ def transform_to_import_rows(
             item_id = ctx.items_by_bank_id.get(REPORTING_COUNTRY_TEMPLATE_ID, {}).get(indicator_id)
             if not item_id:
                 continue
+            if indicator_id in ctx.percentage_bank_ids:
+                value_num = normalize_imported_percentage_value(
+                    value_num,
+                    scale_one_to_hundred=(indicator_id, rnd) in ctx.percentage_unit_interval_keys,
+                )
             built = _scalar_row(
                 aes_id=aes_id,
                 item_id=item_id,

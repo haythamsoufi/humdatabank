@@ -34,9 +34,9 @@ def _mock_notification_service():
     prefs = MagicMock()
     prefs.email_notifications = True
     prefs.notification_frequency = 'immediate'
-    prefs.sound_enabled = True
     prefs.push_notifications = True
     prefs.notification_types_enabled = []
+    prefs.in_app_notification_types_enabled = []
     prefs.push_notification_types_enabled = []
     prefs.digest_day = None
     prefs.digest_time = None
@@ -367,7 +367,7 @@ class TestNotificationPreferences:
         with app.test_request_context(
             '/api/mobile/v1/notifications/preferences',
             method='POST',
-            data=json.dumps({'email_notifications': False, 'sound_enabled': False}),
+            data=json.dumps({'email_notifications': False}),
             content_type='application/json',
             headers=headers,
         ):
@@ -392,7 +392,7 @@ class TestNotificationPreferences:
         with app.test_request_context(
             '/api/mobile/v1/notifications/preferences',
             method='POST',
-            data=json.dumps({'sound_enabled': True}),
+            data=json.dumps({'email_notifications': True}),
             content_type='application/json',
             headers=headers,
         ):
@@ -409,6 +409,6 @@ class TestNotificationPreferences:
         client = app.test_client()
         resp = client.post(
             '/api/mobile/v1/notifications/preferences',
-            json={'sound_enabled': True},
+            json={'email_notifications': True},
         )
         assert resp.status_code == 401

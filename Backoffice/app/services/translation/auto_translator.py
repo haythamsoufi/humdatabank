@@ -1157,18 +1157,52 @@ class AutoTranslator:
 
     @staticmethod
     def _glossary_term_translator(svc, target_code: str, source_code: str, cache: Dict[str, Optional[str]]):
+        """Build a short EN->target term translator, backed by the DB result cache.
+
+        Distinct ``:term-raw`` engine namespace: this intentionally returns the
+        engine's *unofficial* rendering of a bare term (used to detect and swap it
+        for the glossary's official form), which must not collide with -- or be
+        satisfied by -- a full-sentence cache entry that has already had glossary
+        enforcement applied (that would store the *official* form instead and
+        defeat the point of this lookup). Without the DB-backed cache, every
+        string containing a must-term paid for a live MT call per call/batch,
+        including on every cache *hit* of the final translated string (see
+        ``_enforce_cached_translation``).
+        """
+        engine_key = f"{getattr(svc, 'service_name', None) or 'default'}:term-raw"
+
         def translate_term(term: str) -> Optional[str]:
             key = (term or "").strip()
             if not key:
                 return None
             if key in cache:
                 return cache[key]
+
+            try:
+                from app.services.translation.result_cache import get_cached
+
+                persisted = get_cached(key, source_code, target_code, engine_key)
+            except Exception:
+                logger.debug("glossary term cache read skipped for %r", key, exc_info=True)
+                persisted = None
+            if persisted:
+                cache[key] = persisted
+                return persisted
+
             try:
                 out = svc.translate_text(key, target_code, source_code)
             except Exception:
                 logger.debug("glossary term MT failed for %r", key, exc_info=True)
                 out = None
             cache[key] = out
+
+            if out:
+                try:
+                    from app.services.translation.result_cache import put_cached
+
+                    put_cached(key, source_code, target_code, engine_key, out)
+                except Exception:
+                    logger.debug("glossary term cache write skipped for %r", key, exc_info=True)
             return out
 
         return translate_term
@@ -1540,6 +1574,36 @@ class AutoTranslator:
 
         return None
 
+    def _default_target_languages(self, target_languages: List[str] = None) -> List[str]:
+        if target_languages:
+            return target_languages
+        return [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
+
+    def _translate_short_text_to_languages(self, text: Optional[str], target_languages: List[str] = None,
+                                            service_name: str = None) -> Dict[str, str]:
+        """Translate one short string (name/label/option) into each target language.
+
+        Shared implementation for translate_section_name/translate_question_option/
+        translate_page_name/translate_template_name/translate_form_item, which
+        previously each re-implemented this same loop.
+
+        Returns:
+            {'fr': '...', 'es': '...', ...}
+        """
+        result: Dict[str, str] = {}
+        if not (text and text.strip()):
+            return result
+
+        for lang in self._default_target_languages(target_languages):
+            translated = self.translate_text(text, lang, 'en', service_name)
+            if translated:
+                # Get language code (handles both codes and names)
+                lang_code = self._get_language_code(lang)
+                if lang_code:
+                    result[lang_code] = translated
+
+        return result
+
     def translate_form_item(self, label: str, definition: str = None,
                            target_languages: List[str] = None,
                            service_name: str = None) -> Dict[str, Dict[str, str]]:
@@ -1552,35 +1616,11 @@ class AutoTranslator:
                 'definition_translations': {'fr': '...', 'es': '...', ...}
             }
         """
-        if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
-
-        result = {
-            'label_translations': {},
-            'definition_translations': {}
+        target_languages = self._default_target_languages(target_languages)
+        return {
+            'label_translations': self._translate_short_text_to_languages(label, target_languages, service_name),
+            'definition_translations': self._translate_short_text_to_languages(definition, target_languages, service_name),
         }
-
-        # Translate label
-        if label and label.strip():
-            for lang in target_languages:
-                translated_label = self.translate_text(label, lang, 'en', service_name)
-                if translated_label:
-                    # Get language code (handles both codes and names)
-                    lang_code = self._get_language_code(lang)
-                    if lang_code:
-                        result['label_translations'][lang_code] = translated_label
-
-        # Translate definition
-        if definition and definition.strip():
-            for lang in target_languages:
-                translated_definition = self.translate_text(definition, lang, 'en', service_name)
-                if translated_definition:
-                    # Get language code (handles both codes and names)
-                    lang_code = self._get_language_code(lang)
-                    if lang_code:
-                        result['definition_translations'][lang_code] = translated_definition
-
-        return result
 
     def translate_section_name(self, name: str, target_languages: List[str] = None,
                               service_name: str = None) -> Dict[str, str]:
@@ -1590,21 +1630,7 @@ class AutoTranslator:
         Returns:
             {'fr': '...', 'es': '...', ...}
         """
-        if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
-
-        result = {}
-
-        if name and name.strip():
-            for lang in target_languages:
-                translated_name = self.translate_text(name, lang, 'en', service_name)
-                if translated_name:
-                    # Get language code (handles both codes and names)
-                    lang_code = self._get_language_code(lang)
-                    if lang_code:
-                        result[lang_code] = translated_name
-
-        return result
+        return self._translate_short_text_to_languages(name, target_languages, service_name)
 
     def translate_question_option(self, option_text: str, target_languages: List[str] = None,
                                  service_name: str = None) -> Dict[str, str]:
@@ -1614,21 +1640,7 @@ class AutoTranslator:
         Returns:
             {'fr': '...', 'es': '...', ...}
         """
-        if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
-
-        result = {}
-
-        if option_text and option_text.strip():
-            for lang in target_languages:
-                translated_option = self.translate_text(option_text, lang, 'en', service_name)
-                if translated_option:
-                    # Get language code (handles both codes and names)
-                    lang_code = self._get_language_code(lang)
-                    if lang_code:
-                        result[lang_code] = translated_option
-
-        return result
+        return self._translate_short_text_to_languages(option_text, target_languages, service_name)
 
     def translate_page_name(self, name: str, target_languages: List[str] = None,
                            service_name: str = None) -> Dict[str, str]:
@@ -1638,21 +1650,7 @@ class AutoTranslator:
         Returns:
             {'fr': '...', 'es': '...', ...}
         """
-        if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
-
-        result = {}
-
-        if name and name.strip():
-            for lang in target_languages:
-                translated_name = self.translate_text(name, lang, 'en', service_name)
-                if translated_name:
-                    # Get language code (handles both codes and names)
-                    lang_code = self._get_language_code(lang)
-                    if lang_code:
-                        result[lang_code] = translated_name
-
-        return result
+        return self._translate_short_text_to_languages(name, target_languages, service_name)
 
     def translate_template_name(self, name: str, target_languages: List[str] = None,
                               service_name: str = None) -> Dict[str, str]:
@@ -1662,21 +1660,7 @@ class AutoTranslator:
         Returns:
             {'fr': '...', 'es': '...', ...}
         """
-        if not target_languages:
-            target_languages = [Config.LANGUAGE_MODEL_KEY.get(code, code) for code in Config.TRANSLATABLE_LANGUAGES]
-
-        result = {}
-
-        if name and name.strip():
-            for lang in target_languages:
-                translated_name = self.translate_text(name, lang, 'en', service_name)
-                if translated_name:
-                    # Get language code (handles both codes and names)
-                    lang_code = self._get_language_code(lang)
-                    if lang_code:
-                        result[lang_code] = translated_name
-
-        return result
+        return self._translate_short_text_to_languages(name, target_languages, service_name)
 
     def _translate_email_template_html_by_text_nodes(
         self,

@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.services.translation.catalog_service import (
     PROVENANCE_HUMAN,
@@ -452,3 +453,131 @@ class TestUpsertBatchIntegration:
         mock_bulk.assert_called_once()
         assert TranslationString.query.filter_by(locale="en").count() == 0
         assert TranslationString.query.filter_by(locale="fr", msgid="Hello").first().msgstr == "Bonjour"
+
+
+# ---------------------------------------------------------------------------
+# Concurrency: two workers racing to create the same (locale, msgid) row.
+#
+# Both sides' initial SELECT misses (no row yet), so both build an INSERT; the
+# loser's flush hits the real `uq_translation_string_locale_msgid` unique
+# constraint. upsert_string/upsert_batch must recover via a SAVEPOINT retry
+# (re-SELECT + update) instead of surfacing an IntegrityError.
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+class TestUpsertStringConcurrency:
+    def test_retries_as_update_after_concurrent_insert_race(self, db_session):
+        from app.models.translation_quality import TranslationString
+        from app.services.translation.catalog_service import msgid_hash, upsert_string
+
+        locale, msgid = "fr", "Race condition test string"
+
+        # A "concurrent worker" already committed this row before our call started.
+        db_session.add(TranslationString(
+            locale=locale,
+            msgid=msgid,
+            msgid_hash=msgid_hash(msgid),
+            msgstr="Ecriture concurrente",
+            provenance=PROVENANCE_MACHINE,
+            status=STATUS_UNREVIEWED,
+            version=1,
+        ))
+        db_session.commit()
+
+        calls = {"n": 0}
+
+        class _MissFirstThenReal:
+            def filter_by(self, **kwargs):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    # Pretend this call's SELECT ran before the row above existed,
+                    # so it will (wrongly) attempt to INSERT a duplicate.
+                    return SimpleNamespace(first=lambda: None)
+                return db_session.query(TranslationString).filter_by(**kwargs)
+
+        with patch.object(TranslationString, "query", _MissFirstThenReal()), \
+             patch("app.services.translation.catalog_service._sync_po_entry") as mock_sync, \
+             patch("app.utils.po_persistence.finalize_translation_writes"):
+            changed = upsert_string(
+                locale=locale, msgid=msgid, msgstr="Traduction gagnante",
+                provenance=PROVENANCE_MACHINE, engine="google",
+            )
+
+        assert changed is True
+        assert calls["n"] == 2  # raced attempt, then a winning retry
+        mock_sync.assert_called_once()
+
+        row = db_session.query(TranslationString).filter_by(locale=locale, msgid=msgid).one()
+        assert row.msgstr == "Traduction gagnante"
+
+    def test_persistent_conflict_beyond_one_retry_propagates(self, db_session):
+        """A second consecutive failure is not silently swallowed -- only one
+        retry is attempted, matching a genuinely stuck/unexpected conflict."""
+        from app.models.translation_quality import TranslationString
+        from app.services.translation.catalog_service import msgid_hash, upsert_string
+
+        locale, msgid = "fr", "Persistent conflict test string"
+        db_session.add(TranslationString(
+            locale=locale, msgid=msgid, msgid_hash=msgid_hash(msgid),
+            msgstr="Existant", provenance=PROVENANCE_MACHINE, status=STATUS_UNREVIEWED, version=1,
+        ))
+        db_session.commit()
+
+        class _AlwaysMiss:
+            def filter_by(self, **kwargs):
+                return SimpleNamespace(first=lambda: None)
+
+        with patch.object(TranslationString, "query", _AlwaysMiss()), \
+             patch("app.services.translation.catalog_service._sync_po_entry"), \
+             patch("app.utils.po_persistence.finalize_translation_writes"):
+            with pytest.raises(IntegrityError):
+                upsert_string(
+                    locale=locale, msgid=msgid, msgstr="Nouvelle traduction",
+                    provenance=PROVENANCE_MACHINE, engine="google",
+                )
+        db_session.rollback()
+
+
+@pytest.mark.unit
+class TestUpsertBatchConcurrency:
+    def test_retries_whole_batch_once_after_concurrent_insert_race(self, db_session):
+        from app.models.translation_quality import TranslationString
+        from app.services.translation.catalog_service import msgid_hash, upsert_batch
+
+        locale, msgid = "fr", "Race condition test string"
+
+        db_session.add(TranslationString(
+            locale=locale,
+            msgid=msgid,
+            msgid_hash=msgid_hash(msgid),
+            msgstr="Ecriture concurrente",
+            provenance=PROVENANCE_MACHINE,
+            status=STATUS_UNREVIEWED,
+            version=1,
+        ))
+        db_session.commit()
+
+        calls = {"n": 0}
+
+        class _MissFirstThenReal:
+            def filter(self, *args, **kwargs):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    return SimpleNamespace(all=lambda: [])
+                return db_session.query(TranslationString).filter(*args, **kwargs)
+
+        with patch.object(TranslationString, "query", _MissFirstThenReal()), \
+             patch("app.services.translation.catalog_service._sync_po_entries_bulk") as mock_bulk, \
+             patch("app.utils.po_persistence.finalize_translation_writes"):
+            result = upsert_batch(
+                [(msgid, locale, "Traduction gagnante")],
+                provenance=PROVENANCE_MACHINE,
+                engine="google",
+            )
+
+        assert result["updated"] == 1
+        assert (locale, msgid) in result["updated_pairs"]
+        assert calls["n"] == 2  # raced attempt, then a winning retry
+        mock_bulk.assert_called_once()
+
+        row = db_session.query(TranslationString).filter_by(locale=locale, msgid=msgid).one()
+        assert row.msgstr == "Traduction gagnante"

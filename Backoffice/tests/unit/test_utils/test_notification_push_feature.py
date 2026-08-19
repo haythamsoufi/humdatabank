@@ -38,7 +38,6 @@ class TestNotificationPushFeatureFlag:
                 'email_notifications': True,
                 'notification_types_enabled': ['admin_message'],
                 'notification_frequency': 'instant',
-                'sound_enabled': True,
                 'push_notifications': True,
                 'push_notification_types_enabled': ['admin_message'],
                 'digest_day': None,

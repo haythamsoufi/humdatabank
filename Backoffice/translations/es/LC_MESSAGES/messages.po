@@ -29150,25 +29150,3 @@ msgstr "⚠️ ¡Copia esta clave ahora: no se mostrará de nuevo!"
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1013
 msgid "✓"
 msgstr "✓"
-
-# [Removed] was: app/templates/admin/translations/manage_translations.html:705
-#~ msgid "Permanently delete this removed string from all .po files"
-#~ msgstr ""
-#~ "Elimina permanentemente esta cadena eliminada de todos los archivos .po"
-
-# [Removed] was: app/templates/admin/translations/manage_translations.html:735
-#~ msgid ""
-#~ "This permanently deletes %(count)s obsolete (#~) entries from every locale "
-#~ ".po file. Active strings are not affected. Continue?"
-#~ msgstr ""
-#~ "Esto elimina permanentemente %(count)s entradas obsoletas (#~) de todos los "
-#~ "archivos .po locales. Las cuerdas activas no se ven afectadas. ¿Continuar?"
-
-# [Removed] was: app/templates/admin/translations/manage_translations.html:732
-#~ msgid ""
-#~ "This permanently deletes the obsolete (#~) entry for this message from every"
-#~ " locale .po file. Active strings are not affected. Continue?"
-#~ msgstr ""
-#~ "Esto elimina permanentemente la entrada obsoleta (#~) de este mensaje de "
-#~ "todos los archivos locales .po. Las cuerdas activas no se ven afectadas. "
-#~ "¿Continuar?"

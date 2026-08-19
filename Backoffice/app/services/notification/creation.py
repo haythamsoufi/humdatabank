@@ -121,7 +121,6 @@ def _get_or_create_preferences_for_check(
                 notification_types_enabled=[],
                 in_app_notification_types_enabled=[],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(preferences)
             try:
@@ -175,7 +174,6 @@ def get_user_preferences_batch(user_ids: List[int]) -> Dict[int, Any]:
                     notification_types_enabled=[],  # Empty = all enabled
                     in_app_notification_types_enabled=[],  # Empty = all enabled
                     notification_frequency='instant',
-                    sound_enabled=False
                 )
                 default_prefs.append(default_pref)
                 preferences_dict[user_id] = default_pref

@@ -651,7 +651,6 @@ class TestSendNotificationEmails:
                 email_notifications=True,
                 notification_types_enabled=[],
                 notification_frequency='daily',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -676,7 +675,6 @@ class TestSendNotificationEmails:
                 email_notifications=True,
                 notification_types_enabled=[],
                 notification_frequency='instant',
-                sound_enabled=False
             )
             db.session.add(pref)
             db.session.commit()
@@ -722,7 +720,6 @@ class TestSendNotificationEmails:
                 email_notifications=True,
                 notification_types_enabled=[],
                 notification_frequency='daily',
-                sound_enabled=False
             )
             # Last sent very recently
             pref.last_digest_sent_at = utcnow() - timedelta(minutes=1)

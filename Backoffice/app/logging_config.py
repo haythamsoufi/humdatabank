@@ -1,6 +1,7 @@
 """Application logging configuration and startup validation."""
 
 import logging
+import re
 from logging import Filter
 
 # Gunicorn access log request-line fragments for probe/health endpoints.
@@ -28,9 +29,40 @@ _NOISY_ACCESS_PATH_SUBSTRINGS = (
     '/manifest',
 )
 
+# High-frequency UI plumbing. Successful (2xx) hits are not useful in Log Stream;
+# 4xx/5xx on the same paths still pass through so auth/outage issues stay visible.
+_NOISY_ACCESS_SUCCESS_PATH_SUBSTRINGS = (
+    '/api/forms/presence/',
+    '/api/forms/session/keepalive',
+    '/api/notifications/count',
+    '/api/notifications/websocket-status',
+    '/api/stream/status',
+    '/api/devices/heartbeat',
+    '/api/mobile/v1/devices/',
+    '/api/mobile/v1/analytics/screen-view',
+    '/refresh-csrf-token',
+    '/api/v1/csrf-token',
+)
+
+_NOISY_ACCESS_SUCCESS_REQUEST_FRAGMENTS = (
+    '"GET /api/notifications HTTP/',
+    '"GET /api/preferences HTTP/',
+    '"GET /api/users/profile-summary HTTP/',
+)
+
+# Gunicorn: ... "METHOD /path HTTP/1.1" 200 ...
+_ACCESS_STATUS_RE = re.compile(r'HTTP/[0-9.]+" (\d{3})\b')
+
+
+def _access_status_code(msg: str) -> int | None:
+    match = _ACCESS_STATUS_RE.search(msg)
+    if not match:
+        return None
+    return int(match.group(1))
+
 
 def is_noisy_access_log_message(msg: str) -> bool:
-    """Return True for probe/static access log lines that should be suppressed."""
+    """Return True for probe/static/heartbeat access log lines that should be suppressed."""
     if not msg:
         return False
 
@@ -46,6 +78,13 @@ def is_noisy_access_log_message(msg: str) -> bool:
     # Azure front-end / load balancer liveness probes: GET / with no referer or UA.
     if '"-" "-"' in msg and ('"GET / HTTP/1.1"' in msg or '"HEAD / HTTP/1.1"' in msg):
         return True
+
+    status = _access_status_code(msg)
+    if status is not None and 200 <= status < 300:
+        if any(path in msg for path in _NOISY_ACCESS_SUCCESS_PATH_SUBSTRINGS):
+            return True
+        if any(fragment in msg for fragment in _NOISY_ACCESS_SUCCESS_REQUEST_FRAGMENTS):
+            return True
 
     return False
 
@@ -67,6 +106,19 @@ class SQLAlchemyRelationshipFilter(Filter):
         if 'sqlalchemy.orm.relationships' in record.name or 'sqlalchemy.orm.strategies' in record.name:
             return False
         return True
+
+
+class WeasyprintCssIgnoreFilter(Filter):
+    """Drop WeasyPrint 'Ignored `...`' CSS warnings; keep real PDF failures."""
+
+    def filter(self, record):
+        if not hasattr(record, 'getMessage'):
+            return True
+        try:
+            msg = record.getMessage()
+        except Exception:
+            return True
+        return not msg.startswith('Ignored ')
 
 
 def configure_access_log_filters(app):

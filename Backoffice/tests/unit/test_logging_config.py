@@ -8,6 +8,7 @@ from flask import Flask
 from app.logging_config import (
     StaticFileFilter,
     SQLAlchemyRelationshipFilter,
+    WeasyprintCssIgnoreFilter,
     configure_access_log_filters,
     is_noisy_access_log_message,
     validate_email_configuration,
@@ -105,6 +106,42 @@ class TestIsNoisyAccessLogMessage:
         )
         assert is_noisy_access_log_message(msg) is False
 
+    def test_successful_presence_sync_filtered(self):
+        msg = (
+            '4.175.128.233:3277 - - [19/Aug/2026:13:52:32 +0200] '
+            '"POST /api/forms/presence/assignment/4103/sync HTTP/1.1" 200 28 '
+            '"https://databank.ifrc.org/forms/assignment/4103" '
+            '"Mozilla/5.0" 12705'
+        )
+        assert is_noisy_access_log_message(msg) is True
+
+    def test_failed_presence_sync_not_filtered(self):
+        msg = (
+            '4.175.128.233:3277 - - [19/Aug/2026:13:52:32 +0200] '
+            '"POST /api/forms/presence/assignment/4103/sync HTTP/1.1" 500 89 '
+            '"https://databank.ifrc.org/forms/assignment/4103" '
+            '"Mozilla/5.0" 12705'
+        )
+        assert is_noisy_access_log_message(msg) is False
+
+    def test_successful_session_keepalive_filtered(self):
+        msg = (
+            '4.175.128.233:3278 - - [19/Aug/2026:13:52:32 +0200] '
+            '"POST /api/forms/session/keepalive HTTP/1.1" 204 0 '
+            '"https://databank.ifrc.org/forms/assignment/4103" '
+            '"Mozilla/5.0" 800'
+        )
+        assert is_noisy_access_log_message(msg) is True
+
+    def test_notification_send_not_filtered(self):
+        msg = (
+            '4.175.128.233:3279 - - [19/Aug/2026:13:52:32 +0200] '
+            '"POST /api/notifications/send HTTP/1.1" 200 42 '
+            '"https://databank.ifrc.org/admin/communication" '
+            '"Mozilla/5.0" 1200'
+        )
+        assert is_noisy_access_log_message(msg) is False
+
 
 # ---------------------------------------------------------------------------
 # SQLAlchemyRelationshipFilter
@@ -140,6 +177,31 @@ class TestSQLAlchemyRelationshipFilter:
     def test_sqlalchemy_orm_not_filtered(self):
         """sqlalchemy.orm (without sub-module) should pass through."""
         record = self._make_record("sqlalchemy.orm")
+        assert self.filter.filter(record) is True
+
+
+class TestWeasyprintCssIgnoreFilter:
+    def setup_method(self):
+        self.filter = WeasyprintCssIgnoreFilter()
+
+    def _make_record(self, message):
+        return logging.LogRecord(
+            name="weasyprint", level=logging.WARNING, pathname="", lineno=0,
+            msg=message, args=(), exc_info=None
+        )
+
+    def test_ignored_css_filtered(self):
+        record = self._make_record(
+            "Ignored `word-break: break-word` at 178:17, invalid value."
+        )
+        assert self.filter.filter(record) is False
+
+    def test_real_pdf_warning_not_filtered(self):
+        record = self._make_record("Font-face 'Inter' cannot be loaded")
+        assert self.filter.filter(record) is True
+
+    def test_record_without_getMessage(self):
+        record = MagicMock(spec=[])
         assert self.filter.filter(record) is True
 
 

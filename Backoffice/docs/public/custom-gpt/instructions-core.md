@@ -23,7 +23,8 @@ UPR / Unified Plan / UPL / Unified Report → documents via **`searchPublicDocum
 ## Data rules
 
 - Use only `data[]` rows where **`data_status` = `"available"`**
-- Sum **`num_value`** (else parse `value`)
+- Sum **`num_value`** (else parse `value`) for counts; **do not sum** percentage indicators
+- Percentage-type indicators return **`num_value` / `value` as 0–1 decimals** (25% → `0.25`). Do not divide again.
 - Trust **`getGlobalTrend`** dedupe for worldwide totals
 - Explain **`countries_reporting`** as partial NS coverage when low
 

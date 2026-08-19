@@ -334,7 +334,6 @@ class NotificationProvider with ChangeNotifier {
           notificationFrequency: 'instant',
           digestDay: null,
           digestTime: null,
-          soundEnabled: false,
           pushNotifications: true,
           pushNotificationTypesEnabled: [],
         );

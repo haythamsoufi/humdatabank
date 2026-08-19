@@ -386,7 +386,6 @@ class TestGetNotificationPreferences:
                 email_notifications=False,
                 notification_types_enabled=['admin_message'],
                 notification_frequency='daily',
-                sound_enabled=True
             )
             db.session.add(pref)
             db.session.commit()
@@ -419,23 +418,6 @@ class TestUpdateNotificationPreferences:
 
         assert result is not None
         assert result.email_notifications is False
-
-    def test_updates_sound_enabled(self, app, db_session):
-        from app.models import User
-        from app import db
-
-        with app.app_context():
-            user = User(email='update_sound@test.com', name='Sound', active=True)
-            user.set_password('pw')
-            db.session.add(user)
-            db.session.flush()
-            db.session.commit()
-
-            result = NotificationService.update_notification_preferences(
-                user.id, sound_enabled=False
-            )
-
-        assert result.sound_enabled is False
 
     def test_updates_notification_types_with_dict(self, app, db_session):
         from app.models import User

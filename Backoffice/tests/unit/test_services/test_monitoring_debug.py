@@ -360,9 +360,14 @@ class TestConfigureLogging:
             "fontTools",
             "fontTools.subset",
             "fontTools.ttLib",
+            "cairocffi",
+            "tinycss2",
+            "cssselect2",
+            "pydyf",
         ):
             assert logger_name in captured_loggers
             captured_loggers[logger_name].setLevel.assert_any_call(logging.WARNING)
+        captured_loggers["weasyprint"].addFilter.assert_called()
 
     def test_log_to_stdout_also_adds_root_stream_handler(self):
         mgr = _fresh_debug_manager()

@@ -303,6 +303,12 @@ function revealRepeatEntryTitleSelect(select) {
     }
 }
 
+const TITLE_OTHER_STACK_CLASSES = [
+    'mt-2', 'block', 'w-full', 'shadow-sm',
+    'focus:ring-green-500', 'focus:border-green-500',
+    'sm:text-sm', 'border-gray-300', 'rounded-md'
+];
+
 function restoreTitleSelectToFieldBlock(repeatEntry) {
     const titleSelect = repeatEntry.querySelector('select[data-use-as-repeat-entry-title="true"]');
     if (!titleSelect) return;
@@ -319,7 +325,11 @@ function restoreTitleSelectToFieldBlock(repeatEntry) {
     const titleWrap = repeatEntry.querySelector('.repeat-entry__title-select-wrap');
     if (titleWrap) {
         const otherInput = titleWrap.querySelector('.other-text-input');
-        if (otherInput) fieldBlock.appendChild(otherInput);
+        if (otherInput) {
+            otherInput.classList.remove('repeat-entry__title-other');
+            otherInput.classList.add(...TITLE_OTHER_STACK_CLASSES);
+            fieldBlock.appendChild(otherInput);
+        }
     }
 }
 
@@ -385,9 +395,17 @@ function setupRepeatEntryTitleDropdown(repeatEntry, sectionId, instanceNumber) {
     if (titleSelect.dataset.allowOther === 'true') {
         const sourceBlock = fieldBlock || titleSelect.closest('.form-item-block, .repeat-entry');
         const otherInput = sourceBlock?.querySelector('.other-text-input');
-        if (otherInput && otherInput.parentElement !== titleWrap) {
-            otherInput.classList.add('mt-2');
-            titleWrap.appendChild(otherInput);
+        if (otherInput) {
+            otherInput.classList.add('repeat-entry__title-other');
+            otherInput.classList.remove(...TITLE_OTHER_STACK_CLASSES);
+            if (titleSelect.value === '__other__') {
+                otherInput.classList.remove('hidden');
+            } else {
+                otherInput.classList.add('hidden');
+            }
+            if (otherInput.parentElement !== titleWrap) {
+                titleWrap.appendChild(otherInput);
+            }
         }
     }
 

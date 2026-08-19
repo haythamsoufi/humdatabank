@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../providers/shared/notification_provider.dart';
 import '../../providers/shared/auth_provider.dart';
 import '../../widgets/app_bar.dart';
-import '../../widgets/app_switch_list_tile.dart';
 import '../../widgets/bottom_navigation_bar.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../models/shared/notification_preferences.dart';
@@ -47,7 +46,6 @@ class _NotificationPreferencesScreenState
   static const double formFieldPadding = gridUnit + 4; // 12
   static const double formFieldVerticalPadding = gridUnit + 2; // 10
 
-  bool _soundEnabled = false;
   String _notificationFrequency = 'instant';
   String? _digestDay;
   String _digestTime = '09:00';
@@ -78,7 +76,6 @@ class _NotificationPreferencesScreenState
   void _updateLocalState(NotificationPreferences? preferences) {
     if (preferences != null) {
       setState(() {
-        _soundEnabled = preferences.soundEnabled;
         _notificationFrequency = preferences.notificationFrequency;
         _digestDay = preferences.digestDay;
         _digestTime = preferences.digestTime ?? '09:00';
@@ -166,7 +163,6 @@ class _NotificationPreferencesScreenState
       notificationFrequency: _notificationFrequency,
       digestDay: digestDay,
       digestTime: digestTime,
-      soundEnabled: _soundEnabled,
       pushNotifications: pushNotifications,
       pushNotificationTypesEnabled: pushTypesToSend,
     );
@@ -311,23 +307,6 @@ class _NotificationPreferencesScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Sound Notifications
-                _buildSection(
-                  title: localizations.soundNotifications,
-                  child: AppSwitchListTile(
-                    value: _soundEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _soundEnabled = value;
-                      });
-                    },
-                    title: localizations.enableSound,
-                    subtitle: localizations.playSoundForNewNotifications,
-                  ),
-                ),
-
-                const SizedBox(height: sectionSpacing),
-
                 // Email Frequency
                 _buildSection(
                   title: localizations.emailFrequency,

@@ -120,6 +120,34 @@ class TestTranslationReviewRoutes:
         mo_path = po_path.replace('.po', '.mo')
         assert os.path.exists(mo_path)
 
+    def test_glossary_candidates_are_filtered_by_locale(self, client, db_session, translator_user, translation_po_dir):
+        """The inline-review candidate list shares glossary_terms.list_glossary_candidates
+        with the admin dashboard and must only show the translator's assigned language."""
+        from app.models.translation_quality import TranslationGlossaryCandidate
+
+        db_session.add_all([
+            TranslationGlossaryCandidate(
+                source_term="Appeal", target_term="appel", source_lang="en", target_lang="fr",
+                extractor="test", confidence=0.8, proposed_tier="preferred", status="pending",
+            ),
+            TranslationGlossaryCandidate(
+                source_term="Appeal", target_term="llamamiento", source_lang="en", target_lang="es",
+                extractor="test", confidence=0.9, proposed_tier="preferred", status="pending",
+            ),
+        ])
+        db_session.commit()
+
+        _login_translator(client, translator_user)
+        response = client.get(
+            '/translation-review/api/glossary-candidates?locale=fr',
+            headers={'X-Requested-With': 'XMLHttpRequest'},
+        )
+        assert response.status_code == 200
+        items = response.get_json()['items']
+        assert len(items) == 1
+        assert items[0]['target_lang'] == 'fr'
+        assert items[0]['source_term'] == 'Appeal'
+
     def test_toggle_requires_permission(self, client, db_session, app):
         from tests.factories import create_test_user
 
@@ -155,3 +183,21 @@ class TestTranslationReviewHooks:
         with app.test_request_context('/auth/login'):
             html = app.jinja_env.from_string('{{ _("Login") }}').render()
             assert 'Login' in html
+
+    def test_maybe_mark_leaves_blank_translations_falsy(self, app):
+        """An empty/None translation must stay falsy -- marking it would make
+        `if not gettext(...):`-style missing-translation checks see a false positive."""
+        from app.services.translation_review.hooks import maybe_mark
+        from app.services.translation_review.marker import contains_marker
+
+        with app.test_request_context('/some/page'):
+            from flask import g
+
+            g.translation_review_active = True
+            assert maybe_mark('Some label', '') == ''
+            assert maybe_mark('Some label', None) is None
+            assert not maybe_mark('Some label', '')
+
+            marked = maybe_mark('Some label', 'Un texte')
+            assert contains_marker(marked)
+            assert marked.startswith('Un texte')

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-08-18 19:15+0200\n"
+"POT-Creation-Date: 2026-08-19 14:50+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.17.0\n"
 
-#: app/routes/admin/utilities/translations.py:1651
+#: app/routes/admin/utilities/translations.py:1669
 #, python-format
 msgid " (and %(count)d more)"
 msgstr ""
@@ -85,7 +85,7 @@ msgstr ""
 msgid "%(count)s field(s) orphaned"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:288
+#: app/templates/admin/translations/quality_dashboard.html:296
 #, python-format
 msgid "%(count)s pending"
 msgstr ""
@@ -95,7 +95,7 @@ msgstr ""
 msgid "%(count)s shared"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:237
+#: app/templates/admin/translations/quality_dashboard.html:245
 #, python-format
 msgid "%(count)s shown"
 msgstr ""
@@ -107,8 +107,8 @@ msgid ""
 "deleted."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2103
-#: app/routes/admin/utilities/translations.py:2116
+#: app/routes/admin/utilities/translations.py:2121
+#: app/routes/admin/utilities/translations.py:2134
 #, python-format
 msgid "%(count)s string was skipped because it is already human-approved."
 msgstr ""
@@ -315,8 +315,8 @@ msgid ".xlsx or .xls (max 50 MB)"
 msgstr ""
 
 #: app/templates/admin/assignments/manage_assignment.html:665
-#: app/templates/admin/translations/quality_dashboard.html:220
-#: app/templates/admin/translations/quality_dashboard.html:292
+#: app/templates/admin/translations/quality_dashboard.html:228
+#: app/templates/admin/translations/quality_dashboard.html:300
 msgid "0 selected"
 msgstr ""
 
@@ -328,11 +328,11 @@ msgstr ""
 msgid "1 non-compliant country has compliance documents pending validation."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:375
+#: app/templates/admin/translations/quality_dashboard.html:383
 msgid "1 pending"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:377
+#: app/templates/admin/translations/quality_dashboard.html:385
 msgid "1 selected"
 msgstr ""
 
@@ -439,7 +439,7 @@ msgstr ""
 msgid "A server error occurred. Please try again later."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:331
+#: app/routes/admin/utilities/translations.py:336
 msgid "A term with this English source and language already exists."
 msgstr ""
 
@@ -710,8 +710,8 @@ msgstr ""
 msgid "About this report"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:293
-#: app/templates/admin/translations/quality_dashboard.html:368
+#: app/templates/admin/translations/quality_dashboard.html:301
+#: app/templates/admin/translations/quality_dashboard.html:376
 msgid "Accept"
 msgstr ""
 
@@ -878,7 +878,7 @@ msgstr ""
 #: app/templates/admin/security/dashboard.html:167
 #: app/templates/admin/templates/templates.html:254
 #: app/templates/admin/translations/manage_translations.html:699
-#: app/templates/admin/translations/quality_dashboard.html:361
+#: app/templates/admin/translations/quality_dashboard.html:369
 #: app/templates/admin/user_management/access_requests.html:1122
 #: app/templates/admin/validation_questions.html:244
 #: app/templates/admin/validation_rules.html:237
@@ -900,8 +900,8 @@ msgstr ""
 #: app/templates/admin/assignments/assignments.html:128
 #: app/templates/admin/assignments/manage_assignment.html:615
 #: app/templates/admin/plugin_management.html:213
-#: app/templates/admin/translations/quality_dashboard.html:221
-#: app/templates/admin/translations/quality_dashboard.html:363
+#: app/templates/admin/translations/quality_dashboard.html:229
+#: app/templates/admin/translations/quality_dashboard.html:371
 msgid "Activate"
 msgstr ""
 
@@ -934,7 +934,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:1761
 #: app/templates/admin/organization/index.html:1917
 #: app/templates/admin/plugin_management.html:208
-#: app/templates/admin/translations/quality_dashboard.html:359
+#: app/templates/admin/translations/quality_dashboard.html:367
 #: app/templates/admin/user_management/users.html:378
 #: app/templates/components/_status_label.html:74
 #: app/templates/components/ag_grid_i18n_js.html:27
@@ -1304,7 +1304,7 @@ msgstr ""
 msgid "Add follow-up question"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:302
+#: app/templates/admin/translations/quality_dashboard.html:310
 msgid "Add glossary term"
 msgstr ""
 
@@ -1351,8 +1351,8 @@ msgstr ""
 msgid "Add sub-sector"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:208
-#: app/templates/admin/translations/quality_dashboard.html:332
+#: app/templates/admin/translations/quality_dashboard.html:216
+#: app/templates/admin/translations/quality_dashboard.html:340
 msgid "Add term"
 msgstr ""
 
@@ -2148,15 +2148,15 @@ msgid "An error occurred."
 msgstr ""
 
 #: app/routes/admin/form_builder/sections.py:264
-#: app/routes/admin/utilities/translations.py:336
-#: app/routes/admin/utilities/translations.py:938
-#: app/routes/admin/utilities/translations.py:1002
-#: app/routes/admin/utilities/translations.py:1143
-#: app/routes/admin/utilities/translations.py:1529
-#: app/routes/admin/utilities/translations.py:1543
-#: app/routes/admin/utilities/translations.py:1571
-#: app/routes/admin/utilities/translations.py:1590
-#: app/routes/admin/utilities/translations.py:1666
+#: app/routes/admin/utilities/translations.py:341
+#: app/routes/admin/utilities/translations.py:943
+#: app/routes/admin/utilities/translations.py:1007
+#: app/routes/admin/utilities/translations.py:1148
+#: app/routes/admin/utilities/translations.py:1547
+#: app/routes/admin/utilities/translations.py:1561
+#: app/routes/admin/utilities/translations.py:1589
+#: app/routes/admin/utilities/translations.py:1608
+#: app/routes/admin/utilities/translations.py:1684
 #: app/routes/main/dashboard.py:446 app/routes/main/views.py:117
 #: app/templates/admin/indicator_bank/_panel_sectors_scripts.html:845
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1274
@@ -2446,7 +2446,7 @@ msgstr ""
 msgid "Approved"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:200
+#: app/templates/admin/translations/quality_dashboard.html:208
 msgid "Approved glossary"
 msgstr ""
 
@@ -3887,7 +3887,7 @@ msgstr ""
 #: app/templates/admin/templates/templates.html:325
 #: app/templates/admin/translations/manage_translations.html:582
 #: app/templates/admin/translations/manage_translations.html:709
-#: app/templates/admin/translations/quality_dashboard.html:331
+#: app/templates/admin/translations/quality_dashboard.html:339
 #: app/templates/admin/user_management/access_requests.html:326
 #: app/templates/admin/user_management/user_form.html:768
 #: app/templates/admin/user_management/user_form.html:1405
@@ -3956,7 +3956,7 @@ msgstr ""
 msgid "Cancelling…"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:386
+#: app/routes/admin/utilities/translations.py:391
 #: app/routes/translation_review/__init__.py:294
 msgid "Candidate not found or already reviewed"
 msgstr ""
@@ -4013,7 +4013,7 @@ msgstr ""
 msgid "Carry-forward data"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1563
+#: app/routes/admin/utilities/translations.py:1581
 #, python-format
 msgid ""
 "Catalog synced from .po files. New rows: %(inserted)d. Empty rows filled:"
@@ -4218,7 +4218,7 @@ msgstr ""
 msgid "Choose a form template under Setup first."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:328
+#: app/routes/admin/utilities/translations.py:333
 msgid "Choose a target language."
 msgstr ""
 
@@ -4943,7 +4943,7 @@ msgstr ""
 msgid "Comparison complete · reviewing…"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1470
+#: app/routes/admin/utilities/translations.py:1488
 msgid ""
 "Compilation script not found. Please ensure "
 "scripts/i18n/compile_translations.py exists."
@@ -5067,7 +5067,7 @@ msgid "Condition"
 msgstr ""
 
 #: app/templates/admin/ai/review_detail.html:73
-#: app/templates/admin/translations/quality_dashboard.html:367
+#: app/templates/admin/translations/quality_dashboard.html:375
 #: app/templates/forms/entry_form/validation_summary_progress.html:267
 msgid "Confidence"
 msgstr ""
@@ -5206,7 +5206,7 @@ msgid ""
 "you deploy."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:364
+#: app/templates/admin/translations/quality_dashboard.html:372
 msgid "Conflict"
 msgstr ""
 
@@ -5567,11 +5567,11 @@ msgstr ""
 msgid "Could not save SP/EF entry."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:334
+#: app/routes/admin/utilities/translations.py:339
 msgid "Could not save this glossary term."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:372
+#: app/templates/admin/translations/quality_dashboard.html:380
 msgid "Could not save this glossary term. Try again."
 msgstr ""
 
@@ -5591,16 +5591,16 @@ msgstr ""
 msgid "Could not undo changes."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:379
+#: app/templates/admin/translations/quality_dashboard.html:387
 msgid "Could not update the selected rows. Try again."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:373
+#: app/templates/admin/translations/quality_dashboard.html:381
 msgid "Could not update this candidate. Try again."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1401
-#: app/routes/admin/utilities/translations.py:1432
+#: app/routes/admin/utilities/translations.py:1412
+#: app/routes/admin/utilities/translations.py:1450
 msgid "Could not update translation files."
 msgstr ""
 
@@ -6451,8 +6451,8 @@ msgstr ""
 #: app/templates/admin/assignments/assignments.html:127
 #: app/templates/admin/assignments/manage_assignment.html:615
 #: app/templates/admin/plugin_management.html:212
-#: app/templates/admin/translations/quality_dashboard.html:222
-#: app/templates/admin/translations/quality_dashboard.html:362
+#: app/templates/admin/translations/quality_dashboard.html:230
+#: app/templates/admin/translations/quality_dashboard.html:370
 #: app/templates/admin/user_management/user_form.html:29
 #: app/templates/admin/user_management/user_form.html:767
 #: app/templates/components/ag_grid_i18n_js.html:51
@@ -8186,7 +8186,7 @@ msgstr ""
 msgid "Edit global templates in Settings"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:285
+#: app/templates/admin/translations/quality_dashboard.html:293
 msgid "Edit if needed, then accept."
 msgstr ""
 
@@ -8590,11 +8590,11 @@ msgstr ""
 msgid "Ends with"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:142
+#: app/templates/admin/translations/quality_dashboard.html:150
 msgid "Engine mix"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:955
+#: app/routes/admin/utilities/translations.py:960
 msgid "English (en) is the source language and should not be imported."
 msgstr ""
 
@@ -8602,7 +8602,7 @@ msgstr ""
 msgid "English (source, read-only)"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:305
+#: app/templates/admin/translations/quality_dashboard.html:313
 msgid "English source"
 msgstr ""
 
@@ -8636,15 +8636,15 @@ msgstr ""
 msgid "Enter a target year and click \"Load Data\" to preview imputation results."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:326
+#: app/routes/admin/utilities/translations.py:331
 msgid "Enter a valid English source term."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:327
+#: app/routes/admin/utilities/translations.py:332
 msgid "Enter a valid target term."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:374
+#: app/templates/admin/translations/quality_dashboard.html:382
 msgid "Enter both the English source and the translation."
 msgstr ""
 
@@ -8824,7 +8824,7 @@ msgstr ""
 msgid "Error approving document:"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1526
+#: app/routes/admin/utilities/translations.py:1544
 #, python-format
 msgid "Error compiling translations: %(error)s"
 msgstr ""
@@ -8850,7 +8850,7 @@ msgstr ""
 msgid "Error during translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1660
+#: app/routes/admin/utilities/translations.py:1678
 #, python-format
 msgid "Error extracting/updating translations: %(error)s"
 msgstr ""
@@ -9078,18 +9078,18 @@ msgid ""
 "Chinese, Russian, Hindi, Active"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1036
+#: app/routes/admin/utilities/translations.py:1041
 msgid "Excel file is empty or header row not found."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1135
+#: app/routes/admin/utilities/translations.py:1140
 #, python-format
 msgid ""
 "Excel import finished. Updated: %(u)d, skipped missing msgids: %(m)d. "
 "(Empty updates are ignored by default.)"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1042
+#: app/routes/admin/utilities/translations.py:1047
 msgid "Excel import requires a 'msgid' column header."
 msgstr ""
 
@@ -9183,8 +9183,8 @@ msgstr ""
 msgid "Expand to fill content area"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1386
-#: app/routes/admin/utilities/translations.py:1426
+#: app/routes/admin/utilities/translations.py:1391
+#: app/routes/admin/utilities/translations.py:1437
 msgid "Expected JSON body"
 msgstr ""
 
@@ -9438,17 +9438,17 @@ msgstr ""
 msgid "Extracting text from document…"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1611
+#: app/routes/admin/utilities/translations.py:1629
 msgid ""
 "Extraction script not found. Please ensure "
 "scripts/i18n/extract_update_translations.py exists."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1664
+#: app/routes/admin/utilities/translations.py:1682
 msgid "Extraction timed out after 5 minutes. The process may still be running."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:366
+#: app/templates/admin/translations/quality_dashboard.html:374
 msgid "Extractor"
 msgstr ""
 
@@ -10155,7 +10155,7 @@ msgstr ""
 #: app/templates/admin/analytics/dashboard.html:250
 #: app/templates/admin/analytics/user_detail.html:51
 #: app/templates/admin/dashboard.html:280
-#: app/templates/admin/translations/quality_dashboard.html:306
+#: app/templates/admin/translations/quality_dashboard.html:314
 #: app/templates/admin/user_management/user_form.html:311
 #: app/templates/admin/user_management/users.html:253
 #: app/templates/auth/login.html:709 app/templates/tours/tours.html:478
@@ -10603,16 +10603,16 @@ msgstr ""
 msgid "Glossary"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:283
+#: app/templates/admin/translations/quality_dashboard.html:291
 msgid "Glossary candidate inbox"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1585
+#: app/routes/admin/utilities/translations.py:1603
 #, python-format
 msgid "Glossary seed finished. New must-terms: %(added)d."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:330
+#: app/routes/admin/utilities/translations.py:335
 msgid "Glossary term not found."
 msgstr ""
 
@@ -11040,8 +11040,8 @@ msgstr ""
 msgid "How would you like to start?"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:139
-#: app/templates/admin/translations/quality_dashboard.html:256
+#: app/templates/admin/translations/quality_dashboard.html:147
+#: app/templates/admin/translations/quality_dashboard.html:264
 msgid "Human"
 msgstr ""
 
@@ -11441,7 +11441,7 @@ msgstr ""
 msgid "Import template structure from Excel file"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:271
+#: app/templates/admin/translations/quality_dashboard.html:279
 msgid "Import the catalog first, or switch locale."
 msgstr ""
 
@@ -11593,7 +11593,7 @@ msgstr ""
 #: app/templates/admin/organization/index.html:1761
 #: app/templates/admin/organization/index.html:1917
 #: app/templates/admin/plugin_management.html:209
-#: app/templates/admin/translations/quality_dashboard.html:360
+#: app/templates/admin/translations/quality_dashboard.html:368
 #: app/templates/admin/user_management/users.html:379
 #: app/templates/components/_status_label.html:75
 #: app/templates/components/ag_grid_i18n_js.html:28
@@ -12020,12 +12020,12 @@ msgstr ""
 msgid "Invalid template selection or country not assigned to you."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:185
-#: app/routes/admin/utilities/translations.py:188
+#: app/routes/admin/utilities/translations.py:190
+#: app/routes/admin/utilities/translations.py:193
 msgid "Invalid translation payload"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2135
+#: app/routes/admin/utilities/translations.py:2153
 msgid "Invalid translation type"
 msgstr ""
 
@@ -12148,11 +12148,11 @@ msgstr ""
 msgid "Its sector reference will be cleared on deletion."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:366
-#: app/routes/admin/utilities/translations.py:395
-#: app/routes/admin/utilities/translations.py:417
-#: app/routes/admin/utilities/translations.py:438
-#: app/routes/admin/utilities/translations.py:456
+#: app/routes/admin/utilities/translations.py:371
+#: app/routes/admin/utilities/translations.py:400
+#: app/routes/admin/utilities/translations.py:422
+#: app/routes/admin/utilities/translations.py:443
+#: app/routes/admin/utilities/translations.py:461
 #: app/routes/translation_review/__init__.py:158
 #: app/routes/translation_review/__init__.py:274
 msgid "JSON request required"
@@ -12380,8 +12380,8 @@ msgstr ""
 #: app/templates/admin/documents/documents.html:193
 #: app/templates/admin/documents/documents.html:676
 #: app/templates/admin/translations/manage_translations.html:412
-#: app/templates/admin/translations/quality_dashboard.html:314
-#: app/templates/admin/translations/quality_dashboard.html:353
+#: app/templates/admin/translations/quality_dashboard.html:322
+#: app/templates/admin/translations/quality_dashboard.html:361
 #: app/templates/admin/validation_rules.html:233
 #: app/templates/auth/login.html:634
 #: app/templates/components/_mobile_language_menu.html:18
@@ -12811,7 +12811,7 @@ msgstr ""
 msgid "Loading campaigns..."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:296
+#: app/templates/admin/translations/quality_dashboard.html:304
 msgid "Loading candidates…"
 msgstr ""
 
@@ -12894,7 +12894,7 @@ msgstr ""
 msgid "Loading form…"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:226
+#: app/templates/admin/translations/quality_dashboard.html:234
 msgid "Loading glossary…"
 msgstr ""
 
@@ -13094,8 +13094,8 @@ msgstr ""
 msgid "Local Units"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:137
-#: app/templates/admin/translations/quality_dashboard.html:241
+#: app/templates/admin/translations/quality_dashboard.html:145
+#: app/templates/admin/translations/quality_dashboard.html:249
 msgid "Locale"
 msgstr ""
 
@@ -13230,8 +13230,8 @@ msgstr ""
 msgid "Low-quality traces needing review"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:140
-#: app/templates/admin/translations/quality_dashboard.html:258
+#: app/templates/admin/translations/quality_dashboard.html:148
+#: app/templates/admin/translations/quality_dashboard.html:266
 msgid "Machine"
 msgstr ""
 
@@ -13754,8 +13754,8 @@ msgstr ""
 msgid "Message ID"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2017
-#: app/routes/admin/utilities/translations.py:2020
+#: app/routes/admin/utilities/translations.py:2035
+#: app/routes/admin/utilities/translations.py:2038
 msgid "Message ID is required for translation type"
 msgstr ""
 
@@ -14002,12 +14002,12 @@ msgstr ""
 msgid "Multiple different due dates set across entities."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:324
-#: app/templates/admin/translations/quality_dashboard.html:355
+#: app/templates/admin/translations/quality_dashboard.html:332
+#: app/templates/admin/translations/quality_dashboard.html:363
 msgid "Must"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:203
+#: app/templates/admin/translations/quality_dashboard.html:211
 msgid ""
 "Must terms are forced in auto-translate. Preferred terms are guidance "
 "only."
@@ -14605,8 +14605,8 @@ msgstr ""
 msgid "No agent queries yet."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:226
-#: app/templates/admin/translations/quality_dashboard.html:370
+#: app/templates/admin/translations/quality_dashboard.html:234
+#: app/templates/admin/translations/quality_dashboard.html:378
 msgid "No approved glossary terms yet."
 msgstr ""
 
@@ -14629,7 +14629,7 @@ msgstr ""
 msgid "No campaigns found."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:188
+#: app/templates/admin/translations/quality_dashboard.html:196
 msgid "No catalog rows yet."
 msgstr ""
 
@@ -14848,7 +14848,7 @@ msgstr ""
 
 #: app/routes/admin/form_builder/templates.py:360
 #: app/routes/admin/form_builder/templates.py:388
-#: app/routes/admin/utilities/translations.py:740
+#: app/routes/admin/utilities/translations.py:745
 msgid "No file selected."
 msgstr ""
 
@@ -14924,11 +14924,11 @@ msgstr ""
 msgid "No items found matching your search."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:2231
+#: app/routes/admin/utilities/translations.py:2249
 msgid "No items provided"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1054
+#: app/routes/admin/utilities/translations.py:1059
 msgid "No language columns found in Excel header."
 msgstr ""
 
@@ -15007,8 +15007,8 @@ msgstr ""
 msgid "No path data for these filters."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:296
-#: app/templates/admin/translations/quality_dashboard.html:371
+#: app/templates/admin/translations/quality_dashboard.html:304
+#: app/templates/admin/translations/quality_dashboard.html:379
 msgid "No pending candidates."
 msgstr ""
 
@@ -15085,13 +15085,13 @@ msgstr ""
 msgid "No related events found."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1403
+#: app/routes/admin/utilities/translations.py:1414
 msgid ""
 "No removed (obsolete) entries found for this message. Try refreshing the "
 "page."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1434
+#: app/routes/admin/utilities/translations.py:1452
 msgid "No removed (obsolete) entries found. Try refreshing the page."
 msgstr ""
 
@@ -15227,6 +15227,12 @@ msgstr ""
 msgid "No sub-sectors yet."
 msgstr ""
 
+#: app/templates/admin/translations/quality_dashboard.html:135
+msgid ""
+"No target-language catalog rows yet. English is the source language and "
+"is not counted here."
+msgstr ""
+
 #: app/routes/admin/form_builder/sections.py:247
 msgid "No template version found."
 msgstr ""
@@ -15256,7 +15262,7 @@ msgstr ""
 msgid "No translation fields found that need translation"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1845
+#: app/routes/admin/utilities/translations.py:1863
 msgid "No translation service available. Please configure translation API keys."
 msgstr ""
 
@@ -15313,7 +15319,7 @@ msgstr ""
 msgid "No units found. Run database migrations, then refresh."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:270
+#: app/templates/admin/translations/quality_dashboard.html:278
 msgid "No unreviewed strings in the catalog yet."
 msgstr ""
 
@@ -15338,7 +15344,7 @@ msgstr ""
 msgid "No valid countries were selected. Please try again."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:917
+#: app/routes/admin/utilities/translations.py:922
 msgid ""
 "No valid locale PO files found in ZIP. Expected files like: "
 "<lang>/LC_MESSAGES/messages.po"
@@ -15529,7 +15535,7 @@ msgstr ""
 msgid "Note:"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1657
+#: app/routes/admin/utilities/translations.py:1675
 #, python-format
 msgid "Note: %(note)s"
 msgstr ""
@@ -15751,7 +15757,7 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:309
+#: app/templates/admin/translations/quality_dashboard.html:317
 #: app/templates/components/_translation_review_modal.html:16
 msgid "Official translation"
 msgstr ""
@@ -16153,7 +16159,7 @@ msgstr ""
 msgid "Organizations"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:357
+#: app/templates/admin/translations/quality_dashboard.html:365
 msgid "Origin"
 msgstr ""
 
@@ -16326,20 +16332,20 @@ msgstr ""
 msgid "PO ZIP (all languages)"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:927
+#: app/routes/admin/utilities/translations.py:932
 #, python-format
 msgid ""
 "PO ZIP import finished. Locales processed: %(p)d, skipped: %(s)d. "
 "Updated: %(u)d, skipped missing: %(m)d, skipped empty: %(e)d."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:511
-#: app/routes/admin/utilities/translations.py:964
+#: app/routes/admin/utilities/translations.py:516
+#: app/routes/admin/utilities/translations.py:969
 #, python-format
 msgid "PO file not found for %(lang)s."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:992
+#: app/routes/admin/utilities/translations.py:997
 #, python-format
 msgid ""
 "PO import finished for %(lang)s. Updated: %(u)d, skipped missing: %(m)d, "
@@ -16350,7 +16356,7 @@ msgstr ""
 msgid "PO write locking is not active"
 msgstr ""
 
-#: app/routes/forms/export.py:1468 app/routes/forms_validation_summary.py:570
+#: app/routes/forms/export.py:1467 app/routes/forms_validation_summary.py:570
 #: app/routes/forms_validation_summary.py:598
 #: app/routes/forms_validation_summary.py:1537
 #: app/services/documentation/pdf_service.py:121
@@ -16719,7 +16725,7 @@ msgid "Permanently delete all associated data entries and remove the"
 msgstr ""
 
 #: app/templates/admin/translations/manage_translations.html:705
-msgid "Permanently delete this removed string from all .po files"
+msgid "Permanently delete this removed string from the catalog"
 msgstr ""
 
 #: app/templates/admin/rbac/grants.html:49
@@ -16888,11 +16894,11 @@ msgstr ""
 msgid "Please select a file"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:949
+#: app/routes/admin/utilities/translations.py:954
 msgid "Please select a language for PO import."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:503
+#: app/routes/admin/utilities/translations.py:508
 msgid "Please select a language to export."
 msgstr ""
 
@@ -16948,11 +16954,11 @@ msgstr ""
 msgid "Please specify..."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:959
+#: app/routes/admin/utilities/translations.py:964
 msgid "Please upload a .po file for PO import."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:829
+#: app/routes/admin/utilities/translations.py:834
 msgid "Please upload a .zip file for PO ZIP import."
 msgstr ""
 
@@ -16969,7 +16975,7 @@ msgstr ""
 msgid "Please upload an Excel file (.xlsx or .xls)"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1012
+#: app/routes/admin/utilities/translations.py:1017
 msgid "Please upload an Excel file (.xlsx or .xls)."
 msgstr ""
 
@@ -17090,8 +17096,8 @@ msgstr ""
 msgid "Preferences"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:325
-#: app/templates/admin/translations/quality_dashboard.html:356
+#: app/templates/admin/translations/quality_dashboard.html:333
+#: app/templates/admin/translations/quality_dashboard.html:364
 msgid "Preferred"
 msgstr ""
 
@@ -18179,8 +18185,8 @@ msgstr ""
 msgid "Regular section with predefined indicators/questions"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:294
-#: app/templates/admin/translations/quality_dashboard.html:369
+#: app/templates/admin/translations/quality_dashboard.html:302
+#: app/templates/admin/translations/quality_dashboard.html:377
 #: app/templates/admin/user_management/access_requests.html:682
 msgid "Reject"
 msgstr ""
@@ -18385,7 +18391,7 @@ msgstr ""
 msgid "Removed %(count)d field in %(template)s"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1438
+#: app/routes/admin/utilities/translations.py:1456
 #, python-format
 msgid "Removed %(entries)d obsolete translation entries from %(count)d file(s)"
 msgstr ""
@@ -18400,7 +18406,7 @@ msgstr ""
 msgid "Removed obsolete entries"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1406
+#: app/routes/admin/utilities/translations.py:1417
 #, python-format
 msgid "Removed obsolete translation entries from %(count)d file(s)"
 msgstr ""
@@ -20039,7 +20045,7 @@ msgid ""
 "conflicts when multiple people are editing."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:214
+#: app/templates/admin/translations/quality_dashboard.html:222
 msgid "Seed from Indicator Bank"
 msgstr ""
 
@@ -20287,8 +20293,8 @@ msgstr ""
 msgid "Select at least one reporting year."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:332
-#: app/routes/admin/utilities/translations.py:445
+#: app/routes/admin/utilities/translations.py:337
+#: app/routes/admin/utilities/translations.py:450
 msgid "Select at least one row and a bulk action."
 msgstr ""
 
@@ -20800,11 +20806,11 @@ msgid ""
 "basemap."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:223
+#: app/templates/admin/translations/quality_dashboard.html:231
 msgid "Set Must"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:224
+#: app/templates/admin/translations/quality_dashboard.html:232
 msgid "Set Preferred"
 msgstr ""
 
@@ -21391,8 +21397,8 @@ msgid ""
 "changed before saving."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1409
-#: app/routes/admin/utilities/translations.py:1444
+#: app/routes/admin/utilities/translations.py:1420
+#: app/routes/admin/utilities/translations.py:1462
 #, python-format
 msgid "Some languages could not be updated: %(langs)s"
 msgstr ""
@@ -21427,7 +21433,7 @@ msgstr ""
 #: app/templates/admin/data_exploration/explore_data.html:1552
 #: app/templates/admin/templates/data_sync_imputation.html:2002
 #: app/templates/admin/translations/manage_translations.html:697
-#: app/templates/admin/translations/quality_dashboard.html:351
+#: app/templates/admin/translations/quality_dashboard.html:359
 #: app/templates/admin/validation_questions.html:243
 msgid "Source"
 msgstr ""
@@ -21444,7 +21450,7 @@ msgstr ""
 msgid "Source Template"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:373
+#: app/routes/admin/utilities/translations.py:378
 #: app/routes/translation_review/__init__.py:281
 msgid "Source term is required"
 msgstr ""
@@ -21663,7 +21669,7 @@ msgstr ""
 #: app/templates/admin/templates/data_sync_imputation.html:237
 #: app/templates/admin/templates/templates.html:191
 #: app/templates/admin/templates/upr_excel_import.html:118
-#: app/templates/admin/translations/quality_dashboard.html:358
+#: app/templates/admin/translations/quality_dashboard.html:366
 #: app/templates/admin/user_management/access_requests.html:1254
 #: app/templates/admin/user_management/users.html:365
 #: app/templates/admin/validation_dashboard.html:210
@@ -22355,7 +22361,7 @@ msgstr ""
 msgid "Target Period"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:375
+#: app/routes/admin/utilities/translations.py:380
 #: app/routes/translation_review/__init__.py:283
 msgid "Target term is required"
 msgstr ""
@@ -22652,8 +22658,8 @@ msgstr ""
 msgid "Text content"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1802
-#: app/routes/admin/utilities/translations.py:1838
+#: app/routes/admin/utilities/translations.py:1820
+#: app/routes/admin/utilities/translations.py:1856
 msgid "Text is required"
 msgstr ""
 
@@ -23128,14 +23134,14 @@ msgstr ""
 #: app/templates/admin/translations/manage_translations.html:735
 #, python-format
 msgid ""
-"This permanently deletes %(count)s obsolete (#~) entries from every "
-"locale .po file. Active strings are not affected. Continue?"
+"This permanently deletes %(count)s strings that are no longer in the "
+"source catalog. Active strings are not affected. Continue?"
 msgstr ""
 
 #: app/templates/admin/translations/manage_translations.html:732
 msgid ""
-"This permanently deletes the obsolete (#~) entry for this message from "
-"every locale .po file. Active strings are not affected. Continue?"
+"This permanently deletes this string from the translation catalog. Active"
+" source strings are not affected. Continue?"
 msgstr ""
 
 #: app/templates/forms/entry_form/entry_form.html:253
@@ -23369,12 +23375,12 @@ msgstr ""
 msgid "Tick for"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:322
-#: app/templates/admin/translations/quality_dashboard.html:354
+#: app/templates/admin/translations/quality_dashboard.html:330
+#: app/templates/admin/translations/quality_dashboard.html:362
 msgid "Tier"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:329
+#: app/routes/admin/utilities/translations.py:334
 msgid "Tier must be Must or Preferred."
 msgstr ""
 
@@ -23856,7 +23862,7 @@ msgstr ""
 
 #: app/templates/admin/organization/index.html:2554
 #: app/templates/admin/translations/manage_translations.html:719
-#: app/templates/admin/translations/quality_dashboard.html:138
+#: app/templates/admin/translations/quality_dashboard.html:146
 #: app/templates/components/auto_translate_modal_js.html:48
 msgid "Translated"
 msgstr ""
@@ -23879,7 +23885,7 @@ msgstr ""
 
 #: app/services/documentation/service.py:269
 #: app/templates/admin/translations/manage_translations.html:749
-#: app/templates/admin/translations/quality_dashboard.html:352
+#: app/templates/admin/translations/quality_dashboard.html:360
 msgid "Translation"
 msgstr ""
 
@@ -24073,44 +24079,44 @@ msgstr ""
 msgid "Translations"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1524
+#: app/routes/admin/utilities/translations.py:1542
 msgid "Translations compiled and reloaded successfully!"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1517
+#: app/routes/admin/utilities/translations.py:1535
 msgid ""
 "Translations compiled successfully! Application context refreshed. Please"
 " restart the application via your process manager to apply changes across"
 " all workers."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1505
+#: app/routes/admin/utilities/translations.py:1523
 msgid "Translations compiled successfully! Application restart triggered."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1522
+#: app/routes/admin/utilities/translations.py:1540
 msgid ""
 "Translations compiled successfully! However, automatic restart failed. "
 "Please restart the application manually."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1507
+#: app/routes/admin/utilities/translations.py:1525
 msgid ""
 "Translations compiled successfully! Please restart the application "
 "manually to apply changes."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1520
+#: app/routes/admin/utilities/translations.py:1538
 msgid ""
 "Translations compiled successfully! Please restart the application via "
 "your process manager to apply changes."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1647
+#: app/routes/admin/utilities/translations.py:1665
 msgid "Translations extracted and updated successfully!"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1541 app/routes/main/views.py:115
+#: app/routes/admin/utilities/translations.py:1559 app/routes/main/views.py:115
 msgid "Translations reloaded successfully!"
 msgstr ""
 
@@ -24483,8 +24489,8 @@ msgstr ""
 #: app/templates/admin/templates/partials/imputation_badges.html:25
 #: app/templates/admin/translations/manage_translations.html:662
 #: app/templates/admin/translations/manage_translations.html:700
-#: app/templates/admin/translations/quality_dashboard.html:141
-#: app/templates/admin/translations/quality_dashboard.html:260
+#: app/templates/admin/translations/quality_dashboard.html:149
+#: app/templates/admin/translations/quality_dashboard.html:268
 #: app/templates/core/dashboard/_assignments_tab.html:84
 #: app/templates/core/dashboard/_assignments_tab.html:86
 #: app/templates/core/dashboard/_assignments_tab.html:88
@@ -24540,7 +24546,7 @@ msgstr ""
 msgid "Unknown User"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1659
+#: app/routes/admin/utilities/translations.py:1677
 #: app/templates/admin/documents/documents.html:1025
 #: app/templates/admin/documents/documents.html:1065
 #: app/templates/admin/indicator_bank/indicator_bank.html:268
@@ -24560,8 +24566,8 @@ msgstr ""
 msgid "Unknown user"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:506
-#: app/routes/admin/utilities/translations.py:952
+#: app/routes/admin/utilities/translations.py:511
+#: app/routes/admin/utilities/translations.py:957
 #, python-format
 msgid "Unknown/disabled language: %(lang)s"
 msgstr ""
@@ -24593,7 +24599,7 @@ msgstr ""
 msgid "Unreviewed"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:235
+#: app/templates/admin/translations/quality_dashboard.html:243
 msgid "Unreviewed machine strings"
 msgstr ""
 
@@ -24874,13 +24880,14 @@ msgid ""
 "The Variables toolbar button shows sample rendered values."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:189
+#: app/templates/admin/translations/quality_dashboard.html:136
+#: app/templates/admin/translations/quality_dashboard.html:197
 msgid ""
 "Use Sync catalog from .po on Translation Management to import coverage "
 "data."
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:365
+#: app/templates/admin/translations/quality_dashboard.html:373
 msgid "Use approved"
 msgstr ""
 
@@ -25766,7 +25773,7 @@ msgstr ""
 msgid "Warning: This action cannot be undone!"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:216
+#: app/routes/admin/utilities/translations.py:221
 msgid ""
 "Warning: polib package not available. Translation file management will be"
 " limited. Install with: pip install polib"
@@ -27018,8 +27025,8 @@ msgstr ""
 msgid "ms"
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:1212
-#: app/routes/admin/utilities/translations.py:1395
+#: app/routes/admin/utilities/translations.py:1217
+#: app/routes/admin/utilities/translations.py:1400
 #: app/routes/translation_review/__init__.py:109
 #: app/routes/translation_review/__init__.py:163
 msgid "msgid is required"
@@ -27146,11 +27153,11 @@ msgid ""
 "acceptable use and important limits."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:495
+#: app/routes/admin/utilities/translations.py:500
 msgid "polib is not installed; export is unavailable."
 msgstr ""
 
-#: app/routes/admin/utilities/translations.py:746
+#: app/routes/admin/utilities/translations.py:751
 msgid "polib is not installed; import is unavailable."
 msgstr ""
 
@@ -27509,7 +27516,7 @@ msgstr ""
 msgid "{count} indicators"
 msgstr ""
 
-#: app/templates/admin/translations/quality_dashboard.html:376
+#: app/templates/admin/translations/quality_dashboard.html:384
 #, python-brace-format
 msgid "{count} pending"
 msgstr ""
@@ -27517,7 +27524,7 @@ msgstr ""
 #: app/templates/admin/ai/documents.html:713
 #: app/templates/admin/templates/new_template.html:1209
 #: app/templates/admin/templates/new_template.html:1221
-#: app/templates/admin/translations/quality_dashboard.html:378
+#: app/templates/admin/translations/quality_dashboard.html:386
 #, python-brace-format
 msgid "{count} selected"
 msgstr ""

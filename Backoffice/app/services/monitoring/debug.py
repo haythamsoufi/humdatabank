@@ -265,6 +265,19 @@ class DebugManager:
         for _noisy_imaging in ("PIL", "PIL.PngImagePlugin", "PIL.Image", "pytesseract"):
             logging.getLogger(_noisy_imaging).setLevel(logging.WARNING)
 
+        # WeasyPrint + fontTools.subset emit dozens of INFO lines per PDF
+        # (pipeline steps + per-table glyph subsetting). They also attach
+        # their own stderr handlers, which Azure Log Stream paints red even
+        # though the records are INFO, not errors.
+        for _noisy_pdf in (
+            "weasyprint",
+            "weasyprint.progress",
+            "fontTools",
+            "fontTools.subset",
+            "fontTools.ttLib",
+        ):
+            logging.getLogger(_noisy_pdf).setLevel(logging.WARNING)
+
         # PostgreSQL server NOTICEs (e.g. FTS tokens >2047 chars) via SQLAlchemy dialect.
         logging.getLogger("sqlalchemy.dialects.postgresql").setLevel(logging.WARNING)
 

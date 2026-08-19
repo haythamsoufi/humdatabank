@@ -24,6 +24,13 @@ PROVENANCE_REMOTE_SYNC = "remote_sync"
 STATUS_UNREVIEWED = "unreviewed"
 STATUS_APPROVED = "approved"
 
+SOURCE_LOCALE = "en"
+
+
+def is_source_locale(locale: str) -> bool:
+    """English is the catalog source language, not a coverage/target locale."""
+    return (locale or "").strip().lower() == SOURCE_LOCALE
+
 
 def msgid_hash(msgid: str) -> str:
     return hashlib.sha256((msgid or "").encode("utf-8")).hexdigest()[:16]
@@ -137,7 +144,7 @@ def upsert_string(
     from app.models.translation_quality import TranslationString
 
     locale = (locale or "").strip().lower()
-    if not locale or not msgid:
+    if not locale or not msgid or is_source_locale(locale):
         return False
 
     row = TranslationString.query.filter_by(locale=locale, msgid=msgid).first()
@@ -187,6 +194,8 @@ def upsert_many(
     """Update one msgid across locales. Compiles once at the end."""
     updated: List[str] = []
     for lang, msgstr in (lang_to_msgstr or {}).items():
+        if is_source_locale(lang):
+            continue
         if upsert_string(
             locale=lang,
             msgid=msgid,
@@ -239,7 +248,7 @@ def upsert_batch(
     normalized: List[Tuple[str, str, str]] = []
     for msgid, locale, msgstr in items:
         loc = (locale or "").strip().lower()
-        if not loc or not msgid:
+        if not loc or not msgid or is_source_locale(loc):
             continue
         normalized.append((msgid, loc, "" if msgstr is None else str(msgstr)))
 
@@ -315,6 +324,8 @@ def upsert_batch(
 def apply_imported_updates(locale: str, msgid_to_msgstr: Dict[str, str]) -> int:
     """Write imported PO/XLSX values into the catalog without re-saving .po files."""
     n = 0
+    if is_source_locale(locale):
+        return 0
     for msgid, msgstr in (msgid_to_msgstr or {}).items():
         if upsert_string(
             locale=locale,
@@ -657,7 +668,16 @@ def import_from_po_files(
     if locales is None:
         locales = current_app.config.get("SUPPORTED_LANGUAGES") or ["en", "fr", "es", "ar", "ru", "zh"]
 
-    target_locales = [str(loc).strip().lower() for loc in locales if loc and loc != "en"]
+    target_locales = [
+        str(loc).strip().lower()
+        for loc in locales
+        if loc and not is_source_locale(str(loc))
+    ]
+    stale_source = TranslationString.query.filter(
+        TranslationString.locale == SOURCE_LOCALE
+    ).delete(synchronize_session=False)
+    if stale_source:
+        logger.info("import_from_po_files: removed %d source-locale catalog row(s)", stale_source)
     existing_rows = {
         (r.locale, r.msgid): r
         for r in TranslationString.query.filter(TranslationString.locale.in_(target_locales)).all()
@@ -758,7 +778,7 @@ def import_from_po_files(
         for i in range(0, len(pending), 500):
             db.session.add_all(pending[i : i + 500])
             db.session.commit()
-    elif filled:
+    elif filled or stale_source:
         db.session.commit()
     counts["_total_inserted"] = sum(v.get("inserted", 0) for v in counts.values() if isinstance(v, dict))
     counts["_total_filled"] = filled

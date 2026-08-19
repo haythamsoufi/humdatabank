@@ -353,6 +353,19 @@ class TestUpsertStringIntegration:
         assert row.msgstr == "Salut (forced)"
         assert row.provenance == PROVENANCE_MACHINE
 
+    def test_source_locale_is_not_written(self, db_session):
+        from app.models.translation_quality import TranslationString
+        from app.services.translation.catalog_service import upsert_string
+
+        with patch("app.services.translation.catalog_service._sync_po_entry"), \
+             patch("app.utils.po_persistence.finalize_translation_writes"):
+            wrote = upsert_string(
+                locale="en", msgid="Hello", msgstr="Hello",
+                provenance=PROVENANCE_HUMAN,
+            )
+        assert wrote is False
+        assert TranslationString.query.filter_by(locale="en").count() == 0
+
 
 @pytest.mark.unit
 class TestUpsertBatchIntegration:
@@ -422,3 +435,20 @@ class TestUpsertBatchIntegration:
 
         assert result["skipped_protected"] == 0
         assert result["updated"] == 1
+
+    def test_source_locale_items_are_ignored(self, db_session):
+        from app.models.translation_quality import TranslationString
+        from app.services.translation.catalog_service import upsert_batch
+
+        with patch("app.services.translation.catalog_service._sync_po_entries_bulk") as mock_bulk, \
+             patch("app.utils.po_persistence.finalize_translation_writes"):
+            result = upsert_batch(
+                [("Hello", "en", "Hello"), ("Hello", "fr", "Bonjour")],
+                provenance=PROVENANCE_HUMAN,
+            )
+
+        assert result["updated"] == 1
+        assert result["updated_locales"] == ["fr"]
+        mock_bulk.assert_called_once()
+        assert TranslationString.query.filter_by(locale="en").count() == 0
+        assert TranslationString.query.filter_by(locale="fr", msgid="Hello").first().msgstr == "Bonjour"

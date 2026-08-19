@@ -336,6 +336,34 @@ class TestConfigureLogging:
 
         assert "openai" not in captured_loggers
 
+    def test_weasyprint_and_fonttools_loggers_suppressed_to_warning(self):
+        """PDF pipeline INFO (progress + glyph subsetting) is capped at WARNING."""
+        mgr = _fresh_debug_manager()
+        app = _make_mock_app({})
+        captured_loggers = {}
+
+        def mock_get_logger(name=None):
+            mock = MagicMock(spec=logging.Logger, handlers=[])
+            if name:
+                captured_loggers[name] = mock
+            return mock
+
+        with (
+            patch("os.makedirs"),
+            patch("logging.getLogger", side_effect=mock_get_logger),
+        ):
+            mgr.configure_logging(app)
+
+        for logger_name in (
+            "weasyprint",
+            "weasyprint.progress",
+            "fontTools",
+            "fontTools.subset",
+            "fontTools.ttLib",
+        ):
+            assert logger_name in captured_loggers
+            captured_loggers[logger_name].setLevel.assert_any_call(logging.WARNING)
+
     def test_log_to_stdout_also_adds_root_stream_handler(self):
         mgr = _fresh_debug_manager()
         app = _make_mock_app({"LOG_TO_STDOUT": True, "APPLICATION_LOG_FILE_ENABLED": False})

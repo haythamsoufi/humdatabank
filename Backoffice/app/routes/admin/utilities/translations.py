@@ -156,7 +156,12 @@ def _update_po_translations(msgid, lang_to_msgstr, *, provenance=None, engine=No
     )
 
     resolved = provenance or PROVENANCE_HUMAN
-    return upsert_many(msgid, lang_to_msgstr, provenance=resolved, engine=engine)
+    filtered = {
+        lang: msgstr
+        for lang, msgstr in (lang_to_msgstr or {}).items()
+        if lang and str(lang).strip().lower() != "en"
+    }
+    return upsert_many(msgid, filtered, provenance=resolved, engine=engine)
 
 
 def _decode_translation_payload(data):

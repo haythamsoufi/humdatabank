@@ -397,3 +397,44 @@ def test_glossary_term_repo_create_list_update_and_deactivate(db_session):
         assert False, "expected invalid source"
     except GlossaryTermError as exc:
         assert str(exc) == "invalid_source"
+
+
+def test_quality_dashboard_excludes_english_and_seeds_target_locales(db_session, app):
+    from app.models.translation_quality import TranslationString
+    from app.services.translation.catalog_service import (
+        PROVENANCE_HUMAN,
+        msgid_hash,
+    )
+    from app.services.translation.quality_metrics import quality_dashboard_payload
+
+    db_session.add(
+        TranslationString(
+            locale="en",
+            msgid="Hello",
+            msgid_hash=msgid_hash("Hello"),
+            msgstr="Hello",
+            provenance=PROVENANCE_HUMAN,
+            status="approved",
+        )
+    )
+    db_session.add(
+        TranslationString(
+            locale="fr",
+            msgid="Hello",
+            msgid_hash=msgid_hash("Hello"),
+            msgstr="Bonjour",
+            provenance=PROVENANCE_HUMAN,
+            status="approved",
+        )
+    )
+    db_session.commit()
+
+    with app.app_context():
+        payload = quality_dashboard_payload()
+
+    assert "en" not in payload["locales"]
+    assert payload["locales"]["fr"]["total"] == 1
+    assert payload["locales"]["fr"]["human_approved"] == 1
+    assert payload["locales"]["fr"]["translated"] == 1
+    assert payload["catalog_imported"] is True
+    assert payload["human_approved_share_pct"] == 100.0

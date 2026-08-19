@@ -16,6 +16,7 @@ const DEBUG_CONFIG = {
         'form_validation': false,
         'pdf-export': false,
         'excel-export': false,
+        'upr-excel-import': false,
         'calculated-lists-runtime': false,
         'disaggregation-calculator': false,
         'matrix-handler': false,

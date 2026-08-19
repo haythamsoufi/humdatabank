@@ -273,6 +273,9 @@ class UprImportContext:
     percentage_allow_over_100_bank_ids: Set[int] = field(default_factory=set)
     indicator_bank_ids: Set[int] = field(default_factory=set)
     core_yes_no_item_ids: List[int] = field(default_factory=list)
+    # Static form items where FormItem.allow_not_applicable is True — a blank
+    # workbook Applicable/DNA cell only maps to Not Applicable for these ids.
+    not_applicable_item_ids: Set[int] = field(default_factory=set)
     warnings: List[str] = field(default_factory=list)
     # PNS assignment AES ids with at least one Excel Funding row where PNS reported = Yes.
     pns_t22_reported_aes: Set[int] = field(default_factory=set)
@@ -920,6 +923,27 @@ def _load_core_yes_no_item_ids(
         if is_yes_no:
             out.append(int(item.id))
     return out
+
+
+def _load_not_applicable_item_ids(template_id: int, version_id: int) -> Set[int]:
+    """Published-version static form items where Not Applicable is a supported answer.
+
+    A blank workbook Applicable/DNA cell only imports as Not Applicable for
+    items in this set — other indicators keep their historical blank-cell
+    handling (Yes/No defaults to "no"; numeric fields with nothing else
+    present are skipped) since the form has no checkbox to record the state.
+    """
+    from app.models.form_items import FormItem
+
+    return {
+        int(item.id)
+        for item in FormItem.query.filter_by(
+            template_id=int(template_id),
+            version_id=int(version_id),
+            archived=False,
+        )
+        if item.allow_not_applicable
+    }
 
 
 def _reporting_aes_ids_from_excel(
@@ -2529,6 +2553,9 @@ def build_import_context(template_ids: List[int]) -> UprImportContext:
                 pub_vid,
                 other_section_id=ctx.other_indicators_section_id,
                 yes_no_bank_ids=ctx.yes_no_bank_ids,
+            )
+            ctx.not_applicable_item_ids = _load_not_applicable_item_ids(
+                REPORTING_COUNTRY_TEMPLATE_ID, pub_vid
             )
             (
                 ctx.ea_repeat_section_id,

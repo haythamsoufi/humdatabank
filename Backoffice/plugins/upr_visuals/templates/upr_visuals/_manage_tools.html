@@ -1,14 +1,6 @@
 {# Bulk PNG export — Data Explorer UPR visuals tab. #}
 <div id="upr-visuals-admin" class="space-y-5">
     <div class="upr-vis-toolbar">
-        <div class="upr-vis-toolbar__assignment">
-            <label for="upr-vis-assignment" class="upr-vis-toolbar__label">{{ _('Assignment') }}</label>
-            <select id="upr-vis-assignment"
-                    class="upr-vis-toolbar__select"
-                    title="{{ _('Only Unified Plan (24) and Report (33) assignments are listed.')|forceescape }}">
-                <option value="">{{ _('Select an assignment') }}</option>
-            </select>
-        </div>
         <nav id="upr-vis-mode-tabs" class="upr-vis-toolbar__tabs" role="tablist" aria-label="{{ _('UPR visuals tools') }}">
             <button type="button"
                     role="tab"
@@ -29,6 +21,16 @@
                 <i class="fas fa-images" aria-hidden="true"></i>{{ _('Generate') }}
             </button>
         </nav>
+    </div>
+
+    <div class="space-y-3">
+    <div class="upr-vis-preview__controls">
+        <label for="upr-vis-assignment" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Assignment') }}</label>
+        <select id="upr-vis-assignment"
+                class="w-full max-w-xl pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                title="{{ _('Only Unified Plan (24) and Report (33) assignments are listed.')|forceescape }}">
+            <option value="">{{ _('Select an assignment') }}</option>
+        </select>
     </div>
 
     <div id="upr-vis-pane-generate" class="space-y-5" role="tabpanel" aria-labelledby="upr-vis-tab-generate" hidden>
@@ -125,5 +127,6 @@
         <div class="upr-vis-preview__stage">
             <div id="upr-vis-preview-body" class="upr-visual-report__body upr-vis-page"></div>
         </div>
+    </div>
     </div>
 </div>

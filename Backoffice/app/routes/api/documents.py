@@ -185,6 +185,20 @@ def serve_spef_icon(filename):
         abort(404)
 
 
+@api_bp.route('/uploads/ns/<path:filename>', methods=['GET'])
+def serve_ns_logo(filename):
+    """Serve National Society logo files."""
+    try:
+        safe_name = os.path.basename(filename)
+        return storage.stream_response(
+            storage.SYSTEM, f"ns/{safe_name}",
+            filename=safe_name, as_attachment=False,
+        )
+    except Exception as e:
+        current_app.logger.error("Error serving NS logo %s: %s", filename, e)
+        abort(404)
+
+
 @api_bp.route('/uploads/branding/<path:filename>', methods=['GET'])
 def serve_branding_asset(filename):
     """Serve organization logo/favicon uploaded from System Configuration (branding tab)."""

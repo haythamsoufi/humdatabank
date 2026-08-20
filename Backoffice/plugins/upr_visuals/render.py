@@ -11,14 +11,17 @@ from plugins.upr_visuals.catalog import (
     DASHBOARD_BY_ID,
     EF_CODES,
     KPI_ORDER,
+    PLAN_DETAIL_SP_LABELS,
     PLAN_KPI_ORDER,
     SP_CODES,
     SUPPORT_AREA_CODES,
+    SUPPORT_DOT_COLORS,
     kpi_icon_src,
 )
-from plugins.upr_visuals.formatters import format_compact_chf
+from plugins.upr_visuals.formatters import document_subtitle, format_compact_chf, format_header_date
 
 IFRC_RED = "#d22730"
+IFRC_LOGO_SRC = "/static/IFRC_logo_square.svg"
 _NOT_REPORTED = "Not reported"
 
 
@@ -130,16 +133,9 @@ def _is_plan(payload: dict[str, Any]) -> bool:
     return (payload.get("meta") or {}).get("kind") == "plan"
 
 
-def _network_area_label(code: str) -> str:
-    if code == "EFs":
-        return "Enabling local actors"
-    return AREA_LABELS.get(code, code)
-
-
 def _combined(payload: dict[str, Any]) -> str:
     if _is_plan(payload):
         parts = [
-            _plan_cover_banner(payload),
             _in_support(payload),
             _reach(payload),
             _plan_funding(payload),
@@ -147,15 +143,19 @@ def _combined(payload: dict[str, Any]) -> str:
             _support(payload),
             _network_funding(payload),
         ]
-        return "".join(f'<div class="upr-combined-section">{part}</div>' for part in parts if part)
-    parts = [_in_support(payload), _reach(payload), _financial(payload), _support(payload)]
-    if payload.get("core_indicators"):
-        parts.append(_strategic_priorities(payload))
-    if payload.get("enabling_indicators"):
-        parts.append(_enabling_functions(payload))
-    for em in payload.get("emergencies") or []:
-        parts.append(_emergency(payload, int(em["slot"])))
-    return "".join(f'<div class="upr-combined-section">{part}</div>' for part in parts)
+    else:
+        parts = [_in_support(payload), _reach(payload), _financial(payload), _support(payload)]
+        if payload.get("core_indicators"):
+            parts.append(_strategic_priorities(payload))
+        if payload.get("enabling_indicators"):
+            parts.append(_enabling_functions(payload))
+        for em in payload.get("emergencies") or []:
+            parts.append(_emergency(payload, int(em["slot"])))
+    body = "".join(f'<div class="upr-combined-section">{part}</div>' for part in parts if part)
+    header = _doc_header(payload)
+    if not header:
+        return body
+    return f"{header}<div class='upr-combined-body'>{body}</div>"
 
 
 def _in_support(payload: dict[str, Any]) -> str:
@@ -243,35 +243,59 @@ def _plan_chf_html(display: str | None) -> str:
     return f'<span class="upr-num">{escape(text)} CHF</span>'
 
 
-def _plan_cover_banner(payload: dict[str, Any]) -> str:
+def _doc_header(payload: dict[str, Any]) -> str:
     meta = payload.get("meta") or {}
-    country = escape((meta.get("country_name") or "").upper())
-    years = [str(year) for year in (meta.get("plan_years") or []) if year]
-    if len(years) >= 2:
-        span = f"{years[0]}-{years[-1]} IFRC network country plan"
-    elif years:
-        span = f"{years[0]} IFRC network country plan"
-    else:
-        year = meta.get("year") or meta.get("period_name") or ""
-        span = f"{year} IFRC network country plan" if year else "IFRC network country plan"
+    country = (meta.get("country_name") or "").strip().upper()
     if not country:
         return ""
+    subtitle = (meta.get("document_subtitle") or "").strip() or document_subtitle(
+        meta.get("kind") or "report",
+        meta.get("period_name"),
+        plan_years=meta.get("plan_years"),
+    )
+    date_text = (meta.get("header_date") or "").strip() or format_header_date()
+    ns_src = (meta.get("ns_logo_src") or "").strip()
+    ns_alt = (meta.get("national_society") or "National Society").strip() or "National Society"
+    ns_logo_html = ""
+    if ns_src:
+        ns_logo_html = (
+            f"<img class='upr-doc-header__ns-logo' src='{escape(ns_src, quote=True)}' "
+            f"alt='{escape(ns_alt, quote=True)}'>"
+        )
     return (
-        "<header class='upr-plan-cover'>"
-        f"<h1 class='upr-plan-cover__country'>{country}</h1>"
-        f"<p class='upr-plan-cover__span'>{escape(span)}</p>"
+        "<header class='upr-doc-header'>"
+        "<div class='upr-doc-header__brand'>"
+        f"<img class='upr-doc-header__logo' src='{escape(IFRC_LOGO_SRC, quote=True)}' alt='IFRC'>"
+        "</div>"
+        "<div class='upr-doc-header__titles'>"
+        f"<h1 class='upr-doc-header__country'>{escape(country)}</h1>"
+        f"<p class='upr-doc-header__subtitle'>{escape(subtitle)}</p>"
+        "</div>"
+        "<div class='upr-doc-header__meta'>"
+        f"{ns_logo_html}"
+        f"<time class='upr-doc-header__date'>{escape(date_text)}</time>"
+        "</div>"
         "</header>"
     )
+
+
+def _plan_cover_banner(payload: dict[str, Any]) -> str:
+    return _doc_header(payload)
 
 
 def _plan_pns_list(payload: dict[str, Any]) -> str:
     rows = payload.get("participating_societies") or payload.get("support") or []
     names: list[str] = []
     any_star = False
+    seen: set[str] = set()
     for rec in rows:
         name = (rec.get("name") or "").strip()
         if not name:
             continue
+        key = str(rec.get("ns_id") if rec.get("ns_id") is not None else name).lower()
+        if key in seen:
+            continue
+        seen.add(key)
         areas = rec.get("areas") or {}
         spef = any(areas.get(code) for code in SUPPORT_AREA_CODES)
         star = bool(rec.get("multilateral_only") or (areas.get("multilateral") and not spef))
@@ -367,68 +391,84 @@ def _plan_funding(payload: dict[str, Any]) -> str:
     )
 
 
+def _detail_amt_cell(value: Any, *, pill: bool) -> str:
+    number = float(value or 0)
+    disp = format_compact_chf(number) if number else ""
+    if not disp:
+        return "<td class='upr-detail-fund__amt'></td>"
+    text = escape(disp)
+    if pill:
+        text = f"<span class='upr-detail-fund__pill'>{text}</span>"
+    return f"<td class='upr-detail-fund__amt'>{text}</td>"
+
+
+def _detail_pair(hns: dict[str, Any], ifrc: dict[str, Any], key: str, *, pill: bool) -> str:
+    return _detail_amt_cell(hns.get(key), pill=pill) + _detail_amt_cell(ifrc.get(key), pill=pill)
+
+
+def _entity_funding_total(rec: dict[str, Any]) -> float:
+    breakdown = sum(float(rec.get(code) or 0) for code in (*SP_CODES, "EFs"))
+    emergency = float(rec.get("emergency") or 0)
+    if breakdown or emergency:
+        return breakdown + emergency
+    return float(rec.get("total") or 0)
+
+
 def _network_funding(payload: dict[str, Any]) -> str:
+    """Tableau plan layout: Detailed funding requirements (year 0, HNS vs IFRC)."""
     fin = payload.get("financial") or {}
     area_years = list(fin.get("area_years") or [])
     empty = (
         "<section class='upr-block upr-block--network-funding'>"
-        "<h2 class='upr-block__title'>IFRC Network-Supported Activities</h2>"
+        "<h2 class='upr-block__title'>Detailed funding requirements</h2>"
         "<p class='upr-empty'>No funding requirements reported.</p></section>"
     )
     if not area_years:
         return empty
-    entity_specs = (
-        ("HNS", "Host National Society"),
-        ("IFRC Secretariat", "IFRC"),
-    )
-    headers = "".join(
-        f"<th class='upr-support-th'><span>{escape(_network_area_label(code))}</span></th>"
-        for code in SUPPORT_AREA_CODES
-    )
-    body: list[str] = []
-    n_years = len(area_years)
-    for entity, label in entity_specs:
-        has_any = any(
-            any(
-                float((year_row.get("by_entity") or {}).get(entity, {}).get(key) or 0)
-                for key in (*SUPPORT_AREA_CODES, "total")
-            )
-            for year_row in area_years
-        )
-        if not has_any:
-            continue
-        first = True
-        for year_row in area_years:
-            rec = (year_row.get("by_entity") or {}).get(entity) or {}
-            cells = []
-            if first:
-                cells.append(f"<td class='upr-ns' rowspan='{n_years}'>{escape(label)}</td>")
-                first = False
-            cells.append(f"<td class='upr-netfund-year'>{escape(str(year_row.get('year') or ''))}</td>")
-            for code in SUPPORT_AREA_CODES:
-                val = rec.get(code) or 0
-                disp = format_compact_chf(val) if val else ""
-                cells.append(f"<td class='upr-num'>{escape(disp) or '&nbsp;'}</td>")
-            total = rec.get("total") or 0
-            cells.append(f"<td class='upr-num'>{escape(format_compact_chf(total) if total else '') or '&nbsp;'}</td>")
-            body.append(f"<tr>{''.join(cells)}</tr>")
-    if not body:
+    year_row = area_years[0]
+    by_entity = year_row.get("by_entity") or {}
+    hns = by_entity.get("HNS") or {}
+    ifrc = by_entity.get("IFRC Secretariat") or {}
+
+    def has_values(rec: dict[str, Any]) -> bool:
+        return any(float(rec.get(key) or 0) for key in (*SP_CODES, "EFs", "emergency", "total"))
+
+    if not has_values(hns) and not has_values(ifrc):
         return empty
-    n_cols = len(SUPPORT_AREA_CODES)
+
+    year = year_row.get("year") or (payload.get("meta") or {}).get("year") or ""
+    sp_rows = []
+    for code in SP_CODES:
+        label = PLAN_DETAIL_SP_LABELS.get(code) or AREA_LABELS.get(code, code)
+        sp_rows.append(
+            "<tr class='upr-detail-fund__child'>"
+            f"<td>{escape(label)}</td>"
+            f"{_detail_pair(hns, ifrc, code, pill=False)}"
+            "</tr>"
+        )
     return (
         "<section class='upr-block upr-block--network-funding'>"
-        "<h2 class='upr-block__title'>IFRC Network-Supported Activities</h2>"
-        "<p class='upr-fin-unit'>Longer-term needs in Swiss francs (CHF)</p>"
-        "<table class='upr-support-table upr-netfund-table'>"
-        "<colgroup>"
-        "<col class='upr-support-col-ns'>"
-        "<col class='upr-netfund-col-year'>"
-        f"<col class='upr-support-col-num' span='{n_cols + 1}'>"
-        "</colgroup>"
+        "<div class='upr-detail-fund-wrap'>"
+        "<h2 class='upr-block__title'>Detailed funding requirements</h2>"
+        f"<div class='upr-detail-fund__year'>{escape(str(year))}</div>"
+        "<table class='upr-detail-fund'>"
         "<thead><tr>"
-        "<th class='upr-ns'></th><th>Year</th>"
-        f"{headers}<th class='upr-support-th'><span>Total</span></th>"
-        f"</tr></thead><tbody>{''.join(body)}</tbody></table></section>"
+        "<th></th><th>Host National Society</th><th>IFRC</th>"
+        "</tr></thead><tbody>"
+        "<tr class='upr-detail-fund__section'>"
+        "<td>Ongoing emergencies</td>"
+        f"{_detail_pair(hns, ifrc, 'emergency', pill=True)}"
+        "</tr>"
+        "<tr class='upr-detail-fund__group'><td>Longer-term needs</td><td></td><td></td></tr>"
+        f"{''.join(sp_rows)}"
+        "<tr class='upr-detail-fund__section'>"
+        "<td>Enabling local actors</td>"
+        f"{_detail_pair(hns, ifrc, 'EFs', pill=True)}"
+        "</tr></tbody><tfoot><tr>"
+        "<td>Total</td>"
+        f"{_detail_amt_cell(_entity_funding_total(hns), pill=True)}"
+        f"{_detail_amt_cell(_entity_funding_total(ifrc), pill=True)}"
+        "</tr></tfoot></table></div></section>"
     )
 
 
@@ -584,6 +624,41 @@ def _financial_network(
 
 
 def _support(payload: dict[str, Any]) -> str:
+    if _is_plan(payload):
+        return _support_plan(payload)
+    return _support_report(payload)
+
+
+def _support_area_headers() -> str:
+    return "".join(
+        f"<th class='upr-support-th'><span>{escape(AREA_LABELS.get(code, code))}</span></th>"
+        for code in SUPPORT_AREA_CODES
+    )
+
+
+def _support_plan_area_headers() -> str:
+    return "".join(
+        f"<th class='upr-support-th upr-support-th--plan'>"
+        f"<span>{escape(AREA_LABELS.get(code, code))}</span></th>"
+        for code in SUPPORT_AREA_CODES
+    )
+
+
+def _plan_support_area_cell(rec: dict[str, Any], code: str) -> str:
+    areas = rec.get("areas") or {}
+    amounts = rec.get("area_amounts") or {}
+    number = float(amounts.get(code) or 0)
+    active = bool(areas.get(code)) or bool(number)
+    if not active:
+        return "<td class='upr-support-fill'></td>"
+    color = SUPPORT_DOT_COLORS.get(code, AREA_COLORS.get(code, IFRC_RED))
+    text = escape(format_compact_chf(number) if number else "-")
+    return (
+        f"<td class='upr-support-fill upr-support-fill--on' style='background:{color}'>{text}</td>"
+    )
+
+
+def _support_plan(payload: dict[str, Any]) -> str:
     meta = payload.get("meta") or {}
     title = escape(meta.get("support_title") or "Bilateral support")
     rows = payload.get("support") or []
@@ -592,13 +667,76 @@ def _support(payload: dict[str, Any]) -> str:
             f"<section class='upr-block'><h2 class='upr-block__title'>{title}</h2>"
             "<p class='upr-empty'>No participating National Societies reported.</p></section>"
         )
-    headers = "".join(
-        f"<th class='upr-support-th'><span>{escape(AREA_LABELS.get(code, code))}</span></th>"
-        for code in SUPPORT_AREA_CODES
+    funding_label = escape(meta.get("support_funding_label") or "Funding Requirement")
+    confirmed_label = escape(meta.get("support_confirmed_label") or "Confirmed Funding")
+    n_areas = len(SUPPORT_AREA_CODES)
+    body: list[str] = []
+    index = 0
+    while index < len(rows):
+        rec = rows[index]
+        ns_id = rec.get("ns_id")
+        span = 1
+        if ns_id is not None:
+            while index + span < len(rows) and rows[index + span].get("ns_id") == ns_id:
+                span += 1
+        for offset in range(span):
+            row = rows[index + offset]
+            cells: list[str] = []
+            if offset == 0:
+                cells.append(
+                    f"<td class='upr-ns' rowspan='{span}'>{escape(row.get('name') or '')}</td>"
+                )
+            cells.append(f"<td class='upr-support-year'>{escape(str(row.get('year') or ''))}</td>")
+            funding = escape(row.get("funding_display") or "") or "&nbsp;"
+            confirmed = escape(row.get("confirmed_display") or "") or "&nbsp;"
+            cells.append(f"<td class='upr-num'>{funding}</td>")
+            cells.append(f"<td class='upr-num upr-support-confirmed'>{confirmed}</td>")
+            cells.extend(_plan_support_area_cell(row, code) for code in SUPPORT_AREA_CODES)
+            body.append(f"<tr>{''.join(cells)}</tr>")
+        index += span
+    total = payload.get("support_total") or {}
+    total_display = escape((total.get("display") or "").strip() or format_compact_chf(total.get("value")) or "0")
+    confirmed_total = sum(float(row.get("confirmed") or 0) for row in rows)
+    confirmed_total_display = escape(format_compact_chf(confirmed_total) if confirmed_total else "") or "&nbsp;"
+    return (
+        f"<section class='upr-block'><h2 class='upr-block__title'>{title}</h2>"
+        "<table class='upr-support-table upr-support-table--plan'>"
+        "<colgroup>"
+        "<col class='upr-support-col-ns'>"
+        "<col class='upr-support-col-year'>"
+        "<col class='upr-support-col-num'>"
+        "<col class='upr-support-col-num'>"
+        f"<col class='upr-support-col-fill' span='{n_areas}'>"
+        "</colgroup>"
+        "<thead><tr>"
+        "<th class='upr-ns'>National Society</th>"
+        "<th class='upr-support-year'>Year</th>"
+        f"<th class='upr-support-th'><span>{funding_label}</span></th>"
+        f"<th class='upr-support-th'><span>{confirmed_label}</span></th>"
+        f"{_support_plan_area_headers()}</tr></thead><tbody>{''.join(body)}</tbody>"
+        "<tfoot>"
+        "<tr class='upr-support-total-row'>"
+        "<td class='upr-ns'>Total</td>"
+        "<td></td>"
+        f"<td class='upr-num upr-support-total'>CHF {total_display}</td>"
+        f"<td class='upr-num upr-support-confirmed'>{confirmed_total_display}</td>"
+        f"<td colspan='{n_areas}'></td>"
+        "</tr></tfoot></table></section>"
     )
+
+
+def _support_report(payload: dict[str, Any]) -> str:
+    meta = payload.get("meta") or {}
+    title = escape(meta.get("support_title") or "Bilateral support")
+    rows = payload.get("support") or []
+    if not rows:
+        return (
+            f"<section class='upr-block'><h2 class='upr-block__title'>{title}</h2>"
+            "<p class='upr-empty'>No participating National Societies reported.</p></section>"
+        )
     funding_label = escape(
         meta.get("support_funding_label")
-        or ("Funding Requirement" if meta.get("kind") == "plan" else "Funding Reported")
+        or "Funding Reported"
     )
     n_areas = len(SUPPORT_AREA_CODES)
     body = []
@@ -607,7 +745,7 @@ def _support(payload: dict[str, Any]) -> str:
         areas = rec.get("areas") or {}
         for code in SUPPORT_AREA_CODES:
             active = bool(areas.get(code))
-            color = AREA_COLORS.get(code, IFRC_RED) if active else "transparent"
+            color = SUPPORT_DOT_COLORS.get(code, AREA_COLORS.get(code, IFRC_RED)) if active else "transparent"
             cls = "upr-dot upr-dot--on" if active else "upr-dot"
             dots.append(f"<td class='upr-dot-cell'><span class='{cls}' style='background:{color}'></span></td>")
         funding = escape(rec.get("funding_display") or "") or "&nbsp;"
@@ -631,7 +769,7 @@ def _support(payload: dict[str, Any]) -> str:
         "<thead><tr>"
         "<th class='upr-ns'></th>"
         f"<th class='upr-support-th'><span>{funding_label}</span></th>"
-        f"{headers}</tr></thead><tbody>{''.join(body)}</tbody>"
+        f"{_support_area_headers()}</tr></thead><tbody>{''.join(body)}</tbody>"
         "<tfoot>"
         "<tr class='upr-support-total-row'>"
         "<td class='upr-ns'>Total</td>"
@@ -679,10 +817,13 @@ def _emergency(payload: dict[str, Any], slot: int) -> str:
     yes_html = ""
     if yesno:
         yes_html = _hbar_chart(yesno)
-    code_html = f" <span class='upr-code'>{code}</span>" if code else ""
+    if code:
+        title = f"<span class='upr-code'>{code}</span> / {name}"
+    else:
+        title = name
     return (
         "<section class='upr-block upr-block--emergency'>"
-        f"<h2 class='upr-block__title'>{name}{code_html}</h2>"
+        f"<h2 class='upr-block__title'>{title}</h2>"
         f"{grouped}{yes_html}"
         "</section>"
     )
@@ -697,6 +838,14 @@ def _bars_grouped(rows: list[dict[str, Any]], order: tuple[str, ...]) -> str:
             by_code.setdefault(code, []).append(row)
         else:
             leftover.append(row)
+    peak = max(
+        (
+            float(row.get("value") or 0)
+            for row in rows
+            if row.get("kind") != "yesno"
+        ),
+        default=0,
+    ) or 1
     chunks = []
     for code in order:
         group = by_code.get(code) or []
@@ -705,11 +854,11 @@ def _bars_grouped(rows: list[dict[str, Any]], order: tuple[str, ...]) -> str:
         chunks.append(
             "<div class='upr-bar-group'>"
             f"<div class='upr-bar-group__title'>{escape(AREA_LABELS.get(code, code))}</div>"
-            f"{_hbar_chart(group, color=IFRC_RED)}"
+            f"{_hbar_chart(group, color=IFRC_RED, peak=peak)}"
             "</div>"
         )
     if leftover:
-        chunks.append(_hbar_chart(leftover, color=IFRC_RED))
+        chunks.append(_hbar_chart(leftover, color=IFRC_RED, peak=peak))
     return "".join(chunks)
 
 

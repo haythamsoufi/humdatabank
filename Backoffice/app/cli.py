@@ -53,6 +53,27 @@ def register_commands(app):
         count = storage.sync_all_system_logos_to_cdn()
         click.echo(f'Mirrored {count} sector logo(s) to the public CDN.')
 
+    @app.cli.command('sync-ns-logos')
+    @click.option('--dry-run', is_flag=True, help='List matches without downloading or writing.')
+    @click.option('--overwrite', is_flag=True, help='Replace logos that are already stored.')
+    @click.option('--iso3', default=None, help='Sync a single country ISO3 code (e.g. BGD).')
+    @with_appcontext
+    def sync_ns_logos(dry_run, overwrite, iso3):
+        """Download FDRS ns_logos (ISO3 filenames) onto National Society records."""
+        from app.services.organization.ns_logo_service import sync_ns_logos_from_github
+
+        result = sync_ns_logos_from_github(dry_run=dry_run, overwrite=overwrite, iso3=iso3)
+        prefix = 'Would update' if dry_run else 'Updated'
+        click.echo(
+            f"{prefix} {result['updated']} NS logo(s) "
+            f"(github={result['github_files']}, countries={result['countries_with_ns']}, "
+            f"skipped={result['skipped']}, no_ns={result['no_national_society']})."
+        )
+        for err in result.get('errors') or []:
+            click.echo(f'  error: {err}', err=True)
+        if result.get('errors'):
+            raise SystemExit(1)
+
     @app.cli.command('sync-indicator-embeddings')
     @click.option('--batch-size', type=int, default=100, help='Batch size for embedding API calls')
     @with_appcontext

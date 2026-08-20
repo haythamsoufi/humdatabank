@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 
@@ -94,3 +95,43 @@ def planning_years(period_name: str | None) -> list[int]:
     if year is None:
         return []
     return [year, year + 1, year + 2]
+
+
+def format_header_date(value: date | None = None) -> str:
+    """INP/annual-report cover date, e.g. ``2 July 2026``."""
+    day = value or date.today()
+    return f"{day.day} {day.strftime('%B %Y')}"
+
+
+def document_subtitle(
+    kind: str,
+    period_name: str | None,
+    *,
+    plan_years: list[int] | None = None,
+) -> str:
+    """Cover line under the country name on All visuals."""
+    years = [int(year) for year in (plan_years or []) if year]
+    if kind == "plan":
+        if len(years) >= 2:
+            return f"{years[0]}-{years[-1]} IFRC network country plan"
+        if years:
+            return f"{years[0]} IFRC network country plan"
+        horizon = planning_years(period_name)
+        if len(horizon) >= 2:
+            return f"{horizon[0]}-{horizon[-1]} IFRC network country plan"
+        if horizon:
+            return f"{horizon[0]} IFRC network country plan"
+        return "IFRC network country plan"
+    year = years[0] if years else _year_token(period_name or "")
+    raw = (period_name or "").strip().lower()
+    if raw.startswith("jan-jun"):
+        return (
+            f"{year} IFRC network mid-year report, Jan-Jun"
+            if year
+            else "IFRC network mid-year report, Jan-Jun"
+        )
+    return (
+        f"{year} IFRC network annual report, Jan-Dec"
+        if year
+        else "IFRC network annual report, Jan-Dec"
+    )

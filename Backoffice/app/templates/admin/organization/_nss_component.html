@@ -1,7 +1,11 @@
 {# National Societies component: table + init. Uses AG Grid for data display. #}
 {% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 
-<div id="nssComponentRoot">
+<div id="nssComponentRoot"
+     data-error-loading="{{ _('Error loading National Society data. Please try again.') | e }}"
+     data-validation-failed="{{ _('Validation failed: ') | e }}"
+     data-error-prefix="{{ _('Error: ') | e }}"
+     data-generic-error="{{ _('An error occurred. Please try again.') | e }}">
     <div class="bg-white p-4 sm:p-6 shadow-md border border-gray-200">
         {% if nss %}
             <div id="nss-table-container" class="overflow-x-auto">
@@ -125,10 +129,190 @@
 {% endcall %}
 
 {% if can_manage_org %}
+{# Edit National Society Modal #}
+{% call modal_shell('edit-ns-modal', _('Edit National Society'), max_width='max-w-4xl', close_id='close-edit-ns-modal-btn',
+    content_class='max-h-[85vh] overflow-y-auto') %}
+<form id="editNsForm" class="no-submit-guard" method="POST" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-6">
+        <h4 class="text-md font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">{{ _('Basic Information') }}</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label for="edit_ns_name" class="block text-sm font-medium text-gray-700 mb-1">{{ _('National Society Name') }}</label>
+                <input type="text" id="edit_ns_name" name="name" required maxlength="255" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+            </div>
+            <div>
+                <label for="edit_ns_code" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Code') }}</label>
+                <input type="text" id="edit_ns_code" name="code" maxlength="50" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+            </div>
+            <div>
+                <label for="edit_ns_country_id" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
+                <select id="edit_ns_country_id" name="country_id" required class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                    <option value="">{{ _('Select a country') }}</option>
+                    {% for country in countries %}
+                    <option value="{{ country.id }}">{{ country.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="edit_ns_display_order" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Display Order') }}</label>
+                <input type="number" id="edit_ns_display_order" name="display_order" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+            </div>
+            <div class="md:col-span-2">
+                <label for="edit_ns_description" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Description') }}</label>
+                <textarea id="edit_ns_description" name="description" rows="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"></textarea>
+            </div>
+            <div>
+                <label for="edit_ns_logo_file" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Logo (PNG, JPG, GIF, WEBP)') }}</label>
+                <div id="edit_ns_logo_preview" class="mb-2 hidden">
+                    <img id="edit_ns_logo_img" src="" alt="" class="h-16 w-16 object-contain rounded border border-gray-200 bg-white">
+                </div>
+                <input type="file" id="edit_ns_logo_file" name="logo_file" accept="image/png,image/jpeg,image/gif,image/webp" class="block w-full text-sm text-gray-700">
+            </div>
+            <div class="flex items-end">
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="edit_ns_is_active" name="is_active" value="y" class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500">
+                    <span class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <div class="mb-6">
+        <h4 class="text-md font-semibold mb-3 text-gray-800 border-b border-gray-200 pb-2">{{ _('National Society Names in Other Languages') }}</h4>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            <div class="{% if code in ['ar', 'fa', 'he', 'ur'] %}md:col-span-2{% endif %}">
+                <label for="edit_ns_name_{{ code }}" class="block text-sm font-medium text-gray-700 mb-1">
+                    {{ _('National Society Name') }} ({{ (LANGUAGE_DISPLAY_NAMES.get(code) or ALL_LANGUAGES_DISPLAY_NAMES.get(code) or code.upper()) }})
+                </label>
+                <input type="text"
+                       id="edit_ns_name_{{ code }}"
+                       name="name_{{ code }}"
+                       maxlength="255"
+                       {% if code in ['ar', 'fa', 'he', 'ur'] %}dir="rtl"{% endif %}
+                       class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="flex justify-end gap-3">
+        <button type="button" id="cancel-edit-ns-btn" class="btn btn-secondary close-modal">
+            {{ _('Cancel') }}
+        </button>
+        <button type="submit" id="edit-ns-submit-btn" class="btn btn-primary">
+            {{ _('Save Changes') }}
+        </button>
+    </div>
+</form>
+{% endcall %}
+{% endif %}
+
+{% if can_manage_org %}
 <script nonce="{{ csp_nonce() }}">
     $(document).ready(function() {
         $('#nss-excel-btn').on('click', function() { $('#nssExcelModal').removeClass('hidden'); });
         $('.nss-excel-modal-close').on('click', function() { $('#nssExcelModal').addClass('hidden'); });
+
+        var container = $('#nssComponentRoot');
+        var errorLoadingData = container.data('error-loading');
+        var validationFailed = container.data('validation-failed');
+        var errorPrefix = container.data('error-prefix');
+        var genericError = container.data('generic-error');
+        var editModalEl = document.getElementById('edit-ns-modal');
+        var editForm = $('#editNsForm');
+        var editModal = (window.ModalUtils && editModalEl)
+            ? window.ModalUtils.makeModal(editModalEl, { closeSelector: '.close-modal' })
+            : null;
+        if (!editModal) {
+            $('#close-edit-ns-modal-btn, #cancel-edit-ns-btn').on('click', function() {
+                $('#edit-ns-modal').addClass('hidden');
+            });
+        }
+
+        function showNsError(message) {
+            if (typeof showToast === 'function') showToast(message, 'error', 7000);
+            else if (window.showAlert) window.showAlert(message, 'error');
+            else console.error(message);
+        }
+
+        function nsDataUrl(nsId) {
+            return {{ url_for('organization.get_national_society_data', ns_id=999999)|tojson }}.replace('999999', String(nsId));
+        }
+
+        function populateNsForm(data) {
+            $('#edit_ns_name').val(data.name || '');
+            $('#edit_ns_code').val(data.code || '');
+            $('#edit_ns_description').val(data.description || '');
+            $('#edit_ns_country_id').val(data.country_id || '');
+            $('#edit_ns_display_order').val(data.display_order != null ? data.display_order : 0);
+            $('#edit_ns_is_active').prop('checked', !!data.is_active);
+            $('#edit_ns_logo_file').val('');
+            var logoUrl = data.logo_url || '';
+            if (logoUrl) {
+                $('#edit_ns_logo_img').attr('src', logoUrl);
+                $('#edit_ns_logo_preview').removeClass('hidden');
+            } else {
+                $('#edit_ns_logo_img').attr('src', '');
+                $('#edit_ns_logo_preview').addClass('hidden');
+            }
+            var trans = (data && data.name_translations) ? data.name_translations : {};
+            {% for code in TRANSLATABLE_LANGUAGES %}
+            $('#edit_ns_name_{{ code }}').val(trans['{{ code }}'] || '');
+            {% endfor %}
+        }
+
+        $(document).on('click', '.edit-ns-btn', function() {
+            var nsId = $(this).data('ns-id');
+            var editUrl = $(this).data('edit-url') || {{ url_for('organization.edit_national_society', ns_id=999999)|tojson }}.replace('999999', String(nsId));
+            $.get(nsDataUrl(nsId))
+                .done(function(data) {
+                    populateNsForm(data);
+                    editForm.attr('action', editUrl);
+                    if (editModal) editModal.openModal();
+                    else $('#edit-ns-modal').removeClass('hidden');
+                })
+                .fail(function() { showNsError(errorLoadingData); });
+        });
+
+        editForm.on('submit', function(e) {
+            e.preventDefault();
+            var actionUrl = $(this).attr('action');
+            var submitBtn = $('#edit-ns-submit-btn');
+            if (submitBtn.prop('disabled')) return;
+            submitBtn.prop('disabled', true);
+            submitBtn.addClass('opacity-50 cursor-not-allowed');
+            var originalText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin mr-2"></i>' + {{ _("Saving...")|tojson|safe }});
+
+            var formData = new FormData(this);
+            $.ajax({
+                url: actionUrl,
+                method: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .done(function(response) {
+                    if (response && response.success) {
+                        location.reload();
+                    } else {
+                        var msg = (response && (response.message || response.error)) || '';
+                        showNsError(validationFailed + msg);
+                        submitBtn.prop('disabled', false);
+                        submitBtn.removeClass('opacity-50 cursor-not-allowed');
+                        submitBtn.html(originalText);
+                    }
+                })
+                .fail(function(xhr) {
+                    var response = xhr.responseJSON;
+                    var msg = (response && (response.message || response.error)) || genericError;
+                    showNsError(errorPrefix + msg);
+                    submitBtn.prop('disabled', false);
+                    submitBtn.removeClass('opacity-50 cursor-not-allowed');
+                    submitBtn.html(originalText);
+                });
+        });
     });
 </script>
 {% endif %}

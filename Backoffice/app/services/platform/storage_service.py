@@ -671,4 +671,10 @@ def sync_all_system_logos_to_cdn() -> int:
         if row.icon_filename:
             publish_system_logo_to_cdn("spef", row.icon_filename)
             count += 1
+    from app.models.organization import NationalSociety
+
+    for ns in NationalSociety.query.filter(NationalSociety.logo_filename.isnot(None)).all():
+        if ns.logo_filename:
+            publish_system_logo_to_cdn("ns", ns.logo_filename)
+            count += 1
     return count

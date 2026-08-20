@@ -295,6 +295,36 @@ class TestServeSectorLogo:
             assert ".." not in path_arg
 
 
+class TestServeNsLogo:
+    """Tests for GET /api/v1/uploads/ns/<filename>."""
+
+    def test_missing_file_returns_404(self, client, db_session):
+        with patch("app.services.platform.storage_service.stream_response", side_effect=Exception("not found")):
+            resp = client.get(_api("/uploads/ns/missing.png"))
+        assert resp.status_code == 404
+
+    def test_serves_file(self, client, db_session):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        with patch("app.services.platform.storage_service.stream_response", return_value=mock_response) as mock_sr:
+            resp = client.get(_api("/uploads/ns/BGD.png"))
+        mock_sr.assert_called_once()
+        assert mock_sr.call_args[0][1] == "ns/BGD.png"
+
+    def test_path_traversal_basename_only(self, client, db_session):
+        calls = []
+
+        def capture(*args, **kwargs):
+            calls.append(args)
+            raise Exception("stop")
+
+        with patch("app.services.platform.storage_service.stream_response", side_effect=capture):
+            client.get(_api("/uploads/ns/../../etc/passwd"))
+        if calls:
+            path_arg = calls[0][1]
+            assert ".." not in path_arg
+
+
 # ---------------------------------------------------------------------------
 # GET /api/v1/uploads/branding/<filename>
 # ---------------------------------------------------------------------------

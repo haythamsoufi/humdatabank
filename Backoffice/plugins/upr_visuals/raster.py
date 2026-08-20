@@ -23,8 +23,10 @@ _PLUGIN_STATIC_URL = "/upr-visuals/static/"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
 _CSS_PATH = _PLUGIN_DIR / "static" / "css" / "upr-visuals.css"
-_APP_FONTS_DIR = Path(__file__).resolve().parents[2] / "app" / "static" / "fonts"
+_APP_STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "static"
+_APP_FONTS_DIR = _APP_STATIC_DIR / "fonts"
 _PLUGIN_FONTS_DIR = _PLUGIN_DIR / "fonts"
+_APP_STATIC_URL = "/static/"
 
 
 def _first_font(*paths: Path) -> Path | None:
@@ -115,12 +117,16 @@ def resolve_export_image_src(src: str) -> str:
     if not raw or raw.startswith(("data:", "file:")):
         return raw
     plugin_root = _PLUGIN_DIR.resolve()
+    app_static = _APP_STATIC_DIR.resolve()
     candidates: list[Path] = []
     path_only = raw.split("?", 1)[0]
     if path_only.startswith(_PLUGIN_STATIC_URL):
         candidates.append(_PLUGIN_DIR / "static" / path_only[len(_PLUGIN_STATIC_URL) :])
+    elif path_only.startswith(_APP_STATIC_URL):
+        candidates.append(_APP_STATIC_DIR / path_only[len(_APP_STATIC_URL) :])
     elif path_only.startswith("static/"):
         candidates.append(_PLUGIN_DIR / path_only)
+        candidates.append(_APP_STATIC_DIR / path_only[len("static/") :])
     elif not path_only.startswith(("http://", "https://", "/")):
         candidates.append(_PLUGIN_DIR / path_only)
         candidates.append(_PLUGIN_DIR / "static" / path_only)
@@ -129,7 +135,9 @@ def resolve_export_image_src(src: str) -> str:
             resolved = path.resolve()
         except OSError:
             continue
-        if resolved.is_file() and (resolved == plugin_root or plugin_root in resolved.parents):
+        in_plugin = resolved == plugin_root or plugin_root in resolved.parents
+        in_app_static = resolved == app_static or app_static in resolved.parents
+        if resolved.is_file() and (in_plugin or in_app_static):
             return resolved.as_uri()
     return raw
 

@@ -43,10 +43,10 @@ KPI_LABELS = {
 PLAN_KPI_ORDER = ("branches", "staff", "volunteers", "local_units")
 
 PLAN_KPI_LABELS = {
-    "branches": "National Society branches",
-    "staff": "National Society staff",
-    "volunteers": "National Society volunteers",
-    "local_units": "National Society local units",
+    "branches": "Branches",
+    "staff": "Staff",
+    "volunteers": "Volunteers",
+    "local_units": "Local units",
 }
 
 # T24 fallback item ids (published version; label lookup wins when available).
@@ -129,6 +129,15 @@ AREA_LABELS = {
     "EF4": "Accountability and agility",
 }
 
+# Tableau plan "Detailed funding requirements" shortenings (ampersands).
+PLAN_DETAIL_SP_LABELS = {
+    "SP1": "Climate and environment",
+    "SP2": "Disasters & crises",
+    "SP3": "Health & wellbeing",
+    "SP4": "Migration & displacement",
+    "SP5": "Values, power & inclusion",
+}
+
 # T33 Page 1: static core indicators live under this section (and its children).
 # Dynamic extras are the sibling "Other Indicators" section — not Emergency Appeals.
 OVERALL_ACTION_SECTION_NEEDLE = "overall action"
@@ -206,6 +215,16 @@ AREA_COLORS = {
     "funding": "#f39200",
     "expenditure": "#e30613",
     "source": "#2a9d8f",
+}
+
+# Planned-support legend (INP / SPEF dots — distinct from Tableau AREA_COLORS).
+SUPPORT_DOT_COLORS = {
+    "SP1": "#58a04f",
+    "SP2": "#226092",
+    "SP3": "#8fd2ef",
+    "SP4": "#ffb15b",
+    "SP5": "#512c6c",
+    "EFs": "#883a67",
 }
 
 KPI_ICON_FILES = {
@@ -295,8 +314,8 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         True,
         True,
         A4_CONTENT_WIDTH_PX,
-        560,
-        "Participating National Society support by Strategic Priority.",
+        620,
+        "Participating National Society support by Strategic Priority. Plans add year rows and coloured amount cells.",
     ),
     DashboardSpec(
         "network_funding",
@@ -304,8 +323,8 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         True,
         False,
         A4_CONTENT_WIDTH_PX,
-        520,
-        "Host National Society and IFRC longer-term funding requirements by Strategic Priority, Enabling Functions, and year.",
+        500,
+        "Plan-year detailed funding: Host National Society vs IFRC, with ongoing emergencies, longer-term needs, and enabling local actors.",
     ),
     DashboardSpec(
         "strategic_priorities",

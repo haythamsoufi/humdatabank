@@ -26,6 +26,7 @@
     paneGenerate: document.getElementById("upr-vis-pane-generate"),
     panePreview: document.getElementById("upr-vis-pane-preview"),
     previewCountry: document.getElementById("upr-vis-preview-country"),
+    countryFilter: document.getElementById("upr-vis-country-filter"),
     previewTabs: document.getElementById("upr-vis-preview-tabs"),
     previewDownload: document.getElementById("upr-vis-preview-download"),
     previewDownloadMenu: document.getElementById("upr-vis-preview-download-menu"),
@@ -189,7 +190,8 @@
       if (!rows.length) {
         clearSelection(t("noAssignments"));
       } else {
-        clearSelection(t("selectAssignmentFirst"));
+        els.assignment.value = String(rows[0].id);
+        loadCountries();
       }
     } catch (err) {
       clearSelection(t("loadFailed"));
@@ -312,6 +314,7 @@
     els.tabPreview.setAttribute("aria-selected", preview ? "true" : "false");
     els.paneGenerate.hidden = preview;
     els.panePreview.hidden = !preview;
+    if (els.countryFilter) els.countryFilter.hidden = !preview;
     if (preview) loadPreview();
   }
 

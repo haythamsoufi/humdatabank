@@ -8,10 +8,12 @@ import pytest
 
 from plugins.upr_visuals.data import (
     _apply_support_funding,
+    _expand_plan_support_years,
     _extend_support_with_funding,
     _funding_column_bucket,
     _funding_entity,
     _matrix_cells,
+    _ns_logo_src,
     _reach_rows,
     _report_indicator_rows,
     _scalar_number,
@@ -24,15 +26,19 @@ from plugins.upr_visuals.data import (
     _sum_funding_by_bucket,
     _sum_funding_rows,
     _support_from_cells,
+    _usable_ifrc_actual,
     build_report_network_entities,
+    ifrc_secretariat_actuals_for_report,
     max_people_by_area,
     pns_funding_from_plan_cells,
+    pns_area_funding_from_plan_cells,
     spef_icon_srcs,
     sum_t23_host_cells,
     support_total_from_rows,
     t22_host_funding_by_pns,
     t23_host_funding_by_pns,
 )
+from plugins.upr_visuals.catalog import SUPPORT_AREA_CODES
 
 
 @pytest.mark.unit
@@ -40,6 +46,12 @@ def test_spef_icon_alias_maps_reach_codes_to_catalog():
     assert _spef_icon_alias("CC1") == "CC"
     assert _spef_icon_alias("EFs") == "EF1"
     assert _spef_icon_alias("SP1") == "SP1"
+
+
+@pytest.mark.unit
+def test_ns_logo_src_falls_back_to_github_iso3():
+    assert _ns_logo_src(None, "BGD").endswith("/ns_logos/BGD.png")
+    assert _ns_logo_src(None, "xx") == ""
 
 
 @pytest.mark.unit
@@ -231,6 +243,66 @@ def test_pns_funding_from_plan_cells_sums_sp_rows():
 
 
 @pytest.mark.unit
+def test_pns_area_funding_from_plan_cells_groups_by_ns():
+    grouped = pns_area_funding_from_plan_cells(
+        {"7_SP1": 100_000, "7_EF2": 20_000, "HNS_SP1": 9, "7_Total": 999, "12_SP2": 489_000}
+    )
+    assert grouped[7]["SP1"] == 100_000
+    assert grouped[7]["EFs"] == 20_000
+    assert grouped[12]["SP2"] == 489_000
+    assert 7 in grouped
+    assert "HNS" not in grouped
+
+
+@pytest.mark.unit
+def test_expand_plan_support_years_emits_year_rows(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.data._ns_names", lambda ids: {12: "Austrian Red Cross"})
+    ticks = [
+        {
+            "ns_id": 49,
+            "name": "Danish Red Cross",
+            "funding": None,
+            "areas": {code: True for code in SUPPORT_AREA_CODES} | {"multilateral": False},
+        },
+        {
+            "ns_id": 7,
+            "name": "British Red Cross",
+            "funding": None,
+            "areas": {"SP1": True, "SP2": False, "SP3": False, "SP4": False, "SP5": False, "EFs": False},
+        },
+    ]
+    rows = _expand_plan_support_years(
+        ticks,
+        year_totals={
+            2026: {49: 5_200_000, 7: 1_000_000, 12: 489_000},
+            2027: {7: 2_000_000},
+            2028: {7: 2_600_000},
+        },
+        year_areas={
+            2026: {12: {"SP2": 489_000}},
+            2027: {},
+            2028: {},
+        },
+        confirmed={12: 100_000},
+        years=[2026, 2027, 2028],
+    )
+    by_name: dict[str, list] = {}
+    for row in rows:
+        by_name.setdefault(row["name"], []).append(row)
+    assert [row["year"] for row in by_name["British Red Cross"]] == [2026, 2027, 2028]
+    danish = by_name["Danish Red Cross"]
+    assert len(danish) == 1
+    assert danish[0]["year"] == 2026
+    assert danish[0]["funding_display"] == "5.2M"
+    assert all(danish[0]["area_amounts"].get(code) is None for code in SUPPORT_AREA_CODES)
+    austrian = by_name["Austrian Red Cross"]
+    assert len(austrian) == 1
+    assert austrian[0]["area_amounts"]["SP2"] == 489_000
+    assert austrian[0]["confirmed_display"] == "100,000"
+    assert support_total_from_rows(rows)["value"] == 11_289_000
+
+
+@pytest.mark.unit
 def test_t23_host_funding_by_pns():
     entry = SimpleNamespace(
         assignment_entity_status_id=10,
@@ -381,6 +453,59 @@ def test_ifrc_secretariat_always_splits_longer_term_and_emergency():
     eo_req = next(m for m in ifrc["buckets"][1]["metrics"] if m["key"] == "funding_requirement")
     assert req["value"] == 25
     assert eo_req["display"] == "Not reported"
+
+
+@pytest.mark.unit
+def test_ifrc_secretariat_actuals_only_for_myr26():
+    assert ifrc_secretariat_actuals_for_report(period_name="2025", iso2="AF") is None
+    assert ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2025", iso2="AF") is None
+    afg = ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso2="AF")
+    assert afg is not None
+    assert afg["longer_term"]["funding"] == 10_621_043
+    assert afg["longer_term"]["expenditure"] == 3_461_570
+    assert afg["emergency"]["funding"] == 1_938_683
+    assert afg["emergency"]["expenditure"] == 2_929_339
+    by_iso3 = ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso3="AFG")
+    assert by_iso3 == afg
+    missing = ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso2="ZZ")
+    assert missing is None
+    # Albania emergency funding is negative and expenditure is < 1,000 CHF.
+    assert ifrc_secretariat_actuals_for_report(period_name="Jan-Jun 2026", iso2="AL") is None
+
+
+@pytest.mark.unit
+def test_usable_ifrc_actual_drops_below_1000_and_negatives():
+    assert _usable_ifrc_actual(999) is None
+    assert _usable_ifrc_actual(999.99) is None
+    assert _usable_ifrc_actual(-5_000) is None
+    assert _usable_ifrc_actual(0) is None
+    assert _usable_ifrc_actual(None) is None
+    assert _usable_ifrc_actual(1_000) == 1_000
+    assert _usable_ifrc_actual(1_000.4) == 1_000.4
+
+
+@pytest.mark.unit
+def test_build_report_network_entities_uses_ifrc_actuals():
+    plan = {
+        "HNS": {"overall": 100, "longer_term": 80, "emergency": 20},
+        "IFRC Secretariat": {"overall": 200, "longer_term": 150, "emergency": 50},
+        "PNS": {"overall": 300, "longer_term": 300, "emergency": 0},
+    }
+    rows = build_report_network_entities(
+        plan,
+        ifrc_actuals={
+            "longer_term": {"funding": 10_621_043, "expenditure": 3_461_570},
+            "emergency": {"funding": 1_938_683, "expenditure": 2_929_339},
+        },
+    )
+    ifrc = next(row for row in rows if row["entity"] == "IFRC Secretariat")
+    longer = {m["key"]: m for m in ifrc["buckets"][0]["metrics"]}
+    emergency = {m["key"]: m for m in ifrc["buckets"][1]["metrics"]}
+    assert longer["funding_requirement"]["value"] == 150
+    assert longer["funding"]["value"] == 10_621_043
+    assert longer["expenditure"]["value"] == 3_461_570
+    assert emergency["funding"]["value"] == 1_938_683
+    assert emergency["expenditure"]["value"] == 2_929_339
 
 
 @pytest.mark.unit

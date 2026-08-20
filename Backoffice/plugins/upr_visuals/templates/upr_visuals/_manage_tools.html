@@ -24,13 +24,23 @@
     </div>
 
     <div class="space-y-3">
-    <div class="upr-vis-preview__controls">
-        <label for="upr-vis-assignment" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Assignment') }}</label>
-        <select id="upr-vis-assignment"
-                class="w-full max-w-xl pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                title="{{ _('Only Unified Plan (24) and Report (33) assignments are listed.')|forceescape }}">
-            <option value="">{{ _('Select an assignment') }}</option>
-        </select>
+    <div class="upr-vis-filters">
+        <div class="upr-vis-filters__field">
+            <label for="upr-vis-assignment" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Assignment') }}</label>
+            <select id="upr-vis-assignment"
+                    class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    title="{{ _('Only Unified Plan (24) and Report (33) assignments are listed.')|forceescape }}">
+                <option value="">{{ _('Select an assignment') }}</option>
+            </select>
+        </div>
+        <div class="upr-vis-filters__field" id="upr-vis-country-filter">
+            <label for="upr-vis-preview-country" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
+            <select id="upr-vis-preview-country"
+                    class="w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled>
+                <option value="">{{ _('Select a country') }}</option>
+            </select>
+        </div>
     </div>
 
     <div id="upr-vis-pane-generate" class="space-y-5" role="tabpanel" aria-labelledby="upr-vis-tab-generate" hidden>
@@ -97,14 +107,6 @@
     </div>
 
     <div id="upr-vis-pane-preview" class="upr-vis-preview-pane" role="tabpanel" aria-labelledby="upr-vis-tab-preview">
-        <div class="upr-vis-preview__controls">
-            <label for="upr-vis-preview-country" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
-            <select id="upr-vis-preview-country"
-                    class="w-full max-w-xl pl-3 pr-8 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    disabled>
-                <option value="">{{ _('Select a country') }}</option>
-            </select>
-        </div>
         <div class="upr-visuals-embed__toolbar">
             <div id="upr-vis-preview-tabs" class="upr-visuals-embed__tabs" role="tablist" aria-label="{{ _('Dashboards')|forceescape }}"></div>
             <div class="upr-visuals-download">

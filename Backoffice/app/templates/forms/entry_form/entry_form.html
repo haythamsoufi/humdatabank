@@ -7,6 +7,8 @@
 {% from "components/_assignment_status_pipeline.html" import assignment_status_pipeline_badge %}
 {% from "components/_status_label.html" import status_label, status_label_for_data_flag %}
 {% from "forms/entry_form/partials/_entry_form_field_label_attrs.html" import entry_form_field_label_binding %}
+{% set can_use_upr_visuals = (not is_public_submission|default(false)) and (not is_preview_mode|default(false)) and has_permission('admin.data_explore.upr_visuals') %}
+{% set show_upr_visuals_assets = can_use_upr_visuals and template_structure and template_structure.id in [24, 33] %}
 {% block title %}{{ get_localized_template_name(template_structure) if template_structure and get_localized_template_name else (template_structure.name if template_structure else '') }}{% endblock %}
 
 {% block head %}
@@ -22,7 +24,6 @@
 {% endif %}
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
-{% set show_upr_visuals_assets = (not is_public_submission) and (not is_preview_mode|default(false)) and template_structure and template_structure.id in [24, 33] %}
 {% if show_upr_visuals_assets %}
 <link rel="stylesheet" href="{{ url_for('upr_visuals.static_file', filename='css/upr-visuals.css') }}">
 {% endif %}
@@ -168,7 +169,7 @@
                             {% set _use_unified_country_plan_excel = _aes_id and _excel_mode == 'ucp' %}
                             {% set _use_export_excel = _aes_id and _excel_mode == 'generic' and _show_export %}
                             {% set _use_import_excel = _aes_id and _excel_mode == 'generic' and _show_import %}
-                            {% if tmpl and tmpl.id in [24, 33] and _aes_id %}
+                            {% if tmpl and tmpl.id in [24, 33] and _aes_id and can_use_upr_visuals %}
                             <button type="button"
                                     id="upr-visuals-toggle"
                                     class="professional-action-btn"
@@ -675,7 +676,7 @@
 
             {# Main Form Area - Adjusts width based on sidebar state #}
             <div class="lg:flex-1 transition-all duration-300 min-w-0" id="main-form-area">
-                    {% set show_upr_visuals = (not is_public_submission) and (not is_preview_mode|default(false)) and template_structure and template_structure.id in [24, 33] and assignment_status and assignment_status.id %}
+                    {% set show_upr_visuals = show_upr_visuals_assets and assignment_status and assignment_status.id %}
                     {% if show_upr_visuals %}
                         {% include "plugins/upr_visuals/upr_visuals/assignment_panel.html" ignore missing %}
                     {% endif %}
@@ -3129,7 +3130,7 @@
 
 {% block extra_js %}
 <script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
-{% if (not is_public_submission) and (not is_preview_mode|default(false)) and template_structure and template_structure.id in [24, 33] %}
+{% if show_upr_visuals_assets %}
 <script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-assignment.js') }}"></script>
 {% endif %}
 {% if is_preview_mode %}

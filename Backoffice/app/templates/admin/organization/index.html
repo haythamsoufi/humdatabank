@@ -703,6 +703,7 @@ try {
             name_{{ code }}: {{ ((_nt.get(code) if _nt else '') or '')|tojson|safe }},
             {% endfor %}
             country_name: {{ (ns.country.name if ns.country else '')|tojson|safe }},
+            logo_url: {{ (ns_logo_url(ns) or '')|tojson|safe }},
             is_active: {{ ns.is_active|tojson|safe }},
             display_order: {{ ns.display_order or 0 }},
             part_of: {{ (ns.part_of or [])|tojson|safe }},
@@ -724,6 +725,39 @@ try {
      * applies its saved state only once during initialization, so newly-added columns would
      * otherwise revert to default visibility on reload.
      */
+    function nssDesiredColumnOrder() {
+        const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
+        const categoryColIds = availableCategories.map(p => `part_of_${p.replace(/[^a-zA-Z0-9]/g, '_')}`);
+        return ['id', 'logo_url', 'name']
+            .concat(nameColumns)
+            .concat(['country_name', 'is_active', 'display_order'])
+            .concat(categoryColIds)
+            .concat(['actions']);
+    }
+
+    function pinNssColumnOrder() {
+        if (!window.nssGridApi || typeof AgGridHelper.pinActionsColumn !== 'function') return;
+        try {
+            AgGridHelper.pinActionsColumn(
+                window.nssGridApi,
+                nssDesiredColumnOrder(),
+                nssGridHelper && nssGridHelper.columnVisibilityManager
+            );
+            if (typeof window.nssGridApi.applyColumnState === 'function') {
+                window.nssGridApi.applyColumnState({
+                    state: [{ colId: 'logo_url', hide: false }],
+                    applyOrder: false
+                });
+            }
+            const mgr = nssGridHelper && nssGridHelper.columnVisibilityManager;
+            if (mgr && typeof mgr.saveCurrentState === 'function') {
+                mgr.saveCurrentState();
+            }
+        } catch (e) {
+            window.__clientWarn && window.__clientWarn('Could not pin NSs column order:', e);
+        }
+    }
+
     function reapplyNssPersistedColumnState() {
         try {
             if (!nssGridHelper || !nssGridHelper.columnVisibilityManager) return;
@@ -738,6 +772,8 @@ try {
             if (typeof mgr.updatePanel === 'function' && mgr.panelElement && mgr.isPanelVisible) {
                 mgr.updatePanel();
             }
+            // Saved order predates the Logo column and would bury it after Category columns.
+            pinNssColumnOrder();
         } catch (e) {
             window.__clientWarn && window.__clientWarn('Could not re-apply NSs persisted column state:', e);
         }
@@ -799,15 +835,7 @@ try {
         // Update grid with new columns
         window.nssGridApi.setGridOption('columnDefs', allColumns);
 
-        // Ensure Actions column is pinned right
-        try {
-            if (window.nssGridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
-                const desiredOrder = allColumns.map((col) => col.field || col.colId).filter(Boolean);
-                AgGridHelper.pinActionsColumn(window.nssGridApi, desiredOrder, nssGridHelper && nssGridHelper.columnVisibilityManager);
-            }
-        } catch (e) {
-            window.__clientWarn && window.__clientWarn('Could not apply column state:', e);
-        }
+        pinNssColumnOrder();
 
         // Dynamic columns were just injected; re-apply saved visibility (hide/show) now that they exist.
         // Delay slightly to allow AG Grid to register the new columnDefs.
@@ -833,6 +861,25 @@ try {
             wrapText: false,
             autoHeight: false,
             cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
+            field: 'logo_url',
+            colId: 'logo_url',
+            headerName: {{ _("Logo") | tojson }},
+            width: 90,
+            minWidth: 80,
+            maxWidth: 110,
+            hide: false,
+            lockVisible: true,
+            sortable: false,
+            filter: false,
+            cellRenderer: function(params) {
+                if (!params.value) {
+                    return '<span class="text-gray-400">-</span>';
+                }
+                return '<img src="' + params.value + '" alt="" class="h-8 w-8 object-contain rounded border border-gray-200 bg-white">';
+            },
+            cellStyle: { 'text-align': 'center' }
         },
         // All name columns grouped together
         {
@@ -925,7 +972,7 @@ try {
                 }
                 let html = '<div class="flex items-center justify-center gap-2">';
                 if (editUrl) {
-                    html += '<a href="' + editUrl + '" title="' + editTitle + '" class="text-blue-600 hover:text-blue-900"><i class="fas fa-pen fa-fw"></i></a>';
+                    html += '<button type="button" class="edit-ns-btn text-blue-600 hover:text-blue-900" data-ns-id="' + params.data.id + '" data-edit-url="' + editUrl + '" title="' + editTitle + '"><i class="fas fa-pen fa-fw"></i></button>';
                 }
                 if (deleteUrl) {
                     html += '<form action="' + deleteUrl + '" method="POST" class="inline-block" data-confirm="' + deleteConfirm.replace(/"/g, "&quot;") + '">';
@@ -1018,21 +1065,10 @@ try {
         window.nssGridHelper = nssGridHelper;
         window.nssGridApi = gridApi;
 
-        // Ensure Actions column is ALWAYS last (pinned right) and column order is maintained
-        try {
-            if (gridApi && typeof AgGridHelper.pinActionsColumn === 'function') {
-                const nameColumns = [{% for code in TRANSLATABLE_LANGUAGES %}'name_{{ code }}'{% if not loop.last %}, {% endif %}{% endfor %}];
-                const categoryColIds = availableCategories.map(p => `part_of_${p.replace(/[^a-zA-Z0-9]/g, '_')}`);
-                const desiredOrder = ['id', 'name']
-                    .concat(nameColumns)
-                    .concat(['country_name', 'is_active', 'display_order'])
-                    .concat(categoryColIds)
-                    .concat(['actions']);
-                AgGridHelper.pinActionsColumn(gridApi, desiredOrder, nssGridHelper.columnVisibilityManager);
-            }
-        } catch (e) {
-            window.__clientWarn && window.__clientWarn('Could not apply column order for NSs:', e);
-        }
+        pinNssColumnOrder();
+        // ColumnVisibilityManager.finishInitialColumnState re-applies localStorage ~300ms later
+        // and would otherwise push Logo after the Category columns.
+        setTimeout(pinNssColumnOrder, 350);
 
         // Set up event delegation for part_of checkboxes
         setupPartOfCheckboxHandlers();

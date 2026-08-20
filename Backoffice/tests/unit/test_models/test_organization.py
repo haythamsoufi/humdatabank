@@ -104,6 +104,14 @@ class TestNationalSociety:
             ns.set_name_translation('fr', '')
             assert 'fr' not in ns.name_translations
 
+    def test_has_logo(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country)
+            assert ns.has_logo is False
+            ns.logo_filename = "BGD.png"
+            assert ns.has_logo is True
+
 
 @pytest.mark.unit
 class TestNSBranch:

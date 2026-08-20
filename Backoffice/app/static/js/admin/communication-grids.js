@@ -612,7 +612,13 @@ class CommunicationsGridManager {
         const title = status === 'unknown'
             ? ` title="${(t.emailStatusUnknownTooltip || 'The Email API gave no response before our timeout — delivery could not be confirmed. It may have already been sent.').replace(/"/g, '&quot;')}"`
             : '';
-        return `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClass}"${title}>${label}</span>`;
+        const statusBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${badgeClass}"${title}>${label}</span>`;
+        if (!d.email_is_grouped) {
+            return statusBadge;
+        }
+        const groupLabel = t.groupedEmail || 'Group';
+        const groupTitle = (t.groupedEmailTooltip || 'One shared email to the entity team (all recipients on the To line).').replace(/"/g, '&quot;');
+        return `<span class="inline-flex items-center gap-1 flex-wrap">${statusBadge}<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-50 text-sky-800" title="${groupTitle}">${groupLabel}</span></span>`;
     }
 
     renderEmailContent(params) {

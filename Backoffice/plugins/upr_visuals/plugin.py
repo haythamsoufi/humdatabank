@@ -60,11 +60,7 @@ class UprVisualsPlugin(BasePlugin):
         ]
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
-        from plugins.upr_visuals.catalog import PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID
-
         return {
             "explore_first_tab": first_tab,
             "can_manage_upr_visuals": flags.get("can_manage_upr_visuals", False),
-            "upr_plan_template_id": PLAN_TEMPLATE_ID,
-            "upr_report_template_id": REPORT_TEMPLATE_ID,
         }

@@ -1914,6 +1914,7 @@ class NotificationService:
                 'email_retry_count': 0,
                 'email_can_retry': False,
                 'email_can_cancel': False,
+                'email_is_grouped': False,
             }
 
         status_raw = log.status.value if hasattr(log.status, 'value') else str(log.status or '')
@@ -1954,6 +1955,7 @@ class NotificationService:
             'email_retry_count': int(log.retry_count or 0),
             'email_can_retry': NotificationService._email_delivery_log_can_retry(log),
             'email_can_cancel': NotificationService._email_delivery_log_can_cancel(log),
+            'email_is_grouped': False,
         }
 
     @staticmethod

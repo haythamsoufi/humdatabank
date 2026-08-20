@@ -455,10 +455,53 @@ def _maybe_cleanup_expired_jobs() -> None:
     cleanup_expired_ai_document_jobs(now)
 
 
+def _linked_ai_document_id(item) -> Optional[int]:
+    """Resolve the AIDocument id for a job item (entity row or payload)."""
+    if getattr(item, "entity_type", None) == "ai_document" and getattr(item, "entity_id", None):
+        try:
+            return int(item.entity_id)
+        except (TypeError, ValueError):
+            pass
+    payload = item.payload if isinstance(getattr(item, "payload", None), dict) else {}
+    raw = payload.get("ai_document_id")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _item_last_activity(item) -> Optional[object]:
+    """
+    Latest progress signal for an in-flight item.
+
+    Item processors do not heartbeat ``updated_at`` during long work; the
+    document's ``processing_heartbeat_at`` is the live signal. A leftover
+    heartbeat from a previous completed run is ignored.
+    """
+    latest = ensure_utc(getattr(item, "updated_at", None) or getattr(item, "created_at", None))
+    doc_id = _linked_ai_document_id(item)
+    if doc_id is None:
+        return latest
+    try:
+        from app.models import AIDocument
+
+        doc = AIDocument.query.get(doc_id)
+    except Exception:
+        return latest
+    if not doc or _status_str(doc.processing_status) not in ("pending", "processing"):
+        return latest
+    heartbeat = ensure_utc(getattr(doc, "processing_heartbeat_at", None))
+    if heartbeat and (latest is None or heartbeat > latest):
+        latest = heartbeat
+    return latest
+
+
 def _latest_item_activity(job) -> Optional[object]:
     latest = ensure_utc(job.started_at or job.created_at)
     for item in job.items or []:
-        touched = ensure_utc(item.updated_at or item.created_at)
+        touched = _item_last_activity(item)
         if touched and (latest is None or touched > latest):
             latest = touched
     return latest
@@ -510,45 +553,94 @@ def _finalize_job_status(job) -> None:
     logger.info("AI job finalized: job=%s status=%s", job.id, job.status)
 
 
-def _recover_stuck_job_items(job, *, stale_seconds: int) -> None:
-    """Mark long-idle in-flight items as failed when no worker thread is alive."""
-    from app.extensions import db
+_STALE_ITEM_ERROR = "Processing interrupted (worker stopped). Re-run import or reprocess."
+_HUNG_ITEM_ERROR = "Processing stalled (no progress). Re-run import or reprocess."
+_ABANDONED_JOB_ERROR = (
+    "The background worker stopped responding (likely after an app restart). Re-run the job."
+)
+
+
+def _fail_linked_in_progress_document(item, error: str) -> None:
     from app.models import AIDocument
 
-    if is_job_thread_alive(str(job.id)):
+    doc_id = _linked_ai_document_id(item)
+    if doc_id is None:
         return
+    doc = AIDocument.query.get(doc_id)
+    if doc and _status_str(doc.processing_status) in ("pending", "processing"):
+        doc.processing_status = "failed"
+        doc.processing_error = error
 
-    stale_seconds = _stale_seconds_for_job(job)
-    cutoff = utcnow() - timedelta(seconds=stale_seconds)
+
+def _abandon_remaining_ai_job(job, *, reason: str) -> bool:
+    from app.extensions import db
+
+    try:
+        for item in job.items or []:
+            if _status_str(item.status) in _ACTIVE_ITEM_STATUSES:
+                item.status = "failed"
+                item.error = _STALE_ITEM_ERROR
+                _fail_linked_in_progress_document(item, item.error)
+        job.status = "failed"
+        job.error = reason
+        job.finished_at = utcnow()
+        db.session.commit()
+        logger.warning("Abandoned stale AI job: job=%s", job.id)
+        return True
+    except Exception as exc:
+        db.session.rollback()
+        logger.debug("Stale AI job abandon failed: %s", exc)
+        return False
+
+
+def _recover_stuck_job_items(job, *, stale_seconds: int) -> bool:
+    """
+    Fail in-flight items that have stopped making progress.
+
+    A live worker thread no longer pins items as ``processing`` forever. Live
+    threads still get a longer grace window so a large download/embed is not
+    failed after a few minutes — but days-old hung workers are recovered.
+    Document ``processing_heartbeat_at`` counts as progress when the current
+    run is still pending/processing.
+    """
+    thread_alive = is_job_thread_alive(str(job.id))
+    # Hung-but-alive workers: use the same hard window as job abandon.
+    effective_seconds = max(int(stale_seconds) * 10, 1800) if thread_alive else int(stale_seconds)
+    cutoff = utcnow() - timedelta(seconds=effective_seconds)
     changed = False
+    recovered_in_flight = False
+    error = _HUNG_ITEM_ERROR if thread_alive else _STALE_ITEM_ERROR
+
     for item in job.items or []:
-        if item.status not in ("downloading", "processing"):
+        if _status_str(item.status) not in ("downloading", "processing"):
             continue
-        touched = ensure_utc(item.updated_at or item.created_at)
+        touched = _item_last_activity(item)
         if touched and touched > cutoff:
             continue
         item.status = "failed"
-        item.error = "Processing interrupted (worker stopped). Re-run import or reprocess."
+        item.error = error
+        _fail_linked_in_progress_document(item, error)
         changed = True
-        doc_id = None
-        if item.entity_type == "ai_document" and item.entity_id:
-            doc_id = int(item.entity_id)
-        else:
-            payload = item.payload if isinstance(item.payload, dict) else {}
-            raw = payload.get("ai_document_id")
-            if raw is not None:
-                try:
-                    doc_id = int(raw)
-                except (TypeError, ValueError):
-                    doc_id = None
-        if doc_id is not None:
-            doc = AIDocument.query.get(doc_id)
-            if doc and doc.processing_status in ("pending", "processing"):
-                doc.processing_status = "failed"
-                doc.processing_error = item.error
+        recovered_in_flight = True
+
+    if recovered_in_flight and thread_alive:
+        # The hung runner still holds the job lock, so leftover queued items
+        # will never be claimed. Fail them so the job can finalize.
+        for item in job.items or []:
+            if _status_str(item.status) == "queued":
+                item.status = "failed"
+                item.error = _HUNG_ITEM_ERROR
+                _fail_linked_in_progress_document(item, _HUNG_ITEM_ERROR)
+                changed = True
+
     if changed:
         db.session.commit()
-        logger.warning("Recovered stuck AI job items: job=%s", job.id)
+        logger.warning(
+            "Recovered stuck AI job items: job=%s thread_alive=%s",
+            job.id,
+            thread_alive,
+        )
+    return changed
 
 
 def reconcile_stale_ai_job(job_id: str) -> bool:
@@ -557,13 +649,12 @@ def reconcile_stale_ai_job(job_id: str) -> bool:
 
     Returns True when the job was moved to a terminal status.
     """
-    from app.extensions import db
     from app.models import AIJob
 
     job = AIJob.query.get(str(job_id))
     if not job:
         return False
-    if job.status in _TERMINAL_JOB_STATUSES:
+    if _status_str(job.status) in _TERMINAL_JOB_STATUSES:
         return False
 
     stale_seconds = _stale_seconds_for_job(job)
@@ -571,39 +662,31 @@ def reconcile_stale_ai_job(job_id: str) -> bool:
 
     _recover_stuck_job_items(job, stale_seconds=stale_seconds)
     job = AIJob.query.get(str(job_id))
-    if not job or job.status in _TERMINAL_JOB_STATUSES:
-        return job is not None and job.status in _TERMINAL_JOB_STATUSES
+    if not job or _status_str(job.status) in _TERMINAL_JOB_STATUSES:
+        return job is not None and _status_str(job.status) in _TERMINAL_JOB_STATUSES
 
     items = job.items or []
-    has_pending = any((it.status in _ACTIVE_ITEM_STATUSES) for it in items)
+    has_pending = any((_status_str(it.status) in _ACTIVE_ITEM_STATUSES) for it in items)
     if not has_pending:
         _finalize_job_status(job)
         job = AIJob.query.get(str(job_id))
-        return bool(job and job.status in _TERMINAL_JOB_STATUSES)
-
-    if is_job_thread_alive(str(job.id)):
-        return False
+        return bool(job and _status_str(job.status) in _TERMINAL_JOB_STATUSES)
 
     last_activity = ensure_utc(_latest_job_activity(job) or job.created_at)
-    if last_activity and last_activity > utcnow() - timedelta(seconds=abandon_seconds):
+    activity_is_fresh = bool(
+        last_activity and last_activity > utcnow() - timedelta(seconds=abandon_seconds)
+    )
+
+    if is_job_thread_alive(str(job.id)):
+        if activity_is_fresh:
+            return False
+        return _abandon_remaining_ai_job(job, reason=_ABANDONED_JOB_ERROR)
+
+    if activity_is_fresh:
         # Worker thread may have died recently — caller can resume queued work.
         return False
 
-    try:
-        for item in items:
-            if item.status in _ACTIVE_ITEM_STATUSES:
-                item.status = "failed"
-                item.error = "Processing interrupted (worker stopped). Re-run import or reprocess."
-        job.status = "failed"
-        job.error = "The background worker stopped responding (likely after an app restart). Re-run the job."
-        job.finished_at = utcnow()
-        db.session.commit()
-        logger.warning("Abandoned stale AI job: job=%s", job_id)
-        return True
-    except Exception as exc:
-        db.session.rollback()
-        logger.debug("Stale AI job abandon failed: %s", exc)
-        return False
+    return _abandon_remaining_ai_job(job, reason=_ABANDONED_JOB_ERROR)
 
 
 def ensure_ai_job_running(app, job_id: str, target: Callable) -> None:

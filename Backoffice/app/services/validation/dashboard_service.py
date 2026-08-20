@@ -14,7 +14,7 @@ from app.services.data_quality.helpers import numeric_value, parse_period_year, 
 from app.services.forms.reporting_period_service import sort_period_names
 from app.services.validation.rule_labels import format_rule_labels
 from app.services.validation.types import CheckResult, ValidationEvaluationResult
-from .check_service import evaluate_validation_checks
+from .check_service import evaluate_validation_checks, validation_checks_disabled_message
 from app.utils.data_quality_constants import (
     UPR_LEGACY_REPORTING_TEMPLATE_ID,
     UPR_PLANNING_TEMPLATE_ID,
@@ -402,6 +402,7 @@ def preview_country_validation(
         country_id,
         period_name,
         language=language,
+        require_rule_pack=False,
     )
     questions_by_key = _persisted_questions_map(
         template_id,
@@ -419,11 +420,14 @@ def preview_country_validation(
 
     current_year = parse_period_year(evaluation.resolved_period)
     history_years = _history_year_columns(current_year)
+    validation_enabled = bool(evaluation.rule_pack)
 
     return {
         "country_id": country_id,
         "period_name": evaluation.resolved_period,
-        "rule_pack": evaluation.rule_pack,
+        "rule_pack": evaluation.rule_pack or None,
+        "validation_enabled": validation_enabled,
+        "message": None if validation_enabled else validation_checks_disabled_message(template_id),
         "current_year": current_year,
         "flag_count": flag_count,
         "clean_count": len(indicator_rows) - flag_count,

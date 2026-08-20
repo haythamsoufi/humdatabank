@@ -107,14 +107,25 @@ function setupNotificationSettingsGrid(cfg) {
     const data = params.data || {};
     const iconClass = escAttr(data.icon_class || '');
     const isHypothetical = data.emitter_active === false || data.emitter_active === 0;
-    let hypotheticalHtml = '';
+    let badgesHtml = '';
     if (isHypothetical) {
-      hypotheticalHtml =
+      badgesHtml +=
         '<span class="mt-1 inline-flex w-fit rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700" title="' +
         escAttr(data.emitter_status_hint || '') +
         '">' +
         escHtml(data.emitter_status_display || '') +
         '</span>';
+    }
+    if (data.email_delivery === 'grouped' && (data.email_delivery_display || cfg.t.groupedEmail)) {
+      badgesHtml +=
+        '<span class="mt-1 inline-flex w-fit rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-800" title="' +
+        escAttr(data.email_delivery_hint || '') +
+        '">' +
+        escHtml(data.email_delivery_display || cfg.t.groupedEmail) +
+        '</span>';
+    }
+    if (badgesHtml) {
+      badgesHtml = '<div class="flex flex-col items-start gap-1">' + badgesHtml + '</div>';
     }
     return (
       '<div class="flex items-start gap-2">' +
@@ -129,7 +140,7 @@ function setupNotificationSettingsGrid(cfg) {
       '<div class="font-mono text-[11px] text-gray-500 break-all">' +
       escHtml(data.type_key) +
       '</div>' +
-      hypotheticalHtml +
+      badgesHtml +
       '</div></div>'
     );
   }

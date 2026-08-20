@@ -115,8 +115,6 @@ def _explore_active_tab(flags: dict[str, bool], requested_tab: str | None = None
             accessible.append('disaggregation')
         if flags.get('can_access_compliance'):
             accessible.append('compliance')
-        if flags.get('can_access_reports'):
-            accessible.append('reports')
         if flags.get('can_access_pb_progress'):
             accessible.append('pb-progress')
         if requested_tab and requested_tab in accessible:
@@ -246,19 +244,10 @@ def explore_data():
         # Get all countries for filter dropdown
         countries = Country.query.order_by(Country.name).all()
 
-        published_reports = []
-        if tab_flags.get("can_access_reports"):
-            from app.services.reports.definition_service import ReportDefinitionService
-
-            published_reports = [
-                r for r in ReportDefinitionService.list_reports(current_user) if r.status == "published"
-            ]
-
         return render_template("admin/data_exploration/explore_data.html",
                              templates=templates,
                              period_names=period_names,
                              countries=countries,
-                             published_reports=published_reports,
                              explore_first_tab=explore_first_tab,
                              extension_panels=extension_panels,
                              explorer_extension_tabs_render=explorer_extension_tabs_render,

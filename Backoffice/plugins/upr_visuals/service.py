@@ -44,21 +44,24 @@ class UprVisualsService:
     def start_bulk(
         cls,
         *,
-        template_id: int,
-        period_name: str,
+        assigned_form_id: int,
         dashboard_ids: list[str],
         aes_ids: list[int] | None = None,
     ) -> str:
+        from plugins.upr_visuals.data import get_assigned_form_for_bulk
+
+        assigned = get_assigned_form_for_bulk(int(assigned_form_id))
         job_id = str(uuid.uuid4())
-        kind = kind_for_template(int(template_id))
+        kind = kind_for_template(int(assigned.template_id))
         allowed = {spec.id for spec in dashboards_for_kind(kind)}
         selected = [did for did in dashboard_ids if did in allowed] or ["combined"]
         now = utcnow().isoformat()
         status = {
             "job_id": job_id,
             "status": "queued",
-            "template_id": int(template_id),
-            "period_name": period_name,
+            "assigned_form_id": assigned.id,
+            "template_id": int(assigned.template_id),
+            "period_name": assigned.period_name,
             "dashboard_ids": selected,
             "aes_ids": [int(i) for i in (aes_ids or [])],
             "progress": 0,
@@ -146,7 +149,7 @@ class UprVisualsService:
 
     @classmethod
     def _dashboard_html(cls, aes_id: int, dashboard_id: str) -> tuple[dict[str, Any], str]:
-        payload = build_payload(aes_id)
+        payload = build_payload(aes_id, inline_icons=True)
         if dashboard_id not in DASHBOARD_BY_ID:
             raise UprVisualsError(f"Unknown dashboard: {dashboard_id}")
         return payload, render_dashboard_html(payload, dashboard_id)
@@ -157,9 +160,9 @@ class UprVisualsService:
             job = cls.get_status(job_id)
             try:
                 cls._update(job_id, status="running", message="Loading assignments…")
-                from plugins.upr_visuals.data import list_assignments_for_bulk
+                from plugins.upr_visuals.data import list_countries_for_bulk
 
-                assignments = list_assignments_for_bulk(job["template_id"], job.get("period_name"))
+                assignments = list_countries_for_bulk(job["assigned_form_id"])
                 wanted = set(job.get("aes_ids") or [])
                 if wanted:
                     assignments = [row for row in assignments if row["aes_id"] in wanted]
@@ -173,9 +176,15 @@ class UprVisualsService:
                         if cls.get_status(job_id).get("status") == "cancelled":
                             return
                         try:
-                            payload = build_payload(row["aes_id"])
+                            payload = build_payload(row["aes_id"], inline_icons=True)
                         except Exception as exc:
                             logger.warning("UPR visuals skip aes %s: %s", row["aes_id"], exc)
+                            try:
+                                from app.extensions import db
+
+                                db.session.rollback()
+                            except Exception:
+                                pass
                             done += len(dashboards)
                             cls._update(job_id, progress=done)
                             continue

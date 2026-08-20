@@ -12,16 +12,19 @@ from plugins.upr_visuals.data import (
     _funding_column_bucket,
     _funding_entity,
     _matrix_cells,
+    _reach_rows,
     _scalar_number,
     _split_appeal_label,
     _split_cell_key,
     _spef_icon_alias,
+    _sum_funding_by_area,
     _sum_funding_by_bucket,
     _sum_funding_rows,
     _support_from_cells,
     build_report_network_entities,
     max_people_by_area,
     pns_funding_from_plan_cells,
+    spef_icon_srcs,
     sum_t23_host_cells,
     support_total_from_rows,
     t22_host_funding_by_pns,
@@ -34,6 +37,64 @@ def test_spef_icon_alias_maps_reach_codes_to_catalog():
     assert _spef_icon_alias("CC1") == "CC"
     assert _spef_icon_alias("EFs") == "EF1"
     assert _spef_icon_alias("SP1") == "SP1"
+
+
+@pytest.mark.unit
+def test_spef_icon_srcs_uses_indicator_bank_url(monkeypatch):
+    row = SimpleNamespace(id=3, code="SP1", icon_filename="SP1.png", is_active=True)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._load_spef_catalog_rows",
+        lambda: [row],
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._spef_catalog_icon_url",
+        lambda item: f"/api/v1/uploads/spef/{item.icon_filename}",
+    )
+    icons = spef_icon_srcs(inline=False)
+    assert icons["SP1"] == "/api/v1/uploads/spef/SP1.png"
+
+
+@pytest.mark.unit
+def test_spef_icon_srcs_uses_plugin_eo_icon(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.data._load_spef_catalog_rows", lambda: [])
+    icons = spef_icon_srcs(inline=False)
+    assert icons["EO"].endswith("icons/eo-emergency.png")
+
+
+@pytest.mark.unit
+def test_spef_icon_srcs_inlines_plugin_eo_icon(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.data._load_spef_catalog_rows", lambda: [])
+    icons = spef_icon_srcs(inline=True)
+    assert icons["EO"].startswith("data:image/png;base64,")
+    assert icons["SP1"].startswith("data:image/png;base64,")
+
+
+@pytest.mark.unit
+def test_spef_icon_srcs_inline_skips_http_catalog_url(monkeypatch):
+    row = SimpleNamespace(id=3, code="SP1", icon_filename="", is_active=True)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._load_spef_catalog_rows",
+        lambda: [row],
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._spef_catalog_icon_url",
+        lambda item: "/indicator-bank/spef-lookups/3/icon",
+    )
+    icons = spef_icon_srcs(inline=True)
+    assert not str(icons.get("SP1", "")).startswith("/indicator-bank")
+    assert icons["SP1"].startswith("data:image/png;base64,")
+
+
+@pytest.mark.unit
+def test_reach_rows_use_catalog_icon(monkeypatch):
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data.spef_icon_srcs",
+        lambda: {"SP1": "/indicator-bank/spef-lookups/3/icon"},
+    )
+    rows = _reach_rows({"SP1": 1000})
+    sp1 = next(row for row in rows if row["code"] == "SP1")
+    assert sp1["icon_src"] == "/indicator-bank/spef-lookups/3/icon"
+    assert sp1["display"] == "1,000"
 
 
 @pytest.mark.unit
@@ -90,6 +151,27 @@ def test_sum_funding_rows_falls_back_to_total_column():
     grouped = _sum_funding_rows({"HNS_Total": 50, "IFRC Secretariat_row_total": 70})
     assert grouped["HNS"] == 50
     assert grouped["IFRC Secretariat"] == 70
+
+
+@pytest.mark.unit
+def test_sum_funding_by_area_rolls_enabling_functions():
+    grouped = _sum_funding_by_area(
+        {
+            "HNS_SP1": 10,
+            "HNS_EF1": 4,
+            "HNS_Enabling Functions": 6,
+            "IFRC Secretariat_SP2": 20,
+            "IFRC Secretariat_Total": 999,
+            "42_SP1": 30,
+        }
+    )
+    assert grouped["HNS"]["SP1"] == 10
+    assert grouped["HNS"]["EFs"] == 10
+    assert grouped["HNS"]["total"] == 20
+    assert grouped["IFRC Secretariat"]["SP2"] == 20
+    assert grouped["IFRC Secretariat"]["total"] == 20
+    assert grouped["PNS"]["SP1"] == 30
+    assert grouped["PNS"]["total"] == 30
 
 
 @pytest.mark.unit

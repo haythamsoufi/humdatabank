@@ -85,6 +85,10 @@
     <div class="bg-white shadow-md border border-gray-200 mb-24">
         {# Ensure `read_only` is always a real boolean (not Jinja Undefined) #}
         {% set read_only = (((user is defined and user) and user_has_role(user, 'system_manager') and (not current_user.is_authenticated or not current_user_has_role('system_manager'))) or false) %}
+        {# True only on the "Add New User" form (no existing user record yet). Used to make the
+           email field editable there (it's how the account is identified) while keeping it
+           permanently locked for existing users when SSO owns identity — see the email field below. #}
+        {% set is_new_user_form = not (user is defined and user) %}
 
         {# ── Tab navigation (same pattern as System Configuration) ── #}
         {% call scroll_tab_bar(inner_id='main-tabs', aria_label=_('User form sections')) %}
@@ -137,17 +141,34 @@
             This user is a System Manager. Only a System Manager can modify their details.
         </div>
         {% endif %}
+        {% if is_new_user_form and azure_sso_enabled %}
+        <div class="mb-4 p-3 rounded border border-blue-300 bg-blue-50 text-blue-800 text-sm flex items-start">
+            <i class="fas fa-circle-info mr-2 mt-0.5"></i>
+            <div>
+                <strong>{{ _('Pre-adding an account for SSO sign-in') }}</strong>
+                <div>{{ _('This organization signs in through Azure AD SSO, so no password is needed here. Enter the exact email the person will sign in with — their roles and access below will be waiting the first time they sign in.') }}</div>
+                <div class="mt-1">{{ _('Double-check the spelling: once created, the email cannot be edited while SSO is active.') }}</div>
+            </div>
+        </div>
+        {% endif %}
 
             {# User Details Tab #}
             <div class="user-form-panel" id="panel-user-details" role="tabpanel" aria-labelledby="user-details-tab">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="mb-4">
                         {{ form.email.label(class="block text-gray-700 text-sm font-semibold mb-2") }}
-                        {# Email is managed externally via SSO and should never be editable in this system. #}
-                        {{ form.email(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100 cursor-not-allowed", placeholder="Email" if user else "Email Address", readonly=True, disabled=True, autocomplete="username") }}
-                        {# Disabled inputs are not submitted; keep a hidden value for server-side processing/validation. #}
-                        {{ form.email(type="hidden") }}
-                        <p class="mt-1 text-xs text-gray-500">Email is managed by SSO and cannot be edited here.</p>
+                        {% if is_new_user_form %}
+                            {# New user: the email must be entered to identify/create the account. Under SSO it
+                               must exactly match the login email so the person's first sign-in binds to this
+                               same record instead of creating a duplicate (see auth.azure_callback). #}
+                            {{ form.email(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm", placeholder="Email Address", autocomplete="username") }}
+                        {% else %}
+                            {# Existing user: email is the SSO/login identity and is never editable here. #}
+                            {{ form.email(class="shadow-sm appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-100 cursor-not-allowed", placeholder="Email", readonly=True, disabled=True, autocomplete="username") }}
+                            {# Disabled inputs are not submitted; keep a hidden value for server-side processing/validation. #}
+                            {{ form.email(type="hidden") }}
+                            <p class="mt-1 text-xs text-gray-500">{{ _('Email is managed by SSO and cannot be edited here.') }}</p>
+                        {% endif %}
                         {% for error in form.email.errors %}
                             <p class="mt-1 text-red-500 text-xs italic">{{ error }}</p>
                         {% endfor %}
@@ -715,6 +736,12 @@
                         {% endfor %}
                     </div>
 {% endif %}
+{# The RBAC roles panel above only renders (and sets rbac_groups/default_role_type/
+   show_admin_sections via {% set %}) when there are assignable roles for this actor/user;
+   otherwise they stay undefined. Keep the debug snapshot below crash-safe either way. #}
+{% set rbac_groups = rbac_groups if rbac_groups is defined else namespace(system=[], core_roles=[], admin=[], assignment=[], translator=[], other=[]) %}
+{% set default_role_type = default_role_type if default_role_type is defined else none %}
+{% set show_admin_sections = show_admin_sections if show_admin_sections is defined else false %}
 <script nonce="{{ csp_nonce() }}">
 window.userFormConfig = {
     userId: {{ user.id if user else 'null' }},

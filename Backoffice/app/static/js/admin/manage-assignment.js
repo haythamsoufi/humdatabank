@@ -816,6 +816,65 @@
             }] : []
         );
 
+        var pendingEntityStatusFilter = null;
+
+        function applyEntityStatusFilter(statusKey) {
+            var api = window.entityGridApi || entityGridApi;
+            if (!api || !statusKey) return;
+            var label = getStatusDisplayLabel(statusKey);
+            var model = {
+                status: {
+                    filterType: 'customSet',
+                    values: [label]
+                }
+            };
+
+            function commitFilter() {
+                if (typeof api.setFilterModel !== 'function') return;
+                api.setFilterModel(model);
+                if (typeof api.onFilterChanged === 'function') {
+                    api.onFilterChanged();
+                } else if (typeof api.refreshClientSideRowModel === 'function') {
+                    api.refreshClientSideRowModel('filter');
+                }
+            }
+
+            function withStatusFilter(filter) {
+                if (filter && typeof filter.extractUniqueValues === 'function') {
+                    filter.extractUniqueValues();
+                }
+                commitFilter();
+            }
+
+            if (typeof api.getColumnFilterInstance === 'function') {
+                var inst = api.getColumnFilterInstance('status');
+                if (inst && typeof inst.then === 'function') {
+                    inst.then(withStatusFilter);
+                    return;
+                }
+                withStatusFilter(inst);
+                return;
+            }
+            if (typeof api.getFilterInstance === 'function') {
+                var maybe = api.getFilterInstance('status', withStatusFilter);
+                if (maybe && typeof maybe.then === 'function') {
+                    maybe.then(withStatusFilter);
+                }
+                return;
+            }
+            commitFilter();
+        }
+
+        function filterEntitiesByStatus(statusKey) {
+            if (!statusKey) return;
+            pendingEntityStatusFilter = statusKey;
+            openEntitiesTabFromOverview();
+            if (entityGridInitialized) {
+                applyEntityStatusFilter(statusKey);
+                pendingEntityStatusFilter = null;
+            }
+        }
+
         function scheduleEntityGridInit() {
             if (entityGridInitialized) {
                 return;
@@ -840,6 +899,10 @@
             window.__clientLog && window.__clientLog('[INIT-FUNC] initializeEntityGrid function called');
             if (entityGridInitialized) {
                 window.__clientLog && window.__clientLog('[INIT] Already initialized, returning');
+                if (pendingEntityStatusFilter) {
+                    applyEntityStatusFilter(pendingEntityStatusFilter);
+                    pendingEntityStatusFilter = null;
+                }
                 return;
             }
 
@@ -887,6 +950,10 @@
 
             entityGridInitialized = true;
             window.__clientLog && window.__clientLog('[INIT] Entity management grid initialized');
+            if (pendingEntityStatusFilter) {
+                applyEntityStatusFilter(pendingEntityStatusFilter);
+                pendingEntityStatusFilter = null;
+            }
         }
 
         // --- Bulk actions for entity grid selection ---
@@ -1580,6 +1647,133 @@
             }
             window.__clientLog && window.__clientLog('[DEBUG] initializeEntityTabs: Completed');
         }
+
+        function openEntitiesTabFromOverview() {
+            if (!document.getElementById('manage-entities-tab')) return;
+            activateEntityTab('manage-entities-panel');
+            var panel = document.getElementById('manage-entities-panel');
+            if (panel && typeof scheduleEntityGridInit === 'function') {
+                scheduleEntityGridInit();
+            }
+            if (panel && typeof panel.scrollIntoView === 'function') {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        var overviewEl = document.getElementById('assignment-status-overview');
+        if (overviewEl) {
+            overviewEl.addEventListener('click', function (e) {
+                var trigger = e.target.closest('[data-open-entities-tab]');
+                if (!trigger) return;
+                e.preventDefault();
+                openEntitiesTabFromOverview();
+            });
+        }
+
+        (function initAssignmentStatusChart() {
+            var canvas = document.getElementById('assignment-status-chart');
+            var chartCfg = cfg.statusChart;
+            if (!canvas || !chartCfg || typeof Chart === 'undefined') return;
+
+            var statusColors = {
+                pending: '#94a3b8',
+                in_progress: '#fbbf24',
+                requires_revision: '#fb923c',
+                sent_for_review: '#c084fc',
+                submitted: '#60a5fa',
+                approved: '#22c55e',
+                cancelled: '#f87171'
+            };
+            var keys = chartCfg.keys || [];
+            var values = chartCfg.values || [];
+            var labels = chartCfg.labels || [];
+            var colors = keys.map(function (key) {
+                return statusColors[key] || '#94a3b8';
+            });
+            var maxValue = 0;
+            values.forEach(function (n) {
+                if (n > maxValue) maxValue = n;
+            });
+            var isRtl = document.documentElement.dir === 'rtl';
+
+            new Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: (cfg.t && cfg.t.entities) || 'Entities',
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: colors,
+                        borderWidth: 0,
+                        borderRadius: 4,
+                        maxBarThickness: 22
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    locale: document.documentElement.lang || undefined,
+                    layout: { padding: isRtl ? { left: 28 } : { right: 28 } },
+                    onHover: function (event, elements) {
+                        var target = event.native && event.native.target;
+                        if (!target || !target.style) return;
+                        var idx = elements && elements[0] && elements[0].index;
+                        target.style.cursor = (idx != null && values[idx] > 0) ? 'pointer' : 'default';
+                    },
+                    onClick: function (_event, elements) {
+                        var idx = elements && elements[0] && elements[0].index;
+                        if (idx == null || !values[idx]) return;
+                        filterEntitiesByStatus(keys[idx]);
+                    },
+                    scales: {
+                        x: {
+                            display: false,
+                            beginAtZero: true,
+                            suggestedMax: Math.max(maxValue, 1)
+                        },
+                        y: {
+                            ticks: { color: '#374151', autoSkip: false },
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1f2937',
+                            titleColor: '#f3f4f6',
+                            bodyColor: '#d1d5db',
+                            callbacks: {
+                                label: function (context) {
+                                    var n = context.parsed.x;
+                                    return (n == null ? 0 : n) + ' ' + ((cfg.t && cfg.t.entities) || 'Entities');
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'assignmentStatusBarValues',
+                    afterDatasetsDraw: function (chart) {
+                        var ctx = chart.ctx;
+                        var meta = chart.getDatasetMeta(0);
+                        if (!meta || !meta.data) return;
+                        ctx.save();
+                        ctx.fillStyle = '#374151';
+                        ctx.font = '12px sans-serif';
+                        ctx.textAlign = isRtl ? 'right' : 'left';
+                        ctx.textBaseline = 'middle';
+                        meta.data.forEach(function (bar, i) {
+                            var value = values[i];
+                            if (!value || !bar) return;
+                            ctx.fillText(String(value), isRtl ? bar.x - 6 : bar.x + 6, bar.y);
+                        });
+                        ctx.restore();
+                    }
+                }]
+            });
+        })();
 
         // Initialize on page load
         window.__clientLog && window.__clientLog('[DEBUG] Page load: Initializing main assignment tabs');

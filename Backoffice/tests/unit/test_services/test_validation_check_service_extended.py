@@ -180,6 +180,42 @@ class TestEvaluateValidationChecks:
             with pytest.raises(ValueError, match="validation checks enabled"):
                 evaluate_validation_checks(1, "country", 1, "2024")
 
+    def test_preview_without_rule_pack_returns_empty_checks(self):
+        template = MagicMock()
+        template.published_version_id = 5
+        aes = MagicMock()
+        aes.id = 10
+
+        with patch(
+            "app.services.validation.check_service.FormTemplate.query"
+        ) as mock_tpl, patch(
+            "app.services.validation.check_service.get_rule_pack_for_template",
+            return_value=None,
+        ), patch(
+            "app.services.validation.check_service.resolve_assignment_aes",
+            return_value=(aes, "AR 2024"),
+        ), patch(
+            "app.services.validation.check_service.load_form_data_by_kpi",
+            return_value={},
+        ), patch(
+            "app.services.validation.check_service._load_history",
+            return_value={},
+        ), patch(
+            "app.services.validation.check_service._resolve_country_id",
+            return_value=1,
+        ), patch(
+            "app.services.validation.check_service._results_to_drafts",
+            return_value=[],
+        ):
+            mock_tpl.get.return_value = template
+            result = evaluate_validation_checks(
+                33, "country", 1, "2024", require_rule_pack=False
+            )
+
+        assert result.template_id == 33
+        assert result.rule_pack == ""
+        assert result.check_results == []
+
     def test_raises_when_no_assignment_found(self):
         template = MagicMock()
         with patch(

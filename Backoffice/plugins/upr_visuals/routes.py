@@ -7,13 +7,15 @@ from flask_login import current_user, login_required
 from werkzeug.exceptions import NotFound
 
 from plugins.upr_visuals import bp, _PLUGIN_DIR
-from plugins.upr_visuals.catalog import (
-    PLAN_TEMPLATE_ID,
-    REPORT_TEMPLATE_ID,
-    dashboards_for_kind,
-    kind_for_template,
+from plugins.upr_visuals.catalog import dashboards_for_kind, kind_for_template
+from plugins.upr_visuals.data import (
+    UprVisualsError,
+    assignment_supports_visuals,
+    build_payload,
+    get_assigned_form_for_bulk,
+    list_assigned_forms_for_bulk,
+    list_countries_for_bulk,
 )
-from plugins.upr_visuals.data import UprVisualsError, assignment_supports_visuals, build_payload, list_assignments_for_bulk, list_periods
 from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
 from plugins.upr_visuals.service import UprVisualsService
 from app.models.assignments import AssignmentEntityStatus
@@ -124,30 +126,31 @@ def manage_page():
     return redirect(url_for("data_exploration.explore_data", tab="upr-visuals"))
 
 
-@bp.route("/admin/data-exploration/upr-visuals/periods", methods=["GET"])
-@permission_required("admin.data_explore.upr_visuals")
-def periods():
-    try:
-        template_id = int(request.args.get("template_id") or PLAN_TEMPLATE_ID)
-    except (TypeError, ValueError):
-        return json_bad_request("Invalid template.")
-    return json_ok(periods=list_periods(template_id), template_id=template_id)
-
-
 @bp.route("/admin/data-exploration/upr-visuals/assignments", methods=["GET"])
 @permission_required("admin.data_explore.upr_visuals")
 def assignments():
+    return json_ok(assignments=list_assigned_forms_for_bulk())
+
+
+@bp.route("/admin/data-exploration/upr-visuals/countries", methods=["GET"])
+@permission_required("admin.data_explore.upr_visuals")
+def countries():
     try:
-        template_id = int(request.args.get("template_id") or PLAN_TEMPLATE_ID)
+        assigned_form_id = int(request.args.get("assigned_form_id") or 0)
     except (TypeError, ValueError):
-        return json_bad_request("Invalid template.")
-    period_name = (request.args.get("period_name") or "").strip() or None
-    rows = list_assignments_for_bulk(template_id, period_name)
-    kind = kind_for_template(template_id)
+        return json_bad_request("Select an assignment.")
+    if not assigned_form_id:
+        return json_bad_request("Select an assignment.")
+    try:
+        assigned = get_assigned_form_for_bulk(assigned_form_id)
+    except UprVisualsError as exc:
+        return json_bad_request(str(exc))
+    kind = kind_for_template(int(assigned.template_id))
     return json_ok(
-        assignments=rows,
+        countries=list_countries_for_bulk(assigned.id),
         dashboards=[{"id": spec.id, "title": spec.title} for spec in dashboards_for_kind(kind)],
         kind=kind,
+        assigned_form_id=assigned.id,
     )
 
 
@@ -157,24 +160,24 @@ def assignments():
 def generate():
     payload = request.get_json(silent=True) or {}
     try:
-        template_id = int(payload.get("template_id") or PLAN_TEMPLATE_ID)
+        assigned_form_id = int(payload.get("assigned_form_id") or 0)
     except (TypeError, ValueError):
-        return json_bad_request("Invalid template.")
-    period_name = (payload.get("period_name") or "").strip()
-    if not period_name:
-        return json_bad_request("Select a period.")
+        return json_bad_request("Select an assignment.")
+    if not assigned_form_id:
+        return json_bad_request("Select an assignment.")
     dashboard_ids = payload.get("dashboard_ids") or ["combined"]
     if isinstance(dashboard_ids, str):
         dashboard_ids = [dashboard_ids]
     aes_ids = payload.get("aes_ids") or []
     try:
         job_id = UprVisualsService.start_bulk(
-            template_id=template_id,
-            period_name=period_name,
+            assigned_form_id=assigned_form_id,
             dashboard_ids=list(dashboard_ids),
             aes_ids=[int(i) for i in aes_ids] if aes_ids else None,
         )
         return json_ok(job_id=job_id, status=UprVisualsService.get_status(job_id))
+    except UprVisualsError as exc:
+        return json_bad_request(str(exc))
     except RuntimeError as exc:
         return json_bad_request(str(exc))
     except Exception as exc:

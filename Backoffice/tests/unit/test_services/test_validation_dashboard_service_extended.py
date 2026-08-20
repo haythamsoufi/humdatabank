@@ -497,7 +497,7 @@ class TestPreviewCountryValidation:
         with patch(
             "app.services.validation.dashboard_service.evaluate_validation_checks",
             return_value=mock_evaluation,
-        ), patch(
+        ) as mock_eval, patch(
             "app.services.validation.dashboard_service._persisted_questions_map",
             return_value={},
         ), patch(
@@ -509,11 +509,46 @@ class TestPreviewCountryValidation:
         ):
             result = preview_country_validation(21, "FDRS 2024", 1)
 
+        mock_eval.assert_called_once_with(
+            21, "country", 1, "FDRS 2024", language="en", require_rule_pack=False
+        )
         assert "country_id" in result
         assert "flag_count" in result
         assert "indicators" in result
         assert result["flag_count"] == 1
         assert result["severity_counts"]["error"] == 1
+        assert result["validation_enabled"] is True
+        assert result["rule_pack"] == "fdrs_matrix_v1"
+        assert result["message"] is None
+
+    def test_template_without_rule_pack_returns_notice(self):
+        mock_evaluation = MagicMock()
+        mock_evaluation.resolved_period = "AR 2024"
+        mock_evaluation.rule_pack = ""
+        mock_evaluation.drafts = []
+        mock_evaluation.check_results = []
+        mock_evaluation.kpi_data = {}
+        mock_evaluation.history_by_kpi = {}
+
+        with patch(
+            "app.services.validation.dashboard_service.evaluate_validation_checks",
+            return_value=mock_evaluation,
+        ), patch(
+            "app.services.validation.dashboard_service._persisted_questions_map",
+            return_value={},
+        ), patch(
+            "app.services.validation.dashboard_service.build_indicator_preview_rows",
+            return_value=[{"flagged": False, "severity": None, "row_type": "indicator"}],
+        ), patch(
+            "app.services.validation.dashboard_service.parse_period_year",
+            return_value=2024,
+        ):
+            result = preview_country_validation(33, "AR 2024", 1)
+
+        assert result["validation_enabled"] is False
+        assert result["rule_pack"] is None
+        assert "validation checks enabled" in result["message"]
+        assert result["flag_count"] == 0
 
 
 class TestSummarizePeriod:

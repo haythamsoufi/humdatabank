@@ -137,7 +137,9 @@ def _notification_by_user_id_map(
     *,
     entity_type,
     entity_id,
-    assigned_form_id,
+    assigned_form_id=None,
+    related_object_id=None,
+    notification_type=None,
 ):
     """
     Map user_id -> Notification for grouped email delivery logging.
@@ -160,11 +162,13 @@ def _notification_by_user_id_map(
     if not missing_user_ids:
         return result
 
+    object_id = related_object_id if related_object_id is not None else assigned_form_id
+    nt = notification_type or NotificationType.assignment_created
     recent_cutoff = utcnow() - timedelta(seconds=60)
     rows = Notification.query.filter(
         Notification.user_id.in_(missing_user_ids),
-        Notification.notification_type == NotificationType.assignment_created,
-        Notification.related_object_id == assigned_form_id,
+        Notification.notification_type == nt,
+        Notification.related_object_id == object_id,
         Notification.entity_type == entity_type,
         Notification.entity_id == entity_id,
         Notification.created_at >= recent_cutoff,
@@ -622,14 +626,26 @@ def notify_assignment_submitted(assignment_entity_status):
 
             from app.services.notification.emails import send_assignment_submitted_team_email
 
-            notification_by_user_id = {n.user_id: n for n in focal_notifications}
-            send_assignment_submitted_team_email(
-                user_ids=focal_point_ids,
-                assignment_title=assignment_title,
-                submitter_name=submitter_name,
-                related_url=related_url,
-                notification_by_user_id=notification_by_user_id,
+            notification_by_user_id = _notification_by_user_id_map(
+                focal_notifications,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                related_object_id=aes.id,
+                notification_type=NotificationType.assignment_submitted,
             )
+            try:
+                send_assignment_submitted_team_email(
+                    user_ids=focal_point_ids,
+                    assignment_title=assignment_title,
+                    submitter_name=submitter_name,
+                    related_url=related_url,
+                    notification_by_user_id=notification_by_user_id,
+                )
+            except Exception as e:
+                current_app.logger.error(
+                    "[NOTIFY] Failed assignment_submitted team email for %s:%s: %s",
+                    entity_type, entity_id, e, exc_info=True,
+                )
 
 
     secondary_recipients = resolve_submission_review_recipient_user_ids(

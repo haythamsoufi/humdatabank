@@ -1181,6 +1181,9 @@
             {{ _('Each row describes who receives the in-app notification when it is created, how long it is kept (TTL), and the default priority for new notifications of that type. Where applicable, enable or disable delivery to focal points (assignment editor/submitter on the entity) and to admin-capable users (system_manager, admin_core, admin_*). Stored items appear in the Communication Center; WebSockets, push, and email depend on feature flags and each user’s own preferences. High and urgent priorities can trigger immediate email and stronger styling even when the user prefers digests.') }}
           </p>
           <p class="text-xs text-gray-600 mt-2 max-w-3xl">
+            {{ _('Assignment Submitted uses a grouped email for focal points: one message is sent to the whole entity team (everyone visible on the To line), and Communication Center still shows that email on each recipient’s row. Org admins receive a separate individual review email when that audience is enabled.') }}
+          </p>
+          <p class="text-xs text-gray-600 mt-2 max-w-3xl">
             {{ _('Hypothetical types are listed at the bottom; the word Hypothetical appears in the Type column when no in-app notification is emitted for that row yet.') }}
           </p>
         </div>
@@ -1507,6 +1510,7 @@ window.settingsPageConfig = {
         colSystemManagers: {{ _('System managers')|tojson }},
         colTtl: {{ _('TTL')|tojson }},
         colPriority: {{ _('Priority')|tojson }},
+        groupedEmail: {{ _('Grouped email')|tojson }},
         notifyFocalPoints: {{ _('Notify focal points (assignment editor/submitter)')|tojson }},
         notifyOrgAdmins: {{ _('Notify entity-assigned admins (admin_core / admin_*, not system managers)')|tojson }},
         notifySystemManagers: {{ _('Notify deployment-wide system managers')|tojson }},

@@ -7,6 +7,7 @@ using Unified Country Plan (template 24) and Reporting (template 33) data.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import FrozenSet
 
 from app.utils.data_quality_constants import (
@@ -37,6 +38,15 @@ KPI_LABELS = {
     "local_units": "Local Units",
     "volunteers": "Volunteers",
     "staff": "Paid Staff",
+}
+
+PLAN_KPI_ORDER = ("branches", "staff", "volunteers", "local_units")
+
+PLAN_KPI_LABELS = {
+    "branches": "National Society branches",
+    "staff": "National Society staff",
+    "volunteers": "National Society volunteers",
+    "local_units": "National Society local units",
 }
 
 # T24 fallback item ids (published version; label lookup wins when available).
@@ -193,12 +203,37 @@ AREA_COLORS = {
     "source": "#2a9d8f",
 }
 
-KPI_ICONS = {
-    "branches": "fa-sitemap",
-    "local_units": "fa-map-marker-alt",
-    "volunteers": "fa-hands-helping",
-    "staff": "fa-user-tie",
+KPI_ICON_FILES = {
+    "branches": "icons/kpi-independence.png",
+    "local_units": "icons/kpi-independence.png",
+    "staff": "icons/kpi-unity.png",
+    "volunteers": "icons/kpi-voluntary-service.png",
 }
+
+# GitHub originals — used only if a local plugin file is missing.
+KPI_ICON_URLS = {
+    "branches": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
+    "local_units": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
+    "staff": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Unity.png",
+    "volunteers": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Voluntary-service.png",
+}
+
+
+def kpi_icon_src(key: str) -> str:
+    """Local plugin icon when present; otherwise the public IFRC fallback URL."""
+    rel = KPI_ICON_FILES.get(key)
+    if rel:
+        path = Path(__file__).resolve().parent / "static" / rel
+        if path.is_file():
+            return f"/upr-visuals/static/{rel}"
+    return (KPI_ICON_URLS.get(key) or "").strip()
+
+
+# A4 landscape at 96 CSS px (WeasyPrint default). Preview and export share this.
+A4_PAGE_WIDTH_PX = 1123
+A4_PAGE_HEIGHT_PX = 794
+A4_MARGIN_MM = 10
+A4_CONTENT_WIDTH_PX = 1047  # 297mm − 20mm margins
 
 
 @dataclass(frozen=True)
@@ -215,28 +250,28 @@ class DashboardSpec:
 DASHBOARDS: tuple[DashboardSpec, ...] = (
     DashboardSpec(
         "combined",
-        "Country visual",
+        "All visuals",
         True,
         True,
-        1100,
+        A4_CONTENT_WIDTH_PX,
         1600,
-        "Stacked country visual: header, KPIs, people reached, finance, bilateral support.",
+        "Full stacked visual: In Support Of, People reached, finance, and support on one page.",
     ),
     DashboardSpec(
         "in_support",
         "In Support of",
         True,
         True,
-        827,
+        A4_CONTENT_WIDTH_PX,
         250,
-        "National Society header plus four key figures (branches, units, volunteers, staff).",
+        "National Society header plus four key figures. Plans use INP order (branches, staff, volunteers, local units).",
     ),
     DashboardSpec(
         "reach",
         "People reached",
         True,
         True,
-        827,
+        A4_CONTENT_WIDTH_PX,
         280,
         "People reached / to be reached by Strategic Priority and Emergency Operations.",
     ),
@@ -245,25 +280,34 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         "Financial Overview",
         True,
         True,
-        1100,
+        A4_CONTENT_WIDTH_PX,
         900,
-        "IFRC network (plan requirements + PNS bilateral reporting) and host National Society figures.",
+        "Plans: IFRC network funding requirements by year. Reports: network actuals vs requirement.",
     ),
     DashboardSpec(
         "support",
         "Bilateral Support",
         True,
         True,
-        1100,
+        A4_CONTENT_WIDTH_PX,
         560,
         "Participating National Society support by Strategic Priority.",
+    ),
+    DashboardSpec(
+        "network_funding",
+        "Network funding",
+        True,
+        False,
+        A4_CONTENT_WIDTH_PX,
+        520,
+        "Host National Society and IFRC longer-term funding requirements by Strategic Priority, Enabling Functions, and year.",
     ),
     DashboardSpec(
         "strategic_priorities",
         "Strategic Priorities",
         False,
         True,
-        1100,
+        A4_CONTENT_WIDTH_PX,
         1400,
         "Core numeric indicators as horizontal bars, grouped by Strategic Priority.",
     ),
@@ -272,7 +316,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         "Enabling Functions",
         False,
         True,
-        1100,
+        A4_CONTENT_WIDTH_PX,
         900,
         "Enabling Function indicators (bars for numbers, Yes for qualitative).",
     ),
@@ -281,7 +325,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         "Emergency 1",
         False,
         True,
-        827,
+        A4_CONTENT_WIDTH_PX,
         320,
         "First emergency appeal indicators (reporting).",
     ),
@@ -290,7 +334,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         "Emergency 2",
         False,
         True,
-        827,
+        A4_CONTENT_WIDTH_PX,
         320,
         "Second emergency appeal indicators (reporting).",
     ),
@@ -299,7 +343,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         "Emergency 3",
         False,
         True,
-        827,
+        A4_CONTENT_WIDTH_PX,
         320,
         "Third emergency appeal indicators (reporting).",
     ),

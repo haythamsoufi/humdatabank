@@ -24,6 +24,21 @@ def test_assignment_submitted_defaults_all_buckets_true():
     assert merged["assignment_submitted"]["system_managers"] is True
 
 
+def test_assignment_submitted_settings_row_marks_grouped_email():
+    from app.utils.notification_registry import build_notification_settings_delivery_rows
+
+    rows = build_notification_settings_delivery_rows(
+        ttl_resolver=lambda _tk: 30,
+        get_priority_for_type=lambda _tk: "normal",
+        gettext_fn=lambda s: s,
+        merged_audience_rules=get_merged_notification_audience_rules(),
+    )
+    submitted = next(row for row in rows if row["type_key"] == "assignment_submitted")
+    assert submitted["email_delivery"] == "grouped"
+    assert "grouped" in submitted["recipients_display"].lower()
+    assert submitted["email_delivery_display"] == "Grouped email"
+
+
 def test_audience_override_disables_admin_branch_assignment_submitted():
     custom = {k: dict(v) for k, v in DEFAULT_NOTIFICATION_AUDIENCE_RULES.items()}
     custom["assignment_submitted"] = {

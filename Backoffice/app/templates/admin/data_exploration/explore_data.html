@@ -65,14 +65,6 @@
                 <i class="fas fa-clipboard-check mr-1.5"></i>{{ _('Compliance') }}
             </button>
             {% endif %}
-            {% if can_access_reports %}
-            <button type="button" role="tab" id="tab-reports"
-                    data-tab="reports"
-                    aria-selected="{{ 'true' if explore_first_tab == 'reports' else 'false' }}"
-                    class="settings-tab {{ admin_underline_tab_btn_classes(explore_first_tab == 'reports') }}">
-                <i class="fas fa-chart-bar mr-1.5"></i>{{ _('Reports') }}
-            </button>
-            {% endif %}
             {% for ext_tab in explorer_extension_tabs_render|default([]) %}
             <button type="button" role="tab" id="tab-{{ ext_tab.tab_id }}"
                     data-tab="{{ ext_tab.tab_id }}"
@@ -551,12 +543,6 @@
     {% endif %}
     <!-- End Tab panel: Compliance -->
 
-    {% if can_access_reports %}
-    <div id="panel-reports" class="explore-panel{% if explore_first_tab != 'reports' %} hidden{% endif %}" role="tabpanel" aria-labelledby="tab-reports">
-        {% include "admin/reports/_explorer_tab_panel.html" %}
-    </div>
-    {% endif %}
-
     {% for ext_tab in explorer_extension_tabs_render|default([]) %}
     {{ extension_panels.get(ext_tab.tab_id, '')|safe }}
     {% endfor %}
@@ -582,7 +568,6 @@
     const CAN_ACCESS_DATA_TABLE = {{ can_access_data_table|tojson }};
     const CAN_ACCESS_ANALYSIS = {{ can_access_analysis|tojson }};
     const CAN_ACCESS_COMPLIANCE = {{ can_access_compliance|tojson }};
-    const CAN_ACCESS_REPORTS = {{ can_access_reports|default(false)|tojson }};
     const CAN_ACCESS_PB_PROGRESS = {{ can_access_pb_progress|default(false)|tojson }};
     const CAN_USE_AI_VALIDATION = {{ user_has_ai_beta_access(current_user)|tojson }};
     const FDRS_TEMPLATE_ID = {{ fdrs_template_id|tojson }};
@@ -772,12 +757,11 @@
     }
     window.applyExploreParamsToUrl = applyParamsToUrl;
 
-    // Get the currently active main tab id (data-table | disaggregation | compliance | reports | pb-progress)
+    // Get the currently active main tab id (data-table | disaggregation | compliance | pb-progress)
     function getActiveMainTabId() {
         if (domCache.tabDataTable && domCache.tabDataTable.getAttribute('aria-selected') === 'true') return 'data-table';
         if (domCache.tabDisaggregation && domCache.tabDisaggregation.getAttribute('aria-selected') === 'true') return 'disaggregation';
         if (domCache.tabCompliance && domCache.tabCompliance.getAttribute('aria-selected') === 'true') return 'compliance';
-        if (domCache.tabReports && domCache.tabReports.getAttribute('aria-selected') === 'true') return 'reports';
         if (domCache.tabPbProgress && domCache.tabPbProgress.getAttribute('aria-selected') === 'true') return 'pb-progress';
         const selected = document.querySelector('#explore-data-tabs .settings-tab[aria-selected="true"]');
         return selected ? (selected.getAttribute('data-tab') || '') : '';
@@ -812,7 +796,6 @@
                 if (tabId === 'data-table' && domCache.tabDataTable && CAN_ACCESS_DATA_TABLE) switchMainTabFn(domCache.tabDataTable);
                 else if (tabId === 'disaggregation' && domCache.tabDisaggregation && CAN_ACCESS_ANALYSIS) switchMainTabFn(domCache.tabDisaggregation);
                 else if (tabId === 'compliance' && domCache.tabCompliance && CAN_ACCESS_COMPLIANCE) switchMainTabFn(domCache.tabCompliance);
-                else if (tabId === 'reports' && domCache.tabReports && CAN_ACCESS_REPORTS) switchMainTabFn(domCache.tabReports);
                 else if (tabId === 'pb-progress' && domCache.tabPbProgress && CAN_ACCESS_PB_PROGRESS) switchMainTabFn(domCache.tabPbProgress);
                 else {
                     const extTab = document.getElementById('tab-' + tabId);
@@ -1056,12 +1039,10 @@
         domCache.tabDataTable = document.getElementById('tab-data-table');
         domCache.tabDisaggregation = document.getElementById('tab-disaggregation');
         domCache.tabCompliance = document.getElementById('tab-compliance');
-        domCache.tabReports = document.getElementById('tab-reports');
         domCache.tabPbProgress = document.getElementById('tab-pb-progress');
         domCache.panelDataTable = document.getElementById('panel-data-table');
         domCache.panelDisaggregation = document.getElementById('panel-disaggregation');
         domCache.panelCompliance = document.getElementById('panel-compliance');
-        domCache.panelReports = document.getElementById('panel-reports');
         domCache.panelPbProgress = document.getElementById('panel-pb-progress');
         domCache.exploreParametersSection = document.getElementById('explore-parameters-section');
         domCache.disaggTemplateFilterWrap = document.getElementById('disagg-template-filter-wrap');
@@ -3416,8 +3397,8 @@
             if (window.AdminUnderlineTabs) {
                 AdminUnderlineTabs.activateStripTab('#explore-data-tabs', tabId, { panelSelector: '.explore-panel' });
             } else {
-                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance, domCache.tabReports, domCache.tabPbProgress];
-                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance, domCache.panelReports, domCache.panelPbProgress];
+                const tabs = [domCache.tabDataTable, domCache.tabDisaggregation, domCache.tabCompliance, domCache.tabPbProgress];
+                const panels = [domCache.panelDataTable, domCache.panelDisaggregation, domCache.panelCompliance, domCache.panelPbProgress];
                 tabs.forEach((tab, index) => {
                     if (!tab) return;
                     const isActive = tab === activeTab;
@@ -3498,12 +3479,6 @@
                 }
             });
         }
-        if (domCache.tabReports) {
-            domCache.tabReports.addEventListener('click', function() {
-                switchMainTab(domCache.tabReports);
-                applyParamsToUrl();
-            });
-        }
         if (domCache.tabPbProgress) {
             domCache.tabPbProgress.addEventListener('click', function() {
                 switchMainTab(domCache.tabPbProgress);
@@ -3512,7 +3487,7 @@
         }
         document.querySelectorAll('#explore-data-tabs .settings-tab[data-tab]').forEach(function(tabBtn) {
             const tabId = tabBtn.getAttribute('data-tab');
-            if (['data-table', 'disaggregation', 'compliance', 'reports', 'pb-progress'].indexOf(tabId) !== -1) return;
+            if (['data-table', 'disaggregation', 'compliance', 'pb-progress'].indexOf(tabId) !== -1) return;
             tabBtn.addEventListener('click', function() {
                 switchMainTab(tabBtn);
                 applyParamsToUrl();

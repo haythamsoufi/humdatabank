@@ -44,6 +44,10 @@
     pin_actions_on_scroll=True
 ) }}
 
+{% if assignment %}
+{% include "admin/assignments/_assignment_status_overview.html" %}
+{% endif %}
+
 {% set resolved_entity_types = enabled_entity_types if enabled_entity_types is defined else ENABLED_ENTITY_TYPES %}
 {% set has_countries = 'countries' in resolved_entity_types %}
 {% set has_ns_structure = 'ns_structure' in resolved_entity_types %}
@@ -1276,8 +1280,26 @@ window.manageAssignmentConfig = {
         clearReviewer: {{ _('Remove')|tojson }},
         searchMinChars: {{ _('Type at least 2 characters to search.')|tojson }},
         noUsersFound: {{ _('No users found.')|tojson }},
-        completionRate: {{ _('Completion Rate')|tojson }}
+        completionRate: {{ _('Completion Rate')|tojson }},
+        entities: {{ _('Entities')|tojson }}
     },
+    statusChart: {% if assignment and assignment_overview is defined and assignment_overview %}{
+        labels: [
+            {%- for row in assignment_overview.status_breakdown -%}
+            {{ localize_status(row.value)|tojson }}{% if not loop.last %},{% endif %}
+            {%- endfor -%}
+        ],
+        values: [
+            {%- for row in assignment_overview.status_breakdown -%}
+            {{ row.count }}{% if not loop.last %},{% endif %}
+            {%- endfor -%}
+        ],
+        keys: [
+            {%- for row in assignment_overview.status_breakdown -%}
+            {{ row.value|tojson }}{% if not loop.last %},{% endif %}
+            {%- endfor -%}
+        ]
+    }{% else %}null{% endif %},
     submissionReviewRecipient: {
         mode: {{ (form.submission_review_recipient_mode.data if form.submission_review_recipient_mode is defined else 'fds_member')|tojson }},
         users: {% if submission_review_recipient_users is defined and submission_review_recipient_users %}[
@@ -1293,8 +1315,50 @@ window.manageAssignmentConfig = {
 };
 </script>
 <script src="{{ static_url('js/lib/year-picker.js') }}" nonce="{{ csp_nonce() }}"></script>
+{% if assignment %}
+<script src="{{ static_url('libs/chart.umd.min.js') }}"></script>
+{% endif %}
 <script src="{{ static_url('js/admin/manage-assignment.js') }}" nonce="{{ csp_nonce() }}"></script>
 <style>
+/* Assignment status overview: cards + bar chart on one row */
+.assignment-overview-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    align-items: stretch;
+}
+.assignment-overview-cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    align-content: start;
+}
+.assignment-overview-chart-col {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+.assignment-overview-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 16rem;
+    min-height: 16rem;
+    flex: 1 1 auto;
+}
+@media (min-width: 768px) {
+    .assignment-overview-row {
+        grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+    }
+    .assignment-overview-cards {
+        grid-template-columns: 1fr;
+    }
+    .assignment-overview-chart-wrap {
+        height: 100%;
+        min-height: 16rem;
+    }
+}
+
 /* Responsive multi-column layout for NS Structure and Secretariat trees */
 #ns-structure-hierarchy-container > ul,
 #secretariat-hierarchy-container > ul,

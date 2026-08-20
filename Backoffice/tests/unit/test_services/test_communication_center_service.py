@@ -160,6 +160,85 @@ class TestCommunicationCenterService:
         assert rows[0]['record_type'] == RECORD_TYPE_BOTH
         assert rows[0]['has_notification'] is True
         assert rows[0]['has_email'] is True
+        assert rows[0]['email_is_grouped'] is False
+
+    def test_assignment_submitted_team_email_is_grouped(self, app):
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.assignment_submitted,
+                title='Team update: Unified Country Report submitted',
+                message='A focal point submitted Unified Country Report.',
+                title_key='notification.assignment_submitted.title',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            log = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='New Notification: Team update: Unified Country Report submitted by Jamie',
+                status='sent',
+                sent_at=utcnow(),
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            actor_fields_by_id = NotificationService.build_actor_display_fields_map([notification], {})
+            email_fields_by_id = NotificationService.build_email_delivery_fields_map([notification.id])
+
+            rows = build_notification_grid_rows(
+                [notification],
+                actor_fields_by_id=actor_fields_by_id,
+                email_fields_by_id=email_fields_by_id,
+            )
+
+        assert rows[0]['has_email'] is True
+        assert rows[0]['email_is_grouped'] is True
+
+    def test_assignment_submitted_admin_email_is_not_grouped(self, app):
+        with app.app_context():
+            user = _make_user()
+            db.session.add(user)
+            db.session.flush()
+
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.assignment_submitted,
+                title='Jamie has submitted Unified Country Report.',
+                message='Please review.',
+                title_key='notification.assignment_submitted.admin.title',
+            )
+            db.session.add(notification)
+            db.session.flush()
+
+            log = EmailDeliveryLog(
+                notification_id=notification.id,
+                user_id=user.id,
+                email_address=user.email,
+                subject='Jamie has submitted Unified Country Report.',
+                status='sent',
+                sent_at=utcnow(),
+            )
+            db.session.add(log)
+            db.session.commit()
+
+            actor_fields_by_id = NotificationService.build_actor_display_fields_map([notification], {})
+            email_fields_by_id = NotificationService.build_email_delivery_fields_map([notification.id])
+
+            rows = build_notification_grid_rows(
+                [notification],
+                actor_fields_by_id=actor_fields_by_id,
+                email_fields_by_id=email_fields_by_id,
+            )
+
+        assert rows[0]['has_email'] is True
+        assert rows[0]['email_is_grouped'] is False
 
     def test_build_communications_center_grid_merges_rows(self, app):
         with app.app_context():

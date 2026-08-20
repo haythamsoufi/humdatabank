@@ -85,6 +85,83 @@ class TestAutoRecoverStaleProcessing:
         db_session.expire_all()
         assert AIDocument.query.get(doc.id).processing_status == "failed"
 
+    def test_auto_recover_marks_doc_with_stale_job_item(self, app, db_session, admin_user):
+        """Days-old ai_job_items.processing rows must not keep the banner/docs stuck."""
+        from app.models import AIJob, AIJobItem
+        from app.routes.ai_documents import upload as upload_mod
+
+        upload_mod._document_processing_stage.clear()
+        doc = _create_processing_doc(db_session, admin_user)
+        stale_at = datetime.utcnow() - timedelta(hours=6)
+        doc.updated_at = stale_at
+        doc.created_at = stale_at
+        job = AIJob(
+            id=str(uuid.uuid4()),
+            job_type="docs.bulk_reprocess",
+            user_id=admin_user.id,
+            status="running",
+            total_items=1,
+            created_at=stale_at,
+            started_at=stale_at,
+        )
+        db_session.add(job)
+        db_session.flush()
+        db_session.add(
+            AIJobItem(
+                job_id=job.id,
+                item_index=0,
+                entity_type="ai_document",
+                entity_id=doc.id,
+                status="processing",
+                created_at=stale_at,
+                updated_at=stale_at,
+            )
+        )
+        db_session.commit()
+
+        with app.app_context():
+            app.config["AI_DOCS_AUTOFIX_STALE_PROCESSING_TIMEOUT_SECONDS"] = 60
+            updated = _auto_recover_stale_processing_documents()
+
+        assert updated == 1
+        db_session.expire_all()
+        assert AIDocument.query.get(doc.id).processing_status == "failed"
+
+    def test_auto_recover_skips_doc_with_fresh_job_item(self, app, db_session, admin_user):
+        from app.models import AIJob, AIJobItem
+        from app.routes.ai_documents import upload as upload_mod
+
+        upload_mod._document_processing_stage.clear()
+        doc = _create_processing_doc(db_session, admin_user)
+        doc.updated_at = datetime.utcnow() - timedelta(hours=2)
+        job = AIJob(
+            id=str(uuid.uuid4()),
+            job_type="docs.bulk_reprocess",
+            user_id=admin_user.id,
+            status="running",
+            total_items=1,
+        )
+        db_session.add(job)
+        db_session.flush()
+        db_session.add(
+            AIJobItem(
+                job_id=job.id,
+                item_index=0,
+                entity_type="ai_document",
+                entity_id=doc.id,
+                status="processing",
+                updated_at=datetime.utcnow(),
+            )
+        )
+        db_session.commit()
+
+        with app.app_context():
+            app.config["AI_DOCS_AUTOFIX_STALE_PROCESSING_TIMEOUT_SECONDS"] = 60
+            updated = _auto_recover_stale_processing_documents()
+
+        assert updated == 0
+        assert AIDocument.query.get(doc.id).processing_status == "processing"
+
 
 class TestDocumentProcessingStatusStuckDetection:
     """Regression coverage for document_processing_status's stuck-detection heartbeat

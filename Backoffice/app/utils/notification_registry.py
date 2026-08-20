@@ -42,13 +42,18 @@ NOTIFICATION_TYPE_REGISTRY_SPECS: List[Dict[str, Any]] = [
         "type_key": "assignment_submitted",
         "emitter_active": True,
         "audiences": ["focal_points", "admin_users", "system_managers"],
+        "email_delivery": "grouped",
         "description": (
             "Created when someone submits an assignment the user participates in "
-            "(e.g., focal point reviewers)."
+            "(e.g., focal point reviewers). Focal points get one grouped team email "
+            "(everyone on the same To line), not a separate email each."
         ),
         "recipients": (
-            "Focal points on the same entity (assignment editor/submitter role), including whoever submitted. "
-            "Org admins and system managers are separate buckets below."
+            "In-app: focal points on the same entity (including the submitter), plus org admins "
+            "and system managers when those buckets are on. "
+            "Email: one grouped team email to all entity focal points (shared To list — "
+            "Communication Center shows that same email on each recipient row). "
+            "Admins get a separate individual review email."
         ),
     },
     {
@@ -372,6 +377,20 @@ def build_notification_settings_delivery_rows(
                 "Reserved for preferences or future use — the application does not emit this notification type yet."
             )
         )
+        email_delivery = spec.get("email_delivery") or "instant"
+        email_delivery_display = (
+            gettext_fn("Grouped email")
+            if email_delivery == "grouped"
+            else ""
+        )
+        email_delivery_hint = (
+            gettext_fn(
+                "One shared email is sent to the entity team (all recipients on the same To line). "
+                "Communication Center still lists that email on each person’s row."
+            )
+            if email_delivery == "grouped"
+            else ""
+        )
         rows.append(
             {
                 "group": spec["group"],
@@ -390,6 +409,9 @@ def build_notification_settings_delivery_rows(
                 "emitter_active": emitter_active,
                 "emitter_status_display": emitter_status_display,
                 "emitter_status_hint": emitter_status_hint,
+                "email_delivery": email_delivery,
+                "email_delivery_display": email_delivery_display,
+                "email_delivery_hint": email_delivery_hint,
             }
         )
     return rows

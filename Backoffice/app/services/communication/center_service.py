@@ -259,6 +259,16 @@ def format_notification_grid_row(
     read_at = _format_datetime(notification.read_at)
     has_email = bool(email_fields.get('has_email'))
     record_type = RECORD_TYPE_BOTH if has_email else RECORD_TYPE_NOTIFICATION
+    title_key = notification.title_key or ''
+    email_is_grouped = bool(has_email) and (
+        notification_type_value == 'assignment_created'
+        or (
+            notification_type_value == 'assignment_submitted'
+            and title_key != 'notification.assignment_submitted.admin.title'
+        )
+    )
+    email_fields = dict(email_fields)
+    email_fields['email_is_grouped'] = email_is_grouped
 
     return {
         'row_kind': RECORD_TYPE_NOTIFICATION,

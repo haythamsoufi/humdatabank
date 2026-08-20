@@ -1,0 +1,147 @@
+{# Status dashboard shown at the top of manage_assignment.html for existing assignments. #}
+{% from "components/_status_label.html" import status_label %}
+
+{% set overview = assignment_overview %}
+{% if assignment and overview %}
+{% set has_entities = overview.entity_count > 0 %}
+{% set cr = overview.avg_completion_pct %}
+{% set lifecycle = overview.lifecycle %}
+
+<div id="assignment-status-overview" class="mb-6 space-y-4" aria-labelledby="assignment-status-overview-title">
+    <div class="bg-white shadow-md border border-gray-200">
+        <div class="px-4 sm:px-6 py-4 border-b border-gray-200 flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 id="assignment-status-overview-title" class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                    <i class="fas fa-chart-bar text-blue-500" aria-hidden="true"></i>
+                    {{ _('Status overview') }}
+                </h2>
+                <p class="mt-1 text-xs text-gray-500">
+                    {% if overview.template_name %}
+                        <span class="font-medium text-gray-700">{{ overview.template_name }}</span>
+                        {% if overview.period_name %}
+                            <span class="mx-1 text-gray-300" aria-hidden="true">·</span>
+                        {% endif %}
+                    {% endif %}
+                    {% if overview.period_name %}
+                        <span>{{ overview.period_name }}</span>
+                    {% endif %}
+                    {% if overview.assigned_at %}
+                        <span class="mx-1 text-gray-300" aria-hidden="true">·</span>
+                        <span>{{ _('Created') }} {{ overview.assigned_at|datetime_local('date') }}</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                {% if lifecycle == 'active' %}
+                    {{ status_label(_('Active'), 'success') }}
+                {% elif lifecycle == 'inactive' %}
+                    {{ status_label(_('Inactive'), 'neutral') }}
+                {% elif lifecycle == 'closed_expired' %}
+                    {{ status_label(_('Closed'), 'danger') }}
+                    {{ status_label(_('Expired'), 'warning') }}
+                {% else %}
+                    {{ status_label(_('Closed'), 'danger') }}
+                {% endif %}
+                {% if overview.has_data_owner %}
+                    {{ status_label(overview.data_owner_name or _('Data owner'), 'info') }}
+                {% elif lifecycle == 'active' %}
+                    {{ status_label(_('No data owner'), 'warning') }}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="p-4 sm:p-6">
+            <div class="assignment-overview-row">
+            <div class="assignment-overview-cards">
+                <{% if has_entities %}button type="button" data-open-entities-tab{% else %}div{% endif %}
+                   class="bg-gray-50 p-4 rounded-lg border border-gray-200 text-left {% if has_entities %}hover:shadow-md hover:border-gray-300 transition-all duration-200 cursor-pointer{% endif %}">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-700">{{ _('Entities') }}</h3>
+                        <i class="fas fa-sitemap text-blue-500" aria-hidden="true"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-blue-600 tabular-nums">{{ overview.entity_count }}</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {% if overview.country_count == overview.entity_count %}
+                            {{ ngettext('%(num)s country', '%(num)s countries', overview.country_count) }}
+                        {% else %}
+                            {{ ngettext('%(num)s country', '%(num)s countries', overview.country_count) }}
+                            <span class="text-gray-400">·</span>
+                            {{ ngettext('%(num)s other', '%(num)s others', overview.entity_count - overview.country_count) }}
+                        {% endif %}
+                    </p>
+                </{% if has_entities %}button{% else %}div{% endif %}>
+
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-700">{{ _('Avg. completion') }}</h3>
+                        <i class="fas fa-check-circle {% if cr is none %}text-gray-400{% elif cr >= 80 %}text-green-500{% elif cr >= 50 %}text-amber-500{% else %}text-red-500{% endif %}" aria-hidden="true"></i>
+                    </div>
+                    {% if cr is none %}
+                        <p class="text-2xl font-bold text-gray-400 tabular-nums">—</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ _('No completion data yet') }}</p>
+                    {% else %}
+                        <p class="text-2xl font-bold tabular-nums {% if cr >= 80 %}text-green-600{% elif cr >= 50 %}text-amber-600{% else %}text-red-600{% endif %}">{{ '%.1f'|format(cr) }}%</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ _('Across assigned entities') }}</p>
+                    {% endif %}
+                </div>
+
+                <{% if overview.overdue_count > 0 %}button type="button" data-open-entities-tab{% else %}div{% endif %}
+                   class="p-4 rounded-lg border text-left {% if overview.overdue_count > 0 %}bg-red-50 border-red-200 hover:shadow-md transition-all duration-200 cursor-pointer{% else %}bg-gray-50 border-gray-200{% endif %}">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-700">{{ _('Overdue') }}</h3>
+                        <i class="fas fa-calendar-times {% if overview.overdue_count > 0 %}text-red-500{% else %}text-gray-400{% endif %}" aria-hidden="true"></i>
+                    </div>
+                    <p class="text-2xl font-bold tabular-nums {% if overview.overdue_count > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ overview.overdue_count }}</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {% if overview.due_soon_count > 0 %}
+                            {{ ngettext('%(num)s due within 7 days', '%(num)s due within 7 days', overview.due_soon_count) }}
+                        {% else %}
+                            {{ _('Past due, not yet submitted') }}
+                        {% endif %}
+                    </p>
+                </{% if overview.overdue_count > 0 %}button{% else %}div{% endif %}>
+
+                {% if overview.public_url_active %}
+                <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-sm font-semibold text-gray-700">{{ _('Public URL') }}</h3>
+                        <i class="fas fa-link text-green-500" aria-hidden="true"></i>
+                    </div>
+                    <p class="text-2xl font-bold text-green-600">{{ _('On') }}</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ ngettext('%(num)s country enabled', '%(num)s countries enabled', overview.public_country_count) }}
+                    </p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="assignment-overview-chart-col">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h3 class="text-sm font-semibold text-gray-700">{{ _('Entities by status') }}</h3>
+                    {% if overview.earliest_due_date %}
+                        <p class="text-xs text-gray-500">
+                            {{ _('Earliest due') }}:
+                            <span class="font-medium text-gray-700">{{ overview.earliest_due_date|datetime_local('date') }}</span>
+                            {% if overview.has_multiple_due_dates %}
+                                <span class="text-amber-600 ml-1"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i> {{ _('Multiple due dates') }}</span>
+                            {% endif %}
+                        </p>
+                    {% elif overview.expiry_date %}
+                        <p class="text-xs text-gray-500">
+                            {{ _('Expires') }}:
+                            <span class="font-medium text-gray-700">{{ overview.expiry_date|datetime_local('date') }}</span>
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div class="assignment-overview-chart-wrap">
+                    <canvas id="assignment-status-chart"
+                            aria-label="{{ _('Entities by status')|forceescape }}"
+                            role="img"></canvas>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

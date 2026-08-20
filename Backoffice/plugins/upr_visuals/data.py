@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import joinedload
@@ -11,7 +12,6 @@ from app.extensions import db
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.form_items import FormItem
 from app.models.forms import DynamicIndicatorData, FormData, RepeatGroupInstance
-from app.models.indicator_bank import IndicatorBank
 from app.models.organization import NationalSociety
 from app.utils.api_serialization import _country_for_aes, _resolve_matrix_cell
 from plugins.upr_visuals.catalog import (
@@ -21,6 +21,7 @@ from plugins.upr_visuals.catalog import (
     KPI_LABELS,
     KPI_ORDER,
     PLAN_ITEM_FALLBACKS,
+    PLAN_KPI_LABELS,
     PLAN_LABEL_NEEDLES,
     PLAN_TEMPLATE_ID,
     PLANNING_EA_FUNDING_AREAS,
@@ -54,6 +55,18 @@ from plugins.upr_visuals.formatters import (
 
 logger = logging.getLogger(__name__)
 
+_PLUGIN_DIR = Path(__file__).resolve().parent
+# EO is not an SP/EF catalog code; use the plugin asset instead of the indicator bank.
+_PLUGIN_REACH_ICONS = {
+    "EO": "icons/eo-emergency.png",
+    "CC1": "icons/cc1-cross-cutting.png",
+    "SP1": "icons/sp1-climate.png",
+    "SP2": "icons/sp2-disasters.png",
+    "SP3": "icons/sp3-health.png",
+    "SP4": "icons/sp4-migration.png",
+    "SP5": "icons/sp5-inclusion.png",
+}
+
 
 class UprVisualsError(ValueError):
     """Raised when an assignment cannot produce UPR visuals."""
@@ -65,7 +78,8 @@ def assignment_supports_visuals(aes: AssignmentEntityStatus | None) -> bool:
     return int(aes.assigned_form.template_id or 0) in UPR_VISUAL_TEMPLATE_IDS
 
 
-def build_payload(aes_id: int) -> dict[str, Any]:
+def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
+    _set_spef_icon_mode(inline=inline_icons)
     aes = _load_aes(aes_id)
     assigned = aes.assigned_form
     template_id = int(assigned.template_id)
@@ -89,7 +103,7 @@ def build_payload(aes_id: int) -> dict[str, Any]:
             "national_society": display_ns_name(ns.name if ns else country.name if country else ""),
             "year": (planning_years(period_name) or [None])[0],
         },
-        "kpis": _build_kpis(items, by_item),
+        "kpis": _build_kpis(items, by_item, kind=kind),
         "people_reached": [],
         "financial": {"ifrc_network": {}, "sources": [], "years": []},
         "support": [],
@@ -103,10 +117,15 @@ def build_payload(aes_id: int) -> dict[str, Any]:
         payload["people_reached"] = _plan_people_reached(items, by_item, period_name)
         payload["financial"] = _plan_financial(items, by_item, period_name)
         payload["support"] = _plan_support(items, by_item)
-        payload["meta"]["people_title"] = "People to be reached"
-        payload["meta"]["support_title"] = "IFRC network bilateral-supported activities"
+        payload["meta"]["people_title"] = (
+            f"People to be reached in {payload['meta']['year']}"
+            if payload["meta"].get("year")
+            else "People to be reached"
+        )
+        payload["meta"]["support_title"] = "Participating National Societies bilateral support"
         payload["meta"]["support_funding_label"] = "Funding Requirement"
-        payload["meta"]["header_prefix"] = "IN SUPPORT OF"
+        payload["meta"]["header_prefix"] = "In support of"
+        payload["meta"]["plan_years"] = planning_years(period_name)
     else:
         payload["people_reached"] = _report_people_reached(items, by_item, aes.id)
         payload["financial"] = _report_financial(
@@ -137,7 +156,7 @@ def build_payload(aes_id: int) -> dict[str, Any]:
     payload["dashboards"] = [
         {
             "id": spec.id,
-            "title": spec.title,
+            "title": _dashboard_title(spec, kind),
             "description": spec.description,
             "width": spec.width,
             "height": spec.height,
@@ -146,6 +165,20 @@ def build_payload(aes_id: int) -> dict[str, Any]:
     ]
 
     return payload
+
+
+def _dashboard_title(spec, kind: str) -> str:
+    if kind != "plan":
+        return spec.title
+    if spec.id == "financial":
+        return "Funding requirements"
+    if spec.id == "reach":
+        return "People to be reached"
+    if spec.id == "support":
+        return "Bilateral support"
+    if spec.id == "network_funding":
+        return "Network-supported activities"
+    return spec.title
 
 
 def _load_aes(aes_id: int) -> AssignmentEntityStatus:
@@ -163,31 +196,63 @@ def _load_aes(aes_id: int) -> AssignmentEntityStatus:
     return aes
 
 
+def _indicator_bank_options(root):
+    from app.models.indicator_bank import IndicatorBank
+
+    return joinedload(root).joinedload(IndicatorBank.spef_area)
+
+
+def _load_dynamic_indicator_rows(aes_id: int) -> list[DynamicIndicatorData]:
+    query = DynamicIndicatorData.query.options(
+        _indicator_bank_options(DynamicIndicatorData.indicator_bank)
+    ).filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
+    try:
+        return query.all()
+    except Exception:
+        db.session.rollback()
+        logger.debug("UPR visuals: falling back to dynamic rows without SPEF catalog join", exc_info=True)
+        return (
+            DynamicIndicatorData.query.options(joinedload(DynamicIndicatorData.indicator_bank))
+            .filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
+            .all()
+        )
+
+
 def _load_items(template) -> list[FormItem]:
     version_id = getattr(template, "published_version_id", None) if template else None
     if not version_id:
         return []
-    return (
-        FormItem.query.options(
-            joinedload(FormItem.form_section),
-            joinedload(FormItem.indicator_bank).joinedload(IndicatorBank.spef_area),
+    query = FormItem.query.options(
+        joinedload(FormItem.form_section),
+        _indicator_bank_options(FormItem.indicator_bank),
+    ).filter(FormItem.version_id == version_id, FormItem.archived.is_(False))
+    try:
+        return query.all()
+    except Exception:
+        db.session.rollback()
+        logger.debug("UPR visuals: falling back to items without SPEF catalog join", exc_info=True)
+        return (
+            FormItem.query.options(
+                joinedload(FormItem.form_section),
+                joinedload(FormItem.indicator_bank),
+            )
+            .filter(FormItem.version_id == version_id, FormItem.archived.is_(False))
+            .all()
         )
-        .filter(FormItem.version_id == version_id, FormItem.archived.is_(False))
-        .all()
-    )
 
 
 def _load_entries(aes_id: int) -> list[FormData]:
     return FormData.query.filter_by(assignment_entity_status_id=aes_id).all()
 
 
-def _build_kpis(items: list[FormItem], by_item: dict[int, FormData]) -> dict[str, Any]:
+def _build_kpis(items: list[FormItem], by_item: dict[int, FormData], *, kind: str = "report") -> dict[str, Any]:
     bank_to_item: dict[int, FormItem] = {}
     for item in items:
         bank_id = getattr(item, "indicator_bank_id", None)
         if bank_id in KPI_BANK_IDS.values() and bank_id not in bank_to_item:
             bank_to_item[int(bank_id)] = item
 
+    labels = PLAN_KPI_LABELS if kind == "plan" else KPI_LABELS
     kpis = {}
     for key in KPI_ORDER:
         bank_id = KPI_BANK_IDS[key]
@@ -196,7 +261,7 @@ def _build_kpis(items: list[FormItem], by_item: dict[int, FormData]) -> dict[str
         number = _scalar_number(entry)
         kpis[key] = {
             "key": key,
-            "label": KPI_LABELS[key],
+            "label": labels[key],
             "value": number,
             "display": format_count(number) if number is not None else "Not reported",
             "icon": key,
@@ -211,15 +276,23 @@ def _plan_people_reached(items, by_item, period_name: str) -> list[dict[str, Any
     emergency = _resolve_item(items, PLAN_LABEL_NEEDLES["reach_emergency"], PLAN_ITEM_FALLBACKS["reach_emergency"])
     cells = _matrix_cells(by_item.get(longer.id) if longer else None)
     by_code: dict[str, float] = {}
+    headline = 0.0
     for key, raw in cells.items():
         number = to_number(_resolve_matrix_cell(raw))
         if number is None:
             continue
         row, col = _split_cell_key(key)
-        code = _area_code(col) or _area_code(row)
-        if code in SP_CODES and (not year0 or row == year0 or col == year0 or key.startswith(f"{year0}_")):
-            by_code[code] = by_code.get(code, 0) + number
-        elif code in SP_CODES and not year0:
+        if year0 and row != year0 and col != year0 and not key.startswith(f"{year0}_"):
+            continue
+        row_l = (row or "").strip().lower()
+        col_l = (col or "").strip().lower()
+        if col_l in {"total", "row_total"} or row_l in {"total", "row_total"}:
+            if col_l in {"total", "row_total"} and row_l in {"total", "row_total"}:
+                continue
+            headline = max(headline, number)
+            continue
+        code = _area_code(col) or _area_code(row) or section_to_area(col) or section_to_area(row)
+        if code in SP_CODES:
             by_code[code] = by_code.get(code, 0) + number
 
     eo_total = 0.0
@@ -231,7 +304,21 @@ def _plan_people_reached(items, by_item, period_name: str) -> list[dict[str, Any
     if eo_total:
         by_code["EO"] = eo_total
 
-    return _reach_rows(by_code)
+    rows = _reach_rows(by_code)
+    if headline:
+        rows.insert(
+            0,
+            {
+                "code": "TOTAL",
+                "label": "People to be reached",
+                "value": headline,
+                "display": format_count(headline),
+                "has_value": True,
+                "icon_src": "",
+                "is_total": True,
+            },
+        )
+    return rows
 
 
 def _report_people_reached(items, by_item, aes_id: int | None = None) -> list[dict[str, Any]]:
@@ -252,13 +339,7 @@ def _report_people_reached(items, by_item, aes_id: int | None = None) -> list[di
             continue
         candidates.append((area, number))
     if aes_id:
-        dyn_rows = (
-            DynamicIndicatorData.query.options(
-                joinedload(DynamicIndicatorData.indicator_bank).joinedload(IndicatorBank.spef_area)
-            )
-            .filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
-            .all()
-        )
+        dyn_rows = _load_dynamic_indicator_rows(aes_id)
         for dyn in dyn_rows:
             bank = getattr(dyn, "indicator_bank", None)
             if not _is_people_count(bank):
@@ -395,63 +476,168 @@ def _spef_icon_alias(code: str) -> str:
     return upper
 
 
-def spef_icon_srcs() -> dict[str, str]:
-    """Map SPEF catalog codes to icon src (data URI so PNG/PDF export works)."""
-    try:
-        from flask import g, has_app_context
-
-        if has_app_context() and isinstance(getattr(g, "_upr_spef_icon_srcs", None), dict):
-            return g._upr_spef_icon_srcs
-    except Exception:
-        pass
-
-    from app.models.indicator_bank import IndicatorBankSpef
-    from app.services.platform import storage_service as storage
-    from app.utils.sector_logo_urls import spef_icon_url
-
-    try:
-        rows = (
-            IndicatorBankSpef.query.filter(IndicatorBankSpef.icon_filename.isnot(None))
-            .filter(IndicatorBankSpef.is_active.is_(True))
-            .all()
-        )
-    except Exception:
-        logger.debug("UPR visuals: could not load SPEF catalog icons", exc_info=True)
-        return {}
-
-    import base64
-    import mimetypes
-
-    out: dict[str, str] = {}
-    for row in rows:
-        code = (row.code or "").strip().upper()
-        filename = (row.icon_filename or "").strip()
-        if not code or not filename:
-            continue
-        src = ""
-        try:
-            data = storage.download(storage.SYSTEM, f"spef/{filename}")
-            if data:
-                mime = mimetypes.guess_type(filename)[0] or "image/png"
-                src = f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
-        except Exception:
-            try:
-                src = spef_icon_url(row) or ""
-            except Exception:
-                src = ""
-        if not src:
-            continue
-        out[code] = src
-        alias = _spef_icon_alias(code)
-        if alias != code:
-            out.setdefault(alias, src)
-        if code == "CC":
-            out.setdefault("CC1", src)
+def _set_spef_icon_mode(*, inline: bool) -> None:
     try:
         from flask import g, has_app_context
 
         if has_app_context():
-            g._upr_spef_icon_srcs = out
+            g._upr_inline_spef_icons = bool(inline)
+            for attr in ("_upr_spef_icon_srcs", "_upr_spef_icon_srcs_inline"):
+                if hasattr(g, attr):
+                    delattr(g, attr)
+    except Exception:
+        pass
+
+
+def _inline_spef_icons() -> bool:
+    try:
+        from flask import g, has_app_context
+
+        if has_app_context():
+            return bool(getattr(g, "_upr_inline_spef_icons", False))
+    except Exception:
+        pass
+    return False
+
+
+def _load_spef_catalog_rows():
+    """Active SPEF catalog rows — same source as the indicator-bank wizard."""
+    from app.models.indicator_bank import IndicatorBankSpef
+
+    return (
+        IndicatorBankSpef.query.filter(IndicatorBankSpef.is_active.is_(True))
+        .order_by(IndicatorBankSpef.sort_order, IndicatorBankSpef.code)
+        .all()
+    )
+
+
+def _spef_catalog_icon_url(row) -> str:
+    """Browser URL used by the indicator bank and assignment Visuals."""
+    from app.utils.sector_logo_urls import spef_icon_url
+
+    try:
+        return spef_icon_url(row, via_api=True) or spef_icon_url(row) or ""
+    except Exception:
+        try:
+            return spef_icon_url(row) or ""
+        except Exception:
+            return ""
+
+
+def _inline_local_icon(path: Path) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        import base64
+        import mimetypes
+
+        data = path.read_bytes()
+        if not data:
+            return ""
+        mime = mimetypes.guess_type(path.name)[0] or "image/png"
+        return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+    except Exception:
+        return ""
+
+
+def _plugin_reach_icon_src(code: str, *, inline: bool) -> str:
+    rel = _PLUGIN_REACH_ICONS.get((code or "").strip().upper())
+    if not rel:
+        return ""
+    path = _PLUGIN_DIR / "static" / rel
+    if inline:
+        return _inline_local_icon(path)
+    if not path.is_file():
+        return ""
+    try:
+        from flask import url_for
+
+        return url_for("upr_visuals.static_file", filename=rel)
+    except Exception:
+        return f"/upr-visuals/static/{rel}"
+
+
+def _inline_spef_icon(row) -> str:
+    filename = (getattr(row, "icon_filename", None) or "").strip()
+    if not filename:
+        return ""
+    try:
+        import base64
+        import mimetypes
+
+        from app.services.platform import storage_service as storage
+
+        data = storage.download(storage.SYSTEM, f"spef/{filename}")
+        if not data:
+            return ""
+        mime = mimetypes.guess_type(filename)[0] or "image/png"
+        return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+    except Exception:
+        return ""
+
+
+def _remember_spef_icon(out: dict[str, str], code: str, src: str) -> None:
+    out[code] = src
+    alias = _spef_icon_alias(code)
+    if alias != code:
+        out.setdefault(alias, src)
+    if code == "CC":
+        out.setdefault("CC1", src)
+
+
+def spef_icon_srcs(*, inline: bool | None = None) -> dict[str, str]:
+    """Map SPEF catalog codes to icon src from the indicator bank.
+
+    Browser preview and assignment Visuals use ``spef_icon_url`` (same helper as
+    the indicator-bank SPEF catalog). PNG/PDF export can request data URIs.
+    """
+    use_inline = _inline_spef_icons() if inline is None else bool(inline)
+    cache_attr = "_upr_spef_icon_srcs_inline" if use_inline else "_upr_spef_icon_srcs"
+    try:
+        from flask import g, has_app_context
+
+        cached = getattr(g, cache_attr, None) if has_app_context() else None
+        if isinstance(cached, dict):
+            return cached
+    except Exception:
+        pass
+
+    out: dict[str, str] = {}
+    try:
+        rows = _load_spef_catalog_rows()
+    except Exception:
+        logger.debug("UPR visuals: could not load SPEF catalog icons", exc_info=True)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        rows = []
+
+    for row in rows:
+        code = (getattr(row, "code", None) or "").strip().upper()
+        if not code:
+            continue
+        src = ""
+        if use_inline:
+            # WeasyPrint cannot load Flask /indicator-bank URLs; only embed files.
+            src = _inline_spef_icon(row)
+        else:
+            src = _spef_catalog_icon_url(row)
+        if src:
+            _remember_spef_icon(out, code, src)
+
+    for code in _PLUGIN_REACH_ICONS:
+        src = _plugin_reach_icon_src(code, inline=use_inline)
+        if not src:
+            continue
+        if code == "EO" or not out.get(code):
+            _remember_spef_icon(out, code, src)
+
+    try:
+        from flask import g, has_app_context
+
+        if has_app_context():
+            setattr(g, cache_attr, out)
     except Exception:
         pass
     return out
@@ -460,12 +646,14 @@ def spef_icon_srcs() -> dict[str, str]:
 def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
     years = planning_years(period_name)
     year_rows = []
+    area_years = []
     source_totals = {"HNS": 0.0, "IFRC Secretariat": 0.0, "PNS": 0.0}
     for offset, year in enumerate(years):
         fallback_key = f"funding_y{offset}"
         item = _resolve_funding_year_item(items, offset, PLAN_ITEM_FALLBACKS[fallback_key])
         cells = _matrix_cells(by_item.get(item.id) if item else None)
         grouped = _sum_funding_rows(cells)
+        by_area = _sum_funding_by_area(cells)
         hns = grouped.get("HNS", 0.0)
         ifrc = grouped.get("IFRC Secretariat", 0.0)
         pns = grouped.get("PNS", 0.0)
@@ -477,17 +665,35 @@ def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
                 "ifrc": ifrc,
                 "pns": pns,
                 "total": total,
-                "hns_display": format_chf(hns) if hns else "",
-                "ifrc_display": format_chf(ifrc) if ifrc else "",
-                "pns_display": format_chf(pns) if pns else "",
+                "hns_display": format_compact_chf(hns) if hns else "",
+                "ifrc_display": format_compact_chf(ifrc) if ifrc else "",
+                "pns_display": format_compact_chf(pns) if pns else "",
                 "total_display": format_compact_chf(total) if total else "",
             }
         )
+        area_years.append({"year": year, "by_entity": by_area})
         if offset == 0:
             source_totals["HNS"] = hns
             source_totals["IFRC Secretariat"] = ifrc
             source_totals["PNS"] = pns
 
+    cover_sources = []
+    for key, label in (
+        ("HNS", "Through Host National Society"),
+        ("IFRC Secretariat", "Through the IFRC"),
+        ("PNS", "Through Participating National Societies"),
+    ):
+        val = source_totals[key]
+        if key == "PNS" and not val:
+            continue
+        cover_sources.append(
+            {
+                "entity": key,
+                "label": label,
+                "value": val,
+                "display": format_compact_chf(val) if val else "Not reported",
+            }
+        )
     network_req = sum(source_totals.values())
     sources = [
         {
@@ -505,8 +711,10 @@ def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
             "funding": None,
             "expenditure": None,
         },
+        "cover_sources": cover_sources,
         "sources": sources,
         "years": year_rows,
+        "area_years": area_years,
     }
 
 
@@ -1206,13 +1414,7 @@ def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, An
         .order_by(RepeatGroupInstance.instance_number)
         .all()
     )
-    dyn_rows = (
-        DynamicIndicatorData.query.options(
-            joinedload(DynamicIndicatorData.indicator_bank).joinedload(IndicatorBank.spef_area)
-        )
-        .filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
-        .all()
-    )
+    dyn_rows = _load_dynamic_indicator_rows(aes_id)
     by_slot: dict[int, list[DynamicIndicatorData]] = {}
     for row in dyn_rows:
         if row.repeat_instance_number:
@@ -1397,8 +1599,11 @@ def _bank_area(bank) -> str | None:
     if bank is None:
         return None
     spef = getattr(bank, "spef_area", None)
-    code = getattr(spef, "code", None) or getattr(bank, "area", None)
-    return _area_code(code)
+    if spef is not None:
+        mapped = _area_code(getattr(spef, "code", None))
+        if mapped:
+            return mapped
+    return _area_code(getattr(bank, "area", None))
 
 
 def _funding_entity(row: str | None) -> str | None:
@@ -1450,6 +1655,57 @@ def _sum_funding_rows(cells: dict[str, Any]) -> dict[str, float]:
     for key in grouped:
         if not grouped[key] and totals[key]:
             grouped[key] = totals[key]
+    return grouped
+
+
+def _funding_area_code(col: str | None) -> str | None:
+    code = _area_code(col)
+    if code in SP_CODES or code == "EFs":
+        return code
+    if code in EF_CODES:
+        return "EFs"
+    mapped = section_to_area(col)
+    if mapped in SP_CODES or mapped == "EFs":
+        return mapped
+    if mapped in EF_CODES:
+        return "EFs"
+    text = (col or "").strip().lower()
+    if "enabling" in text:
+        return "EFs"
+    return None
+
+
+def _sum_funding_by_area(cells: dict[str, Any]) -> dict[str, dict[str, float]]:
+    """T24 funding cells grouped by entity and Strategic Priority / Enabling Functions."""
+    entities = ("HNS", "IFRC Secretariat", "PNS")
+    grouped = {key: {code: 0.0 for code in SUPPORT_AREA_CODES} | {"total": 0.0} for key in entities}
+    totals = {key: 0.0 for key in entities}
+    for key, raw in cells.items():
+        number = to_number(_resolve_matrix_cell(raw))
+        if not number:
+            continue
+        row, col = _split_cell_key(key)
+        entity = _funding_entity(row)
+        if entity not in grouped:
+            if entity is None:
+                try:
+                    int(row)
+                    entity = "PNS"
+                except (TypeError, ValueError):
+                    continue
+            else:
+                continue
+        if (col or "").strip().lower() in {"total", "row_total"}:
+            totals[entity] += number
+            continue
+        code = _funding_area_code(col)
+        if not code:
+            continue
+        grouped[entity][code] += number
+        grouped[entity]["total"] += number
+    for key, rec in grouped.items():
+        if not rec["total"] and totals[key]:
+            rec["total"] = totals[key]
     return grouped
 
 
@@ -1521,14 +1777,33 @@ def _split_appeal_label(label: str) -> tuple[str, str]:
     return text, ""
 
 
-def list_assignments_for_bulk(template_id: int, period_name: str | None = None) -> list[dict[str, Any]]:
-    """Country assignments available for bulk PNG generation."""
-    from app.models.assignments import AssignedForm
+def list_assigned_forms_for_bulk() -> list[dict[str, Any]]:
+    """Unified Plan and Report assignments available for bulk PNG generation."""
+    rows = (
+        AssignedForm.query.options(joinedload(AssignedForm.template))
+        .filter(AssignedForm.template_id.in_(UPR_VISUAL_TEMPLATE_IDS))
+        .order_by(AssignedForm.period_name.desc(), AssignedForm.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": assigned.id,
+            "display_name": assigned.display_name,
+            "template_id": assigned.template_id,
+            "template_name": assigned.template.name if assigned.template else "",
+            "period_name": assigned.period_name,
+            "kind": kind_for_template(int(assigned.template_id or 0)),
+        }
+        for assigned in rows
+    ]
+
+
+def list_countries_for_bulk(assigned_form_id: int) -> list[dict[str, Any]]:
+    """Country rows on one assignment, for bulk PNG generation."""
     from app.models.core import Country
 
-    query = (
-        db.session.query(AssignmentEntityStatus, AssignedForm, Country)
-        .join(AssignedForm, AssignmentEntityStatus.assigned_form_id == AssignedForm.id)
+    rows = (
+        db.session.query(AssignmentEntityStatus, Country)
         .outerjoin(
             Country,
             db.and_(
@@ -1536,31 +1811,23 @@ def list_assignments_for_bulk(template_id: int, period_name: str | None = None) 
                 AssignmentEntityStatus.entity_id == Country.id,
             ),
         )
-        .filter(AssignedForm.template_id == int(template_id))
+        .filter(AssignmentEntityStatus.assigned_form_id == int(assigned_form_id))
         .filter(AssignmentEntityStatus.entity_type == "country")
+        .order_by(Country.name.asc().nullslast())
+        .all()
     )
-    if period_name:
-        query = query.filter(AssignedForm.period_name == period_name)
-    rows = query.order_by(Country.name.asc().nullslast(), AssignedForm.period_name).all()
     return [
         {
             "aes_id": aes.id,
-            "period_name": assigned.period_name,
             "country_name": country.name if country else "",
             "iso3": country.iso3 if country else "",
         }
-        for aes, assigned, country in rows
+        for aes, country in rows
     ]
 
 
-def list_periods(template_id: int) -> list[str]:
-    from app.models.assignments import AssignedForm
-
-    rows = (
-        db.session.query(AssignedForm.period_name)
-        .filter(AssignedForm.template_id == int(template_id))
-        .distinct()
-        .order_by(AssignedForm.period_name.desc())
-        .all()
-    )
-    return [row[0] for row in rows if row[0]]
+def get_assigned_form_for_bulk(assigned_form_id: int) -> AssignedForm:
+    assigned = AssignedForm.query.get(int(assigned_form_id))
+    if assigned is None or int(assigned.template_id or 0) not in UPR_VISUAL_TEMPLATE_IDS:
+        raise UprVisualsError("Select a Unified Plan or Report assignment.")
+    return assigned

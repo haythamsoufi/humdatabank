@@ -68,6 +68,12 @@ class TestNewUserFormRoute:
             resp = _admin_get(logged_in_admin_client, "/admin/users/new", follow_redirects=False)
         assert resp.status_code == 302
 
+    def test_system_manager_can_view_new_user_form_when_b2c_configured(self, logged_in_sm_client, db_session):
+        """System Managers get a narrow pre-provisioning exception to the SSO-only guard."""
+        with patch("app.routes.admin.user_management.crud.is_azure_b2c_configured", return_value=True):
+            resp = _admin_get(logged_in_sm_client, "/admin/users/new", follow_redirects=False)
+        assert resp.status_code == 200
+
 
 # ===========================================================================
 # POST /admin/users/new — create user
@@ -114,6 +120,80 @@ class TestCreateUserRoute:
                 data={"email": "blocked@example.com", "name": "Blocked", "password": "Test123!"},
             )
         assert resp.status_code in (200, 302)
+
+    def test_regular_admin_still_blocked_when_b2c_configured_no_user_created(
+        self, logged_in_admin_client, db_session, app
+    ):
+        """Non-system-manager admins keep the pre-existing SSO-only restriction (pentest Finding #4)."""
+        with patch("app.routes.admin.user_management.crud.is_azure_b2c_configured", return_value=True):
+            resp = _admin_post(
+                logged_in_admin_client,
+                "/admin/users/new",
+                data={"email": "should_not_be_created@example.com", "name": "Nope", "password": "Test123!"},
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+        with app.app_context():
+            from app.models import User
+            assert User.query.filter_by(email="should_not_be_created@example.com").first() is None
+
+    def test_system_manager_can_pre_add_user_when_b2c_configured(
+        self, logged_in_sm_client, system_manager_user, db_session, app
+    ):
+        """System Managers may pre-provision an account ahead of someone's first SSO sign-in.
+
+        Also exercises email normalization (mixed-case entry still lands lowercased so it
+        matches what auth.azure_callback will look up on first sign-in).
+        """
+        with app.app_context():
+            from app.models.rbac import RbacRole
+            role = RbacRole.query.first()
+            role_id = role.id if role else None
+
+        with patch("app.routes.admin.user_management.crud.is_azure_b2c_configured", return_value=True), \
+             patch("app.routes.admin.user_management.crud._is_azure_sso_enabled", return_value=True), \
+             patch("app.services.email.service.send_welcome_email"):
+            resp = _admin_post(
+                logged_in_sm_client,
+                "/admin/users/new",
+                data={
+                    "email": "PreAdded.User@EXAMPLE.com",
+                    "name": "Pre Added",
+                    "password": "",
+                    "title": "",
+                    "countries": [],
+                    "rbac_roles": [str(role_id)] if role_id else [],
+                },
+                follow_redirects=False,
+            )
+        assert resp.status_code == 302
+
+        with app.app_context():
+            from app.models import User
+            created = User.query.filter_by(email="preadded.user@example.com").first()
+            assert created is not None
+            assert created.name == "Pre Added"
+            assert created.password_hash is None
+
+    def test_email_normalized_case_insensitive_duplicate(
+        self, logged_in_admin_client, admin_user, db_session
+    ):
+        """A differently-cased email entry still collides with an existing account."""
+        with patch("app.routes.admin.user_management.crud.is_azure_b2c_configured", return_value=False), \
+             patch("app.services.email.service.send_welcome_email"):
+            resp = _admin_post(
+                logged_in_admin_client,
+                "/admin/users/new",
+                data={
+                    "email": admin_user.email.upper(),
+                    "name": "Case Dup",
+                    "password": "TestPassword123!",
+                    "title": "",
+                    "countries": [],
+                },
+            )
+        assert resp.status_code == 200
+        assert b"already exists" in resp.data
 
 
 # ===========================================================================

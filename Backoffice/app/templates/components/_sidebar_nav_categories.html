@@ -91,7 +91,7 @@
 {% endif %}
 
 {# Form & Data Management Category - Only show if user has any form/data management permissions #}
-{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') or has_permission('admin.data_explore.reports') or has_permission('admin.reports.view') or has_permission('admin.reports.edit') %}
+{% set can_access_data_explorer = is_system_manager or has_permission('admin.data_explore.data_table') or has_permission('admin.data_explore.analysis') or has_permission('admin.data_explore.compliance') %}
 {% set can_access_reports_builder = is_system_manager or has_permission('admin.reports.view') or has_permission('admin.reports.edit') %}
 {% for ext_tab in data_explorer_extension_tabs|default([]) %}
 {% set can_access_data_explorer = can_access_data_explorer or has_permission(ext_tab.permission) %}

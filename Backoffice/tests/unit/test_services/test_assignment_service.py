@@ -221,3 +221,198 @@ class TestGetAssignmentEntityStatusesByCountry:
         with app.app_context():
             query = AssignmentService.get_assignment_entity_statuses_by_country(9_999_999)
             assert query.count() == 0
+
+
+@pytest.mark.unit
+class TestBuildStatusOverview:
+    """Tests for AssignmentService.build_status_overview."""
+
+    def test_none_assignment_returns_none(self, app):
+        with app.app_context():
+            assert AssignmentService.build_status_overview(None) is None
+
+    def test_empty_entities(self, db_session, app):
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status="pending")
+            assignment = aes.assigned_form
+            overview = AssignmentService.build_status_overview(assignment, entities=[])
+            assert overview["entity_count"] == 0
+            assert overview["done_count"] == 0
+            assert overview["open_count"] == 0
+            assert overview["submission_rate_pct"] == 0.0
+            assert overview["avg_completion_pct"] is None
+            assert overview["lifecycle"] == "active"
+            assert overview["overdue_count"] == 0
+
+    def test_mixed_statuses_and_completion(self, db_session, app):
+        from datetime import timedelta
+
+        from app.models import AssignmentEntityStatus
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            country_a = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country_a, status="pending"
+            )
+            assignment = aes.assigned_form
+            aes.due_date = utcnow() - timedelta(days=2)
+            aes.completion_rate = 20
+
+            country_b = create_test_country(db_session)
+            submitted = AssignmentEntityStatus(
+                assigned_form_id=assignment.id,
+                entity_type="country",
+                entity_id=country_b.id,
+                status="submitted",
+                completion_rate=80,
+            )
+            db_session.add(submitted)
+            db_session.commit()
+
+            overview = AssignmentService.build_status_overview(
+                assignment, entities=[aes, submitted]
+            )
+            assert overview["entity_count"] == 2
+            assert overview["country_count"] == 2
+            assert overview["status_counts"]["pending"] == 1
+            assert overview["status_counts"]["submitted"] == 1
+            assert overview["done_count"] == 1
+            assert overview["open_count"] == 1
+            assert overview["submission_rate_pct"] == 50.0
+            assert overview["avg_completion_pct"] == 50.0
+            assert overview["overdue_count"] == 1
+            assert overview["template_name"] == assignment.template.name
+            assert overview["period_name"] == assignment.period_name
+
+    def test_due_soon_not_overdue(self, db_session, app):
+        from datetime import timedelta
+
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status="in_progress")
+            aes.due_date = utcnow() + timedelta(days=3)
+            db_session.commit()
+            overview = AssignmentService.build_status_overview(
+                aes.assigned_form, entities=[aes]
+            )
+            assert overview["overdue_count"] == 0
+            assert overview["due_soon_count"] == 1
+
+    def test_submitted_past_due_is_not_overdue(self, db_session, app):
+        from datetime import timedelta
+
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            aes = create_test_assignment_entity_status(db_session, status="submitted")
+            aes.due_date = utcnow() - timedelta(days=10)
+            db_session.commit()
+            overview = AssignmentService.build_status_overview(
+                aes.assigned_form, entities=[aes]
+            )
+            assert overview["overdue_count"] == 0
+            assert overview["done_count"] == 1
+
+    def test_lifecycle_inactive_and_closed(self, db_session, app):
+        from datetime import timedelta
+
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            aes = create_test_assignment_entity_status(
+                db_session, status="pending", is_active=False
+            )
+            assignment = aes.assigned_form
+            overview = AssignmentService.build_status_overview(assignment, entities=[aes])
+            assert overview["lifecycle"] == "inactive"
+
+            assignment.is_active = True
+            assignment.is_closed = True
+            overview = AssignmentService.build_status_overview(assignment, entities=[aes])
+            assert overview["lifecycle"] == "closed"
+
+            assignment.is_closed = False
+            assignment.expiry_date = utcnow().date() - timedelta(days=1)
+            overview = AssignmentService.build_status_overview(assignment, entities=[aes])
+            assert overview["lifecycle"] == "closed_expired"
+
+    def test_public_url_and_data_owner(self, db_session, app):
+        from tests.factories import create_test_user
+
+        with app.app_context():
+            owner = create_test_user(db_session, name="Owner User")
+            aes = create_test_assignment_entity_status(db_session, status="pending")
+            assignment = aes.assigned_form
+            assignment.unique_token = "overview-token-test"
+            assignment.is_public_active = True
+            assignment.data_owner_id = owner.id
+            aes.is_public_available = True
+            db_session.commit()
+            db_session.refresh(assignment)
+
+            overview = AssignmentService.build_status_overview(assignment, entities=[aes])
+            assert overview["public_url_generated"] is True
+            assert overview["public_url_active"] is True
+            assert overview["public_country_count"] == 1
+            assert overview["has_data_owner"] is True
+            assert overview["data_owner_name"] == "Owner User"
+
+    def test_multiple_due_dates(self, db_session, app):
+        from datetime import timedelta
+
+        from app.models import AssignmentEntityStatus
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            country_a = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country_a, status="pending"
+            )
+            assignment = aes.assigned_form
+            today = utcnow()
+            aes.due_date = today + timedelta(days=1)
+
+            country_b = create_test_country(db_session)
+            other = AssignmentEntityStatus(
+                assigned_form_id=assignment.id,
+                entity_type="country",
+                entity_id=country_b.id,
+                status="pending",
+                due_date=today + timedelta(days=10),
+            )
+            db_session.add(other)
+            db_session.commit()
+
+            overview = AssignmentService.build_status_overview(
+                assignment, entities=[aes, other]
+            )
+            assert overview["has_multiple_due_dates"] is True
+            assert overview["earliest_due_date"] == aes.due_date.date()
+
+    def test_cancelled_excluded_from_submission_rate(self, db_session, app):
+        from app.models import AssignmentEntityStatus
+
+        with app.app_context():
+            country_a = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(
+                db_session, country=country_a, status="approved"
+            )
+            assignment = aes.assigned_form
+            country_b = create_test_country(db_session)
+            cancelled = AssignmentEntityStatus(
+                assigned_form_id=assignment.id,
+                entity_type="country",
+                entity_id=country_b.id,
+                status="cancelled",
+            )
+            db_session.add(cancelled)
+            db_session.commit()
+
+            overview = AssignmentService.build_status_overview(
+                assignment, entities=[aes, cancelled]
+            )
+            assert overview["cancelled_count"] == 1
+            assert overview["submission_rate_pct"] == 100.0
+            assert overview["open_count"] == 0

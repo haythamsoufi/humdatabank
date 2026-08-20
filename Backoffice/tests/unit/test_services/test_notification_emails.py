@@ -28,6 +28,7 @@ from app.services.notification.emails import (
     _filter_instant_email_eligible_user_ids,
     build_grouped_entity_email_preview,
     send_grouped_entity_email,
+    send_assignment_submitted_team_email,
 )
 from app.models.enums import NotificationType
 
@@ -1579,3 +1580,43 @@ class TestSendGroupedEntityEmail:
         assert log is not None
         assert log.notification_id == notification.id
         assert log.status == 'sent'
+
+
+class TestSendAssignmentSubmittedTeamEmail:
+    def test_logs_per_recipient_when_send_fails(self, app, db_session):
+        from app.models import User, Notification, EmailDeliveryLog
+        from app import db
+
+        with app.app_context():
+            user = User(email='team-fail@example.com', name='Team User', active=True)
+            user.set_password('pw')
+            db.session.add(user)
+            db.session.flush()
+            notification = Notification(
+                user_id=user.id,
+                notification_type=NotificationType.assignment_submitted,
+                title='Team update submitted',
+                message='Submitted.',
+                title_key='notification.assignment_submitted.title',
+            )
+            db.session.add(notification)
+            db.session.commit()
+
+            with patch('app.services.notification.emails.send_email', return_value=False), \
+                 patch('app.services.notification.emails.get_org_name', return_value='Test Org'):
+                result = send_assignment_submitted_team_email(
+                    user_ids=[user.id],
+                    assignment_title='Unified Country Report',
+                    submitter_name='Jamie Example',
+                    related_url='/forms/assignment/1',
+                    notification_by_user_id={user.id: notification},
+                )
+
+            log = EmailDeliveryLog.query.filter_by(user_id=user.id).order_by(
+                EmailDeliveryLog.id.desc()
+            ).first()
+
+        assert result is False
+        assert log is not None
+        assert log.notification_id == notification.id
+        assert log.status in ('failed', 'unknown', 'pending')

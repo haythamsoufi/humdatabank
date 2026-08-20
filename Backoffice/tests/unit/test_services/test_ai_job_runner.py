@@ -4,12 +4,13 @@ import threading
 import time
 import uuid
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy.orm import sessionmaker
 
 from app.extensions import db
-from app.models import AIJob, AIJobItem
+from app.models import AIDocument, AIJob, AIJobItem
 from app.services.ai.ai_job_runner import (
     AI_DOCUMENTS_JOB_TTL_SECONDS,
     AI_DOCUMENTS_JOB_TYPES,
@@ -131,6 +132,118 @@ class TestAIJobRunnerStaleReconcile:
         db_session.expire_all()
         job = AIJob.query.get(job_id)
         assert getattr(job.status, "value", job.status) == "failed"
+
+    def test_reconcile_abandons_hung_live_thread_after_hard_timeout(self, db_session, admin_user, app):
+        """A still-alive but silent worker must not keep items on processing for days."""
+        job_id, item_id = _create_ai_doc_job(db_session, admin_user, status="running")
+        stale_at = datetime.utcnow() - timedelta(hours=6)
+        job = AIJob.query.get(job_id)
+        job.created_at = stale_at
+        job.started_at = stale_at
+        item = AIJobItem.query.get(item_id)
+        item.status = "processing"
+        item.created_at = stale_at
+        item.updated_at = stale_at
+        db_session.commit()
+
+        with app.app_context():
+            app.config["AI_DOCS_JOB_STALE_SECONDS"] = 60
+            with patch("app.services.ai.ai_job_runner.is_job_thread_alive", return_value=True):
+                assert reconcile_stale_ai_job(job_id) is True
+
+        db_session.expire_all()
+        job = AIJob.query.get(job_id)
+        item = AIJobItem.query.get(item_id)
+        assert getattr(job.status, "value", job.status) == "failed"
+        assert getattr(item.status, "value", item.status) == "failed"
+
+    def test_reconcile_fails_queued_items_when_inflight_is_hung(self, db_session, admin_user, app):
+        job_id, first_item_id = _create_ai_doc_job(db_session, admin_user, status="running")
+        stale_at = datetime.utcnow() - timedelta(hours=6)
+        second = AIJobItem(
+            job_id=job_id,
+            item_index=1,
+            entity_type="ai_document",
+            entity_id=456,
+            status="queued",
+            payload={"document_id": 456},
+            created_at=stale_at,
+            updated_at=stale_at,
+        )
+        db_session.add(second)
+        job = AIJob.query.get(job_id)
+        job.created_at = stale_at
+        job.started_at = stale_at
+        job.total_items = 2
+        first = AIJobItem.query.get(first_item_id)
+        first.status = "processing"
+        first.created_at = stale_at
+        first.updated_at = stale_at
+        db_session.commit()
+        second_id = second.id
+
+        with app.app_context():
+            app.config["AI_DOCS_JOB_STALE_SECONDS"] = 60
+            with patch("app.services.ai.ai_job_runner.is_job_thread_alive", return_value=True):
+                assert reconcile_stale_ai_job(job_id) is True
+
+        db_session.expire_all()
+        job = AIJob.query.get(job_id)
+        assert getattr(job.status, "value", job.status) == "failed"
+        assert getattr(AIJobItem.query.get(first_item_id).status, "value", None) == "failed"
+        assert getattr(AIJobItem.query.get(second_id).status, "value", None) == "failed"
+
+    def test_reconcile_keeps_live_thread_with_recent_item_activity(self, db_session, admin_user, app):
+        job_id, item_id = _create_ai_doc_job(db_session, admin_user, status="running")
+        item = AIJobItem.query.get(item_id)
+        item.status = "processing"
+        item.updated_at = datetime.utcnow()
+        db_session.commit()
+
+        with app.app_context():
+            app.config["AI_DOCS_JOB_STALE_SECONDS"] = 60
+            with patch("app.services.ai.ai_job_runner.is_job_thread_alive", return_value=True):
+                assert reconcile_stale_ai_job(job_id) is False
+
+        db_session.expire_all()
+        item = AIJobItem.query.get(item_id)
+        assert getattr(item.status, "value", item.status) == "processing"
+        job = AIJob.query.get(job_id)
+        assert getattr(job.status, "value", job.status) == "running"
+
+    def test_reconcile_keeps_live_thread_with_recent_document_heartbeat(self, db_session, admin_user, app):
+        doc = AIDocument(
+            title="Live heartbeat",
+            filename="live.pdf",
+            file_type="pdf",
+            file_size_bytes=100,
+            storage_path="live.pdf",
+            content_hash=f"hash-{uuid.uuid4().hex}",
+            processing_status="processing",
+            user_id=admin_user.id,
+            processing_heartbeat_at=datetime.utcnow(),
+        )
+        db_session.add(doc)
+        db_session.commit()
+
+        job_id, item_id = _create_ai_doc_job(db_session, admin_user, status="running")
+        stale_at = datetime.utcnow() - timedelta(hours=2)
+        item = AIJobItem.query.get(item_id)
+        item.entity_id = doc.id
+        item.status = "processing"
+        item.created_at = stale_at
+        item.updated_at = stale_at
+        db_session.commit()
+
+        with app.app_context():
+            app.config["AI_DOCS_JOB_STALE_SECONDS"] = 60
+            with patch("app.services.ai.ai_job_runner.is_job_thread_alive", return_value=True):
+                assert reconcile_stale_ai_job(job_id) is False
+
+        db_session.expire_all()
+        item = AIJobItem.query.get(item_id)
+        assert getattr(item.status, "value", item.status) == "processing"
+        assert AIDocument.query.get(doc.id).processing_status == "processing"
 
 
 class TestRunAiJobEndToEnd:

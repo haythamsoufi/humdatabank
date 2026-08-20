@@ -103,6 +103,11 @@
         feedbackEl.classList.add.apply(feedbackEl.classList, classes);
         feedbackEl.classList.remove('hidden');
     }
+    function hideFeedback() {
+        if (!feedbackEl) return;
+        feedbackEl.textContent = '';
+        feedbackEl.classList.add('hidden');
+    }
     window.validationDashboardShowFeedback = showFeedback;
 
     function readSavedScope() {
@@ -246,6 +251,7 @@
         initIndicatorsGrid([]);
         updateKpis();
         setActionButtonsEnabled(false);
+        hideFeedback();
     }
 
     function updateKpis() {
@@ -454,6 +460,7 @@
             setActionButtonsEnabled(false);
             initIndicatorsGrid([]);
             updateKpis();
+            hideFeedback();
             saveScope();
             return;
         }
@@ -463,7 +470,7 @@
             country_name: opt.textContent,
             period_name: opt.getAttribute('data-period') || state.period,
         };
-        setActionButtonsEnabled(true);
+        setActionButtonsEnabled(false);
         loadIndicatorPreview(state.selectedCountry.country_id);
         saveScope();
     }
@@ -546,11 +553,18 @@
             state.preview = data.preview || null;
             state.rawIndicatorRows = (state.preview && state.preview.indicators) || [];
             state.historyYears = (state.preview && state.preview.history_years) || [];
+            var checksEnabled = !!(state.preview && state.preview.validation_enabled !== false && state.preview.rule_pack);
+            setActionButtonsEnabled(!!state.selectedCountry && checksEnabled);
             rebuildIndicatorsGrid();
             updateKpis();
+            if (state.preview && state.preview.validation_enabled === false && state.preview.message) {
+                showFeedback(state.preview.message, 'info');
+            } else {
+                hideFeedback();
+            }
         } catch (err) {
-            console.error(err);
-            showFeedback(t.previewFailed || 'Preview failed', 'error');
+            setActionButtonsEnabled(false);
+            showFeedback((err && err.message) || t.previewFailed || 'Preview failed', 'error');
         }
     }
 

@@ -44,6 +44,7 @@ from sqlalchemy.orm import joinedload
 from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionContext, RepeatGroupInstance, RepeatGroupData
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.country_utils import get_countries_by_region_with_part_of
+from app.services.assignments.service import AssignmentService
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
@@ -1131,6 +1132,9 @@ def edit_assignment(assignment_id):
     # Create form for editing assignment entity status
     edit_aes_form = AssignmentEntityStatusForm()
     assignment_entity_status_choices = AssignmentEntityStatusValue.choices()
+    assignment_overview = AssignmentService.build_status_overview(
+        assignment, assignment_entities
+    )
 
     return render_template("admin/assignments/manage_assignment.html",
                          assignment=assignment,
@@ -1139,6 +1143,7 @@ def edit_assignment(assignment_id):
                          assignment_entities=assignment_entities,
                          assignment_entity_display=assignment_entity_display,
                          assignment_entity_fds_members=assignment_entity_fds_members,
+                         assignment_overview=assignment_overview,
                          edit_aes_form=edit_aes_form,
                          assignment_entity_status_choices=assignment_entity_status_choices,
                          get_localized_country_name=get_localized_country_name,

@@ -983,13 +983,13 @@ def send_assignment_submitted_team_email(
     class _TeamEmailNotification:
         notification_type = NotificationType.assignment_submitted
         priority = 'normal'
-        related_url = related_url
 
-        def __init__(self, email_title, email_message):
+        def __init__(self, email_title, email_message, url):
             self.title = email_title
             self.message = email_message
+            self.related_url = url
 
-    pseudo_notification = _TeamEmailNotification(title, message)
+    pseudo_notification = _TeamEmailNotification(title, message, related_url)
     subject = _instant_notification_subject(pseudo_notification, locale)
     i18n = _build_instant_email_i18n(locale, '', False, 'assignment_submitted')
     i18n['greeting'] = _with_user_locale(locale, lambda g: g('Hello,')) or 'Hello,'
@@ -1012,43 +1012,63 @@ def send_assignment_submitted_team_email(
         **i18n,
     )
 
-    filtered_out = []
     _failure_info: list = []
-    success = send_email(
-        subject=subject,
-        recipients=recipient_emails,
-        html=body,
-        sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
-        expose_recipients_in_to=True,
-        _filtered_out=filtered_out,
-        _failure_info=_failure_info,
-    )
-    if not success and not filtered_out:
+    try:
+        filtered_out = []
+        success = send_email(
+            subject=subject,
+            recipients=recipient_emails,
+            html=body,
+            sender=current_app.config.get('MAIL_NOREPLY_SENDER', current_app.config['MAIL_DEFAULT_SENDER']),
+            expose_recipients_in_to=True,
+            _filtered_out=filtered_out,
+            _failure_info=_failure_info,
+        )
+        if not success and not filtered_out:
+            current_app.logger.error(
+                "[EMAIL_NOTIFICATION] Failed to send assignment submitted team email to %d focal point(s)",
+                len(recipient_emails),
+            )
+
+        for user in users:
+            if not user.email:
+                continue
+            linked = notification_by_user_id.get(user.id)
+            log = log_email_attempt(
+                _linked_notification_id(linked),
+                user.id,
+                user.email,
+                subject,
+            )
+            if success:
+                mark_email_sent(log.id)
+            elif filtered_out:
+                pass
+            else:
+                mark_email_failed_or_unknown(
+                    log.id, "Team email send returned False", _failure_info[-1] if _failure_info else None
+                )
+        return success or bool(filtered_out)
+    except Exception as e:
+        for user in users:
+            if not user.email:
+                continue
+            linked = notification_by_user_id.get(user.id)
+            log = log_email_attempt(
+                _linked_notification_id(linked),
+                user.id,
+                user.email,
+                subject,
+            )
+            mark_email_failed_or_unknown(
+                log.id, str(e), _failure_info[-1] if _failure_info else None
+            )
         current_app.logger.error(
-            "[EMAIL_NOTIFICATION] Failed to send assignment submitted team email to %d focal point(s)",
-            len(recipient_emails),
+            "[EMAIL_NOTIFICATION] Error sending assignment submitted team email: %s",
+            e,
+            exc_info=True,
         )
         return False
-
-    for user in users:
-        if not user.email:
-            continue
-        linked = notification_by_user_id.get(user.id)
-        log = log_email_attempt(
-            linked.id if linked else None,
-            user.id,
-            user.email,
-            subject,
-        )
-        if success:
-            mark_email_sent(log.id)
-        elif filtered_out:
-            pass
-        else:
-            mark_email_failed_or_unknown(
-                log.id, "Team email send returned False", _failure_info[-1] if _failure_info else None
-            )
-    return success or bool(filtered_out)
 
 
 def send_instant_notification_email(user, notification, override_preferences=False):

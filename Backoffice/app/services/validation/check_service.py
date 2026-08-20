@@ -96,6 +96,13 @@ def _load_history(
     return history
 
 
+def validation_checks_disabled_message(template_id: int) -> str:
+    return (
+        f"Template {template_id} does not have validation checks enabled. "
+        "Edit the template version, enable Data Quality (QoD), and set a validation rule pack."
+    )
+
+
 def evaluate_validation_checks(
     template_id: int,
     entity_type: str,
@@ -104,6 +111,7 @@ def evaluate_validation_checks(
     *,
     rule_pack: str | None = None,
     language: str = "en",
+    require_rule_pack: bool = True,
 ) -> ValidationEvaluationResult:
     """Run validation rules without persisting questions (dashboard preview)."""
     template = FormTemplate.query.get(template_id)
@@ -112,10 +120,9 @@ def evaluate_validation_checks(
 
     pack = rule_pack or get_rule_pack_for_template(template)
     if not pack:
-        raise ValueError(
-            f"Template {template_id} does not have validation checks enabled. "
-            "Edit the template version, enable Data Quality (QoD), and set a validation rule pack."
-        )
+        if require_rule_pack:
+            raise ValueError(validation_checks_disabled_message(template_id))
+        pack = ""
 
     aes, resolved_period = resolve_assignment_aes(template_id, entity_type, entity_id, period_name)
     if aes is None:

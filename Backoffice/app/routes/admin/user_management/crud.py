@@ -619,8 +619,30 @@ def reject_user_access_requests(user_id):
 @bp.route("/users/new", methods=["GET", "POST"])
 @permission_required('admin.users.create')
 def new_user():
-    """Admin route to add a new user."""
-    if is_azure_b2c_configured():
+    """Admin route to add a new user.
+
+    Normally, when Azure AD B2C is configured, identity is fully owned by the
+    IdP: accounts are auto-created on first SSO sign-in (see
+    auth.azure_callback) and manual creation is blocked — this closed a
+    pentest finding where an admin could redirect an *existing* account by
+    changing its email (see docs/security/pentest-praudit-20260430-response.md,
+    Finding #4). System Managers are still let through here as a deliberate,
+    narrow exception so they can *pre-provision* an account (roles/entity
+    access) ahead of someone's first sign-in. This does not reopen Finding #4:
+      - Only System Managers (already RBAC superusers, able to grant any role
+        to any user regardless of this feature) get the exception; every
+        other admin stays fully blocked, exactly as before.
+      - This can only create a brand-new row — an EXISTING user's email can
+        still never be changed here or in edit_user() while B2C is configured.
+      - The duplicate-email guard below still stops this from shadowing/
+        hijacking an existing account.
+    """
+    from app.services.organization.authorization_service import AuthorizationService
+
+    sso_configured = is_azure_b2c_configured()
+    current_is_sys_mgr = AuthorizationService.is_system_manager(current_user)
+
+    if sso_configured and not current_is_sys_mgr:
         actor_id = None
         try:
             if getattr(current_user, "is_authenticated", False):
@@ -628,11 +650,12 @@ def new_user():
         except Exception:
             pass
         current_app.logger.info(
-            "Admin user create blocked: Azure AD B2C is configured (actor_id=%s).",
+            "Admin user create blocked: Azure AD B2C is configured and actor is not a System Manager (actor_id=%s).",
             actor_id,
         )
         flash(
-            "New accounts are created through Azure AD B2C sign-in. Manual user creation is not available.",
+            "New accounts are created through Azure AD B2C sign-in. Only a System Manager can pre-add an "
+            "account ahead of someone's first sign-in.",
             "warning",
         )
         return redirect(url_for("user_management.manage_users"))
@@ -640,10 +663,8 @@ def new_user():
     form = UserForm()
     enabled_entity_groups = get_enabled_entity_groups()
     allowed_non_country_entity_types = _get_allowed_non_country_entity_types()
-    from app.services.organization.authorization_service import AuthorizationService
     from app.models.rbac import RbacRole
     azure_sso_enabled = _is_azure_sso_enabled()
-    current_is_sys_mgr = AuthorizationService.is_system_manager(current_user)
     can_assign_rbac_roles = AuthorizationService.has_rbac_permission(current_user, "admin.users.roles.assign")
     can_manage_entity_grants_create = (
         current_is_sys_mgr
@@ -696,7 +717,10 @@ def new_user():
             form.rbac_roles.choices = _filter_role_choices_for_actor(form.rbac_roles.choices, current_user)
 
     if form.validate_on_submit():
-        email = form.email.data
+        # Normalize so a differently-cased/whitespace-padded entry still matches
+        # the email Azure SSO will send on first sign-in (auth.azure_callback
+        # normalizes the same way) and still collides with an existing row.
+        email = (form.email.data or "").strip().lower()
         password = form.password.data
         name = form.name.data
         title = form.title.data
@@ -816,7 +840,10 @@ def new_user():
                     # Log admin action for user creation
                     log_admin_action(
                         action_type='user_create',
-                        description=f'Created new user: {new_user.email}',
+                        description=(
+                            f'Created new user: {new_user.email}'
+                            + (' (pre-provisioned ahead of SSO sign-in)' if sso_configured else '')
+                        ),
                         target_type='user',
                         target_id=new_user.id,
                         target_description=f'{new_user.name or new_user.email}',
@@ -826,7 +853,8 @@ def new_user():
                             'title': new_user.title,
                             'profile_color': new_user.profile_color,
                             'country_ids': assigned_country_ids or [],
-                            'entity_permissions': entity_permissions
+                            'entity_permissions': entity_permissions,
+                            'pre_provisioned_for_sso': sso_configured,
                         },
                         risk_level='medium'
                     )

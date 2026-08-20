@@ -3,9 +3,21 @@
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
-from plugins.upr_visuals.catalog import DASHBOARD_BY_ID
+from plugins.upr_visuals.catalog import (
+    A4_MARGIN_MM,
+    A4_PAGE_HEIGHT_PX,
+    A4_PAGE_WIDTH_PX,
+    DASHBOARD_BY_ID,
+)
+
+# WeasyPrint zoom (PDF units per CSS px). MuPDF get_pixmap(matrix=N) upscales a
+# 72dpi bake of the CSS box — icons stay soft. Zoom first, then pixmap 1:1.
+PNG_EXPORT_SCALE = 4.0
+_IMG_SRC_RE = re.compile(r'(<img\b[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
+_PLUGIN_STATIC_URL = "/upr-visuals/static/"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
 _CSS_PATH = _PLUGIN_DIR / "static" / "css" / "upr-visuals.css"
@@ -23,17 +35,20 @@ def _first_font(*paths: Path) -> Path | None:
 def _font_face(family: str, path: Path | None, weight: int) -> str | None:
     if path is None:
         return None
-    posix = path.as_posix()
     return (
-        f"@font-face {{ font-family: '{family}'; src: url('file:///{posix}'); "
+        f"@font-face {{ font-family: '{family}'; src: url('{path.resolve().as_uri()}'); "
         f"font-weight: {weight}; font-style: normal; }}"
     )
 
 
 def _font_css() -> str:
+    open_sans_dirs = (
+        _APP_FONTS_DIR,
+        _PLUGIN_DIR.parents[0] / "pb_progress" / "visuals" / "report" / "fonts",
+    )
     faces = [
-        _font_face("Open Sans", _first_font(_APP_FONTS_DIR / "OpenSans-Regular.ttf"), 400),
-        _font_face("Open Sans", _first_font(_APP_FONTS_DIR / "OpenSans-Bold.ttf"), 700),
+        _font_face("Open Sans", _first_font(*(folder / "OpenSans-Regular.ttf" for folder in open_sans_dirs)), 400),
+        _font_face("Open Sans", _first_font(*(folder / "OpenSans-Bold.ttf" for folder in open_sans_dirs)), 700),
         _font_face(
             "Montserrat",
             _first_font(
@@ -54,25 +69,84 @@ def _font_css() -> str:
     return "\n".join(face for face in faces if face)
 
 
+def _css_for_print(css: str) -> str:
+    """Drop @media blocks. WeasyPrint rejects query-only media, and PNG export is desktop-width."""
+    out: list[str] = []
+    i = 0
+    while True:
+        start = css.find("@media", i)
+        if start < 0:
+            out.append(css[i:])
+            break
+        out.append(css[i:start])
+        brace = css.find("{", start)
+        if brace < 0:
+            break
+        depth = 0
+        j = brace
+        while j < len(css):
+            if css[j] == "{":
+                depth += 1
+            elif css[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    j += 1
+                    break
+            j += 1
+        i = j
+    return "".join(out)
+
+
 def _page_size(dashboard_id: str) -> tuple[int, int]:
-    """PDF canvas size. PNG output is cropped to ink, so this is headroom only."""
-    spec = DASHBOARD_BY_ID[dashboard_id]
-    width = spec.width
-    if dashboard_id == "combined":
-        return width, max(spec.height * 5, 8000)
-    return width, max(spec.height * 2, spec.height + 400)
+    """A4 landscape page in CSS pixels. ``dashboard_id`` kept for callers."""
+    DASHBOARD_BY_ID[dashboard_id]
+    return A4_PAGE_WIDTH_PX, A4_PAGE_HEIGHT_PX
 
 
-def _wrap(dashboard_html: str, width: int) -> str:
+def resolve_export_image_src(src: str) -> str:
+    """Map Flask/plugin image URLs to file:// so WeasyPrint can read them."""
+    raw = (src or "").strip()
+    if not raw or raw.startswith(("data:", "file:")):
+        return raw
+    plugin_root = _PLUGIN_DIR.resolve()
+    candidates: list[Path] = []
+    path_only = raw.split("?", 1)[0]
+    if path_only.startswith(_PLUGIN_STATIC_URL):
+        candidates.append(_PLUGIN_DIR / "static" / path_only[len(_PLUGIN_STATIC_URL) :])
+    elif path_only.startswith("static/"):
+        candidates.append(_PLUGIN_DIR / path_only)
+    elif not path_only.startswith(("http://", "https://", "/")):
+        candidates.append(_PLUGIN_DIR / path_only)
+        candidates.append(_PLUGIN_DIR / "static" / path_only)
+    for path in candidates:
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved.is_file() and (resolved == plugin_root or plugin_root in resolved.parents):
+            return resolved.as_uri()
+    return raw
+
+
+def _rewrite_export_images(html: str) -> str:
+    def _replace(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{resolve_export_image_src(match.group(2))}{match.group(3)}"
+
+    return _IMG_SRC_RE.sub(_replace, html)
+
+
+def _wrap(dashboard_html: str, width: int | None = None) -> str:
     css = _CSS_PATH.read_text(encoding="utf-8") if _CSS_PATH.is_file() else ""
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
         "<style>"
-        f"{_font_css()}\n{css}\n"
+        f"{_font_css()}\n{_css_for_print(css)}\n"
         "html, body { margin: 0; padding: 0; background: #fff; }"
-        f".upr-dashboard {{ width: {width}px; max-width: {width}px; }}"
+        ".upr-dashboard { width: 100%; max-width: none; }"
+        ".upr-vis-page { width: auto; max-width: none; min-height: 0; "
+        "padding: 0; margin: 0; box-shadow: none; }"
         "</style></head><body>"
-        f"{dashboard_html}</body></html>"
+        f"{_rewrite_export_images(dashboard_html)}</body></html>"
     )
 
 
@@ -161,7 +235,7 @@ def ink_bounds(
     return x0, y0, x1, y1
 
 
-def _trim_pixmap(pixmap, *, pad: int = 16):
+def _trim_pixmap(pixmap, *, pad: int = 16, keep_width: bool = False):
     import fitz
 
     bounds = ink_bounds(pixmap.samples, pixmap.width, pixmap.height, pixmap.n)
@@ -172,6 +246,9 @@ def _trim_pixmap(pixmap, *, pad: int = 16):
     y0 = max(0, y0 - pad)
     x1 = min(pixmap.width - 1, x1 + pad)
     y1 = min(pixmap.height - 1, y1 + pad)
+    if keep_width:
+        x0 = 0
+        x1 = pixmap.width - 1
     if x0 == 0 and y0 == 0 and x1 == pixmap.width - 1 and y1 == pixmap.height - 1:
         return pixmap
     width = x1 - x0 + 1
@@ -186,24 +263,44 @@ def _trim_pixmap(pixmap, *, pad: int = 16):
     return fitz.Pixmap(pixmap.colorspace, width, height, cropped, alpha)
 
 
-def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str) -> bytes:
+def _stitch_pixmaps(pixmaps: list) -> object:
+    """Stack A4 pages top-to-bottom so one PNG still holds a multi-page visual."""
+    import fitz
+
+    width = max(pixmap.width for pixmap in pixmaps)
+    height = sum(pixmap.height for pixmap in pixmaps)
+    channels = pixmaps[0].n
+    canvas = bytearray([255] * (width * height * channels))
+    top = 0
+    for pixmap in pixmaps:
+        src_stride = pixmap.width * channels
+        dest_stride = width * channels
+        source = pixmap.samples
+        for row in range(pixmap.height):
+            start = row * src_stride
+            dest = (top + row) * dest_stride
+            canvas[dest : dest + src_stride] = source[start : start + src_stride]
+        top += pixmap.height
+    return fitz.Pixmap(pixmaps[0].colorspace, width, height, bytes(canvas), 0)
+
+
+def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.0) -> bytes:
     try:
         from weasyprint import CSS, HTML
     except ImportError as exc:
         raise RuntimeError("WeasyPrint is required for UPR visual export.") from exc
 
-    width, page_height = _page_size(dashboard_id)
-    pad = 16
-    document_html = _wrap(dashboard_html, width)
+    _page_size(dashboard_id)
+    document_html = _wrap(dashboard_html)
     page_css = CSS(
         string=(
-            f"@page {{ size: {width + pad * 2}px {page_height + pad * 2}px; margin: {pad}px; }}\n"
+            f"@page {{ size: A4 landscape; margin: {A4_MARGIN_MM}mm; }}\n"
             "html, body { margin: 0; padding: 0; background: #fff; }"
         )
     )
     pdf_buffer = io.BytesIO()
-    HTML(string=document_html, base_url=f"{_PLUGIN_DIR.resolve().as_posix()}/").write_pdf(
-        pdf_buffer, stylesheets=[page_css], optimize_images=True
+    HTML(string=document_html, base_url=_PLUGIN_DIR.resolve().as_uri() + "/").write_pdf(
+        pdf_buffer, stylesheets=[page_css], optimize_images=False, zoom=zoom
     )
     return pdf_buffer.getvalue()
 
@@ -213,7 +310,7 @@ def render_png(
     output_path: Path,
     *,
     dashboard_id: str,
-    scale: float = 2.0,
+    scale: float = PNG_EXPORT_SCALE,
 ) -> Path:
     try:
         import fitz
@@ -222,12 +319,12 @@ def render_png(
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    doc = fitz.open(stream=render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id), filetype="pdf")
+    pdf_bytes = render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id, zoom=scale)
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     try:
-        page = doc[0]
-        clip = _content_rect(page)
-        pixmap = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False, clip=clip)
-        pixmap = _trim_pixmap(pixmap)
+        pixmaps = [page.get_pixmap(alpha=False) for page in doc]
+        pixmap = pixmaps[0] if len(pixmaps) == 1 else _stitch_pixmaps(pixmaps)
+        pixmap = _trim_pixmap(pixmap, keep_width=True)
         pixmap.save(str(output_path))
     finally:
         doc.close()

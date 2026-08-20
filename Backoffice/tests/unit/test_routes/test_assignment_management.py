@@ -420,6 +420,24 @@ class TestEditAssignment:
         assert payload[0]['completion_rate'] == 67.5
         assert payload[0]['assignment_url'] == f'/forms/assignment/{aes_id}'
 
+    def test_existing_assignment_shows_status_overview(self, logged_in_client, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            assignment_id = aes.assigned_form_id
+        resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="assignment-status-overview"' in html
+        assert 'id="assignment-status-chart"' in html
+        assert "Status overview" in html
+
+    def test_new_assignment_hides_status_overview(self, logged_in_client):
+        resp = logged_in_client.get("/admin/assignments/new")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'id="assignment-status-overview"' not in html
+
     def test_get_not_found(self, logged_in_client, db_session):
         resp = logged_in_client.get("/admin/assignments/edit/999999")
         assert resp.status_code in (404, 302)

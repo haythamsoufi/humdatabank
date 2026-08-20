@@ -437,9 +437,11 @@ def _get_default_doc_stats():
 
 def _auto_recover_stale_processing_documents() -> int:
     """
-    Best-effort recovery for stale `processing` rows when opening AI documents page.
-    Marks long-stale rows as failed if there is no active in-process stage and no
-    active import/reprocess job item linked to the document.
+    Best-effort recovery for stale `processing`/`pending` rows when opening the
+    AI documents page. Marks long-stale rows as failed if there is no active
+    in-process stage and no *fresh* import/reprocess job item linked to the
+    document. Days-old `ai_job_items.status='processing'` rows do not shield
+    the document — those items are themselves stale.
     """
     try:
         from app.models import AIDocument
@@ -452,7 +454,7 @@ def _auto_recover_stale_processing_documents() -> int:
 
         stale_candidates = (
             db.session.query(AIDocument.id)
-            .filter(AIDocument.processing_status == "processing")
+            .filter(AIDocument.processing_status.in_(("processing", "pending")))
             .filter(
                 db.or_(
                     db.and_(AIDocument.updated_at.is_(None), AIDocument.created_at <= cutoff),
@@ -496,11 +498,14 @@ def _auto_recover_stale_processing_documents() -> int:
         if not candidate_ids:
             return 0
 
-        # Keep docs that are still tied to active queue/job items (best-effort).
+        # Keep docs that are still tied to a live queue item. Queued rows may
+        # wait a long time in a healthy batch; only downloading/processing
+        # items need a recent heartbeat. Days-old processing rows do not shield.
         if _check_ai_reprocess_job_tables_exist():
             try:
                 from app.models import AIJobItem
 
+                item_fresh_cutoff = utcnow() - timedelta(seconds=timeout_seconds)
                 active_job_ids = {
                     int(r[0]) for r in (
                         db.session.query(AIJobItem.entity_id)
@@ -508,6 +513,14 @@ def _auto_recover_stale_processing_documents() -> int:
                             AIJobItem.entity_type == "ai_document",
                             AIJobItem.entity_id.isnot(None),
                             AIJobItem.status.in_(("queued", "downloading", "processing")),
+                            db.or_(
+                                AIJobItem.status == "queued",
+                                AIJobItem.updated_at > item_fresh_cutoff,
+                                db.and_(
+                                    AIJobItem.updated_at.is_(None),
+                                    AIJobItem.created_at > item_fresh_cutoff,
+                                ),
+                            ),
                         )
                         .distinct()
                         .all()
@@ -523,7 +536,7 @@ def _auto_recover_stale_processing_documents() -> int:
         updated = (
             db.session.query(AIDocument)
             .filter(AIDocument.id.in_(candidate_ids))
-            .filter(AIDocument.processing_status == "processing")
+            .filter(AIDocument.processing_status.in_(("processing", "pending")))
             .update(
                 {
                     AIDocument.processing_status: "failed",
@@ -546,6 +559,34 @@ def _auto_recover_stale_processing_documents() -> int:
         return 0
 
 
+def _runner_for_ai_document_job_type(job_type: str):
+    """Return the background target for an AI documents job type, if known."""
+    if job_type == "docs.bulk_import_system":
+        return _run_system_bulk_import_job
+    if job_type == "docs.bulk_reprocess":
+        return _run_bulk_reprocess_job
+    if job_type == "docs.bulk_reprocess_metadata":
+        return _run_bulk_metadata_reprocess_job
+    if job_type == "ifrc_api_bulk":
+        from app.routes.ai_documents.ifrc import _run_ifrc_bulk_import_job
+
+        return _run_ifrc_bulk_import_job
+    return None
+
+
+def _resume_active_ai_document_jobs(user_id: int) -> list[dict]:
+    """Reconcile stale jobs, resume live ones, then return still-active jobs."""
+    if not user_id or not _check_ai_reprocess_job_tables_exist():
+        return []
+    worker_app = current_app._get_current_object()
+    for active in get_active_ai_document_jobs_for_user(user_id):
+        target = _runner_for_ai_document_job_type(active.get("job_type"))
+        jid = active.get("job_id")
+        if target and jid:
+            ensure_ai_job_running(worker_app, jid, target)
+    return get_active_ai_document_jobs_for_user(user_id)
+
+
 @bp.route("/documents/active-jobs", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def ai_documents_active_jobs():
@@ -554,7 +595,7 @@ def ai_documents_active_jobs():
         if not _check_ai_reprocess_job_tables_exist():
             return json_ok(success=True, jobs=[])
         user_id = int(getattr(current_user, "id", 0) or 0)
-        jobs = get_active_ai_document_jobs_for_user(user_id)
+        jobs = _resume_active_ai_document_jobs(user_id)
         return json_ok(success=True, jobs=jobs)
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
@@ -593,7 +634,12 @@ def document_library():
             compute_ai_document_status_stats,
         )
 
-        # Self-heal stale "processing" rows before rendering the page.
+        # Reconcile hung/stale batch jobs first so leftover ai_job_items no
+        # longer look "in progress" and no longer shield document autofix.
+        user_id = int(getattr(current_user, "id", 0) or 0)
+        _resume_active_ai_document_jobs(user_id)
+
+        # Self-heal stale processing/pending rows before rendering the page.
         _auto_recover_stale_processing_documents()
 
         filters = parse_ai_document_library_filters(request.args)
@@ -623,26 +669,12 @@ def document_library():
             if r and r[0] is not None
         ]
 
-        active_jobs = []
-        if _check_ai_reprocess_job_tables_exist():
-            user_id = int(getattr(current_user, "id", 0) or 0)
-            active_jobs = get_active_ai_document_jobs_for_user(user_id)
-            worker_app = current_app._get_current_object()
-            for active in active_jobs:
-                job_type = active.get("job_type")
-                jid = active.get("job_id")
-                if not jid:
-                    continue
-                if job_type == "docs.bulk_import_system":
-                    ensure_ai_job_running(worker_app, jid, _run_system_bulk_import_job)
-                elif job_type == "docs.bulk_reprocess":
-                    ensure_ai_job_running(worker_app, jid, _run_bulk_reprocess_job)
-                elif job_type == "docs.bulk_reprocess_metadata":
-                    ensure_ai_job_running(worker_app, jid, _run_bulk_metadata_reprocess_job)
-                elif job_type == "ifrc_api_bulk":
-                    from app.routes.ai_documents.ifrc import _run_ifrc_bulk_import_job
-
-                    ensure_ai_job_running(worker_app, jid, _run_ifrc_bulk_import_job)
+        # Re-read after reconcile so the progress banner is not seeded with dead jobs.
+        active_jobs = (
+            get_active_ai_document_jobs_for_user(user_id)
+            if _check_ai_reprocess_job_tables_exist()
+            else []
+        )
 
         # Global stats (always unfiltered) + filtered counts when URL filters are active.
         global_stats = {

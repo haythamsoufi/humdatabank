@@ -11,7 +11,7 @@ from sqlalchemy.orm import joinedload
 from app.extensions import db
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.form_items import FormItem
-from app.models.forms import DynamicIndicatorData, FormData, RepeatGroupInstance
+from app.models.forms import DynamicIndicatorData, FormData, FormSection, RepeatGroupInstance
 from app.models.organization import NationalSociety
 from app.utils.api_serialization import _country_for_aes, _resolve_matrix_cell
 from plugins.upr_visuals.catalog import (
@@ -20,6 +20,8 @@ from plugins.upr_visuals.catalog import (
     KPI_BANK_IDS,
     KPI_LABELS,
     KPI_ORDER,
+    OTHER_INDICATORS_SECTION_NAME,
+    OVERALL_ACTION_SECTION_NEEDLE,
     PLAN_ITEM_FALLBACKS,
     PLAN_KPI_LABELS,
     PLAN_LABEL_NEEDLES,
@@ -144,8 +146,12 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             year=payload["meta"].get("year"),
         )
         payload["emergencies"] = _report_emergencies(aes.id, items)
-        payload["core_indicators"] = _report_indicator_rows(items, by_item, SP_CODES, bars_only=True)
-        payload["enabling_indicators"] = _report_indicator_rows(items, by_item, EF_CODES, bars_only=False)
+        payload["core_indicators"] = _report_indicator_rows(
+            items, by_item, SP_CODES, bars_only=True, aes_id=aes.id
+        )
+        payload["enabling_indicators"] = _report_indicator_rows(
+            items, by_item, EF_CODES, bars_only=False, aes_id=aes.id
+        )
         payload["meta"]["people_title"] = "People reached"
         payload["meta"]["support_title"] = "IFRC Network-Supported Activities"
         payload["meta"]["support_funding_label"] = "Funding Reported"
@@ -204,7 +210,8 @@ def _indicator_bank_options(root):
 
 def _load_dynamic_indicator_rows(aes_id: int) -> list[DynamicIndicatorData]:
     query = DynamicIndicatorData.query.options(
-        _indicator_bank_options(DynamicIndicatorData.indicator_bank)
+        _indicator_bank_options(DynamicIndicatorData.indicator_bank),
+        joinedload(DynamicIndicatorData.section),
     ).filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
     try:
         return query.all()
@@ -212,10 +219,17 @@ def _load_dynamic_indicator_rows(aes_id: int) -> list[DynamicIndicatorData]:
         db.session.rollback()
         logger.debug("UPR visuals: falling back to dynamic rows without SPEF catalog join", exc_info=True)
         return (
-            DynamicIndicatorData.query.options(joinedload(DynamicIndicatorData.indicator_bank))
+            DynamicIndicatorData.query.options(
+                joinedload(DynamicIndicatorData.indicator_bank),
+                joinedload(DynamicIndicatorData.section),
+            )
             .filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
             .all()
         )
+
+
+def _section_load_options():
+    return joinedload(FormItem.form_section).joinedload(FormSection.parent_section)
 
 
 def _load_items(template) -> list[FormItem]:
@@ -223,7 +237,7 @@ def _load_items(template) -> list[FormItem]:
     if not version_id:
         return []
     query = FormItem.query.options(
-        joinedload(FormItem.form_section),
+        _section_load_options(),
         _indicator_bank_options(FormItem.indicator_bank),
     ).filter(FormItem.version_id == version_id, FormItem.archived.is_(False))
     try:
@@ -233,7 +247,7 @@ def _load_items(template) -> list[FormItem]:
         logger.debug("UPR visuals: falling back to items without SPEF catalog join", exc_info=True)
         return (
             FormItem.query.options(
-                joinedload(FormItem.form_section),
+                _section_load_options(),
                 joinedload(FormItem.indicator_bank),
             )
             .filter(FormItem.version_id == version_id, FormItem.archived.is_(False))
@@ -377,16 +391,66 @@ def _is_people_count(bank) -> bool:
     return meas in {"number", "count", ""}
 
 
+def _section_is_overall_action(section) -> bool:
+    """True when section (or an ancestor) is the T33 Overall Action Indicators block."""
+    current = section
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        name = (getattr(current, "name", None) or "").strip().lower()
+        if OVERALL_ACTION_SECTION_NEEDLE in name:
+            return True
+        current = getattr(current, "parent_section", None)
+    return False
+
+
+def _section_is_other_indicators(section) -> bool:
+    name = (getattr(section, "name", None) or "").strip().lower()
+    stype = (getattr(section, "section_type", None) or "").strip().lower()
+    return name == OTHER_INDICATORS_SECTION_NAME and stype == "dynamic_indicators"
+
+
+def _indicator_visual_row(area: str, label: str, meas: str, entry, *, bars_only: bool) -> dict[str, Any] | None:
+    if meas in {"yesno", "yes/no", "boolean"}:
+        if bars_only:
+            return None
+        flag = _yes_no(entry)
+        if flag is None:
+            return None
+        return {
+            "code": area,
+            "label": label,
+            "value": 1.0 if flag else 0.0,
+            "display": "Yes" if flag else "No",
+            "kind": "yesno",
+        }
+    if meas in {"percentage", "percent"}:
+        return None
+    number = _scalar_number(entry)
+    if not number:
+        return None
+    return {
+        "code": area,
+        "label": label,
+        "value": number,
+        "display": format_count(number),
+        "kind": "number",
+    }
+
+
 def _report_indicator_rows(
     items: list[FormItem],
     by_item: dict[int, FormData],
     areas: tuple[str, ...],
     *,
     bars_only: bool,
+    aes_id: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Core / EF indicators for Tableau Sheet 49 (bars) and Sheet 50 (text + bars)."""
+    """Overall Action core indicators plus Other Indicators dynamics (not Key Data / Funding / EA)."""
     rows: list[dict[str, Any]] = []
     for item in items:
+        if not _section_is_overall_action(getattr(item, "form_section", None)):
+            continue
         bank = getattr(item, "indicator_bank", None)
         if not bank:
             continue
@@ -395,36 +459,26 @@ def _report_indicator_rows(
             continue
         meas = (getattr(bank, "type", None) or "").strip().lower()
         label = (getattr(bank, "name", None) or item.label or "").strip()
-        if meas in {"yesno", "yes/no", "boolean"}:
-            if bars_only:
+        row = _indicator_visual_row(area, label, meas, by_item.get(item.id), bars_only=bars_only)
+        if row:
+            rows.append(row)
+    if aes_id:
+        for dyn in _load_dynamic_indicator_rows(aes_id):
+            if dyn.repeat_instance_number:
                 continue
-            flag = _yes_no(by_item.get(item.id))
-            if flag is None:
+            if not _section_is_other_indicators(getattr(dyn, "section", None)):
                 continue
-            rows.append(
-                {
-                    "code": area,
-                    "label": label,
-                    "value": 1.0 if flag else 0.0,
-                    "display": "Yes" if flag else "No",
-                    "kind": "yesno",
-                }
-            )
-            continue
-        if meas in {"percentage", "percent"}:
-            continue
-        number = _scalar_number(by_item.get(item.id))
-        if not number:
-            continue
-        rows.append(
-            {
-                "code": area,
-                "label": label,
-                "value": number,
-                "display": format_count(number),
-                "kind": "number",
-            }
-        )
+            bank = getattr(dyn, "indicator_bank", None)
+            if not bank:
+                continue
+            area = _bank_area(bank)
+            if area not in areas:
+                continue
+            meas = (getattr(bank, "type", None) or "").strip().lower()
+            label = (dyn.custom_label or getattr(bank, "name", None) or "").strip()
+            row = _indicator_visual_row(area, label, meas, dyn, bars_only=bars_only)
+            if row:
+                rows.append(row)
     rows.sort(key=lambda row: (areas.index(row["code"]) if row["code"] in areas else 99, -(row.get("value") or 0)))
     return rows
 

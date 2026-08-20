@@ -170,7 +170,7 @@
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 0.5rem 1.25rem;
     border-bottom: 1px solid #e5e7eb;
 }
@@ -183,10 +183,9 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex: 1 1 16rem;
+    flex: 0 1 22rem;
     min-width: 12rem;
     max-width: 28rem;
-    margin-left: auto;
     padding-bottom: 0.4rem;
 }
 .upr-vis-toolbar__label {
@@ -210,6 +209,9 @@
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
 }
 .upr-vis-mode-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
@@ -218,6 +220,9 @@
     background: transparent;
     color: #4b5563;
     cursor: pointer;
+}
+.upr-vis-mode-tab i {
+    font-size: 0.8125rem;
 }
 .upr-vis-mode-tab:hover {
     color: #111827;
@@ -250,16 +255,16 @@
      class="explore-panel{% if explore_first_tab != 'upr-visuals' %} hidden{% endif %}"
      role="tabpanel"
      aria-labelledby="tab-upr-visuals">
-    <div class="p-4 sm:p-6 space-y-4">
-        {% if can_manage_upr_visuals %}
+    {% if can_manage_upr_visuals %}
+        <div class="-mt-4 sm:-mt-6">
             {% include "plugins/upr_visuals/upr_visuals/_manage_tools.html" %}
-        {% else %}
-            <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
-                <i class="fas fa-lock text-gray-400 mb-2" aria-hidden="true"></i>
-                <p>{{ _('Bulk PNG generation is available to system managers.') }}</p>
-            </div>
-        {% endif %}
-    </div>
+        </div>
+    {% else %}
+        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
+            <i class="fas fa-lock text-gray-400 mb-2" aria-hidden="true"></i>
+            <p>{{ _('Bulk PNG generation is available to system managers.') }}</p>
+        </div>
+    {% endif %}
 </div>
 {% if can_manage_upr_visuals %}
 <script nonce="{{ csp_nonce() }}">

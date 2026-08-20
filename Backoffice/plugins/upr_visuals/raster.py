@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from plugins.upr_visuals.catalog import (
@@ -13,9 +14,10 @@ from plugins.upr_visuals.catalog import (
     DASHBOARD_BY_ID,
 )
 
-# WeasyPrint zoom (PDF units per CSS px). MuPDF get_pixmap(matrix=N) upscales a
-# 72dpi bake of the CSS box — icons stay soft. Zoom first, then pixmap 1:1.
-PNG_EXPORT_SCALE = 4.0
+# WeasyPrint zoom (PDF units per CSS px), then pixmap 1:1. ~8× A4 (~576 dpi)
+# so text and icons stay sharp when the PNG is zoomed. Do not use
+# get_pixmap(matrix=N) — that only upscales a 72 dpi bake.
+PNG_EXPORT_SCALE = 8.0
 _IMG_SRC_RE = re.compile(r'(<img\b[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
 _PLUGIN_STATIC_URL = "/upr-visuals/static/"
 
@@ -33,14 +35,18 @@ def _first_font(*paths: Path) -> Path | None:
 
 
 def _font_face(family: str, path: Path | None, weight: int) -> str | None:
-    if path is None:
+    if path is None or not path.is_file():
         return None
+    # file:// — WeasyPrint 69 often fails to parse huge unquoted data:font URIs.
+    uri = path.resolve().as_uri()
     return (
-        f"@font-face {{ font-family: '{family}'; src: url('{path.resolve().as_uri()}'); "
+        f"@font-face {{ font-family: '{family}'; "
+        f"src: url('{uri}') format('truetype'); "
         f"font-weight: {weight}; font-style: normal; }}"
     )
 
 
+@lru_cache(maxsize=1)
 def _font_css() -> str:
     open_sans_dirs = (
         _APP_FONTS_DIR,
@@ -300,7 +306,12 @@ def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.
     )
     pdf_buffer = io.BytesIO()
     HTML(string=document_html, base_url=_PLUGIN_DIR.resolve().as_uri() + "/").write_pdf(
-        pdf_buffer, stylesheets=[page_css], optimize_images=False, zoom=zoom
+        pdf_buffer,
+        stylesheets=[page_css],
+        optimize_images=False,
+        full_fonts=True,
+        hinting=True,
+        zoom=zoom,
     )
     return pdf_buffer.getvalue()
 

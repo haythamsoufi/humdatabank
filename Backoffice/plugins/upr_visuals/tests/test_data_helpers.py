@@ -13,7 +13,10 @@ from plugins.upr_visuals.data import (
     _funding_entity,
     _matrix_cells,
     _reach_rows,
+    _report_indicator_rows,
     _scalar_number,
+    _section_is_other_indicators,
+    _section_is_overall_action,
     _split_appeal_label,
     _split_cell_key,
     _spef_icon_alias,
@@ -378,6 +381,84 @@ def test_ifrc_secretariat_always_splits_longer_term_and_emergency():
     eo_req = next(m for m in ifrc["buckets"][1]["metrics"] if m["key"] == "funding_requirement")
     assert req["value"] == 25
     assert eo_req["display"] == "Not reported"
+
+
+@pytest.mark.unit
+def test_section_is_overall_action_walks_parent():
+    parent = SimpleNamespace(name="Overall Action Indicators", parent_section=None)
+    child = SimpleNamespace(name="Resilience - Climate and environment", parent_section=parent)
+    key_data = SimpleNamespace(name="Key Data", parent_section=None)
+    assert _section_is_overall_action(parent) is True
+    assert _section_is_overall_action(child) is True
+    assert _section_is_overall_action(key_data) is False
+    assert _section_is_overall_action(None) is False
+
+
+@pytest.mark.unit
+def test_section_is_other_indicators():
+    other = SimpleNamespace(name="Other Indicators", section_type="dynamic_indicators")
+    emergency = SimpleNamespace(name="Emergency Appeal Indicators", section_type="dynamic_indicators")
+    assert _section_is_other_indicators(other) is True
+    assert _section_is_other_indicators(emergency) is False
+    assert _section_is_other_indicators(None) is False
+
+
+@pytest.mark.unit
+def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
+    overall = SimpleNamespace(name="Overall Action Indicators", parent_section=None)
+    climate = SimpleNamespace(name="Resilience - Climate and environment", parent_section=overall)
+    key_data = SimpleNamespace(name="Key Data", parent_section=None)
+    other = SimpleNamespace(name="Other Indicators", section_type="dynamic_indicators")
+    emergency = SimpleNamespace(name="Emergency Appeal Indicators", section_type="dynamic_indicators")
+
+    core_item = SimpleNamespace(
+        id=1,
+        label="Climate people",
+        form_section=climate,
+        indicator_bank=SimpleNamespace(name="People reached with climate activities", type="number", spef_area=SimpleNamespace(code="SP1"), area="SP1"),
+    )
+    kpi_item = SimpleNamespace(
+        id=2,
+        label="Volunteers",
+        form_section=key_data,
+        indicator_bank=SimpleNamespace(name="Number of people volunteering.", type="number", spef_area=SimpleNamespace(code="EF2"), area="EF2"),
+    )
+    by_item = {
+        1: SimpleNamespace(data_not_available=False, not_applicable=False, get_display_value=lambda: "1000", numeric_value=1000),
+        2: SimpleNamespace(data_not_available=False, not_applicable=False, get_display_value=lambda: "50", numeric_value=50),
+    }
+    other_dyn = SimpleNamespace(
+        repeat_instance_number=None,
+        section=other,
+        custom_label=None,
+        indicator_bank=SimpleNamespace(name="Number of people reached - Cash Transfer Programming.", type="number", spef_area=SimpleNamespace(code="SP2"), area="SP2"),
+        data_not_available=False,
+        not_applicable=False,
+        get_display_value=lambda: "250",
+        numeric_value=250,
+    )
+    ea_dyn = SimpleNamespace(
+        repeat_instance_number=1,
+        section=emergency,
+        custom_label=None,
+        indicator_bank=SimpleNamespace(name="Number of people reached with disaster risk reduction.", type="number", spef_area=SimpleNamespace(code="SP2"), area="SP2"),
+        data_not_available=False,
+        not_applicable=False,
+        get_display_value=lambda: "9000",
+        numeric_value=9000,
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._load_dynamic_indicator_rows",
+        lambda aes_id: [other_dyn, ea_dyn],
+    )
+
+    rows = _report_indicator_rows([core_item, kpi_item], by_item, ("SP1", "SP2", "EF2"), bars_only=True, aes_id=1642)
+    labels = [row["label"] for row in rows]
+    assert labels == [
+        "People reached with climate activities",
+        "Number of people reached - Cash Transfer Programming.",
+    ]
+    assert {row["code"] for row in rows} == {"SP1", "SP2"}
 
 
 @pytest.mark.unit

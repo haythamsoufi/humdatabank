@@ -1,26 +1,6 @@
 {# Bulk PNG export — Data Explorer UPR visuals tab. #}
 <div id="upr-visuals-admin" class="space-y-5">
     <div class="upr-vis-toolbar">
-        <nav id="upr-vis-mode-tabs" class="upr-vis-toolbar__tabs" role="tablist" aria-label="{{ _('UPR visuals tools') }}">
-            <button type="button"
-                    role="tab"
-                    id="upr-vis-tab-generate"
-                    data-upr-mode="generate"
-                    aria-selected="true"
-                    aria-controls="upr-vis-pane-generate"
-                    class="upr-vis-mode-tab is-active">
-                {{ _('Generate') }}
-            </button>
-            <button type="button"
-                    role="tab"
-                    id="upr-vis-tab-preview"
-                    data-upr-mode="preview"
-                    aria-selected="false"
-                    aria-controls="upr-vis-pane-preview"
-                    class="upr-vis-mode-tab">
-                {{ _('Preview') }}
-            </button>
-        </nav>
         <div class="upr-vis-toolbar__assignment">
             <label for="upr-vis-assignment" class="upr-vis-toolbar__label">{{ _('Assignment') }}</label>
             <select id="upr-vis-assignment"
@@ -29,9 +9,29 @@
                 <option value="">{{ _('Select an assignment') }}</option>
             </select>
         </div>
+        <nav id="upr-vis-mode-tabs" class="upr-vis-toolbar__tabs" role="tablist" aria-label="{{ _('UPR visuals tools') }}">
+            <button type="button"
+                    role="tab"
+                    id="upr-vis-tab-preview"
+                    data-upr-mode="preview"
+                    aria-selected="true"
+                    aria-controls="upr-vis-pane-preview"
+                    class="upr-vis-mode-tab is-active">
+                <i class="fas fa-eye" aria-hidden="true"></i>{{ _('Preview') }}
+            </button>
+            <button type="button"
+                    role="tab"
+                    id="upr-vis-tab-generate"
+                    data-upr-mode="generate"
+                    aria-selected="false"
+                    aria-controls="upr-vis-pane-generate"
+                    class="upr-vis-mode-tab">
+                <i class="fas fa-images" aria-hidden="true"></i>{{ _('Generate') }}
+            </button>
+        </nav>
     </div>
 
-    <div id="upr-vis-pane-generate" class="space-y-5" role="tabpanel" aria-labelledby="upr-vis-tab-generate">
+    <div id="upr-vis-pane-generate" class="space-y-5" role="tabpanel" aria-labelledby="upr-vis-tab-generate" hidden>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <section class="upr-vis-card" aria-labelledby="upr-vis-dashboards-heading">
                 <div class="upr-vis-card__header">
@@ -94,7 +94,7 @@
         </div>
     </div>
 
-    <div id="upr-vis-pane-preview" class="upr-vis-preview-pane" role="tabpanel" aria-labelledby="upr-vis-tab-preview" hidden>
+    <div id="upr-vis-pane-preview" class="upr-vis-preview-pane" role="tabpanel" aria-labelledby="upr-vis-tab-preview">
         <div class="upr-vis-preview__controls">
             <label for="upr-vis-preview-country" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Country') }}</label>
             <select id="upr-vis-preview-country"
@@ -103,7 +103,24 @@
                 <option value="">{{ _('Select a country') }}</option>
             </select>
         </div>
-        <div id="upr-vis-preview-tabs" class="upr-visuals-embed__tabs" role="tablist" aria-label="{{ _('Dashboards')|forceescape }}"></div>
+        <div class="upr-visuals-embed__toolbar">
+            <div id="upr-vis-preview-tabs" class="upr-visuals-embed__tabs" role="tablist" aria-label="{{ _('Dashboards')|forceescape }}"></div>
+            <div class="upr-visuals-download">
+                <button type="button" id="upr-vis-preview-download" class="btn btn-icon btn-sm btn-secondary"
+                        title="{{ _('Download')|forceescape }}"
+                        aria-label="{{ _('Download')|forceescape }}"
+                        aria-haspopup="menu"
+                        aria-expanded="false"
+                        aria-controls="upr-vis-preview-download-menu"
+                        disabled>
+                    <i class="fas fa-download" aria-hidden="true"></i>
+                </button>
+                <div id="upr-vis-preview-download-menu" class="upr-visuals-download__menu" role="menu">
+                    <button type="button" role="menuitem" data-format="png">{{ _('PNG') }}</button>
+                    <button type="button" role="menuitem" data-format="pdf">{{ _('PDF') }}</button>
+                </div>
+            </div>
+        </div>
         <p id="upr-vis-preview-status" class="text-sm text-gray-500"></p>
         <div class="upr-vis-preview__stage">
             <div id="upr-vis-preview-body" class="upr-visual-report__body upr-vis-page"></div>

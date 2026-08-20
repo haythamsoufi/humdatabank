@@ -27,9 +27,13 @@
     panePreview: document.getElementById("upr-vis-pane-preview"),
     previewCountry: document.getElementById("upr-vis-preview-country"),
     previewTabs: document.getElementById("upr-vis-preview-tabs"),
+    previewDownload: document.getElementById("upr-vis-preview-download"),
+    previewDownloadMenu: document.getElementById("upr-vis-preview-download-menu"),
     previewStatus: document.getElementById("upr-vis-preview-status"),
     previewBody: document.getElementById("upr-vis-preview-body"),
   };
+  const previewDownloadWrap =
+    els.previewDownload && els.previewDownload.closest(".upr-visuals-download");
   let pollTimer = null;
   let jobId = null;
   let running = false;
@@ -133,6 +137,7 @@
     els.dashSelectAll.disabled = on || !els.dashboards.querySelector("input");
     els.dashSelectNone.disabled = on || !els.dashboards.querySelector("input");
     els.previewCountry.disabled = on || !els.previewCountry.querySelector("option[value]:not([value=''])");
+    syncPreviewDownload();
     els.cancel.classList.toggle("hidden", !on);
     els.dashboards.querySelectorAll("input").forEach((input) => {
       input.disabled = on;
@@ -327,6 +332,8 @@
     els.previewCountry.disabled = true;
     els.previewTabs.replaceChildren();
     els.previewBody.replaceChildren();
+    setPreviewDownloadOpen(false);
+    syncPreviewDownload();
     setPreviewStatus("");
   }
 
@@ -347,6 +354,7 @@
     if (rows && rows.length) {
       els.previewCountry.value = String(rows[0].aes_id);
     }
+    syncPreviewDownload();
   }
 
   function renderPreviewTabs(dashboards) {
@@ -395,6 +403,7 @@
     if (!els.assignment.value) {
       setPreviewStatus(t("previewNeedAssignment"));
       els.previewBody.replaceChildren();
+      syncPreviewDownload();
       return;
     }
     if (!els.previewCountry.value) {
@@ -405,6 +414,7 @@
     if (!aesId) {
       setPreviewStatus(t("previewNeedCountry"));
       els.previewBody.replaceChildren();
+      syncPreviewDownload();
       return;
     }
     if (!previewDashboards.length) {
@@ -417,7 +427,10 @@
       previewDashboard = previewDashboards[0].id;
     }
     renderPreviewTabs(previewDashboards);
-    if (aesId === previewAesId && showPreviewHtml(aesId, previewDashboard)) return;
+    if (aesId === previewAesId && showPreviewHtml(aesId, previewDashboard)) {
+      syncPreviewDownload();
+      return;
+    }
     previewAesId = aesId;
     setPreviewStatus(t("previewLoading"));
     try {
@@ -438,10 +451,31 @@
         els.previewBody.innerHTML = data.html || "";
         setPreviewStatus("");
       }
+      syncPreviewDownload();
     } catch (err) {
       els.previewBody.innerHTML = "";
       setPreviewStatus(t("previewFailed"));
+      syncPreviewDownload();
     }
+  }
+
+  function setPreviewDownloadOpen(open) {
+    previewDownloadWrap?.classList.toggle("is-open", open);
+    els.previewDownload?.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  function syncPreviewDownload() {
+    const ready = Boolean(els.previewCountry.value && previewDashboard && !running);
+    if (els.previewDownload) els.previewDownload.disabled = !ready;
+    if (!ready) setPreviewDownloadOpen(false);
+  }
+
+  function downloadPreviewVisual(format) {
+    const aesId = els.previewCountry.value;
+    if (!aesId || !previewDashboard) return;
+    const kind = format === "pdf" ? "pdf" : "png";
+    window.location.href = `/upr-visuals/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(previewDashboard)}`;
+    setPreviewDownloadOpen(false);
   }
 
   function setDashboards(checked) {
@@ -514,6 +548,23 @@
     previewHtmlCache = Object.create(null);
     previewAesId = "";
     loadPreview();
+  });
+  els.previewDownload?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (els.previewDownload.disabled) return;
+    setPreviewDownloadOpen(!previewDownloadWrap?.classList.contains("is-open"));
+  });
+  els.previewDownloadMenu?.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-format]");
+    if (!item) return;
+    downloadPreviewVisual(item.dataset.format);
+  });
+  document.addEventListener("click", (event) => {
+    if (!previewDownloadWrap || previewDownloadWrap.contains(event.target)) return;
+    setPreviewDownloadOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setPreviewDownloadOpen(false);
   });
   els.generate.addEventListener("click", async () => {
     const assignedFormId = parseInt(els.assignment.value, 10);

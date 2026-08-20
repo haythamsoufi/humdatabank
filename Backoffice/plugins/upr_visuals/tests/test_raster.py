@@ -5,13 +5,36 @@ from __future__ import annotations
 import pytest
 
 from plugins.upr_visuals.raster import (
+    PNG_EXPORT_SCALE,
     _css_for_print,
+    _font_css,
     _page_size,
     _rewrite_export_images,
     _stitch_pixmaps,
     ink_bounds,
     resolve_export_image_src,
 )
+
+
+@pytest.mark.unit
+def test_export_fonts_are_inlined():
+    css = _font_css()
+    assert "file:" in css
+    assert "Open Sans" in css
+    assert "OpenSans-Regular" in css
+    assert PNG_EXPORT_SCALE >= 8
+
+
+@pytest.mark.unit
+def test_export_open_sans_files_are_real_ttf():
+    from pathlib import Path
+
+    from plugins.upr_visuals.raster import _APP_FONTS_DIR
+
+    for name in ("OpenSans-Regular.ttf", "OpenSans-Bold.ttf"):
+        path = Path(_APP_FONTS_DIR) / name
+        header = path.read_bytes()[:4]
+        assert header in {b"\x00\x01\x00\x00", b"OTTO"}, f"{name} is not a TTF/OTF (got {header!r})"
 
 
 @pytest.mark.unit

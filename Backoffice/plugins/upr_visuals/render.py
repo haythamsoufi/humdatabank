@@ -679,10 +679,10 @@ def _emergency(payload: dict[str, Any], slot: int) -> str:
     yes_html = ""
     if yesno:
         yes_html = _hbar_chart(yesno)
+    code_html = f" <span class='upr-code'>{code}</span>" if code else ""
     return (
         "<section class='upr-block upr-block--emergency'>"
-        f"<h2 class='upr-block__title'>{name}"
-        f"{f' <span class=\"upr-code\">{code}</span>' if code else ''}</h2>"
+        f"<h2 class='upr-block__title'>{name}{code_html}</h2>"
         f"{grouped}{yes_html}"
         "</section>"
     )

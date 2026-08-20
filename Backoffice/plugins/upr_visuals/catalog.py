@@ -129,6 +129,11 @@ AREA_LABELS = {
     "EF4": "Accountability and agility",
 }
 
+# T33 Page 1: static core indicators live under this section (and its children).
+# Dynamic extras are the sibling "Other Indicators" section — not Emergency Appeals.
+OVERALL_ACTION_SECTION_NEEDLE = "overall action"
+OTHER_INDICATORS_SECTION_NAME = "other indicators"
+
 # Form section name fragments → SP/EF code (T33 core indicators).
 SECTION_AREA_HINTS = (
     ("climate and environment", "SP1"),

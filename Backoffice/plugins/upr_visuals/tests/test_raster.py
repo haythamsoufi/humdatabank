@@ -104,6 +104,9 @@ def test_resolve_export_image_src_maps_plugin_static():
     assert resolve_export_image_src("data:image/png;base64,abc") == "data:image/png;base64,abc"
     remote = "https://example.test/icon.png"
     assert resolve_export_image_src(remote) == remote
+    logo = resolve_export_image_src("/static/IFRC_logo_square.svg")
+    assert logo.startswith("file:")
+    assert logo.lower().endswith("ifrc_logo_square.svg")
 
 
 @pytest.mark.unit

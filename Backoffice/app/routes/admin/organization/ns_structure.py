@@ -46,12 +46,14 @@ from app.utils.api_formatting import choices_from_query
 from app.utils.api_responses import (
     json_bad_request,
     json_error,
+    json_form_errors,
     json_ok,
     json_select_options,
     json_server_error,
     require_json_data,
     require_json_keys,
 )
+from app.utils.sector_logo_urls import ns_logo_url
 from app.utils.error_handling import handle_json_view_exception
 from config.config import Config
 from app.forms.organization import (
@@ -75,7 +77,37 @@ from app.forms.organization import (
     stream_entity_translation_events,
     commit_translation_entity,
 )
+from app.routes.admin.system_admin.helpers import (
+    _delete_logo_file,
+    _safe_logo_mimetype,
+    _save_logo_file,
+)
+from app.services.platform import storage_service as storage
 from . import bp
+
+NS_LOGO_SUBDIR = "ns"
+
+
+def _ns_logo_stem(ns: NationalSociety) -> str:
+    country = getattr(ns, "country", None)
+    if country is None and ns.country_id:
+        country = Country.query.get(ns.country_id)
+    iso3 = (getattr(country, "iso3", None) or "").strip().upper()
+    if len(iso3) == 3 and iso3.isalpha():
+        return iso3
+    code = (ns.code or "").strip()
+    return code or f"ns-{ns.id}"
+
+
+def _apply_ns_logo_upload(ns: NationalSociety, form: NationalSocietyForm) -> None:
+    file_storage = form.logo_file.data
+    if not file_storage or not getattr(file_storage, "filename", None):
+        return
+    if ns.logo_filename:
+        _delete_logo_file(ns.logo_filename, subdir=NS_LOGO_SUBDIR)
+    saved = _save_logo_file(file_storage, _ns_logo_stem(ns), subdir=NS_LOGO_SUBDIR)
+    if saved:
+        ns.logo_filename = saved
 
 # ==================== National Societies ====================
 
@@ -98,6 +130,7 @@ def new_national_society():
         ns.name_translations = collect_translations(form, 'name')
         db.session.add(ns)
         db.session.flush()
+        _apply_ns_logo_upload(ns, form)
         flash(f'National Society "{ns.name}" created successfully.', 'success')
         return redirect(url_for('organization.index', tab='nss'))
 
@@ -108,6 +141,25 @@ def new_national_society():
                            entity_label='National Society',
                            icon='fas fa-hands-helping',
                            cancel_url=url_for('organization.index', tab='nss'))
+
+
+@bp.route('/national-societies/<int:ns_id>/data', methods=['GET'])
+@admin_permission_required('admin.organization.manage')
+def get_national_society_data(ns_id):
+    """JSON payload for the Edit National Society modal."""
+    ns = NationalSociety.query.get_or_404(ns_id)
+    return json_ok(
+        id=ns.id,
+        name=ns.name or '',
+        code=ns.code or '',
+        description=ns.description or '',
+        country_id=ns.country_id,
+        country_name=ns.country.name if ns.country else '',
+        is_active=bool(ns.is_active),
+        display_order=ns.display_order or 0,
+        logo_url=ns_logo_url(ns) or '',
+        name_translations=ns.name_translations or {},
+    )
 
 
 @bp.route('/national-societies/<int:ns_id>/edit', methods=['GET', 'POST'])
@@ -140,10 +192,16 @@ def edit_national_society(ns_id):
         ns.is_active = form.is_active.data
         ns.display_order = form.display_order.data or 0
         ns.name_translations = collect_translations(form, 'name')
+        _apply_ns_logo_upload(ns, form)
 
         db.session.flush()
+        if is_json_request():
+            return json_ok(message=f'National Society "{ns.name}" updated successfully.')
         flash(f'National Society "{ns.name}" updated successfully.', 'success')
         return redirect(url_for('organization.index', tab='nss'))
+
+    if is_json_request() and request.method == 'POST':
+        return json_form_errors(form)
 
     return render_template('admin/organization/edit_entity.html',
                            form=form,
@@ -172,6 +230,25 @@ def delete_national_society(ns_id):
             flash("An error occurred. Please try again.", "danger")
 
     return redirect(url_for('organization.index', tab='nss'))
+
+
+@bp.route('/national-societies/<int:ns_id>/logo', methods=['GET'])
+@limiter.exempt
+@rbac_guard_audit_exempt("Intentionally public to allow NS logo rendering without admin session.")
+def national_society_logo(ns_id):
+    ns = NationalSociety.query.get_or_404(ns_id)
+    if not ns.logo_filename:
+        return ("", 404)
+    rel_path = f"{NS_LOGO_SUBDIR}/{ns.logo_filename}"
+    if not storage.exists(storage.SYSTEM, rel_path):
+        return ("", 404)
+    return storage.stream_response(
+        storage.SYSTEM, rel_path,
+        filename=ns.logo_filename, as_attachment=False,
+        mimetype=_safe_logo_mimetype(ns.logo_filename),
+    )
+
+
 # ==================== NS Branches ====================
 
 @bp.route('/ns-branches', methods=['GET'])

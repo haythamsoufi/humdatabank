@@ -37,6 +37,9 @@ class NationalSociety(db.Model):
     # Foreign key relationships
     country_id = db.Column(db.Integer, db.ForeignKey('country.id'), nullable=False, index=True)
 
+    # FDRS ns_logos file stored under system/ns/ (usually {ISO3}.png).
+    logo_filename = db.Column(db.String(255), nullable=True)
+
     # Relationships
     country = db.relationship('Country', backref='national_societies')
 
@@ -65,6 +68,11 @@ class NationalSociety(db.Model):
             self.name_translations[language] = text.strip()
         elif language in self.name_translations:
             del self.name_translations[language]
+
+
+    @property
+    def has_logo(self) -> bool:
+        return bool((self.logo_filename or "").strip())
 
 
 class NSBranch(db.Model):

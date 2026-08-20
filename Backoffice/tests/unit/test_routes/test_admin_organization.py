@@ -517,10 +517,9 @@ class TestImportNationalSocietiesOverwrite:
 
 class TestNationalSocietyCRUD:
     def test_new_ns_get_renders_form(self, logged_in_client, db_session):
-        with _mock_render() as mock_rt:
-            resp = logged_in_client.get("/admin/organization/national-societies/new")
+        resp = logged_in_client.get("/admin/organization/national-societies/new")
         assert resp.status_code == 200
-        mock_rt.assert_called_once()
+        assert b'logo_file' in resp.data
 
     def test_new_ns_post_valid_creates_ns(self, logged_in_client, db_session, app):
         country = create_test_country(db_session, name="NS Country", iso3="NSC", iso2="NC")
@@ -546,13 +545,21 @@ class TestNationalSocietyCRUD:
         ns = NationalSociety(name="Edit NS", country_id=country.id, is_active=True)
         db_session.add(ns)
         db_session.commit()
-        with _mock_render() as mock_rt:
-            resp = logged_in_client.get(f"/admin/organization/national-societies/{ns.id}/edit")
+        resp = logged_in_client.get(f"/admin/organization/national-societies/{ns.id}/edit")
         assert resp.status_code == 200
-        mock_rt.assert_called()
+        assert b'logo_file' in resp.data
 
     def test_edit_ns_get_nonexistent_returns_404(self, logged_in_client, db_session):
         resp = logged_in_client.get("/admin/organization/national-societies/99999/edit")
+        assert resp.status_code == 404
+
+    def test_ns_logo_missing_returns_404(self, logged_in_client, db_session, app):
+        from app.models.organization import NationalSociety
+        country = create_test_country(db_session, name="NS Logo Country", iso3="NLC", iso2="NL")
+        ns = NationalSociety(name="Logo NS", country_id=country.id, is_active=True)
+        db_session.add(ns)
+        db_session.commit()
+        resp = logged_in_client.get(f"/admin/organization/national-societies/{ns.id}/logo")
         assert resp.status_code == 404
 
     def test_edit_ns_post_valid_updates_ns(self, logged_in_client, db_session, app):
@@ -567,6 +574,54 @@ class TestNationalSocietyCRUD:
             follow_redirects=False,
         )
         assert resp.status_code in (200, 302)
+
+    def test_get_ns_data_returns_json(self, logged_in_client, db_session, app):
+        from app.models.organization import NationalSociety
+        country = create_test_country(db_session, name="NS Data Country", iso3="NDA", iso2="NA")
+        ns = NationalSociety(
+            name="Data NS",
+            country_id=country.id,
+            is_active=True,
+            code="DNS",
+            description="A test NS",
+            display_order=3,
+            name_translations={"fr": "NS Données"},
+        )
+        db_session.add(ns)
+        db_session.commit()
+        resp = logged_in_client.get(f"/admin/organization/national-societies/{ns.id}/data")
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        assert payload["name"] == "Data NS"
+        assert payload["code"] == "DNS"
+        assert payload["description"] == "A test NS"
+        assert payload["country_id"] == country.id
+        assert payload["is_active"] is True
+        assert payload["display_order"] == 3
+        assert payload["name_translations"]["fr"] == "NS Données"
+
+    def test_get_ns_data_nonexistent_returns_404(self, logged_in_client, db_session):
+        resp = logged_in_client.get("/admin/organization/national-societies/99999/data")
+        assert resp.status_code == 404
+
+    def test_edit_ns_post_ajax_returns_json(self, logged_in_client, db_session, app):
+        from app.models.organization import NationalSociety
+        country = create_test_country(db_session, name="NS Ajax Country", iso3="NJA", iso2="NJ")
+        ns = NationalSociety(name="Ajax NS", country_id=country.id, is_active=True)
+        db_session.add(ns)
+        db_session.commit()
+        resp = logged_in_client.post(
+            f"/admin/organization/national-societies/{ns.id}/edit",
+            data={"name": "Updated Ajax NS", "country_id": str(country.id), "is_active": "y"},
+            headers={"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
+            follow_redirects=False,
+        )
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload["success"] is True
+        updated = NationalSociety.query.get(ns.id)
+        assert updated.name == "Updated Ajax NS"
 
     def test_delete_ns_redirects(self, logged_in_client, db_session, app):
         from app.models.organization import NationalSociety

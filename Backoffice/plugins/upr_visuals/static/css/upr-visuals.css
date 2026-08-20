@@ -17,6 +17,94 @@
   overflow: hidden;
 }
 
+.upr-dashboard--combined {
+  overflow: visible;
+}
+
+.upr-vis-page:has(> .upr-dashboard--combined) {
+  padding: 0;
+}
+
+.upr-doc-header {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  background: #011e41;
+  color: #fff;
+  padding: 0.85rem 1.15rem 0.7rem;
+  box-sizing: border-box;
+}
+
+.upr-doc-header__brand,
+.upr-doc-header__meta {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+}
+
+.upr-doc-header__logo {
+  display: block;
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: contain;
+  background: #fff;
+}
+
+.upr-doc-header__titles {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.upr-doc-header__country {
+  font-family: "Montserrat", "Open Sans", sans-serif;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  color: #fff;
+  margin: 0;
+  padding: 0 0 0.28rem;
+  border-bottom: 2px solid #d22730;
+}
+
+.upr-doc-header__subtitle {
+  margin: 0.4rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: #fff;
+}
+
+.upr-doc-header__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+.upr-doc-header__ns-logo {
+  display: block;
+  width: 5.5rem;
+  height: 5.5rem;
+  object-fit: contain;
+  background: #fff;
+}
+
+.upr-doc-header__date {
+  margin-top: auto;
+  font-size: 0.72rem;
+  font-style: italic;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.upr-combined-body {
+  padding: 1.15rem 12mm 10mm;
+}
+
 .upr-vis-page {
   width: min(100%, 297mm);
   margin-inline: auto;
@@ -44,7 +132,9 @@
 .upr-support-total,
 .upr-plan-cover__country,
 .upr-plan-fund__source-value,
-.upr-plan-fund__projected-value {
+.upr-plan-fund__projected-value,
+.upr-detail-fund__amt,
+.upr-support-fill--on {
   font-family: "Montserrat", "Open Sans", sans-serif;
   font-variant-numeric: tabular-nums;
 }
@@ -556,7 +646,9 @@
 }
 
 .upr-support-col-num,
-.upr-support-col-dot {
+.upr-support-col-dot,
+.upr-support-col-fill,
+.upr-support-col-year {
   width: auto;
 }
 
@@ -644,7 +736,10 @@
 .upr-support-table td.upr-dot-cell,
 .upr-support-table th.upr-support-th,
 .upr-support-table td.upr-num,
-.upr-support-table th.upr-num {
+.upr-support-table th.upr-num,
+.upr-support-table td.upr-support-fill,
+.upr-support-table td.upr-support-year,
+.upr-support-table th.upr-support-year {
   text-align: center;
 }
 
@@ -666,6 +761,52 @@
   border-color: transparent;
 }
 
+.upr-support-table--plan .upr-ns {
+  vertical-align: top;
+  font-weight: 600;
+}
+
+.upr-support-year {
+  text-align: center;
+  white-space: nowrap;
+  font-weight: 600;
+  width: 4.25rem;
+}
+
+.upr-support-confirmed {
+  color: #6d6e71;
+}
+
+.upr-support-th--plan {
+  min-width: 2.6rem;
+  max-width: 3.1rem;
+  height: 9.5rem;
+  padding: 0.35rem 0.15rem 0.45rem;
+  vertical-align: bottom;
+}
+
+.upr-support-th--plan span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.upr-support-fill {
+  text-align: center;
+  min-width: 4.6rem;
+  padding: 0.28rem 0.2rem;
+}
+
+.upr-support-fill--on {
+  color: #fff;
+  font-weight: 400;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 .upr-not-reported {
   color: #8a8d91;
   font-style: italic;
@@ -681,9 +822,8 @@
 }
 
 .upr-code {
-  font-weight: 600;
-  color: #58595b;
-  font-size: 0.85rem;
+  font-weight: 700;
+  color: #d22730;
 }
 
 #upr-visuals-panel {
@@ -897,17 +1037,79 @@
   margin: 0.45rem 0 0;
 }
 
-.upr-netfund-table {
-  width: 100%;
+.upr-detail-fund-wrap {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0.85rem 1.35rem 1.1rem;
+  background: #f3f4f6;
 }
 
-.upr-netfund-year {
+.upr-detail-fund-wrap .upr-block__title {
+  margin-bottom: 0.25rem;
+}
+
+.upr-detail-fund__year {
   text-align: center;
-  white-space: nowrap;
-  font-weight: 600;
-  width: 4.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin: 0 0 0.65rem;
 }
 
-.upr-netfund-col-year {
-  width: 4.5rem;
+.upr-detail-fund {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.upr-detail-fund th,
+.upr-detail-fund td {
+  padding: 0.28rem 0.55rem;
+  border: none;
+  vertical-align: middle;
+}
+
+.upr-detail-fund thead th {
+  font-weight: 700;
+  text-align: right;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid #c5c9ce;
+}
+
+.upr-detail-fund thead th:first-child,
+.upr-detail-fund td:first-child {
+  text-align: left;
+}
+
+.upr-detail-fund__section td:first-child,
+.upr-detail-fund__group td:first-child,
+.upr-detail-fund tfoot td:first-child {
+  font-weight: 700;
+}
+
+.upr-detail-fund__child td:first-child {
+  padding-left: 1.6rem;
+  font-weight: 400;
+}
+
+.upr-detail-fund__amt {
+  text-align: right;
+  white-space: nowrap;
+  width: 8.5rem;
+  color: #58595b;
+}
+
+.upr-detail-fund__pill {
+  display: inline-block;
+  min-width: 4.4rem;
+  padding: 0.12rem 0.7rem;
+  background: #e2e4e8;
+  border-radius: 999px;
+  text-align: center;
+  color: #58595b;
+}
+
+.upr-detail-fund tfoot td {
+  padding-top: 0.5rem;
+  border-top: 1px solid #c5c9ce;
+  color: #58595b;
 }

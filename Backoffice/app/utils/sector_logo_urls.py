@@ -102,3 +102,44 @@ def spef_icon_url(
         sid=row_id,
         _external=external,
     )
+
+
+def ns_logo_url(
+    ns: Any,
+    *,
+    external: bool = False,
+    via_api: bool = False,
+) -> Optional[str]:
+    """Return the best public URL for a National Society logo."""
+    filename = _logo_filename(ns)
+    if not filename:
+        return None
+
+    cdn_url = _cdn_logo_url(filename, getattr(ns, "updated_at", None), subdir="ns")
+    if cdn_url:
+        return cdn_url
+
+    if via_api:
+        from flask import request
+
+        path = f"/api/v1/uploads/ns/{filename}"
+        if external:
+            return f"{request.host_url.rstrip('/')}{path}"
+        return url_for("api.serve_ns_logo", filename=filename)
+
+    ns_id = getattr(ns, "id", None)
+    if not ns_id:
+        return None
+    return url_for(
+        "organization.national_society_logo",
+        ns_id=ns_id,
+        _external=external,
+    )
+
+
+def github_ns_logo_url(iso3: str | None) -> Optional[str]:
+    """Public FDRS ns_logos file for a country ISO3 code."""
+    code = (iso3 or "").strip().upper()
+    if len(code) != 3 or not code.isalpha():
+        return None
+    return f"https://raw.githubusercontent.com/FDRS-ifrc/general/main/ns_logos/{code}.png"

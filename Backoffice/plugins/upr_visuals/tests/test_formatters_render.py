@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from plugins.upr_visuals.catalog import (
     PLAN_TEMPLATE_ID,
     REACH_CODES,
     REPORT_TEMPLATE_ID,
+    SUPPORT_DOT_COLORS,
     dashboards_for_kind,
     display_ns_name,
     kind_for_template,
     section_to_area,
 )
 from plugins.upr_visuals.formatters import (
+    document_subtitle,
     format_chf,
     format_compact_chf,
     format_count,
+    format_header_date,
     period_to_round,
     planning_years,
     to_number,
@@ -115,6 +120,10 @@ def test_period_to_round():
     assert period_to_round("Jan-Jun 2026", "report") == "MYR26"
     assert planning_years("2026") == [2026, 2027, 2028]
     assert "CC1" in REACH_CODES
+    assert format_header_date(date(2026, 7, 2)) == "2 July 2026"
+    assert document_subtitle("plan", "2026") == "2026-2028 IFRC network country plan"
+    assert document_subtitle("report", "2025") == "2025 IFRC network annual report, Jan-Dec"
+    assert document_subtitle("report", "Jan-Jun 2026") == "2026 IFRC network mid-year report, Jan-Jun"
 
 
 def _payload():
@@ -131,12 +140,14 @@ def _payload():
             "people_title": "People to be reached in 2026",
             "support_title": "Participating National Societies bilateral support",
             "header_prefix": "In support of",
+            "header_date": "2 July 2026",
+            "document_subtitle": "2026-2028 IFRC network country plan",
         },
         "kpis": {
-            "branches": {"label": "National Society branches", "display": "34"},
-            "staff": {"label": "National Society staff", "display": "4,000"},
-            "volunteers": {"label": "National Society volunteers", "display": "26,000"},
-            "local_units": {"label": "National Society local units", "display": "329"},
+            "branches": {"label": "Branches", "display": "34"},
+            "staff": {"label": "Staff", "display": "4,000"},
+            "volunteers": {"label": "Volunteers", "display": "26,000"},
+            "local_units": {"label": "Local units", "display": "329"},
         },
         "people_reached": [
             {"code": "SP1", "label": "Climate and environment", "display": "50,000", "has_value": True},
@@ -185,6 +196,7 @@ def _payload():
                             "SP4": 0,
                             "SP5": 0,
                             "EFs": 200_000,
+                            "emergency": 0,
                             "total": 1_700_000,
                         },
                         "IFRC Secretariat": {
@@ -194,6 +206,7 @@ def _payload():
                             "SP4": 0,
                             "SP5": 0,
                             "EFs": 0,
+                            "emergency": 30_000_000,
                             "total": 100_000,
                         },
                     },
@@ -225,9 +238,13 @@ def _payload():
         },
         "support": [
             {
+                "ns_id": 7,
                 "name": "Netherlands Red Cross",
+                "year": 2026,
                 "funding_display": "1.2M",
+                "confirmed_display": "",
                 "areas": {"SP1": True, "SP2": False, "SP3": True, "SP4": False, "SP5": False, "EFs": True},
+                "area_amounts": {"SP1": 1_200_000, "SP3": None, "EFs": None},
             }
         ],
         "emergencies": [],
@@ -240,9 +257,9 @@ def test_render_in_support_header():
     html = render_dashboard_html(_payload(), "in_support")
     assert "In support of Uganda Red Cross Society" in html
     assert "IN SUPPORT OF UGANDA RED CROSS SOCIETY" not in html
-    assert html.find("National Society branches") < html.find("National Society staff")
-    assert html.find("National Society staff") < html.find("National Society volunteers")
-    assert html.find("National Society volunteers") < html.find("National Society local units")
+    assert html.find("Branches") < html.find("Staff")
+    assert html.find("Staff") < html.find("Volunteers")
+    assert html.find("Volunteers") < html.find("Local units")
     assert "&lt;" not in html
     assert "26,000" in html
     assert "icons/kpi-independence.png" in html
@@ -306,7 +323,12 @@ def test_render_reach_and_support():
     support = render_dashboard_html(_payload(), "support")
     assert "Netherlands Red Cross" in html or "Netherlands Red Cross" in support
     assert "Participating National Societies bilateral support" in support
-    assert "upr-dot--on" in support
+    assert "upr-dot--on" not in support
+    assert "upr-support-fill--on" in support
+    assert "upr-support-table--plan" in support
+    assert ">Year</th>" in support
+    assert "Confirmed Funding" in support
+    assert "2026" in support
     assert "Funding Requirement" in support
     report_payload = _payload()
     report_payload["meta"]["kind"] = "report"
@@ -326,6 +348,10 @@ def test_render_reach_and_support():
     assert "upr-num" in report_html
     assert "<tfoot>" in report_html
     assert "upr-support-totals" not in report_html
+    assert "upr-dot--on" in report_html
+    assert "upr-support-fill--on" not in report_html
+    assert ">Year</th>" not in report_html
+    assert "Confirmed Funding" not in report_html
     empty_funding = _payload()
     empty_funding["support"][0]["funding_display"] = ""
     empty_html = render_dashboard_html(empty_funding, "support")
@@ -337,10 +363,86 @@ def test_render_reach_and_support():
 
 
 @pytest.mark.unit
+def test_support_table_uses_spef_dot_colors():
+    payload = _payload()
+    payload["meta"]["kind"] = "report"
+    payload["support"][0]["areas"] = {
+        "SP1": True,
+        "SP2": True,
+        "SP3": True,
+        "SP4": True,
+        "SP5": True,
+        "EFs": True,
+    }
+    html = render_dashboard_html(payload, "support")
+    assert "upr-dot--on" in html
+    assert "upr-support-fill--on" not in html
+    for code, color in SUPPORT_DOT_COLORS.items():
+        assert f"background:{color}" in html, code
+    assert "#6ba543" not in html
+    assert "#e30613" not in html
+
+
+@pytest.mark.unit
+def test_plan_support_fills_cells_and_years():
+    payload = _payload()
+    payload["support"] = [
+        {
+            "ns_id": 1,
+            "name": "British Red Cross",
+            "year": 2026,
+            "funding_display": "1M",
+            "confirmed_display": "400,000",
+            "confirmed": 400_000,
+            "areas": {"SP1": True, "SP2": False, "SP3": False, "SP4": False, "SP5": False, "EFs": False},
+            "area_amounts": {"SP1": 1_000_000},
+        },
+        {
+            "ns_id": 1,
+            "name": "British Red Cross",
+            "year": 2027,
+            "funding_display": "2M",
+            "confirmed_display": "",
+            "areas": {"SP1": True, "SP2": False, "SP3": False, "SP4": False, "SP5": False, "EFs": False},
+            "area_amounts": {},
+        },
+        {
+            "ns_id": 49,
+            "name": "Danish Red Cross",
+            "year": 2026,
+            "funding_display": "5.2M",
+            "confirmed_display": "",
+            "areas": {"SP1": True, "SP2": True, "SP3": True, "SP4": True, "SP5": True, "EFs": True},
+            "area_amounts": {},
+        },
+    ]
+    payload["support_total"] = {"value": 8_200_000, "display": "8.2M"}
+    html = render_dashboard_html(payload, "support")
+    assert "rowspan='2'" in html
+    assert html.count("British Red Cross") == 1
+    assert html.count("Danish Red Cross") == 1
+    assert ">2026<" in html or "2026" in html
+    assert "2027" in html
+    assert "upr-support-fill--on" in html
+    assert "upr-dot--on" not in html
+    assert ">-</td>" in html
+    assert "1M" in html
+    assert "400,000" in html
+    assert "CHF 8.2M" in html
+    for color in SUPPORT_DOT_COLORS.values():
+        assert f"background:{color}" in html
+
+
+@pytest.mark.unit
 def test_render_plan_combined_matches_inp_cover():
     html = render_dashboard_html(_payload(), "combined")
+    assert "upr-doc-header" in html
+    assert "/static/IFRC_logo_square.svg" in html
+    assert "upr-doc-header__logo" in html
+    assert "ns-logo" not in html
     assert "UGANDA" in html
     assert "2026-2028 IFRC network country plan" in html
+    assert "2 July 2026" in html
     assert "In support of Uganda Red Cross Society" in html
     assert "People to be reached in 2026" in html
     assert "IFRC network Funding Requirements" in html
@@ -349,11 +451,22 @@ def test_render_plan_combined_matches_inp_cover():
     assert "Projected funding requirements" in html
     assert "19.1M CHF" in html
     assert "Participating National Societies" in html
-    assert "IFRC Network-Supported Activities" in html
+    assert "Detailed funding requirements" in html
+    assert "IFRC Network-Supported Activities" not in html
     assert "Enabling local actors" in html
     assert "FINANCIAL OVERVIEW" not in html
     assert "Strategic Priorities" not in html
     assert html.count("upr-combined-section") >= 6
+
+
+@pytest.mark.unit
+def test_render_combined_includes_ns_logo_when_src_set():
+    payload = _payload()
+    payload["meta"]["ns_logo_src"] = "/api/v1/uploads/ns/UGA.png"
+    html = render_dashboard_html(payload, "combined")
+    assert "upr-doc-header__ns-logo" in html
+    assert "/api/v1/uploads/ns/UGA.png" in html
+    assert "upr-doc-header__logo" in html
 
 
 @pytest.mark.unit
@@ -362,11 +475,22 @@ def test_render_report_combined_keeps_tableau_overview():
     payload["meta"]["kind"] = "report"
     payload["meta"]["header_prefix"] = "IN SUPPORT OF"
     payload["meta"]["people_title"] = "People reached"
+    payload["meta"]["document_subtitle"] = "2025 IFRC network annual report, Jan-Dec"
+    payload["meta"]["header_date"] = "2 July 2026"
     html = render_dashboard_html(payload, "combined")
     assert "IN SUPPORT OF UGANDA RED CROSS SOCIETY" in html
+    assert "upr-doc-header" in html
+    assert "AFGHANISTAN" not in html
+    assert "UGANDA" in html
+    assert "2025 IFRC network annual report, Jan-Dec" in html
+    assert "/static/IFRC_logo_square.svg" in html
+    assert "upr-doc-header__logo" in html
+    assert html.count("upr-doc-header__logo") == 1
     assert "FINANCIAL OVERVIEW" in html
     assert "IFRC network Funding Requirements" not in html
     assert "2026-2028 IFRC network country plan" not in html
+    in_support = render_dashboard_html(payload, "in_support")
+    assert "upr-doc-header" not in in_support
 
 
 @pytest.mark.unit
@@ -385,6 +509,33 @@ def test_render_dashboards_html_includes_each_chip():
     assert "FINANCIAL OVERVIEW" not in by_id["financial"]
     assert "Host National Society" in by_id["network_funding"]
     assert "upr-dashboard--combined" in by_id["combined"]
+
+
+@pytest.mark.unit
+def test_render_plan_network_funding_matches_tableau_detail():
+    html = render_dashboard_html(_payload(), "network_funding")
+    assert "Detailed funding requirements" in html
+    assert "IFRC Network-Supported Activities" not in html
+    assert "Longer-term needs in Swiss francs" not in html
+    assert "upr-detail-fund-wrap" in html
+    assert html.find("Ongoing emergencies") < html.find("Longer-term needs")
+    assert html.find("Longer-term needs") < html.find("Climate and environment")
+    assert html.find("Climate and environment") < html.find("Disasters &amp; crises")
+    assert html.find("Disasters &amp; crises") < html.find("Health &amp; wellbeing")
+    assert html.find("Values, power &amp; inclusion") < html.find("Enabling local actors")
+    assert html.find("Enabling local actors") < html.find("Total")
+    assert "upr-detail-fund__child" in html
+    assert "upr-detail-fund__pill" in html
+    assert "30M" in html
+    assert "1.7M" in html
+    assert "30.1M" in html
+    climate = html.find("Climate and environment")
+    emergencies = html.find("Ongoing emergencies")
+    child_slice = html[climate:html.find("Enabling local actors")]
+    assert "upr-detail-fund__pill" not in child_slice
+    assert "upr-detail-fund__pill" in html[emergencies:climate]
+    assert "upr-netfund-year" not in html
+    assert ">2027<" not in html
 
 
 @pytest.mark.unit
@@ -514,13 +665,33 @@ def test_render_report_financial_breakdown():
 def test_render_strategic_priority_bars():
     payload = _payload()
     payload["core_indicators"] = [
-        {"code": "SP1", "label": "People reached with climate activities", "value": 50000, "display": "50,000", "kind": "number"},
-        {"code": "SP2", "label": "People reached with livelihoods support", "value": 12000, "display": "12,000", "kind": "number"},
+        {"code": "SP1", "label": "People reached with climate activities", "value": 1_573_911, "display": "1,573,911", "kind": "number"},
+        {"code": "SP2", "label": "People reached with livelihoods support", "value": 58_264, "display": "58,264", "kind": "number"},
     ]
     html = render_dashboard_html(payload, "strategic_priorities")
     assert "Strategic Priorities" in html
     assert "upr-bar-fill" in html
     assert "People reached with climate activities" in html
+    assert "width:100.0%" in html
+    assert "width:3.7%" in html
+    assert html.count("width:100.0%") == 1
+
+
+@pytest.mark.unit
+def test_emergency_title_is_code_slash_name():
+    payload = _payload()
+    payload["meta"]["kind"] = "report"
+    payload["emergencies"] = [
+        {
+            "slot": 1,
+            "name": "Afghanistan Earthquake",
+            "code": "MDRAF007",
+            "indicators": [],
+        }
+    ]
+    html = render_dashboard_html(payload, "emergency_1")
+    assert "<span class='upr-code'>MDRAF007</span> / Afghanistan Earthquake" in html
+    assert "Afghanistan Earthquake <span" not in html
 
 
 @pytest.mark.unit

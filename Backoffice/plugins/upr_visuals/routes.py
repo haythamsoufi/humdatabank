@@ -44,6 +44,7 @@ def static_file(filename: str):
 
 @bp.route("/upr-visuals/assignment/<int:aes_id>", methods=["GET"])
 @login_required
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_payload(aes_id: int):
     try:
         _aes_or_404(aes_id)
@@ -67,6 +68,7 @@ def assignment_payload(aes_id: int):
 
 @bp.route("/upr-visuals/assignment/<int:aes_id>/report", methods=["GET"])
 @login_required
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_report(aes_id: int):
     try:
         _aes_or_404(aes_id)
@@ -83,6 +85,7 @@ def assignment_report(aes_id: int):
 
 @bp.route("/upr-visuals/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
 @login_required
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_png(aes_id: int, dashboard_id: str):
     try:
         _aes_or_404(aes_id)
@@ -102,6 +105,7 @@ def assignment_png(aes_id: int, dashboard_id: str):
 
 @bp.route("/upr-visuals/assignment/<int:aes_id>/pdf/<dashboard_id>", methods=["GET"])
 @login_required
+@permission_required("admin.data_explore.upr_visuals")
 def assignment_pdf(aes_id: int, dashboard_id: str):
     try:
         _aes_or_404(aes_id)

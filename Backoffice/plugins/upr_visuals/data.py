@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -49,15 +51,20 @@ from plugins.upr_visuals.formatters import (
     format_chf,
     format_compact_chf,
     format_count,
+    format_header_date,
     period_to_round,
     planning_years,
     to_number,
     _year_token,
+    document_subtitle,
 )
 
 logger = logging.getLogger(__name__)
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
+_MYR26_IFRC_ACTUALS_PATH = _PLUGIN_DIR / "snapshots" / "myr26_ifrc_secretariat_actuals.json"
+# Snapshot overlay: drop noise, rounding crumbs, and negative IFRC actuals.
+_IFRC_ACTUALS_MIN_CHF = 1000.0
 # EO is not an SP/EF catalog code; use the plugin asset instead of the indicator bank.
 _PLUGIN_REACH_ICONS = {
     "EO": "icons/eo-emergency.png",
@@ -104,6 +111,13 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             "iso3": country.iso3 if country else "",
             "national_society": display_ns_name(ns.name if ns else country.name if country else ""),
             "year": (planning_years(period_name) or [None])[0],
+            "header_date": format_header_date(),
+            "document_subtitle": document_subtitle(kind, period_name),
+            "ns_logo_src": _ns_logo_src(
+                ns,
+                country.iso3 if country else "",
+                inline=inline_icons,
+            ),
         },
         "kpis": _build_kpis(items, by_item, kind=kind),
         "people_reached": [],
@@ -118,7 +132,12 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
     if kind == "plan":
         payload["people_reached"] = _plan_people_reached(items, by_item, period_name)
         payload["financial"] = _plan_financial(items, by_item, period_name)
-        payload["support"] = _plan_support(items, by_item)
+        payload["support"] = _plan_support(
+            items,
+            by_item,
+            period_name=period_name,
+            country_id=country.id if country else None,
+        )
         payload["meta"]["people_title"] = (
             f"People to be reached in {payload['meta']['year']}"
             if payload["meta"].get("year")
@@ -126,6 +145,7 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
         )
         payload["meta"]["support_title"] = "Participating National Societies bilateral support"
         payload["meta"]["support_funding_label"] = "Funding Requirement"
+        payload["meta"]["support_confirmed_label"] = "Confirmed Funding"
         payload["meta"]["header_prefix"] = "In support of"
         payload["meta"]["plan_years"] = planning_years(period_name)
     else:
@@ -136,6 +156,8 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             country_id=country.id if country else None,
             host_ns_id=ns.id if ns else None,
             period_name=period_name,
+            iso2=country.iso2 if country else None,
+            iso3=country.iso3 if country else None,
         )
         payload["support"] = _report_support(
             items,
@@ -630,6 +652,56 @@ def _inline_spef_icon(row) -> str:
         return ""
 
 
+def _inline_ns_logo(filename: str) -> str:
+    name = (filename or "").strip()
+    if not name:
+        return ""
+    try:
+        import base64
+        import mimetypes
+
+        from app.services.platform import storage_service as storage
+
+        data = storage.download(storage.SYSTEM, f"ns/{name}")
+        if not data:
+            return ""
+        mime = mimetypes.guess_type(name)[0] or "image/png"
+        return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+    except Exception:
+        return ""
+
+
+def _ns_logo_src(ns, iso3: str, *, inline: bool = False) -> str:
+    """Stored NS logo, else the public FDRS GitHub file for this ISO3."""
+    filename = (getattr(ns, "logo_filename", None) or "").strip() if ns else ""
+    if inline and filename:
+        data_uri = _inline_ns_logo(filename)
+        if data_uri:
+            return data_uri
+    if ns:
+        try:
+            from app.utils.sector_logo_urls import ns_logo_url
+
+            url = ns_logo_url(ns, via_api=True) or ns_logo_url(ns)
+            if url:
+                return url
+        except Exception:
+            try:
+                from app.utils.sector_logo_urls import ns_logo_url
+
+                url = ns_logo_url(ns) or ""
+                if url:
+                    return url
+            except Exception:
+                pass
+    try:
+        from app.utils.sector_logo_urls import github_ns_logo_url
+
+        return github_ns_logo_url(iso3) or ""
+    except Exception:
+        return ""
+
+
 def _remember_spef_icon(out: dict[str, str], code: str, src: str) -> None:
     out[code] = src
     alias = _spef_icon_alias(code)
@@ -708,6 +780,9 @@ def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
         cells = _matrix_cells(by_item.get(item.id) if item else None)
         grouped = _sum_funding_rows(cells)
         by_area = _sum_funding_by_area(cells)
+        buckets = _sum_funding_by_bucket(cells)
+        for entity, rec in by_area.items():
+            rec["emergency"] = float((buckets.get(entity) or {}).get("emergency") or 0)
         hns = grouped.get("HNS", 0.0)
         ifrc = grouped.get("IFRC Secretariat", 0.0)
         pns = grouped.get("PNS", 0.0)
@@ -779,13 +854,16 @@ def _report_financial(
     country_id: int | None = None,
     host_ns_id: int | None = None,
     period_name: str = "",
+    iso2: str | None = None,
+    iso3: str | None = None,
 ) -> dict[str, Any]:
     """Host NS figures from this T33 assignment, plus the Tableau main network block.
 
     Main IFRC-network visual (cross-submission):
     - Funding requirement → Unified Country Plan (template 24) for the same calendar year
     - PNS funding / expenditure → published T23 funding matrix, keyed by this host NS
-    - IFRC Secretariat funding → this T33 funding-sources matrix (item 1403)
+    - IFRC Secretariat Funding/Expenditure → MYR26 snapshot (System Financial Figures
+      table Final); other rounds stay unreported until a live IFRC actuals source exists
 
     National Society visual (same assignment): HNS funding sources, expenditure, SP breakdown.
     """
@@ -862,11 +940,15 @@ def _report_financial(
         except Exception:
             logger.exception("UPR visuals: failed to load T23 PNS funding for host NS %s", host_ns_id)
 
+    ifrc_actuals = ifrc_secretariat_actuals_for_report(
+        period_name=period_name, iso2=iso2, iso3=iso3
+    )
     network_entities = build_report_network_entities(
         plan_buckets,
         pns_funding=pns_reported.get("funding") or 0.0,
         pns_expenditure=pns_reported.get("expenditure") or 0.0,
         other_funding=by_entity.get("Other sources") or 0.0,
+        ifrc_actuals=ifrc_actuals,
     )
 
     return {
@@ -891,6 +973,7 @@ def _report_financial(
             "plan_aes_id": plan_meta.get("aes_id"),
             "plan_period": plan_meta.get("period_name"),
             "pns_assignments": pns_reported.get("assignments") or 0,
+            "ifrc_actuals_source": "myr26_ifrc_secretariat_actuals" if ifrc_actuals else None,
         },
     }
 
@@ -901,12 +984,15 @@ def build_report_network_entities(
     pns_funding: float = 0.0,
     pns_expenditure: float = 0.0,
     other_funding: float = 0.0,
+    ifrc_actuals: dict[str, dict[str, float]] | None = None,
 ) -> list[dict[str, Any]]:
     """Tableau Financial Overview (3) row groups.
 
     Country = full T24 requirement. IFRC Secretariat splits Longer-term / Emergency
-    Operations from the plan matrix (actuals are not stored on T33). PNS actuals
-    come from template 23. HNS other uses T24 HNS requirement + T33 other sources.
+    Operations from the plan matrix. MYR26 Funding/Expenditure come from the
+    System Financial Figures snapshot; other rounds leave actuals unreported.
+    PNS actuals come from template 23. HNS other uses T24 HNS requirement + T33
+    other sources.
     """
     empty = {"overall": 0.0, "longer_term": 0.0, "emergency": 0.0}
     hns = plan_buckets.get("HNS") or empty
@@ -925,7 +1011,7 @@ def build_report_network_entities(
         {
             "entity": "IFRC Secretariat",
             "label": FUNDING_ENTITY_LABELS["IFRC Secretariat"],
-            "buckets": _ifrc_network_buckets(ifrc),
+            "buckets": _ifrc_network_buckets(ifrc, actuals=ifrc_actuals),
         },
         {
             "entity": "PNS",
@@ -958,26 +1044,103 @@ def build_report_network_entities(
     ]
 
 
-def _ifrc_network_buckets(ifrc: dict[str, float]) -> list[dict[str, Any]]:
+def _ifrc_network_buckets(
+    ifrc: dict[str, float],
+    *,
+    actuals: dict[str, dict[str, float]] | None = None,
+) -> list[dict[str, Any]]:
     """Always emit Tableau's Longer-term / Emergency Operations split for IFRC Secretariat."""
     longer_val = ifrc.get("longer_term") or 0
     emergency_val = ifrc.get("emergency") or 0
     if not longer_val and not emergency_val:
         longer_val = ifrc.get("overall") or 0
+    longer_act = (actuals or {}).get("longer_term") or {}
+    emergency_act = (actuals or {}).get("emergency") or {}
     return [
         _network_bucket(
             "longer_term",
             "Longer-term",
             funding_requirement=longer_val or None,
+            funding=longer_act.get("funding"),
+            expenditure=longer_act.get("expenditure"),
             include_actuals=True,
         ),
         _network_bucket(
             "emergency",
             "Emergency Operations",
             funding_requirement=emergency_val or None,
+            funding=emergency_act.get("funding"),
+            expenditure=emergency_act.get("expenditure"),
             include_actuals=True,
         ),
     ]
+
+
+def ifrc_secretariat_actuals_for_report(
+    *,
+    period_name: str,
+    iso2: str | None = None,
+    iso3: str | None = None,
+) -> dict[str, dict[str, float]] | None:
+    """MYR26-only IFRC Secretariat Funding/Expenditure from the shipped snapshot."""
+    if period_to_round(period_name, "report") != "MYR26":
+        return None
+    rec = _myr26_ifrc_actuals_record(iso2=iso2, iso3=iso3)
+    if not rec:
+        return None
+    out: dict[str, dict[str, float]] = {}
+    for bucket in ("longer_term", "emergency"):
+        metrics = rec.get(bucket)
+        if not isinstance(metrics, dict) or not metrics:
+            continue
+        cleaned = {
+            key: number
+            for key in ("funding", "expenditure")
+            if (number := _usable_ifrc_actual(metrics.get(key))) is not None
+        }
+        if cleaned:
+            out[bucket] = cleaned
+    return out or None
+
+
+def _usable_ifrc_actual(value: Any) -> float | None:
+    """Keep IFRC snapshot amounts of at least 1,000 CHF; drop smaller and negatives."""
+    number = to_number(value)
+    if number is None or number < _IFRC_ACTUALS_MIN_CHF:
+        return None
+    return number
+
+
+@lru_cache(maxsize=1)
+def _myr26_ifrc_actuals_by_iso2() -> dict[str, dict[str, Any]]:
+    if not _MYR26_IFRC_ACTUALS_PATH.is_file():
+        return {}
+    try:
+        payload = json.loads(_MYR26_IFRC_ACTUALS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        logger.exception("UPR visuals: failed to load MYR26 IFRC Secretariat actuals snapshot")
+        return {}
+    by_iso2 = payload.get("by_iso2") if isinstance(payload, dict) else None
+    if not isinstance(by_iso2, dict):
+        return {}
+    return {str(key).strip().upper(): rec for key, rec in by_iso2.items() if rec}
+
+
+def _myr26_ifrc_actuals_record(*, iso2: str | None, iso3: str | None) -> dict[str, Any] | None:
+    catalog = _myr26_ifrc_actuals_by_iso2()
+    if not catalog:
+        return None
+    code2 = (iso2 or "").strip().upper()
+    if code2 and code2 in catalog:
+        rec = catalog[code2]
+        return rec if isinstance(rec, dict) else None
+    code3 = (iso3 or "").strip().upper()
+    if not code3:
+        return None
+    for rec in catalog.values():
+        if isinstance(rec, dict) and str(rec.get("iso3") or "").strip().upper() == code3:
+            return rec
+    return None
 
 
 def _network_bucket(
@@ -1232,12 +1395,35 @@ def _find_country_aes_for_year(
     return exact or yearly
 
 
-def _plan_support(items, by_item) -> list[dict[str, Any]]:
+def _plan_support(
+    items,
+    by_item,
+    *,
+    period_name: str = "",
+    country_id: int | None = None,
+) -> list[dict[str, Any]]:
     item = _resolve_item(items, PLAN_LABEL_NEEDLES["support"], PLAN_ITEM_FALLBACKS["support"])
-    rows = _support_from_cells(_matrix_cells(by_item.get(item.id) if item else None), planned=True)
-    funding_item = _resolve_funding_year_item(items, 0, PLAN_ITEM_FALLBACKS["funding_y0"])
-    amounts = pns_funding_from_plan_cells(_matrix_cells(by_item.get(funding_item.id) if funding_item else None))
-    return _extend_support_with_funding(_apply_support_funding(rows, amounts), amounts)
+    tick_rows = _support_from_cells(_matrix_cells(by_item.get(item.id) if item else None), planned=True)
+    years = planning_years(period_name) or []
+    year_totals: dict[int, dict[int, float]] = {}
+    year_areas: dict[int, dict[int, dict[str, float]]] = {}
+    for offset, year in enumerate(years):
+        fallback_key = f"funding_y{offset}"
+        fallback_id = PLAN_ITEM_FALLBACKS.get(fallback_key)
+        fund_item = _resolve_funding_year_item(items, offset, fallback_id) if fallback_id else None
+        cells = _matrix_cells(by_item.get(fund_item.id) if fund_item else None)
+        year_totals[year] = pns_funding_from_plan_cells(cells)
+        year_areas[year] = pns_area_funding_from_plan_cells(cells)
+    confirmed: dict[int, float] = {}
+    if country_id and years:
+        try:
+            confirmed = _load_t22_funding_by_pns(int(country_id), period_name, years[0])
+        except Exception:
+            logger.exception(
+                "UPR visuals: failed to load T22 confirmed PNS funding for host country %s",
+                country_id,
+            )
+    return _expand_plan_support_years(tick_rows, year_totals, year_areas, confirmed, years)
 
 
 def _report_support(
@@ -1318,6 +1504,104 @@ def _is_support_funding_column(col: str | None) -> bool:
     if not text or "expend" in text or "transfer" in text:
         return False
     return text in {"total", "row_total"} or "funding" in text
+
+
+def pns_area_funding_from_plan_cells(cells: dict[str, Any]) -> dict[int, dict[str, float]]:
+    """Per-PNS Strategic Priority / Enabling Functions amounts from a T24 funding matrix."""
+    grouped: dict[int, dict[str, float]] = {}
+    for key, raw in cells.items():
+        number = to_number(_resolve_matrix_cell(raw))
+        if not number:
+            continue
+        row, col = _split_cell_key(key)
+        try:
+            ns_id = int(row)
+        except (TypeError, ValueError):
+            continue
+        code = _funding_area_code(col)
+        if not code:
+            continue
+        rec = grouped.setdefault(ns_id, {area: 0.0 for area in SUPPORT_AREA_CODES})
+        rec[code] = rec.get(code, 0.0) + number
+    return grouped
+
+
+def _expand_plan_support_years(
+    tick_rows: list[dict[str, Any]],
+    year_totals: dict[int, dict[int, float]],
+    year_areas: dict[int, dict[int, dict[str, float]]],
+    confirmed: dict[int, float],
+    years: list[int],
+) -> list[dict[str, Any]]:
+    """One row per National Society × plan year that has ticks or funding."""
+    by_ns = {int(row["ns_id"]): row for row in tick_rows if row.get("ns_id") is not None}
+    all_ids: set[int] = set(by_ns)
+    for totals in year_totals.values():
+        all_ids.update(int(ns_id) for ns_id in totals)
+    for areas in year_areas.values():
+        all_ids.update(int(ns_id) for ns_id in areas)
+    all_ids.update(int(ns_id) for ns_id in confirmed)
+    names = {int(row["ns_id"]): row["name"] for row in tick_rows if row.get("ns_id") is not None}
+    missing = [ns_id for ns_id in all_ids if ns_id not in names]
+    names.update({int(ns_id): display_ns_name(label) for ns_id, label in _ns_names(missing).items()})
+    empty_areas = {code: False for code in SUPPORT_AREA_CODES}
+    year_list = list(years) or [None]
+    first_year = year_list[0]
+    rows: list[dict[str, Any]] = []
+    for ns_id in all_ids:
+        tick = by_ns.get(ns_id) or {}
+        areas = tick.get("areas") or dict(empty_areas)
+        name = display_ns_name(names.get(ns_id) or str(ns_id))
+        active_years = []
+        for year in year_list:
+            total = float((year_totals.get(year) or {}).get(ns_id) or 0)
+            area_amt = (year_areas.get(year) or {}).get(ns_id) or {}
+            if total or any(area_amt.values()):
+                active_years.append(year)
+        if not active_years:
+            if any(areas.get(code) for code in SUPPORT_AREA_CODES) or confirmed.get(ns_id) or tick.get("funding"):
+                active_years = [first_year]
+        for year in active_years:
+            total = float((year_totals.get(year) or {}).get(ns_id) or 0)
+            if not total and year == first_year:
+                total = float(tick.get("funding") or 0)
+            area_amt = (year_areas.get(year) or {}).get(ns_id) or {}
+            conf = float(confirmed.get(ns_id) or 0) if year == first_year else 0.0
+            rows.append(
+                {
+                    "ns_id": int(ns_id),
+                    "name": name,
+                    "year": year,
+                    "funding": total or None,
+                    "funding_display": format_compact_chf(total) if total else "",
+                    "confirmed": conf or None,
+                    "confirmed_display": format_compact_chf(conf) if conf else "",
+                    "areas": {code: bool(areas.get(code)) for code in SUPPORT_AREA_CODES}
+                    | {"multilateral": bool(areas.get("multilateral"))},
+                    "area_amounts": {
+                        code: (float(area_amt[code]) if area_amt.get(code) else None)
+                        for code in SUPPORT_AREA_CODES
+                    },
+                    "multilateral_only": bool(
+                        tick.get("multilateral_only")
+                        or (areas.get("multilateral") and not any(areas.get(code) for code in SUPPORT_AREA_CODES))
+                    ),
+                }
+            )
+    for rec in tick_rows:
+        if rec.get("ns_id") is not None:
+            continue
+        rows.append(
+            {
+                **rec,
+                "year": first_year,
+                "confirmed": None,
+                "confirmed_display": "",
+                "area_amounts": {code: None for code in SUPPORT_AREA_CODES},
+            }
+        )
+    rows.sort(key=lambda row: ((row.get("name") or "").lower(), int(row.get("year") or 0)))
+    return rows
 
 
 def pns_funding_from_plan_cells(cells: dict[str, Any]) -> dict[int, float]:
@@ -1836,7 +2120,10 @@ def list_assigned_forms_for_bulk() -> list[dict[str, Any]]:
     rows = (
         AssignedForm.query.options(joinedload(AssignedForm.template))
         .filter(AssignedForm.template_id.in_(UPR_VISUAL_TEMPLATE_IDS))
-        .order_by(AssignedForm.period_name.desc(), AssignedForm.id.desc())
+        .order_by(
+            AssignedForm.assigned_at.desc().nullslast(),
+            AssignedForm.id.desc(),
+        )
         .all()
     )
     return [

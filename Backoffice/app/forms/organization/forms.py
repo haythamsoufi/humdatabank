@@ -1,5 +1,6 @@
 """WTForms for organization admin CRUD."""
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField
 from wtforms import StringField, TextAreaField, BooleanField, IntegerField, SelectField, DateField
 from wtforms.validators import DataRequired, Optional, Length
 
@@ -36,6 +37,10 @@ class NationalSocietyForm(FlaskForm):
     country_id = SelectField('Country', coerce=int, validators=[DataRequired()])
     is_active = BooleanField('Active', default=True)
     display_order = IntegerField('Display Order', validators=[Optional()])
+    logo_file = FileField(
+        'Logo (PNG, JPG, GIF, WEBP)',
+        validators=[Optional(), FileAllowed(['png', 'jpg', 'jpeg', 'gif', 'webp'], 'Images only')],
+    )
 
     def __init__(self, *args, **kwargs):
         add_translation_fields(self.__class__, 'name', 'National Society Name', 255)

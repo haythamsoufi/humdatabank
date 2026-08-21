@@ -6,7 +6,11 @@ from typing import Dict, List, Optional
 from flask import current_app, request
 from app.models import db, FormItem
 from app.utils.plugin_data_processor import plugin_data_processor
-from app.services.forms.processors._common import get_english_field_name
+from app.services.forms.processors._common import (
+    get_english_field_name,
+    decode_b64_matrix_json,
+    MatrixJsonDecodeError,
+)
 from app.services.monitoring.debug import debug_manager
 
 logger = debug_manager.get_logger(__name__)
@@ -32,9 +36,10 @@ class PluginProcessorMixin:
                 if not plugin_data_processor.plugin_manager and hasattr(current_app, 'plugin_manager'):
                     plugin_data_processor.initialize(current_app.plugin_manager)
 
-                # Get the field value from request
+                # Get the field value from request (client may base64-encode to avoid WAF blocks,
+                # same convention as matrix fields)
                 field_name = f'field_value[{plugin_field.id}]'
-                field_value = request.form.get(field_name, '')
+                field_value = decode_b64_matrix_json(request.form.get(field_name, ''))
 
                 cls._log_verbose(f"Processing plugin field {field_name}: {field_value}")
 
@@ -53,6 +58,14 @@ class PluginProcessorMixin:
                     validation_errors.append(f"Plugin field '{plugin_field.label}': {error_message}")
                     logger.error(f"Plugin field validation failed: {error_message}")
 
+            except MatrixJsonDecodeError as e:
+                # Raised before _save_plugin_field_data runs, so any previously saved
+                # value for this field is left untouched — see decode_b64_matrix_json.
+                logger.error(f"Plugin field {plugin_field.id}: {e}")
+                validation_errors.append(
+                    f"Plugin field '{plugin_field.label}': submitted data could not be decoded. "
+                    "Refresh the page and try again."
+                )
             except Exception as e:
                 logger.error(f"Error processing plugin field {plugin_field.id}: {e}", exc_info=True)
                 validation_errors.append(f"Plugin field '{plugin_field.label}': Processing error")

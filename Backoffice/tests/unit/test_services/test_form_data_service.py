@@ -1424,3 +1424,189 @@ class TestUpdateIndicatorEntry:
             FormDataService._update_indicator_entry(entry, indicator, "100", False, True)
             entry.set_simple_value.assert_not_called()
             entry.set_disaggregated_data.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FormDataService._process_matrix_data — field-level base64 WAF workaround
+#
+# field_value[id] may be posted as "b64:<base64 utf-8 json>" to dodge Application
+# Gateway WAF false positives on matrix JSON (see
+# docs/runbooks/incidents/waf-403-form-payload-refactor-guide.md). A corrupted
+# payload must raise MatrixJsonDecodeError and be treated as a hard failure —
+# never silently coerced to "field cleared", which would wipe previously-saved
+# data (see decode_b64_matrix_json docstring for the rollout-hazard rationale).
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProcessMatrixDataB64Safety:
+    def _make_matrix(self, item_id=42, label="Funding Matrix"):
+        matrix = MagicMock()
+        matrix.id = item_id
+        matrix.label = label
+        matrix.config = {}
+        matrix.is_required = False
+        return matrix
+
+    def _b64(self, json_str):
+        import base64
+        return 'b64:' + base64.b64encode(json_str.encode('utf-8')).decode('ascii')
+
+    def test_valid_b64_payload_is_decoded_and_saved(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        matrix = self._make_matrix()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(disagg_data={"old_col": 1})
+        payload = self._b64('{"1_col": 5}')
+
+        with app.test_request_context(
+            '/test', method='POST', data={f'field_value[{matrix.id}]': payload}
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                changes = FormDataService._process_matrix_data(matrix, aes, validation_errors)
+
+        assert validation_errors == []
+        assert existing_entry.disagg_data == {"1_col": 5}
+        assert len(changes) == 1
+
+    def test_raw_json_without_b64_prefix_still_works(self, app):
+        """Backwards compatibility: older cached JS / offline draft resubmits post raw JSON."""
+        from app.services.forms.data_service import FormDataService
+
+        matrix = self._make_matrix()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(disagg_data=None)
+
+        with app.test_request_context(
+            '/test', method='POST', data={f'field_value[{matrix.id}]': '{"1_col": 7}'}
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                FormDataService._process_matrix_data(matrix, aes, validation_errors)
+
+        assert validation_errors == []
+        assert existing_entry.disagg_data == {"1_col": 7}
+
+    def test_corrupted_b64_payload_preserves_existing_data_and_reports_error(self, app):
+        """The core safety guarantee: a decode failure must NOT wipe existing data."""
+        from app.services.forms.data_service import FormDataService
+
+        matrix = self._make_matrix()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(disagg_data={"1_col": 999})
+
+        with app.test_request_context(
+            '/test', method='POST',
+            data={f'field_value[{matrix.id}]': 'b64:not-valid-base64!!!'},
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                changes = FormDataService._process_matrix_data(matrix, aes, validation_errors)
+
+        # Existing data must be untouched (not wiped to None) and the caller
+        # must be told the save failed rather than getting a false "success".
+        assert existing_entry.disagg_data == {"1_col": 999}
+        assert changes == []
+        assert len(validation_errors) == 1
+        assert "could not be decoded" in validation_errors[0]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RepeatGroupProcessorMixin._process_repeat_matrix_data_comprehensive — same
+# base64 convention. Unlike the top-level matrix path, returning None here is
+# already safe: the caller only writes a RepeatGroupData row when
+# should_create_data_availability_entry() is True, so None = "no meaningful
+# data" = existing row left untouched (verified against processing_service.py).
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProcessRepeatMatrixDataB64Safety:
+    def _b64(self, json_str):
+        import base64
+        return 'b64:' + base64.b64encode(json_str.encode('utf-8')).decode('ascii')
+
+    def _make_field(self, item_id=7):
+        field = MagicMock()
+        field.id = item_id
+        return field
+
+    def test_valid_b64_payload_is_decoded(self, app):
+        from app.services.forms.data_service import FormDataService
+        field = self._make_field()
+        field_values = {'field_0_1': self._b64('{"row1_col": 3}')}
+        with app.app_context():
+            result = FormDataService._process_repeat_matrix_data_comprehensive(field, field_values, 0)
+        assert result == {"row1_col": 3}
+
+    def test_corrupted_b64_returns_none_instead_of_raising(self, app):
+        from app.services.forms.data_service import FormDataService
+        field = self._make_field()
+        field_values = {'field_0_1': 'b64:not-valid-base64!!!'}
+        with app.app_context():
+            result = FormDataService._process_repeat_matrix_data_comprehensive(field, field_values, 0)
+        # None => should_create_data_availability_entry() is False => caller
+        # leaves any existing RepeatGroupData row untouched (no silent wipe).
+        assert result is None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PluginProcessorMixin._process_plugin_fields — same base64 convention applied
+# to plugin field JSON (e.g. emergency_operations), which independently calls
+# json.loads() on field_value[id] via plugin_data_processor.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProcessPluginFieldsB64Safety:
+    def _b64(self, json_str):
+        import base64
+        return 'b64:' + base64.b64encode(json_str.encode('utf-8')).decode('ascii')
+
+    def _make_plugin_field(self, item_id=55, label="Emergency Operation"):
+        field = MagicMock()
+        field.id = item_id
+        field.label = label
+        field.item_type = 'plugin_emergency_operations'
+        return field
+
+    def test_corrupted_b64_reports_error_and_skips_save(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        plugin_field = self._make_plugin_field()
+        aes = _make_mock_oes()
+
+        with app.test_request_context(
+            '/test', method='POST',
+            data={f'field_value[{plugin_field.id}]': 'b64:not-valid-base64!!!'},
+        ):
+            with patch.object(FormDataService, '_save_plugin_field_data') as mock_save:
+                validation_errors = []
+                FormDataService._process_plugin_fields(
+                    section=MagicMock(id=1),
+                    assignment_entity_status=aes,
+                    validation_errors=validation_errors,
+                    plugin_fields=[plugin_field],
+                )
+
+        # Must never reach the save step with a garbage/undecoded value.
+        mock_save.assert_not_called()
+        assert len(validation_errors) == 1
+        assert "could not be decoded" in validation_errors[0]

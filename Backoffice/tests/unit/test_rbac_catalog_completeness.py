@@ -195,3 +195,64 @@ class TestRbacCatalogHasNoDuplicateCodes:
             "A plugin's get_seed_roles() must not reuse a core or another "
             "plugin's role code."
         )
+
+
+class TestBaselineRolesPreserveMigrationBackfilledPermissions:
+    """
+    RBAC review finding: `add_reports_permissions` and
+    `add_validation_admin_permissions` (migrations/versions/) each backfilled
+    extra permissions directly onto an *existing* baseline role's
+    `rbac_role_permission` rows -- to avoid an abrupt access loss for current
+    holders when Reports/Validation split off of Analysis/Compliance as
+    separate permissions. Neither migration touched `_baseline_roles()`.
+
+    seed_rbac_permissions_and_roles()'s reconciliation step deletes any
+    rbac_role_permission link for a *catalog* permission that isn't in that
+    role's `permission_codes` (see the "Remove stale" loop). Since both
+    backfilled codes ARE core catalog permissions, omitting them from these
+    two roles' `permission_codes` doesn't just leave them unseeded -- it
+    makes the every seed run (which, since entrypoint.sh now runs `flask
+    rbac seed` unconditionally on every deploy, means "the next deploy")
+    actively delete the migration's grant out from under existing role
+    holders.
+
+    This test pins the fix so it can't regress silently: someone tidying up
+    `_baseline_roles()` without this context would otherwise have no signal
+    that trimming these "unrelated-looking" codes off of
+    admin_data_explorer_analysis / admin_data_explorer_compliance re-creates
+    a real production access-loss bug.
+    """
+
+    def test_analysis_role_keeps_backfilled_reports_permissions(self, app):
+        core_permissions, extension_permissions, baseline_roles, _ = _full_catalog(app)
+        roles_by_code = {str(r.get("code")): r for r in baseline_roles}
+        role = roles_by_code.get("admin_data_explorer_analysis")
+        assert role is not None, "admin_data_explorer_analysis role definition is missing from _baseline_roles()"
+
+        codes = set(role.get("permission_codes") or [])
+        missing = {"admin.reports.view", "admin.reports.edit"} - codes
+        assert not missing, (
+            f"admin_data_explorer_analysis is missing {sorted(missing)}. These were "
+            "backfilled onto this role by the add_reports_permissions migration "
+            "and must stay in its permission_codes or `flask rbac seed` will "
+            "delete them from existing role holders."
+        )
+
+    def test_compliance_role_keeps_backfilled_validation_permissions(self, app):
+        core_permissions, extension_permissions, baseline_roles, _ = _full_catalog(app)
+        roles_by_code = {str(r.get("code")): r for r in baseline_roles}
+        role = roles_by_code.get("admin_data_explorer_compliance")
+        assert role is not None, "admin_data_explorer_compliance role definition is missing from _baseline_roles()"
+
+        codes = set(role.get("permission_codes") or [])
+        missing = {
+            "admin.validation.dashboard",
+            "admin.validation.questions",
+            "admin.validation.rules",
+        } - codes
+        assert not missing, (
+            f"admin_data_explorer_compliance is missing {sorted(missing)}. These "
+            "were backfilled onto this role by the add_validation_admin_permissions "
+            "migration and must stay in its permission_codes or `flask rbac seed` "
+            "will delete them from existing role holders."
+        )

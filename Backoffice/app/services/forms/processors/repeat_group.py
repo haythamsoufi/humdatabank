@@ -16,7 +16,11 @@ from app.services.forms.processing_service import (
     get_form_items_for_section,
     should_create_data_availability_entry as unified_should_create,
 )
-from app.services.forms.processors._common import get_english_field_name, decode_b64_matrix_json
+from app.services.forms.processors._common import (
+    get_english_field_name,
+    decode_b64_matrix_json,
+    MatrixJsonDecodeError,
+)
 from app.services.monitoring.debug import debug_manager, performance_monitor
 
 logger = debug_manager.get_logger(__name__)
@@ -720,7 +724,15 @@ class RepeatGroupProcessorMixin:
         # Matrix data is stored in the hidden field: field_{field_index}_1
         # The first input (index 0) is the search input, the second (index 1) is the hidden field
         matrix_data_key = f'field_{field_index}_1'
-        matrix_data_json = decode_b64_matrix_json(field_values.get(matrix_data_key, ''))
+        try:
+            matrix_data_json = decode_b64_matrix_json(field_values.get(matrix_data_key, ''))
+        except MatrixJsonDecodeError as e:
+            # Returning None here is safe (not a silent wipe): the caller only
+            # updates/creates a RepeatGroupData row when has_meaningful_data is
+            # True (see should_create_data_availability_entry), so a None here
+            # simply leaves any previously-saved entry untouched.
+            logger.error(f"Repeat matrix field {field.id}: {e}")
+            return None
 
         cls._log_verbose(f"Matrix data key: {matrix_data_key}, value: {matrix_data_json}")
 

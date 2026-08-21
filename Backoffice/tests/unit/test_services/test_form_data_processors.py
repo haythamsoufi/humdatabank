@@ -1,8 +1,49 @@
 """Unit tests for form data processor mixins split from data_service."""
+import base64
 import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+class TestDecodeB64MatrixJson:
+    """WAF workaround: field_value[id] may arrive as ``b64:<base64 utf-8 json>``.
+
+    See Backoffice/docs/runbooks/incidents/waf-403-form-payload-refactor-guide.md
+    (field-level b64: convention) for why this exists and its safe-failure contract.
+    """
+
+    def _b64(self, s: str) -> str:
+        return 'b64:' + base64.b64encode(s.encode('utf-8')).decode('ascii')
+
+    def test_passthrough_for_empty_value(self):
+        from app.services.forms.processors._common import decode_b64_matrix_json
+        assert decode_b64_matrix_json('') == ''
+        assert decode_b64_matrix_json(None) is None
+
+    def test_passthrough_for_raw_json_without_prefix(self):
+        """Backwards compatibility with older cached JS / offline draft resubmits."""
+        from app.services.forms.processors._common import decode_b64_matrix_json
+        raw = '{"1_Total Funding": 123.12}'
+        assert decode_b64_matrix_json(raw) == raw
+
+    def test_decodes_valid_b64_prefixed_json(self):
+        from app.services.forms.processors._common import decode_b64_matrix_json
+        original = '{"4_EFs": 0, "4_Total Funding": 123.12}'
+        assert decode_b64_matrix_json(self._b64(original)) == original
+
+    def test_decodes_non_ascii_row_names(self):
+        """Matches the encoder's unescape(encodeURIComponent(...)) + btoa() round-trip."""
+        from app.services.forms.processors._common import decode_b64_matrix_json
+        original = json.dumps({"Société Nationale_Funding": 5})
+        assert decode_b64_matrix_json(self._b64(original)) == original
+
+    def test_raises_matrix_json_decode_error_on_corrupted_payload(self):
+        """Must raise (not silently return ''), or callers could mistake corruption
+        for an intentionally-cleared field and wipe previously-saved data."""
+        from app.services.forms.processors._common import decode_b64_matrix_json, MatrixJsonDecodeError
+        with pytest.raises(MatrixJsonDecodeError):
+            decode_b64_matrix_json('b64:not-valid-base64!!!')
 
 
 class TestProcessorMixinDelegation:

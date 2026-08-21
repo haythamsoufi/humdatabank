@@ -8,7 +8,7 @@
 # Upload strategy:
 #   1. AzCopy dry-run — discover files that differ from blob storage
 #   2. AzCopy sync    — upload only those files (azcopy sync has no --cache-control flag)
-#   3. az storage blob update — set Cache-Control on newly synced files only
+#   3. AzCopy set-properties (or az storage blob update) — Cache-Control metadata only
 #   4. az storage blob upload-batch — fallback when AzCopy is not installed
 #
 # Optional env:
@@ -17,7 +17,7 @@
 #   STATIC_STORAGE_ACCOUNT_NAME      override AccountName parsed from connection string
 #   STATIC_CONFIGURE_CORS=1          one-time blob CORS setup (account-level)
 #   STATIC_CORS_ORIGINS              space-separated origins when STATIC_CONFIGURE_CORS=1
-#   STATIC_FORCE_UPLOAD=1            skip dry-run short-circuit (full sync + cache-control on changed)
+#   STATIC_FORCE_UPLOAD=1            skip dry-run short-circuit (full sync + cache-control on container)
 
 set -euo pipefail
 
@@ -151,22 +151,46 @@ _collect_dry_run_files() {
   rm -f "$dry_out"
 }
 
+# Metadata-only Cache-Control. Never re-upload file bytes — that is what made
+# FORCE_STATIC_UPLOAD deploys take ~7 minutes (one `az storage blob upload`
+# progress bar per static file).
 _apply_cache_control_headers() {
   local list_file="$1"
-  local parallel count xargs_status
+  local dest="${2:-}"
+  local parallel count xargs_status dest_base dest_qs
 
   if [[ ! -s "$list_file" ]]; then
     echo "No files need Cache-Control metadata updates."
     return 0
   fi
 
-  parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
   count="$(grep -cve '^[[:space:]]*$' "$list_file" || true)"
-  echo "Setting Cache-Control on ${count} synced blob(s) (parallel=${parallel}) ..."
 
-  # Re-upload with --content-cache-control (AzCopy sync cannot set headers).
-  # Use the AzCopy dry-run file list — not git diff — so blob names match what was synced.
+  # Whole-container property update is one AzCopy call. Safe because this
+  # container holds only app static assets. Use it for force uploads or any
+  # large batch so CI does not issue hundreds of per-blob ARM calls.
+  if command -v azcopy >/dev/null 2>&1 && [[ -n "$dest" ]] \
+     && { [[ "${STATIC_FORCE_UPLOAD:-}" == "1" ]] || [[ "${count}" -ge 20 ]]; }; then
+    echo "Setting Cache-Control on container '${CONTAINER}' via AzCopy set-properties (recursive; ${count} synced file(s))."
+    azcopy set-properties "${dest}" \
+      --cache-control="${CACHE_CONTROL}" \
+      --recursive \
+      --log-level=WARNING \
+      --output-type=text
+    return 0
+  fi
+
+  parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
+  echo "Setting Cache-Control metadata on ${count} synced blob(s) (parallel=${parallel}) ..."
+
   export CONTAINER SOURCE_DIR CACHE_CONTROL AZURE_STORAGE_CONNECTION_STRING
+  dest_base=""
+  dest_qs=""
+  if [[ -n "$dest" ]]; then
+    dest_base="${dest%%\?*}"
+    dest_qs="${dest#*\?}"
+    export dest_base dest_qs
+  fi
 
   set +e
   tr -d '\r' < "$list_file" \
@@ -178,15 +202,24 @@ _apply_cache_control_headers() {
           echo "WARN: skipping Cache-Control for missing local file: ${rel}" >&2
           exit 0
         fi
-        if ! az storage blob upload \
+        if [[ -n "${dest_base:-}" ]] && command -v azcopy >/dev/null 2>&1; then
+          if ! azcopy set-properties "${dest_base}/${rel}?${dest_qs}" \
+            --cache-control="${CACHE_CONTROL}" \
+            --log-level=ERROR \
+            --output-type=text; then
+            echo "ERROR: Cache-Control set-properties failed for: ${rel}" >&2
+            exit 1
+          fi
+          exit 0
+        fi
+        if ! az storage blob update \
           --container-name "${CONTAINER}" \
-          --file "${local_file}" \
           --name "${rel}" \
           --content-cache-control "${CACHE_CONTROL}" \
           --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
-          --overwrite \
+          --only-show-errors \
           --output none; then
-          echo "ERROR: Cache-Control upload failed for: ${rel}" >&2
+          echo "ERROR: Cache-Control update failed for: ${rel}" >&2
           exit 1
         fi
       ' _ {}
@@ -237,7 +270,7 @@ _upload_with_azcopy() {
     --output-type=text
 
   tr -d '\r' < "$files_to_sync" | sed '/^[[:space:]]*$/d' | sort -u >"$cache_control_files"
-  _apply_cache_control_headers "$cache_control_files"
+  _apply_cache_control_headers "$cache_control_files" "${dest}"
 }
 
 _upload_with_az_cli() {
@@ -249,6 +282,7 @@ _upload_with_az_cli() {
     --content-cache-control "${CACHE_CONTROL}" \
     --max-connections 32 \
     --overwrite \
+    --only-show-errors \
     --output none
 }
 

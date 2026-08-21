@@ -129,6 +129,59 @@ Use this request template with IT:
 
 ---
 
+## Implemented Tactical Workaround: base64 Payload Encoding
+
+Everything above this section is the strategic "shrink/split the payload" plan.
+Separately, two **base64 encoding conventions are already shipped** in the
+codebase as a tactical fix — they hide JSON content from the WAF instead of
+reducing it. Both exist today; use this table to pick the right one instead of
+inventing a third.
+
+| | Full-payload envelope (preferred) | Field-level `b64:` prefix |
+|---|---|---|
+| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`) |
+| **Wire format** | Whole body becomes `{"payload": "<b64 of JSON.stringify(everything)>"}`, sent as `Content-Type: application/json` | Individual `field_value[id]` values become the string `"b64:<b64 of that field's JSON>"`; rest of the request stays `multipart/form-data`/form-urlencoded |
+| **Client helper** | `btoa(unescape(encodeURIComponent(JSON.stringify(inner))))` — see `form-submit-ui.js`, `manage-settings.js` (`wrapEmailTemplateApiJsonBody`) | `__serializeMatrixData()` in `app/static/js/forms/modules/matrix/formatting.js` |
+| **Server helper** | `get_request_data()` in `app/utils/request_utils.py` — transparently unwraps `payload`/`payload_b64` into a `_JsonFormProxy` that mimics `request.form` | `decode_b64_matrix_json()` in `app/services/forms/processors/_common.py` |
+| **Why not the same one everywhere** | Requires the route to read every field from one `data = get_request_data()` object instead of `request.form` directly | The assignment-save pipeline reads `request.form` directly in 50+ call sites across `data_service.py` and processor mixins (`indicator.py`, `plugin.py`, `repeat_group.py`, `document.py`), **and** the same request carries real file uploads (`request.files`, see `processors/document.py`) — switching the whole endpoint to a JSON body would break uploads and requires threading a proxy through every call site. The narrower per-field prefix avoids that refactor. |
+
+### Safe-failure contract (field-level convention)
+
+`decode_b64_matrix_json()` raises `MatrixJsonDecodeError` — it does **not**
+silently return `''` — when a `b64:`-prefixed value fails to decode. This is
+deliberate: coercing a decode failure to `''`/empty is indistinguishable from
+"the user cleared the field," which would let a corrupted or version-mismatched
+payload silently overwrite previously-saved matrix/plugin data with an `HTTP
+200` "success" response. Every call site catches `MatrixJsonDecodeError`
+specifically and either:
+
+- reports a validation error **before** touching the stored value
+  (`data_service.py::_process_matrix_data`, `processors/plugin.py::_process_plugin_fields`), or
+- returns `None`/no-op, which the caller already treats as "no meaningful data,
+  leave existing row untouched" (`processors/repeat_group.py::_process_repeat_matrix_data_comprehensive`,
+  verified against `should_create_data_availability_entry()`).
+
+**Deploy-order implication:** because encode (client) and decode (server) must
+agree on the `b64:` prefix, deploy the backend before/together with the
+frontend change, not after. A stale browser tab holding new JS against an
+old backend (or vice versa during a slow rolling restart) will hit this
+safe-failure path — a validation error is shown, but the save is rejected
+rather than partially applied.
+
+### When to use which
+
+- New heavy JSON config endpoint with no file uploads, and you can read all
+  input from one place → use the **full-payload envelope**
+  (`get_request_data()` + `{payload: b64}}`).
+- Adding to the existing assignment entry-form save (matrix cell, plugin
+  field, or similar `field_value[id]`-shaped input) where `request.form` is
+  already read deep in the call stack → reuse `decode_b64_matrix_json()` /
+  `MatrixJsonDecodeError`, following the exact catch pattern in
+  `plugin.py::_process_plugin_fields` (decode, let it raise into the existing
+  per-field `except`).
+
+---
+
 ## Recommended Standard (Keep Single "Save Settings" UX)
 
 Do not require per-tab manual saving. Keep one Save button, but change transport strategy.

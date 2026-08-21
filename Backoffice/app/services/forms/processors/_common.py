@@ -11,18 +11,38 @@ def get_english_field_name(form_item):
     return form_item.label
 
 
-def decode_b64_matrix_json(value: str) -> str:
-    """Decode a base64-encoded matrix JSON field value posted by the browser.
+class MatrixJsonDecodeError(Exception):
+    """A ``b64:``-prefixed field value could not be base64/UTF-8 decoded.
 
-    The JS serialiser prefixes encoded payloads with ``b64:`` so the WAF does
-    not inspect the raw JSON content (keys like ``4_Total Funding`` and numeric
-    values trigger OWASP 942-* SQL-injection rules).  Values without the prefix
-    are returned unchanged for backwards compatibility.
+    Callers MUST NOT treat this the same as "no data submitted" — silently
+    coercing it to an empty value would overwrite previously-saved data with
+    nothing. The most likely cause is a client/server version mismatch (e.g. a
+    browser tab holding new JS that emits ``b64:`` while mid-rollout the
+    request lands on an app instance still running the old decoder), so the
+    save must fail loudly instead of quietly wiping data. See the "field-level
+    b64:" section of ``waf-403-form-payload-refactor-guide.md``.
+    """
+
+
+def decode_b64_matrix_json(value: str) -> str:
+    """Decode a base64-encoded JSON field value posted by the browser.
+
+    The JS serialisers (matrix cells, plugin fields) prefix encoded payloads
+    with ``b64:`` so the WAF does not inspect the raw JSON content (keys like
+    ``4_Total Funding`` and numeric values trigger OWASP 942-* SQL-injection
+    rules). Values without the prefix are returned unchanged for backwards
+    compatibility with older cached JS / offline draft resubmits.
+
+    Raises:
+        MatrixJsonDecodeError: if the value has the ``b64:`` prefix but cannot
+            be decoded. Callers must let this propagate to their existing
+            per-field error handling (which reports a validation error and
+            returns *before* touching the stored value) rather than catching
+            it and continuing — see class docstring.
     """
     if value and value.startswith('b64:'):
         try:
             return base64.b64decode(value[4:]).decode('utf-8')
-        except Exception:
-            logger.warning('Failed to base64-decode matrix field value; treating as empty.')
-            return ''
+        except Exception as exc:
+            raise MatrixJsonDecodeError(f'Failed to base64-decode field value: {exc}') from exc
     return value

@@ -50,7 +50,11 @@ from app.services.forms.processors import (
 logger = debug_manager.get_logger(__name__)
 
 
-from app.services.forms.processors._common import get_english_field_name, decode_b64_matrix_json  # noqa: F401 re-export
+from app.services.forms.processors._common import (  # noqa: F401 re-export
+    get_english_field_name,
+    decode_b64_matrix_json,
+    MatrixJsonDecodeError,
+)
 
 class FormDataService(
     PluginProcessorMixin,
@@ -1692,6 +1696,15 @@ class FormDataService(
                 validation_errors.append(f"Required matrix field '{matrix.label}' has no value.")
                 logger.warning(f"Required matrix field {matrix.id} ({matrix.label}) has no value")
 
+        except MatrixJsonDecodeError as e:
+            # Raised before data_entry is looked up/mutated above, so the previously
+            # saved matrix value is untouched. Report a real failure instead of the
+            # generic message so this is distinguishable in logs from other bugs.
+            logger.error(f"Matrix field {matrix.id}: {e}")
+            validation_errors.append(
+                f"Matrix field '{matrix.label}': submitted data could not be decoded. "
+                "Refresh the page and try again."
+            )
         except Exception as e:
             logger.error(f"Error processing matrix field {matrix.id}: {e}", exc_info=True)
             validation_errors.append(f"Matrix field '{matrix.label}': Processing error")

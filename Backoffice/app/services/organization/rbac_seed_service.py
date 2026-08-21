@@ -454,29 +454,56 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
     ]
 
 
-def _extension_permission_catalog() -> List[Tuple[str, str, str]]:
+def _plugin_registry():
+    """Return the app plugin manager, loading plugins if the registry is still empty."""
     try:
         from flask import current_app
+    except Exception as exc:
+        logger.debug("Plugin registry: no Flask context: %s", exc)
+        return None
 
+    try:
         registry = getattr(current_app, "plugin_manager", None)
-        if registry is None:
-            return []
+    except Exception as exc:
+        logger.warning("Plugin registry: current_app unavailable: %s", exc)
+        return None
+
+    if registry is None:
+        return None
+
+    if getattr(registry, "plugins", None):
+        return registry
+
+    load = getattr(registry, "load_plugins", None)
+    if not callable(load):
+        return registry
+
+    try:
+        load()
+    except Exception as exc:
+        logger.warning("RBAC seed: failed to load plugins for extension catalog: %s", exc)
+    return registry
+
+
+def _extension_permission_catalog() -> List[Tuple[str, str, str]]:
+    registry = _plugin_registry()
+    if registry is None:
+        return []
+    try:
         return registry.get_all_seed_permissions()
     except Exception as exc:
-        logger.debug("Extension permission catalog unavailable: %s", exc)
+        logger.warning("Extension permission catalog unavailable: %s", exc)
         return []
 
 
 def _extension_baseline_roles() -> List[Dict[str, Any]]:
+    registry = _plugin_registry()
+    if registry is None:
+        return []
     try:
-        from flask import current_app
-
-        registry = getattr(current_app, "plugin_manager", None)
-        if registry is None:
-            return []
         return registry.get_all_seed_roles()
     except Exception as exc:
-        logger.debug("Extension role catalog unavailable: %s", exc)
+        logger.warning("Extension role catalog unavailable: %s", exc)
         return []
 
 
@@ -518,8 +545,21 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
       - created_role_permission_links
       - deleted_role_permission_links
     """
-    permission_catalog = _permission_catalog() + _extension_permission_catalog()
-    baseline_roles = _baseline_roles(permission_catalog) + _extension_baseline_roles()
+    core_permissions = _permission_catalog()
+    extension_permissions = _extension_permission_catalog()
+    permission_catalog = core_permissions + extension_permissions
+    core_roles = _baseline_roles(permission_catalog)
+    extension_roles = _extension_baseline_roles()
+    baseline_roles = core_roles + extension_roles
+    if extension_roles or extension_permissions:
+        logger.info(
+            "RBAC seed catalog includes %s plugin permission(s) and %s plugin role(s): %s",
+            len(extension_permissions),
+            len(extension_roles),
+            ", ".join(str(r.get("code")) for r in extension_roles if r.get("code")) or "(none)",
+        )
+    else:
+        logger.info("RBAC seed catalog has no plugin permissions/roles (plugin_manager empty or unloaded)")
 
     # Defense-in-depth: rbac_role.code / rbac_permission.code should each be protected
     # by a DB-level UNIQUE constraint or unique index (either is fine -- environments

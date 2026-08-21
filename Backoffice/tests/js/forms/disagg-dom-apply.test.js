@@ -34,6 +34,7 @@ function standardIndicatorBlockHtml(id) {
         <input type="number" name="indicator_${id}_sexage_male_18_49">
         <input type="number" name="indicator_${id}_sexage_female_5_17">
         <input type="number" name="indicator_${id}_sexage_female_18_49">
+        <input type="number" name="indicator_${id}_sexage_unknown_unknown">
         <input type="checkbox" name="indicator_${id}_standard_value" value="yes">
         <input type="checkbox" name="indicator_${id}_standard_value" value="no">
         <input type="checkbox" name="indicator_${id}_data_not_available">
@@ -66,7 +67,13 @@ describe('applyDisaggToBlock', () => {
         const applied = applyDisaggToBlock(block, {
             mode: 'sex_age',
             values: {
-                direct: { male_5_17: 10, female_5_17: 20, male_18_49: 30, female_18_49: 40 },
+                direct: {
+                    male_5_17: 10,
+                    female_5_17: 20,
+                    male_18_49: 30,
+                    female_18_49: 40,
+                    unknown_unknown: 7,
+                },
                 indirect: 5,
             },
         });
@@ -77,6 +84,7 @@ describe('applyDisaggToBlock', () => {
         expect(block.querySelector('[name="indicator_47_sexage_female_5_17"]').value).toBe('20');
         expect(block.querySelector('[name="indicator_47_sexage_male_18_49"]').value).toBe('30');
         expect(block.querySelector('[name="indicator_47_sexage_female_18_49"]').value).toBe('40');
+        expect(block.querySelector('[name="indicator_47_sexage_unknown_unknown"]').value).toBe('7');
         expect(block.querySelector('[name="indicator_47_indirect_reach"]').value).toBe('5');
     });
 
@@ -87,12 +95,13 @@ describe('applyDisaggToBlock', () => {
 
         const applied = applyDisaggToBlock(block, {
             mode: 'sex',
-            values: { direct: { male: 100, female: 200, unknown: 0 } },
+            values: { direct: { male: 100, female: 200, unknown: 7 } },
         });
 
         expect(applied).toBe(true);
         expect(block.querySelector('[name="indicator_48_sex_male"]').value).toBe('100');
         expect(block.querySelector('[name="indicator_48_sex_female"]').value).toBe('200');
+        expect(block.querySelector('[name="indicator_48_sex_unknown"]').value).toBe('7');
     });
 
     it('applies total mode with a scalar total and indirect reach', async () => {

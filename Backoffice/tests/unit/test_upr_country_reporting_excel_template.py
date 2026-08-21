@@ -394,6 +394,25 @@ def test_parse_workbook_row_disagg_sex_age(upr_country_reporting_workbook):
     assert disagg["values"]["indirect"] == 3
 
 
+def test_parse_workbook_row_disagg_other_unknown_goes_to_form_unknown():
+    disagg = _parse_workbook_row_disagg(
+        {"Total Male": 10, "Total Female": 20, "Other/Unknown": 7}
+    )
+    assert disagg == {"mode": "sex", "values": {"male": 10, "female": 20, "unknown": 7}}
+
+
+def test_parse_workbook_row_disagg_sex_age_keeps_other_unknown_on_unknown_row():
+    disagg = _parse_workbook_row_disagg(
+        {"Male <5": 10, "Female <5": 5, "Other/Unknown": 7, "Indirectly reached": 3}
+    )
+    assert disagg is not None
+    assert disagg["mode"] == "sex_age"
+    assert disagg["values"]["direct"]["male__5"] == 10
+    assert disagg["values"]["direct"]["female__5"] == 5
+    assert disagg["values"]["direct"]["unknown_unknown"] == 7
+    assert disagg["values"]["indirect"] == 3
+
+
 def test_disagg_consistency_warning_none_when_only_sex_age_present():
     row = {"Male <5": 10, "Female <5": 5}
     assert _disagg_consistency_warning(row, indicator_label="X") is None
@@ -406,6 +425,18 @@ def test_disagg_consistency_warning_none_when_only_total_present():
 
 def test_disagg_consistency_warning_none_when_sex_age_matches_sex_totals():
     row = {"Male <5": 10, "Male 5-17": 20, "Total Male": 30, "Total Female": 0}
+    assert _disagg_consistency_warning(row, indicator_label="X") is None
+
+
+def test_disagg_consistency_warning_none_when_other_unknown_complements_sex_age():
+    row = {
+        "Male <5": 10,
+        "Female <5": 5,
+        "Other/Unknown": 7,
+        "Total Male": 10,
+        "Total Female": 5,
+        "Total Direct": 22,
+    }
     assert _disagg_consistency_warning(row, indicator_label="X") is None
 
 
@@ -509,10 +540,42 @@ def test_disagg_by_sex_merges_non_binary_into_unknown(upr_country_reporting_work
 
 def test_merge_non_binary_into_unknown_breakdown():
     merged = _merge_non_binary_into_unknown_breakdown(
-        {"male": 1, "non_binary": 2, "unknown": 3, "non_binary_5_17": 4}
+        {
+            "male": 1,
+            "non_binary": 2,
+            "unknown": 3,
+            "non_binary_5_17": 4,
+            "unknown_5_17": 5,
+            "male_unknown": 6,
+        }
     )
     assert merged["male"] == 1
-    assert merged["unknown"] == 9
+    assert merged["male_unknown"] == 6
+    assert merged["unknown"] == 14
+
+
+def test_disagg_by_sex_age_merges_non_binary_and_unknown_rows(upr_country_reporting_workbook):
+    key_to_header, _ = _build_upr_country_reporting_disagg_header_maps(upr_country_reporting_workbook)
+    cells = _disagg_payload_to_workbook_cells(
+        {
+            "mode": "sex_age",
+            "values": {
+                "direct": {
+                    "male__5": 10,
+                    "female__5": 5,
+                    "non_binary__5": 2,
+                    "non_binary_5_17": 3,
+                    "unknown__5": 4,
+                    "unknown_5_17": 6,
+                }
+            },
+        },
+        key_to_header,
+    )
+    assert cells[key_to_header["unknown"]] == 15
+    assert cells[key_to_header["male__5"]] == 10
+    assert cells[key_to_header["female__5"]] == 5
+    assert cells[key_to_header["direct"]] == 30
 
 
 def test_disagg_by_sex_age_sums_total_direct(upr_country_reporting_workbook):

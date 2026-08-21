@@ -57,6 +57,16 @@ def deferred_rbac_seed(app, selected_config_name, is_reloader):
     if os.environ.get("RUNNING_MIGRATION"):
         return
 
+    # `flask db upgrade` / `flask rbac seed` boot the full app factory. The
+    # background auto-seed races the CLI command for the advisory lock and can
+    # make `flask rbac seed` report +0 while another worker "is seeding".
+    if str(os.environ.get("FLASK_RUN_FROM_CLI") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return
+
     if app.debug and not is_reloader:
         return
 

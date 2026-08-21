@@ -152,7 +152,7 @@ PY
 
   echo "Running: python -m flask db upgrade"
   set +e
-  python -m flask db upgrade 2>&1
+  RUNNING_MIGRATION=1 python -m flask db upgrade 2>&1
   UPGRADE_EXIT=$?
   set -e
 
@@ -190,42 +190,18 @@ PY
   fi
 
   echo "Running: python -m flask db current"
-  python -m flask db current 2>&1 || true
+  RUNNING_MIGRATION=1 python -m flask db current 2>&1 || true
 
   echo "=========================================="
   echo "RBAC permissions seeding (best-effort)"
   echo "=========================================="
-  # Seed RBAC permissions/role-permissions if RBAC is enabled and permissions table is empty.
-  # This prevents admin lockouts when migrations are applied but seeding is skipped.
-  RBAC_SEED_ON_STARTUP="$(echo "${RBAC_SEED_ON_STARTUP:-false}" | tr '[:upper:]' '[:lower:]')"
+  # Re-sync the RBAC catalog after every deploy so newly added plugin roles
+  # (e.g. admin_data_explorer_upr_visuals) land in an already-populated database.
+  # The seeder is idempotent. Set RBAC_SEED_ON_STARTUP=false to skip.
+  RBAC_SEED_ON_STARTUP="$(echo "${RBAC_SEED_ON_STARTUP:-true}" | tr '[:upper:]' '[:lower:]')"
   if [ "$RBAC_SEED_ON_STARTUP" != "false" ]; then
-    python - <<'PY' 2>/dev/null && NEED_SEED=0 || NEED_SEED=1
-import os
-from sqlalchemy import create_engine, text
-
-url = os.environ.get("DATABASE_URL")
-engine = create_engine(url, pool_pre_ping=True)
-with engine.connect() as conn:
-    # If RBAC tables don't exist yet, nothing to do.
-    exists = conn.execute(text("""
-        SELECT EXISTS (
-          SELECT 1 FROM information_schema.tables
-          WHERE table_name = 'rbac_permission'
-        )
-    """)).scalar()
-    if not exists:
-        raise SystemExit(0)
-    count = conn.execute(text("SELECT COUNT(*) FROM rbac_permission")).scalar()
-    if count and int(count) > 0:
-        raise SystemExit(0)
-raise SystemExit(1)
-PY
-    if [ "$NEED_SEED" -eq 1 ]; then
-      echo "RBAC: rbac_permission is empty -> running: python -m flask rbac seed"
-      python -m flask rbac seed 2>&1 || echo "WARN: RBAC seeding failed (continuing)"
-    else
-      echo "RBAC: permissions already seeded (skipping)"
-    fi
+    echo "Running: python -m flask rbac seed"
+    python -m flask rbac seed 2>&1 || echo "WARN: RBAC seeding failed (continuing)"
   else
     echo "RBAC seeding skipped (RBAC_SEED_ON_STARTUP=false)"
   fi

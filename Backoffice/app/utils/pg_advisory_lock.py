@@ -11,6 +11,8 @@ SQLAlchemy logs that server notice at INFO under sqlalchemy.dialects.postgresql.
 
 from __future__ import annotations
 
+import time
+
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -51,6 +53,38 @@ def try_session_advisory_lock(session, lock_id: int) -> bool:
             {"lock_id": int(lock_id)},
         ).scalar()
     )
+
+
+def wait_for_session_advisory_lock(
+    session,
+    lock_id: int,
+    *,
+    timeout_seconds: float = 30.0,
+    poll_interval_seconds: float = 0.25,
+) -> bool:
+    """Retry `pg_try_advisory_lock()` until acquired or `timeout_seconds` elapses.
+
+    Use this (instead of the blocking `pg_advisory_lock()` SQL function) for
+    operator/deploy-triggered callers that must not silently no-op just because
+    a background worker happens to hold the lock at that instant, but also must
+    not hang forever if something is actually wrong.
+
+    Deliberately implemented as a polling loop over the existing non-blocking
+    `try_session_advisory_lock()` rather than `SELECT pg_advisory_lock(:id)`
+    with `SET LOCAL lock_timeout`: Postgres has a known race (see upstream bug
+    #17686) where a low `lock_timeout` can raise `lock_not_available` on a
+    blocking `pg_advisory_lock()` call *after* the lock was actually granted,
+    leaking a lock nothing will ever unlock. Each poll here is a plain
+    `pg_try_advisory_lock()` call that always returns an unambiguous true/false,
+    so there's nothing to leak.
+    """
+    deadline = time.monotonic() + max(0.0, timeout_seconds)
+    while True:
+        if try_session_advisory_lock(session, lock_id):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(poll_interval_seconds)
 
 
 def acquire_transaction_advisory_lock(session, lock_id: int) -> None:

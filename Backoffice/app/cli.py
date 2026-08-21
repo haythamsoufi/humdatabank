@@ -34,6 +34,9 @@ def register_commands(app):
     from app.cli_commands.translations import register_translation_commands
     register_translation_commands(app)
 
+    from app.cli_commands.rbac import register_rbac_commands
+    register_rbac_commands(app)
+
     # AI regression testing
     from app.cli_commands.ai_regression import ai_regression_cli
     app.cli.add_command(ai_regression_cli)
@@ -423,42 +426,9 @@ def register_commands(app):
             click.echo(f'Error generating static workflow tours: {e}', err=True)
             raise
 
-    # ========================================================================
-    # RBAC Commands
-    # ========================================================================
-
-    @app.cli.group('rbac')
-    def rbac_group():
-        """Manage RBAC permissions and roles."""
-        pass
-
-    @rbac_group.command('seed')
-    @with_appcontext
-    def seed_rbac():
-        """Seed RBAC permissions and baseline roles (idempotent)."""
-        from app.services.organization.rbac_seed_service import (
-            get_missing_baseline_role_codes,
-            seed_rbac_permissions_and_roles,
-        )
-
-        # Operator-initiated: do not lose to a gunicorn worker's advisory lock.
-        stats = seed_rbac_permissions_and_roles(use_advisory_lock=False)
-        if stats.get("skipped_due_to_lock"):
-            click.echo("RBAC seed skipped (advisory lock held by another process).")
-            return
-        click.echo("RBAC seed complete.")
-        click.echo(
-            f"- Permissions: {stats.get('created_permissions', 0)} created, {stats.get('updated_permissions', 0)} updated"
-        )
-        click.echo(
-            f"- Roles: {stats.get('created_roles', 0)} created, {stats.get('updated_roles', 0)} updated"
-        )
-        click.echo(
-            f"- Role-permission links: {stats.get('created_role_permission_links', 0)} created, {stats.get('deleted_role_permission_links', 0)} deleted"
-        )
-        missing = get_missing_baseline_role_codes()
-        if missing:
-            click.echo(f"WARNING: still missing role(s): {', '.join(missing)}")
+    # NOTE: `flask rbac ...` commands are registered above via
+    # register_rbac_commands(app) (app/cli_commands/rbac.py). Do not also define
+    # an `rbac` CLI group inline here -- Click would create conflicting groups.
 
     # ========================================================================
     # Email / Notification Template Seeding

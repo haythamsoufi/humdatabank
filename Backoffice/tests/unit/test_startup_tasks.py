@@ -222,7 +222,15 @@ class TestDeferredRbacSeed:
 
         mock_thread.assert_not_called()
 
-    def test_returns_early_when_flask_cli(self):
+    def test_flask_run_from_cli_env_var_does_not_prevent_seeding(self):
+        """Regression guard: FLASK_RUN_FROM_CLI is set by Flask for *every*
+        `flask` subcommand, including plain `flask run` in local dev -- not
+        just one-off commands like `flask rbac seed`. A previous fix bailed
+        out of auto-seeding whenever this env var was set, which silently
+        disabled the local-dev auto-seed safety net entirely. The CLI/auto-seed
+        race this was meant to solve is now handled at the advisory-lock layer
+        (RbacSeedLockMode.WAIT for CLI/entrypoint callers) instead.
+        """
         fn = self._import()
         app = _mock_app()
 
@@ -232,9 +240,11 @@ class TestDeferredRbacSeed:
         }):
             os.environ.pop("RUNNING_MIGRATION", None)
             with patch("app.startup_tasks.threading.Thread") as mock_thread:
+                mock_instance = MagicMock()
+                mock_thread.return_value = mock_instance
                 fn(app, "production", is_reloader=False)
 
-        mock_thread.assert_not_called()
+        mock_instance.start.assert_called_once()
 
     def test_returns_early_when_debug_without_reloader(self):
         fn = self._import()

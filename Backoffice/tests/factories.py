@@ -165,6 +165,15 @@ def create_test_admin(db_session, **kwargs):
         return int(role.id)
 
     def _ensure_permission(code: str) -> int:
+        # NOTE: creates a RbacPermission row for `code` on the fly if one
+        # doesn't exist yet -- unlike production, this does NOT go through
+        # the real seed catalog (_permission_catalog() in
+        # rbac_seed_service.py). A typo'd/renamed permission code passed to
+        # `_grant()` below will happily "work" here (this test user gets
+        # access) even though `flask rbac seed` would never create that
+        # permission for a real user -- see
+        # tests/unit/test_rbac_catalog_completeness.py for the check that
+        # catches that class of drift against real route decorators.
         perm = db_session.query(RbacPermission).filter_by(code=code).first()
         if perm:
             return int(perm.id)
@@ -240,7 +249,6 @@ def create_test_admin(db_session, **kwargs):
     _grant(role_id, "admin.indicator_bank.view")
     _grant(role_id, "admin.indicator_bank.edit")
     _grant(role_id, "admin.indicator_bank.archive")
-    _grant(role_id, "admin.indicator_bank.delete")
     _grant(role_id, "admin.translations.view")
     _grant(role_id, "admin.translations.edit")
     _grant(role_id, "admin.translations.manage")
@@ -250,7 +258,6 @@ def create_test_admin(db_session, **kwargs):
     _grant(role_id, "admin.assignments.create")
     _grant(role_id, "admin.assignments.delete")
     _grant(role_id, "admin.templates.delete")
-    _grant(role_id, "admin.analytics.manage")
 
     db_session.commit()
     db_session.refresh(user)

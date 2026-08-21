@@ -716,9 +716,20 @@ class TestWorkflowsGenerateStaticCommand:
 
 
 class TestRbacSeedCommand:
-    """Tests for `flask rbac seed`."""
+    """Tests for `flask rbac seed` as wired up on the real app.
+
+    The command's implementation lives in app/cli_commands/rbac.py
+    (register_rbac_commands); app/cli.py's register_commands() calls it rather
+    than defining its own `rbac` group inline. This test exercises the *real*
+    `runner` fixture (built from the actual app factory) specifically to catch
+    wiring regressions -- e.g. register_rbac_commands never being called, or a
+    duplicate `rbac` group conflicting with it -- that a synthetic mini-app
+    fixture (see test_cli_commands.py) wouldn't be able to detect.
+    """
 
     def test_seed_success(self, runner):
+        from app.services.organization.rbac_seed_service import RbacSeedLockMode
+
         stats = {
             "created_permissions": 10,
             "updated_permissions": 2,
@@ -741,7 +752,46 @@ class TestRbacSeedCommand:
         assert "10 created" in result.output
         assert "3 created" in result.output
         assert "20 created" in result.output
-        mock_seed.assert_called_once_with(use_advisory_lock=False)
+        # Operator-triggered seeding must wait for the lock (not silently skip
+        # just because a gunicorn worker's background auto-seed holds it).
+        mock_seed.assert_called_once_with(
+            lock_mode=RbacSeedLockMode.WAIT, wait_timeout_seconds=30.0
+        )
+
+    def test_seed_skipped_after_wait_timeout_mentions_wait_duration(self, runner):
+        with patch(
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
+            return_value={"skipped_due_to_lock": 1},
+        ):
+            result = runner.invoke(args=["rbac", "seed", "--wait-timeout", "5"])
+
+        assert result.exit_code == 0
+        assert "skipped" in result.output.lower()
+        assert "5s" in result.output
+
+    def test_seed_custom_wait_timeout_is_passed_through(self, runner):
+        from app.services.organization.rbac_seed_service import RbacSeedLockMode
+
+        with patch(
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
+            return_value={
+                "created_permissions": 0,
+                "updated_permissions": 0,
+                "created_roles": 0,
+                "updated_roles": 0,
+                "created_role_permission_links": 0,
+                "deleted_role_permission_links": 0,
+            },
+        ) as mock_seed, patch(
+            "app.services.organization.rbac_seed_service.get_missing_baseline_role_codes",
+            return_value=[],
+        ):
+            result = runner.invoke(args=["rbac", "seed", "--wait-timeout", "45"])
+
+        assert result.exit_code == 0
+        mock_seed.assert_called_once_with(
+            lock_mode=RbacSeedLockMode.WAIT, wait_timeout_seconds=45.0
+        )
 
 
 class TestSeedEmailTemplatesCommand:

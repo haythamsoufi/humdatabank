@@ -17,10 +17,12 @@ from unittest.mock import MagicMock, patch
 class TestRbacCliCommandsModule:
     """Tests for register_rbac_commands (cli_commands/rbac.py).
 
-    NOTE: The main app already registers an `rbac` CLI group via cli.py, so
-    register_rbac_commands is NOT invoked during normal app startup (it would
-    cause a duplicate-command conflict). We exercise it by registering it on a
-    minimal Flask app created within the test.
+    register_rbac_commands is the canonical source of the `flask rbac ...`
+    group -- cli.py calls it once during normal app startup (see
+    register_commands in app/cli.py) rather than defining its own inline
+    `rbac` group. This test file registers it on its own minimal Flask app
+    (instead of the shared `app`/`runner` fixtures) to keep these unit tests
+    independent of the main app's CLI wiring.
     """
 
     @pytest.fixture()

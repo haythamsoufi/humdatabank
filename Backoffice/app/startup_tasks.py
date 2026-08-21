@@ -57,15 +57,12 @@ def deferred_rbac_seed(app, selected_config_name, is_reloader):
     if os.environ.get("RUNNING_MIGRATION"):
         return
 
-    # `flask db upgrade` / `flask rbac seed` boot the full app factory. The
-    # background auto-seed races the CLI command for the advisory lock and can
-    # make `flask rbac seed` report +0 while another worker "is seeding".
-    if str(os.environ.get("FLASK_RUN_FROM_CLI") or "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-    }:
-        return
+    # NOTE: `flask rbac seed` used to race this background thread for the advisory
+    # lock. That's now solved at the lock layer (rbac_seed_service uses a bounded
+    # blocking wait for CLI/entrypoint-triggered seeding instead of a non-blocking
+    # try), not by disabling this thread -- `FLASK_RUN_FROM_CLI` is set by Flask for
+    # *every* `flask` subcommand, including plain `flask run`, so bailing out here
+    # on that env var previously also disabled local-dev auto-seed entirely.
 
     if app.debug and not is_reloader:
         return
@@ -87,9 +84,15 @@ def deferred_rbac_seed(app, selected_config_name, is_reloader):
                 if last_err is not None:
                     raise last_err
 
-                from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+                from app.services.organization.rbac_seed_service import (
+                    RbacSeedLockMode,
+                    seed_rbac_permissions_and_roles,
+                )
 
-                stats = seed_rbac_permissions_and_roles()
+                # TRY (non-blocking): a background boot-time thread must never block
+                # worker startup waiting on another process's lock. Losing the race to
+                # a sibling worker seeding the same catalog is harmless.
+                stats = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.TRY)
                 if stats.get("skipped_due_to_lock"):
                     app.logger.info("RBAC auto-seed skipped (another worker is seeding).")
                 else:

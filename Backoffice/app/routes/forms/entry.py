@@ -24,6 +24,7 @@ from app.models import (
     SubmissionDiscussionComment,
 )
 from app.models.enums import EntityType
+from app.routes.admin.shared import admin_required
 from app.services.organization.entity_service import EntityService
 from app.services.assignments.completion_service import AssignmentCompletionService
 from app.services.forms.data_service import FormDataService
@@ -38,7 +39,6 @@ from app.services.templates.preparation_service import TemplatePreparationServic
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.assignment_document_carryover import merge_carryover_into_submitted_documents_dict
-from app.utils.form_authorization import admin_required
 from app.utils.form_localization import (
     get_localized_country_name,
     get_localized_indicator_definition,

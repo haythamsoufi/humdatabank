@@ -328,18 +328,6 @@ class TestCheckAssignmentEditAccessDecorator:
 
 
 @pytest.mark.unit
-class TestAdminRequiredPassthrough:
-    def test_delegates_to_admin_shared(self, app):
-        from app.utils.form_authorization import admin_required
-        with patch('app.routes.admin.shared.admin_required', side_effect=lambda f: f) as mock_admin:
-            @admin_required
-            def view():
-                return 'ok'
-            assert view() == 'ok'
-            mock_admin.assert_called_once()
-
-
-@pytest.mark.unit
 class TestCheckDocumentAccessDecorator:
     def _view(self, document_id):
         return {'doc': document_id}

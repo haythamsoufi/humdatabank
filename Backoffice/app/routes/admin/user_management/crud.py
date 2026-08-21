@@ -48,12 +48,11 @@ from .helpers import (
     _cascade_delete_user_related,
     _get_translator_form_context,
     _apply_user_translator_languages,
-    _warn_if_critical_rbac_roles_missing,
+    _critical_rbac_roles_integrity_ok,
     _get_role_codes_by_id,
     _get_missing_rbac_role_codes_for_display,
+    _RESTRICTED_RBAC_ROLE_CODES,
 )
-
-_RESTRICTED_RBAC_ROLE_CODES = ["system_manager", "admin_full", "admin_plugins_manager"]
 
 
 # === User Management Routes ===
@@ -685,13 +684,20 @@ def new_user():
     except Exception as e:
         current_app.logger.debug("restricted_role_ids query failed: %s", e)
         restricted_role_ids = set()
-    _warn_if_critical_rbac_roles_missing(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
+    rbac_integrity_ok = _critical_rbac_roles_integrity_ok(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
     if not current_is_sys_mgr and restricted_role_ids:
         form.rbac_roles.choices = [
             (rid, label)
             for (rid, label) in (form.rbac_roles.choices or [])
             if int(rid) not in restricted_role_ids
         ]
+
+    # Fail CLOSED (not open): if RBAC has been seeded but restricted_role_ids
+    # couldn't be verified as complete (see _critical_rbac_roles_integrity_ok),
+    # block RBAC role assignment entirely for non-system-managers rather than
+    # silently letting through whichever restriction we couldn't confirm.
+    if not current_is_sys_mgr and not rbac_integrity_ok:
+        can_assign_rbac_roles = False
 
     # If the current admin cannot assign roles, do not render/validate roles on this form.
     # (We will apply a safe default RBAC role on the backend.)
@@ -733,6 +739,20 @@ def new_user():
         else:
             # Check for restricted role assignments
             has_restricted_role = False
+            # Defense-in-depth fail-closed check: if RBAC integrity couldn't be
+            # verified (see rbac_integrity_ok above), reject role assignment for
+            # non-system-managers outright instead of relying solely on the
+            # sys_role/plugins_role lookups below, which themselves depend on the
+            # same RBAC data that may be incomplete.
+            if not current_is_sys_mgr and not rbac_integrity_ok and (form.rbac_roles.data or []):
+                flash(
+                    "RBAC role data looks incomplete, so role assignment is "
+                    "temporarily disabled for non-System-Managers. Ask a System "
+                    "Manager to run `flask rbac seed`.",
+                    "danger",
+                )
+                has_restricted_role = True
+
             if sys_role and (sys_role.id in (form.rbac_roles.data or [])) and not AuthorizationService.is_system_manager(current_user):
                 flash("Only a System Manager can assign the System Manager role.", "danger")
                 has_restricted_role = True
@@ -941,13 +961,20 @@ def edit_user(user_id):
     except Exception as e:
         current_app.logger.debug("restricted_role_ids query failed: %s", e)
         restricted_role_ids = set()
-    _warn_if_critical_rbac_roles_missing(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
+    rbac_integrity_ok = _critical_rbac_roles_integrity_ok(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
     if not current_is_sys_mgr and restricted_role_ids:
         form.rbac_roles.choices = [
             (rid, label)
             for (rid, label) in (form.rbac_roles.choices or [])
             if int(rid) not in restricted_role_ids
         ]
+
+    # Fail CLOSED (not open): if RBAC has been seeded but restricted_role_ids
+    # couldn't be verified as complete (see _critical_rbac_roles_integrity_ok),
+    # block RBAC role assignment entirely for non-system-managers rather than
+    # silently letting through whichever restriction we couldn't confirm.
+    if not current_is_sys_mgr and not rbac_integrity_ok:
+        can_assign_rbac_roles = False
 
     # If the current admin cannot assign roles, do not render/validate roles on this form.
     # (We will preserve existing RBAC roles on save.)
@@ -976,6 +1003,19 @@ def edit_user(user_id):
         # context (preferences, devices, role-type state, ...).
         if user_is_sys_mgr and not current_is_sys_mgr:
             flash("Only a System Manager can modify a System Manager user.", "danger")
+            return redirect(url_for("user_management.edit_user", user_id=user.id))
+        # Defense-in-depth fail-closed check: if RBAC integrity couldn't be
+        # verified (see rbac_integrity_ok above), reject role changes for
+        # non-system-managers outright instead of relying solely on the
+        # sys_role/plugins_role lookups below, which themselves depend on the
+        # same RBAC data that may be incomplete.
+        if not current_is_sys_mgr and not rbac_integrity_ok and (form.rbac_roles.data or []):
+            flash(
+                "RBAC role data looks incomplete, so role changes are temporarily "
+                "disabled for non-System-Managers. Ask a System Manager to run "
+                "`flask rbac seed`.",
+                "danger",
+            )
             return redirect(url_for("user_management.edit_user", user_id=user.id))
         if sys_role and (sys_role.id in (form.rbac_roles.data or [])) and not current_is_sys_mgr:
             flash("Only a System Manager can assign the System Manager role.", "danger")

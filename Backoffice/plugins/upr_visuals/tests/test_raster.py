@@ -7,11 +7,13 @@ from pathlib import Path
 import pytest
 
 from plugins.upr_visuals.raster import (
+    MAX_PNG_EDGE,
     PNG_EXPORT_SCALE,
     _css_for_print,
     _font_css,
     _page_size,
     _pdf_page_css,
+    _png_render_scale,
     _rewrite_export_images,
     _stitch_pixmaps,
     _wrap,
@@ -105,9 +107,11 @@ def test_combined_finance_scales_as_a_unit():
     assert ".upr-combined-section--finance .upr-block--finance" not in css
     assert ".upr-combined-section--finance .upr-fin-net td" not in css
     assert ".upr-combined-section--finance .upr-fin-hero" not in css
-    pdf_css = _pdf_page_css("combined")
-    assert ".upr-combined-section--finance .upr-block--finance" in pdf_css
-    assert "font-size: 0.78rem" in pdf_css
+    wrapped = _wrap('<div class="upr-combined-section--finance">x</div>', dashboard_id="combined")
+    assert ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }" in wrapped
+    assert ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }" not in _wrap(
+        "<div>x</div>", dashboard_id="financial"
+    )
 
 
 @pytest.mark.unit
@@ -139,6 +143,34 @@ def test_stitch_pixmaps_stacks_pages():
     assert stacked.height == 5
     assert stacked.samples[0] == 10
     assert stacked.samples[-1] == 40
+
+
+class _FakeRect:
+    def __init__(self, width: float, height: float):
+        self.width = width
+        self.height = height
+
+
+class _FakePage:
+    def __init__(self, width: float, height: float):
+        self.rect = _FakeRect(width, height)
+
+
+@pytest.mark.unit
+def test_png_render_scale_keeps_single_page_at_export_scale():
+    doc = [_FakePage(842, 595)]
+    assert _png_render_scale(doc, scale=8.0) == 8.0
+
+
+@pytest.mark.unit
+def test_png_render_scale_caps_stitched_combined_height():
+    pages = 6
+    page_h = 842.0
+    doc = [_FakePage(595, page_h) for _ in range(pages)]
+    scale = _png_render_scale(doc, scale=8.0)
+    assert scale < 8.0
+    assert pages * page_h * scale <= MAX_PNG_EDGE
+    assert MAX_PNG_EDGE == 16384
 
 
 @pytest.mark.unit

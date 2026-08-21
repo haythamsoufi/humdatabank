@@ -50,7 +50,7 @@ from app.services.forms.processors import (
 logger = debug_manager.get_logger(__name__)
 
 
-from app.services.forms.processors._common import get_english_field_name  # noqa: F401 re-export
+from app.services.forms.processors._common import get_english_field_name, decode_b64_matrix_json  # noqa: F401 re-export
 
 class FormDataService(
     PluginProcessorMixin,
@@ -1529,9 +1529,9 @@ class FormDataService(
         field_changes = []
 
         try:
-            # Get matrix data from form
+            # Get matrix data from form (client may base64-encode to avoid WAF blocks)
             field_name = f'field_value[{matrix.id}]'
-            matrix_data_json = request.form.get(field_name, '')
+            matrix_data_json = decode_b64_matrix_json(request.form.get(field_name, ''))
 
             # Get data availability flags
             data_not_available = request.form.get(f'matrix_{matrix.id}_data_not_available') == '1'

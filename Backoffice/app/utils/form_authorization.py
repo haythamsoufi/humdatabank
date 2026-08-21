@@ -226,16 +226,6 @@ def check_assignment_edit_access(f):
     return decorated_function
 
 
-def admin_required(f):
-    """
-    Deprecated passthrough — import admin_required directly from
-    ``app.routes.admin.shared`` instead. This alias is kept for backward
-    compatibility with older imports and will be removed in a future cleanup.
-    """
-    from app.routes.admin.shared import admin_required as _admin_required
-    return _admin_required(f)
-
-
 def check_document_access(f):
     """
     Decorator to check access for document operations.

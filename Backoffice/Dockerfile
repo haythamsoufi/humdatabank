@@ -1,4 +1,13 @@
-FROM python:3.11-slim AS builder
+# Pinned by digest, not just tag: GitHub-hosted runners are ephemeral (no local Docker
+# layer cache persists between workflow runs), so the *only* cross-run cache is the ACR
+# `:buildcache` registry cache. If the mutable "3.11-slim" tag silently repoints to a new
+# digest between builds, every layer after this FROM misses cache — even on the "fast path"
+# where requirements.txt/Dockerfile didn't change — because BuildKit's cache key chains from
+# the base image. Pinning makes the base image byte-identical across builds until bumped here.
+# Refresh periodically for security patches:
+#   docker pull python:3.11-slim && docker inspect --format='{{index .RepoDigests 0}}' python:3.11-slim
+# digest as of 2026-08-21:
+FROM python:3.11-slim@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7 AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -20,7 +29,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # Final stage - minimal runtime image
-FROM python:3.11-slim
+# Same pinned digest as the builder stage above (see comment there) — keep them in sync.
+FROM python:3.11-slim@sha256:9c900dea9e8fb7e16277c179b555cc72d29a352dbc33cff48ad5a0412fd5bfc7
 
 ARG ASSET_VERSION=""
 ARG GIT_SHA=""

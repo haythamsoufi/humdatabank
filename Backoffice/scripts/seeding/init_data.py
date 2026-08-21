@@ -139,9 +139,12 @@ def main():
 
                     # Ensure baseline RBAC roles and permission links exist
                     try:
-                        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+                        from app.services.organization.rbac_seed_service import (
+                            RbacSeedLockMode,
+                            seed_rbac_permissions_and_roles,
+                        )
 
-                        seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                        seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.WAIT)
                     except Exception as e:
                         logger.debug("RBAC seed skipped during init_data: %s", e)
 

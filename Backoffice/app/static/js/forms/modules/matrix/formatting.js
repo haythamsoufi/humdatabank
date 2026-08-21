@@ -362,7 +362,16 @@ export function __reorderMatrixData(data) {
 export function __serializeMatrixData(data) {
     const sanitized = __reorderMatrixData(data || {});
     if (!sanitized || typeof sanitized !== 'object') return '';
-    return Object.keys(sanitized).length > 0 ? JSON.stringify(sanitized) : '';
+    const json = Object.keys(sanitized).length > 0 ? JSON.stringify(sanitized) : '';
+    if (!json) return '';
+    // Base64-encode to avoid WAF false-positives on JSON keys/values in
+    // form-urlencoded bodies. Server decodes the b64: prefix before json.loads().
+    // unescape+encodeURIComponent makes btoa() safe for non-ASCII row/column names.
+    try {
+        return 'b64:' + btoa(unescape(encodeURIComponent(json)));
+    } catch (_) {
+        return json;
+    }
 }
 
 

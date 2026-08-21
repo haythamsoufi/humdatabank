@@ -16,6 +16,7 @@ from app.models import (
     FormSection, PublicSubmission, PublicSubmissionStatus, QuestionType,
     RepeatGroupInstance, RepeatGroupData, DynamicIndicatorData, DynamicSectionContext,
 )
+from app.routes.admin.shared import admin_required
 from app.services.organization.authorization_service import AuthorizationService
 from app.services.organization.entity_service import EntityService
 from app.services.forms.data_service import FormDataService
@@ -23,7 +24,6 @@ from app.services.forms.processing_service import get_form_items_for_section, sl
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_responses import json_bad_request, json_ok, json_server_error
 from app.utils.constants import SELF_REPORT_PERIOD_NAME
-from app.utils.form_authorization import admin_required
 from app.utils.form_localization import (
     get_localized_country_name,
     get_localized_indicator_definition,

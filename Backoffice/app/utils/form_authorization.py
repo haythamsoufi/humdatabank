@@ -53,6 +53,90 @@ def can_edit_assignment(assignment_entity_status, user) -> bool:
     return AuthorizationService.can_edit_assignment(assignment_entity_status, user)
 
 
+READONLY_NOTICE_PUBLIC = "public"
+READONLY_NOTICE_SENT_FOR_REVIEW = "sent_for_review"
+READONLY_NOTICE_APPROVED = "approved"
+READONLY_NOTICE_SUBMITTED = "submitted"
+READONLY_NOTICE_VIEW_ONLY = "view_only"
+READONLY_NOTICE_ROUND_CLOSED = "round_closed"
+READONLY_NOTICE_GENERIC = "generic"
+
+
+def _assignment_status_value(assignment_entity_status) -> str:
+    if assignment_entity_status is None:
+        return ""
+    status = getattr(assignment_entity_status, "status", None)
+    if status is None:
+        return ""
+    return status.value if hasattr(status, "value") else str(status)
+
+
+def assignment_is_round_closed_for_entity(assignment_entity_status) -> bool:
+    """Safely call AssignmentEntityStatus.is_round_closed_for_entity() (a method, not a property)."""
+    if assignment_entity_status is None:
+        return False
+    checker = getattr(assignment_entity_status, "is_round_closed_for_entity", None)
+    if not callable(checker):
+        return False
+    try:
+        return bool(checker())
+    except Exception:
+        return False
+
+
+def assignment_readonly_notice_reason(
+    assignment_entity_status,
+    user,
+    *,
+    is_public_submission: bool = False,
+) -> str:
+    """Why the entry form is read-only.
+
+    Priority:
+      1. Public submission
+      2. Workflow lock (sent for review / approved / submitted)
+      3. Missing assignment.enter (viewer / documents-only)
+      4. Collection round closed for this entity
+      5. Generic fallback
+
+    Viewers must not see the closed-round notice: that copy tells data-entry
+    users that only an admin can reopen the form, which is misleading when the
+    current user could not enter data even on an open assignment.
+    """
+    if is_public_submission:
+        return READONLY_NOTICE_PUBLIC
+
+    status = _assignment_status_value(assignment_entity_status)
+    if status == "sent_for_review":
+        return READONLY_NOTICE_SENT_FOR_REVIEW
+    if status == "approved":
+        return READONLY_NOTICE_APPROVED
+    if status == "submitted":
+        return READONLY_NOTICE_SUBMITTED
+
+    can_enter = False
+    if user and getattr(user, "is_authenticated", False) and assignment_entity_status is not None:
+        from app.services.organization.authorization_service import AuthorizationService
+
+        scope = {
+            "entity_type": getattr(assignment_entity_status, "entity_type", None),
+            "entity_id": getattr(assignment_entity_status, "entity_id", None),
+            "assigned_form_id": getattr(assignment_entity_status, "assigned_form_id", None),
+        }
+        assigned_form = getattr(assignment_entity_status, "assigned_form", None)
+        if assigned_form is not None:
+            scope["template_id"] = getattr(assigned_form, "template_id", None)
+        can_enter = AuthorizationService.has_rbac_permission(user, "assignment.enter", scope=scope)
+
+    if not can_enter:
+        return READONLY_NOTICE_VIEW_ONLY
+
+    if assignment_is_round_closed_for_entity(assignment_entity_status):
+        return READONLY_NOTICE_ROUND_CLOSED
+
+    return READONLY_NOTICE_GENERIC
+
+
 def check_assignment_access(f):
     """
     Decorator to check if user has access to an assignment.
@@ -131,7 +215,7 @@ def check_assignment_edit_access(f):
                     f"This assignment for {entity_display} is in '{aes.status}' status and cannot be edited by you at this time.",
                     "warning"
                 )
-                return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+                return redirect(url_for("assignments.view_assignment", aes_id=aes.id))
 
             return f(aes_id, *args, **kwargs)
         except Exception as e:
@@ -194,7 +278,7 @@ def check_document_access(f):
                         f"This assignment for {entity_label} is in '{aes.status}' status and documents cannot be modified at this time.",
                         "warning"
                     )
-                    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+                    return redirect(url_for("assignments.view_assignment", aes_id=aes.id))
             else:
                 # Document not found - all documents are now in SubmittedDocument table
                 flash("Document not found.", "danger")

@@ -51,6 +51,15 @@ def register_template_context(app, config_class):
         app.jinja_env.globals['user_has_permission'] = user_has_permission
     except Exception as e:
         app.logger.error(f"Failed to expose user_has_permission to Jinja: {e}")
+    try:
+        from app.utils.form_authorization import (
+            assignment_is_round_closed_for_entity,
+            assignment_readonly_notice_reason,
+        )
+        app.jinja_env.globals['assignment_is_round_closed_for_entity'] = assignment_is_round_closed_for_entity
+        app.jinja_env.globals['assignment_readonly_notice_reason'] = assignment_readonly_notice_reason
+    except Exception as e:
+        app.logger.error(f"Failed to expose assignment readonly notice helpers to Jinja: {e}")
 
     app.jinja_env.globals['SUPPORTED_LANGUAGES'] = app.config.get('SUPPORTED_LANGUAGES')
     app.jinja_env.globals['LANGUAGE_DISPLAY_NAMES'] = getattr(Config, 'LANGUAGE_DISPLAY_NAMES', {})

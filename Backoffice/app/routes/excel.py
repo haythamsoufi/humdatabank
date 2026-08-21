@@ -45,7 +45,7 @@ def _validate_generic_excel_export_assignment(aes, *, is_ajax: bool):
         if is_ajax:
             return None, json_forbidden(msg)
         flash(msg, "warning")
-        return None, redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+        return None, redirect(url_for("assignments.view_assignment", aes_id=aes.id))
     return aes, None
 
 
@@ -56,7 +56,7 @@ def _validate_generic_excel_import_assignment(aes, *, is_ajax: bool):
         if is_ajax:
             return None, json_forbidden(msg)
         flash(msg, "warning")
-        return None, redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+        return None, redirect(url_for("assignments.view_assignment", aes_id=aes.id))
     return aes, None
 
 
@@ -164,7 +164,7 @@ def import_assignment_excel(aes_id):
         flash(error_msg, "warning")
         if is_ajax:
             return json_not_found(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     _, error_response = _validate_generic_excel_import_assignment(aes, is_ajax=is_ajax)
     if error_response is not None:
@@ -180,7 +180,7 @@ def import_assignment_excel(aes_id):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     # Validate file extension
     if not excel_file.filename.lower().endswith('.xlsx'):
@@ -188,7 +188,7 @@ def import_assignment_excel(aes_id):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     # Validate file size (check content_length if available, otherwise read and check)
     file_size = excel_file.content_length
@@ -203,7 +203,7 @@ def import_assignment_excel(aes_id):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
         wb = ExcelService.load_workbook(excel_file)
@@ -212,7 +212,7 @@ def import_assignment_excel(aes_id):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     result = ExcelService.import_assignment_data(aes, wb)
 
@@ -256,7 +256,7 @@ def import_assignment_excel(aes_id):
         if is_ajax:
             return json_bad_request(error_msg, errors=result['errors'])
 
-    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
 
 def _assignment_template_id(aes) -> int:
@@ -282,7 +282,7 @@ def _validate_upr_country_reporting_assignment(aes_id, *, is_ajax: bool):
         flash(error_msg, "warning")
         if is_ajax:
             return None, json_bad_request(error_msg)
-        return None, redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return None, redirect(url_for("assignments.view_assignment", aes_id=aes_id))
     return aes, None
 
 
@@ -297,7 +297,7 @@ def _validate_assignment_editable_state(aes, *, is_ajax: bool):
         flash(error_msg, "warning")
         if is_ajax:
             return json_forbidden(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes.id))
     return None
 
 
@@ -307,14 +307,14 @@ def _validate_excel_upload(excel_file, *, is_ajax: bool, aes_id: int):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     if not excel_file.filename.lower().endswith(".xlsx"):
         error_msg = "Invalid file type. Please upload a .xlsx file."
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     file_size = excel_file.content_length
     if file_size is None:
@@ -329,7 +329,7 @@ def _validate_excel_upload(excel_file, *, is_ajax: bool, aes_id: int):
         flash(error_msg, "danger")
         if is_ajax:
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
     return None
 
 
@@ -354,14 +354,14 @@ def export_upr_country_reporting_template(aes_id):
         flash(error_msg, "danger")
         if is_json_request():
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
     except Exception as exc:
         current_app.logger.error("%s export failed: %s", UPR_COUNTRY_REPORTING_LABEL, exc, exc_info=True)
         error_msg = f"{UPR_COUNTRY_REPORTING_LABEL} export failed: {exc}"
         flash(error_msg, "danger")
         if is_json_request():
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
         template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
@@ -483,7 +483,7 @@ def import_upr_country_reporting_template(aes_id):
         if is_ajax:
             return json_bad_request(error_msg, warnings=result.get("warnings"))
 
-    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
 
 def _validate_unified_country_plan_assignment(aes_id, *, is_ajax: bool):
@@ -502,7 +502,7 @@ def _validate_unified_country_plan_assignment(aes_id, *, is_ajax: bool):
         flash(error_msg, "warning")
         if is_ajax:
             return None, json_bad_request(error_msg)
-        return None, redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return None, redirect(url_for("assignments.view_assignment", aes_id=aes_id))
     return aes, None
 
 
@@ -522,14 +522,14 @@ def export_unified_country_plan_template(aes_id):
         flash(error_msg, "danger")
         if is_json_request():
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
     except Exception as exc:
         current_app.logger.error("%s export failed: %s", UNIFIED_COUNTRY_PLAN_LABEL, exc, exc_info=True)
         error_msg = f"{UNIFIED_COUNTRY_PLAN_LABEL} export failed: {exc}"
         flash(error_msg, "danger")
         if is_json_request():
             return json_bad_request(error_msg)
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
         template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
@@ -634,4 +634,4 @@ def import_unified_country_plan_template(aes_id):
         if is_ajax:
             return json_bad_request(error_msg, warnings=result.get("warnings"))
 
-    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))

@@ -97,7 +97,7 @@ def _assignment_created_related_url(aes) -> str:
     """
     aes_id = getattr(aes, 'id', None)
     if aes_id:
-        return url_for('forms.view_edit_form', form_type='assignment', form_id=aes_id)
+        return url_for('assignments.view_assignment', aes_id=aes_id)
     return url_for('main.dashboard')
 
 
@@ -386,7 +386,7 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False, act
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='admin',
         icon=None,
         user_id=None
@@ -435,7 +435,7 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False, act
         message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.assigned_form_id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='normal',
         exclude_user_ids=exclude_user_ids,
         send_email_notifications=False,
@@ -463,7 +463,7 @@ def notify_assignment_created(assignment_entity_status, notify_admins=False, act
                 message_params=dict(message_params),
                 related_object_type='assignment',
                 related_object_id=aes.assigned_form_id,
-                related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+                related_url=url_for('assignments.view_assignment', aes_id=aes.id),
                 entity_type=entity_type,
                 entity_id=entity_id,
                 priority='normal',
@@ -564,7 +564,7 @@ def notify_assignment_submitted(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='form',
         icon=None,
         user_id=None
@@ -577,7 +577,7 @@ def notify_assignment_submitted(assignment_entity_status):
 
     assignment_title = _resolve_assignment_display_title(assigned_form, template_name)
     entity_name = _resolve_entity_name(entity_type, entity_id)
-    related_url = url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id)
+    related_url = url_for('assignments.view_assignment', aes_id=aes.id)
 
     focal_notifications = []
     if audience_bucket_enabled(NotificationType.assignment_submitted, "focal_points"):
@@ -758,7 +758,7 @@ def notify_assignment_sent_for_review(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='form',
         icon=None,
         user_id=None,
@@ -782,7 +782,7 @@ def notify_assignment_sent_for_review(assignment_entity_status):
             entity_id=entity_id,
             related_object_type='assignment',
             related_object_id=aes.id,
-            related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+            related_url=url_for('assignments.view_assignment', aes_id=aes.id),
             priority='high',
             override_email_preferences=True,
         ) or []
@@ -808,7 +808,7 @@ def notify_assignment_sent_for_review(assignment_entity_status):
             entity_id=entity_id,
             related_object_type='assignment',
             related_object_id=aes.id,
-            related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+            related_url=url_for('assignments.view_assignment', aes_id=aes.id),
             priority='high',
             override_email_preferences=True,
         ) or []
@@ -842,7 +842,7 @@ def notify_assignment_returned_for_revision(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='form',
         icon=None,
         user_id=None,
@@ -883,7 +883,7 @@ def notify_assignment_returned_for_revision(assignment_entity_status):
         entity_id=entity_id,
         related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='high',
         override_email_preferences=True,
     )
@@ -912,7 +912,7 @@ def notify_assignment_approved(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='admin',
         icon=None,
         user_id=None
@@ -940,7 +940,7 @@ def notify_assignment_approved(assignment_entity_status):
         message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='normal'
     )
 
@@ -969,7 +969,7 @@ def notify_assignment_reopened(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='admin',
         icon=None,
         user_id=None
@@ -997,7 +997,7 @@ def notify_assignment_reopened(assignment_entity_status):
         message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='normal'
     )
     return notifications
@@ -1026,7 +1026,7 @@ def notify_self_report_created(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='admin',
         icon=None,
         user_id=None
@@ -1046,7 +1046,7 @@ def notify_self_report_created(assignment_entity_status):
         message_params=message_params,
         related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='normal'
     )
 
@@ -1096,7 +1096,7 @@ def notify_form_data_updated(assignment_entity_status, completion_percentage=Non
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='form',
         icon=None,
         user_id=None

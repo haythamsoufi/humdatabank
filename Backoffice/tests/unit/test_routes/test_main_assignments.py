@@ -96,9 +96,8 @@ class TestReopenAssignment:
         with patch(f"{_AUTH_SVC}.can_reopen_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_reopened", return_value=None):
             resp = client.post(f"/reopen_assignment/{aes.id}", follow_redirects=False)
-        assert_redirect(resp)
+        assert_redirect(resp, "dashboard")
         location = resp.headers.get("Location", "")
-        assert "dashboard" in location
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):
@@ -179,9 +178,8 @@ class TestApproveAssignment:
         with patch(f"{_AUTH_SVC}.can_approve_assignment", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_approved", return_value=None):
             resp = client.post(f"/approve_assignment/{aes.id}", follow_redirects=False)
-        assert_redirect(resp)
+        assert_redirect(resp, "dashboard")
         location = resp.headers.get("Location", "")
-        assert "dashboard" in location
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):
@@ -242,9 +240,8 @@ class TestReturnAssignmentForRevision:
         with patch(f"{_AUTH_SVC}.can_return_for_revision", return_value=True), \
              patch(f"{_NOTIF_CORE}.notify_assignment_returned_for_revision", return_value=None):
             resp = client.post(f"/return_assignment_for_revision/{aes.id}", follow_redirects=False)
-        assert_redirect(resp)
+        assert_redirect(resp, "dashboard")
         location = resp.headers.get("Location", "")
-        assert "dashboard" in location
         assert str(country.id) in location
 
     def test_db_error_flashes_error(self, client, db_session, app, admin_user):

@@ -35,6 +35,9 @@ from plugins.upr_visuals.catalog import (
     PNS_REPORT_LABEL_NEEDLES,
     PNS_REPORT_TEMPLATE_ID,
     REACH_CODES,
+    REACH_DROP_LONG_TERM_NEEDLES,
+    REACH_EMERGENCY_BANK_ID,
+    REACH_EMERGENCY_TO_SP2_NEEDLES,
     REPORT_ITEM_FALLBACKS,
     REPORT_LABEL_NEEDLES,
     REPORTING_SP_BREAKDOWN_AREA_TO_ROW,
@@ -87,6 +90,38 @@ def assignment_supports_visuals(aes: AssignmentEntityStatus | None) -> bool:
     return int(aes.assigned_form.template_id or 0) in UPR_VISUAL_TEMPLATE_IDS
 
 
+def visuals_document_title(*, country_name: str | None, assignment_title: str | None) -> str:
+    """Same string as the live PDF tab title (country — assignment)."""
+    parts = [
+        part
+        for part in ((country_name or "").strip(), str(assignment_title or "").strip())
+        if part
+    ]
+    return " — ".join(parts) or "UPR visuals"
+
+
+def visuals_browser_title(aes: AssignmentEntityStatus) -> str:
+    """Tab title for the live assignment PDF viewer."""
+    country = _country_for_aes(aes)
+    assigned = aes.assigned_form
+    return visuals_document_title(
+        country_name=getattr(country, "name", None),
+        assignment_title=assigned.display_name if assigned else "",
+    )
+
+
+def filename_from_visual_title(title: str, ext: str = "pdf") -> str:
+    """ASCII download name matching the PDF page title (HTTP headers are latin-1)."""
+    raw = (title or "").strip() or "UPR visuals"
+    raw = raw.replace("\u2014", " - ").replace("\u2013", "-")
+    for char in '<>:"/\\|?*':
+        raw = raw.replace(char, " ")
+    raw = raw.encode("ascii", "ignore").decode("ascii")
+    raw = " ".join(raw.split()) or "UPR visuals"
+    suffix = ext.lstrip(".").lower() or "pdf"
+    return f"{raw}.{suffix}"
+
+
 def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
     _set_spef_icon_mode(inline=inline_icons)
     aes = _load_aes(aes_id)
@@ -109,6 +144,11 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             "round_code": period_to_round(period_name, kind),
             "country_name": country.name if country else "",
             "iso3": country.iso3 if country else "",
+            "iso2": country.iso2 if country else "",
+            "document_title": visuals_document_title(
+                country_name=country.name if country else "",
+                assignment_title=assigned.display_name,
+            ),
             "national_society": display_ns_name(ns.name if ns else country.name if country else ""),
             "year": (planning_years(period_name) or [None])[0],
             "header_date": format_header_date(),
@@ -358,16 +398,22 @@ def _plan_people_reached(items, by_item, period_name: str) -> list[dict[str, Any
 
 
 def _report_people_reached(items, by_item, aes_id: int | None = None) -> list[dict[str, Any]]:
-    """Highest people-count indicator per Strategic Priority, Cross-cutting, and EO.
+    """Highest people-count indicator per Strategic Priority and EO.
 
     Matches Tableau People Reached ``MAX`` of unit=People / type=Number values.
+    Temporary: Cross-cutting is hidden; emergency-response reach counts under
+    Disasters and crises (SP2); long-term services reach is dropped.
     """
     candidates: list[tuple[str, float]] = []
     for item in items:
         bank = getattr(item, "indicator_bank", None)
         if not _is_people_count(bank):
             continue
-        area = _area_from_item(item)
+        area = override_people_reached_area(
+            _area_from_item(item),
+            bank=bank,
+            label=getattr(item, "label", None),
+        )
         if area not in REACH_CODES:
             continue
         number = _scalar_number(by_item.get(item.id))
@@ -380,7 +426,11 @@ def _report_people_reached(items, by_item, aes_id: int | None = None) -> list[di
             bank = getattr(dyn, "indicator_bank", None)
             if not _is_people_count(bank):
                 continue
-            area = "EO" if dyn.repeat_instance_number else _bank_area(bank)
+            area = override_people_reached_area(
+                "EO" if dyn.repeat_instance_number else _bank_area(bank),
+                bank=bank,
+                label=getattr(dyn, "custom_label", None),
+            )
             if area not in REACH_CODES:
                 continue
             number = _scalar_number(dyn)
@@ -388,6 +438,17 @@ def _report_people_reached(items, by_item, aes_id: int | None = None) -> list[di
                 continue
             candidates.append((area, number))
     return _reach_rows(max_people_by_area(candidates))
+
+
+def override_people_reached_area(area: str | None, *, bank=None, label: str | None = None) -> str | None:
+    """Temporary People reached remapping for Cross-cutting indicators."""
+    text = " ".join(part for part in (label, getattr(bank, "name", None)) if part).strip().lower()
+    bank_id = getattr(bank, "id", None)
+    if any(needle in text for needle in REACH_DROP_LONG_TERM_NEEDLES):
+        return None
+    if bank_id == REACH_EMERGENCY_BANK_ID or any(needle in text for needle in REACH_EMERGENCY_TO_SP2_NEEDLES):
+        return "SP2"
+    return area
 
 
 def max_people_by_area(candidates: list[tuple[str, float]]) -> dict[str, float]:

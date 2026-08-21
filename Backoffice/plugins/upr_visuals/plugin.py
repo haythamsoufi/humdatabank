@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.plugins.base import BasePlugin, DataExplorerTabConfig, SeedPermission, SeedRole
+from app.plugins.base import BasePlugin, CspOverride, DataExplorerTabConfig, SeedPermission, SeedRole
+
+# Titled viewer iframes the same-origin PDF; default CSP is frame-ancestors 'none'.
+_UPR_PDF_VIEWER_CSP = (
+    "default-src 'self'; "
+    "script-src 'none'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self'; "
+    "frame-src 'self'; "
+    "frame-ancestors 'self'; "
+    "base-uri 'self'; "
+    "form-action 'none'"
+)
 
 
 class UprVisualsPlugin(BasePlugin):
@@ -56,6 +68,15 @@ class UprVisualsPlugin(BasePlugin):
                 name="Admin: Data Explorer (UPR visuals)",
                 description="Access Unified Plan and Report visuals in Data Explorer.",
                 permission_codes=["admin.data_explore.upr_visuals"],
+            ),
+        ]
+
+    def get_csp_overrides(self) -> list[CspOverride]:
+        return [
+            CspOverride(
+                endpoint="upr_visuals.assignment_pdf",
+                path_predicate=lambda path: True,
+                policy=_UPR_PDF_VIEWER_CSP,
             ),
         ]
 

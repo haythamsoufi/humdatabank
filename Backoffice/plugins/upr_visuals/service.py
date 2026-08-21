@@ -16,7 +16,7 @@ from werkzeug.exceptions import NotFound
 from app.services.platform import storage_service
 from app.utils.datetime_helpers import utcnow
 from plugins.upr_visuals.catalog import DASHBOARD_BY_ID, dashboards_for_kind, kind_for_template
-from plugins.upr_visuals.data import UprVisualsError, build_payload
+from plugins.upr_visuals.data import UprVisualsError, build_payload, filename_from_visual_title
 from plugins.upr_visuals.raster import render_pdf_bytes, render_png
 from plugins.upr_visuals.render import render_dashboard_html
 
@@ -31,9 +31,13 @@ _threads: dict[str, threading.Thread] = {}
 
 
 def visual_export_filename(meta: dict[str, Any], dashboard_id: str, ext: str) -> str:
+    suffix = ext.lstrip(".").lower()
+    if dashboard_id == "combined":
+        title = str(meta.get("document_title") or "").strip()
+        if title:
+            return filename_from_visual_title(title, suffix)
     iso3 = str(meta.get("iso3") or "UNK").replace("/", "-")
     round_code = str(meta.get("round_code") or meta.get("period_name") or "round").replace("/", "-")
-    suffix = ext.lstrip(".").lower()
     return f"{iso3}_{round_code}_{dashboard_id}.{suffix}"
 
 

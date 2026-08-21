@@ -391,7 +391,7 @@ class WorkflowTourParser {
                                 }
                             } else {
                                 // Need to navigate - but only if next page looks like a complete URL
-                                // Don't navigate to partial paths like "/forms/assignment" that need an ID
+                                // Don't navigate to partial paths like "/assignment" that need an ID
                                 const looksLikePartialPath = /\/(assignment|user|template)$/.test(nextStepData.page);
                                 if (looksLikePartialPath) {
                                     // Can't auto-navigate to partial path

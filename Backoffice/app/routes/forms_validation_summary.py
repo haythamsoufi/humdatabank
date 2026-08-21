@@ -1561,7 +1561,7 @@ def register_validation_summary_routes(bp) -> None:
                 exc_info=True,
             )
             flash("Failed to generate validation summary.", "danger")
-            return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+            return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     @bp.route("/assignment_status/<int:aes_id>/validation_summary/opinions", methods=["GET"])
     @login_required

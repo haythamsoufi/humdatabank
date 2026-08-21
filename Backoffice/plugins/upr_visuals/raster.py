@@ -8,9 +8,13 @@ from functools import lru_cache
 from pathlib import Path
 
 from plugins.upr_visuals.catalog import (
+    A4_COMBINED_FOLLOWING_MARGIN_MM,
+    A4_COMBINED_MARGIN_MM,
     A4_MARGIN_MM,
     A4_PAGE_HEIGHT_PX,
     A4_PAGE_WIDTH_PX,
+    A4_PORTRAIT_HEIGHT_PX,
+    A4_PORTRAIT_WIDTH_PX,
     DASHBOARD_BY_ID,
 )
 
@@ -105,10 +109,86 @@ def _css_for_print(css: str) -> str:
     return "".join(out)
 
 
+def _is_portrait_export(dashboard_id: str) -> bool:
+    return dashboard_id == "combined"
+
+
 def _page_size(dashboard_id: str) -> tuple[int, int]:
-    """A4 landscape page in CSS pixels. ``dashboard_id`` kept for callers."""
+    """A4 CSS-pixel canvas. Combined (All visuals) is portrait; other chips stay landscape."""
     DASHBOARD_BY_ID[dashboard_id]
+    if _is_portrait_export(dashboard_id):
+        return A4_PORTRAIT_WIDTH_PX, A4_PORTRAIT_HEIGHT_PX
     return A4_PAGE_WIDTH_PX, A4_PAGE_HEIGHT_PX
+
+
+def _pdf_page_css(dashboard_id: str) -> str:
+    portrait = _is_portrait_export(dashboard_id)
+    orientation = "portrait" if portrait else "landscape"
+    margin = A4_COMBINED_MARGIN_MM if portrait else A4_MARGIN_MM
+    keep_together = ""
+    if portrait:
+        keep_together = (
+            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators),"
+            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) > .upr-block,"
+            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) table,"
+            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) .upr-bars {"
+            " break-inside: avoid; page-break-inside: avoid; }"
+            ".upr-doc-header {"
+            " break-inside: avoid; page-break-inside: avoid;"
+            " break-after: avoid; page-break-after: avoid;"
+            " margin: 0; width: 100%; }"
+            ".upr-dashboard--combined { display: block; }"
+            ".upr-doc-footer {"
+            " position: running(cover-footer); margin: 0; padding: 0; }"
+            ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
+            ".upr-combined-section--finance {"
+            " break-inside: avoid; page-break-inside: avoid; }"
+            ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
+            ".upr-combined-section--indicators,"
+            ".upr-combined-section--indicators > .upr-block {"
+            " break-inside: auto; page-break-inside: auto; }"
+            ".upr-combined-section--indicators .upr-block__title {"
+            " break-after: avoid; page-break-after: avoid; }"
+            ".upr-combined-section--indicators .upr-bar-group,"
+            ".upr-combined-section--indicators .upr-bar-row {"
+            " break-inside: avoid; page-break-inside: avoid; }"
+            ".upr-combined-section--page-start {"
+            " break-before: page; page-break-before: always; }"
+            ".upr-support-table { width: 100%; max-width: 100%; table-layout: fixed; }"
+            ".upr-support-table .upr-ns { white-space: normal; overflow-wrap: anywhere; }"
+            ".upr-support-th--plan span { writing-mode: horizontal-tb; transform: none; }"
+            ".upr-reach-row{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; }"
+            ".upr-combined-section > .upr-block--reach{"
+            " margin-left:-8mm; margin-right:-8mm; width:calc(100% + 16mm); max-width:none;"
+            " padding:1.15rem 8mm 1.35rem; }"
+            ".upr-reach-icon,.upr-reach-icon--img{ width:3.35rem; height:3.35rem; }"
+            ".upr-reach-icon--img img{ width:2.05rem; height:2.05rem; }"
+            ".upr-fin-hero,.upr-fin-grid{ width:100%; max-width:100%; }"
+            ".upr-fin-grid{ table-layout:fixed; border-collapse:collapse; }"
+            ".upr-fin-grid--with-sources .upr-fin-col-overview-plot{ width:22%; }"
+            ".upr-fin-grid .upr-bar-label{ white-space:nowrap; }"
+            ".upr-bar-track{ display:flex; flex-wrap:nowrap; align-items:center; width:100%; white-space:nowrap; }"
+        )
+    if portrait:
+        page = (
+            f"@page {{ size: A4 portrait; margin: {A4_COMBINED_FOLLOWING_MARGIN_MM}mm 0; }}\n"
+            "@page :first {\n"
+            f"  margin: {A4_COMBINED_MARGIN_MM}mm {A4_COMBINED_MARGIN_MM}mm 18mm;\n"
+            "  @bottom-center {\n"
+            "    content: element(cover-footer);\n"
+            "    width: 100%;\n"
+            "    vertical-align: bottom;\n"
+            "    padding: 0 8mm 5mm;\n"
+            "  }\n"
+            "}\n"
+        )
+    else:
+        page = f"@page {{ size: A4 {orientation}; margin: {margin}mm; }}\n"
+    return (
+        page
+        + "html, body { margin: 0; padding: 0; background: #fff; }\n"
+        f"{keep_together}"
+    )
 
 
 def resolve_export_image_src(src: str) -> str:
@@ -149,8 +229,25 @@ def _rewrite_export_images(html: str) -> str:
     return _IMG_SRC_RE.sub(_replace, html)
 
 
-def _wrap(dashboard_html: str, width: int | None = None) -> str:
+def _wrap(dashboard_html: str, width: int | None = None, *, dashboard_id: str = "") -> str:
     css = _CSS_PATH.read_text(encoding="utf-8") if _CSS_PATH.is_file() else ""
+    keep_together = ""
+    if _is_portrait_export(dashboard_id):
+        keep_together = (
+            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators),"
+            " .upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) > .upr-block,"
+            " .upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) table,"
+            " .upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) .upr-bars {"
+            " break-inside: avoid; page-break-inside: avoid; }"
+            ".upr-combined-section--indicators,"
+            " .upr-combined-section--indicators > .upr-block {"
+            " break-inside: auto; page-break-inside: auto; }"
+            ".upr-combined-section--indicators .upr-bar-group {"
+            " break-inside: avoid; page-break-inside: avoid; }"
+            ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
+            ".upr-combined-section--finance {"
+            " break-inside: avoid; page-break-inside: avoid; }"
+        )
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
         "<style>"
@@ -159,6 +256,7 @@ def _wrap(dashboard_html: str, width: int | None = None) -> str:
         ".upr-dashboard { width: 100%; max-width: none; }"
         ".upr-vis-page { width: auto; max-width: none; min-height: 0; "
         "padding: 0; margin: 0; box-shadow: none; }"
+        f"{keep_together}"
         "</style></head><body>"
         f"{_rewrite_export_images(dashboard_html)}</body></html>"
     )
@@ -305,13 +403,8 @@ def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.
         raise RuntimeError("WeasyPrint is required for UPR visual export.") from exc
 
     _page_size(dashboard_id)
-    document_html = _wrap(dashboard_html)
-    page_css = CSS(
-        string=(
-            f"@page {{ size: A4 landscape; margin: {A4_MARGIN_MM}mm; }}\n"
-            "html, body { margin: 0; padding: 0; background: #fff; }"
-        )
-    )
+    document_html = _wrap(dashboard_html, dashboard_id=dashboard_id)
+    page_css = CSS(string=_pdf_page_css(dashboard_id))
     pdf_buffer = io.BytesIO()
     HTML(string=document_html, base_url=_PLUGIN_DIR.resolve().as_uri() + "/").write_pdf(
         pdf_buffer,

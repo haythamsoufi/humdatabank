@@ -443,11 +443,11 @@ class TestEntryFormRoutes:
                 mock_edit.return_value = True
                 mock_prep.return_value = (template, [], {})
 
-                resp = client.get(f'/forms/assignment/{aes_id}')
+                resp = client.get(f'/assignment/{aes_id}')
                 assert resp.status_code == 200
 
     def test_view_edit_form_assignment_redirect(self, client, db_session, app, admin_user):
-        """Test legacy /forms/assignment_status/<id> redirects to unified route."""
+        """Test legacy /forms/assignment_status/<id> redirects to new canonical route."""
         with app.app_context():
             # Create test data
             country = create_test_country(db_session)
@@ -479,7 +479,7 @@ class TestEntryFormRoutes:
             resp = client.get(f'/forms/assignment_status/{aes_id}', follow_redirects=False)
             assert resp.status_code in (301, 302, 308)
             location = resp.headers.get('Location') or ''
-            assert f'/forms/assignment/{aes_id}' in location
+            assert f'/assignment/{aes_id}' in location
 
 
 @pytest.mark.integration

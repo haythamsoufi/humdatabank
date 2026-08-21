@@ -418,7 +418,7 @@ class TestEditAssignment:
         payload = json.loads(html[json_start:json_end].strip())
         assert len(payload) == 1
         assert payload[0]['completion_rate'] == 67.5
-        assert payload[0]['assignment_url'] == f'/forms/assignment/{aes_id}'
+        assert payload[0]['assignment_url'] == f'/assignment/{aes_id}'
 
     def test_existing_assignment_shows_status_overview(self, logged_in_client, db_session, app):
         with app.app_context():

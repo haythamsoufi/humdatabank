@@ -51,7 +51,7 @@
                                         {% endif %}
                                         {# Wrap the title in an anchor tag to make it clickable #}
                                         {% if item.type == 'assigned' %}
-                                            <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=item.item_object.id) }}" class="hover:underline text-black-700"> {# Added styling for link appearance #}
+                                            <a href="{{ url_for('assignments.view_assignment', aes_id=item.item_object.id) }}" class="hover:underline text-black-700"> {# Added styling for link appearance #}
                                                 {% if item.item_object.assigned_form.custom_name %}
                                                     {{ item.item_object.assigned_form.display_name }}
                                                 {% else %}
@@ -227,12 +227,12 @@
                                             )
                                         ) %}
                                         {% if current_user_has_role('assignment_editor_submitter') and aes.is_round_closed_for_entity() %}
-                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-secondary btn-sm">
+                                        <a href="{{ url_for('assignments.view_assignment', aes_id=aes.id) }}" class="btn btn-secondary btn-sm">
                                             <i class="fas fa-eye mr-1 -ml-0.5"></i>
                                             {{ _('View') }}
                                         </a>
                                         {% elif current_user_has_role('assignment_editor_submitter') and aes_can_enter %}
-                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
+                                        <a href="{{ url_for('assignments.view_assignment', aes_id=aes.id) }}" class="btn btn-primary btn-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                                             <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
@@ -241,7 +241,7 @@
                                         </a>
                                         {% elif (current_user_has_role('system_manager') or is_admin_user) %}
                                         {# Admins and System Managers see "Enter Data" for assigned forms #}
-                                        <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) }}" class="btn btn-primary btn-sm">
+                                        <a href="{{ url_for('assignments.view_assignment', aes_id=aes.id) }}" class="btn btn-primary btn-sm">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1 -ml-0.5" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                                             <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
@@ -529,7 +529,7 @@
                                                     <div class="ml-4">
                                                         <div class="text-sm font-medium text-gray-900">
                                                             {% if item.type == 'assigned' %}
-                                                                <a href="{{ url_for('forms.view_edit_form', form_type='assignment', form_id=item.item_object.id) }}" class="hover:underline text-black-700">
+                                                                <a href="{{ url_for('assignments.view_assignment', aes_id=item.item_object.id) }}" class="hover:underline text-black-700">
                                                                     {% if item.item_object.assigned_form.custom_name %}
                                                                         {{ item.item_object.assigned_form.display_name }}
                                                                     {% else %}

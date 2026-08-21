@@ -78,7 +78,7 @@ def register_entry_routes(bp):
     def view_edit_form(form_type, form_id):
         """Unified form viewing/editing endpoint for all form types."""
         if form_type == "assignment":
-            return handle_assignment_form(form_id)
+            return redirect(url_for("assignments.view_assignment", aes_id=form_id), 301)
         elif form_type == "public-submission":
             return redirect(url_for("forms.view_public_submission", submission_id=form_id))
         else:
@@ -89,7 +89,7 @@ def register_entry_routes(bp):
     @login_required
     def enter_data(aes_id):
         """Legacy route for backward compatibility - redirects to unified route."""
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     @bp.route("/templates/preview/<int:template_id>", methods=["GET"])
     @admin_required
@@ -770,7 +770,7 @@ def handle_assignment_form(aes_id):
         if not can_edit:
              entity_name = EntityService.get_entity_display_name(assignment_entity_status.entity_type, assignment_entity_status.entity_id)
              flash(_("This assignment for %(entity)s is in '%(status)s' status and cannot be edited by you at this time.", entity=entity_name, status=assignment_entity_status.status), "warning")
-             return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id))
+             return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
 
         if csrf_form.validate_on_submit():
             try:
@@ -786,7 +786,7 @@ def handle_assignment_form(aes_id):
                         msg = '; '.join(submission_result['validation_errors'])
                         return json_bad_request(msg, success=False)
                     else:
-                        redirect_url = url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id)
+                        redirect_url = url_for("assignments.view_assignment", aes_id=assignment_entity_status.id)
                         return redirect(redirect_url)
 
                 field_changes_tracker = submission_result['field_changes']
@@ -1032,7 +1032,7 @@ def handle_assignment_form(aes_id):
                         )
                     else:
                         flash("Progress saved successfully.", "success")
-                        redirect_url = url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id)
+                        redirect_url = url_for("assignments.view_assignment", aes_id=assignment_entity_status.id)
                         return redirect(redirect_url)
 
             except Exception as e:
@@ -1044,7 +1044,7 @@ def handle_assignment_form(aes_id):
                     return json_server_error(error_message, success=False)
                 else:
                     flash(error_message, "danger")
-                    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id))
+                    return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
         else:
             current_app.logger.error("CSRF validation failed")
             current_app.logger.error(f"CSRF form errors: {csrf_form.errors}")
@@ -1055,7 +1055,7 @@ def handle_assignment_form(aes_id):
                 return json_bad_request(error_message, success=False)
             else:
                 flash(error_message, "danger")
-                return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id))
+                return redirect(url_for("assignments.view_assignment", aes_id=assignment_entity_status.id))
 
     template_structure = form_template
 
@@ -1199,7 +1199,7 @@ def handle_assignment_form(aes_id):
         json=json,
         hasattr=hasattr,
         get_localized_country_name=get_localized_country_name,
-        form_action=url_for("forms.view_edit_form", form_type="assignment", form_id=assignment_entity_status.id),
+        form_action=url_for("assignments.view_assignment", aes_id=assignment_entity_status.id),
         translation_key=get_translation_key(),
         get_localized_indicator_definition=get_localized_indicator_definition,
         get_localized_indicator_type=get_localized_indicator_type,

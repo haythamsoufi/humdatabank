@@ -1402,7 +1402,7 @@ class AuthorizationService:
                             f"This assignment for {entity_name} is in '{aes.status}' status and cannot be edited by you at this time.",
                             "warning"
                         )
-                    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes.id))
+                    return redirect(url_for("assignments.view_assignment", aes_id=aes.id))
 
                 return f(aes_id, *args, **kwargs)
             except Exception as e:

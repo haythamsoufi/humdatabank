@@ -59,6 +59,8 @@ def get_unified_form_url(form_type, form_id, action=None):
     """
     if action:
         return url_for(f'forms.{action}_{form_type.replace("-", "_")}', **{f'{form_type.replace("-", "_")}_id' if 'submission' in form_type else 'form_id': form_id})
+    elif form_type == 'assignment':
+        return url_for('assignments.view_assignment', aes_id=form_id)
     else:
         return url_for('forms.view_edit_form', form_type=form_type, form_id=form_id)
 

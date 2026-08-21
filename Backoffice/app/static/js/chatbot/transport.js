@@ -1943,7 +1943,7 @@ export const TransportMixin = {
             } else if (path.includes('/analytics') || path.includes('/audit')) {
                 context.pageData.pageType = 'analytics';
                 context.pageData.description = 'Analytics dashboard showing platform usage and data insights';
-            } else if (path.includes('/forms/assignment/') || path.includes('/forms/public-submission/') ||
+            } else if (path.includes('/assignment/') || path.includes('/forms/assignment/') || path.includes('/forms/public-submission/') ||
                        path.includes('/entry_form') || path.includes('/form/') ||
                        path.includes('/public/') || path.includes('/assignment_status/')) {
                 context.pageData.pageType = 'data_entry_form';

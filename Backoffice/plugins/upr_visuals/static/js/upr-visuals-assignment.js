@@ -111,7 +111,7 @@
     if (!force && showFromCache(dashboardId)) return;
     setStatus("Loading visuals…");
     try {
-      const data = await fetchJson(`/upr-visuals/assignment/${aesId}?dashboard=${encodeURIComponent(dashboardId)}`, {
+      const data = await fetchJson(`/assignment/${aesId}/visuals?dashboard=${encodeURIComponent(dashboardId)}`, {
         headers: csrfHeaders(),
         credentials: "same-origin",
       });
@@ -149,7 +149,15 @@
 
   function downloadVisual(format) {
     const kind = format === "pdf" ? "pdf" : "png";
-    window.location.href = `/upr-visuals/assignment/${aesId}/${kind}/${encodeURIComponent(activeDashboard)}`;
+    const path =
+      kind === "pdf" && activeDashboard === "combined"
+        ? `/assignment/${aesId}/pdf`
+        : `/assignment/${aesId}/${kind}/${encodeURIComponent(activeDashboard)}`;
+    if (kind === "pdf" && activeDashboard === "combined") {
+      window.open(path, "_blank", "noopener");
+    } else {
+      window.location.href = path;
+    }
     setDownloadOpen(false);
   }
 

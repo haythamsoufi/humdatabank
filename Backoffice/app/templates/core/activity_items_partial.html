@@ -7,7 +7,7 @@
     {% set assignment_id = activity.assignment_id %}
     {% set field_id = sp.get('field_id') if sp else None %}
     {% if assignment_id %}
-        {% set base_url = url_for('forms.view_edit_form', form_type='assignment', form_id=assignment_id) %}
+        {% set base_url = url_for('assignments.view_assignment', aes_id=assignment_id) %}
         {% if field_id %}
             {% set activity_href = base_url + '#field-' ~ field_id %}
         {% else %}

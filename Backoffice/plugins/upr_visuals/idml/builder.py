@@ -416,6 +416,7 @@ class Idml:
         scale = min(w / img_w, h / img_h) if img_w and img_h else 1.0
         dw, dh = img_w * scale, img_h * scale
         ox, oy = (w - dw) / 2, (h - dh) / 2
+        escaped_uri = escape(uri, {'"': "&quot;"})
         return (
             f'<Rectangle Self="{rid}" ContentType="GraphicType" '
             f'ItemTransform="{_item_transform(x, y)}" ItemLayer="{_LAYER_ID}" Visible="true" '
@@ -428,7 +429,7 @@ class Idml:
             "<Profile type='enumeration'>UseDocument</Profile>"
             f'<GraphicBounds Left="0" Top="0" Right="{img_w:.4f}" Bottom="{img_h:.4f}"/>'
             "</Properties>"
-            f'<Link Self="{lid}" LinkResourceURI="{escape(uri, {"\"": "&quot;"})}" '
+            f'<Link Self="{lid}" LinkResourceURI="{escaped_uri}" '
             'LinkResourceFormat="$ID/PNG" StoredState="Normal" LinkResourceModified="false" '
             'LinkObjectModified="false" ShowInUI="true" CanEmbed="true" CanUnembed="true" '
             'CanPackage="true" ImportPolicy="Unmanaged"/>'
@@ -438,6 +439,7 @@ class Idml:
     def svg_frame(self, x: float, y: float, w: float, h: float, uri: str, svg_w: float, svg_h: float) -> str:
         rid, gid, lid = self.uid(), self.uid(), self.uid()
         scale = min(w / svg_w, h / svg_h) if svg_w and svg_h else 1.0
+        escaped_uri = escape(uri, {'"': "&quot;"})
         return (
             f'<Rectangle Self="{rid}" ContentType="GraphicType" '
             f'ItemTransform="{_item_transform(x, y)}" ItemLayer="{_LAYER_ID}" Visible="true" '
@@ -450,7 +452,7 @@ class Idml:
             "<Profile type='enumeration'>UseDocument</Profile>"
             f'<GraphicBounds Left="0" Top="0" Right="{svg_w:.4f}" Bottom="{svg_h:.4f}"/>'
             "</Properties>"
-            f'<Link Self="{lid}" LinkResourceURI="{escape(uri, {"\"": "&quot;"})}" '
+            f'<Link Self="{lid}" LinkResourceURI="{escaped_uri}" '
             'LinkResourceFormat="$ID/Scalable Vector Graphics" StoredState="Normal" '
             'LinkResourceModified="false" LinkObjectModified="false" ShowInUI="true" '
             'CanEmbed="true" CanUnembed="true" CanPackage="true" ImportPolicy="Unmanaged"/>'
@@ -464,6 +466,7 @@ class Idml:
         dw, dh = pdf_w * scale, pdf_h * scale
         ox, oy = (A4_W - dw) / 2.0, (A4_H - dh) / 2.0
         uri = f"file:Links/{filename}"
+        escaped_uri = escape(uri, {'"': "&quot;"})
         return (
             f'<Rectangle Self="{rid}" ContentType="GraphicType" '
             f'ItemTransform="{_item_transform(0, 0)}" ItemLayer="{_LAYER_ID}" Visible="true" '
@@ -477,7 +480,7 @@ class Idml:
             "<Profile type='enumeration'>UseDocument</Profile>"
             f'<GraphicBounds Left="0" Top="0" Right="{pdf_w:.4f}" Bottom="{pdf_h:.4f}"/>'
             "</Properties>"
-            f'<Link Self="{lid}" LinkResourceURI="{escape(uri, {"\"": "&quot;"})}" '
+            f'<Link Self="{lid}" LinkResourceURI="{escaped_uri}" '
             'LinkResourceFormat="$ID/Adobe Portable Document Format (PDF)" StoredState="Normal" '
             'LinkResourceModified="false" LinkObjectModified="false" ShowInUI="true" '
             'CanEmbed="true" CanUnembed="true" CanPackage="true" ImportPolicy="Unmanaged"/>'
@@ -500,6 +503,7 @@ class Idml:
         """Place one region of a WeasyPrint page at the same A4 coordinates."""
         rid, gid, lid = self.uid(), self.uid(), self.uid()
         uri = f"file:Links/{filename}"
+        escaped_uri = escape(uri, {'"': "&quot;"})
         return (
             f'<Rectangle Self="{rid}" ContentType="GraphicType" '
             f'ItemTransform="{_item_transform(x, y)}" ItemLayer="{_LAYER_ID}" Visible="true" '
@@ -512,7 +516,7 @@ class Idml:
             "<Profile type='enumeration'>UseDocument</Profile>"
             f'<GraphicBounds Left="0" Top="0" Right="{pdf_w:.4f}" Bottom="{pdf_h:.4f}"/>'
             "</Properties>"
-            f'<Link Self="{lid}" LinkResourceURI="{escape(uri, {"\"": "&quot;"})}" '
+            f'<Link Self="{lid}" LinkResourceURI="{escaped_uri}" '
             'LinkResourceFormat="$ID/Adobe Portable Document Format (PDF)" StoredState="Normal" '
             'LinkResourceModified="false" LinkObjectModified="false" ShowInUI="true" '
             'CanEmbed="true" CanUnembed="true" CanPackage="true" ImportPolicy="Unmanaged"/>'

@@ -24,6 +24,12 @@ from plugins.upr_visuals.formatters import appeal_number, document_subtitle, for
 IFRC_RED = "#d22730"
 IFRC_LOGO_SRC = "/static/IFRC_logo_square.svg"
 _NOT_REPORTED = "Not reported"
+_PLAN_REQ_BAR_CLASS = {
+    "HNS": "upr-plan-req__bar--hns",
+    "PNS": "upr-plan-req__bar--pns",
+    "IFRC Secretariat": "upr-plan-req__bar--ifrc",
+}
+_PLAN_REQ_ORDER = ("HNS", "PNS", "IFRC Secretariat")
 
 
 def _metric_html(text: str | None, *, fallback: str = _NOT_REPORTED) -> str:
@@ -146,7 +152,6 @@ def _combined(payload: dict[str, Any]) -> str:
             _in_support(payload),
             _reach(payload),
             _plan_funding(payload),
-            _plan_pns_list(payload),
             _network_funding(payload),
             _support(payload),
         ):
@@ -179,8 +184,16 @@ def _combined_section_wrap(part: str, *, page_start: bool = False) -> str:
     extra = ""
     if "upr-block--finance" in part:
         extra = " upr-combined-section--finance"
+    elif "upr-block--plan-fund" in part or "upr-plan-detail-row" in part:
+        extra = " upr-combined-section--plan-fund"
+    elif "upr-block--network-funding" in part:
+        extra = " upr-combined-section--network-funding"
     elif "upr-block--bars" in part:
         extra = " upr-combined-section--indicators"
+    elif "upr-block--reach" in part:
+        extra = " upr-combined-section--reach"
+    elif "upr-kpi-row" in part:
+        extra = " upr-combined-section--before-reach"
     if page_start:
         extra += " upr-combined-section--page-start"
     return f'<div class="upr-combined-section{extra}">{part}</div>'
@@ -389,12 +402,45 @@ def _plan_pns_list(payload: dict[str, Any]) -> str:
         note = "<p class='upr-plan-pns__note'>* Multilateral support only</p>"
     else:
         note = ""
+    items = "".join(f"<li>{name}</li>" for name in names)
     return (
         "<section class='upr-block upr-block--pns-list'>"
         "<h2 class='upr-block__title'>Participating National Societies</h2>"
-        f"<p class='upr-plan-pns__names'>{', '.join(names)}</p>"
+        f"<ul class='upr-plan-pns__list'>{items}</ul>"
         f"{note}</section>"
     )
+
+
+def _with_plan_pns(payload: dict[str, Any], detail: str) -> str:
+    pns = _plan_pns_list(payload)
+    if not pns:
+        return detail
+    return (
+        "<div class='upr-plan-detail-row'>"
+        "<table class='upr-plan-detail-row__grid'><tr>"
+        f"<td class='upr-plan-detail-row__fund'>{detail}</td>"
+        f"<td class='upr-plan-detail-row__pns'>{pns}</td>"
+        "</tr></table></div>"
+    )
+
+
+def _plan_req_amount(display: str | None, *, tone: str = "dark") -> str:
+    text = (display or "").strip()
+    extra = " upr-plan-req__amt--accent" if tone == "accent" else ""
+    if not text or text.lower() == "not reported":
+        return f"<span class='upr-plan-req__amt{extra}'>{_metric_html(text)}</span>"
+    if text.upper().endswith("CHF"):
+        text = text[:-3].strip()
+    return (
+        f"<span class='upr-plan-req__amt{extra}'>"
+        f"<span class='upr-num upr-plan-fund__source-value'>{escape(text)}</span>"
+        "<span class='upr-plan-req__chf'> CHF</span></span>"
+    )
+
+
+def _plan_req_total(display: str | None) -> str:
+    amount = _plan_req_amount(display, tone="accent")
+    return f"<div class='upr-plan-req__total'>Total {amount}</div>"
 
 
 def _plan_funding(payload: dict[str, Any]) -> str:
@@ -414,6 +460,7 @@ def _plan_funding(payload: dict[str, Any]) -> str:
                 continue
             cover.append(
                 {
+                    "entity": entity,
                     "label": label_map.get(entity, src.get("label") or entity),
                     "display": src.get("display") or "",
                     "value": src.get("value") or 0,
@@ -421,45 +468,69 @@ def _plan_funding(payload: dict[str, Any]) -> str:
             )
     year0 = meta.get("year") or (years[0].get("year") if years else None)
     network = fin.get("ifrc_network") or {}
-    sources = []
-    for src in cover:
-        sources.append(
-            "<div class='upr-plan-fund__source'>"
-            f"<div class='upr-plan-fund__source-value'>{_plan_chf_html(src.get('display'))}</div>"
-            f"<div class='upr-plan-fund__source-label'>{escape(src.get('label') or '')}</div>"
-            "</div>"
+    rank = {key: index for index, key in enumerate(_PLAN_REQ_ORDER)}
+    cover.sort(key=lambda src: rank.get(src.get("entity") or "", 99))
+    visible = [src for src in cover if float(src.get("value") or 0) > 0]
+    peak = max((float(src.get("value") or 0) for src in visible), default=0.0) or 1.0
+    rows = []
+    for src in visible:
+        value = float(src.get("value") or 0)
+        pct = min(100.0, max(8.0, 100.0 * value / peak))
+        hatch = _PLAN_REQ_BAR_CLASS.get(src.get("entity") or "", "upr-plan-req__bar--ifrc")
+        amount = _plan_req_amount(src.get("display"))
+        on_bar = pct >= 48
+        if on_bar:
+            plot = (
+                f"<div class='upr-plan-req__plot'>"
+                f"<span class='upr-plan-req__bar {hatch}' style='width:{pct:.1f}%'>{amount}</span>"
+                "</div>"
+            )
+        else:
+            plot = (
+                f"<div class='upr-plan-req__plot'>"
+                f"<span class='upr-plan-req__bar {hatch}' style='width:{pct:.1f}%'></span>"
+                "<span class='upr-plan-req__arrow' aria-hidden='true'></span>"
+                f"{amount}</div>"
+            )
+        rows.append(
+            "<div class='upr-plan-req__row'>"
+            f"<div class='upr-plan-req__label'>{escape(src.get('label') or '')}</div>"
+            f"{plot}</div>"
         )
-    total_display = network.get("funding_requirement_display") or (years[0].get("total_display") if years else "")
-    body = (
-        f"<div class='upr-plan-fund__year'>{escape(str(year0 or ''))}</div>" if year0 else ""
+    year0_total = network.get("funding_requirement_display") or (
+        years[0].get("total_display") if years else ""
     )
-    if sources:
-        body += f"<div class='upr-plan-fund__sources'>{''.join(sources)}</div>"
-        body += (
-            "<div class='upr-plan-fund__total'>Total "
-            f"{_plan_chf_html(total_display)}</div>"
+    current = ""
+    if year0 or rows:
+        tree = f"<div class='upr-plan-req__tree'>{''.join(rows)}</div>" if rows else ""
+        current = (
+            "<div class='upr-plan-req__current'>"
+            f"<div class='upr-plan-req__year'>{escape(str(year0 or ''))}</div>"
+            f"{_plan_req_total(year0_total)}"
+            f"{tree}</div>"
         )
-    else:
-        body += "<p class='upr-empty'>No funding requirements reported.</p>"
     projected = []
     for year_row in years[1:]:
         projected.append(
-            "<div class='upr-plan-fund__projected-year'>"
-            f"<div class='upr-plan-fund__year'>{escape(str(year_row.get('year') or ''))}</div>"
-            "<div class='upr-plan-fund__projected-label'>Total</div>"
-            f"<div class='upr-plan-fund__projected-value'>{_plan_chf_html(year_row.get('total_display'))}</div>"
-            "</div>"
+            "<div class='upr-plan-req__proj'>"
+            f"<div class='upr-plan-req__year'>{escape(str(year_row.get('year') or ''))}</div>"
+            f"{_plan_req_total(year_row.get('total_display'))}</div>"
         )
+    extra = ""
     if projected:
-        body += (
-            "<h3 class='upr-block__subtitle'>Projected funding requirements</h3>"
-            f"<div class='upr-plan-fund__projected'>{''.join(projected)}</div>"
+        extra = (
+            f"<div class='upr-plan-req__projected'>{''.join(projected)}</div>"
+            "<p class='upr-plan-req__note'>*Projected funding requirements</p>"
         )
-    return (
+    if not current and not extra:
+        body = "<p class='upr-empty'>No funding requirements reported.</p>"
+    else:
+        body = f"<div class='upr-plan-req'>{current}{extra}</div>"
+    return _with_plan_pns(
+        payload,
         "<section class='upr-block upr-block--plan-fund'>"
         "<h2 class='upr-block__title'>IFRC network Funding Requirements</h2>"
-        "<p class='upr-fin-unit'>in Swiss francs (CHF)</p>"
-        f"{body}</section>"
+        f"{body}</section>",
     )
 
 
@@ -518,7 +589,7 @@ def _network_funding(payload: dict[str, Any]) -> str:
             f"{_detail_pair(hns, ifrc, code, pill=False)}"
             "</tr>"
         )
-    return (
+    detail = (
         "<section class='upr-block upr-block--network-funding'>"
         "<div class='upr-detail-fund-wrap'>"
         "<h2 class='upr-block__title'>Detailed funding requirements</h2>"
@@ -542,6 +613,7 @@ def _network_funding(payload: dict[str, Any]) -> str:
         f"{_detail_amt_cell(_entity_funding_total(ifrc), pill=True)}"
         "</tr></tfoot></table></div></section>"
     )
+    return detail
 
 
 def _financial(payload: dict[str, Any]) -> str:
@@ -707,10 +779,17 @@ def _financial_network(
             first_entity = False
         if not table_rows:
             return ""
+        row_count = len(table_rows)
+        if row_count <= 10:
+            density = " upr-fin-net--airy"
+        elif row_count <= 16:
+            density = " upr-fin-net--spread"
+        else:
+            density = ""
         return (
             "<div class='upr-fin-network'>"
             "<h3 class='upr-block__subtitle upr-block__subtitle--center'>IFRC network</h3>"
-            "<table class='upr-fin-net'><colgroup>"
+            f"<table class='upr-fin-net{density}'><colgroup>"
             "<col class='upr-fin-net-col-entity'>"
             "<col class='upr-fin-net-col-bucket'>"
             "<col class='upr-fin-net-col-metric'>"

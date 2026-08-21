@@ -7,8 +7,9 @@
 #
 # Upload strategy:
 #   1. AzCopy dry-run — discover files that differ from blob storage
-#   2. AzCopy sync    — upload only those files (azcopy sync has no --cache-control flag)
-#   3. AzCopy set-properties (or az storage blob update) — Cache-Control metadata only
+#   2. Incremental: AzCopy sync, then az storage blob update (Cache-Control only)
+#   3. FORCE_STATIC_UPLOAD=1: AzCopy copy with --cache-control (set-properties
+#      cannot set this HTTP header — only tier/metadata/tags)
 #   4. az storage blob upload-batch — fallback when AzCopy is not installed
 #
 # Optional env:
@@ -17,7 +18,7 @@
 #   STATIC_STORAGE_ACCOUNT_NAME      override AccountName parsed from connection string
 #   STATIC_CONFIGURE_CORS=1          one-time blob CORS setup (account-level)
 #   STATIC_CORS_ORIGINS              space-separated origins when STATIC_CONFIGURE_CORS=1
-#   STATIC_FORCE_UPLOAD=1            skip dry-run short-circuit (full sync + cache-control on container)
+#   STATIC_FORCE_UPLOAD=1            full AzCopy copy with Cache-Control (skip dry-run)
 
 set -euo pipefail
 
@@ -151,13 +152,14 @@ _collect_dry_run_files() {
   rm -f "$dry_out"
 }
 
-# Metadata-only Cache-Control. Never re-upload file bytes — that is what made
-# FORCE_STATIC_UPLOAD deploys take ~7 minutes (one `az storage blob upload`
-# progress bar per static file).
+# Metadata-only Cache-Control via Azure CLI. AzCopy set-properties has no
+# --cache-control flag (only tier / metadata / tags), so do not call it here.
+# Used after incremental sync (typically a handful of files). Force uploads
+# set the header during azcopy copy instead — 500+ az CLI process starts
+# would be slower than re-copying ~30MB with the header already set.
 _apply_cache_control_headers() {
   local list_file="$1"
-  local dest="${2:-}"
-  local parallel count xargs_status dest_base dest_qs
+  local parallel count xargs_status
 
   if [[ ! -s "$list_file" ]]; then
     echo "No files need Cache-Control metadata updates."
@@ -165,32 +167,10 @@ _apply_cache_control_headers() {
   fi
 
   count="$(grep -cve '^[[:space:]]*$' "$list_file" || true)"
-
-  # Whole-container property update is one AzCopy call. Safe because this
-  # container holds only app static assets. Use it for force uploads or any
-  # large batch so CI does not issue hundreds of per-blob ARM calls.
-  if command -v azcopy >/dev/null 2>&1 && [[ -n "$dest" ]] \
-     && { [[ "${STATIC_FORCE_UPLOAD:-}" == "1" ]] || [[ "${count}" -ge 20 ]]; }; then
-    echo "Setting Cache-Control on container '${CONTAINER}' via AzCopy set-properties (recursive; ${count} synced file(s))."
-    azcopy set-properties "${dest}" \
-      --cache-control="${CACHE_CONTROL}" \
-      --recursive \
-      --log-level=WARNING \
-      --output-type=text
-    return 0
-  fi
-
   parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
   echo "Setting Cache-Control metadata on ${count} synced blob(s) (parallel=${parallel}) ..."
 
   export CONTAINER SOURCE_DIR CACHE_CONTROL AZURE_STORAGE_CONNECTION_STRING
-  dest_base=""
-  dest_qs=""
-  if [[ -n "$dest" ]]; then
-    dest_base="${dest%%\?*}"
-    dest_qs="${dest#*\?}"
-    export dest_base dest_qs
-  fi
 
   set +e
   tr -d '\r' < "$list_file" \
@@ -200,16 +180,6 @@ _apply_cache_control_headers() {
         local_file="${SOURCE_DIR}/${rel}"
         if [[ ! -f "${local_file}" ]]; then
           echo "WARN: skipping Cache-Control for missing local file: ${rel}" >&2
-          exit 0
-        fi
-        if [[ -n "${dest_base:-}" ]] && command -v azcopy >/dev/null 2>&1; then
-          if ! azcopy set-properties "${dest_base}/${rel}?${dest_qs}" \
-            --cache-control="${CACHE_CONTROL}" \
-            --log-level=ERROR \
-            --output-type=text; then
-            echo "ERROR: Cache-Control set-properties failed for: ${rel}" >&2
-            exit 1
-          fi
           exit 0
         fi
         if ! az storage blob update \
@@ -248,11 +218,20 @@ _upload_with_azcopy() {
   trap 'rm -f "$files_to_sync" "$cache_control_files"' RETURN
 
   if [[ "${STATIC_FORCE_UPLOAD:-}" == "1" ]]; then
-    echo "STATIC_FORCE_UPLOAD=1 — skipping dry-run short-circuit."
-    find "${SOURCE_DIR}" -type f -printf '%P\n' | sort -u >"$files_to_sync"
-  else
-    _collect_dry_run_files "${dest}" "$files_to_sync"
+    # copy (not sync) so --cache-control is applied during upload. Quoted
+    # "${SOURCE_DIR}/*" is passed to AzCopy (not expanded by bash) so files
+    # land at the container root, same as azcopy sync with a trailing slash.
+    echo "STATIC_FORCE_UPLOAD=1 — AzCopy copy with Cache-Control (no set-properties)."
+    azcopy copy "${SOURCE_DIR}/*" "${dest}" \
+      --recursive \
+      --overwrite=true \
+      --cache-control="${CACHE_CONTROL}" \
+      --log-level=WARNING \
+      --output-type=text
+    return 0
   fi
+
+  _collect_dry_run_files "${dest}" "$files_to_sync"
 
   if [[ ! -s "$files_to_sync" ]]; then
     echo "AzCopy dry-run: no static files differ from blob storage; skipping sync and Cache-Control pass."
@@ -262,7 +241,7 @@ _upload_with_azcopy() {
   echo "AzCopy dry-run: $(wc -l < "$files_to_sync" | tr -d ' ') file(s) to sync."
   echo "Syncing static assets with AzCopy (parallel; skips unchanged files) ..."
   # Trailing slash on source: sync contents of the directory into the container root.
-  # Note: azcopy sync does not support --cache-control; headers are applied after sync via az cli.
+  # azcopy sync cannot set Cache-Control; apply it after via az storage blob update.
   azcopy sync "${SOURCE_DIR}/" "${dest}" \
     --recursive \
     --delete-destination=false \
@@ -270,7 +249,7 @@ _upload_with_azcopy() {
     --output-type=text
 
   tr -d '\r' < "$files_to_sync" | sed '/^[[:space:]]*$/d' | sort -u >"$cache_control_files"
-  _apply_cache_control_headers "$cache_control_files" "${dest}"
+  _apply_cache_control_headers "$cache_control_files"
 }
 
 _upload_with_az_cli() {

@@ -131,9 +131,6 @@ def create_app(config_name=None):
     init_upload_storage(app)
     init_flask_extensions(app, config_class, startup_start)
 
-    from app.startup_tasks import run_startup_tasks
-    run_startup_tasks(app, selected_config_name, is_reloader)
-
     register_favicon_routes(app, static_folder_path)
 
     from app.middleware import register_site_lock_middleware, register_session_timeout_middleware
@@ -147,7 +144,19 @@ def create_app(config_name=None):
     register_template_context(app, config_class)
 
     is_reloading = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    if not hasattr(app, 'plugin_manager') and (not app.debug or is_reloading or app.config.get('TESTING')):
+    is_cli = str(os.environ.get('FLASK_RUN_FROM_CLI') or '').strip().lower() in {
+        '1', 'true', 'yes',
+    }
+    # Werkzeug's debug parent process must not load plugins (the reloader child
+    # will). Flask CLI commands still need the catalog — including `flask rbac
+    # seed` — so always load when invoked from the CLI.
+    should_load_plugins = (
+        not app.debug
+        or is_reloading
+        or app.config.get('TESTING')
+        or is_cli
+    )
+    if not hasattr(app, 'plugin_manager') and should_load_plugins:
         from app.plugins import PluginManager
         from app.plugins.form_integration import FormIntegration
         app.plugin_manager = PluginManager(app)
@@ -155,7 +164,7 @@ def create_app(config_name=None):
         app.plugin_manager.load_plugins()
         app.plugin_manager.register_template_loader()
         app.plugin_manager.register_context_processors()
-    elif app.debug and not is_reloading and not app.config.get('TESTING'):
+    elif app.debug and not is_reloading and not app.config.get('TESTING') and not is_cli:
         from app.plugins import PluginManager
         from app.plugins.form_integration import FormIntegration
         app.plugin_manager = PluginManager(app)
@@ -164,6 +173,11 @@ def create_app(config_name=None):
     # Compatibility alias — consumers should use plugin_manager directly.
     if hasattr(app, 'plugin_manager'):
         app.extension_registry = app.plugin_manager
+
+    # RBAC auto-seed reads plugin get_seed_roles(); it must start after plugins
+    # are loaded or the first boot after a plugin role is added is a no-op.
+    from app.startup_tasks import run_startup_tasks
+    run_startup_tasks(app, selected_config_name, is_reloader)
 
     from app.routes import register_all_blueprints
     from app.routes.api import api_bp

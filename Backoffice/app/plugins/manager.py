@@ -1012,8 +1012,13 @@ class PluginManager:
     def get_all_seed_permissions(self) -> List[tuple[str, str, str]]:
         catalog: List[tuple[str, str, str]] = []
         seen: Set[str] = set()
-        for plugin in self.plugins.values():
-            for perm in plugin.get_seed_permissions():
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                perms = plugin.get_seed_permissions() or []
+            except Exception as exc:
+                self.logger.warning("get_seed_permissions failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for perm in perms:
                 if perm.code in seen:
                     continue
                 seen.add(perm.code)
@@ -1022,8 +1027,13 @@ class PluginManager:
 
     def get_all_seed_roles(self) -> List[Dict[str, Any]]:
         roles: List[Dict[str, Any]] = []
-        for plugin in self.plugins.values():
-            for role in plugin.get_seed_roles():
+        for plugin_id, plugin in self.plugins.items():
+            try:
+                plugin_roles = plugin.get_seed_roles() or []
+            except Exception as exc:
+                self.logger.warning("get_seed_roles failed for plugin %s: %s", plugin_id, exc)
+                continue
+            for role in plugin_roles:
                 roles.append(
                     {
                         "code": role.code,

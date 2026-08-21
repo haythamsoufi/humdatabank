@@ -366,14 +366,16 @@ class TestSeedRbacPermissionsAndRoles:
 
     def test_skip_when_lock_not_acquired(self, db_session, app):
         with app.app_context():
-            from app import db as _db
-            with patch.object(_db.session, 'execute') as mock_exec:
-                mock_result = MagicMock()
-                mock_result.scalar.return_value = False  # lock not acquired
-                mock_exec.return_value = mock_result
-
-                with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                    result = seed_rbac_permissions_and_roles(use_advisory_lock=True)
+            with patch(
+                "app.services.organization.rbac_seed_service.try_session_advisory_lock",
+                return_value=False,
+            ), patch(
+                "app.services.organization.rbac_seed_service.db"
+            ) as mock_db, patch(
+                "app.services.organization.rbac_seed_service.safe_remove"
+            ):
+                mock_db.engine.dialect.name = "postgresql"
+                result = seed_rbac_permissions_and_roles(use_advisory_lock=True)
 
             assert result['skipped_due_to_lock'] == 1
             assert result['created_permissions'] == 0
@@ -465,6 +467,7 @@ class TestSeedRbacPermissionsAndRoles:
         bad_roles = [{'code': '', 'name': 'Empty', 'description': 'x', 'permission_codes': []}]
         with app.app_context():
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=bad_roles), \
+                 patch('app.services.organization.rbac_seed_service._extension_baseline_roles', return_value=[]), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
                 result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
             assert result['created_roles'] == 0
@@ -482,6 +485,7 @@ class TestSeedRbacPermissionsAndRoles:
         ]
         with app.app_context():
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=roles_with_dup), \
+                 patch('app.services.organization.rbac_seed_service._extension_baseline_roles', return_value=[]), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
                 result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
             # Only one link should be created for the unique permission
@@ -512,6 +516,63 @@ class TestSeedRbacPermissionsAndRoles:
         ]
         with app.app_context():
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=roles), \
+                 patch('app.services.organization.rbac_seed_service._extension_baseline_roles', return_value=[]), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
                 result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
             assert result['created_role_permission_links'] == 0
+
+    def test_creates_plugin_extension_role(self, db_session, app):
+        """Plugin seed roles must be inserted even when core roles already exist."""
+        from app.models.rbac import RbacRole, RbacPermission
+
+        ext_perm = ("admin.data_explore.upr_visuals", "UPR visuals", "Access UPR visuals")
+        ext_role = {
+            "code": "admin_data_explorer_upr_visuals",
+            "name": "Admin: Data Explorer (UPR visuals)",
+            "description": "Access UPR visuals.",
+            "permission_codes": ["admin.data_explore.upr_visuals"],
+        }
+        with app.app_context():
+            with patch(
+                "app.services.organization.rbac_seed_service._extension_permission_catalog",
+                return_value=[],
+            ), patch(
+                "app.services.organization.rbac_seed_service._extension_baseline_roles",
+                return_value=[],
+            ), patch("app.services.organization.rbac_seed_service.safe_remove"):
+                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+            assert db_session.query(RbacRole).filter_by(code=ext_role["code"]).first() is None
+
+            with patch(
+                "app.services.organization.rbac_seed_service._extension_permission_catalog",
+                return_value=[ext_perm],
+            ), patch(
+                "app.services.organization.rbac_seed_service._extension_baseline_roles",
+                return_value=[ext_role],
+            ), patch("app.services.organization.rbac_seed_service.safe_remove"):
+                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+
+            assert result["created_roles"] == 1
+            assert result["created_permissions"] == 1
+            role = db_session.query(RbacRole).filter_by(code=ext_role["code"]).first()
+            perm = db_session.query(RbacPermission).filter_by(code=ext_perm[0]).first()
+            assert role is not None
+            assert perm is not None
+
+    def test_plugin_registry_loads_empty_manager(self, app):
+        from app.services.organization.rbac_seed_service import _plugin_registry
+
+        registry = MagicMock()
+        registry.plugins = {}
+        original = getattr(app, "plugin_manager", None)
+        try:
+            app.plugin_manager = registry
+            with app.app_context():
+                resolved = _plugin_registry()
+            registry.load_plugins.assert_called_once()
+            assert resolved is registry
+        finally:
+            if original is not None:
+                app.plugin_manager = original
+            elif hasattr(app, "plugin_manager"):
+                delattr(app, "plugin_manager")

@@ -195,7 +195,9 @@ WORKBOOK_NORM_HEADER_TO_KEY: Dict[str, str] = {
     "total direct": "direct",
     "total male": "male",
     "total female": "female",
+    # Header text varies by wrap: "Other/ Unknown" vs "Other/Unknown".
     "other/ unknown": "unknown",
+    "other/unknown": "unknown",
     # NOTE: the "<5" age-group label slugifies (see slugify_age_group /
     # processing_service.py) to "_5" (the "<" becomes "_"), and the sexage
     # field-name/JSON-key pattern is "{sex_slug}_{age_slug}" — so the real
@@ -280,24 +282,30 @@ def _disagg_breakdown_dict(mode: str, values: Dict[str, Any]) -> Optional[Dict[s
     return None
 
 
+def _normalize_disagg_key(key: str) -> str:
+    return str(key or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+
 def _is_non_binary_disagg_key(key: str) -> bool:
-    norm = str(key or "").strip().lower().replace("-", "_")
+    norm = _normalize_disagg_key(key)
     return norm == "non_binary" or norm.startswith("non_binary_")
 
 
+def _is_unknown_sex_disagg_key(key: str) -> bool:
+    """True for form Unknown *sex* (unknown, unknown_5_17, …), not male_unknown age."""
+    norm = _normalize_disagg_key(key)
+    return norm == "unknown" or norm.startswith("unknown_")
+
+
 def _merge_non_binary_into_unknown_breakdown(breakdown: Dict[str, Any]) -> Dict[str, float]:
-    """Map form non_binary counts into workbook Other/Unknown (merged with unknown)."""
+    """Sum form Non-binary + Unknown (all age cells) into workbook Other/Unknown."""
     merged: Dict[str, float] = {}
     other_unknown = 0.0
     for key, val in breakdown.items():
         num = _coerce_disagg_number(val)
         if num is None:
             continue
-        if _is_non_binary_disagg_key(str(key)):
-            other_unknown += num
-            continue
-        norm = str(key).strip().lower().replace("-", "_")
-        if norm == "unknown":
+        if _is_non_binary_disagg_key(str(key)) or _is_unknown_sex_disagg_key(str(key)):
             other_unknown += num
             continue
         merged[str(key)] = merged.get(str(key), 0.0) + num
@@ -398,14 +406,19 @@ def _disagg_consistency_warning(
 
     if sex_age:
         sex_age_total = sum(sex_age.values())
-        if sex and abs(sex_age_total - sum(sex.values())) > tolerance:
+        # Other/Unknown has no age columns; it complements sex+age rather than
+        # conflicting with Total Male/Female.
+        unknown_only = sex.get("unknown")
+        male_female = {k: v for k, v in sex.items() if k != "unknown"}
+        if male_female and abs(sex_age_total - sum(male_female.values())) > tolerance:
             return (
                 f"{name!r}{where} has both a sex+age breakdown (summing to {sex_age_total:g}) and "
-                f"separate Total Male/Female values (summing to {sum(sex.values()):g}) that don't "
+                f"separate Total Male/Female values (summing to {sum(male_female.values()):g}) that don't "
                 f"match — the sex+age breakdown was imported and the separate totals were ignored. "
                 f"Please check for moved, duplicated, or stale cells."
             )
-        if sex_age and direct_total is not None and abs(sex_age_total - direct_total) > tolerance:
+        comparable_direct = sex_age_total + (unknown_only or 0.0)
+        if direct_total is not None and abs(comparable_direct - direct_total) > tolerance:
             return (
                 f"{name!r}{where} has a sex+age breakdown (summing to {sex_age_total:g}) that "
                 f"doesn't match its Total Direct value ({direct_total:g}) — the sex+age breakdown "
@@ -432,7 +445,14 @@ def _parse_workbook_row_disagg(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     sex_age, sex, direct_total, indirect = _extract_disagg_components(row)
 
     if sex_age:
-        values: Dict[str, Any] = {"direct": sex_age}
+        direct = dict(sex_age)
+        unknown_total = sex.get("unknown")
+        if unknown_total is not None:
+            # Excel Other/Unknown has no age split. Import it onto the form's
+            # Unknown × Unknown cell (indicator_*_sexage_unknown_unknown).
+            # Sex-only rows (no age columns) use mode=sex / values.unknown below.
+            direct["unknown_unknown"] = direct.get("unknown_unknown", 0.0) + unknown_total
+        values: Dict[str, Any] = {"direct": direct}
         if indirect is not None:
             values["indirect"] = indirect
         return {"mode": "sex_age", "values": values}

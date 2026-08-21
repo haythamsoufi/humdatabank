@@ -730,6 +730,9 @@ class TestRbacSeedCommand:
         with patch(
             "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
             return_value=stats,
+        ) as mock_seed, patch(
+            "app.services.organization.rbac_seed_service.get_missing_baseline_role_codes",
+            return_value=[],
         ):
             result = runner.invoke(args=["rbac", "seed"])
 
@@ -738,6 +741,7 @@ class TestRbacSeedCommand:
         assert "10 created" in result.output
         assert "3 created" in result.output
         assert "20 created" in result.output
+        mock_seed.assert_called_once_with(use_advisory_lock=False)
 
 
 class TestSeedEmailTemplatesCommand:

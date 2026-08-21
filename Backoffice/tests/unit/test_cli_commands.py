@@ -59,6 +59,28 @@ class TestRbacCliCommandsModule:
         assert "2 created" in result.output
         assert "10 created" in result.output
 
+    def test_rbac_seed_warns_when_roles_still_missing(self, rbac_runner):
+        stats = {
+            "created_permissions": 0,
+            "updated_permissions": 0,
+            "created_roles": 0,
+            "updated_roles": 0,
+            "created_role_permission_links": 0,
+            "deleted_role_permission_links": 0,
+        }
+        with patch(
+            "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",
+            return_value=stats,
+        ), patch(
+            "app.services.organization.rbac_seed_service.get_missing_baseline_role_codes",
+            return_value=["admin_data_explorer_upr_visuals"],
+        ):
+            result = rbac_runner.invoke(args=["rbac", "seed"])
+
+        assert result.exit_code == 0
+        assert "still missing" in result.output
+        assert "admin_data_explorer_upr_visuals" in result.output
+
     def test_rbac_seed_skipped_due_to_lock(self, rbac_runner):
         with patch(
             "app.services.organization.rbac_seed_service.seed_rbac_permissions_and_roles",

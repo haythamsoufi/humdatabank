@@ -436,9 +436,16 @@ def register_commands(app):
     @with_appcontext
     def seed_rbac():
         """Seed RBAC permissions and baseline roles (idempotent)."""
-        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+        from app.services.organization.rbac_seed_service import (
+            get_missing_baseline_role_codes,
+            seed_rbac_permissions_and_roles,
+        )
 
-        stats = seed_rbac_permissions_and_roles()
+        # Operator-initiated: do not lose to a gunicorn worker's advisory lock.
+        stats = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+        if stats.get("skipped_due_to_lock"):
+            click.echo("RBAC seed skipped (advisory lock held by another process).")
+            return
         click.echo("RBAC seed complete.")
         click.echo(
             f"- Permissions: {stats.get('created_permissions', 0)} created, {stats.get('updated_permissions', 0)} updated"
@@ -449,6 +456,9 @@ def register_commands(app):
         click.echo(
             f"- Role-permission links: {stats.get('created_role_permission_links', 0)} created, {stats.get('deleted_role_permission_links', 0)} deleted"
         )
+        missing = get_missing_baseline_role_codes()
+        if missing:
+            click.echo(f"WARNING: still missing role(s): {', '.join(missing)}")
 
     # ========================================================================
     # Email / Notification Template Seeding

@@ -158,16 +158,20 @@ class TestDeferredRbacSeed:
 
         mock_thread.assert_not_called()
 
-    def test_returns_early_when_auto_seed_env_is_empty_and_config_not_prod(self):
+    def test_auto_seeds_when_env_unset_including_development(self):
         fn = self._import()
         app = _mock_app()
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("AUTO_SEED_RBAC_ON_STARTUP", None)
+            os.environ.pop("RUNNING_MIGRATION", None)
+            os.environ.pop("FLASK_RUN_FROM_CLI", None)
             with patch("app.startup_tasks.threading.Thread") as mock_thread:
+                mock_instance = MagicMock()
+                mock_thread.return_value = mock_instance
                 fn(app, "development", is_reloader=False)
 
-        mock_thread.assert_not_called()
+        mock_instance.start.assert_called_once()
 
     def test_auto_seeds_for_production_config(self):
         fn = self._import()
@@ -213,6 +217,20 @@ class TestDeferredRbacSeed:
             "AUTO_SEED_RBAC_ON_STARTUP": "true",
             "RUNNING_MIGRATION": "1",
         }):
+            with patch("app.startup_tasks.threading.Thread") as mock_thread:
+                fn(app, "production", is_reloader=False)
+
+        mock_thread.assert_not_called()
+
+    def test_returns_early_when_flask_cli(self):
+        fn = self._import()
+        app = _mock_app()
+
+        with patch.dict(os.environ, {
+            "AUTO_SEED_RBAC_ON_STARTUP": "true",
+            "FLASK_RUN_FROM_CLI": "true",
+        }):
+            os.environ.pop("RUNNING_MIGRATION", None)
             with patch("app.startup_tasks.threading.Thread") as mock_thread:
                 fn(app, "production", is_reloader=False)
 

@@ -19,7 +19,10 @@ def register_rbac_commands(app) -> None:
         app-startup auto-seed always apply exactly the same permission catalog
         and role definitions.
         """
-        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+        from app.services.organization.rbac_seed_service import (
+            get_missing_baseline_role_codes,
+            seed_rbac_permissions_and_roles,
+        )
         result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
         if result.get("skipped_due_to_lock"):
             click.echo("RBAC seed skipped (advisory lock held by another process).")
@@ -28,3 +31,6 @@ def register_rbac_commands(app) -> None:
         click.echo(f"- Permissions: {result.get('created_permissions', 0)} created, {result.get('updated_permissions', 0)} updated")
         click.echo(f"- Roles: {result.get('created_roles', 0)} created, {result.get('updated_roles', 0)} updated")
         click.echo(f"- Role-permission links: {result.get('created_role_permission_links', 0)} created, {result.get('deleted_role_permission_links', 0)} deleted")
+        missing = get_missing_baseline_role_codes()
+        if missing:
+            click.echo(f"WARNING: still missing role(s): {', '.join(missing)}")

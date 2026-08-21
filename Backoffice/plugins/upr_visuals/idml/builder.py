@@ -1236,7 +1236,7 @@ def build_cover_chrome(
     if date_text:
         date_w = 130.0
         date_x = A4_W - LOGO_PAD - date_w
-        date_y = LOGO_Y + LOGO + 3.0 if ns_logo else 93.5
+        date_y = LOGO_Y + LOGO + 10.0 if ns_logo else 93.5
         items.append(
             _label(
                 doc,

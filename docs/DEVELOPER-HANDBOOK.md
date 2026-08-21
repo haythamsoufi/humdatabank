@@ -94,6 +94,8 @@ If `flask` commands complain about `FLASK_APP`, set it for your shell session:
 $env:FLASK_APP = "run.py"
 ```
 
+**One Flask on port 5000.** Windows can bind two `python run.py` processes to `127.0.0.1:5000` at once, which makes assignment/PDF requests look stuck. Start only one server — a second `run.py` now exits with an error instead of sharing the port. To stop a forgotten copy: `netstat -ano | findstr :5000` then `taskkill /F /PID <pid>`. For WeasyPrint/P&B exports, `FLASK_USE_RELOADER=false` avoids mid-request restarts.
+
 ## Common Development Commands
 
 ### Backoffice Development

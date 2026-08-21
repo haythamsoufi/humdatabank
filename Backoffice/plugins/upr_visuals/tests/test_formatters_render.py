@@ -477,17 +477,30 @@ def test_render_plan_combined_matches_inp_cover():
     assert "In support of Uganda Red Cross Society" in html
     assert "People to be reached in 2026" in html
     assert "IFRC network Funding Requirements" in html
+    assert "upr-combined-section--plan-fund" in html
+    assert "upr-combined-section--network-funding" in html
+    assert "upr-combined-section--reach" in html
+    assert "upr-combined-section--before-reach" in html
+    assert "upr-plan-req" in html
+    assert "upr-plan-req__tree" in html
+    assert "upr-plan-req__bar--hns" in html
     assert "Through Host National Society" in html
     assert "Through the IFRC" in html
-    assert "Projected funding requirements" in html
-    assert "19.1M CHF" in html
+    assert "*Projected funding requirements" in html
+    assert "20.2M" in html
+    assert "6.7M" in html
     assert "Participating National Societies" in html
     assert "Detailed funding requirements" in html
     assert "IFRC Network-Supported Activities" not in html
     assert "Enabling local actors" in html
     assert "FINANCIAL OVERVIEW" not in html
     assert "Strategic Priorities" not in html
-    assert html.count("upr-combined-section") >= 6
+    assert html.count("upr-combined-section") >= 5
+    assert "upr-plan-detail-row" in html
+    assert "upr-plan-pns__list" in html
+    assert "<li>Netherlands Red Cross</li>" in html
+    assert html.find("IFRC network Funding Requirements") < html.find("upr-plan-pns__list")
+    assert html.find("upr-plan-pns__list") < html.find("Detailed funding requirements")
     assert html.find("Detailed funding requirements") < html.find("upr-support-table")
     assert "ONGOING EMERGENCY INDICATORS" not in html
     assert "font-size:3.15rem" in html
@@ -549,6 +562,8 @@ def test_render_report_combined_keeps_tableau_overview():
     assert "upr-doc-header__logo" in html
     assert html.count("upr-doc-header__logo") == 1
     assert "FINANCIAL OVERVIEW" in html
+    assert "upr-combined-section--reach" in html
+    assert "upr-combined-section--before-reach" in html
     assert "upr-combined-section--finance" in html
     assert "upr-fin-cover" in html
     assert "IFRC network Funding Requirements" not in html
@@ -620,6 +635,7 @@ def test_render_plan_network_funding_matches_tableau_detail():
     assert "IFRC Network-Supported Activities" not in html
     assert "Longer-term needs in Swiss francs" not in html
     assert "upr-detail-fund-wrap" in html
+    assert "upr-plan-detail-row" not in html
     assert html.find("Ongoing emergencies") < html.find("Longer-term needs")
     assert html.find("Longer-term needs") < html.find("Climate and environment")
     assert html.find("Climate and environment") < html.find("Disasters &amp; crises")
@@ -758,6 +774,7 @@ def test_render_report_financial_breakdown():
     assert "Longer-term" in html
     assert "Emergency Operations" in html
     assert "upr-fin-net" in html
+    assert "upr-fin-net--airy" in html
     assert "upr-fin-net-col-metric" in html
     assert "upr-fin-net__entity" in html
     assert "upr-fin-net__bucket" in html

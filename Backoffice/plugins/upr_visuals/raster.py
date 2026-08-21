@@ -152,7 +152,9 @@ def _pdf_page_css(dashboard_id: str) -> str:
             ".upr-doc-footer {"
             " position: running(cover-footer); margin: 0; padding: 0; }"
             ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
-            ".upr-combined-section--finance {"
+            ".upr-combined-section--finance,"
+            ".upr-combined-section--plan-fund,.upr-block--plan-fund,"
+            ".upr-combined-section--network-funding {"
             " break-inside: avoid; page-break-inside: avoid; }"
             ".upr-combined-section--indicators,"
             ".upr-combined-section--indicators > .upr-block {"
@@ -255,7 +257,9 @@ def _wrap(dashboard_html: str, width: int | None = None, *, dashboard_id: str = 
             ".upr-combined-section--indicators .upr-bar-group {"
             " break-inside: avoid; page-break-inside: avoid; }"
             ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
-            ".upr-combined-section--finance {"
+            ".upr-combined-section--finance,"
+            ".upr-combined-section--plan-fund,.upr-block--plan-fund,"
+            ".upr-combined-section--network-funding {"
             " break-inside: avoid; page-break-inside: avoid; }"
             # Author CSS (not WeasyPrint user stylesheets) so this beats
             # .upr-block--finance { font-size: 1rem } in the shared sheet.

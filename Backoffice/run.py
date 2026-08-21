@@ -80,37 +80,6 @@ app = create_app(os.getenv('FLASK_CONFIG'))
 
 
 if __name__ == '__main__':
-    def _find_available_port(host: str, start_port: int, max_tries: int = 20) -> int:
-        """
-        Find an available TCP port by attempting to bind.
-
-        This avoids WinError 10013/10048 cases on Windows where some ports (notably 5000)
-        may be excluded/reserved by the OS or another process.
-        """
-        try:
-            import socket
-        except Exception as e:
-            logging.getLogger(__name__).debug("socket import failed: %s", e)
-            return start_port
-
-        for p in range(int(start_port), int(start_port) + int(max_tries)):
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                try:
-                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                except Exception as e:
-                    logging.getLogger(__name__).debug("setsockopt SO_REUSEADDR failed: %s", e)
-                s.bind((host, p))
-                return p
-            except OSError:
-                continue
-            finally:
-                try:
-                    s.close()
-                except Exception as e:
-                    logging.getLogger(__name__).debug("socket close failed: %s", e)
-        return start_port
-
     def _parse_bool_env(value: str | None, default: bool = False) -> bool:
         """Parse env as boolean. Only 'true' and 'false' accepted (case-insensitive)."""
         if value is None or str(value).strip() == "":
@@ -130,8 +99,25 @@ if __name__ == '__main__':
     default_port = 5000
     port = int(port_env) if port_env else int(default_port)
 
-    if not port_env:
-        port = _find_available_port(host, port)
+    from app.utils.dev_server_port import (
+        find_available_port,
+        occupied_server_message,
+        port_has_listener,
+        should_guard_existing_server,
+    )
+
+    # Windows SO_REUSEADDR lets a second `python run.py` bind :5000 while the
+    # first is still serving. Guard in the original process only — the Werkzeug
+    # reloader child must re-bind after a restart.
+    if should_guard_existing_server() and port_has_listener(host, port):
+        msg = occupied_server_message(host, port)
+        app.logger.error(msg)
+        raise SystemExit(msg)
+
+    if not port_env and should_guard_existing_server():
+        # Skip Hyper-V / ICS excluded ports (WinError 10013). Do not hop just
+        # because another Flask is listening — that case already exited above.
+        port = find_available_port(host, port)
 
     debug_env = os.environ.get("FLASK_DEBUG")
     if debug_env is not None:

@@ -1,9 +1,10 @@
-"""Bulk PNG generation jobs and single-dashboard PNG/PDF export for UPR visuals."""
+"""Bulk PNG generation jobs and single-dashboard PNG/PDF/IDML export for UPR visuals."""
 
 from __future__ import annotations
 
 import io
 import logging
+import shutil
 import threading
 import uuid
 import zipfile
@@ -150,6 +151,50 @@ class UprVisualsService:
         payload, html = cls._dashboard_html(aes_id, dashboard_id)
         filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "pdf")
         return render_pdf_bytes(html, dashboard_id=dashboard_id), filename
+
+    @classmethod
+    def idml_zip_bytes(cls, aes_id: int, word_bytes: bytes | None = None) -> tuple[bytes, str]:
+        from plugins.upr_visuals.data import filename_from_visual_title
+        from plugins.upr_visuals.idml import build_indesign_package
+
+        payload, html = cls._dashboard_html(aes_id, "combined")
+        pdf_bytes = render_pdf_bytes(html, dashboard_id="combined")
+        work_dir = Path(current_app.instance_path) / "upr_visuals_tmp" / f"idml_{uuid.uuid4().hex}"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            result = build_indesign_package(
+                payload=payload,
+                pdf_bytes=pdf_bytes,
+                work_dir=work_dir,
+                word_bytes=word_bytes,
+            )
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
+        title = str((payload.get("meta") or {}).get("document_title") or result.get("title") or "UPR visuals")
+        stem = filename_from_visual_title(title, "zip")[:-4]
+        return result["zip_bytes"], f"{stem} - InDesign.zip"
+
+    @classmethod
+    def narrative_pdf_bytes(cls, aes_id: int, word_bytes: bytes) -> tuple[bytes, str]:
+        from plugins.upr_visuals.idml import (
+            folio_label,
+            load_word_paragraphs,
+            merge_report_pdfs,
+            render_narrative_pdf_bytes,
+            style_narrative_blocks,
+        )
+
+        payload, html = cls._dashboard_html(aes_id, "combined")
+        meta = payload.get("meta") or {}
+        visuals = render_pdf_bytes(html, dashboard_id="combined")
+        styled = style_narrative_blocks(
+            load_word_paragraphs(word_bytes),
+            country_name=str(meta.get("country_name") or ""),
+        )
+        narrative = render_narrative_pdf_bytes(styled, folio=folio_label(meta))
+        data = merge_report_pdfs(visuals, narrative, folio=folio_label(meta)) if styled else visuals
+        filename = visual_export_filename(meta, "combined", "pdf")
+        return data, filename
 
     @classmethod
     def _dashboard_html(cls, aes_id: int, dashboard_id: str) -> tuple[dict[str, Any], str]:

@@ -476,7 +476,7 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 | Plugin contract | [`Backoffice/app/plugins/base.py`](Backoffice/app/plugins/base.py) (`BasePlugin`, optional admin hooks) |
 | Discovery & lifecycle | [`Backoffice/app/plugins/manager.py`](Backoffice/app/plugins/manager.py) (`PluginManager`) |
 | Example plugin | [`Backoffice/plugins/pb_progress/`](Backoffice/plugins/pb_progress/) |
-| UPR visuals plugin | [`Backoffice/plugins/upr_visuals/`](Backoffice/plugins/upr_visuals/) — live Unified Plan (template 24) / Report (template 33) dashboards on assignment pages, plus bulk PNG export on the Data Explorer **UPR visuals** tab (replaces Tableau `UPR Visuals.twb`). Temporary People reached remapping: [`people-reached.md`](../Backoffice/plugins/upr_visuals/docs/people-reached.md) |
+| UPR visuals plugin | [`Backoffice/plugins/upr_visuals/`](Backoffice/plugins/upr_visuals/) — live Unified Plan (template 24) / Report (template 33) dashboards on assignment pages; PNG/PDF/InDesign download; optional Word-narrative PDF or InDesign package; bulk PNG export on the Data Explorer **UPR visuals** tab (replaces Tableau `UPR Visuals.twb`). Temporary People reached remapping: [`people-reached.md`](../Backoffice/plugins/upr_visuals/docs/people-reached.md) |
 | Standalone tool scripts | `Backoffice/plugins/<id>/visuals/` (or similar subfolder) |
 
 **To add a new admin-feature plugin:**

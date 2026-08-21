@@ -236,7 +236,12 @@ def main():
                         except IntegrityError:
                             logger.info('Second default focal point user already exists (skipped)')
 
-                    # Create system manager user
+                    # Create system manager user. No country entity permission is
+                    # granted: the system_manager RBAC role already unlocks every
+                    # country (see AuthorizationService.is_system_manager and
+                    # EntityService.get_entities_for_user), so an explicit grant
+                    # would only scope them down to that one country in UI paths
+                    # that branch on "does this user have any entity permissions".
                     sys_manager_exists = User.query.filter_by(email='test_sys@humdatabank.org').first()
                     if not sys_manager_exists:
                         sys_manager = User(email='test_sys@humdatabank.org', name='Test System Manager')
@@ -246,11 +251,7 @@ def main():
                                 db.session.add(sys_manager)
                                 db.session.flush()
                                 db.session.add(RbacUserRole(user_id=sys_manager.id, role_id=sys_role_id))
-                                if test_country:
-                                    country = Country.query.get(test_country_id)
-                                    if country:
-                                        sys_manager.add_entity_permission(entity_type='country', entity_id=country.id)
-                            logger.info('Created default system manager user')
+                            logger.info('Created default system manager user (all countries via role)')
                         except IntegrityError:
                             logger.info('Default system manager user already exists (skipped)')
 

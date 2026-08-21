@@ -1,4 +1,4 @@
-"""UPR Visuals plugin — live assignment dashboards and bulk PNG export."""
+"""UPR Visuals plugin — live assignment dashboards, PNG/PDF/IDML export, bulk PNG."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class UprVisualsPlugin(BasePlugin):
 
     @property
     def version(self) -> str:
-        return "1.0.0"
+        return "1.1.0"
 
     def get_field_types(self):
         return []

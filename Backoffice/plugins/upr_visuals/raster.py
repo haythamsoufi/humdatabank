@@ -84,12 +84,20 @@ def _font_css() -> str:
     return "\n".join(face for face in faces if face)
 
 
+_PRINT_DROP_AT = ("@media", "@keyframes", "@-webkit-keyframes")
+
+
 def _css_for_print(css: str) -> str:
-    """Drop @media blocks. WeasyPrint rejects query-only media, and PNG export is desktop-width."""
+    """Drop screen-only at-rules. WeasyPrint rejects @media and @keyframes."""
     out: list[str] = []
     i = 0
-    while True:
-        start = css.find("@media", i)
+    length = len(css)
+    while i < length:
+        start = -1
+        for name in _PRINT_DROP_AT:
+            pos = css.find(name, i)
+            if pos >= 0 and (start < 0 or pos < start):
+                start = pos
         if start < 0:
             out.append(css[i:])
             break

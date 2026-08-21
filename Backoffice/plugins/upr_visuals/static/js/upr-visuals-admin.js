@@ -473,20 +473,14 @@
     if (!ready) setPreviewDownloadOpen(false);
   }
 
-  function downloadPreviewVisual(format) {
-    const aesId = els.previewCountry.value;
-    if (!aesId || !previewDashboard) return;
-    const kind = format === "pdf" ? "pdf" : "png";
-    const path =
-      kind === "pdf" && previewDashboard === "combined"
-        ? `/assignment/${encodeURIComponent(aesId)}/pdf`
-        : `/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(previewDashboard)}`;
-    if (kind === "pdf" && previewDashboard === "combined") {
-      window.open(path, "_blank", "noopener");
-    } else {
-      window.location.href = path;
-    }
-    setPreviewDownloadOpen(false);
+  if (window.UprVisualsDownload) {
+    window.UprVisualsDownload.bindDownloadMenu({
+      button: els.previewDownload,
+      menu: els.previewDownloadMenu,
+      wrap: previewDownloadWrap,
+      aesIdFn: () => els.previewCountry.value,
+      dashboardFn: () => previewDashboard,
+    });
   }
 
   function setDashboards(checked) {
@@ -559,23 +553,6 @@
     previewHtmlCache = Object.create(null);
     previewAesId = "";
     loadPreview();
-  });
-  els.previewDownload?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    if (els.previewDownload.disabled) return;
-    setPreviewDownloadOpen(!previewDownloadWrap?.classList.contains("is-open"));
-  });
-  els.previewDownloadMenu?.addEventListener("click", (event) => {
-    const item = event.target.closest("[data-format]");
-    if (!item) return;
-    downloadPreviewVisual(item.dataset.format);
-  });
-  document.addEventListener("click", (event) => {
-    if (!previewDownloadWrap || previewDownloadWrap.contains(event.target)) return;
-    setPreviewDownloadOpen(false);
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setPreviewDownloadOpen(false);
   });
   els.generate.addEventListener("click", async () => {
     const assignedFormId = parseInt(els.assignment.value, 10);

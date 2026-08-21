@@ -72,6 +72,16 @@ def test_pdf_viewer_sets_document_title():
 
 
 @pytest.mark.unit
+def test_file_response_zip_is_attachment():
+    from plugins.upr_visuals.routes import _file_response
+
+    response = _file_response(b"PK", "NS - InDesign.zip", mimetype="application/zip", download=True)
+    assert response.mimetype == "application/zip"
+    assert response.headers["Content-Disposition"].startswith("attachment;")
+    assert "NS - InDesign.zip" in response.headers["Content-Disposition"]
+
+
+@pytest.mark.unit
 def test_pdf_viewer_csp_allows_same_origin_frame():
     from plugins.upr_visuals.plugin import UprVisualsPlugin, _UPR_PDF_VIEWER_CSP
 

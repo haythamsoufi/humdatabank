@@ -151,6 +151,51 @@ def _ensure_dev_test_admin_roles(user, app_instance) -> None:
         app_instance.logger.debug("RBAC test admin role assignment failed: %s", e)
 
 
+def _ensure_dev_test_sys_manager_role(user, app_instance) -> None:
+    """Ensure the existing dev test_sys user has the system_manager RBAC role."""
+    try:
+        added = _assign_role_to_user(
+            int(user.id),
+            "system_manager",
+            name="System Manager",
+            description="Full access (superuser).",
+        )
+        if added:
+            db.session.commit()
+            app_instance.logger.info(
+                "Granted system_manager role to '%s'",
+                user.email,
+            )
+    except Exception as e:
+        db.session.rollback()
+        app_instance.logger.debug("RBAC system manager role assignment failed: %s", e)
+
+
+def _clear_dev_test_sys_manager_entity_permissions(user, app_instance) -> None:
+    """Drop leftover entity grants. System managers already have all countries."""
+    from app.models.core import UserEntityPermission
+
+    if not user:
+        return
+
+    try:
+        deleted = UserEntityPermission.query.filter_by(user_id=int(user.id)).delete(
+            synchronize_session=False
+        )
+        if deleted:
+            db.session.commit()
+            app_instance.logger.info(
+                "Removed %d leftover entity permission(s) from system manager '%s'",
+                deleted,
+                user.email,
+            )
+    except Exception as e:
+        db.session.rollback()
+        app_instance.logger.debug(
+            "Clearing entity permissions failed for '%s': %s", user.email, e
+        )
+
+
 def create_default_data(app_instance):
     """Seed test country, RBAC roles, and test users. Development only."""
     flask_config = os.environ.get('FLASK_CONFIG', '').lower()
@@ -361,8 +406,6 @@ def create_default_data(app_instance):
                             name="System Manager",
                             description="Full access (superuser).",
                         )
-                        if test_country_id:
-                            sys_manager.add_entity_permission(entity_type="country", entity_id=test_country_id)
                     except Exception as e:
                         app_instance.logger.debug("RBAC system manager role assignment failed: %s", e)
 
@@ -375,7 +418,7 @@ def create_default_data(app_instance):
                         )
                     else:
                         app_instance.logger.info(
-                            "Created default system manager user '%s' and assigned Testland",
+                            "Created default system manager user '%s' (all countries via role)",
                             test_sys_email,
                         )
                 else:
@@ -386,7 +429,8 @@ def create_default_data(app_instance):
                 app_instance.logger.info(
                     "Default system manager user '%s' already exists.", test_sys_email
                 )
-                _ensure_user_country_entity_permission(sys_manager_user, test_country_id, app_instance)
+                _ensure_dev_test_sys_manager_role(sys_manager_user, app_instance)
+                _clear_dev_test_sys_manager_entity_permissions(sys_manager_user, app_instance)
 
         except Exception as e:
             db.session.rollback()

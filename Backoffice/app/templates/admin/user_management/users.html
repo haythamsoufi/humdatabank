@@ -381,6 +381,16 @@ window.usersGridConfig.t = {
     active_4d3d769b: {{ _('Active')|tojson }},
     inactive_3cab7a0a: {{ _('Inactive')|tojson }},
 };
+{# Testland (iso3 TST) is a seeded sandbox country — omit it from the "has every country" / Global check. #}
+{% set ignore_countries_for_global = [] %}
+{% for _region, _countries in countries_by_region.items() %}
+    {% for _country in _countries %}
+        {% if _country.name == 'Testland' or _country.iso3 == 'TST' %}
+            {% set __ = ignore_countries_for_global.append(_country.name) %}
+        {% endif %}
+    {% endfor %}
+{% endfor %}
+window.usersGridConfig.ignoreCountriesForGlobal = {{ (ignore_countries_for_global or ['Testland'])|tojson }};
 </script>
 <script src="{{ static_url('js/admin/users-grid.js') }}"></script>
 {% endblock %}

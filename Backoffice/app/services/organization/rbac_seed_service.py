@@ -14,6 +14,7 @@ This module is intentionally used by both:
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import text
@@ -23,8 +24,42 @@ logger = logging.getLogger(__name__)
 from app.extensions import db
 from app.models import User
 from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission, RbacUserRole
-from app.utils.pg_advisory_lock import release_session_advisory_lock, try_session_advisory_lock
+from app.utils.pg_advisory_lock import (
+    release_session_advisory_lock,
+    try_session_advisory_lock,
+    wait_for_session_advisory_lock,
+)
 from app.utils.transactions import atomic, safe_remove
+
+
+class RbacSeedLockMode(str, Enum):
+    """How `seed_rbac_permissions_and_roles()` coordinates with concurrent seeders.
+
+    Session-level PostgreSQL advisory locks (see `app/utils/pg_advisory_lock.py`)
+    prevent two processes from writing the RBAC catalog at the same time and
+    hitting spurious unique-constraint races. Which strategy to use depends on
+    who's calling:
+
+    - TRY: non-blocking. If another process holds the lock, return immediately
+      with `skipped_due_to_lock=1` and make no writes. Right for the
+      best-effort background auto-seed thread started on every gunicorn worker
+      boot (`app/startup_tasks.py`) -- losing the race to a sibling worker
+      seeding the exact same catalog is harmless, and a boot-time thread must
+      never block app startup waiting on another process.
+    - WAIT: retry non-blocking attempts for up to `wait_timeout_seconds`
+      (see `wait_for_session_advisory_lock`) before giving up. Right for
+      operator/deploy-triggered seeding (`flask rbac seed`, entrypoint.sh,
+      one-off scripts): these calls must reliably apply catalog changes rather
+      than silently reporting "0 created, 0 updated" just because a gunicorn
+      worker's background auto-seed happened to be holding the lock at that
+      instant.
+    - NONE: skip the advisory lock entirely. Only appropriate for tests that
+      want deterministic execution regardless of dialect/concurrency.
+    """
+
+    TRY = "try"
+    WAIT = "wait"
+    NONE = "none"
 
 
 def _permission_catalog() -> List[Tuple[str, str, str]]:
@@ -533,9 +568,18 @@ def get_missing_baseline_role_codes() -> List[str]:
         return []
 
 
-def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[str, int]:
+def seed_rbac_permissions_and_roles(
+    *,
+    lock_mode: RbacSeedLockMode = RbacSeedLockMode.TRY,
+    wait_timeout_seconds: float = 30.0,
+) -> Dict[str, int]:
     """
     Seed RBAC permissions and baseline roles (idempotent).
+
+    `lock_mode` controls how this call coordinates with other processes that
+    might be seeding at the same time -- see `RbacSeedLockMode` for the exact
+    semantics of TRY / WAIT / NONE and which callers should use which.
+    `wait_timeout_seconds` only applies to `RbacSeedLockMode.WAIT`.
 
     Returns counts:
       - created_permissions
@@ -545,6 +589,7 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
       - created_role_permission_links
       - deleted_role_permission_links
     """
+    lock_mode = RbacSeedLockMode(lock_mode)
     core_permissions = _permission_catalog()
     extension_permissions = _extension_permission_catalog()
     permission_catalog = core_permissions + extension_permissions
@@ -673,9 +718,14 @@ def seed_rbac_permissions_and_roles(*, use_advisory_lock: bool = True) -> Dict[s
     lock_key = 915_037_121  # arbitrary stable integer constant
     lock_acquired = False
 
-    if use_advisory_lock and db.engine.dialect.name == "postgresql":
+    if lock_mode != RbacSeedLockMode.NONE and db.engine.dialect.name == "postgresql":
         try:
-            lock_acquired = try_session_advisory_lock(db.session, lock_key)
+            if lock_mode == RbacSeedLockMode.WAIT:
+                lock_acquired = wait_for_session_advisory_lock(
+                    db.session, lock_key, timeout_seconds=wait_timeout_seconds
+                )
+            else:
+                lock_acquired = try_session_advisory_lock(db.session, lock_key)
             if not lock_acquired:
                 return {
                     "skipped_due_to_lock": 1,

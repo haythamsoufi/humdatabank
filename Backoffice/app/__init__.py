@@ -144,17 +144,15 @@ def create_app(config_name=None):
     register_template_context(app, config_class)
 
     is_reloading = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
-    is_cli = str(os.environ.get('FLASK_RUN_FROM_CLI') or '').strip().lower() in {
-        '1', 'true', 'yes',
-    }
-    # Werkzeug's debug parent process must not load plugins (the reloader child
-    # will). Flask CLI commands still need the catalog — including `flask rbac
-    # seed` — so always load when invoked from the CLI.
+    # Werkzeug's debug parent process must not load plugins; the reloader child
+    # will. One-off `flask` CLI commands that need the plugin catalog (e.g.
+    # `flask rbac seed`) don't need special-casing here: rbac_seed_service's
+    # _plugin_registry() lazily calls load_plugins() itself if the registry is
+    # still empty when seeding runs, regardless of boot order.
     should_load_plugins = (
         not app.debug
         or is_reloading
         or app.config.get('TESTING')
-        or is_cli
     )
     if not hasattr(app, 'plugin_manager') and should_load_plugins:
         from app.plugins import PluginManager
@@ -164,7 +162,7 @@ def create_app(config_name=None):
         app.plugin_manager.load_plugins()
         app.plugin_manager.register_template_loader()
         app.plugin_manager.register_context_processors()
-    elif app.debug and not is_reloading and not app.config.get('TESTING') and not is_cli:
+    elif app.debug and not is_reloading and not app.config.get('TESTING'):
         from app.plugins import PluginManager
         from app.plugins.form_integration import FormIntegration
         app.plugin_manager = PluginManager(app)

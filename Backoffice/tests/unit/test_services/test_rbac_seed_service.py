@@ -9,6 +9,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from app.services.organization.rbac_seed_service import (
+    RbacSeedLockMode,
     _permission_catalog,
     _baseline_roles,
     seed_rbac_permissions_and_roles,
@@ -157,7 +158,7 @@ class TestSeedRbacPermissionsAndRoles:
     # ------------------------------------------------------------------
 
     def test_return_dict_has_all_keys(self, db_session, app):
-        result = self._run(app, use_advisory_lock=False)
+        result = self._run(app, lock_mode=RbacSeedLockMode.NONE)
         expected_keys = {
             'skipped_due_to_lock', 'created_permissions', 'updated_permissions',
             'created_roles', 'updated_roles', 'created_role_permission_links',
@@ -166,7 +167,7 @@ class TestSeedRbacPermissionsAndRoles:
         assert expected_keys == set(result.keys())
 
     def test_first_run_creates_permissions_and_roles(self, db_session, app):
-        result = self._run(app, use_advisory_lock=False)
+        result = self._run(app, lock_mode=RbacSeedLockMode.NONE)
         assert result['skipped_due_to_lock'] == 0
         assert result['created_permissions'] > 0
         assert result['created_roles'] > 0
@@ -180,8 +181,8 @@ class TestSeedRbacPermissionsAndRoles:
     # ------------------------------------------------------------------
 
     def test_second_run_creates_nothing_new(self, db_session, app):
-        self._run(app, use_advisory_lock=False)
-        result = self._run(app, use_advisory_lock=False)
+        self._run(app, lock_mode=RbacSeedLockMode.NONE)
+        result = self._run(app, lock_mode=RbacSeedLockMode.NONE)
         assert result['created_permissions'] == 0
         assert result['created_roles'] == 0
         assert result['created_role_permission_links'] == 0
@@ -195,7 +196,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacPermission
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             perm = db_session.query(RbacPermission).filter_by(code='admin.users.view').first()
             assert perm is not None
@@ -203,7 +204,7 @@ class TestSeedRbacPermissionsAndRoles:
             db_session.commit()
 
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['updated_permissions'] >= 1
             db_session.expire(perm)
@@ -214,14 +215,14 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacPermission
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             perm = db_session.query(RbacPermission).filter_by(code='admin.users.view').first()
             perm.description = 'Old description'
             db_session.commit()
 
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['updated_permissions'] >= 1
 
@@ -233,7 +234,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacRole
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             role = db_session.query(RbacRole).filter_by(code='system_manager').first()
             assert role is not None
@@ -241,7 +242,7 @@ class TestSeedRbacPermissionsAndRoles:
             db_session.commit()
 
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['updated_roles'] >= 1
             db_session.expire(role)
@@ -252,14 +253,14 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacRole
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             role = db_session.query(RbacRole).filter_by(code='system_manager').first()
             role.description = 'Old description'
             db_session.commit()
 
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['updated_roles'] >= 1
 
@@ -271,7 +272,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacRole, RbacPermission, RbacRolePermission
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             # Give assignment_viewer an extra (catalog) permission it shouldn't have
             role = db_session.query(RbacRole).filter_by(code='assignment_viewer').first()
@@ -281,7 +282,7 @@ class TestSeedRbacPermissionsAndRoles:
             db_session.commit()
 
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['deleted_role_permission_links'] >= 1
             remaining = db_session.query(RbacRolePermission).filter_by(
@@ -293,7 +294,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacRole, RbacPermission, RbacRolePermission
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             # Remove a link that should exist
             role = db_session.query(RbacRole).filter_by(code='assignment_viewer').first()
@@ -306,7 +307,7 @@ class TestSeedRbacPermissionsAndRoles:
                 db_session.commit()
 
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['created_role_permission_links'] >= 1
             restored = db_session.query(RbacRolePermission).filter_by(
@@ -322,7 +323,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacPermission
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             catalog = _permission_catalog()
             for code, name, _ in catalog:
@@ -334,7 +335,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacRole
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             catalog = _permission_catalog()
             for role_def in _baseline_roles(catalog):
@@ -345,7 +346,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             from app.models.rbac import RbacRole, RbacPermission, RbacRolePermission
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             catalog_codes = {code for code, _, _ in _permission_catalog()}
             role = db_session.query(RbacRole).filter_by(code='system_manager').first()
@@ -375,7 +376,7 @@ class TestSeedRbacPermissionsAndRoles:
                 "app.services.organization.rbac_seed_service.safe_remove"
             ):
                 mock_db.engine.dialect.name = "postgresql"
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=True)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.TRY)
 
             assert result['skipped_due_to_lock'] == 1
             assert result['created_permissions'] == 0
@@ -396,24 +397,81 @@ class TestSeedRbacPermissionsAndRoles:
 
             with patch.object(_db.session, 'execute', side_effect=side_effect):
                 with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                    result = seed_rbac_permissions_and_roles(use_advisory_lock=True)
+                    result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.TRY)
 
             # Should have run the seeding despite the lock error
             assert 'created_permissions' in result
 
     def test_advisory_lock_true_runs_normally(self, db_session, app):
-        """use_advisory_lock=True with a real PG connection should work."""
+        """lock_mode=RbacSeedLockMode.TRY with a real PG connection should work."""
         with app.app_context():
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
                 try:
-                    result = seed_rbac_permissions_and_roles(use_advisory_lock=True)
+                    result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.TRY)
                     assert 'skipped_due_to_lock' in result
                 except Exception:
                     pytest.skip("Advisory lock not supported in this test environment")
 
     def test_no_advisory_lock_runs_normally(self, db_session, app):
-        result = self._run(app, use_advisory_lock=False)
+        result = self._run(app, lock_mode=RbacSeedLockMode.NONE)
         assert result['skipped_due_to_lock'] == 0
+
+    def test_wait_mode_uses_blocking_wait_helper_and_seeds_on_success(self, db_session, app):
+        """WAIT mode must go through wait_for_session_advisory_lock (which
+        retries) rather than a single non-blocking try -- this is what actually
+        fixes the `flask rbac seed` vs. background-auto-seed race (previously a
+        single non-blocking try, so the CLI could silently report 0/0). The
+        retry-loop mechanics themselves are covered in test_pg_advisory_lock.py;
+        here we only verify seed_rbac_permissions_and_roles wires WAIT mode to
+        that helper and honors its result."""
+        with app.app_context():
+            with patch(
+                "app.services.organization.rbac_seed_service.wait_for_session_advisory_lock",
+                return_value=True,
+            ) as mock_wait, patch(
+                "app.services.organization.rbac_seed_service.try_session_advisory_lock"
+            ) as mock_try, patch(
+                "app.services.organization.rbac_seed_service.safe_remove"
+            ):
+                result = seed_rbac_permissions_and_roles(
+                    lock_mode=RbacSeedLockMode.WAIT, wait_timeout_seconds=5.0
+                )
+
+            assert result['skipped_due_to_lock'] == 0
+            assert result['created_permissions'] > 0
+            mock_wait.assert_called_once()
+            assert mock_wait.call_args.kwargs.get('timeout_seconds') == 5.0
+            # TRY's plain non-blocking helper must not be used in WAIT mode.
+            mock_try.assert_not_called()
+
+    def test_wait_mode_gives_up_after_timeout(self, db_session, app):
+        """WAIT mode must not hang forever -- once wait_for_session_advisory_lock
+        gives up, seeding should report skipped_due_to_lock exactly like TRY
+        mode's immediate skip (no partial/only-some-tables writes)."""
+        with app.app_context():
+            with patch(
+                "app.services.organization.rbac_seed_service.wait_for_session_advisory_lock",
+                return_value=False,
+            ), patch(
+                "app.services.organization.rbac_seed_service.safe_remove"
+            ):
+                result = seed_rbac_permissions_and_roles(
+                    lock_mode=RbacSeedLockMode.WAIT, wait_timeout_seconds=0.01
+                )
+
+            assert result['skipped_due_to_lock'] == 1
+            assert result['created_permissions'] == 0
+
+    def test_lock_mode_accepts_plain_string(self, db_session, app):
+        """Callers passing a bare string (e.g. from a CLI option) should still
+        work -- RbacSeedLockMode(...) normalizes it to the enum member."""
+        result = self._run(app, lock_mode="none")
+        assert result['skipped_due_to_lock'] == 0
+
+    def test_invalid_lock_mode_raises(self, app):
+        with app.app_context():
+            with pytest.raises(ValueError):
+                seed_rbac_permissions_and_roles(lock_mode="bogus")
 
     # ------------------------------------------------------------------
     # created_by attribution
@@ -427,7 +485,7 @@ class TestSeedRbacPermissionsAndRoles:
 
             # First seed to get roles
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             # Create a user, attach system_manager role
             user = create_test_user(db_session, role='system_manager')
@@ -442,7 +500,7 @@ class TestSeedRbacPermissionsAndRoles:
 
             # Re-seed – should find SM user and not crash
             with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result['skipped_due_to_lock'] == 0
 
@@ -453,7 +511,7 @@ class TestSeedRbacPermissionsAndRoles:
             with patch.object(User, 'query', new_callable=MagicMock) as mock_q:
                 mock_q.join.return_value.join.return_value.filter.return_value.first.side_effect = Exception("DB error")
                 with patch('app.services.organization.rbac_seed_service.safe_remove'):
-                    result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                    result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
             # Should not raise; should have created permissions
             assert result['created_permissions'] > 0
 
@@ -469,7 +527,7 @@ class TestSeedRbacPermissionsAndRoles:
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=bad_roles), \
                  patch('app.services.organization.rbac_seed_service._extension_baseline_roles', return_value=[]), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
             assert result['created_roles'] == 0
 
     def test_duplicate_permission_codes_deduplicated(self, db_session, app):
@@ -487,7 +545,7 @@ class TestSeedRbacPermissionsAndRoles:
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=roles_with_dup), \
                  patch('app.services.organization.rbac_seed_service._extension_baseline_roles', return_value=[]), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
             # Only one link should be created for the unique permission
             assert result['created_role_permission_links'] <= 1
 
@@ -505,7 +563,7 @@ class TestSeedRbacPermissionsAndRoles:
         with app.app_context():
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=roles_with_empty), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
             # Should not crash; assignment.view gets resolved
             assert result['skipped_due_to_lock'] == 0
 
@@ -518,7 +576,7 @@ class TestSeedRbacPermissionsAndRoles:
             with patch('app.services.organization.rbac_seed_service._baseline_roles', return_value=roles), \
                  patch('app.services.organization.rbac_seed_service._extension_baseline_roles', return_value=[]), \
                  patch('app.services.organization.rbac_seed_service.safe_remove'):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
             assert result['created_role_permission_links'] == 0
 
     def test_creates_plugin_extension_role(self, db_session, app):
@@ -540,7 +598,7 @@ class TestSeedRbacPermissionsAndRoles:
                 "app.services.organization.rbac_seed_service._extension_baseline_roles",
                 return_value=[],
             ), patch("app.services.organization.rbac_seed_service.safe_remove"):
-                seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
             assert db_session.query(RbacRole).filter_by(code=ext_role["code"]).first() is None
 
             with patch(
@@ -550,7 +608,7 @@ class TestSeedRbacPermissionsAndRoles:
                 "app.services.organization.rbac_seed_service._extension_baseline_roles",
                 return_value=[ext_role],
             ), patch("app.services.organization.rbac_seed_service.safe_remove"):
-                result = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+                result = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.NONE)
 
             assert result["created_roles"] == 1
             assert result["created_permissions"] == 1

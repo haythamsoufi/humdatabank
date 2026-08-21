@@ -1,0 +1,294 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.3, pluggy-1.6.0
+rootdir: C:\Humanitarian Databank\Backoffice
+configfile: pytest.ini
+plugins: anyio-4.9.0, langsmith-0.7.30, locust-2.43.4, asyncio-0.23.8, cov-7.0.0, flask-1.3.0, mock-3.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT
+collected 82 items
+
+tests\unit\test_routes\test_user_management_crud.py .............. [14/82  17%]
+F.......F...F.........F.....................FF...FF............... [80/82  97%]
+..                                                                 [82/82 100%]
+
+================================== FAILURES ===================================
+____________ TestApproveAccessRequest.test_approve_pending_request ____________
+tests\unit\test_routes\test_user_management_crud.py:253: in test_approve_pending_request
+    with patch(
+C:\Python313\Lib\unittest\mock.py:1497: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+C:\Python313\Lib\unittest\mock.py:1467: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'app.routes.admin.user_management.crud' from 'C:\\Humanitarian Databank\\Backoffice\\app\\routes\\admin\\user_management\\crud.py'> does not have the attribute 'notify_user_added_to_country'
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+_________ TestRejectAccessRequest.test_reject_with_null_user_country __________
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1964: in _exec_single_context
+    self.dialect.do_execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\default.py:945: in do_execute
+    cursor.execute(statement, parameters)
+E   psycopg2.errors.ForeignKeyViolation: insert or update on table "country_access_request" violates foreign key constraint "country_access_request_user_id_fkey"
+E   DETAIL:  Key (user_id)=(999999) is not present in table "user".
+
+The above exception was the direct cause of the following exception:
+tests\unit\test_routes\test_user_management_crud.py:351: in test_reject_with_null_user_country
+    db_session.commit()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\scoping.py:599: in commit
+    return self._proxied.commit()
+           ^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\state_changes.py:139: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\state_changes.py:139: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4353: in flush
+    self._flush(objects)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4488: in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\util\langhelpers.py:146: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4449: in _flush
+    flush_context.execute()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\sql\elements.py:523: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1638: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1843: in _execute_context
+    return self._exec_single_context(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1983: in _exec_single_context
+    self._handle_dbapi_exception(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:2352: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1964: in _exec_single_context
+    self.dialect.do_execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\default.py:945: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlalchemy.exc.IntegrityError: (psycopg2.errors.ForeignKeyViolation) insert or update on table "country_access_request" violates foreign key constraint "country_access_request_user_id_fkey"
+E   DETAIL:  Key (user_id)=(999999) is not present in table "user".
+E   
+E   [SQL: INSERT INTO country_access_request (user_id, country_id, request_message, status, created_at, processed_at, processed_by_user_id, admin_notes) VALUES (%(user_id)s, %(country_id)s, %(request_message)s, %(status)s, %(created_at)s, %(processed_at)s, %(processed_by_user_id)s, %(admin_notes)s) RETURNING country_access_request.id]
+E   [parameters: {'user_id': 999999, 'country_id': 999999, 'request_message': None, 'status': 'pending', 'created_at': datetime.datetime(2026, 8, 21, 11, 14, 54, 84819, tzinfo=datetime.timezone.utc), 'processed_at': None, 'processed_by_user_id': None, 'admin_notes': None}]
+E   (Background on this error at: https://sqlalche.me/e/20/gkpj)
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+_______ TestApproveAllAccessRequests.test_skips_invalid_user_or_country _______
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1964: in _exec_single_context
+    self.dialect.do_execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\default.py:945: in do_execute
+    cursor.execute(statement, parameters)
+E   psycopg2.errors.ForeignKeyViolation: insert or update on table "country_access_request" violates foreign key constraint "country_access_request_user_id_fkey"
+E   DETAIL:  Key (user_id)=(9999998) is not present in table "user".
+
+The above exception was the direct cause of the following exception:
+tests\unit\test_routes\test_user_management_crud.py:393: in test_skips_invalid_user_or_country
+    db_session.commit()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\scoping.py:599: in commit
+    return self._proxied.commit()
+           ^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\state_changes.py:139: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\state_changes.py:139: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4353: in flush
+    self._flush(objects)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4488: in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\util\langhelpers.py:146: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4449: in _flush
+    flush_context.execute()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\sql\elements.py:523: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1638: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1843: in _execute_context
+    return self._exec_single_context(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1983: in _exec_single_context
+    self._handle_dbapi_exception(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:2352: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1964: in _exec_single_context
+    self.dialect.do_execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\default.py:945: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlalchemy.exc.IntegrityError: (psycopg2.errors.ForeignKeyViolation) insert or update on table "country_access_request" violates foreign key constraint "country_access_request_user_id_fkey"
+E   DETAIL:  Key (user_id)=(9999998) is not present in table "user".
+E   
+E   [SQL: INSERT INTO country_access_request (user_id, country_id, request_message, status, created_at, processed_at, processed_by_user_id, admin_notes) VALUES (%(user_id)s, %(country_id)s, %(request_message)s, %(status)s, %(created_at)s, %(processed_at)s, %(processed_by_user_id)s, %(admin_notes)s) RETURNING country_access_request.id]
+E   [parameters: {'user_id': 9999998, 'country_id': 9999998, 'request_message': None, 'status': 'pending', 'created_at': datetime.datetime(2026, 8, 21, 11, 15, 25, 94798, tzinfo=datetime.timezone.utc), 'processed_at': None, 'processed_by_user_id': None, 'admin_notes': None}]
+E   (Background on this error at: https://sqlalche.me/e/20/gkpj)
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+___________________ TestNewUser.test_admin_get_returns_200 ____________________
+tests\unit\test_routes\test_user_management_crud.py:533: in test_admin_get_returns_200
+    assert resp.status_code == 200
+E   assert 302 == 200
+E    +  where 302 = <WrapperTestResponse streamed [302 FOUND]>.status_code
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+---------------------------- Captured stdout call -----------------------------
+[2026-08-21 13:16:35 CEST] INFO in app: Admin user create blocked: Azure AD B2C is configured and actor is not a System Manager (actor_id=1).
+______________ TestKickoutDevice.test_404_for_nonexistent_device ______________
+tests\unit\test_routes\test_user_management_crud.py:928: in test_404_for_nonexistent_device
+    assert resp.status_code == 404
+E   assert 500 == 404
+E    +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+---------------------------- Captured stdout call -----------------------------
+[2026-08-21 13:19:14 CEST] ERROR in app: An internal error occurred.
+Traceback (most recent call last):
+  File "C:\Humanitarian Databank\Backoffice\app\routes\admin\user_management\crud.py", line 1368, in kickout_device
+    device = UserDevice.query.filter_by(id=device_id, user_id=user_id).first_or_404()
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask_sqlalchemy\query.py", line 46, in first_or_404
+    abort(404, description=description)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask\helpers.py", line 291, in abort
+    current_app.aborter(code, *args, **kwargs)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\werkzeug\exceptions.py", line 887, in __call__
+    raise self.mapping[code](*args, **kwargs)
+werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+_______________ TestKickoutDevice.test_404_for_nonexistent_user _______________
+tests\unit\test_routes\test_user_management_crud.py:933: in test_404_for_nonexistent_user
+    assert resp.status_code == 404
+E   assert 500 == 404
+E    +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+---------------------------- Captured stdout call -----------------------------
+[2026-08-21 13:19:22 CEST] ERROR in app: An internal error occurred.
+Traceback (most recent call last):
+  File "C:\Humanitarian Databank\Backoffice\app\routes\admin\user_management\crud.py", line 1365, in kickout_device
+    user = User.query.get_or_404(user_id)
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask_sqlalchemy\query.py", line 33, in get_or_404
+    abort(404, description=description)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask\helpers.py", line 291, in abort
+    current_app.aborter(code, *args, **kwargs)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\werkzeug\exceptions.py", line 887, in __call__
+    raise self.mapping[code](*args, **kwargs)
+werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+______________ TestRemoveDevice.test_404_for_nonexistent_device _______________
+tests\unit\test_routes\test_user_management_crud.py:969: in test_404_for_nonexistent_device
+    assert resp.status_code == 404
+E   assert 500 == 404
+E    +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+---------------------------- Captured stdout call -----------------------------
+[2026-08-21 13:19:53 CEST] ERROR in app: An internal error occurred.
+Traceback (most recent call last):
+  File "C:\Humanitarian Databank\Backoffice\app\routes\admin\user_management\crud.py", line 1419, in remove_device
+    device = UserDevice.query.filter_by(id=device_id, user_id=user_id).first_or_404()
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask_sqlalchemy\query.py", line 46, in first_or_404
+    abort(404, description=description)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask\helpers.py", line 291, in abort
+    current_app.aborter(code, *args, **kwargs)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\werkzeug\exceptions.py", line 887, in __call__
+    raise self.mapping[code](*args, **kwargs)
+werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+_______________ TestRemoveDevice.test_404_for_nonexistent_user ________________
+tests\unit\test_routes\test_user_management_crud.py:974: in test_404_for_nonexistent_user
+    assert resp.status_code == 404
+E   assert 500 == 404
+E    +  where 500 = <WrapperTestResponse streamed [500 INTERNAL SERVER ERROR]>.status_code
+---------------------------- Captured stderr setup ----------------------------
+
+WARNING: waiting for exclusive test-DB lock (another pytest process is using the same TEST_DATABASE_URL).
+Do not run two pytest suites against the test database at once ù the other run's DROP SCHEMA will delete tables mid-test.
+
+---------------------------- Captured stdout call -----------------------------
+[2026-08-21 13:20:01 CEST] ERROR in app: An internal error occurred.
+Traceback (most recent call last):
+  File "C:\Humanitarian Databank\Backoffice\app\routes\admin\user_management\crud.py", line 1416, in remove_device
+    user = User.query.get_or_404(user_id)
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask_sqlalchemy\query.py", line 33, in get_or_404
+    abort(404, description=description)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\flask\helpers.py", line 291, in abort
+    current_app.aborter(code, *args, **kwargs)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\werkzeug\exceptions.py", line 887, in __call__
+    raise self.mapping[code](*args, **kwargs)
+werkzeug.exceptions.NotFound: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+-- generated xml file: C:\Humanitarian Databank\Backoffice\test_results.xml ---
+=========================== short test summary info ===========================
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestApproveAccessRequest::test_approve_pending_request
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestRejectAccessRequest::test_reject_with_null_user_country
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestApproveAllAccessRequests::test_skips_invalid_user_or_country
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestNewUser::test_admin_get_returns_200
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestKickoutDevice::test_404_for_nonexistent_device
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestKickoutDevice::test_404_for_nonexistent_user
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestRemoveDevice::test_404_for_nonexistent_device
+FAILED tests/unit/test_routes/test_user_management_crud.py::TestRemoveDevice::test_404_for_nonexistent_user
+============ 8 failed, 74 passed, 68 warnings in 679.90s (0:11:19) ============

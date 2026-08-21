@@ -12,19 +12,60 @@
     var escapeHtml = AgGridRenderers.escapeHtml;
     var escapeHtmlAttr = AgGridRenderers.escapeHtmlAttr;
 
-    function getTotalCountriesInRegions(user) {
-        return Object.values(user.countries_by_region || {}).reduce(function (sum, countries) {
-            return sum + (countries ? countries.length : 0);
-        }, 0);
+    var ignoreCountriesForGlobal = {};
+    (cfg.ignoreCountriesForGlobal && cfg.ignoreCountriesForGlobal.length
+        ? cfg.ignoreCountriesForGlobal
+        : ['Testland']
+    ).forEach(function (name) {
+        if (name) ignoreCountriesForGlobal[name] = true;
+    });
+
+    function isIgnoredCountryForGlobal(name) {
+        return !!(name && ignoreCountriesForGlobal[name]);
+    }
+
+    function countriesForGlobal(list) {
+        return (list || []).filter(function (name) { return !isIgnoredCountryForGlobal(name); });
+    }
+
+    function getCountriesByRegionForGlobal(user) {
+        var source = user.countries_by_region || {};
+        var filtered = {};
+        for (var region in source) {
+            if (!Object.prototype.hasOwnProperty.call(source, region)) continue;
+            var countries = countriesForGlobal(source[region]);
+            if (countries.length) filtered[region] = countries;
+        }
+        return filtered;
+    }
+
+    function getAssignedCountriesForGlobal(user) {
+        return countriesForGlobal(user && user.countries);
+    }
+
+    /** True when the user has every real country (Testland / sandbox countries do not count). */
+    function hasAllCountries(user) {
+        var catalog = getCountriesByRegionForGlobal(user);
+        var catalogNames = [];
+        for (var region in catalog) {
+            if (!Object.prototype.hasOwnProperty.call(catalog, region)) continue;
+            catalogNames = catalogNames.concat(catalog[region]);
+        }
+        if (!catalogNames.length) return false;
+        var assignedSet = {};
+        getAssignedCountriesForGlobal(user).forEach(function (name) {
+            assignedSet[name] = true;
+        });
+        return catalogNames.every(function (name) { return assignedSet[name]; });
     }
 
     function getCompleteRegionNames(user) {
         var regions = [];
-        var assigned = user.countries || [];
-        for (var region in user.countries_by_region || {}) {
-            if (!Object.prototype.hasOwnProperty.call(user.countries_by_region, region)) continue;
-            var countries = user.countries_by_region[region] || [];
-            if (!countries.length) continue;
+        var assigned = getAssignedCountriesForGlobal(user);
+        var catalog = getCountriesByRegionForGlobal(user);
+        for (var region in catalog) {
+            if (!Object.prototype.hasOwnProperty.call(catalog, region)) continue;
+            var countries = catalog[region];
             var regionUserCount = countries.filter(function (c) { return assigned.indexOf(c) !== -1; }).length;
             if (regionUserCount === countries.length) {
                 regions.push(region);
@@ -43,23 +84,22 @@
         if (user.country_count > 0) {
             if (user.country_count === 1 && user.countries && user.countries.length) {
                 parts.push(user.countries[0]);
+            } else if (hasAllCountries(user)) {
+                parts.push(t.global_f2a89e71 || 'Global');
             } else {
-                var totalCountries = getTotalCountriesInRegions(user);
-                if (user.country_count === totalCountries) {
-                    parts.push(t.global_f2a89e71 || 'Global');
+                var completeRegions = getCompleteRegionNames(user);
+                if (!completeRegions.length) {
+                    parts.push(user.country_count + ' ' + (t.countries_790d59ef || 'countries'));
                 } else {
-                    var completeRegions = getCompleteRegionNames(user);
-                    if (!completeRegions.length) {
-                        parts.push(user.country_count + ' ' + (t.countries_790d59ef || 'countries'));
-                    } else {
-                        parts = parts.concat(completeRegions);
-                        var completeRegionsTotal = completeRegions.reduce(function (sum, region) {
-                            var countries = (user.countries_by_region || {})[region] || [];
-                            return sum + countries.length;
-                        }, 0);
-                        if (user.country_count > completeRegionsTotal) {
-                            parts.push('+' + (user.country_count - completeRegionsTotal) + ' ' + (t.other_countries_b1e7b76a || 'other countries'));
-                        }
+                    var catalog = getCountriesByRegionForGlobal(user);
+                    parts = parts.concat(completeRegions);
+                    var completeRegionsTotal = completeRegions.reduce(function (sum, region) {
+                        var countries = catalog[region] || [];
+                        return sum + countries.length;
+                    }, 0);
+                    var assignedCount = getAssignedCountriesForGlobal(user).length;
+                    if (assignedCount > completeRegionsTotal) {
+                        parts.push('+' + (assignedCount - completeRegionsTotal) + ' ' + (t.other_countries_b1e7b76a || 'other countries'));
                     }
                 }
             }
@@ -117,8 +157,7 @@
         }
 
         if (user.country_count > 0) {
-            var totalCountries = getTotalCountriesInRegions(user);
-            if (user.country_count === totalCountries && totalCountries > 0) {
+            if (hasAllCountries(user)) {
                 add(t.global_f2a89e71 || 'Global');
             } else {
                 getCompleteRegionNames(user).forEach(add);
@@ -147,32 +186,23 @@
             displayedAny = true;
             if (user.country_count === 1) {
                 html += escapeHtml(user.countries[0]);
+            } else if (hasAllCountries(user)) {
+                html += '<span class="font-medium text-blue-600">' + escapeHtml(t.global_f2a89e71 || 'Global') + '</span>';
             } else {
-                var totalCountries = Object.values(user.countries_by_region || {}).reduce(function (sum, countries) { return sum + (countries ? countries.length : 0); }, 0);
-                if (user.country_count === totalCountries) {
-                    html += '<span class="font-medium text-blue-600">' + escapeHtml(t.global_f2a89e71 || 'Global') + '</span>';
+                var completeRegions = getCompleteRegionNames(user);
+                if (!completeRegions.length) {
+                    html += '<span class="cursor-help" title="' + escapeHtmlAttr(user.countries.join(', ')) + '">' + user.country_count + ' ' + escapeHtml(t.countries_790d59ef || 'countries') + '</span>';
                 } else {
-                    var hasCompleteRegion = false;
-                    var regions = {};
-                    for (var region in user.countries_by_region || {}) {
-                        var countries = user.countries_by_region[region];
-                        var regionTotal = countries ? countries.length : 0;
-                        var regionUserCount = countries ? countries.filter(function (c) { return user.countries.includes(c); }).length : 0;
-                        if (regionTotal > 0) {
-                            regions[region] = { total: regionTotal, user: regionUserCount };
-                            if (regionUserCount === regionTotal) {
-                                hasCompleteRegion = true;
-                                html += '<div class="font-medium text-green-600">' + escapeHtml(region) + '</div>';
-                            }
-                        }
-                    }
-                    if (!hasCompleteRegion) {
-                        html += '<span class="cursor-help" title="' + escapeHtmlAttr(user.countries.join(', ')) + '">' + user.country_count + ' ' + escapeHtml(t.countries_790d59ef || 'countries') + '</span>';
-                    } else {
-                        var completeRegionsTotal = Object.values(regions).reduce(function (sum, r) { return sum + (r.user === r.total ? r.total : 0); }, 0);
-                        if (user.country_count > completeRegionsTotal) {
-                            html += '<div class="text-gray-500 text-xs mt-1">+' + (user.country_count - completeRegionsTotal) + ' ' + escapeHtml(t.other_countries_b1e7b76a || 'other countries') + '</div>';
-                        }
+                    completeRegions.forEach(function (region) {
+                        html += '<div class="font-medium text-green-600">' + escapeHtml(region) + '</div>';
+                    });
+                    var catalog = getCountriesByRegionForGlobal(user);
+                    var completeRegionsTotal = completeRegions.reduce(function (sum, region) {
+                        return sum + ((catalog[region] || []).length);
+                    }, 0);
+                    var assignedCount = getAssignedCountriesForGlobal(user).length;
+                    if (assignedCount > completeRegionsTotal) {
+                        html += '<div class="text-gray-500 text-xs mt-1">+' + (assignedCount - completeRegionsTotal) + ' ' + escapeHtml(t.other_countries_b1e7b76a || 'other countries') + '</div>';
                     }
                 }
             }

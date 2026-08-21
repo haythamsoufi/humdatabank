@@ -1,0 +1,175 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.3, pytest-9.0.3, pluggy-1.6.0 -- C:\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Humanitarian Databank\Backoffice
+configfile: pytest.ini
+plugins: anyio-4.9.0, langsmith-0.7.30, locust-2.43.4, asyncio-0.23.8, cov-7.0.0, flask-1.3.0, mock-3.15.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT
+collecting ... collected 59 items
+
+tests/unit/test_routes/test_user_management_helpers.py::TestNormalizeUserEmailForComparison::test_none_returns_empty_string PASSED [ 1/59   1%]
+tests/unit/test_routes/test_user_management_helpers.py::TestNormalizeUserEmailForComparison::test_strips_and_lowercases PASSED [ 2/59   3%]
+tests/unit/test_routes/test_user_management_helpers.py::TestNormalizeUserEmailForComparison::test_already_lowercase PASSED [ 3/59   5%]
+tests/unit/test_routes/test_user_management_helpers.py::TestNormalizeUserEmailForComparison::test_non_string_value PASSED [ 4/59   6%]
+tests/unit/test_routes/test_user_management_helpers.py::TestIsAzureSsoEnabled::test_returns_false_when_not_configured PASSED [ 5/59   8%]
+tests/unit/test_routes/test_user_management_helpers.py::TestIsAzureSsoEnabled::test_returns_true_when_configured PASSED [ 6/59  10%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetAllowedNonCountryEntityTypes::test_returns_list PASSED [ 7/59  11%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetAllowedNonCountryEntityTypes::test_excludes_countries PASSED [ 8/59  13%]
+tests/unit/test_routes/test_user_management_helpers.py::TestComputeRoleTypeForUserId::test_focal_point_for_user_with_no_admin_roles PASSED [ 9/59  15%]
+tests/unit/test_routes/test_user_management_helpers.py::TestComputeRoleTypeForUserId::test_admin_for_user_with_admin_role PASSED [10/59  16%]
+tests/unit/test_routes/test_user_management_helpers.py::TestComputeRoleTypeForUserId::test_sys_mgr_returns_admin PASSED [11/59  18%]
+tests/unit/test_routes/test_user_management_helpers.py::TestComputeRoleTypeForUserId::test_exception_returns_admin_default PASSED [12/59  20%]
+tests/unit/test_routes/test_user_management_helpers.py::TestComputeRoleTypeForUserId::test_approver_only_returns_admin PASSED [13/59  22%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetCountriesByRegion::test_returns_defaultdict PASSED [14/59  23%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetCountriesByRegion::test_groups_countries_by_region PASSED [15/59  25%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetCountriesByRegion::test_none_region_grouped_as_unassigned FAILED [16/59  27%]
+tests/unit/test_routes/test_user_management_helpers.py::TestSetUserRbacRoles::test_replaces_existing_roles PASSED [17/59  28%]
+tests/unit/test_routes/test_user_management_helpers.py::TestSetUserRbacRoles::test_empty_role_list_removes_all PASSED [18/59  30%]
+tests/unit/test_routes/test_user_management_helpers.py::TestSetUserRbacRoles::test_deduplicates_role_ids PASSED [19/59  32%]
+tests/unit/test_routes/test_user_management_helpers.py::TestSetUserRbacRoles::test_ignores_none_ids PASSED [20/59  33%]
+tests/unit/test_routes/test_user_management_helpers.py::TestSetUserRbacRoles::test_no_op_for_user_with_no_id PASSED [21/59  35%]
+tests/unit/test_routes/test_user_management_helpers.py::TestEnsureUserHasDefaultRbacRole::test_adds_default_role_if_none PASSED [22/59  37%]
+tests/unit/test_routes/test_user_management_helpers.py::TestEnsureUserHasDefaultRbacRole::test_no_op_if_already_has_role PASSED [23/59  38%]
+tests/unit/test_routes/test_user_management_helpers.py::TestEnsureUserHasDefaultRbacRole::test_creates_role_if_missing PASSED [24/59  40%]
+tests/unit/test_routes/test_user_management_helpers.py::TestEnsureUserHasDefaultRbacRole::test_no_op_for_user_with_no_id PASSED [25/59  42%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRequestedAdminRolesForActor::test_empty_list_returns_empty PASSED [26/59  44%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRequestedAdminRolesForActor::test_non_admin_roles_are_kept PASSED [27/59  45%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRequestedAdminRolesForActor::test_admin_role_dropped_if_actor_lacks_it PASSED [28/59  47%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRequestedAdminRolesForActor::test_admin_role_kept_if_actor_has_it PASSED [29/59  49%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRoleChoicesForActor::test_empty_choices_returns_empty PASSED [30/59  50%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRoleChoicesForActor::test_non_admin_choices_kept PASSED [31/59  52%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRoleChoicesForActor::test_admin_choice_dropped_if_actor_lacks PASSED [32/59  54%]
+tests/unit/test_routes/test_user_management_helpers.py::TestFilterRoleChoicesForActor::test_invalid_rid_in_choices_skipped FAILED [33/59  55%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_empty_list_returns_empty PASSED [34/59  57%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_deduplicates PASSED [35/59  59%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_focal_point_strips_admin_roles PASSED [36/59  61%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_focal_point_strips_approver_role PASSED [37/59  62%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_focal_point_adds_viewer_when_no_assignment_roles PASSED [38/59  64%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_focal_point_viewer_only_does_not_add_editor PASSED [39/59  66%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_drops_deprecated_role PASSED [40/59  67%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_admin_auto_downgraded_to_focal_point PASSED [41/59  69%]
+tests/unit/test_routes/test_user_management_helpers.py::TestApplyRoleTypeAndImplications::test_none_in_role_ids_skipped PASSED [42/59  71%]
+tests/unit/test_routes/test_user_management_helpers.py::TestCountryAccessRequestToDict::test_serializes_full_request PASSED [43/59  72%]
+tests/unit/test_routes/test_user_management_helpers.py::TestCountryAccessRequestToDict::test_handles_no_processed_by PASSED [44/59  74%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetUserDeletionPreview::test_returns_will_delete_and_will_unassign PASSED [45/59  76%]
+tests/unit/test_routes/test_user_management_helpers.py::TestGetUserDeletionPreview::test_counts_are_integers PASSED [46/59  77%]
+tests/unit/test_routes/test_user_management_helpers.py::TestCascadeDeleteUserRelated::test_deletes_user PASSED [47/59  79%]
+tests/unit/test_routes/test_user_management_helpers.py::TestCascadeDeleteUserRelated::test_deletes_entity_permissions PASSED [48/59  81%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserListRows::test_empty_list_returns_empty PASSED [49/59  83%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserListRows::test_returns_row_for_each_user PASSED [50/59  84%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserListRows::test_row_has_expected_fields PASSED [51/59  86%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserListRows::test_includes_country_data PASSED [52/59  88%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_returns_none_for_nonexistent_user PASSED [53/59  89%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_returns_dict_for_user PASSED [54/59  91%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_includes_rbac_roles PASSED [55/59  93%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_includes_entity_permissions PASSED [56/59  94%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_computed_role_type_field PASSED [57/59  96%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_is_system_manager_field PASSED [58/59  98%]
+tests/unit/test_routes/test_user_management_helpers.py::TestBuildAdminUserDetailDict::test_effective_permissions_aggregated PASSED [59/59 100%]
+
+================================== FAILURES ===================================
+_______ TestGetCountriesByRegion.test_none_region_grouped_as_unassigned _______
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1964: in _exec_single_context
+    self.dialect.do_execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\default.py:945: in do_execute
+    cursor.execute(statement, parameters)
+E   psycopg2.errors.NotNullViolation: null value in column "region" of relation "country" violates not-null constraint
+E   DETAIL:  Failing row contains (1, NoRegionCnt, null, NZZ, NZ, null, null, Active, en, null, null, null).
+
+The above exception was the direct cause of the following exception:
+tests\unit\test_routes\test_user_management_helpers.py:192: in test_none_region_grouped_as_unassigned
+    db_session.commit()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\scoping.py:599: in commit
+    return self._proxied.commit()
+           ^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:2032: in commit
+    trans.commit(_to_root=True)
+<string>:2: in commit
+    ???
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\state_changes.py:139: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:1313: in commit
+    self._prepare_impl()
+<string>:2: in _prepare_impl
+    ???
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\state_changes.py:139: in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:1288: in _prepare_impl
+    self.session.flush()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4353: in flush
+    self._flush(objects)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4488: in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\util\langhelpers.py:146: in __exit__
+    raise exc_value.with_traceback(exc_tb)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\session.py:4449: in _flush
+    flush_context.execute()
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\unitofwork.py:466: in execute
+    rec.execute(self)
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\unitofwork.py:642: in execute
+    util.preloaded.orm_persistence.save_obj(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\persistence.py:93: in save_obj
+    _emit_insert_statements(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\orm\persistence.py:1233: in _emit_insert_statements
+    result = connection.execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\sql\elements.py:523: in _execute_on_connection
+    return connection._execute_clauseelement(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1638: in _execute_clauseelement
+    ret = self._execute_context(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1843: in _execute_context
+    return self._exec_single_context(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1983: in _exec_single_context
+    self._handle_dbapi_exception(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:2352: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\base.py:1964: in _exec_single_context
+    self.dialect.do_execute(
+C:\Users\Haytham.Alsoufi\AppData\Roaming\Python\Python313\site-packages\sqlalchemy\engine\default.py:945: in do_execute
+    cursor.execute(statement, parameters)
+E   sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "region" of relation "country" violates not-null constraint
+E   DETAIL:  Failing row contains (1, NoRegionCnt, null, NZZ, NZ, null, null, Active, en, null, null, null).
+E   
+E   [SQL: INSERT INTO country (name, short_name, iso3, iso2, secretariat_regional_office_id, region, status, preferred_language, currency_code, fds_member_user_id) VALUES (%(name)s, %(short_name)s, %(iso3)s, %(iso2)s, %(secretariat_regional_office_id)s, %(region)s, %(status)s, %(preferred_language)s, %(currency_code)s, %(fds_member_user_id)s) RETURNING country.id]
+E   [parameters: {'name': 'NoRegionCnt', 'short_name': None, 'iso3': 'NZZ', 'iso2': 'NZ', 'secretariat_regional_office_id': None, 'region': None, 'status': 'Active', 'preferred_language': 'en', 'currency_code': None, 'fds_member_user_id': None}]
+E   (Background on this error at: https://sqlalche.me/e/20/gkpj)
+______ TestFilterRoleChoicesForActor.test_invalid_rid_in_choices_skipped ______
+tests\unit\test_routes\test_user_management_helpers.py:443: in test_invalid_rid_in_choices_skipped
+    assert result == []
+E   AssertionError: assert [('not-an-int', 'Bad')] == []
+E     
+E     Left contains one more item: ('not-an-int', 'Bad')
+E     
+E     Full diff:
+E     - []
+E     + [
+E     +     (
+E     +         'not-an-int',
+E     +         'Bad',
+E     +     ),
+E     + ]
+-- generated xml file: C:\Humanitarian Databank\Backoffice\test_results.xml ---
+=========================== short test summary info ===========================
+FAILED tests/unit/test_routes/test_user_management_helpers.py::TestGetCountriesByRegion::test_none_region_grouped_as_unassigned - sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "region" of relation "country" violates not-null constraint
+DETAIL:  Failing row contains (1, NoRegionCnt, null, NZZ, NZ, null, null, Active, en, null, null, null).
+
+[SQL: INSERT INTO country (name, short_name, iso3, iso2, secretariat_regional_office_id, region, status, preferred_language, currency_code, fds_member_user_id) VALUES (%(name)s, %(short_name)s, %(iso3)s, %(iso2)s, %(secretariat_regional_office_id)s, %(region)s, %(status)s, %(preferred_language)s, %(currency_code)s, %(fds_member_user_id)s) RETURNING country.id]
+[parameters: {'name': 'NoRegionCnt', 'short_name': None, 'iso3': 'NZZ', 'iso2': 'NZ', 'secretariat_regional_office_id': None, 'region': None, 'status': 'Active', 'preferred_language': 'en', 'currency_code': None, 'fds_member_user_id': None}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+FAILED tests/unit/test_routes/test_user_management_helpers.py::TestFilterRoleChoicesForActor::test_invalid_rid_in_choices_skipped - AssertionError: assert [('not-an-int', 'Bad')] == []
+  
+  Left contains one more item: ('not-an-int', 'Bad')
+  
+  Full diff:
+  - []
+  + [
+  +     (
+  +         'not-an-int',
+  +         'Bad',
+  +     ),
+  + ]
+============ 2 failed, 57 passed, 16 warnings in 236.33s (0:03:56) ============

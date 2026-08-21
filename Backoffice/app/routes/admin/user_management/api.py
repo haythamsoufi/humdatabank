@@ -32,6 +32,8 @@ from .helpers import (
     _apply_role_type_and_implications,
     _country_access_request_to_dict,
     _get_user_deletion_preview,
+    _critical_rbac_roles_integrity_ok,
+    _RESTRICTED_RBAC_ROLE_CODES,
 )
 
 
@@ -257,11 +259,27 @@ def api_user_update(user_id):
 
             restricted_role_ids = set()
             try:
-                restricted_codes = ["system_manager", "admin_full", "admin_plugins_manager"]
-                rows = RbacRole.query.filter(RbacRole.code.in_(restricted_codes)).with_entities(RbacRole.id).all()
+                rows = RbacRole.query.filter(RbacRole.code.in_(_RESTRICTED_RBAC_ROLE_CODES)).with_entities(RbacRole.id).all()
                 restricted_role_ids = {int(r[0]) for r in rows if r and r[0] is not None}
             except Exception as e:
                 current_app.logger.debug("restricted_role_ids query failed: %s", e)
+
+            rbac_integrity_ok = _critical_rbac_roles_integrity_ok(_RESTRICTED_RBAC_ROLE_CODES, restricted_role_ids)
+
+            # Fail CLOSED (not open): if RBAC has been seeded but restricted_role_ids
+            # couldn't be verified as complete, reject role assignment for
+            # non-system-managers outright instead of relying solely on the
+            # filter below and the sys_role/plugins_role checks further down, which
+            # themselves depend on the same RBAC data that may be incomplete.
+            # Checked against the raw request (before restricted_role_ids filtering)
+            # so this can't be bypassed just because the one role code that failed
+            # to resolve happens not to be in the (necessarily incomplete) filter set.
+            if not current_is_sys_mgr and not rbac_integrity_ok and requested_role_ids:
+                return _bad(
+                    "RBAC role data looks incomplete, so role assignment is "
+                    "temporarily disabled for non-System-Managers. Ask a System "
+                    "Manager to run `flask rbac seed`."
+                )
 
             if not current_is_sys_mgr and restricted_role_ids:
                 requested_role_ids = [rid for rid in requested_role_ids if int(rid) not in restricted_role_ids]

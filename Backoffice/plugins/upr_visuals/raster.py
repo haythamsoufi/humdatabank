@@ -22,6 +22,9 @@ from plugins.upr_visuals.catalog import (
 # so text and icons stay sharp when the PNG is zoomed. Do not use
 # get_pixmap(matrix=N) — that only upscales a 72 dpi bake.
 PNG_EXPORT_SCALE = 8.0
+# Combined All visuals stacks A4 pages into one strip. Paint/GDI+ allows
+# 32,767 px; WinUI Snipping Tool and Photos use Direct3D textures (16,384).
+MAX_PNG_EDGE = 16384
 _IMG_SRC_RE = re.compile(r'(<img\b[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
 _PLUGIN_STATIC_URL = "/upr-visuals/static/"
 
@@ -143,7 +146,6 @@ def _pdf_page_css(dashboard_id: str) -> str:
             ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
             ".upr-combined-section--finance {"
             " break-inside: avoid; page-break-inside: avoid; }"
-            ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
             ".upr-combined-section--indicators,"
             ".upr-combined-section--indicators > .upr-block {"
             " break-inside: auto; page-break-inside: auto; }"
@@ -247,6 +249,9 @@ def _wrap(dashboard_html: str, width: int | None = None, *, dashboard_id: str = 
             ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
             ".upr-combined-section--finance {"
             " break-inside: avoid; page-break-inside: avoid; }"
+            # Author CSS (not WeasyPrint user stylesheets) so this beats
+            # .upr-block--finance { font-size: 1rem } in the shared sheet.
+            ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
         )
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
@@ -417,6 +422,13 @@ def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.
     return pdf_buffer.getvalue()
 
 
+def _png_render_scale(doc, *, scale: float) -> float:
+    """Fit a stitched multi-page PNG under Direct3D's 16,384 px texture limit."""
+    width = max((float(page.rect.width) for page in doc), default=1.0)
+    height = sum(float(page.rect.height) for page in doc) or 1.0
+    return max(0.25, min(float(scale), MAX_PNG_EDGE / height, MAX_PNG_EDGE / width))
+
+
 def render_png(
     dashboard_html: str,
     output_path: Path,
@@ -431,10 +443,20 @@ def render_png(
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    pdf_bytes = render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id, zoom=scale)
+    # Combined / multi-page: rasterize from a 1× PDF, then scale the pixmap so
+    # the stacked strip stays under MAX_PNG_EDGE (Snipping Tool / D3D 16,384).
+    bake_zoom = 1.0 if _is_portrait_export(dashboard_id) else scale
+    pdf_bytes = render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id, zoom=bake_zoom)
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     try:
-        pixmaps = [page.get_pixmap(alpha=False) for page in doc]
+        if bake_zoom == 1.0:
+            render_scale = _png_render_scale(doc, scale=scale)
+            matrix = fitz.Matrix(render_scale, render_scale)
+            pixmaps = [page.get_pixmap(matrix=matrix, alpha=False) for page in doc]
+        else:
+            pixmaps = [page.get_pixmap(alpha=False) for page in doc]
+        if len(pixmaps) > 1:
+            pixmaps = [_trim_pixmap(pixmap, keep_width=True) for pixmap in pixmaps]
         pixmap = pixmaps[0] if len(pixmaps) == 1 else _stitch_pixmaps(pixmaps)
         pixmap = _trim_pixmap(pixmap, keep_width=True)
         pixmap.save(str(output_path))

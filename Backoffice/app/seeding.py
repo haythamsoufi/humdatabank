@@ -63,9 +63,12 @@ def _baseline_role_defs_by_code():
 def _ensure_rbac_seeded(app_instance) -> None:
     """Best-effort RBAC catalog seed so role-permission links exist."""
     try:
-        from app.services.organization.rbac_seed_service import seed_rbac_permissions_and_roles
+        from app.services.organization.rbac_seed_service import (
+            RbacSeedLockMode,
+            seed_rbac_permissions_and_roles,
+        )
 
-        stats = seed_rbac_permissions_and_roles(use_advisory_lock=False)
+        stats = seed_rbac_permissions_and_roles(lock_mode=RbacSeedLockMode.WAIT)
         app_instance.logger.debug("RBAC seed during default data: %s", stats)
     except Exception as e:
         app_instance.logger.debug("RBAC seed skipped during default data: %s", e)

@@ -81,7 +81,12 @@ _blob_relative_path() {
     rel="${abs_path#"${SOURCE_DIR}"}"
     rel="${rel#/}"
   fi
-  printf '%s' "$rel"
+  # Trailing newline is required: callers invoke this once per file inside a
+  # `while read` loop piped to `sort -u`. Without it, every path printed in the
+  # same loop run concatenates onto one line (no separator), so downstream
+  # consumers (see _apply_cache_control_headers) see a single bogus "path" and
+  # skip Cache-Control for the entire batch.
+  printf '%s\n' "$rel"
 }
 
 # Extract blob-relative path from an AzCopy dry-run Source/Destination value.
@@ -94,7 +99,8 @@ _dry_run_blob_path() {
     # https://account.blob.core.windows.net/container/js/foo.js?... -> js/foo.js
     value="${value#*://${ACCOUNT_NAME}.blob.core.windows.net/${CONTAINER}/}"
     value="${value%%\?*}"
-    printf '%s' "$value"
+    # See newline comment in _blob_relative_path above — same reasoning applies here.
+    printf '%s\n' "$value"
     return 0
   fi
   _blob_relative_path "$value"

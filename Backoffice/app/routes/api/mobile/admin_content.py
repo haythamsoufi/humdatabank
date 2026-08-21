@@ -831,7 +831,15 @@ def edit_indicator(indicator_id):
 
 
 @mobile_bp.route('/admin/content/indicator-bank/<int:indicator_id>/delete', methods=['POST'])
-@mobile_auth_required(permission='admin.indicator_bank.delete')
+# 'admin.indicator_bank.delete' does not exist in the RBAC seed catalog (the
+# catalog has view/create/edit/archive/suggestions.review -- no separate
+# delete tier), which made this endpoint inaccessible to every
+# non-System-Manager (no role can ever hold a permission that isn't in the
+# catalog; System Manager alone still got in via has_rbac_permission()'s
+# superuser shortcut). Match the HTML equivalent
+# (system_admin.delete_indicator_bank), which gates hard delete on
+# 'admin.indicator_bank.edit'.
+@mobile_auth_required(permission='admin.indicator_bank.edit')
 def delete_indicator(indicator_id):
     """Delete an indicator from the bank."""
     from app.models import IndicatorBank

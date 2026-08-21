@@ -20,6 +20,14 @@ from app.models.system import UserDevice
 from app.utils.entity_groups import get_enabled_entity_groups, get_allowed_entity_type_codes
 from app.utils.azure_b2c_config import is_azure_b2c_configured
 
+# Single source of truth for the RBAC role codes that only a System Manager may
+# assign/revoke. Every privilege-escalation guard (HTML new_user/edit_user in
+# crud.py, the JSON PATCH handler in api.py, and the mobile PATCH handler in
+# app/routes/api/mobile/admin_users.py) must import this constant rather than
+# hardcoding its own copy of the list -- three near-identical inline copies
+# previously existed and could silently drift out of sync with each other.
+_RESTRICTED_RBAC_ROLE_CODES = ["system_manager", "admin_full", "admin_plugins_manager"]
+
 
 def _apply_role_type_and_implications(
     requested_role_ids: list[int] | list,
@@ -186,36 +194,49 @@ def _get_allowed_non_country_entity_types():
     return list(get_allowed_entity_type_codes(groups))
 
 
-def _warn_if_critical_rbac_roles_missing(restricted_codes: list, restricted_role_ids: set) -> None:
+def _critical_rbac_roles_integrity_ok(restricted_codes: list, restricted_role_ids: set) -> bool:
     """
-    Defensive integrity check for the privilege-escalation guards in new_user/edit_user.
+    Defensive integrity check gating the privilege-escalation guards in
+    new_user/edit_user/api.py.
 
-    Those guards look up System Manager / Admin: Full / Plugins-manager by RBAC role
-    `code` and simply no-op (fail OPEN, not closed) if the lookup comes back empty —
-    e.g. `if sys_role and not current_is_sys_mgr: <filter choices>` silently skips the
-    filter when `sys_role` is None. That's expected/harmless on a fresh install before
-    `flask rbac seed` has ever run. But if RBAC *has* been seeded and one of these
-    specific codes is still missing (renamed via direct DB edit, corrupted migration,
-    accidental deletion, ...), it's a silent, security-relevant misconfiguration that
-    should be surfaced in logs rather than swallowed.
+    Those guards look up System Manager / Admin: Full / Plugins-manager by RBAC
+    role `code` and filter/reject based on the resolved ids (`restricted_role_ids`).
+    If one of `restricted_codes` doesn't resolve to a row, the caller cannot trust
+    that set to be a *complete* list of ids to block -- e.g. `sys_role = None`
+    would make `if sys_role and not current_is_sys_mgr: <filter choices>` silently
+    skip the filter instead of blocking the System Manager role. Returning False
+    tells the caller to fail CLOSED (deny RBAC role assignment for non-System-Managers
+    entirely) instead of silently letting through whichever restriction couldn't be
+    verified.
+
+    Returns True when there is nothing to enforce yet (RBAC not seeded at all -- a
+    fresh install before the first `flask rbac seed` -- so there's no privileged
+    role a non-admin *could* escalate into), or when every expected code resolved.
+    Returns False (and logs a warning) when RBAC has been seeded but a critical role
+    code is still missing (renamed via direct DB edit, corrupted migration,
+    accidental deletion, ...), or when the check itself couldn't be completed
+    (fail closed rather than assume everything's fine).
     """
     try:
         from app.models.rbac import RbacRole
 
         if RbacRole.query.first() is None:
-            # RBAC hasn't been seeded at all yet; nothing to warn about.
-            return
+            # RBAC hasn't been seeded at all yet; nothing to enforce yet.
+            return True
         if len(restricted_role_ids) < len(restricted_codes):
             current_app.logger.warning(
                 "RBAC integrity: expected critical role code(s) %s in rbac_role but "
-                "only found %d matching row(s). Privilege-escalation guards for the "
-                "missing role(s) will not be enforced until the seed data is corrected "
+                "only found %d matching row(s). Failing CLOSED: RBAC role assignment "
+                "is disabled for non-System-Managers until the seed data is corrected "
                 "(re-run `flask rbac seed`).",
                 restricted_codes,
                 len(restricted_role_ids),
             )
+            return False
+        return True
     except Exception as e:
         current_app.logger.debug("critical RBAC role integrity check failed: %s", e)
+        return False
 
 
 def _get_missing_rbac_role_codes_for_display(current_is_sys_mgr: bool) -> list:

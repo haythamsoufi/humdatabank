@@ -3128,6 +3128,7 @@
 {% block extra_js %}
 <script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
 {% if show_upr_visuals_assets %}
+<script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-download.js') }}"></script>
 <script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-assignment.js') }}"></script>
 {% endif %}
 {% if is_preview_mode %}

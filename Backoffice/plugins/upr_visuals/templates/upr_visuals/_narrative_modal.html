@@ -1,0 +1,59 @@
+{% from "macros/modal_shell.html" import modal_shell %}
+{% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
+
+{% set narrative_title %}<i class="fas fa-file-word w-6 h-6 mr-2 text-blue-600"></i> {{ _('Add narrative document') }}{% endset %}
+{% call modal_shell(
+    'upr-visuals-narrative-modal',
+    narrative_title,
+    aria_label=_('Add narrative document'),
+    max_width='max-w-lg',
+    z_index=60,
+    title_safe=true,
+    close_class='upr-visuals-narrative-close',
+    title_class='flex items-center',
+    data_attrs={'dropzone_module': static_url('js/components/excel-import-dropzone.js')}
+) %}
+    <div class="excel-io-modal__panel-intro">
+        <p class="excel-io-modal__panel-lead">
+            {{ _('Visuals come from this assignment. Narrative pages follow the Word file. InDesign downloads as a zip — unzip it, then open the .idml file.') }}
+        </p>
+    </div>
+    <input type="hidden" id="upr-visuals-narrative-format" value="">
+    {% call excel_import_dropzone(
+        'upr-visuals-narrative-dropzone',
+        input_id='upr-visuals-narrative-file',
+        input_name='file',
+        variant='neutral',
+        accept='.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        title=_('Drop your Word document here'),
+        hint=_('or click to browse — .docx only'),
+        change_hint=_('Click to change file'),
+        selected_icon='fa-file-word',
+        max_size_bytes=20971520,
+        required=false
+    ) %}{% endcall %}
+    <p class="excel-io-modal__note" data-upr-narrative-note>
+        <i class="fas fa-info-circle" aria-hidden="true"></i>{{ _('Maximum file size: 20 MB') }}
+    </p>
+    <div id="upr-visuals-narrative-progress" class="upr-visuals-narrative-progress" hidden>
+        <div class="upr-visuals-narrative-progress__track" aria-hidden="true">
+            <span class="upr-visuals-narrative-progress__bar"></span>
+        </div>
+        <p class="upr-visuals-narrative-progress__copy">
+            <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+            <span id="upr-visuals-narrative-progress-label">{{ _('Generating…') }}</span>
+        </p>
+    </div>
+    <p id="upr-visuals-narrative-status" class="upr-visuals-narrative-status" role="status" hidden></p>
+    <div class="upr-visuals-narrative-actions">
+        <button type="button" class="btn btn-secondary upr-visuals-narrative-close">{{ _('Cancel') }}</button>
+        <button type="button"
+                id="upr-visuals-narrative-submit"
+                class="btn btn-primary"
+                disabled
+                data-label-pdf="{{ _('Generate PDF')|forceescape }}"
+                data-label-idml="{{ _('Generate InDesign')|forceescape }}">
+            <i class="fas fa-file-export mr-1" aria-hidden="true"></i><span data-upr-narrative-submit-label>{{ _('Generate') }}</span>
+        </button>
+    </div>
+{% endcall %}

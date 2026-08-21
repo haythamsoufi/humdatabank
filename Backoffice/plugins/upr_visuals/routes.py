@@ -1,4 +1,4 @@
-"""HTTP routes for UPR visuals — assignment embed, PNG/PDF export, admin bulk."""
+"""HTTP routes for UPR visuals — assignment embed, PNG/PDF/IDML export, admin bulk."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from plugins.upr_visuals.data import (
     visuals_browser_title,
 )
 from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
+from plugins.upr_visuals.idml import read_docx_upload
 from plugins.upr_visuals.service import UprVisualsService
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import permission_required, system_manager_required
@@ -115,15 +116,19 @@ def _content_disposition(filename: str, *, download: bool) -> str:
     return header
 
 
-def _pdf_response(data: bytes, filename: str, *, download: bool) -> Response:
+def _file_response(data: bytes, filename: str, *, mimetype: str, download: bool) -> Response:
     return Response(
         data,
-        mimetype="application/pdf",
+        mimetype=mimetype,
         headers={
             "Content-Disposition": _content_disposition(filename, download=download),
             "Cache-Control": "no-store",
         },
     )
+
+
+def _pdf_response(data: bytes, filename: str, *, download: bool) -> Response:
+    return _file_response(data, filename, mimetype="application/pdf", download=download)
 
 
 def _pdf_viewer_response(*, title: str, pdf_url: str) -> Response:
@@ -200,6 +205,48 @@ def assignment_pdf(aes_id: int):
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals PDF failed for aes {aes_id}"
         )
 
+
+
+@bp.route("/assignment/<int:aes_id>/idml", methods=["GET"])
+@login_required
+@permission_required("admin.data_explore.upr_visuals")
+def assignment_idml(aes_id: int):
+    try:
+        _aes_or_404(aes_id)
+        data, filename = UprVisualsService.idml_zip_bytes(aes_id)
+        return _file_response(data, filename, mimetype="application/zip", download=True)
+    except UprVisualsError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        return handle_json_view_exception(
+            exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals IDML failed for aes {aes_id}"
+        )
+
+
+@bp.route("/assignment/<int:aes_id>/visuals/narrative", methods=["POST"])
+@login_required
+@permission_required("admin.data_explore.upr_visuals")
+def assignment_narrative(aes_id: int):
+    try:
+        _aes_or_404(aes_id)
+        fmt = (request.form.get("format") or request.args.get("format") or "").strip().lower()
+        if fmt not in {"pdf", "idml"}:
+            return json_bad_request("Choose PDF with narrative or InDesign with narrative.")
+        upload = request.files.get("file")
+        if upload is None or not (upload.filename or "").strip():
+            return json_bad_request("Upload a Word document (.docx).")
+        word_bytes = read_docx_upload(upload, filename=upload.filename or "")
+        if fmt == "pdf":
+            data, filename = UprVisualsService.narrative_pdf_bytes(aes_id, word_bytes)
+            return _pdf_response(data, filename, download=True)
+        data, filename = UprVisualsService.idml_zip_bytes(aes_id, word_bytes=word_bytes)
+        return _file_response(data, filename, mimetype="application/zip", download=True)
+    except UprVisualsError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        return handle_json_view_exception(
+            exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals narrative export failed for aes {aes_id}"
+        )
 
 
 @bp.route("/assignment/<int:aes_id>/pdf/<dashboard_id>", methods=["GET"])

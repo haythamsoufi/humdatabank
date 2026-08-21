@@ -60,6 +60,23 @@ def test_print_css_drops_media_queries():
 
 
 @pytest.mark.unit
+def test_print_css_drops_keyframes():
+    css = (
+        ".upr-dot { width: 1rem; }\n"
+        "@keyframes upr-vis-narrative-slide {\n"
+        "  0% { left: -38%; }\n"
+        "  100% { left: 100%; }\n"
+        "}\n"
+        ".upr-bar { display: flex; }\n"
+    )
+    printed = _css_for_print(css)
+    assert ".upr-dot { width: 1rem; }" in printed
+    assert ".upr-bar { display: flex; }" in printed
+    assert "@keyframes" not in printed
+    assert "upr-vis-narrative-slide" not in printed
+
+
+@pytest.mark.unit
 def test_pdf_canvas_is_a4_landscape_for_single_chips():
     from plugins.upr_visuals.catalog import A4_PAGE_HEIGHT_PX, A4_PAGE_WIDTH_PX
 
@@ -97,6 +114,7 @@ def test_combined_pdf_is_portrait_and_keeps_sections_together():
     assert "position: running(cover-footer)" in css
     wrapped = _wrap('<div class="upr-combined-section">x</div>', dashboard_id="combined")
     assert "page-break-inside: avoid" in wrapped
+    assert "@keyframes" not in wrapped
 
 
 @pytest.mark.unit

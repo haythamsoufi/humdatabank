@@ -1146,7 +1146,7 @@
   position: absolute;
   right: 0;
   top: calc(100% + 0.25rem);
-  min-width: 8rem;
+  min-width: 13.5rem;
   padding: 0.25rem;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -1177,6 +1177,13 @@
 .upr-visuals-download__menu button:focus {
   background: #f3f4f6;
   color: #011e41;
+}
+
+.upr-visuals-download__divider {
+  height: 0;
+  margin: 0.25rem 0.35rem;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
 }
 
 .upr-visuals-embed__tabs {
@@ -1397,4 +1404,86 @@
   padding-top: 0.5rem;
   border-top: 1px solid #c5c9ce;
   color: #58595b;
+}
+
+.upr-visuals-narrative-status {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+.upr-visuals-narrative-status[hidden] {
+  display: none;
+}
+.upr-visuals-narrative-status.is-error {
+  color: #b91c1c;
+}
+.upr-visuals-narrative-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+#upr-visuals-narrative-dropzone.is-generating {
+  min-height: 0;
+}
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__content,
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__content--selected {
+  min-height: 0;
+  padding: 0.55rem 0.9rem;
+}
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__status,
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__divider,
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__change-hint {
+  display: none;
+}
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__file-panel {
+  flex: 1 1 100%;
+  padding-right: 0;
+}
+#upr-visuals-narrative-dropzone.is-generating .excel-io-dropzone__file-icon {
+  margin-bottom: 0.15rem;
+}
+#upr-visuals-narrative-modal.is-generating [data-upr-narrative-note] {
+  display: none;
+}
+
+.upr-visuals-narrative-progress {
+  margin-top: 0.85rem;
+}
+.upr-visuals-narrative-progress[hidden] {
+  display: none;
+}
+.upr-visuals-narrative-progress__track {
+  position: relative;
+  height: 0.35rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ccfbf1;
+}
+.upr-visuals-narrative-progress__bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  border-radius: 999px;
+  background: #0d9488;
+  animation: upr-vis-narrative-slide 1.15s ease-in-out infinite;
+}
+.upr-visuals-narrative-progress__copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0.65rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+.upr-visuals-narrative-progress__copy i {
+  font-size: 0.95rem;
+}
+@keyframes upr-vis-narrative-slide {
+  0% { left: -38%; }
+  100% { left: 100%; }
 }

@@ -283,5 +283,6 @@ window.UprVisualsAdminConfig = {
     }
 };
 </script>
+<script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-download.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-admin.js') }}"></script>
 {% endif %}

@@ -584,6 +584,109 @@ class TestSystemManagerUserCreation:
         assert "already exists" in info_calls.lower()
 
 
+class TestEnsureDevTestSysManagerRole:
+    def test_grants_missing_role_and_commits(self):
+        from app.seeding import _ensure_dev_test_sys_manager_role
+
+        app = _mock_app()
+        user = MagicMock(id=40, email="test_sys@example.com")
+        with patch("app.seeding._assign_role_to_user", return_value=True) as assign:
+            with patch("app.seeding.db") as mock_db:
+                _ensure_dev_test_sys_manager_role(user, app)
+
+        assign.assert_called_once_with(
+            40,
+            "system_manager",
+            name="System Manager",
+            description="Full access (superuser).",
+        )
+        mock_db.session.commit.assert_called_once()
+        app.logger.info.assert_called()
+        assert "system_manager" in str(app.logger.info.call_args)
+
+    def test_skips_commit_when_role_already_present(self):
+        from app.seeding import _ensure_dev_test_sys_manager_role
+
+        app = _mock_app()
+        user = MagicMock(id=40, email="test_sys@example.com")
+        with patch("app.seeding._assign_role_to_user", return_value=False):
+            with patch("app.seeding.db") as mock_db:
+                _ensure_dev_test_sys_manager_role(user, app)
+
+        mock_db.session.commit.assert_not_called()
+        app.logger.info.assert_not_called()
+
+    def test_rolls_back_on_assignment_error(self):
+        from app.seeding import _ensure_dev_test_sys_manager_role
+
+        app = _mock_app()
+        user = MagicMock(id=40, email="test_sys@example.com")
+        with patch("app.seeding._assign_role_to_user", side_effect=RuntimeError("db down")):
+            with patch("app.seeding.db") as mock_db:
+                _ensure_dev_test_sys_manager_role(user, app)
+
+        mock_db.session.rollback.assert_called_once()
+        app.logger.debug.assert_called()
+
+
+class TestClearDevTestSysManagerEntityPermissions:
+    def test_deletes_leftover_grants_and_commits(self):
+        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+
+        app = _mock_app()
+        user = MagicMock(id=40, email="test_sys@example.com")
+        mock_query = MagicMock()
+        mock_query.filter_by.return_value.delete.return_value = 2
+        with patch("app.models.core.UserEntityPermission") as perm_cls:
+            perm_cls.query = mock_query
+            with patch("app.seeding.db") as mock_db:
+                _clear_dev_test_sys_manager_entity_permissions(user, app)
+
+        mock_query.filter_by.assert_called_once_with(user_id=40)
+        mock_db.session.commit.assert_called_once()
+        app.logger.info.assert_called()
+        assert "leftover entity permission" in str(app.logger.info.call_args)
+
+    def test_skips_commit_when_no_grants(self):
+        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+
+        app = _mock_app()
+        user = MagicMock(id=40, email="test_sys@example.com")
+        mock_query = MagicMock()
+        mock_query.filter_by.return_value.delete.return_value = 0
+        with patch("app.models.core.UserEntityPermission") as perm_cls:
+            perm_cls.query = mock_query
+            with patch("app.seeding.db") as mock_db:
+                _clear_dev_test_sys_manager_entity_permissions(user, app)
+
+        mock_db.session.commit.assert_not_called()
+        app.logger.info.assert_not_called()
+
+    def test_rolls_back_on_delete_error(self):
+        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+
+        app = _mock_app()
+        user = MagicMock(id=40, email="test_sys@example.com")
+        mock_query = MagicMock()
+        mock_query.filter_by.return_value.delete.side_effect = RuntimeError("db down")
+        with patch("app.models.core.UserEntityPermission") as perm_cls:
+            perm_cls.query = mock_query
+            with patch("app.seeding.db") as mock_db:
+                _clear_dev_test_sys_manager_entity_permissions(user, app)
+
+        mock_db.session.rollback.assert_called_once()
+        app.logger.debug.assert_called()
+
+    def test_noop_when_user_missing(self):
+        from app.seeding import _clear_dev_test_sys_manager_entity_permissions
+
+        app = _mock_app()
+        with patch("app.seeding.db") as mock_db:
+            _clear_dev_test_sys_manager_entity_permissions(None, app)
+
+        mock_db.session.commit.assert_not_called()
+
+
 # ===========================================================================
 # National Society creation
 # ===========================================================================

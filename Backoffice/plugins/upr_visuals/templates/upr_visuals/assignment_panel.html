@@ -13,11 +13,11 @@
                 <i class="fas fa-download" aria-hidden="true"></i>
             </button>
             <div id="upr-visuals-download-menu" class="upr-visuals-download__menu" role="menu">
-                <button type="button" role="menuitem" data-format="png">{{ _('PNG') }}</button>
-                <button type="button" role="menuitem" data-format="pdf">{{ _('PDF') }}</button>
+                {% include "plugins/upr_visuals/upr_visuals/_download_menu.html" %}
             </div>
         </div>
     </div>
     <p id="upr-visuals-status" class="text-sm text-gray-500 mb-2"></p>
     <div id="upr-visuals-body" class="upr-visual-report__body upr-vis-page"></div>
 </div>
+{% include "plugins/upr_visuals/upr_visuals/_narrative_modal.html" %}

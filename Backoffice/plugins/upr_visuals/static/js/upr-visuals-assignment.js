@@ -142,41 +142,15 @@
     link.addEventListener("click", () => showForm());
   });
 
-  function setDownloadOpen(open) {
-    downloadWrap?.classList.toggle("is-open", open);
-    downloadBtn?.setAttribute("aria-expanded", open ? "true" : "false");
+  if (window.UprVisualsDownload) {
+    window.UprVisualsDownload.bindDownloadMenu({
+      button: downloadBtn,
+      menu: downloadMenu,
+      wrap: downloadWrap,
+      aesIdFn: () => aesId,
+      dashboardFn: () => activeDashboard,
+    });
   }
-
-  function downloadVisual(format) {
-    const kind = format === "pdf" ? "pdf" : "png";
-    const path =
-      kind === "pdf" && activeDashboard === "combined"
-        ? `/assignment/${aesId}/pdf`
-        : `/assignment/${aesId}/${kind}/${encodeURIComponent(activeDashboard)}`;
-    if (kind === "pdf" && activeDashboard === "combined") {
-      window.open(path, "_blank", "noopener");
-    } else {
-      window.location.href = path;
-    }
-    setDownloadOpen(false);
-  }
-
-  downloadBtn?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    setDownloadOpen(!downloadWrap?.classList.contains("is-open"));
-  });
-  downloadMenu?.addEventListener("click", (event) => {
-    const item = event.target.closest("[data-format]");
-    if (!item) return;
-    downloadVisual(item.dataset.format);
-  });
-  document.addEventListener("click", (event) => {
-    if (!downloadWrap || downloadWrap.contains(event.target)) return;
-    setDownloadOpen(false);
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setDownloadOpen(false);
-  });
 
   document.addEventListener("formSubmitted", () => {
     if (!panel.classList.contains("is-visible")) return;

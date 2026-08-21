@@ -154,17 +154,19 @@ jobs:
           echo "Disk space before cleanup:"
           df -h
 
-          # This cleanup step can take ~1-2 minutes. Only run it when disk is tight.
-          # GitHub runners usually have enough space; your build was already starting with ~19G free.
+          # This cleanup step can take ~1-2 minutes (dotnet/android/CodeQL + docker prune).
+          # The image build typically needs ~6-8G; skip when the runner already has enough.
+          # 15G was too tight: ubuntu-24.04 often starts at ~14G free, which is enough,
+          # but still triggered a 2-minute cleanup (see run 32479917281).
           avail_gb="$(df -BG / | tail -1 | awk '{gsub("G","",$4); print $4}')"
           echo "Available disk on /: ${avail_gb}G"
 
-          if [ "${avail_gb}" -ge 15 ]; then
-            echo "Skipping cleanup (>=15G free)."
+          if [ "${avail_gb}" -ge 10 ]; then
+            echo "Skipping cleanup (>=10G free)."
             exit 0
           fi
 
-          echo "Running cleanup (<15G free)."
+          echo "Running cleanup (<10G free)."
           # Remove unnecessary packages and files
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
@@ -377,10 +379,15 @@ jobs:
         env:
           AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
           STATIC_BLOB_CONTAINER: ${{ steps.static_config.outputs.container }}
+          # inputs.force_static_upload is a boolean; the script expects STATIC_FORCE_UPLOAD=1
+          STATIC_FORCE_UPLOAD: ${{ inputs.force_static_upload == true && '1' || '' }}
         run: |
           set -euo pipefail
           chmod +x Backoffice/azure/upload-static-assets.sh
-          STATIC_CDN_URL="$(Backoffice/azure/upload-static-assets.sh | sed -n 's/^STATIC_CDN_URL=//p' | tail -1)"
+          # tee to stderr so the script's progress/diagnostics (sync counts, Cache-Control
+          # summary, WARN lines) show up in the workflow log instead of being swallowed by
+          # the `sed -n` filter below, which only needs the final STATIC_CDN_URL= line.
+          STATIC_CDN_URL="$(Backoffice/azure/upload-static-assets.sh | tee /dev/stderr | sed -n 's/^STATIC_CDN_URL=//p' | tail -1)"
           if [ -z "${STATIC_CDN_URL}" ]; then
             echo "ERROR: upload-static-assets.sh did not print STATIC_CDN_URL"
             exit 1

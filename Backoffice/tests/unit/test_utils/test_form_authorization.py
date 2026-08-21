@@ -13,6 +13,15 @@ from app.utils.form_authorization import (
     check_assignment_access,
     check_assignment_edit_access,
     check_document_access,
+    assignment_is_round_closed_for_entity,
+    assignment_readonly_notice_reason,
+    READONLY_NOTICE_PUBLIC,
+    READONLY_NOTICE_SENT_FOR_REVIEW,
+    READONLY_NOTICE_APPROVED,
+    READONLY_NOTICE_SUBMITTED,
+    READONLY_NOTICE_VIEW_ONLY,
+    READONLY_NOTICE_ROUND_CLOSED,
+    READONLY_NOTICE_GENERIC,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.auth_security]
@@ -75,6 +84,109 @@ class TestFormAuthorizationWrappers:
             ) as mock_fn:
                 assert check_self_report_access(aes, user) is False
             mock_fn.assert_called_once_with(aes, user)
+
+
+def _readonly_aes(*, status='in_progress', round_closed=False):
+    aes = MagicMock()
+    aes.status = status
+    aes.entity_type = 'country'
+    aes.entity_id = 1
+    aes.assigned_form_id = 10
+    aes.assigned_form = MagicMock(template_id=20)
+    aes.is_round_closed_for_entity = MagicMock(return_value=round_closed)
+    return aes
+
+
+def _readonly_user(*, authenticated=True):
+    user = MagicMock()
+    user.is_authenticated = authenticated
+    return user
+
+
+@pytest.mark.unit
+class TestAssignmentReadonlyNoticeReason:
+    def test_public_submission(self):
+        assert assignment_readonly_notice_reason(None, None, is_public_submission=True) == READONLY_NOTICE_PUBLIC
+
+    def test_workflow_status_before_permissions(self):
+        aes = _readonly_aes(status='submitted', round_closed=True)
+        user = _readonly_user()
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=False,
+        ):
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_SUBMITTED
+
+        aes.status = 'approved'
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=False,
+        ):
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_APPROVED
+
+        aes.status = 'sent_for_review'
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=False,
+        ):
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_SENT_FOR_REVIEW
+
+    def test_viewer_on_open_assignment_is_view_only_not_round_closed(self):
+        """Jinja used to treat the unbound method as truthy, so viewers always saw 'round closed'."""
+        aes = _readonly_aes(status='in_progress', round_closed=False)
+        user = _readonly_user()
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=False,
+        ) as mock_perm:
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_VIEW_ONLY
+        mock_perm.assert_called_once()
+        assert mock_perm.call_args.args[1] == 'assignment.enter'
+
+    def test_viewer_on_closed_round_is_still_view_only(self):
+        aes = _readonly_aes(status='pending', round_closed=True)
+        user = _readonly_user()
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=False,
+        ):
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_VIEW_ONLY
+
+    def test_enterer_on_closed_round_sees_round_closed(self):
+        aes = _readonly_aes(status='in_progress', round_closed=True)
+        user = _readonly_user()
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=True,
+        ):
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_ROUND_CLOSED
+
+    def test_enterer_on_open_assignment_falls_back_to_generic(self):
+        aes = _readonly_aes(status='cancelled', round_closed=False)
+        user = _readonly_user()
+        with patch(
+            'app.services.organization.authorization_service.AuthorizationService.has_rbac_permission',
+            return_value=True,
+        ):
+            assert assignment_readonly_notice_reason(aes, user) == READONLY_NOTICE_GENERIC
+
+    def test_enum_status_value_is_unwrapped(self):
+        status = MagicMock()
+        status.value = 'approved'
+        aes = _readonly_aes(status=status, round_closed=False)
+        assert assignment_readonly_notice_reason(aes, _readonly_user()) == READONLY_NOTICE_APPROVED
+
+    def test_round_closed_helper_requires_calling_the_method(self):
+        aes = _readonly_aes(round_closed=False)
+        assert assignment_is_round_closed_for_entity(aes) is False
+        aes.is_round_closed_for_entity.assert_called_once_with()
+
+        aes.is_round_closed_for_entity.return_value = True
+        assert assignment_is_round_closed_for_entity(aes) is True
+
+        dummy = MagicMock(spec=[])
+        assert assignment_is_round_closed_for_entity(dummy) is False
+        assert assignment_is_round_closed_for_entity(None) is False
 
 
 @pytest.mark.unit

@@ -156,7 +156,7 @@ def notify_self_report_created(assignment_entity_status):
         related_object_type='assignment',
         related_object_id=aes.id,
         assignment_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         activity_category='admin',
         icon=None,
         user_id=None
@@ -177,7 +177,7 @@ def notify_self_report_created(assignment_entity_status):
         },
         related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='normal'
     )
 

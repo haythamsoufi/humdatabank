@@ -113,7 +113,7 @@
                                 <span class="mx-2">•</span>
                                 <span class="font-medium mr-1">{{ _('Status:') }}</span>
                                 {% set aes_status = assignment_status.status.value if assignment_status.status is not none and assignment_status.status.value is defined else assignment_status.status %}
-                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_status.is_closed|default(false), translation_key if translation_key is defined else 'en', assignment_status) }}
+                                {{ assignment_status_pipeline_badge(assignment_status.status, assignment_is_round_closed_for_entity(assignment_status), translation_key if translation_key is defined else 'en', assignment_status) }}
                                 {# Completion rate is stored on assignment_entity_status and rendered immediately. #}
                                 {% if assignment_entity_status_id_for_rate is defined and assignment_entity_status_id_for_rate %}
                                 <span class="mx-2">•</span>
@@ -248,14 +248,11 @@
 
         {% if not can_edit and not is_preview_mode %}
             {% set _org_data_email = 'data@' ~ (get_organization_email_domain() or get_organization_domain()) %}
-            {% set _assignment_scope = {
-                'entity_type': assignment_status.entity_type,
-                'entity_id': assignment_status.entity_id,
-                'assigned_form_id': assignment_status.assigned_form_id,
-            } if (assignment_status is defined and assignment_status and not is_public_submission) else none %}
-            {% set _can_enter_assignment = has_permission('assignment.enter', _assignment_scope) if _assignment_scope else false %}
-            {% set _raw_assignment_status = assignment_status.status if (assignment_status is defined and assignment_status) else none %}
-            {% set _assignment_status_value = _raw_assignment_status.value if (_raw_assignment_status is not none and _raw_assignment_status.value is defined) else (_raw_assignment_status|string if _raw_assignment_status is not none else '') %}
+            {% set _readonly_reason = assignment_readonly_notice_reason(
+                assignment_status if assignment_status is defined else none,
+                current_user,
+                is_public_submission=is_public_submission|default(false),
+            ) %}
             <div class="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-4 mb-6" role="alert">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
@@ -264,18 +261,18 @@
                     <div class="ml-3">
                         <p class="font-medium">{{ _('Read-only') }}</p>
                         <p class="text-sm mt-1">
-                        {% if is_public_submission %}
+                        {% if _readonly_reason == 'public' %}
                             {{ _('This public submission is read-only. You can review the responses but cannot change them.') }}
-                        {% elif _assignment_status_value == 'sent_for_review' %}
+                        {% elif _readonly_reason == 'sent_for_review' %}
                             {{ _('This assignment has been sent to %(org)s for review. You cannot make changes until it is returned for revision.', org=ORG_NAME) }}
-                        {% elif _assignment_status_value == 'approved' %}
+                        {% elif _readonly_reason == 'approved' %}
                             {{ _('This form has been validated and is read-only. To request changes, please write to %(email)s and include your reason for the request.', email=_org_data_email) }}
-                        {% elif _assignment_status_value == 'submitted' %}
+                        {% elif _readonly_reason == 'submitted' %}
                             {{ _('This form has been submitted and is read-only. To request reopening, please write to %(email)s and include your reason for the request.', email=_org_data_email) }}
-                        {% elif assignment_status is defined and assignment_status.is_round_closed_for_entity %}
-                            {{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}
-                        {% elif _assignment_scope and not _can_enter_assignment %}
+                        {% elif _readonly_reason == 'view_only' %}
                             {{ _('You have view-only access to this assignment. You can review the data but cannot enter or change values.') }}
+                        {% elif _readonly_reason == 'round_closed' %}
+                            {{ _('This assignment\'s data collection round is closed. You can view the form, but only an administrator can make changes or reopen it for this entity.') }}
                         {% else %}
                             {{ _('This form is read-only. You can review the data but cannot make changes.') }}
                         {% endif %}

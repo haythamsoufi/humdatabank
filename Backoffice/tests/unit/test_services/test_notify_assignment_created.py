@@ -43,7 +43,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 result = notify_assignment_created(pending_aes)
 
@@ -72,7 +72,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 result = notify_assignment_created(pending_aes)
 
@@ -107,7 +107,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_created(pending_aes)
 
@@ -142,7 +142,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_created(pending_aes, notify_admins=True)
 
@@ -171,7 +171,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_created(pending_aes)
 
@@ -207,7 +207,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_created(pending_aes, actor_user_id=explicit_actor_id)
 
@@ -232,7 +232,7 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_created(pending_aes)
 
@@ -256,13 +256,13 @@ class TestNotifyAssignmentCreated:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/99",
+                return_value="/assignment/99",
             ):
                 notify_assignment_created(pending_aes)
 
         mock_send_email.assert_called_once()
         sample = mock_send_email.call_args.kwargs["sample_notification"]
-        assert sample.related_url == "/forms/assignment/99"
+        assert sample.related_url == "/assignment/99"
 
 
 class TestPreviewAssignmentCreatedGroupedEmail:

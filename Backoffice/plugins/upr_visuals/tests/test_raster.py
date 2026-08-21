@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from plugins.upr_visuals.raster import (
@@ -9,8 +11,10 @@ from plugins.upr_visuals.raster import (
     _css_for_print,
     _font_css,
     _page_size,
+    _pdf_page_css,
     _rewrite_export_images,
     _stitch_pixmaps,
+    _wrap,
     ink_bounds,
     resolve_export_image_src,
 )
@@ -54,15 +58,56 @@ def test_print_css_drops_media_queries():
 
 
 @pytest.mark.unit
-def test_pdf_canvas_is_a4_landscape():
+def test_pdf_canvas_is_a4_landscape_for_single_chips():
     from plugins.upr_visuals.catalog import A4_PAGE_HEIGHT_PX, A4_PAGE_WIDTH_PX
 
     width, height = _page_size("strategic_priorities")
     assert width == A4_PAGE_WIDTH_PX
     assert height == A4_PAGE_HEIGHT_PX
-    combined_w, combined_h = _page_size("combined")
-    assert combined_w == A4_PAGE_WIDTH_PX
-    assert combined_h == A4_PAGE_HEIGHT_PX
+    css = _pdf_page_css("strategic_priorities")
+    assert "A4 landscape" in css
+    assert "portrait" not in css
+    assert "margin: 6mm" in css
+
+
+@pytest.mark.unit
+def test_combined_pdf_is_portrait_and_keeps_sections_together():
+    from plugins.upr_visuals.catalog import A4_PORTRAIT_HEIGHT_PX, A4_PORTRAIT_WIDTH_PX
+
+    width, height = _page_size("combined")
+    assert width == A4_PORTRAIT_WIDTH_PX
+    assert height == A4_PORTRAIT_HEIGHT_PX
+    assert width < height
+    css = _pdf_page_css("combined")
+    assert "A4 portrait" in css
+    assert "margin: 10mm 0" in css
+    assert "margin: 0mm 0mm 18mm" in css
+    assert "page-break-inside: avoid" in css
+    assert "upr-combined-section--finance" in css
+    assert "upr-combined-section--indicators" in css
+    assert "upr-combined-section--page-start" in css
+    assert "upr-bar-group" in css
+    assert "upr-fin-cover" in css
+    assert "table-layout: fixed" in css
+    assert ".upr-reach-row" in css
+    assert "element(cover-footer)" in css
+    assert "@page :first" in css
+    assert "position: running(cover-footer)" in css
+    wrapped = _wrap('<div class="upr-combined-section">x</div>', dashboard_id="combined")
+    assert "page-break-inside: avoid" in wrapped
+
+
+@pytest.mark.unit
+def test_combined_finance_scales_as_a_unit():
+    css = (Path(__file__).resolve().parents[1] / "static" / "css" / "upr-visuals.css").read_text(
+        encoding="utf-8"
+    )
+    assert ".upr-combined-section--finance .upr-block--finance" not in css
+    assert ".upr-combined-section--finance .upr-fin-net td" not in css
+    assert ".upr-combined-section--finance .upr-fin-hero" not in css
+    pdf_css = _pdf_page_css("combined")
+    assert ".upr-combined-section--finance .upr-block--finance" in pdf_css
+    assert "font-size: 0.78rem" in pdf_css
 
 
 @pytest.mark.unit

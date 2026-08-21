@@ -112,7 +112,19 @@ PNS_REPORT_LABEL_NEEDLES = {
 SP_CODES = ("SP1", "SP2", "SP3", "SP4", "SP5")
 EF_CODES = ("EF1", "EF2", "EF3", "EF4")
 SUPPORT_AREA_CODES = (*SP_CODES, "EFs")
-REACH_CODES = ("EO", "CC1", *SP_CODES)
+# Temporary: hide Cross-cutting on People reached. Emergency-response reach
+# is remapped to SP2; long-term services reach is dropped.
+# How to change or revert: docs/people-reached.md
+REACH_CODES = ("EO", *SP_CODES)
+REACH_EMERGENCY_TO_SP2_NEEDLES = ("emergency response and early recovery",)
+REACH_DROP_LONG_TERM_NEEDLES = (
+    "long-term services and programmes",
+    "longer-term services and programmes",
+    "longer term services and programmes",
+    "long term services and programmes",
+)
+# T33 Cross Cutting bank id for emergency response / early recovery.
+REACH_EMERGENCY_BANK_ID = 619
 
 AREA_LABELS = {
     "EO": "Emergency Operations",
@@ -127,6 +139,16 @@ AREA_LABELS = {
     "EF2": "National Society development",
     "EF3": "Humanitarian diplomacy",
     "EF4": "Accountability and agility",
+}
+
+# Two-line support-table headers (WeasyPrint cannot rotate writing-mode text).
+SUPPORT_AREA_HEADER_LINES = {
+    "SP1": ("Climate and", "environment"),
+    "SP2": ("Disasters and", "crises"),
+    "SP3": ("Health and", "wellbeing"),
+    "SP4": ("Migration and", "displacement"),
+    "SP5": ("Values, power", "and inclusion"),
+    "EFs": ("Enabling", "Functions"),
 }
 
 # Tableau plan "Detailed funding requirements" shortenings (ampersands).
@@ -253,11 +275,16 @@ def kpi_icon_src(key: str) -> str:
     return (KPI_ICON_URLS.get(key) or "").strip()
 
 
-# A4 landscape at 96 CSS px (WeasyPrint default). Preview and export share this.
+# A4 landscape at 96 CSS px (WeasyPrint default). Single-chip export uses this.
 A4_PAGE_WIDTH_PX = 1123
 A4_PAGE_HEIGHT_PX = 794
-A4_MARGIN_MM = 10
+A4_MARGIN_MM = 6
+A4_COMBINED_MARGIN_MM = 0  # first page — navy header bleeds to the page edge
+A4_COMBINED_FOLLOWING_MARGIN_MM = 10  # later pages — keep content off the paper edge
 A4_CONTENT_WIDTH_PX = 1047  # 297mm − 20mm margins
+# A4 portrait — All visuals (combined) PDF.
+A4_PORTRAIT_WIDTH_PX = A4_PAGE_HEIGHT_PX
+A4_PORTRAIT_HEIGHT_PX = A4_PAGE_WIDTH_PX
 
 
 @dataclass(frozen=True)
@@ -279,7 +306,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         True,
         A4_CONTENT_WIDTH_PX,
         1600,
-        "Full stacked visual: In Support Of, People reached, finance, and support on one page.",
+        "Full stacked visual: In Support Of, People reached, finance, emergencies, SP/EF indicators, then support across portrait A4 pages.",
     ),
     DashboardSpec(
         "in_support",
@@ -309,15 +336,6 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         "Plans: IFRC network funding requirements by year. Reports: network actuals vs requirement.",
     ),
     DashboardSpec(
-        "support",
-        "Bilateral Support",
-        True,
-        True,
-        A4_CONTENT_WIDTH_PX,
-        620,
-        "Participating National Society support by Strategic Priority. Plans add year rows and coloured amount cells.",
-    ),
-    DashboardSpec(
         "network_funding",
         "Network funding",
         True,
@@ -325,24 +343,6 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         A4_CONTENT_WIDTH_PX,
         500,
         "Plan-year detailed funding: Host National Society vs IFRC, with ongoing emergencies, longer-term needs, and enabling local actors.",
-    ),
-    DashboardSpec(
-        "strategic_priorities",
-        "Strategic Priorities",
-        False,
-        True,
-        A4_CONTENT_WIDTH_PX,
-        1400,
-        "Core numeric indicators as horizontal bars, grouped by Strategic Priority.",
-    ),
-    DashboardSpec(
-        "enabling_functions",
-        "Enabling Functions",
-        False,
-        True,
-        A4_CONTENT_WIDTH_PX,
-        900,
-        "Enabling Function indicators (bars for numbers, Yes for qualitative).",
     ),
     DashboardSpec(
         "emergency_1",
@@ -370,6 +370,33 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         A4_CONTENT_WIDTH_PX,
         320,
         "Third emergency appeal indicators (reporting).",
+    ),
+    DashboardSpec(
+        "strategic_priorities",
+        "Strategic Priorities",
+        False,
+        True,
+        A4_CONTENT_WIDTH_PX,
+        1400,
+        "Core numeric indicators as horizontal bars, grouped by Strategic Priority.",
+    ),
+    DashboardSpec(
+        "enabling_functions",
+        "Enabling Functions",
+        False,
+        True,
+        A4_CONTENT_WIDTH_PX,
+        900,
+        "Enabling Function indicators (bars for numbers, Yes for qualitative).",
+    ),
+    DashboardSpec(
+        "support",
+        "Bilateral Support",
+        True,
+        True,
+        A4_CONTENT_WIDTH_PX,
+        620,
+        "Participating National Society support by Strategic Priority. Plans add year rows and coloured amount cells.",
     ),
 )
 

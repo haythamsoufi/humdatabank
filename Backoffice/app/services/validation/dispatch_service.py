@@ -198,7 +198,7 @@ def send_dispatch(
         entry_url = ""
         if entry_path:
             try:
-                entry_url = url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id, _external=True)
+                entry_url = url_for("assignments.view_assignment", aes_id=aes_id, _external=True)
                 entry_url += "?validation_panel=open"
             except Exception:
                 entry_url = entry_path

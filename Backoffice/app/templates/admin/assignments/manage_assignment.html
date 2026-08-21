@@ -1192,7 +1192,7 @@
     "completion_rate": {{ (aes.completion_rate|float if aes.completion_rate is not none else 0)|tojson }},
     "is_public_available": {{ aes.is_public_available|tojson }},
     "has_public_url": {{ (assignment.has_public_url() if assignment else false)|tojson }},
-    "assignment_url": {{ (url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id) if assignment else '')|tojson }},
+    "assignment_url": {{ (url_for('assignments.view_assignment', aes_id=aes.id) if assignment else '')|tojson }},
     "remove_from_public_url": {{ (url_for('assignment_management.remove_country_from_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
     "add_to_public_url": {{ (url_for('assignment_management.add_country_to_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
     "remove_country_url": {{ (url_for('assignment_management.remove_country_from_assignment', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and aes.entity_type == 'country' else '')|tojson }},

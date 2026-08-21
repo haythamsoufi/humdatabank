@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from html import escape
+
 from flask import Response, redirect, request, send_from_directory, url_for
 from flask_login import current_user, login_required
 from werkzeug.exceptions import NotFound
@@ -15,6 +17,7 @@ from plugins.upr_visuals.data import (
     get_assigned_form_for_bulk,
     list_assigned_forms_for_bulk,
     list_countries_for_bulk,
+    visuals_browser_title,
 )
 from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
 from plugins.upr_visuals.service import UprVisualsService
@@ -42,7 +45,7 @@ def static_file(filename: str):
     return send_from_directory(str(_PLUGIN_DIR / "static"), filename)
 
 
-@bp.route("/upr-visuals/assignment/<int:aes_id>", methods=["GET"])
+@bp.route("/assignment/<int:aes_id>/visuals", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
 def assignment_payload(aes_id: int):
@@ -66,7 +69,8 @@ def assignment_payload(aes_id: int):
         )
 
 
-@bp.route("/upr-visuals/assignment/<int:aes_id>/report", methods=["GET"])
+
+@bp.route("/assignment/<int:aes_id>/visuals/report", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
 def assignment_report(aes_id: int):
@@ -83,7 +87,72 @@ def assignment_report(aes_id: int):
         )
 
 
-@bp.route("/upr-visuals/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
+
+def _wants_download() -> bool:
+    return (request.args.get("download") or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _wants_raw_pdf() -> bool:
+    return (request.args.get("raw") or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _content_disposition(filename: str, *, download: bool) -> str:
+    """latin-1 safe Content-Disposition; filename* carries UTF-8 when needed."""
+    from urllib.parse import quote
+
+    disposition = "attachment" if download else "inline"
+    name = (filename or "visuals.pdf").replace('"', "").replace("\r", "").replace("\n", "").strip()
+    ascii_name = (
+        name.replace("\u2014", " - ")
+        .replace("\u2013", "-")
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    ascii_name = " ".join(ascii_name.split()) or "visuals.pdf"
+    header = f'{disposition}; filename="{ascii_name}"'
+    if name != ascii_name:
+        header += f"; filename*=UTF-8''{quote(name, safe='')}"
+    return header
+
+
+def _pdf_response(data: bytes, filename: str, *, download: bool) -> Response:
+    return Response(
+        data,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": _content_disposition(filename, download=download),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+def _pdf_viewer_response(*, title: str, pdf_url: str) -> Response:
+    safe_title = escape(title)
+    safe_url = escape(pdf_url, quote=True)
+    html = (
+        "<!DOCTYPE html><html lang='en'><head>"
+        "<meta charset='utf-8'>"
+        f"<title>{safe_title}</title>"
+        "<style>html,body{margin:0;height:100%;background:#525659}"
+        "iframe{border:0;width:100%;height:100%;display:block}</style>"
+        "</head><body>"
+        f"<iframe src='{safe_url}' title='{safe_title}'></iframe>"
+        "</body></html>"
+    )
+    return Response(
+        html,
+        mimetype="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+def _assignment_pdf_response(aes_id: int, dashboard_id: str, *, download: bool) -> Response:
+    _aes_or_404(aes_id)
+    data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id)
+    return _pdf_response(data, filename, download=download)
+
+
+@bp.route("/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
 def assignment_png(aes_id: int, dashboard_id: str):
@@ -93,7 +162,9 @@ def assignment_png(aes_id: int, dashboard_id: str):
         return Response(
             data,
             mimetype="image/png",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={
+                "Content-Disposition": _content_disposition(filename, download=True),
+            },
         )
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
@@ -103,17 +174,24 @@ def assignment_png(aes_id: int, dashboard_id: str):
         )
 
 
-@bp.route("/upr-visuals/assignment/<int:aes_id>/pdf/<dashboard_id>", methods=["GET"])
+
+@bp.route("/assignment/<int:aes_id>/pdf", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
-def assignment_pdf(aes_id: int, dashboard_id: str):
+def assignment_pdf(aes_id: int):
+    """Live All visuals PDF. Browser navigation gets a titled viewer; ?raw=1 is the file."""
+    dashboard_id = (request.args.get("dashboard") or "combined").strip() or "combined"
     try:
-        _aes_or_404(aes_id)
-        data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id)
-        return Response(
-            data,
-            mimetype="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        aes = _aes_or_404(aes_id)
+        if _wants_download() or _wants_raw_pdf():
+            data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id)
+            return _pdf_response(data, filename, download=_wants_download())
+        params: dict[str, str | int] = {"aes_id": aes_id, "raw": 1}
+        if dashboard_id != "combined":
+            params["dashboard"] = dashboard_id
+        return _pdf_viewer_response(
+            title=visuals_browser_title(aes),
+            pdf_url=url_for("upr_visuals.assignment_pdf", **params),
         )
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
@@ -121,6 +199,22 @@ def assignment_pdf(aes_id: int, dashboard_id: str):
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals PDF failed for aes {aes_id}"
         )
+
+
+
+@bp.route("/assignment/<int:aes_id>/pdf/<dashboard_id>", methods=["GET"])
+@login_required
+@permission_required("admin.data_explore.upr_visuals")
+def assignment_pdf_dashboard(aes_id: int, dashboard_id: str):
+    try:
+        return _assignment_pdf_response(aes_id, dashboard_id, download=True)
+    except UprVisualsError as exc:
+        return json_bad_request(str(exc))
+    except Exception as exc:
+        return handle_json_view_exception(
+            exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals PDF failed for aes {aes_id}"
+        )
+
 
 
 @bp.route("/admin/data-exploration/upr-visuals/manage", methods=["GET"])

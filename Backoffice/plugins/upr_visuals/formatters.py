@@ -135,3 +135,11 @@ def document_subtitle(
         if year
         else "IFRC network annual report, Jan-Dec"
     )
+
+
+def appeal_number(iso2: str | None) -> str:
+    """Country appeal code ``MAA`` + ISO2 + ``001`` (e.g. Uganda → ``MAAUG001``)."""
+    code = (iso2 or "").strip().upper()
+    if len(code) != 2 or not code.isalpha():
+        return ""
+    return f"MAA{code}001"

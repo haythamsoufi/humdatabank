@@ -16,6 +16,7 @@ from plugins.upr_visuals.data import (
     _ns_logo_src,
     _reach_rows,
     _report_indicator_rows,
+    _report_people_reached,
     _scalar_number,
     _section_is_other_indicators,
     _section_is_overall_action,
@@ -30,6 +31,7 @@ from plugins.upr_visuals.data import (
     build_report_network_entities,
     ifrc_secretariat_actuals_for_report,
     max_people_by_area,
+    override_people_reached_area,
     pns_funding_from_plan_cells,
     pns_area_funding_from_plan_cells,
     spef_icon_srcs,
@@ -587,7 +589,7 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
 
 
 @pytest.mark.unit
-def test_max_people_by_area_keeps_highest_per_sp_and_cross_cutting():
+def test_max_people_by_area_keeps_highest_per_sp_and_ignores_cross_cutting():
     best = max_people_by_area(
         [
             ("SP1", 100),
@@ -601,10 +603,89 @@ def test_max_people_by_area_keeps_highest_per_sp_and_cross_cutting():
         ]
     )
     assert best["SP1"] == 2500
-    assert best["CC1"] == 1200
+    assert "CC1" not in best
     assert best["SP2"] == 50
     assert best["EO"] == 9000
     assert "EF1" not in best
+
+
+@pytest.mark.unit
+def test_override_people_reached_area_moves_emergency_and_drops_long_term():
+    emergency = SimpleNamespace(
+        id=619,
+        name="Number of people reached with emergency response and early recovery programmes.",
+    )
+    long_term = SimpleNamespace(
+        id=618,
+        name="Number of people reached with long-term services and programmes.",
+    )
+    assert override_people_reached_area("CC1", bank=emergency) == "SP2"
+    assert override_people_reached_area("CC1", bank=long_term) is None
+    assert (
+        override_people_reached_area(
+            "CC1",
+            label="Number of people reached with emergency response and early recovery programmes.",
+        )
+        == "SP2"
+    )
+    assert override_people_reached_area("SP3", bank=SimpleNamespace(id=1, name="People reached with health")) == "SP3"
+
+
+def _people_item(item_id, name, area, *, bank_id=None):
+    return SimpleNamespace(
+        id=item_id,
+        label=name,
+        form_section=SimpleNamespace(name="Overall Action Indicators"),
+        indicator_bank=SimpleNamespace(
+            id=bank_id,
+            name=name,
+            type="number",
+            unit="People",
+            spef_area=SimpleNamespace(code=area),
+            area=area,
+        ),
+    )
+
+
+def _people_entry(value):
+    return SimpleNamespace(
+        data_not_available=False,
+        not_applicable=False,
+        get_display_value=lambda: value,
+        numeric_value=value,
+    )
+
+
+@pytest.mark.unit
+def test_report_people_reached_folds_emergency_into_disasters_and_drops_long_term(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.data.spef_icon_srcs", lambda: {})
+    disasters = _people_item(1, "Number of people reached with disaster risk reduction.", "SP2")
+    emergency = _people_item(
+        2,
+        "Number of people reached with emergency response and early recovery programmes.",
+        "CC1",
+        bank_id=619,
+    )
+    long_term = _people_item(
+        3,
+        "Number of people reached with long-term services and programmes.",
+        "CC1",
+    )
+    climate = _people_item(4, "Number of people reached addressing climate risks.", "SP1")
+    rows = _report_people_reached(
+        [disasters, emergency, long_term, climate],
+        {
+            1: _people_entry(100),
+            2: _people_entry(500),
+            3: _people_entry(9000),
+            4: _people_entry(200),
+        },
+    )
+    by_code = {row["code"]: row for row in rows}
+    assert "CC1" not in by_code
+    assert by_code["SP2"]["value"] == 500
+    assert by_code["SP1"]["value"] == 200
+    assert by_code["SP2"]["label"] == "Disasters and crises"
 
 
 @pytest.mark.unit
@@ -618,3 +699,34 @@ def test_visual_export_filename():
     )
     assert name == "AFG_P25_financial.pdf"
     assert visual_export_filename({}, "combined", "png") == "UNK_round_combined.png"
+    assert (
+        visual_export_filename(
+            {"document_title": "Bangladesh — Unified Plan – 2026", "iso3": "BGD"},
+            "combined",
+            "pdf",
+        )
+        == "Bangladesh - Unified Plan - 2026.pdf"
+    )
+
+
+@pytest.mark.unit
+def test_filename_from_visual_title_strips_illegal_chars():
+    from plugins.upr_visuals.data import filename_from_visual_title
+
+    assert filename_from_visual_title("Bangladesh — Unified Plan – 2026") == (
+        "Bangladesh - Unified Plan - 2026.pdf"
+    )
+    assert filename_from_visual_title('A/B: "Plan"') == "A B Plan.pdf"
+
+
+@pytest.mark.unit
+def test_visuals_browser_title_uses_country_and_assignment(monkeypatch):
+    from plugins.upr_visuals.data import visuals_browser_title
+
+    assigned = SimpleNamespace(display_name="Unified Plan – 2026")
+    aes = SimpleNamespace(assigned_form=assigned)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._country_for_aes",
+        lambda _aes: SimpleNamespace(name="Bangladesh"),
+    )
+    assert visuals_browser_title(aes) == "Bangladesh — Unified Plan – 2026"

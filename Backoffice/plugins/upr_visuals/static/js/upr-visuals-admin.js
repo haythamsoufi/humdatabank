@@ -438,7 +438,7 @@
     setPreviewStatus(t("previewLoading"));
     try {
       const response = await fetchFn(
-        `/upr-visuals/assignment/${encodeURIComponent(aesId)}?dashboard=${encodeURIComponent(previewDashboard)}`,
+        `/assignment/${encodeURIComponent(aesId)}/visuals?dashboard=${encodeURIComponent(previewDashboard)}`,
         { headers: csrfHeaders(), credentials: "same-origin" }
       );
       const data = await response.json();
@@ -477,7 +477,15 @@
     const aesId = els.previewCountry.value;
     if (!aesId || !previewDashboard) return;
     const kind = format === "pdf" ? "pdf" : "png";
-    window.location.href = `/upr-visuals/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(previewDashboard)}`;
+    const path =
+      kind === "pdf" && previewDashboard === "combined"
+        ? `/assignment/${encodeURIComponent(aesId)}/pdf`
+        : `/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(previewDashboard)}`;
+    if (kind === "pdf" && previewDashboard === "combined") {
+      window.open(path, "_blank", "noopener");
+    } else {
+      window.location.href = path;
+    }
     setPreviewDownloadOpen(false);
   }
 

@@ -19,6 +19,7 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     from app.routes import main as main_bp
     from app.routes import help_docs as help_docs_bp
     from app.routes import forms as forms_bp
+    from app.routes import assignments as assignments_bp
     from app.routes import forms_api as forms_api_bp
     from app.routes import plugins as plugins_api_bp
     from app.routes import public as public_bp
@@ -40,6 +41,7 @@ def register_all_blueprints(app, csrf, startup_start, static_folder_path=None):
     app.register_blueprint(main_bp.bp)
     app.register_blueprint(help_docs_bp.bp)
     app.register_blueprint(forms_bp.bp)
+    app.register_blueprint(assignments_bp.bp)
     app.register_blueprint(forms_api_bp.bp)
     app.register_blueprint(plugins_api_bp.bp)
     app.register_blueprint(public_bp.bp)

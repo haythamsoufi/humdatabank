@@ -147,7 +147,7 @@ def render_notification_preview(
             message=message,
             notification_type=nt or NotificationType.admin_message,
             priority=priority,
-            related_url="/forms/assignment/1",
+            related_url="/assignment/1",
             title_key=variant["title_key"],
             message_key=variant["message_key"],
             title_params=params,

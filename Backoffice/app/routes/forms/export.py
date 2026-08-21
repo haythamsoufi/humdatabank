@@ -507,7 +507,7 @@ def _export_pdf_impl(aes_id):
         from app.services.imports.assignment_excel_access import assignment_uses_export_pdf
         if not assignment or not assignment_uses_export_pdf(assignment):
             flash("PDF export is not enabled for this assignment.", "warning")
-            return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+            return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
         from app.utils.api_serialization import _country_for_aes
         country = _country_for_aes(assignment_entity_status)
@@ -1488,7 +1488,7 @@ def _export_pdf_impl(aes_id):
     except Exception as e:
         current_app.logger.error(f"Error generating PDF for ACS {aes_id}: {e}", exc_info=True)
         flash("Failed to generate PDF.", "danger")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
 
 def _export_excel_impl(aes_id):
@@ -1830,16 +1830,16 @@ def _import_excel_impl(aes_id):
     from app.services.organization.authorization_service import AuthorizationService
     if not AuthorizationService.can_edit_assignment(assignment_entity_status, current_user):
         flash("You are not authorized to import data for this assignment or it's not in an editable state.", "warning")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     excel_file = request.files.get('excel_file')
     if not excel_file or excel_file.filename == '':
         flash("No Excel file selected for import.", "danger")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     if not excel_file.filename.lower().endswith('.xlsx'):
         flash("Invalid file type. Please upload a .xlsx file.", "danger")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     file_size = excel_file.content_length
     if file_size is None:
@@ -1849,7 +1849,7 @@ def _import_excel_impl(aes_id):
 
     if file_size > MAX_EXCEL_FILE_SIZE:
         flash(f"File size ({file_size / (1024*1024):.2f}MB) exceeds the maximum allowed size of 10MB.", "danger")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
         from app.utils.advanced_validation import AdvancedValidator
@@ -1858,17 +1858,17 @@ def _import_excel_impl(aes_id):
         if not is_valid_mime:
             current_app.logger.warning(f"Excel import MIME mismatch: claimed {file_ext}, detected {detected_mime}")
             flash("File content does not match its extension. Please upload a valid Excel file.", "danger")
-            return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+            return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
     except Exception as e:
         current_app.logger.warning(f"MIME validation error for Excel import: {e}", exc_info=True)
         flash("Unable to validate file type. Please try again.", "danger")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     try:
         workbook = ExcelService.load_workbook(excel_file)
     except ValueError as exc:
         flash("An error occurred. Please try again.", "danger")
-        return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+        return redirect(url_for("assignments.view_assignment", aes_id=aes_id))
 
     result = ExcelService.import_assignment_data(assignment_entity_status, workbook)
     if result['success']:
@@ -1885,4 +1885,4 @@ def _import_excel_impl(aes_id):
             error_msg += f" (and {len(result.get('errors', [])) - 5} more)"
         flash(error_msg, "danger")
 
-    return redirect(url_for("forms.view_edit_form", form_type="assignment", form_id=aes_id))
+    return redirect(url_for("assignments.view_assignment", aes_id=aes_id))

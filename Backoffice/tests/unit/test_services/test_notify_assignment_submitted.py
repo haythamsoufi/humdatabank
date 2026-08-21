@@ -44,7 +44,7 @@ class TestNotifyAssignmentSubmitted:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_submitted(submitted_aes)
 
@@ -85,7 +85,7 @@ class TestNotifyAssignmentSubmitted:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_submitted(submitted_aes)
 
@@ -114,7 +114,7 @@ class TestNotifyAssignmentSubmitted:
                 "app.services.notification.notifiers.assignment.log_entity_activity",
             ), patch(
                 "app.services.notification.notifiers.assignment.url_for",
-                return_value="/forms/assignment/1",
+                return_value="/assignment/1",
             ):
                 notify_assignment_submitted(submitted_aes)
 
@@ -126,24 +126,29 @@ class TestNotifyAssignmentSubmitted:
     def test_notification_copy(self, app):
         from app.services.notification.core import translate_notification_message
 
+        params = {
+            "assignment_title": "Annual Report \u2013 Jan-Jun 2026",
+            "country": "Kenya",
+            "submitter_name": "Sabrina Raff",
+        }
         with app.app_context():
             submitter_message = translate_notification_message(
                 "notification.assignment_submitted.submitter.message",
-                {"assignment_title": "Annual Report \u2013 Jan-Jun 2026"},
+                params,
             )
             peer_message = translate_notification_message(
                 "notification.assignment_submitted.message",
-                {"assignment_title": "Annual Report \u2013 Jan-Jun 2026"},
+                params,
             )
             team_email = translate_notification_message(
                 "notification.assignment_submitted.team_email.message",
-                {
-                    "assignment_title": "Annual Report \u2013 Jan-Jun 2026",
-                    "submitter_name": "Sabrina Raff",
-                },
+                params,
             )
 
         assert "You submitted" in submitter_message
+        assert "Kenya" in submitter_message
         assert "successfully" in submitter_message.lower()
-        assert "another focal point" in peer_message.lower()
+        assert "Sabrina Raff" in peer_message
+        assert "Kenya" in peer_message
+        assert "no action needed from you" in peer_message.lower()
         assert "Sabrina Raff" in team_email

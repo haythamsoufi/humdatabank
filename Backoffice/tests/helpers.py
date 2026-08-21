@@ -123,10 +123,22 @@ def login_session(client: Any, user_id: int) -> None:
 
 
 def assert_redirect(resp: Any, contains: Optional[str] = None) -> None:
-    """Assert a response is an HTTP redirect and optionally check Location."""
+    """Assert a response is an HTTP redirect and optionally check Location.
+
+    ``contains="dashboard"`` matches ``main.dashboard``, which is mounted at ``/``.
+    """
     assert resp.status_code in (301, 302, 303, 307, 308)
-    if contains is not None:
-        assert contains in (resp.headers.get("Location") or "")
+    if contains is None:
+        return
+    location = resp.headers.get("Location") or ""
+    if contains == "dashboard":
+        from urllib.parse import urlparse
+        path = urlparse(location).path or "/"
+        assert path in ("/", "/dashboard") or "dashboard" in location, (
+            f"Expected dashboard redirect, got Location={location!r}"
+        )
+        return
+    assert contains in location
 
 
 def assert_json_has_keys(resp: Any, *keys: str) -> dict:

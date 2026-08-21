@@ -24,7 +24,8 @@ import shutil
 from contextlib import suppress
 from unittest.mock import patch, MagicMock
 from flask import Flask
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 
 from app import create_app, db
 from app.extensions import login
@@ -139,29 +140,57 @@ def _create_all_test_tables():
             raise
 
 
-def _reset_test_schema(app):
-    """Drop and recreate the full test schema from current model metadata."""
-    _disengage_db_connections()
+# Held for the whole db_session fixture (reset + test body), not just DROP/CREATE.
+# A lock that only covers schema reset lets a second pytest drop tables mid-test.
+_TEST_DB_LOCK_KEY = 7474242
 
-    if db.engine.dialect.name == "postgresql":
-        with db.engine.connect() as conn:
-            conn.execute(text("SELECT pg_advisory_lock(7474242)"))
-            # pg_advisory_lock is session-scoped, not transaction-scoped: committing
-            # here does NOT release it, but it stops this connection from sitting
-            # idle-in-transaction for the whole (multi-second) reset below. The test
-            # DB's idle_in_transaction_session_timeout would otherwise kill this
-            # connection while _run_test_schema_reset() does its real work on other
-            # connections, turning an otherwise-successful reset into a spurious
-            # "server closed the connection unexpectedly" failure on unlock.
-            conn.commit()
-            try:
-                _run_test_schema_reset()
-            finally:
-                with suppress(Exception):
-                    conn.execute(text("SELECT pg_advisory_unlock(7474242)"))
-                    conn.commit()
+
+def _acquire_test_db_lock(engine):
+    """Take an exclusive advisory lock on a dedicated (non-pool) connection.
+
+    ``db.engine.dispose()`` runs after every test and would release a pooled
+    lock connection. NullPool + AUTOCOMMIT keeps the lock alive for the test
+    body without holding an open transaction.
+    """
+    if engine.dialect.name != "postgresql":
+        return None, None
+
+    lock_engine = create_engine(engine.url, poolclass=NullPool)
+    conn = lock_engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    got = conn.execute(text(f"SELECT pg_try_advisory_lock({_TEST_DB_LOCK_KEY})")).scalar()
+    if not got:
+        import sys
+        print(
+            "\nWARNING: waiting for exclusive test-DB lock "
+            "(another pytest process is using the same TEST_DATABASE_URL).\n"
+            "Do not run two pytest suites against the test database at once — "
+            "the other run's DROP SCHEMA will delete tables mid-test.\n",
+            file=sys.stderr,
+            flush=True,
+        )
+        conn.execute(text(f"SELECT pg_advisory_lock({_TEST_DB_LOCK_KEY})"))
+    return conn, lock_engine
+
+
+def _release_test_db_lock(lock_conn, lock_engine):
+    if lock_conn is None:
         return
+    with suppress(Exception):
+        lock_conn.execute(text(f"SELECT pg_advisory_unlock({_TEST_DB_LOCK_KEY})"))
+    with suppress(Exception):
+        lock_conn.close()
+    if lock_engine is not None:
+        with suppress(Exception):
+            lock_engine.dispose()
 
+
+def _reset_test_schema(app):
+    """Drop and recreate the full test schema from current model metadata.
+
+    Caller (``db_session``) must already hold ``_TEST_DB_LOCK_KEY`` on PostgreSQL
+    so a concurrent pytest cannot DROP tables during the test body.
+    """
+    _disengage_db_connections()
     _run_test_schema_reset()
 
 
@@ -440,23 +469,27 @@ def db_session(app):
         if not metadata_tables:
             raise RuntimeError("No tables found in metadata! Models may not be imported correctly.")
 
+        lock_conn, lock_engine = _acquire_test_db_lock(db.engine)
         try:
-            _reset_test_schema(app)
-        except RuntimeError:
-            raise
-        except Exception as e:
-            import traceback
-            app.logger.error(f"Error creating tables: {e}\n{traceback.format_exc()}")
-            raise
+            try:
+                _reset_test_schema(app)
+            except RuntimeError:
+                raise
+            except Exception as e:
+                import traceback
+                app.logger.error(f"Error creating tables: {e}\n{traceback.format_exc()}")
+                raise
 
-        session_factory = db.session.session_factory
-        prev_expire_on_commit = session_factory.kw.get("expire_on_commit", True)
-        session_factory.configure(expire_on_commit=False)
-        try:
-            yield db.session
+            session_factory = db.session.session_factory
+            prev_expire_on_commit = session_factory.kw.get("expire_on_commit", True)
+            session_factory.configure(expire_on_commit=False)
+            try:
+                yield db.session
+            finally:
+                session_factory.configure(expire_on_commit=prev_expire_on_commit)
+                _disengage_db_connections()
         finally:
-            session_factory.configure(expire_on_commit=prev_expire_on_commit)
-            _disengage_db_connections()
+            _release_test_db_lock(lock_conn, lock_engine)
 
 
 @pytest.fixture(scope='function')

@@ -131,7 +131,7 @@ class InteractiveTour {
         }
 
         // Check if we're on the correct page
-        // Support prefix matching: "/forms/assignment" matches "/forms/assignment/123"
+        // Support prefix matching: "/assignment" matches "/assignment/123"
         const currentPath = window.location.pathname;
         if (step.page) {
             const isExactMatch = currentPath === step.page;
@@ -345,7 +345,7 @@ class InteractiveTour {
                                 // If the link's destination matches the next step's page, intercept
                                 if (nextStep && nextStep.page) {
                                     const linkPath = new URL(originalHref, window.location.origin).pathname;
-                                    // Support prefix matching: step page "/forms/assignment" matches link "/forms/assignment/123"
+                                    // Support prefix matching: step page "/assignment" matches link "/assignment/123"
                                     const isExactMatch = linkPath === nextStep.page;
                                     const isPrefixMatch = linkPath.startsWith(nextStep.page + '/');
 

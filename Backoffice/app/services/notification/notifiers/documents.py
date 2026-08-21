@@ -54,7 +54,7 @@ def notify_document_uploaded(assignment_entity_status, document_name):
         },
         related_object_type='assignment',
         related_object_id=aes.id,
-        related_url=url_for('forms.view_edit_form', form_type='assignment', form_id=aes.id),
+        related_url=url_for('assignments.view_assignment', aes_id=aes.id),
         priority='normal',
         exclude_user_id=current_user.id if current_user.is_authenticated else None
     )

@@ -7,9 +7,9 @@ alwaysApply: true
 
 ## MCP setup
 
-Project config (`.cursor/mcp.json`) runs Playwright MCP with **`--isolated`**: each `browser_close` wipes cookies, cache, and service workers. Prefer that over persistent profiles.
+Project config (`.cursor/mcp.json`) runs Playwright MCP **`@0.0.78`** with **`--isolated`**: each `browser_close` wipes cookies, cache, and service workers. Prefer that over persistent profiles. Do not bump to `@latest` / 0.0.79 until Microsoft ships a `playwright-core` whose `browsers.json` matches Registry (0.0.79 crashes on startup: `reading 'dir'`).
 
-If you also enable Playwright MCP in user-level Cursor config, **disable that entry** when working in this repo — `.cursor/mcp.json` here is canonical. Two servers launch two Chromes; older `@playwright/mcp` 0.0.x builds also showed a `--no-sandbox` warning banner on Windows (fixed in current releases).
+If you also enable Playwright MCP in user-level Cursor config, **disable that entry** when working in this repo — `.cursor/mcp.json` here is canonical. Two servers launch two Chromes; older `@playwright/mcp` 0.0.x builds also showed a `--no-sandbox` warning banner on Windows (fixed in 0.0.78).
 
 **Base URL:** `http://127.0.0.1:5000` (matches the Flask dev server bind address).
 

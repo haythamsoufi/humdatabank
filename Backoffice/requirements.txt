@@ -76,6 +76,7 @@ argon2-cffi==23.1.0
 markdown==3.10
 beautifulsoup4==4.14.3
 lxml==6.1.0                         # was 6.0.2 - CVE XXE via iterparse() default config
+defusedxml==0.7.1                   # hardened XML parse for user-uploaded OOXML (UPR visuals)
 
 # Performance and caching
 redis==7.1.0

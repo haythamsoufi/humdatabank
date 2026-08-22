@@ -21,6 +21,9 @@
         return meta ? meta.getAttribute('content') : '';
     }
 
+    /** Overflow bucket in page_view_path_counts; must match app.utils.page_view_paths._OTHER_PATH_BUCKET. */
+    var PATH_COUNT_OTHER_KEY = '_other';
+
     /**
      * Sorted [{ path, count }] from session page_view_path_counts (descending by count).
      */

@@ -35,7 +35,13 @@
   };
   const previewDownloadWrap =
     els.previewDownload && els.previewDownload.closest(".upr-visuals-download");
+  const shared = window.UprVisualsShared || {};
+  const POLL_INTERVAL_MS = 1500;
+  const POLL_MAX_FAILURES = 5;
+  const POLL_MAX_MS = 30 * 60 * 1000;
   let pollTimer = null;
+  let pollFailures = 0;
+  let pollStartedAt = 0;
   let jobId = null;
   let running = false;
   let previewDashboards = [];
@@ -54,6 +60,9 @@
   }
 
   function csrfHeaders() {
+    if (shared.csrfHeaders) {
+      return shared.csrfHeaders({ "Content-Type": "application/json" });
+    }
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
     const headers = { Accept: "application/json", "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" };
     if (token) headers["X-CSRFToken"] = token;
@@ -173,6 +182,10 @@
         credentials: "same-origin",
       });
       const data = await response.json();
+      if (!response.ok || data.success === false) {
+        clearSelection(data.error || t("loadFailed"));
+        return;
+      }
       const rows = data.assignments || [];
       els.assignment.replaceChildren();
       const placeholder = document.createElement("option");
@@ -361,6 +374,20 @@
   }
 
   function renderPreviewTabs(dashboards) {
+    if (shared.renderDashboardTabs) {
+      shared.renderDashboardTabs({
+        container: els.previewTabs,
+        dashboards,
+        activeId: previewDashboard,
+        tablistId: "upr-vis-preview-tabs",
+        onSelect: (id) => {
+          if (id === previewDashboard) return;
+          previewDashboard = id;
+          loadPreview();
+        },
+      });
+      return;
+    }
     els.previewTabs.replaceChildren();
     (dashboards || []).forEach((dash) => {
       const btn = document.createElement("button");
@@ -381,9 +408,13 @@
     const html = previewHtmlCache[aesId] && previewHtmlCache[aesId][dashboardId];
     if (html == null) return false;
     previewDashboard = dashboardId;
-    els.previewTabs.querySelectorAll(".upr-visuals-embed__tab").forEach((el) => {
-      el.classList.toggle("is-active", el.dataset.dashboard === dashboardId);
-    });
+    if (shared.markActiveTab) {
+      shared.markActiveTab(els.previewTabs, dashboardId);
+    } else {
+      els.previewTabs.querySelectorAll(".upr-visuals-embed__tab").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.dashboard === dashboardId);
+      });
+    }
     els.previewBody.innerHTML = html;
     setPreviewStatus("");
     return true;
@@ -391,6 +422,10 @@
 
   function rememberPreviewHtml(aesId, dashboardId, data) {
     if (!previewHtmlCache[aesId]) previewHtmlCache[aesId] = Object.create(null);
+    if (shared.rememberHtml) {
+      shared.rememberHtml(previewHtmlCache[aesId], dashboardId, data);
+      return;
+    }
     const byId = data && data.html_by_dashboard;
     if (byId && typeof byId === "object") {
       Object.keys(byId).forEach((id) => {
@@ -434,28 +469,37 @@
       syncPreviewDownload();
       return;
     }
+    const requestedDashboard = previewDashboard;
     previewAesId = aesId;
     setPreviewStatus(t("previewLoading"));
     try {
       const response = await fetchFn(
-        `/assignment/${encodeURIComponent(aesId)}/visuals?dashboard=${encodeURIComponent(previewDashboard)}`,
+        `/assignment/${encodeURIComponent(aesId)}/visuals?dashboard=${encodeURIComponent(requestedDashboard)}`,
         { headers: csrfHeaders(), credentials: "same-origin" }
       );
       const data = await response.json();
       if (!response.ok || data.success === false) {
         throw new Error(data.error || t("previewFailed"));
       }
-      rememberPreviewHtml(aesId, previewDashboard, data);
+      rememberPreviewHtml(aesId, requestedDashboard, data);
+      if (els.previewCountry.value !== aesId) return;
       if (data.payload && data.payload.dashboards) {
         previewDashboards = data.payload.dashboards;
         renderPreviewTabs(previewDashboards);
       }
-      if (!showPreviewHtml(aesId, previewDashboard)) {
+      if (previewDashboard !== requestedDashboard) {
+        if (showPreviewHtml(aesId, previewDashboard)) {
+          syncPreviewDownload();
+          return;
+        }
+      }
+      if (!showPreviewHtml(aesId, requestedDashboard)) {
         els.previewBody.innerHTML = data.html || "";
         setPreviewStatus("");
       }
       syncPreviewDownload();
     } catch (err) {
+      if (els.previewCountry.value !== aesId) return;
       els.previewBody.innerHTML = "";
       setPreviewStatus(t("previewFailed"));
       syncPreviewDownload();
@@ -509,31 +553,54 @@
     return "";
   }
 
-  async function poll() {
-    const response = await fetchFn(
-      `/admin/data-exploration/upr-visuals/status${jobId ? "?job_id=" + encodeURIComponent(jobId) : ""}`,
-      { headers: csrfHeaders(), credentials: "same-origin" }
-    );
-    const data = await response.json();
-    const status = data.status || {};
-    jobId = status.job_id || jobId;
-    const total = status.total || 0;
-    const progress = status.progress || 0;
-    const pct = total ? Math.round((progress / total) * 100) : 0;
-    const state = status.status || "";
-    showProgress(statusTone(state), statusMessage(status), pct);
+  function stopPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+    pollFailures = 0;
+  }
 
-    if (state === "completed" && status.zip_key) {
-      els.download.href = `/admin/data-exploration/upr-visuals/download/${encodeURIComponent(jobId)}`;
-      els.download.classList.remove("hidden");
+  async function poll() {
+    if (pollStartedAt && Date.now() - pollStartedAt > POLL_MAX_MS) {
+      stopPolling();
       setRunning(false);
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
+      showProgress("is-error", t("loadFailed"), 0);
+      return;
     }
-    if (state === "failed" || state === "cancelled") {
-      setRunning(false);
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
+    try {
+      const response = await fetchFn(
+        `/admin/data-exploration/upr-visuals/status${jobId ? "?job_id=" + encodeURIComponent(jobId) : ""}`,
+        { headers: csrfHeaders(), credentials: "same-origin" }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || t("loadFailed"));
+      }
+      pollFailures = 0;
+      const status = data.status || {};
+      jobId = status.job_id || jobId;
+      const total = status.total || 0;
+      const progress = status.progress || 0;
+      const pct = total ? Math.round((progress / total) * 100) : 0;
+      const state = status.status || "";
+      showProgress(statusTone(state), statusMessage(status), pct);
+
+      if (state === "completed" && status.zip_key) {
+        els.download.href = `/admin/data-exploration/upr-visuals/download/${encodeURIComponent(jobId)}`;
+        els.download.classList.remove("hidden");
+        setRunning(false);
+        stopPolling();
+      }
+      if (state === "failed" || state === "cancelled") {
+        setRunning(false);
+        stopPolling();
+      }
+    } catch (err) {
+      pollFailures += 1;
+      if (pollFailures >= POLL_MAX_FAILURES) {
+        stopPolling();
+        setRunning(false);
+        showProgress("is-error", t("loadFailed"), 0);
+      }
     }
   }
 
@@ -591,8 +658,10 @@
         return;
       }
       jobId = data.job_id;
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(poll, 1500);
+      stopPolling();
+      pollFailures = 0;
+      pollStartedAt = Date.now();
+      pollTimer = setInterval(poll, POLL_INTERVAL_MS);
       poll();
     } catch (err) {
       setRunning(false);
@@ -601,13 +670,25 @@
   });
   els.cancel.addEventListener("click", async () => {
     if (!jobId) return;
-    await fetchFn("/admin/data-exploration/upr-visuals/cancel", {
-      method: "POST",
-      headers: csrfHeaders(),
-      credentials: "same-origin",
-      body: JSON.stringify({ job_id: jobId }),
-    });
-    poll();
+    els.cancel.disabled = true;
+    try {
+      const response = await fetchFn("/admin/data-exploration/upr-visuals/cancel", {
+        method: "POST",
+        headers: csrfHeaders(),
+        credentials: "same-origin",
+        body: JSON.stringify({ job_id: jobId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.success === false) {
+        showProgress("is-error", data.error || t("loadFailed"));
+        return;
+      }
+      await poll();
+    } catch (err) {
+      showProgress("is-error", t("loadFailed"));
+    } finally {
+      els.cancel.disabled = false;
+    }
   });
 
   clearSelection(t("loadingAssignments"));

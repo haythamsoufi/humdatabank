@@ -5,7 +5,9 @@ from __future__ import annotations
 from html import escape
 from pathlib import Path
 
-from plugins.upr_visuals.idml.builder import _STYLE_RUNS, folio_label
+from plugins.upr_visuals.errors import UprVisualsError
+from plugins.upr_visuals.idml.constants import _STYLE_RUNS
+from plugins.upr_visuals.idml.narrative_style import folio_label, folio_text
 from plugins.upr_visuals.raster import _PLUGIN_DIR, _PLUGIN_FONTS_DIR, _font_css
 
 _APP_FONTS_DIR = Path(__file__).resolve().parents[3] / "app" / "static" / "fonts"
@@ -166,7 +168,7 @@ def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "") -> bytes:
     try:
         from weasyprint import CSS, HTML
     except ImportError as exc:
-        raise RuntimeError("WeasyPrint is required for UPR visual export.") from exc
+        raise UprVisualsError("WeasyPrint is required for UPR visual export.") from exc
 
     _ = folio
     body = "".join(_para_html(para) for para in styled)
@@ -197,6 +199,30 @@ def _montserrat_regular() -> Path | None:
     return None
 
 
+def apply_report_folios(out, *, folio: str = "") -> None:
+    """Stamp ``{label}    /    {n}`` from page 2 onward. Page 1 is the cover."""
+    import fitz
+
+    label = folio or folio_label({})
+    font_path = _montserrat_regular()
+    for index in range(1, out.page_count):
+        page = out[index]
+        if font_path is not None:
+            page.insert_font(fontname="mont", fontfile=str(font_path))
+            fontname = "mont"
+        else:
+            fontname = "helv"
+        rect = fitz.Rect(34.0, 803.7, 563.9, 817.7)
+        page.insert_textbox(
+            rect,
+            folio_text(label, index + 1),
+            fontname=fontname,
+            fontsize=8,
+            color=(0, 0, 0),
+            align=getattr(fitz, "TEXT_ALIGN_CENTER", 1),
+        )
+
+
 def merge_report_pdfs(visuals_pdf: bytes, narrative_pdf: bytes, *, folio: str = "") -> bytes:
     import fitz
 
@@ -204,28 +230,11 @@ def merge_report_pdfs(visuals_pdf: bytes, narrative_pdf: bytes, *, folio: str = 
     out = fitz.open(stream=visuals_pdf, filetype="pdf")
     try:
         extra = fitz.open(stream=narrative_pdf, filetype="pdf")
-        start = out.page_count
         try:
             out.insert_pdf(extra)
         finally:
             extra.close()
-        font_path = _montserrat_regular()
-        for index in range(start, out.page_count):
-            page = out[index]
-            if font_path is not None:
-                page.insert_font(fontname="mont", fontfile=str(font_path))
-                fontname = "mont"
-            else:
-                fontname = "helv"
-            rect = fitz.Rect(34.0, 803.7, 563.9, 817.7)
-            page.insert_textbox(
-                rect,
-                f"{label}    /    {index + 1}",
-                fontname=fontname,
-                fontsize=8,
-                color=(0, 0, 0),
-                align=getattr(fitz, "TEXT_ALIGN_CENTER", 1),
-            )
+        apply_report_folios(out, folio=label)
         return out.tobytes()
     finally:
         out.close()

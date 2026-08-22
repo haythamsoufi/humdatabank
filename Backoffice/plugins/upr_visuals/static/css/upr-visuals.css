@@ -1094,14 +1094,6 @@
   padding: 0.45rem 0;
 }
 
-.upr-dot {
-  display: inline-block;
-  width: 0.85rem;
-  height: 0.85rem;
-  border-radius: 999px;
-  background: transparent;
-}
-
 .upr-dot--on {
   border-color: transparent;
 }

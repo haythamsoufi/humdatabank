@@ -6,7 +6,7 @@ from html import escape
 
 from flask import Response, redirect, request, send_from_directory, url_for
 from flask_login import current_user, login_required
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import HTTPException, NotFound
 
 from plugins.upr_visuals import bp, _PLUGIN_DIR
 from plugins.upr_visuals.catalog import dashboards_for_kind, kind_for_template
@@ -27,6 +27,15 @@ from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
 from app.utils.api_responses import GENERIC_ERROR_MESSAGE, json_bad_request, json_ok
 from app.utils.error_handling import handle_json_view_exception
+from app.utils.rate_limiting import rate_limit
+
+MAX_BULK_AES_IDS = 250
+MAX_BULK_DASHBOARDS = 20
+
+
+def _render_rate_key() -> str:
+    user_id = getattr(current_user, "id", None)
+    return f"upr_visuals_render_{user_id or 'anon'}"
 
 
 def _aes_or_404(aes_id: int) -> AssignmentEntityStatus:
@@ -64,6 +73,8 @@ def assignment_payload(aes_id: int):
         )
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals payload failed for aes {aes_id}"
@@ -82,6 +93,8 @@ def assignment_report(aes_id: int):
         return json_ok(payload=payload, html=html)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals report failed for aes {aes_id}"
@@ -160,6 +173,7 @@ def _assignment_pdf_response(aes_id: int, dashboard_id: str, *, download: bool) 
 @bp.route("/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_png(aes_id: int, dashboard_id: str):
     try:
         _aes_or_404(aes_id)
@@ -173,6 +187,8 @@ def assignment_png(aes_id: int, dashboard_id: str):
         )
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals PNG failed for aes {aes_id}"
@@ -183,6 +199,7 @@ def assignment_png(aes_id: int, dashboard_id: str):
 @bp.route("/assignment/<int:aes_id>/pdf", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_pdf(aes_id: int):
     """Live All visuals PDF. Browser navigation gets a titled viewer; ?raw=1 is the file."""
     dashboard_id = (request.args.get("dashboard") or "combined").strip() or "combined"
@@ -200,6 +217,8 @@ def assignment_pdf(aes_id: int):
         )
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals PDF failed for aes {aes_id}"
@@ -210,6 +229,7 @@ def assignment_pdf(aes_id: int):
 @bp.route("/assignment/<int:aes_id>/idml", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_idml(aes_id: int):
     try:
         _aes_or_404(aes_id)
@@ -217,6 +237,8 @@ def assignment_idml(aes_id: int):
         return _file_response(data, filename, mimetype="application/zip", download=True)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals IDML failed for aes {aes_id}"
@@ -226,6 +248,7 @@ def assignment_idml(aes_id: int):
 @bp.route("/assignment/<int:aes_id>/visuals/narrative", methods=["POST"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_narrative(aes_id: int):
     try:
         _aes_or_404(aes_id)
@@ -243,6 +266,8 @@ def assignment_narrative(aes_id: int):
         return _file_response(data, filename, mimetype="application/zip", download=True)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals narrative export failed for aes {aes_id}"
@@ -252,11 +277,14 @@ def assignment_narrative(aes_id: int):
 @bp.route("/assignment/<int:aes_id>/pdf/<dashboard_id>", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_pdf_dashboard(aes_id: int, dashboard_id: str):
     try:
         return _assignment_pdf_response(aes_id, dashboard_id, download=True)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         return handle_json_view_exception(
             exc, GENERIC_ERROR_MESSAGE, log_message=f"UPR visuals PDF failed for aes {aes_id}"
@@ -273,12 +301,14 @@ def manage_page():
 
 @bp.route("/admin/data-exploration/upr-visuals/assignments", methods=["GET"])
 @permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
 def assignments():
     return json_ok(assignments=list_assigned_forms_for_bulk())
 
 
 @bp.route("/admin/data-exploration/upr-visuals/countries", methods=["GET"])
 @permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
 def countries():
     try:
         assigned_form_id = int(request.args.get("assigned_form_id") or 0)
@@ -313,7 +343,15 @@ def generate():
     dashboard_ids = payload.get("dashboard_ids") or ["combined"]
     if isinstance(dashboard_ids, str):
         dashboard_ids = [dashboard_ids]
+    if not isinstance(dashboard_ids, (list, tuple)):
+        return json_bad_request("Select dashboards.")
+    if len(dashboard_ids) > MAX_BULK_DASHBOARDS:
+        return json_bad_request(f"Select at most {MAX_BULK_DASHBOARDS} dashboards.")
     aes_ids = payload.get("aes_ids") or []
+    if not isinstance(aes_ids, (list, tuple)):
+        return json_bad_request("Select countries.")
+    if len(aes_ids) > MAX_BULK_AES_IDS:
+        return json_bad_request(f"Select at most {MAX_BULK_AES_IDS} countries.")
     try:
         job_id = UprVisualsService.start_bulk(
             assigned_form_id=assigned_form_id,
@@ -331,6 +369,7 @@ def generate():
 
 @bp.route("/admin/data-exploration/upr-visuals/status", methods=["GET"])
 @permission_required("admin.data_explore.upr_visuals")
+@system_manager_required
 def status():
     job_id = (request.args.get("job_id") or "").strip() or None
     return json_ok(status=UprVisualsService.get_status(job_id))

@@ -23,31 +23,57 @@ PNS_REPORT_TEMPLATE_ID = 23
 PNS_PLAN_TEMPLATE_ID = 22
 UPR_VISUAL_TEMPLATE_IDS: FrozenSet[int] = frozenset({PLAN_TEMPLATE_ID, REPORT_TEMPLATE_ID})
 
+@dataclass(frozen=True)
+class KpiSpec:
+    key: str
+    bank_id: int
+    report_label: str
+    plan_label: str
+    icon_file: str
+    icon_url: str
+
+
+KPI_SPECS: tuple[KpiSpec, ...] = (
+    KpiSpec(
+        "branches",
+        1117,
+        "Local Branches",
+        "Branches",
+        "icons/kpi-independence.png",
+        "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
+    ),
+    KpiSpec(
+        "local_units",
+        723,
+        "Local Units",
+        "Local units",
+        "icons/kpi-independence.png",
+        "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
+    ),
+    KpiSpec(
+        "volunteers",
+        724,
+        "Volunteers",
+        "Volunteers",
+        "icons/kpi-voluntary-service.png",
+        "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Voluntary-service.png",
+    ),
+    KpiSpec(
+        "staff",
+        727,
+        "Paid Staff",
+        "Staff",
+        "icons/kpi-unity.png",
+        "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Unity.png",
+    ),
+)
+
 # NS key figures (same bank ids on T24 and T33).
-KPI_BANK_IDS = {
-    "branches": 1117,
-    "local_units": 723,
-    "volunteers": 724,
-    "staff": 727,
-}
-
-KPI_ORDER = ("branches", "local_units", "volunteers", "staff")
-
-KPI_LABELS = {
-    "branches": "Local Branches",
-    "local_units": "Local Units",
-    "volunteers": "Volunteers",
-    "staff": "Paid Staff",
-}
-
+KPI_BANK_IDS = {spec.key: spec.bank_id for spec in KPI_SPECS}
+KPI_ORDER = tuple(spec.key for spec in KPI_SPECS)
+KPI_LABELS = {spec.key: spec.report_label for spec in KPI_SPECS}
 PLAN_KPI_ORDER = ("branches", "staff", "volunteers", "local_units")
-
-PLAN_KPI_LABELS = {
-    "branches": "Branches",
-    "staff": "Staff",
-    "volunteers": "Volunteers",
-    "local_units": "Local units",
-}
+PLAN_KPI_LABELS = {spec.key: spec.plan_label for spec in KPI_SPECS}
 
 # T24 fallback item ids (published version; label lookup wins when available).
 PLAN_ITEM_FALLBACKS = {
@@ -249,20 +275,8 @@ SUPPORT_DOT_COLORS = {
     "EFs": "#883a67",
 }
 
-KPI_ICON_FILES = {
-    "branches": "icons/kpi-independence.png",
-    "local_units": "icons/kpi-independence.png",
-    "staff": "icons/kpi-unity.png",
-    "volunteers": "icons/kpi-voluntary-service.png",
-}
-
-# GitHub originals — used only if a local plugin file is missing.
-KPI_ICON_URLS = {
-    "branches": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
-    "local_units": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
-    "staff": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Unity.png",
-    "volunteers": "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Voluntary-service.png",
-}
+KPI_ICON_FILES = {spec.key: spec.icon_file for spec in KPI_SPECS}
+KPI_ICON_URLS = {spec.key: spec.icon_url for spec in KPI_SPECS}
 
 
 def kpi_icon_src(key: str) -> str:
@@ -296,6 +310,7 @@ class DashboardSpec:
     width: int
     height: int
     description: str
+    plan_title: str | None = None
 
 
 DASHBOARDS: tuple[DashboardSpec, ...] = (
@@ -325,6 +340,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         A4_CONTENT_WIDTH_PX,
         280,
         "People reached / to be reached by Strategic Priority and Emergency Operations.",
+        "People to be reached",
     ),
     DashboardSpec(
         "financial",
@@ -334,6 +350,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         A4_CONTENT_WIDTH_PX,
         900,
         "Plans: IFRC network funding requirements by year. Reports: network actuals vs requirement.",
+        "Funding requirements",
     ),
     DashboardSpec(
         "network_funding",
@@ -343,6 +360,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         A4_CONTENT_WIDTH_PX,
         500,
         "Plan-year detailed funding: Host National Society vs IFRC, with ongoing emergencies, longer-term needs, and enabling local actors.",
+        "Network-supported activities",
     ),
     DashboardSpec(
         "emergency_1",
@@ -397,6 +415,7 @@ DASHBOARDS: tuple[DashboardSpec, ...] = (
         A4_CONTENT_WIDTH_PX,
         620,
         "Participating National Society support by Strategic Priority. Plans add year rows and coloured amount cells.",
+        "Bilateral support",
     ),
 )
 

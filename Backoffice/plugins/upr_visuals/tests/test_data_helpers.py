@@ -28,6 +28,7 @@ from plugins.upr_visuals.data import (
     _sum_funding_rows,
     _support_from_cells,
     _usable_ifrc_actual,
+    _report_financial,
     build_report_network_entities,
     ifrc_secretariat_actuals_for_report,
     max_people_by_area,
@@ -41,6 +42,16 @@ from plugins.upr_visuals.data import (
     t23_host_funding_by_pns,
 )
 from plugins.upr_visuals.catalog import SUPPORT_AREA_CODES
+
+
+@pytest.mark.unit
+def test_split_modules_keep_runtime_imports():
+    from plugins.upr_visuals import indicators, pns_funding, support
+
+    assert pns_funding.NationalSociety is not None
+    assert support.logger is not None
+    assert indicators.RepeatGroupInstance is not None
+    assert indicators.DynamicIndicatorData is not None
 
 
 @pytest.mark.unit
@@ -60,11 +71,11 @@ def test_ns_logo_src_falls_back_to_github_iso3():
 def test_spef_icon_srcs_uses_indicator_bank_url(monkeypatch):
     row = SimpleNamespace(id=3, code="SP1", icon_filename="SP1.png", is_active=True)
     monkeypatch.setattr(
-        "plugins.upr_visuals.data._load_spef_catalog_rows",
+        "plugins.upr_visuals.icons._load_spef_catalog_rows",
         lambda: [row],
     )
     monkeypatch.setattr(
-        "plugins.upr_visuals.data._spef_catalog_icon_url",
+        "plugins.upr_visuals.icons._spef_catalog_icon_url",
         lambda item: f"/api/v1/uploads/spef/{item.icon_filename}",
     )
     icons = spef_icon_srcs(inline=False)
@@ -73,14 +84,14 @@ def test_spef_icon_srcs_uses_indicator_bank_url(monkeypatch):
 
 @pytest.mark.unit
 def test_spef_icon_srcs_uses_plugin_eo_icon(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._load_spef_catalog_rows", lambda: [])
+    monkeypatch.setattr("plugins.upr_visuals.icons._load_spef_catalog_rows", lambda: [])
     icons = spef_icon_srcs(inline=False)
     assert icons["EO"].endswith("icons/eo-emergency.png")
 
 
 @pytest.mark.unit
 def test_spef_icon_srcs_inlines_plugin_eo_icon(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._load_spef_catalog_rows", lambda: [])
+    monkeypatch.setattr("plugins.upr_visuals.icons._load_spef_catalog_rows", lambda: [])
     icons = spef_icon_srcs(inline=True)
     assert icons["EO"].startswith("data:image/png;base64,")
     assert icons["SP1"].startswith("data:image/png;base64,")
@@ -90,11 +101,11 @@ def test_spef_icon_srcs_inlines_plugin_eo_icon(monkeypatch):
 def test_spef_icon_srcs_inline_skips_http_catalog_url(monkeypatch):
     row = SimpleNamespace(id=3, code="SP1", icon_filename="", is_active=True)
     monkeypatch.setattr(
-        "plugins.upr_visuals.data._load_spef_catalog_rows",
+        "plugins.upr_visuals.icons._load_spef_catalog_rows",
         lambda: [row],
     )
     monkeypatch.setattr(
-        "plugins.upr_visuals.data._spef_catalog_icon_url",
+        "plugins.upr_visuals.icons._spef_catalog_icon_url",
         lambda item: "/indicator-bank/spef-lookups/3/icon",
     )
     icons = spef_icon_srcs(inline=True)
@@ -105,7 +116,7 @@ def test_spef_icon_srcs_inline_skips_http_catalog_url(monkeypatch):
 @pytest.mark.unit
 def test_reach_rows_use_catalog_icon(monkeypatch):
     monkeypatch.setattr(
-        "plugins.upr_visuals.data.spef_icon_srcs",
+        "plugins.upr_visuals.people_reached.spef_icon_srcs",
         lambda: {"SP1": "/indicator-bank/spef-lookups/3/icon"},
     )
     rows = _reach_rows({"SP1": 1000})
@@ -203,7 +214,7 @@ def test_split_cell_key_keeps_supported_column():
 
 @pytest.mark.unit
 def test_support_from_cells_ticks(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
+    monkeypatch.setattr("plugins.upr_visuals.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
     rows = _support_from_cells({"7_SP1": 1, "7_EFs": 1}, planned=True)
     assert len(rows) == 1
     assert rows[0]["name"] == "Netherlands Red Cross"
@@ -214,7 +225,7 @@ def test_support_from_cells_ticks(monkeypatch):
 
 @pytest.mark.unit
 def test_support_from_cells_reporting_supported_columns(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
+    monkeypatch.setattr("plugins.upr_visuals.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
     rows = _support_from_cells(
         {"7_SP1 Supported": 1, "7_SP2 Planned": 1, "7_EFs Supported": 1},
         planned=False,
@@ -227,7 +238,7 @@ def test_support_from_cells_reporting_supported_columns(monkeypatch):
 
 @pytest.mark.unit
 def test_support_from_cells_reads_total_funding_column(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
+    monkeypatch.setattr("plugins.upr_visuals.support._ns_names", lambda ids: {7: "The Netherlands Red Cross"})
     rows = _support_from_cells(
         {"7_SP1 Supported": 1, "7_Total": 1_200_000},
         planned=False,
@@ -258,7 +269,7 @@ def test_pns_area_funding_from_plan_cells_groups_by_ns():
 
 @pytest.mark.unit
 def test_expand_plan_support_years_emits_year_rows(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._ns_names", lambda ids: {12: "Austrian Red Cross"})
+    monkeypatch.setattr("plugins.upr_visuals.support._ns_names", lambda ids: {12: "Austrian Red Cross"})
     ticks = [
         {
             "ns_id": 49,
@@ -332,7 +343,7 @@ def test_t22_host_funding_by_pns_prefers_total():
 
 @pytest.mark.unit
 def test_extend_support_with_funding_adds_amount_only_rows(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data._ns_names", lambda ids: {12: "Austrian Red Cross"})
+    monkeypatch.setattr("plugins.upr_visuals.support._ns_names", lambda ids: {12: "Austrian Red Cross"})
     amounts = {49: 1_700_000, 12: 650_000}
     rows = _apply_support_funding(
         [
@@ -398,6 +409,16 @@ def test_sum_t23_host_cells_filters_by_host_ns():
     assert totals["expenditure"] == 80
     assert totals["transferred"] == 10
     assert totals["assignments"] == 2
+
+
+@pytest.mark.unit
+def test_report_financial_empty_items_does_not_raise():
+    result = _report_financial([], {}, country_id=None, host_ns_id=None, period_name="Annual 2025")
+    assert result["ifrc_network"]["funding"] is None
+    assert result["ifrc_network"]["expenditure"] is None
+    assert result["sources"]
+    assert result["breakdown"] == []
+    assert result["network_entities"]
 
 
 @pytest.mark.unit
@@ -575,7 +596,7 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
         numeric_value=9000,
     )
     monkeypatch.setattr(
-        "plugins.upr_visuals.data._load_dynamic_indicator_rows",
+        "plugins.upr_visuals.indicators._load_dynamic_indicator_rows",
         lambda aes_id: [other_dyn, ea_dyn],
     )
 
@@ -658,7 +679,7 @@ def _people_entry(value):
 
 @pytest.mark.unit
 def test_report_people_reached_folds_emergency_into_disasters_and_drops_long_term(monkeypatch):
-    monkeypatch.setattr("plugins.upr_visuals.data.spef_icon_srcs", lambda: {})
+    monkeypatch.setattr("plugins.upr_visuals.people_reached.spef_icon_srcs", lambda: {})
     disasters = _people_item(1, "Number of people reached with disaster risk reduction.", "SP2")
     emergency = _people_item(
         2,
@@ -730,3 +751,4 @@ def test_visuals_browser_title_uses_country_and_assignment(monkeypatch):
         lambda _aes: SimpleNamespace(name="Bangladesh"),
     )
     assert visuals_browser_title(aes) == "Bangladesh — Unified Plan – 2026"
+

@@ -1,6 +1,8 @@
 {# Live UPR visuals panel on Unified Plan / Report assignment pages. #}
 <div id="upr-visuals-panel" class="bg-white p-3 sm:p-6 rounded-lg border border-gray-200 mb-4 sm:mb-6"
-     data-aes-id="{{ assignment_status.id }}">
+     data-aes-id="{{ assignment_status.id }}"
+     data-loading="{{ _('Loading visuals…')|forceescape }}"
+     data-failed="{{ _('Could not load visuals.')|forceescape }}">
     <div class="upr-visuals-embed__toolbar">
         <div id="upr-visuals-tabs" class="upr-visuals-embed__tabs" role="tablist" aria-label="{{ _('UPR visuals')|forceescape }}"></div>
         <div class="upr-visuals-download">

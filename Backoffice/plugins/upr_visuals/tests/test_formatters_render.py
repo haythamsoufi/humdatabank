@@ -27,7 +27,7 @@ from plugins.upr_visuals.formatters import (
     planning_years,
     to_number,
 )
-from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html
+from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
 
 
 @pytest.mark.unit
@@ -117,6 +117,8 @@ def test_format_compact_chf_matches_tableau():
     assert format_compact_chf(1_000) == "1,000"
     assert format_compact_chf(6_700_000) == "6.7M"
     assert format_compact_chf(2_000_000) == "2M"
+    assert format_compact_chf(999_600) == "1M"
+    assert format_compact_chf(999_499) == "999,000"
 
 
 @pytest.mark.unit
@@ -849,6 +851,34 @@ def test_number_styles_use_montserrat():
     assert "Open Sans" in font_css
     assert "file:" in font_css
     assert "OpenSans-Regular" in font_css
+
+
+_EMPTY_PAYLOAD = {
+    "meta": {},
+    "kpis": {},
+    "people_reached": [],
+    "financial": {},
+    "support": [],
+    "core_indicators": [],
+    "enabling_indicators": [],
+    "emergencies": [],
+    "dashboards": [
+        {"id": "combined"},
+        {"id": "in_support"},
+        {"id": "reach"},
+        {"id": "financial"},
+        {"id": "support"},
+    ],
+}
+
+
+@pytest.mark.unit
+def test_empty_payload_dashboard_and_report_render():
+    for dashboard_id in ("combined", "in_support", "reach", "financial", "support"):
+        html = render_dashboard_html(_EMPTY_PAYLOAD, dashboard_id)
+        assert f'upr-dashboard--{dashboard_id}' in html
+    report = render_report_html(_EMPTY_PAYLOAD)
+    assert "upr-visual-report" in report
 
 
 @pytest.mark.unit

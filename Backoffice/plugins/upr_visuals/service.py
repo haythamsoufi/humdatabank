@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import io
 import logging
 import shutil
 import threading
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Callable
 
 from flask import current_app
 from werkzeug.exceptions import NotFound
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 STORAGE_CATEGORY = "upr_visuals"
 STATUS_NAME = "status.json"
+RENDER_TIMEOUT_SECONDS = 120
 
 _lock = threading.Lock()
 _jobs: dict[str, dict[str, Any]] = {}
@@ -37,9 +39,13 @@ def visual_export_filename(meta: dict[str, Any], dashboard_id: str, ext: str) ->
         title = str(meta.get("document_title") or "").strip()
         if title:
             return filename_from_visual_title(title, suffix)
-    iso3 = str(meta.get("iso3") or "UNK").replace("/", "-")
-    round_code = str(meta.get("round_code") or meta.get("period_name") or "round").replace("/", "-")
-    return f"{iso3}_{round_code}_{dashboard_id}.{suffix}"
+    iso3 = filename_from_visual_title(str(meta.get("iso3") or "UNK"), "png")[:-4]
+    round_code = filename_from_visual_title(
+        str(meta.get("round_code") or meta.get("period_name") or "round"),
+        "png",
+    )[:-4]
+    dash = filename_from_visual_title(dashboard_id, "png")[:-4]
+    return f"{iso3}_{round_code}_{dash}.{suffix}"
 
 
 class UprVisualsService:
@@ -138,13 +144,15 @@ class UprVisualsService:
         payload, html = cls._dashboard_html(aes_id, dashboard_id)
         filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "png")
         tmp = Path(current_app.instance_path) / "upr_visuals_tmp" / f"{uuid.uuid4().hex}_{filename}"
-        render_png(html, tmp, dashboard_id=dashboard_id)
-        data = tmp.read_bytes()
+        tmp.parent.mkdir(parents=True, exist_ok=True)
         try:
-            tmp.unlink()
-        except OSError:
-            pass
-        return data, filename
+            render_png(html, tmp, dashboard_id=dashboard_id)
+            return tmp.read_bytes(), filename
+        finally:
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
     @classmethod
     def pdf_bytes(cls, aes_id: int, dashboard_id: str) -> tuple[bytes, str]:
@@ -204,7 +212,16 @@ class UprVisualsService:
         return payload, render_dashboard_html(payload, dashboard_id)
 
     @classmethod
+    def _render_with_timeout(cls, fn: Callable[[], Any], timeout: float = RENDER_TIMEOUT_SECONDS) -> Any:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(fn)
+            return future.result(timeout=timeout)
+
+    @classmethod
     def _run_bulk(cls, app, job_id: str) -> None:
+        work_root = Path(app.instance_path) / "upr_visuals_tmp"
+        job_dir = work_root / job_id
+        zip_path = work_root / f"{job_id}.zip"
         with app.app_context():
             job = cls.get_status(job_id)
             try:
@@ -218,9 +235,10 @@ class UprVisualsService:
                 dashboards = job.get("dashboard_ids") or ["combined"]
                 total = max(len(assignments) * len(dashboards), 1)
                 cls._update(job_id, total=total, message="Rendering…")
-                buffer = io.BytesIO()
+                job_dir.mkdir(parents=True, exist_ok=True)
                 done = 0
-                with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                errors: list[str] = []
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                     for row in assignments:
                         if cls.get_status(job_id).get("status") == "cancelled":
                             return
@@ -228,6 +246,7 @@ class UprVisualsService:
                             payload = build_payload(row["aes_id"], inline_icons=True)
                         except Exception as exc:
                             logger.warning("UPR visuals skip aes %s: %s", row["aes_id"], exc)
+                            errors.append(f"aes {row['aes_id']}: {exc}")
                             try:
                                 from app.extensions import db
 
@@ -243,28 +262,52 @@ class UprVisualsService:
                         folder = f"{iso3}_{round_code}"
                         available = {item.get("id") for item in payload.get("dashboards") or []}
                         for dashboard_id in dashboards:
+                            if cls.get_status(job_id).get("status") == "cancelled":
+                                return
                             if str(dashboard_id).startswith("emergency_") and dashboard_id not in available:
                                 done += 1
                                 cls._update(job_id, progress=done)
                                 continue
-                            html = render_dashboard_html(payload, dashboard_id)
-                            tmp = Path(app.instance_path) / "upr_visuals_tmp" / job_id / f"{dashboard_id}.png"
-                            render_png(html, tmp, dashboard_id=dashboard_id)
-                            zf.write(tmp, arcname=f"{folder}/{dashboard_id}.png")
+                            tmp = job_dir / f"{dashboard_id}.png"
                             try:
-                                tmp.unlink()
-                            except OSError:
-                                pass
+                                html = render_dashboard_html(payload, dashboard_id)
+                                cls._render_with_timeout(
+                                    lambda html=html, tmp=tmp, dashboard_id=dashboard_id: render_png(
+                                        html, tmp, dashboard_id=dashboard_id
+                                    )
+                                )
+                                zf.write(tmp, arcname=f"{folder}/{dashboard_id}.png")
+                            except FuturesTimeoutError:
+                                logger.warning(
+                                    "UPR visuals render timed out for aes %s dashboard %s",
+                                    row["aes_id"],
+                                    dashboard_id,
+                                )
+                                errors.append(f"aes {row['aes_id']} {dashboard_id}: timed out")
+                            except Exception as exc:
+                                logger.warning(
+                                    "UPR visuals skip aes %s dashboard %s: %s",
+                                    row["aes_id"],
+                                    dashboard_id,
+                                    exc,
+                                )
+                                errors.append(f"aes {row['aes_id']} {dashboard_id}: {exc}")
+                            finally:
+                                try:
+                                    tmp.unlink()
+                                except OSError:
+                                    pass
                             done += 1
                             cls._update(job_id, progress=done, message=f"{iso3} · {dashboard_id}")
                 zip_key = f"exports/{job_id}/upr-visuals.zip"
-                storage_service.upload(STORAGE_CATEGORY, zip_key, buffer.getvalue())
+                storage_service.upload(STORAGE_CATEGORY, zip_key, zip_path.read_bytes())
                 cls._update(
                     job_id,
                     status="completed",
                     progress=total,
                     zip_key=zip_key,
                     message="Done",
+                    error="; ".join(errors) if errors else None,
                     finished_at=utcnow().isoformat(),
                 )
             except Exception as exc:
@@ -276,6 +319,12 @@ class UprVisualsService:
                     message="Failed",
                     finished_at=utcnow().isoformat(),
                 )
+            finally:
+                shutil.rmtree(job_dir, ignore_errors=True)
+                try:
+                    zip_path.unlink()
+                except OSError:
+                    pass
 
     @classmethod
     def _update(cls, job_id: str, **fields: Any) -> None:

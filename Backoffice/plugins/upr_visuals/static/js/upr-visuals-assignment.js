@@ -11,11 +11,17 @@
   const downloadWrap = downloadBtn && downloadBtn.closest(".upr-visuals-download");
   const formArea = document.getElementById("sections-container");
   const toggleBtn = document.getElementById("upr-visuals-toggle");
+  const shared = window.UprVisualsShared || {};
+  const i18n = {
+    loading: panel.dataset.loading || "Loading visuals…",
+    failed: panel.dataset.failed || "Could not load visuals.",
+  };
   let activeDashboard = "combined";
   let loaded = false;
   let htmlCache = Object.create(null);
 
   function csrfHeaders() {
+    if (shared.csrfHeaders) return shared.csrfHeaders();
     const token =
       document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ||
       document.querySelector('input[name="csrf_token"]')?.value ||
@@ -61,6 +67,10 @@
   }
 
   function markActiveTab(dashboardId) {
+    if (shared.markActiveTab) {
+      shared.markActiveTab(tabsEl, dashboardId);
+      return;
+    }
     if (!tabsEl) return;
     tabsEl.querySelectorAll(".upr-visuals-embed__tab").forEach((el) => {
       el.classList.toggle("is-active", el.dataset.dashboard === dashboardId);
@@ -78,6 +88,20 @@
   }
 
   function renderTabs(dashboards) {
+    if (shared.renderDashboardTabs) {
+      shared.renderDashboardTabs({
+        container: tabsEl,
+        dashboards,
+        activeId: activeDashboard,
+        tablistId: "upr-visuals-tabs",
+        onSelect: (id) => {
+          if (id === activeDashboard) return;
+          if (showFromCache(id)) return;
+          loadDashboard(id);
+        },
+      });
+      return;
+    }
     if (!tabsEl) return;
     tabsEl.innerHTML = "";
     (dashboards || []).forEach((dash) => {
@@ -96,6 +120,10 @@
   }
 
   function rememberHtml(dashboardId, data) {
+    if (shared.rememberHtml) {
+      shared.rememberHtml(htmlCache, dashboardId, data);
+      return;
+    }
     const byId = data && data.html_by_dashboard;
     if (byId && typeof byId === "object") {
       Object.keys(byId).forEach((id) => {
@@ -108,23 +136,33 @@
 
   async function loadDashboard(dashboardId, opts) {
     const force = !!(opts && opts.force);
-    if (!force && showFromCache(dashboardId)) return;
-    setStatus("Loading visuals…");
+    const requested = dashboardId;
+    if (!force && showFromCache(requested)) return;
+    activeDashboard = requested;
+    setStatus(i18n.loading);
     try {
-      const data = await fetchJson(`/assignment/${aesId}/visuals?dashboard=${encodeURIComponent(dashboardId)}`, {
+      const data = await fetchJson(`/assignment/${aesId}/visuals?dashboard=${encodeURIComponent(requested)}`, {
         headers: csrfHeaders(),
         credentials: "same-origin",
       });
       if (!data || data.success === false) {
-        throw new Error((data && data.error) || "Could not load visuals");
+        throw new Error((data && data.error) || i18n.failed);
       }
-      rememberHtml(dashboardId, data);
+      rememberHtml(requested, data);
       if (data.payload && data.payload.dashboards) renderTabs(data.payload.dashboards);
       loaded = true;
-      if (!showFromCache(dashboardId) && body) body.innerHTML = data.html || "";
+      if (activeDashboard !== requested) return;
+      if (!showFromCache(requested) && body) body.innerHTML = data.html || "";
       setStatus("");
     } catch (err) {
-      if (body) body.innerHTML = `<p class="upr-empty">Could not load visuals.</p>`;
+      if (activeDashboard !== requested) return;
+      if (body) {
+        body.replaceChildren();
+        const p = document.createElement("p");
+        p.className = "upr-empty";
+        p.textContent = i18n.failed;
+        body.appendChild(p);
+      }
       setStatus("");
     }
   }

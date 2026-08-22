@@ -225,14 +225,6 @@
 .upr-vis-preview-pane[hidden] {
     display: none;
 }
-.upr-vis-preview__stage {
-    overflow: auto;
-    max-height: 75vh;
-    padding: 1rem;
-    background: #e8ecf0;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.375rem;
-}
 </style>
 <link rel="stylesheet" href="{{ url_for('upr_visuals.static_file', filename='css/upr-visuals.css') }}">
 
@@ -283,6 +275,7 @@ window.UprVisualsAdminConfig = {
     }
 };
 </script>
+<script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-shared.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-download.js') }}"></script>
 <script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-admin.js') }}"></script>
 {% endif %}

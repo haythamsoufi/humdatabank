@@ -47,7 +47,8 @@ def format_compact_chf(value: Any) -> str:
         return str(int(round(number)))
     if abs(number) < 1_000_000:
         thousands = int(round(number / 1000.0))
-        return f"{thousands:,}000" if thousands >= 1000 else f"{thousands},000"
+        if thousands < 1000:
+            return f"{thousands},000"
     millions = number / 1_000_000.0
     rounded = round(millions, 1)
     if rounded == int(rounded):

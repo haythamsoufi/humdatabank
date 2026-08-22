@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import plugins.upr_visuals.raster as _raster_mod
 from plugins.upr_visuals.raster import (
     MAX_PNG_EDGE,
     PNG_EXPORT_SCALE,
@@ -202,6 +203,62 @@ def test_resolve_export_image_src_maps_plugin_static():
     logo = resolve_export_image_src("/static/IFRC_logo_square.svg")
     assert logo.startswith("file:")
     assert logo.lower().endswith("ifrc_logo_square.svg")
+
+
+class _FakeHTTPResponse:
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def read(self) -> bytes:
+        return self._data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+@pytest.mark.unit
+def test_resolve_export_image_src_inlines_trusted_github(monkeypatch):
+    """NS logo and KPI icon HTTPS URLs from the FDRS GitHub CDN are inlined as data URIs."""
+    fake_png = b"\x89PNG\r\n\x1a\n"
+    monkeypatch.setattr(_raster_mod, "urlopen", lambda url, timeout=10: _FakeHTTPResponse(fake_png))
+
+    ns_logo = "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ns_logos/AFG.png"
+    result = resolve_export_image_src(ns_logo)
+    assert result.startswith("data:image/png;base64,")
+
+    kpi_icon = "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Unity.png"
+    assert resolve_export_image_src(kpi_icon).startswith("data:image/png;base64,")
+
+    # Untrusted HTTPS still passes through unchanged (blocked later by _restricted_url_fetcher)
+    untrusted = "https://example.test/icon.png"
+    assert resolve_export_image_src(untrusted) == untrusted
+
+
+@pytest.mark.unit
+def test_resolve_export_image_src_trusted_github_fetch_failure_falls_back(monkeypatch):
+    """A network error fetching a trusted URL returns the original URL (logged, not raised)."""
+    monkeypatch.setattr(_raster_mod, "urlopen", lambda url, timeout=10: (_ for _ in ()).throw(OSError("timeout")))
+    ns_logo = "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ns_logos/AFG.png"
+    assert resolve_export_image_src(ns_logo) == ns_logo
+
+
+@pytest.mark.unit
+def test_resolve_export_image_src_inlines_ns_logo_api(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.platform.storage_service.download",
+        lambda category, rel: b"\x89PNG\r\n\x1a\n",
+    )
+    src = resolve_export_image_src("/api/v1/uploads/ns/uganda.png")
+    assert src.startswith("data:image/png;base64,")
+    assert resolve_export_image_src("/api/v1/uploads/ns/../secret.png") == src
+    monkeypatch.setattr(
+        "app.services.platform.storage_service.download",
+        lambda category, rel: (_ for _ in ()).throw(FileNotFoundError("missing")),
+    )
+    assert resolve_export_image_src("/api/v1/uploads/ns/missing.png") == ""
 
 
 @pytest.mark.unit

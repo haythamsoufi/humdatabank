@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import io
+import logging
+import mimetypes
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname, urlopen
 
 from plugins.upr_visuals.catalog import (
     A4_COMBINED_FOLLOWING_MARGIN_MM,
@@ -27,6 +32,7 @@ PNG_EXPORT_SCALE = 8.0
 MAX_PNG_EDGE = 16384
 _IMG_SRC_RE = re.compile(r'(<img\b[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
 _PLUGIN_STATIC_URL = "/upr-visuals/static/"
+_NS_LOGO_API_PREFIX = "/api/v1/uploads/ns/"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
 _CSS_PATH = _PLUGIN_DIR / "static" / "css" / "upr-visuals.css"
@@ -34,6 +40,12 @@ _APP_STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "static"
 _APP_FONTS_DIR = _APP_STATIC_DIR / "fonts"
 _PLUGIN_FONTS_DIR = _PLUGIN_DIR / "fonts"
 _APP_STATIC_URL = "/static/"
+# HTTPS origins trusted for export image inlining (NS logos and KPI icons from the
+# public FDRS GitHub repo).  Only these prefixes are fetched; all other https:// URLs
+# remain unchanged and will be blocked by _restricted_url_fetcher as before.
+_TRUSTED_REMOTE_PREFIXES = ("https://raw.githubusercontent.com/FDRS-ifrc/",)
+
+logger = logging.getLogger(__name__)
 
 
 def _first_font(*paths: Path) -> Path | None:
@@ -85,6 +97,57 @@ def _font_css() -> str:
 
 
 _PRINT_DROP_AT = ("@media", "@keyframes", "@-webkit-keyframes")
+_BACKDROP_MIN_COVERAGE_W = 0.85
+_BACKDROP_MIN_COVERAGE_H = 0.45
+_BACKDROP_NEAR_FULL_W = 0.95
+_BACKDROP_NEAR_FULL_H = 0.95
+_BACKDROP_WHITE_CHANNEL = 0.98
+_CONTENT_CLIP_PAD_PX = 12
+_TRIM_PIXMAP_PAD_PX = 16
+_PORTRAIT_KEEP_TOGETHER_CSS = (
+    ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators),"
+    ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) > .upr-block,"
+    ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) table,"
+    ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) .upr-bars {"
+    " break-inside: avoid; page-break-inside: avoid; }"
+    ".upr-doc-header {"
+    " break-inside: avoid; page-break-inside: avoid;"
+    " break-after: avoid; page-break-after: avoid;"
+    " margin: 0; width: 100%; }"
+    ".upr-dashboard--combined { display: block; }"
+    ".upr-doc-footer {"
+    " position: running(cover-footer); margin: 0; padding: 0; }"
+    ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
+    ".upr-combined-section--finance,"
+    ".upr-combined-section--plan-fund,.upr-block--plan-fund,"
+    ".upr-combined-section--network-funding {"
+    " break-inside: avoid; page-break-inside: avoid; }"
+    ".upr-combined-section--indicators,"
+    ".upr-combined-section--indicators > .upr-block {"
+    " break-inside: auto; page-break-inside: auto; }"
+    ".upr-combined-section--indicators .upr-block__title {"
+    " break-after: avoid; page-break-after: avoid; }"
+    ".upr-combined-section--indicators .upr-bar-group,"
+    ".upr-combined-section--indicators .upr-bar-row {"
+    " break-inside: avoid; page-break-inside: avoid; }"
+    ".upr-combined-section--page-start {"
+    " break-before: page; page-break-before: always; }"
+    ".upr-support-table { width: 100%; max-width: 100%; table-layout: fixed; }"
+    ".upr-support-table .upr-ns { white-space: normal; overflow-wrap: anywhere; }"
+    ".upr-support-th--plan span { writing-mode: horizontal-tb; transform: none; }"
+    ".upr-reach-row{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; }"
+    ".upr-combined-section > .upr-block--reach{"
+    " margin-left:-8mm; margin-right:-8mm; width:calc(100% + 16mm); max-width:none;"
+    " padding:1.15rem 8mm 1.35rem; }"
+    ".upr-reach-icon,.upr-reach-icon--img{ width:3.35rem; height:3.35rem; }"
+    ".upr-reach-icon--img img{ width:2.05rem; height:2.05rem; }"
+    ".upr-fin-hero,.upr-fin-grid{ width:100%; max-width:100%; }"
+    ".upr-fin-grid{ table-layout:fixed; border-collapse:collapse; }"
+    ".upr-fin-grid--with-sources .upr-fin-col-overview-plot{ width:22%; }"
+    ".upr-fin-grid .upr-bar-label{ white-space:nowrap; }"
+    ".upr-bar-track{ display:flex; flex-wrap:nowrap; align-items:center; width:100%; white-space:nowrap; }"
+    ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
+)
 
 
 def _css_for_print(css: str) -> str:
@@ -120,6 +183,12 @@ def _css_for_print(css: str) -> str:
     return "".join(out)
 
 
+@lru_cache(maxsize=1)
+def _print_css() -> str:
+    css = _CSS_PATH.read_text(encoding="utf-8") if _CSS_PATH.is_file() else ""
+    return _css_for_print(css)
+
+
 def _is_portrait_export(dashboard_id: str) -> bool:
     return dashboard_id == "combined"
 
@@ -136,51 +205,7 @@ def _pdf_page_css(dashboard_id: str) -> str:
     portrait = _is_portrait_export(dashboard_id)
     orientation = "portrait" if portrait else "landscape"
     margin = A4_COMBINED_MARGIN_MM if portrait else A4_MARGIN_MM
-    keep_together = ""
-    if portrait:
-        keep_together = (
-            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators),"
-            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) > .upr-block,"
-            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) table,"
-            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) .upr-bars {"
-            " break-inside: avoid; page-break-inside: avoid; }"
-            ".upr-doc-header {"
-            " break-inside: avoid; page-break-inside: avoid;"
-            " break-after: avoid; page-break-after: avoid;"
-            " margin: 0; width: 100%; }"
-            ".upr-dashboard--combined { display: block; }"
-            ".upr-doc-footer {"
-            " position: running(cover-footer); margin: 0; padding: 0; }"
-            ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
-            ".upr-combined-section--finance,"
-            ".upr-combined-section--plan-fund,.upr-block--plan-fund,"
-            ".upr-combined-section--network-funding {"
-            " break-inside: avoid; page-break-inside: avoid; }"
-            ".upr-combined-section--indicators,"
-            ".upr-combined-section--indicators > .upr-block {"
-            " break-inside: auto; page-break-inside: auto; }"
-            ".upr-combined-section--indicators .upr-block__title {"
-            " break-after: avoid; page-break-after: avoid; }"
-            ".upr-combined-section--indicators .upr-bar-group,"
-            ".upr-combined-section--indicators .upr-bar-row {"
-            " break-inside: avoid; page-break-inside: avoid; }"
-            ".upr-combined-section--page-start {"
-            " break-before: page; page-break-before: always; }"
-            ".upr-support-table { width: 100%; max-width: 100%; table-layout: fixed; }"
-            ".upr-support-table .upr-ns { white-space: normal; overflow-wrap: anywhere; }"
-            ".upr-support-th--plan span { writing-mode: horizontal-tb; transform: none; }"
-            ".upr-reach-row{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; }"
-            ".upr-combined-section > .upr-block--reach{"
-            " margin-left:-8mm; margin-right:-8mm; width:calc(100% + 16mm); max-width:none;"
-            " padding:1.15rem 8mm 1.35rem; }"
-            ".upr-reach-icon,.upr-reach-icon--img{ width:3.35rem; height:3.35rem; }"
-            ".upr-reach-icon--img img{ width:2.05rem; height:2.05rem; }"
-            ".upr-fin-hero,.upr-fin-grid{ width:100%; max-width:100%; }"
-            ".upr-fin-grid{ table-layout:fixed; border-collapse:collapse; }"
-            ".upr-fin-grid--with-sources .upr-fin-col-overview-plot{ width:22%; }"
-            ".upr-fin-grid .upr-bar-label{ white-space:nowrap; }"
-            ".upr-bar-track{ display:flex; flex-wrap:nowrap; align-items:center; width:100%; white-space:nowrap; }"
-        )
+    keep_together = _PORTRAIT_KEEP_TOGETHER_CSS if portrait else ""
     if portrait:
         page = (
             f"@page {{ size: A4 portrait; margin: {A4_COMBINED_FOLLOWING_MARGIN_MM}mm 0; }}\n"
@@ -203,8 +228,59 @@ def _pdf_page_css(dashboard_id: str) -> str:
     )
 
 
+def _is_allowed_local_path(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    plugin_root = _PLUGIN_DIR.resolve()
+    app_static = _APP_STATIC_DIR.resolve()
+    return resolved == plugin_root or plugin_root in resolved.parents or resolved == app_static or app_static in resolved.parents
+
+
+def _ns_logo_data_uri(filename: str) -> str:
+    name = os.path.basename((filename or "").replace("\\", "/")).strip()
+    if not name or name in {".", ".."}:
+        return ""
+    try:
+        from app.services.platform import storage_service as storage
+
+        data = storage.download(storage.SYSTEM, f"ns/{name}")
+    except Exception:
+        logger.debug("UPR visuals: could not load NS logo %s for export", name, exc_info=True)
+        return ""
+    if not data:
+        return ""
+    mime = mimetypes.guess_type(name)[0] or "image/png"
+    import base64
+
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def _fetch_remote_as_data_uri(url: str) -> str:
+    """Download a remote image from a trusted origin and return a data URI.
+
+    Only called for URLs that match _TRUSTED_REMOTE_PREFIXES, so no untrusted
+    network egress happens during export.
+    """
+    import base64
+
+    parsed = urlparse(url)
+    name = Path(unquote(parsed.path)).name or "image.png"
+    try:
+        with urlopen(url, timeout=10) as resp:
+            data = resp.read()
+    except Exception:
+        logger.debug("UPR visuals: could not fetch remote image %s for export", url, exc_info=True)
+        return ""
+    if not data:
+        return ""
+    mime = mimetypes.guess_type(name)[0] or "image/png"
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
 def resolve_export_image_src(src: str) -> str:
-    """Map Flask/plugin image URLs to file:// so WeasyPrint can read them."""
+    """Map Flask/plugin image URLs to file:// or data: so WeasyPrint can read them."""
     raw = (src or "").strip()
     if not raw or raw.startswith(("data:", "file:")):
         return raw
@@ -212,6 +288,8 @@ def resolve_export_image_src(src: str) -> str:
     app_static = _APP_STATIC_DIR.resolve()
     candidates: list[Path] = []
     path_only = raw.split("?", 1)[0]
+    if path_only.startswith(_NS_LOGO_API_PREFIX):
+        return _ns_logo_data_uri(path_only[len(_NS_LOGO_API_PREFIX) :]) or ""
     if path_only.startswith(_PLUGIN_STATIC_URL):
         candidates.append(_PLUGIN_DIR / "static" / path_only[len(_PLUGIN_STATIC_URL) :])
     elif path_only.startswith(_APP_STATIC_URL):
@@ -231,7 +309,27 @@ def resolve_export_image_src(src: str) -> str:
         in_app_static = resolved == app_static or app_static in resolved.parents
         if resolved.is_file() and (in_plugin or in_app_static):
             return resolved.as_uri()
+    # Inline images from known trusted remote origins so they survive
+    # _restricted_url_fetcher (which blocks all http/https).
+    if any(raw.startswith(p) for p in _TRUSTED_REMOTE_PREFIXES):
+        return _fetch_remote_as_data_uri(raw) or raw
     return raw
+
+
+def _restricted_url_fetcher(url, timeout=10, ssl_context=None):
+    """Allow only data: and local files under the plugin / app static trees."""
+    from weasyprint.urls import default_url_fetcher
+
+    raw = (url or "").strip()
+    if raw.startswith("data:"):
+        return default_url_fetcher(url, timeout=timeout, ssl_context=ssl_context)
+    parsed = urlparse(raw)
+    if parsed.scheme != "file":
+        raise ValueError(f"Blocked export URL scheme: {parsed.scheme or 'unknown'}")
+    local = Path(url2pathname(unquote(parsed.path)))
+    if not _is_allowed_local_path(local):
+        raise ValueError("Blocked export file URL outside allowed static roots")
+    return default_url_fetcher(url, timeout=timeout, ssl_context=ssl_context)
 
 
 def _rewrite_export_images(html: str) -> str:
@@ -242,33 +340,11 @@ def _rewrite_export_images(html: str) -> str:
 
 
 def _wrap(dashboard_html: str, width: int | None = None, *, dashboard_id: str = "") -> str:
-    css = _CSS_PATH.read_text(encoding="utf-8") if _CSS_PATH.is_file() else ""
-    keep_together = ""
-    if _is_portrait_export(dashboard_id):
-        keep_together = (
-            ".upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators),"
-            " .upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) > .upr-block,"
-            " .upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) table,"
-            " .upr-combined-section:not(.upr-combined-section--finance):not(.upr-combined-section--indicators) .upr-bars {"
-            " break-inside: avoid; page-break-inside: avoid; }"
-            ".upr-combined-section--indicators,"
-            " .upr-combined-section--indicators > .upr-block {"
-            " break-inside: auto; page-break-inside: auto; }"
-            ".upr-combined-section--indicators .upr-bar-group {"
-            " break-inside: avoid; page-break-inside: avoid; }"
-            ".upr-fin-cover,.upr-fin-hero,.upr-fin-grid,"
-            ".upr-combined-section--finance,"
-            ".upr-combined-section--plan-fund,.upr-block--plan-fund,"
-            ".upr-combined-section--network-funding {"
-            " break-inside: avoid; page-break-inside: avoid; }"
-            # Author CSS (not WeasyPrint user stylesheets) so this beats
-            # .upr-block--finance { font-size: 1rem } in the shared sheet.
-            ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
-        )
+    keep_together = _PORTRAIT_KEEP_TOGETHER_CSS if _is_portrait_export(dashboard_id) else ""
     return (
         "<!DOCTYPE html><html><head><meta charset='utf-8'>"
         "<style>"
-        f"{_font_css()}\n{_css_for_print(css)}\n"
+        f"{_font_css()}\n{_print_css()}\n"
         "html, body { margin: 0; padding: 0; background: #fff; }"
         ".upr-dashboard { width: 100%; max-width: none; }"
         ".upr-vis-page { width: auto; max-width: none; min-height: 0; "
@@ -287,17 +363,23 @@ def _is_page_backdrop(drawing, page_rect) -> bool:
     import fitz
 
     area = fitz.Rect(rect)
-    covers_page = area.width >= page_rect.width * 0.85 and area.height >= page_rect.height * 0.45
+    covers_page = (
+        area.width >= page_rect.width * _BACKDROP_MIN_COVERAGE_W
+        and area.height >= page_rect.height * _BACKDROP_MIN_COVERAGE_H
+    )
     if not covers_page:
         return False
     fill = drawing.get("fill")
     if not fill:
-        return area.width >= page_rect.width * 0.95 and area.height >= page_rect.height * 0.95
+        return (
+            area.width >= page_rect.width * _BACKDROP_NEAR_FULL_W
+            and area.height >= page_rect.height * _BACKDROP_NEAR_FULL_H
+        )
     try:
         rgb = fill[:3]
     except (TypeError, IndexError):
         return False
-    return all(float(channel) >= 0.98 for channel in rgb)
+    return all(float(channel) >= _BACKDROP_WHITE_CHANNEL for channel in rgb)
 
 
 def _content_rect(page):
@@ -319,10 +401,10 @@ def _content_rect(page):
         clip |= fitz.Rect(rect)
     if clip.is_empty:
         return page.rect
-    clip.x0 = max(page.rect.x0, clip.x0 - 12)
-    clip.y0 = max(page.rect.y0, clip.y0 - 12)
-    clip.x1 = min(page.rect.x1, clip.x1 + 12)
-    clip.y1 = min(page.rect.y1, clip.y1 + 12)
+    clip.x0 = max(page.rect.x0, clip.x0 - _CONTENT_CLIP_PAD_PX)
+    clip.y0 = max(page.rect.y0, clip.y0 - _CONTENT_CLIP_PAD_PX)
+    clip.x1 = min(page.rect.x1, clip.x1 + _CONTENT_CLIP_PAD_PX)
+    clip.y1 = min(page.rect.y1, clip.y1 + _CONTENT_CLIP_PAD_PX)
     return clip
 
 
@@ -337,34 +419,18 @@ def ink_bounds(
     """Inclusive pixel bbox of non-white content. Used to trim PNG whitespace."""
     if width <= 0 or height <= 0 or n < 3:
         return None
-    buf = memoryview(samples)
-    stride = width * n
+    import numpy as np
 
-    def row_used(y: int) -> bool:
-        row = buf[y * stride : (y + 1) * stride]
-        for i in range(0, len(row), n):
-            if row[i] < threshold or row[i + 1] < threshold or row[i + 2] < threshold:
-                return True
-        return False
-
-    y0 = next((y for y in range(height) if row_used(y)), None)
-    if y0 is None:
+    arr = np.frombuffer(samples, dtype=np.uint8).reshape(height, width, n)
+    used = (arr[:, :, :3] < threshold).any(axis=2)
+    rows = np.flatnonzero(used.any(axis=1))
+    if rows.size == 0:
         return None
-    y1 = next(y for y in range(height - 1, y0 - 1, -1) if row_used(y))
-
-    def col_used(x: int) -> bool:
-        for y in range(y0, y1 + 1):
-            i = (y * width + x) * n
-            if buf[i] < threshold or buf[i + 1] < threshold or buf[i + 2] < threshold:
-                return True
-        return False
-
-    x0 = next(x for x in range(width) if col_used(x))
-    x1 = next(x for x in range(width - 1, x0 - 1, -1) if col_used(x))
-    return x0, y0, x1, y1
+    cols = np.flatnonzero(used.any(axis=0))
+    return int(cols[0]), int(rows[0]), int(cols[-1]), int(rows[-1])
 
 
-def _trim_pixmap(pixmap, *, pad: int = 16, keep_width: bool = False):
+def _trim_pixmap(pixmap, *, pad: int = _TRIM_PIXMAP_PAD_PX, keep_width: bool = False):
     import fitz
 
     bounds = ink_bounds(pixmap.samples, pixmap.width, pixmap.height, pixmap.n)
@@ -423,7 +489,11 @@ def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.
     document_html = _wrap(dashboard_html, dashboard_id=dashboard_id)
     page_css = CSS(string=_pdf_page_css(dashboard_id))
     pdf_buffer = io.BytesIO()
-    HTML(string=document_html, base_url=_PLUGIN_DIR.resolve().as_uri() + "/").write_pdf(
+    HTML(
+        string=document_html,
+        base_url=_PLUGIN_DIR.resolve().as_uri() + "/",
+        url_fetcher=_restricted_url_fetcher,
+    ).write_pdf(
         pdf_buffer,
         stylesheets=[page_css],
         optimize_images=False,

@@ -3,6 +3,12 @@
   let dropzoneReady = null;
 
   function csrfToken() {
+    if (global.UprVisualsShared && typeof global.UprVisualsShared.csrfToken === "function") {
+      return global.UprVisualsShared.csrfToken();
+    }
+    if (typeof global.getCSRFToken === "function") {
+      return global.getCSRFToken() || "";
+    }
     return (
       document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ||
       document.querySelector('input[name="csrf_token"]')?.value ||
@@ -48,12 +54,50 @@
     };
   }
 
+  let lastModalFocus = null;
+  let modalKeyHandler = null;
+
+  function focusableIn(root) {
+    return Array.from(
+      root.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+    ).filter((el) => !el.disabled && el.offsetParent !== null);
+  }
+
   function setModalOpen(open) {
     const { root } = modalEls();
     if (!root) return;
-    root.classList.toggle("hidden", !open);
-    if (!open) root.setAttribute("hidden", "");
-    else root.removeAttribute("hidden");
+    if (open) {
+      lastModalFocus = document.activeElement;
+      root.classList.remove("hidden");
+      root.removeAttribute("hidden");
+      const focusable = focusableIn(root);
+      (focusable[0] || root).focus();
+      modalKeyHandler = (event) => {
+        if (event.key !== "Tab") return;
+        const items = focusableIn(root);
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      };
+      document.addEventListener("keydown", modalKeyHandler);
+    } else {
+      root.classList.add("hidden");
+      root.setAttribute("hidden", "");
+      if (modalKeyHandler) {
+        document.removeEventListener("keydown", modalKeyHandler);
+        modalKeyHandler = null;
+      }
+      if (lastModalFocus && typeof lastModalFocus.focus === "function") {
+        lastModalFocus.focus();
+      }
+    }
   }
 
   function setModalStatus(text, isError) {
@@ -108,7 +152,10 @@
         });
         return dropzoneApi;
       })
-      .catch(() => null);
+      .catch(() => {
+        setModalStatus("Could not load the file picker. Use a .docx file of 20 MB or less.", true);
+        return null;
+      });
     return dropzoneReady;
   }
 
@@ -137,6 +184,15 @@
     }
     if (!chosen) {
       setModalStatus("Choose a Word document (.docx).", true);
+      return;
+    }
+    const name = (chosen.name || "").toLowerCase();
+    if (!name.endsWith(".docx")) {
+      setModalStatus("Please upload a Word document (.docx)", true);
+      return;
+    }
+    if (chosen.size > 20 * 1024 * 1024) {
+      setModalStatus("File is too large (20 MB maximum)", true);
       return;
     }
     const fmt = format && format.value === "idml" ? "idml" : "pdf";

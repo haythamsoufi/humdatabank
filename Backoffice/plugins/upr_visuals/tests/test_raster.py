@@ -147,6 +147,7 @@ def test_print_css_drops_webkit_scrollbar_and_embed_chrome():
     printed = _print_css()
     assert "::-webkit-scrollbar" not in printed
     assert ".upr-visuals-embed__tabs" not in printed
+    assert ".upr-vis-skel" not in printed
     assert ".upr-dashboard" in printed
     assert 'font-family: "Open Sans", "Segoe UI", sans-serif' in printed
 
@@ -296,6 +297,69 @@ def test_stitch_pixmaps_stacks_pages():
     assert stacked.height == 5
     assert stacked.samples[0] == 10
     assert stacked.samples[-1] == 40
+
+
+@pytest.mark.unit
+def test_stitch_pixmaps_pads_narrower_page():
+    import fitz
+
+    top = fitz.Pixmap(fitz.csRGB, 4, 1, bytes([10] * (4 * 1 * 3)), 0)
+    bottom = fitz.Pixmap(fitz.csRGB, 2, 1, bytes([40] * (2 * 1 * 3)), 0)
+    stacked = _stitch_pixmaps([top, bottom])
+    assert stacked.width == 4
+    assert stacked.height == 2
+    row = stacked.samples[4 * 3 :]
+    assert bytes(row[:6]) == bytes([40] * 6)
+    assert bytes(row[6:]) == bytes([255] * 6)
+
+
+@pytest.mark.unit
+def test_render_png_from_pdf_writes_png(tmp_path):
+    import fitz
+
+    from plugins.upr_visuals.raster import render_png_from_pdf
+
+    doc = fitz.open()
+    page = doc.new_page(width=80, height=60)
+    page.draw_rect(page.rect, color=(1, 0, 0), fill=(1, 0, 0))
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    out = tmp_path / "out.png"
+    render_png_from_pdf(pdf_bytes, out, dashboard_id="combined", scale=2.0)
+    assert out.is_file()
+    assert out.stat().st_size > 0
+    pix = fitz.Pixmap(str(out))
+    assert pix.width > 0
+    assert pix.height > 0
+
+
+@pytest.mark.unit
+def test_render_png_job_file_uses_pdf_path(tmp_path, monkeypatch):
+    pdf_path = tmp_path / "in.pdf"
+    pdf_path.write_bytes(b"%PDF")
+    out = tmp_path / "out.png"
+    job = tmp_path / "job.json"
+    job.write_text(
+        json.dumps(
+            {
+                "pdf_path": str(pdf_path),
+                "output_path": str(out),
+                "dashboard_id": "combined",
+                "scale": 8.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake(pdf_bytes, path, dashboard_id="combined", scale=8.0):
+        assert pdf_bytes == b"%PDF"
+        assert dashboard_id == "combined"
+        assert scale == 8.0
+        Path(path).write_bytes(b"png")
+
+    monkeypatch.setattr(_raster_mod, "render_png_from_pdf", fake)
+    _raster_mod.render_png_job_file(job)
+    assert out.read_bytes() == b"png"
 
 
 class _FakeRect:

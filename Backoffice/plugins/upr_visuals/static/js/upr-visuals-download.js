@@ -291,7 +291,7 @@
       if (!response.ok || !data.job_id) {
         throw new Error(data.error || "Could not generate this report.");
       }
-      const fileResponse = await pollNarrativeJob(aesId, data.job_id, fmt);
+      const fileResponse = await pollExportJob(aesId, data.job_id, fmt);
       const blob = await fileResponse.blob();
       const fallback = fmt === "idml" ? "UPR visuals - InDesign.zip" : "UPR visuals.pdf";
       saveBlob(blob, filenameFromHeader(fileResponse.headers.get("Content-Disposition"), fallback));
@@ -311,7 +311,7 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function pollNarrativeJob(aesId, jobId, fmt) {
+  async function pollExportJob(aesId, jobId, fmt, onStatus) {
     const started = Date.now();
     const statusUrl =
       `/assignment/${encodeURIComponent(aesId)}/visuals/narrative/status?job_id=${encodeURIComponent(jobId)}`;
@@ -321,7 +321,9 @@
       const status = (data.status && data.status.status) || data.status || "";
       const payload = data.status && typeof data.status === "object" ? data.status : {};
       const message = payload.message || "";
-      if (message || payload.progress) {
+      if (typeof onStatus === "function") {
+        onStatus(payload);
+      } else if (message || payload.progress) {
         setBusy(true, message, payload);
       }
       if (!response.ok) {
@@ -347,7 +349,9 @@
     throw new Error(
       fmt === "idml"
         ? "InDesign export is taking too long. Try again in a moment."
-        : "PDF export is taking too long. Try again in a moment."
+        : fmt === "png"
+          ? "PNG export is taking too long. Try again in a moment."
+          : "PDF export is taking too long. Try again in a moment."
     );
   }
 
@@ -378,7 +382,85 @@
     return url;
   }
 
-  function startSimpleDownload(aesId, dashboardId, format) {
+  function downloadStatusEl(box) {
+    if (!box) return null;
+    let el = box.querySelector(".upr-visuals-download__status");
+    if (el) return el;
+    el = document.createElement("span");
+    el.className = "upr-visuals-download__status";
+    el.setAttribute("role", "status");
+    el.hidden = true;
+    box.appendChild(el);
+    return el;
+  }
+
+  function setDownloadBusy(box, button, busy, message, isError) {
+    if (box) box.classList.toggle("is-busy", !!busy || !!isError);
+    if (button) {
+      button.disabled = !!busy;
+      button.setAttribute("aria-busy", busy ? "true" : "false");
+    }
+    const icon = button && button.querySelector("i");
+    if (icon) {
+      icon.classList.toggle("fa-download", !busy);
+      icon.classList.toggle("fa-spinner", !!busy);
+      icon.classList.toggle("fa-spin", !!busy);
+    }
+    const status = downloadStatusEl(box);
+    if (!status) return;
+    const text = message || "";
+    status.textContent = text;
+    status.hidden = !text;
+    status.classList.toggle("is-error", !!isError);
+  }
+
+  async function startInPagePngDownload(aesId, dashboardId, ui) {
+    const box = ui && ui.box;
+    const button = ui && ui.button;
+    if (box && box.classList.contains("is-busy") && button && button.disabled) return;
+    const url = withLang(`/assignment/${encodeURIComponent(aesId)}/png/${encodeURIComponent(dashboardId)}`);
+    setDownloadBusy(box, button, true, "Preparing PNG…");
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
+      });
+      const type = response.headers.get("Content-Type") || "";
+      if (type.includes("text/html")) {
+        window.location.href = url;
+        return;
+      }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.job_id) {
+        throw new Error(data.error || "Could not generate this image.");
+      }
+      const fileResponse = await pollExportJob(aesId, data.job_id, "png", (payload) => {
+        const raw = (payload && payload.message) || "";
+        const label =
+          raw === "Ready" || raw === "Generating PNG…" || raw.indexOf("Waiting for PDF") === 0
+            ? "Preparing PNG…"
+            : raw || "Preparing PNG…";
+        setDownloadBusy(box, button, true, label);
+      });
+      const blob = await fileResponse.blob();
+      saveBlob(blob, filenameFromHeader(fileResponse.headers.get("Content-Disposition"), "visuals.png"));
+      setDownloadBusy(box, button, false, "");
+    } catch (err) {
+      setDownloadBusy(
+        box,
+        button,
+        false,
+        err && err.message ? err.message : "Could not generate this image.",
+        true
+      );
+    }
+  }
+
+  function startSimpleDownload(aesId, dashboardId, format, ui) {
+    if (format === "png") {
+      startInPagePngDownload(aesId, dashboardId, ui);
+      return;
+    }
     if (format === "idml") {
       window.location.href = withLang(`/assignment/${encodeURIComponent(aesId)}/idml`);
       return;
@@ -416,6 +498,7 @@
       const dashboardId = dashboardFn() || "combined";
       setOpen(false);
       if (!aesId) return;
+      if (box && box.classList.contains("is-busy") && button && button.disabled) return;
       if (format === "pdf-narrative") {
         openNarrativeModal("pdf", aesId);
         return;
@@ -424,7 +507,7 @@
         openNarrativeModal("idml", aesId);
         return;
       }
-      startSimpleDownload(aesId, dashboardId, format);
+      startSimpleDownload(aesId, dashboardId, format, { box, button });
     });
     document.addEventListener("click", (event) => {
       if (!box || box.contains(event.target)) return;

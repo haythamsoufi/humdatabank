@@ -120,6 +120,46 @@ def test_export_wait_copy_matches_format():
 
 
 @pytest.mark.unit
+def test_wants_json_export_for_xhr():
+    from flask import Flask
+
+    from plugins.upr_visuals.routes import _wants_json_export
+
+    app = Flask(__name__)
+    with app.test_request_context("/", headers={"X-Requested-With": "XMLHttpRequest"}):
+        assert _wants_json_export() is True
+    with app.test_request_context("/", headers={"Accept": "application/json"}):
+        assert _wants_json_export() is True
+    with app.test_request_context("/", headers={"Accept": "text/html"}):
+        assert _wants_json_export() is False
+
+
+@pytest.mark.unit
+def test_assignment_png_returns_json_job(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr_visuals import routes
+
+    monkeypatch.setattr(routes, "_aes_or_404", lambda aes_id: object())
+    monkeypatch.setattr(routes, "_queue_visual_export", lambda *_a, **_k: "job-png")
+    monkeypatch.setattr(
+        routes,
+        "build_assignment_export_status",
+        lambda job_id: {"job_id": job_id, "status": "queued", "export_format": "png"},
+    )
+    app = Flask(__name__)
+    with app.test_request_context(
+        "/assignment/9/png/combined",
+        headers={"X-Requested-With": "XMLHttpRequest", "Accept": "application/json"},
+    ):
+        response = routes._assignment_png_response(9, "combined")
+    assert response.status_code == 202
+    data = response.get_json()
+    assert data["job_id"] == "job-png"
+    assert data["status"]["status"] == "queued"
+
+
+@pytest.mark.unit
 def test_export_wait_page_has_live_status(monkeypatch):
     from flask import Flask
 

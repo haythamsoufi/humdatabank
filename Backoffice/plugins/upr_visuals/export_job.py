@@ -16,6 +16,7 @@ from plugins.upr_visuals.raster import (
     _BACKOFFICE_ROOT,
     render_pdf_bytes,
     render_png,
+    render_png_from_pdf,
     summarize_child_log,
 )
 
@@ -33,6 +34,15 @@ def run_export_job_file(job_path: str | Path) -> None:
     dashboard_id = str(job.get("dashboard_id") or "combined")
     lang = str(job.get("lang") or "en")
     os.environ["UPR_VISUALS_LANG"] = lang
+
+    if kind == "png_from_pdf":
+        render_png_from_pdf(
+            Path(job["pdf_path"]).read_bytes(),
+            output,
+            dashboard_id=dashboard_id,
+            scale=float(job.get("scale") or PNG_EXPORT_SCALE),
+        )
+        return
 
     if kind == "png":
         render_png(

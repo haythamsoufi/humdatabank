@@ -537,7 +537,12 @@
     }
     const requestedDashboard = previewDashboard;
     previewAesId = aesId;
-    setPreviewStatus(t("previewLoading"));
+    setPreviewStatus("");
+    if (shared.showVisualsSkeleton) {
+      shared.showVisualsSkeleton(els.previewBody, t("previewLoading"));
+    } else {
+      setPreviewStatus(t("previewLoading"));
+    }
     const progressId = shared.newProgressId ? shared.newProgressId() : "";
     const progressLabels = {
       loading: t("previewLoading"),
@@ -547,9 +552,10 @@
     const stopWatch =
       progressId && shared.watchVisualsProgress
         ? shared.watchVisualsProgress(aesId, progressId, (rec, elapsed) => {
-            if (shared.formatVisualsProgress) {
-              setPreviewStatus(shared.formatVisualsProgress(progressLabels, rec, elapsed));
-            }
+            if (!shared.formatVisualsProgress) return;
+            const text = shared.formatVisualsProgress(progressLabels, rec, elapsed);
+            if (shared.showVisualsSkeleton) shared.showVisualsSkeleton(els.previewBody, text);
+            else setPreviewStatus(text);
           })
         : null;
     try {

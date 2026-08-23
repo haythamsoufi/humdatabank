@@ -338,6 +338,16 @@ def _queue_visual_export(aes_id: int, export_format: str, *, dashboard_id: str =
     return job_id
 
 
+def _wants_json_export() -> bool:
+    """Menu clicks fetch JSON; a typed URL still gets the wait page."""
+    if not has_request_context():
+        return False
+    if (request.headers.get("X-Requested-With") or "").lower() == "xmlhttprequest":
+        return True
+    accept = (request.headers.get("Accept") or "").lower()
+    return accept.startswith("application/json")
+
+
 def _export_wait_copy(export_format: str) -> tuple[str, str]:
     fmt = str(export_format or "pdf").strip().lower()
     if fmt == "png":
@@ -422,15 +432,21 @@ def _assignment_pdf_response(aes_id: int, dashboard_id: str, *, download: bool) 
     return _export_wait_response(aes_id, job_id, download=download)
 
 
+def _assignment_png_response(aes_id: int, dashboard_id: str) -> Response:
+    _aes_or_404(aes_id)
+    job_id = _queue_visual_export(aes_id, "png", dashboard_id=dashboard_id)
+    if _wants_json_export():
+        return json_accepted(job_id=job_id, status=build_assignment_export_status(job_id))
+    return _export_wait_response(aes_id, job_id, download=True)
+
+
 @bp.route("/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
 @rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_png(aes_id: int, dashboard_id: str):
     try:
-        _aes_or_404(aes_id)
-        job_id = _queue_visual_export(aes_id, "png", dashboard_id=dashboard_id)
-        return _export_wait_response(aes_id, job_id, download=True)
+        return _assignment_png_response(aes_id, dashboard_id)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
     except HTTPException:

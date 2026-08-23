@@ -72,6 +72,12 @@ _PLAN_REQ_BAR_CLASS = {
     "PNS": "upr-plan-req__bar--pns",
     "IFRC Secretariat": "upr-plan-req__bar--ifrc",
 }
+_PLAN_REQ_ARROW = (
+    "<span class='upr-plan-req__arrow' aria-hidden='true'>"
+    "<svg viewBox='0 0 8 10' width='8' height='10' focusable='false'>"
+    "<path d='M1 1 L7 5 L1 9 Z' fill='#222'/></svg>"
+    "</span>"
+)
 _PLAN_REQ_ORDER = ("HNS", "PNS", "IFRC Secretariat")
 
 
@@ -581,7 +587,7 @@ def _plan_funding(payload: dict[str, Any]) -> str:
             plot = (
                 f"<div class='upr-plan-req__plot'>"
                 f"<span class='upr-plan-req__bar {hatch}' style='width:{pct:.1f}%'></span>"
-                "<span class='upr-plan-req__arrow' aria-hidden='true'></span>"
+                f"{_PLAN_REQ_ARROW}"
                 f"{amount}</div>"
             )
         rows.append(

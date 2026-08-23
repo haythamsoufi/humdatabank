@@ -94,6 +94,34 @@ def test_run_export_job_file_pdf(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_run_export_job_file_png_from_pdf(tmp_path, monkeypatch):
+    pdf = tmp_path / "in.pdf"
+    pdf.write_bytes(b"%PDF-reuse")
+    out = tmp_path / "out.png"
+    job = tmp_path / "job.json"
+    job.write_text(
+        json.dumps(
+            {
+                "kind": "png_from_pdf",
+                "pdf_path": str(pdf),
+                "output_path": str(out),
+                "dashboard_id": "combined",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_from_pdf(pdf_bytes, path, dashboard_id="combined", scale=8.0):
+        assert pdf_bytes == b"%PDF-reuse"
+        assert dashboard_id == "combined"
+        Path(path).write_bytes(b"png-from-pdf")
+
+    monkeypatch.setattr("plugins.upr_visuals.export_job.render_png_from_pdf", fake_from_pdf)
+    run_export_job_file(job)
+    assert out.read_bytes() == b"png-from-pdf"
+
+
+@pytest.mark.unit
 def test_run_export_job_file_idml(tmp_path, monkeypatch):
     html = tmp_path / "in.html"
     html.write_text("<html/>", encoding="utf-8")

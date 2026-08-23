@@ -27,9 +27,8 @@ from plugins.upr_visuals.catalog import (
     DASHBOARD_BY_ID,
 )
 
-# WeasyPrint zoom (PDF units per CSS px), then pixmap 1:1. ~8× A4 (~576 dpi)
-# so text and icons stay sharp when the PNG is zoomed. Do not use
-# get_pixmap(matrix=N) — that only upscales a 72 dpi bake.
+# Rasterize the WeasyPrint PDF with a pixmap matrix. Vector type stays sharp;
+# combined strips are then capped by MAX_PNG_EDGE (Direct3D 16,384 px).
 PNG_EXPORT_SCALE = 8.0
 # Combined All visuals stacks A4 pages into one strip. Paint/GDI+ allows
 # 32,767 px; WinUI Snipping Tool and Photos use Direct3D textures (16,384).
@@ -406,6 +405,7 @@ _PRINT_DROP_SELECTOR_MARKERS = (
     ".upr-visuals-download",
     ".upr-visuals-narrative",
     "#upr-visuals-narrative",
+    ".upr-vis-skel",
 )
 _PRINT_DROP_DECL_RE = re.compile(
     r"(?i)([;{])\s*(?:box-shadow|overflow-x|-webkit-overflow-scrolling|scrollbar-width)\s*:[^;}]*"
@@ -765,6 +765,7 @@ def ink_bounds(
 
 def _trim_pixmap(pixmap, *, pad: int = _TRIM_PIXMAP_PAD_PX, keep_width: bool = False):
     import fitz
+    import numpy as np
 
     bounds = ink_bounds(pixmap.samples, pixmap.width, pixmap.height, pixmap.n)
     if bounds is None:
@@ -779,36 +780,42 @@ def _trim_pixmap(pixmap, *, pad: int = _TRIM_PIXMAP_PAD_PX, keep_width: bool = F
         x1 = pixmap.width - 1
     if x0 == 0 and y0 == 0 and x1 == pixmap.width - 1 and y1 == pixmap.height - 1:
         return pixmap
-    width = x1 - x0 + 1
-    height = y1 - y0 + 1
-    n = pixmap.n
-    stride = pixmap.width * n
-    src = pixmap.samples
-    cropped = b"".join(
-        src[y * stride + x0 * n : y * stride + (x1 + 1) * n] for y in range(y0, y1 + 1)
-    )
+    arr = np.frombuffer(pixmap.samples, dtype=np.uint8).reshape(pixmap.height, pixmap.width, pixmap.n)
+    cropped = np.ascontiguousarray(arr[y0 : y1 + 1, x0 : x1 + 1])
     alpha = 1 if pixmap.alpha else 0
-    return fitz.Pixmap(pixmap.colorspace, width, height, cropped, alpha)
+    return fitz.Pixmap(
+        pixmap.colorspace,
+        cropped.shape[1],
+        cropped.shape[0],
+        cropped.tobytes(),
+        alpha,
+    )
 
 
 def _stitch_pixmaps(pixmaps: list) -> object:
     """Stack A4 pages top-to-bottom so one PNG still holds a multi-page visual."""
     import fitz
 
+    if len(pixmaps) == 1:
+        return pixmaps[0]
     width = max(pixmap.width for pixmap in pixmaps)
     height = sum(pixmap.height for pixmap in pixmaps)
     channels = pixmaps[0].n
     canvas = bytearray([255] * (width * height * channels))
-    top = 0
+    dest_stride = width * channels
+    offset = 0
     for pixmap in pixmaps:
-        src_stride = pixmap.width * channels
-        dest_stride = width * channels
         source = pixmap.samples
-        for row in range(pixmap.height):
-            start = row * src_stride
-            dest = (top + row) * dest_stride
-            canvas[dest : dest + src_stride] = source[start : start + src_stride]
-        top += pixmap.height
+        src_stride = pixmap.width * channels
+        row_bytes = pixmap.height * src_stride
+        if pixmap.width == width:
+            canvas[offset : offset + row_bytes] = source
+        else:
+            for row in range(pixmap.height):
+                start = row * src_stride
+                dest = offset + row * dest_stride
+                canvas[dest : dest + src_stride] = source[start : start + src_stride]
+        offset += pixmap.height * dest_stride
     return fitz.Pixmap(pixmaps[0].colorspace, width, height, bytes(canvas), 0)
 
 
@@ -851,13 +858,14 @@ def _png_render_scale(doc, *, scale: float) -> float:
     return max(0.25, min(float(scale), MAX_PNG_EDGE / height, MAX_PNG_EDGE / width))
 
 
-def render_png(
-    dashboard_html: str,
+def render_png_from_pdf(
+    pdf_bytes: bytes,
     output_path: Path,
     *,
     dashboard_id: str,
     scale: float = PNG_EXPORT_SCALE,
 ) -> Path:
+    """Rasterize an already-rendered visuals PDF. Avoids a second WeasyPrint pass."""
     try:
         import fitz
     except ImportError as exc:
@@ -865,39 +873,26 @@ def render_png(
 
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    # Combined / multi-page: rasterize from a 1× PDF, then scale the pixmap so
-    # the stacked strip stays under MAX_PNG_EDGE (Snipping Tool / D3D 16,384).
-    bake_zoom = 1.0 if _is_portrait_export(dashboard_id) else scale
-    pdf_bytes = render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id, zoom=bake_zoom)
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pixmap = None
     try:
-        if bake_zoom == 1.0:
-            render_scale = _png_render_scale(doc, scale=scale)
-            matrix = fitz.Matrix(render_scale, render_scale)
-        else:
-            render_scale = bake_zoom
-            matrix = None
+        render_scale = _png_render_scale(doc, scale=scale)
+        matrix = fitz.Matrix(render_scale, render_scale)
         logger.info(
-            "UPR PNG %s: %s page(s), scale=%.2f",
+            "UPR PNG %s: %s page(s), scale=%.2f (from PDF)",
             dashboard_id,
             doc.page_count,
             render_scale,
         )
+        pages = []
         for page in doc:
-            page_pix = (
-                page.get_pixmap(matrix=matrix, alpha=False)
-                if matrix is not None
-                else page.get_pixmap(alpha=False)
-            )
+            page_pix = page.get_pixmap(matrix=matrix, alpha=False)
             if doc.page_count > 1:
                 page_pix = _trim_pixmap(page_pix, keep_width=True)
-            if pixmap is None:
-                pixmap = page_pix
-            else:
-                pixmap = _stitch_pixmaps([pixmap, page_pix])
-        if pixmap is None:
+            pages.append(page_pix)
+        if not pages:
             raise RuntimeError(f"PNG render produced no pages for {dashboard_id}")
+        pixmap = _stitch_pixmaps(pages)
         pixmap = _trim_pixmap(pixmap, keep_width=True)
         pixmap.save(str(output_path))
     except MemoryError as exc:
@@ -910,18 +905,38 @@ def render_png(
     return output_path
 
 
+def render_png(
+    dashboard_html: str,
+    output_path: Path,
+    *,
+    dashboard_id: str,
+    scale: float = PNG_EXPORT_SCALE,
+) -> Path:
+    pdf_bytes = render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id, zoom=1.0)
+    return render_png_from_pdf(
+        pdf_bytes, output_path, dashboard_id=dashboard_id, scale=scale
+    )
+
+
 def render_png_job_file(job_path: str | Path) -> None:
     """Child-process entry: read a JSON job file and write the PNG."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("weasyprint").setLevel(logging.ERROR)
     job = json.loads(Path(job_path).read_text(encoding="utf-8"))
+    output = Path(job["output_path"])
+    dashboard_id = str(job.get("dashboard_id") or "combined")
+    scale = float(job.get("scale") or PNG_EXPORT_SCALE)
+    pdf_path = job.get("pdf_path")
+    if pdf_path:
+        render_png_from_pdf(
+            Path(pdf_path).read_bytes(),
+            output,
+            dashboard_id=dashboard_id,
+            scale=scale,
+        )
+        return
     html = Path(job["html_path"]).read_text(encoding="utf-8")
-    render_png(
-        html,
-        Path(job["output_path"]),
-        dashboard_id=str(job["dashboard_id"]),
-        scale=float(job.get("scale") or PNG_EXPORT_SCALE),
-    )
+    render_png(html, output, dashboard_id=dashboard_id, scale=scale)
 
 
 def render_png_isolated(

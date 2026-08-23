@@ -244,6 +244,16 @@ def audit_trail():
                     pass
 
             q = apply_audit_trail_user_activity_noise_filters(q)
+            if not activity_type_filter:
+                from app.services.audit.trail_session_query import (
+                    AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
+                )
+
+                q = q.filter(
+                    ~UserActivityLog.activity_type.in_(
+                        AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES
+                    )
+                )
 
             q = q.order_by(desc(UserActivityLog.timestamp))
             paginated = q.paginate(page=page, per_page=per_page, error_out=False)

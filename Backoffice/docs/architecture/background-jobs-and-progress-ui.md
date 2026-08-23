@@ -387,6 +387,7 @@ Use this as a step-by-step when moving an existing feature to this stack.
 | `docs.bulk_import_system` | `docs_b_bulk_import_system` |
 | `ifrc_api_bulk` | `ifrc_api_bulk` |
 | `fdrs.data_sync` | *(inline modal poll — `data_sync_imputation.html`)* |
+| `upr_visuals.bulk_export` | *(bespoke `#upr-vis-progress` poll — `upr-visuals-admin.js`)* |
 
 ---
 

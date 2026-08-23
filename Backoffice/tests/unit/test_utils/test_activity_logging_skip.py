@@ -17,6 +17,7 @@ from app.utils.activity_logging_skip import (
     should_exclude_from_activity_catalog,
     should_skip_activity_endpoint,
     should_skip_activity_path,
+    should_skip_activity_type,
 )
 
 
@@ -99,6 +100,28 @@ class TestShouldSkipActivityEndpoint:
         # No dot → rsplit gives the full string as suffix
         suffix_ep = list(SKIP_ACTIVITY_ENDPOINT_SUFFIXES)[0]
         assert should_skip_activity_endpoint(suffix_ep) is True
+
+    def test_wizard_and_plumbing_endpoints_skipped(self):
+        from app.utils.activity_logging_skip import SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
+
+        assert should_skip_activity_endpoint("upr_excel_import.analyze") is True
+        assert should_skip_activity_endpoint("upr_visuals.assignment_narrative") is True
+        assert should_skip_activity_endpoint("auth.complete_profile") is True
+        assert "auth.complete_profile" in SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
+        assert should_skip_activity_endpoint("assignment_management.new_assignment") is False
+
+
+class TestShouldSkipActivityType:
+    def test_form_saved_skipped(self):
+        assert should_skip_activity_type("form_saved") is True
+        assert should_skip_activity_type("form_save") is True
+
+    def test_submit_not_skipped(self):
+        assert should_skip_activity_type("form_submitted") is False
+
+    def test_none_and_empty_not_skipped(self):
+        assert should_skip_activity_type(None) is False
+        assert should_skip_activity_type("") is False
 
 
 # ---------------------------------------------------------------------------

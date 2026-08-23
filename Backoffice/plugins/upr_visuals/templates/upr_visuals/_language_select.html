@@ -1,0 +1,28 @@
+{# Searchable export-language picker. Suggested = system-enabled languages. #}
+{% set _current = (current_ui_language()|string|lower|replace('-', '_')).split('_')[0] %}
+{% set _supported = SUPPORTED_LANGUAGES or [] %}
+{% set _all = ALL_LANGUAGES_DISPLAY_NAMES or {} %}
+<label class="upr-visuals-lang" data-upr-lang-wrap>
+    <span class="sr-only">{{ _('Language') }}</span>
+    <select class="upr-visuals-lang__select"
+            data-upr-lang-select
+            data-default-lang="{{ _current or 'en' }}"
+            data-placeholder="{{ _('Language')|forceescape }}"
+            aria-label="{{ _('Language')|forceescape }}">
+        <optgroup label="{{ _('Suggested') }}">
+            {% for code in _supported %}
+                {% set code_base = (code|string|lower|replace('-', '_')).split('_')[0] %}
+                {% set _en_name = LANGUAGE_DISPLAY_NAMES.get(code_base) or _all.get(code_base) or '' %}
+                <option value="{{ code_base }}" data-search-text="{{ (_en_name ~ ' ' ~ code_base)|forceescape }}"{% if code_base == _current %} selected{% endif %}>{{ language_native_name(code_base) or _en_name or code_base.upper() }} ({{ code_base.upper() }})</option>
+            {% endfor %}
+        </optgroup>
+        <optgroup label="{{ _('All languages') }}">
+            {% for code, name in _all.items() %}
+                {% set code_base = (code|string|lower) %}
+                {% if code_base not in _supported %}
+                    <option value="{{ code_base }}" data-search-text="{{ (name ~ ' ' ~ code_base)|forceescape }}"{% if code_base == _current %} selected{% endif %}>{{ language_native_name(code_base) or name or code_base.upper() }} ({{ code_base.upper() }})</option>
+                {% endif %}
+            {% endfor %}
+        </optgroup>
+    </select>
+</label>

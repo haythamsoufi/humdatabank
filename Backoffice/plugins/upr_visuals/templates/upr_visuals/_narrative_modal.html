@@ -34,6 +34,9 @@
     ) %}{% endcall %}
     <p class="excel-io-modal__note" data-upr-narrative-note>
         <i class="fas fa-info-circle" aria-hidden="true"></i>{{ _('Maximum file size: 20 MB') }}
+        <span data-upr-narrative-translate
+              hidden
+              data-template="{{ _('The Word narrative will be translated into {language} after upload, before the report is generated.')|forceescape }}"></span>
     </p>
     <div id="upr-visuals-narrative-progress" class="upr-visuals-narrative-progress" hidden>
         <div class="upr-visuals-narrative-progress__track" aria-hidden="true">

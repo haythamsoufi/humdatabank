@@ -27,6 +27,7 @@ from plugins.upr_visuals.formatters import (
     to_number,
     _year_token,
 )
+from plugins.upr_visuals.i18n import t
 from plugins.upr_visuals.loaders import _load_entries, _load_items
 from plugins.upr_visuals.matrix import (
     _classify_funding_row,
@@ -90,9 +91,9 @@ def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
 
     cover_sources = []
     for key, label in (
-        ("HNS", "Through Host National Society"),
-        ("IFRC Secretariat", "Through the IFRC"),
-        ("PNS", "Through Participating National Societies"),
+        ("HNS", t("Through Host National Society")),
+        ("IFRC Secretariat", t("Through the IFRC")),
+        ("PNS", t("Through Participating National Societies")),
     ):
         val = source_totals[key]
         if key == "PNS" and not val:
@@ -102,23 +103,23 @@ def _plan_financial(items, by_item, period_name: str) -> dict[str, Any]:
                 "entity": key,
                 "label": label,
                 "value": val,
-                "display": format_compact_chf(val) if val else "Not reported",
+                "display": format_compact_chf(val) if val else t("Not reported"),
             }
         )
     network_req = sum(source_totals.values())
     sources = [
         {
             "entity": key,
-            "label": FUNDING_ENTITY_LABELS[key],
+            "label": t(FUNDING_ENTITY_LABELS[key]),
             "value": val,
-            "display": format_chf(val) if val else "Not reported",
+            "display": format_chf(val) if val else t("Not reported"),
         }
         for key, val in source_totals.items()
     ]
     return {
         "ifrc_network": {
             "funding_requirement": network_req,
-            "funding_requirement_display": format_compact_chf(network_req) if network_req else "Not reported",
+            "funding_requirement_display": format_compact_chf(network_req) if network_req else t("Not reported"),
             "funding": None,
             "expenditure": None,
         },
@@ -175,9 +176,9 @@ def _report_financial(
         sources.append(
             {
                 "entity": key,
-                "label": FUNDING_ENTITY_LABELS[key],
+                "label": t(FUNDING_ENTITY_LABELS[key]),
                 "value": val or None,
-                "display": format_compact_chf(val) if val else "Not reported",
+                "display": format_compact_chf(val) if val else t("Not reported"),
             }
         )
 
@@ -201,7 +202,7 @@ def _report_financial(
             breakdown.append(
                 {
                     "code": code,
-                    "label": AREA_LABELS[code],
+                    "label": t(AREA_LABELS[code]),
                     "funding": metrics.get("funding"),
                     "expenditure": metrics.get("expenditure"),
                 }
@@ -237,15 +238,15 @@ def _report_financial(
         "ifrc_network": {
             "funding_requirement": None,
             "funding": funding_total or None,
-            "funding_display": format_compact_chf(funding_total) if funding_total else "Not reported",
+            "funding_display": format_compact_chf(funding_total) if funding_total else t("Not reported"),
             "expenditure": expenditure,
-            "expenditure_display": format_compact_chf(expenditure) if expenditure else "Not reported",
+            "expenditure_display": format_compact_chf(expenditure) if expenditure else t("Not reported"),
         },
         "national_society": {
             "funding": funding_total or None,
-            "funding_display": format_compact_chf(funding_total) if funding_total else "Not reported",
+            "funding_display": format_compact_chf(funding_total) if funding_total else t("Not reported"),
             "expenditure": expenditure,
-            "expenditure_display": format_compact_chf(expenditure) if expenditure else "Not reported",
+            "expenditure_display": format_compact_chf(expenditure) if expenditure else t("Not reported"),
         },
         "sources": sources,
         "years": [],
@@ -285,19 +286,19 @@ def build_report_network_entities(
     return [
         {
             "entity": "Country",
-            "label": "Country",
+            "label": t("Country"),
             "buckets": [
                 _network_bucket("overall", "", funding_requirement=country_req or None),
             ],
         },
         {
             "entity": "IFRC Secretariat",
-            "label": FUNDING_ENTITY_LABELS["IFRC Secretariat"],
+            "label": t(FUNDING_ENTITY_LABELS["IFRC Secretariat"]),
             "buckets": _ifrc_network_buckets(ifrc, actuals=ifrc_actuals),
         },
         {
             "entity": "PNS",
-            "label": FUNDING_ENTITY_LABELS["PNS"],
+            "label": t(FUNDING_ENTITY_LABELS["PNS"]),
             "buckets": [
                 _network_bucket(
                     "overall",
@@ -311,7 +312,7 @@ def build_report_network_entities(
         },
         {
             "entity": "Other sources",
-            "label": FUNDING_ENTITY_LABELS["Other sources"],
+            "label": t(FUNDING_ENTITY_LABELS["Other sources"]),
             "buckets": [
                 _network_bucket(
                     "overall",
@@ -341,7 +342,7 @@ def _ifrc_network_buckets(
     return [
         _network_bucket(
             "longer_term",
-            "Longer-term",
+            t("Longer-term"),
             funding_requirement=longer_val or None,
             funding=longer_act.get("funding"),
             expenditure=longer_act.get("expenditure"),
@@ -349,7 +350,7 @@ def _ifrc_network_buckets(
         ),
         _network_bucket(
             "emergency",
-            "Emergency Operations",
+            t("Emergency Operations"),
             funding_requirement=emergency_val or None,
             funding=emergency_act.get("funding"),
             expenditure=emergency_act.get("expenditure"),
@@ -435,11 +436,11 @@ def _network_bucket(
     include_actuals: bool = False,
     include_expenditure: bool = True,
 ) -> dict[str, Any]:
-    specs = [("funding_requirement", funding_requirement, "Funding requirement")]
+    specs = [("funding_requirement", funding_requirement, t("Funding requirement"))]
     if include_actuals:
-        specs.append(("funding", funding, "Funding"))
+        specs.append(("funding", funding, t("Funding")))
         if include_expenditure:
-            specs.append(("expenditure", expenditure, "Expenditure"))
+            specs.append(("expenditure", expenditure, t("Expenditure")))
     metrics = [_metric_row(metric_key, metric_label, value) for metric_key, value, metric_label in specs]
     return {"key": key, "label": label, "metrics": metrics}
 
@@ -450,7 +451,7 @@ def _metric_row(key: str, label: str, value: float | None) -> dict[str, Any]:
         "key": key,
         "label": label,
         "value": number or 0,
-        "display": format_compact_chf(number) if number else "Not reported",
+        "display": format_compact_chf(number) if number else t("Not reported"),
         "reported": bool(number),
     }
 

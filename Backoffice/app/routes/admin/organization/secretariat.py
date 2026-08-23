@@ -51,7 +51,6 @@ from app.utils.api_responses import (
     require_json_keys,
 )
 from app.utils.error_handling import handle_json_view_exception
-from config.config import Config
 from app.forms.organization import (
     CountryForm,
     NationalSocietyForm,
@@ -71,7 +70,9 @@ from app.forms.organization import (
     secretariat_translation_jobs,
     regional_office_translation_fields,
     stream_entity_translation_events,
-    commit_translation_entity,
+    get_translation_codes,
+    unique_iso_language_codes,
+    iso_language_code,
 )
 from . import bp
 
@@ -480,14 +481,15 @@ def api_get_translation_counts():
         if not entity_type:
             return json_bad_request('Entity type is required')
 
-        # Initialize counts for all languages
-        counts = {}
-        for lang_code in Config.TRANSLATABLE_LANGUAGES:
-            counts[lang_code] = 0
+        # Initialize counts for all languages the UI actually shows
+        counts = {lang_code: 0 for lang_code in get_translation_codes()}
 
-        def _merge_counts(extra_counts: Dict[str, int]):
+        def _merge_counts(extra_counts: dict[str, int]):
             for lang_key, value in extra_counts.items():
-                counts[lang_key] = counts.get(lang_key, 0) + value
+                code = iso_language_code(lang_key)
+                if not code or code == "en":
+                    continue
+                counts[code] = counts.get(code, 0) + value
 
         if entity_type == 'countries':
             _merge_counts(count_missing_name_translations(Country.query.all()))
@@ -540,7 +542,6 @@ def api_auto_translate_organizations():
     """API endpoint to auto-translate organization entities with real-time progress streaming."""
     try:
         from app.services.translation.auto_translator import get_auto_translator
-        from config.config import Config
         import json
 
         data = get_json_safe()
@@ -558,13 +559,9 @@ def api_auto_translate_organizations():
         if not target_languages:
             return json_bad_request('Target languages are required')
 
-        # Normalize target languages to ISO codes (e.g., 'fr_FR' -> 'fr')
-        normalized_languages = []
-        for lang in target_languages:
-            if isinstance(lang, str):
-                lang_norm = lang.split('_', 1)[0].strip().lower()
-                if lang_norm:
-                    normalized_languages.append(lang_norm)
+        # Honor the languages the user selected (ISO base codes, e.g. ru_RU -> ru).
+        # Do not require them to appear in stale Config.TRANSLATABLE_LANGUAGES.
+        normalized_languages = unique_iso_language_codes(target_languages, exclude_en=True)
 
         if not normalized_languages:
             return json_bad_request('Invalid target languages')
@@ -572,169 +569,32 @@ def api_auto_translate_organizations():
         def generate():
             """Generator function that yields HTTP streaming events as translations complete."""
             try:
-                from sqlalchemy.orm.attributes import flag_modified
-
                 auto_translator = get_auto_translator()
-                total_count = 0
-                processed_count = 0
-                success_count = 0
-                error_count = 0
 
                 # Process translations and stream results (combining count and process in one pass)
                 if entity_type == 'countries':
-                    # First pass: calculate total count
-                    countries = Country.query.all()
-                    for country in countries:
-                        if not country.name or not country.name.strip():
-                            continue
-                        translations = country.name_translations or {}
-                        for lang_code in Config.TRANSLATABLE_LANGUAGES:
-                            if lang_code not in normalized_languages:
-                                continue
-                            if lang_code not in translations or not translations.get(lang_code, '').strip():
-                                total_count += 1
-
-                    # Send initial message with total count
-                    yield f"data: {json.dumps({'type': 'start', 'total': total_count})}\n\n"
-
-                    # Second pass: process translations
-                    for country in countries:
-                        if not country.name or not country.name.strip():
-                            continue
-
-                        translations = country.name_translations or {}
-                        for lang_code in Config.TRANSLATABLE_LANGUAGES:
-                            if lang_code not in normalized_languages:
-                                continue
-                            # Check if translation already exists (using short code)
-                            if lang_code in translations and translations.get(lang_code, '').strip():
-                                continue  # Already translated
-
-                            # Translate
-                            translated = auto_translator.translate_text(
-                                country.name,
-                                lang_code,
-                                'en',
-                                translation_service
-                            )
-
-                            if translated:
-                                if not country.name_translations:
-                                    country.name_translations = {}
-                                # Store using short ISO code (e.g., 'fr')
-                                country.name_translations[lang_code] = translated
-                                # CRITICAL: Mark the JSONB field as modified so SQLAlchemy detects the change
-                                flag_modified(country, 'name_translations')
-
-                                result = {
-                                    'success': True,
-                                    'entity_type': 'country',
-                                    'entity_id': country.id,
-                                    'language': lang_code
-                                }
-                                success_count += 1
-                            else:
-                                result = {
-                                    'success': False,
-                                    'entity_type': 'country',
-                                    'entity_id': country.id,
-                                    'language': lang_code,
-                                    'error': 'Translation service returned no result'
-                                }
-                                error_count += 1
-
-                            processed_count += 1
-
-                            # Persist each translation immediately (streaming opts out of auto-commit)
-                            try:
-                                commit_translation_entity(country)
-                            except Exception as e:
-                                request_transaction_rollback()
-                                current_app.logger.error(f"Error committing translation for country {country.id}, language {lang_code}: {e}")
-                                result['success'] = False
-                                result['error'] = GENERIC_ERROR_MESSAGE
-                                error_count += 1
-                                success_count -= 1  # Adjust counts since we marked it as success earlier
-
-                            # Stream the result immediately after commit
-                            yield f"data: {json.dumps({'type': 'progress', 'result': result, 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
+                    for event in stream_entity_translation_events(
+                        Country.query.all(),
+                        'country',
+                        [('name', 'name_translations')],
+                        normalized_languages,
+                        auto_translator,
+                        translation_service,
+                    ):
+                        yield event
+                    return
 
                 elif entity_type == 'national_societies':
-                    # First pass: calculate total count
-                    nss = NationalSociety.query.all()
-                    for ns in nss:
-                        if not ns.name or not ns.name.strip():
-                            continue
-                        translations = ns.name_translations or {}
-                        for lang_code in Config.TRANSLATABLE_LANGUAGES:
-                            if lang_code not in normalized_languages:
-                                continue
-                            if lang_code not in translations or not translations.get(lang_code, '').strip():
-                                total_count += 1
-
-                    # Send initial message with total count
-                    yield f"data: {json.dumps({'type': 'start', 'total': total_count})}\n\n"
-
-                    # Second pass: process translations
-                    for ns in nss:
-                        if not ns.name or not ns.name.strip():
-                            continue
-
-                        translations = ns.name_translations or {}
-                        for lang_code in Config.TRANSLATABLE_LANGUAGES:
-                            if lang_code not in normalized_languages:
-                                continue
-                            # Check if translation already exists (using short code)
-                            if lang_code in translations and translations.get(lang_code, '').strip():
-                                continue
-
-                            translated = auto_translator.translate_text(
-                                ns.name,
-                                lang_code,
-                                'en',
-                                translation_service
-                            )
-
-                            if translated:
-                                if not ns.name_translations:
-                                    ns.name_translations = {}
-                                # Store using short ISO code (e.g., 'fr')
-                                ns.name_translations[lang_code] = translated
-                                # CRITICAL: Mark the JSONB field as modified so SQLAlchemy detects the change
-                                flag_modified(ns, 'name_translations')
-
-                                result = {
-                                    'success': True,
-                                    'entity_type': 'national_society',
-                                    'entity_id': ns.id,
-                                    'language': lang_code
-                                }
-                                success_count += 1
-                            else:
-                                result = {
-                                    'success': False,
-                                    'entity_type': 'national_society',
-                                    'entity_id': ns.id,
-                                    'language': lang_code,
-                                    'error': 'Translation service returned no result'
-                                }
-                                error_count += 1
-
-                            processed_count += 1
-
-                            # Persist each translation immediately (streaming opts out of auto-commit)
-                            try:
-                                commit_translation_entity(ns)
-                            except Exception as e:
-                                request_transaction_rollback()
-                                current_app.logger.error(f"Error committing translation for NS {ns.id}, language {lang_code}: {e}")
-                                result['success'] = False
-                                result['error'] = GENERIC_ERROR_MESSAGE
-                                error_count += 1
-                                success_count -= 1  # Adjust counts since we marked it as success earlier
-
-                            # Stream the result immediately after commit
-                            yield f"data: {json.dumps({'type': 'progress', 'result': result, 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
+                    for event in stream_entity_translation_events(
+                        NationalSociety.query.all(),
+                        'national_society',
+                        [('name', 'name_translations')],
+                        normalized_languages,
+                        auto_translator,
+                        translation_service,
+                    ):
+                        yield event
+                    return
 
                 elif entity_type == 'ns_structure':
                     yield f"data: {json.dumps({'type': 'error', 'message': 'NS Structure entities do not currently support translations. Translation fields need to be added to the models first.'})}\n\n"
@@ -804,9 +664,6 @@ def api_auto_translate_organizations():
                 else:
                     yield f"data: {json.dumps({'type': 'error', 'message': 'Invalid entity type'})}\n\n"
                     return
-
-                # Send completion message (each translation is committed as it completes)
-                yield f"data: {json.dumps({'type': 'complete', 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
 
             except Exception as e:
                 current_app.logger.error(f"Error in translation stream: {e}")

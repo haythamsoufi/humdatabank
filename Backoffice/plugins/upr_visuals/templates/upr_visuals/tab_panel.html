@@ -239,13 +239,14 @@
     {% else %}
         <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-8 text-center text-sm text-gray-600">
             <i class="fas fa-lock text-gray-400 mb-2" aria-hidden="true"></i>
-            <p>{{ _('Bulk PNG generation is available to system managers.') }}</p>
+            <p>{{ _('Bulk export is available to system managers.') }}</p>
         </div>
     {% endif %}
 </div>
 {% if can_manage_upr_visuals %}
 <script nonce="{{ csp_nonce() }}">
 window.UprVisualsAdminConfig = {
+    activeJob: {{ (active_upr_visuals_job or none)|tojson }},
     i18n: {
         selectAssignment: {{ _('Select an assignment')|tojson }},
         selectAssignmentFirst: {{ _('Select an assignment to load dashboards and countries.')|tojson }},
@@ -255,12 +256,17 @@ window.UprVisualsAdminConfig = {
         noCountries: {{ _('This assignment has no countries.')|tojson }},
         noDashboards: {{ _('No dashboards available for this assignment.')|tojson }},
         loadFailed: {{ _('Could not load data. Refresh the page and try again.')|tojson }},
+        serverStopped: {{ _('The server stopped during export. Restart Flask and try again.')|tojson }},
         needAssignment: {{ _('Select an assignment.')|tojson }},
         needDashboards: {{ _('Select at least one dashboard.')|tojson }},
         needCountries: {{ _('Select at least one country.')|tojson }},
         startFailed: {{ _('Could not start export.')|tojson }},
         selectedCount: {{ _('{selected} of {total} selected')|tojson }},
-        generating: {{ _('Generating PNGs…')|tojson }},
+        generating: {{ _('Generating…')|tojson }},
+        generatePng: {{ _('Generate PNGs')|tojson }},
+        generatePdf: {{ _('Generate PDFs')|tojson }},
+        generateIdml: {{ _('Generate InDesign')|tojson }},
+        needFormat: {{ _('Select an export type.')|tojson }},
         queued: {{ _('Queued')|tojson }},
         rendering: {{ _('Rendering…')|tojson }},
         done: {{ _('Export ready. Download the ZIP below.')|tojson }},
@@ -271,6 +277,8 @@ window.UprVisualsAdminConfig = {
         previewNeedAssignment: {{ _('Select an assignment to preview a country visual.')|tojson }},
         previewNeedCountry: {{ _('Select a country to preview.')|tojson }},
         previewLoading: {{ _('Loading preview…')|tojson }},
+        previewTranslating: {{ _('Translating visuals… {done} of {total}')|tojson }},
+        previewRemaining: {{ _('{pending} remaining')|tojson }},
         previewFailed: {{ _('Could not load this preview.')|tojson }},
     }
 };

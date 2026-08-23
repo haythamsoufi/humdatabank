@@ -232,10 +232,15 @@ class TestDetermineActivityType:
         assert _determine_activity_type("POST", "forms.reopen_assignment_xyz") == "form_reopened"
 
     def test_post_validate_endpoint(self):
-        assert _determine_activity_type("POST", "forms.validate_data") == "form_validated"
+        assert _determine_activity_type("POST", "forms.validate_data") == "request"
 
     def test_post_verify_endpoint(self):
-        assert _determine_activity_type("POST", "forms.verify_something") == "form_validated"
+        assert _determine_activity_type("POST", "forms.verify_something") == "request"
+
+    def test_post_excel_validate_is_not_form_validated(self):
+        assert _determine_activity_type(
+            "POST", "excel.validate_upr_country_reporting_import"
+        ) == "request"
 
     def test_post_enter_data_save(self):
         assert _determine_activity_type("POST", "forms.enter_data", {"action": "save"}) == "form_saved"
@@ -1068,7 +1073,7 @@ class TestActivityRegisteredHooks:
 
     def test_after_request_non_deferred_logs_activity(self, app):
         with app.test_request_context("/dashboard", method="POST",
-                                       data={"action": "save"},
+                                       data={"action": "submit"},
                                        content_type="application/x-www-form-urlencoded"):
             g.activity_user_id = 1
             g._auto_txn_managed = False
@@ -1085,6 +1090,26 @@ class TestActivityRegisteredHooks:
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
                 mock_log.assert_called_once()
+                assert resp.status_code == 200
+
+    def test_after_request_skips_draft_save(self, app):
+        with app.test_request_context("/forms/assignment/1", method="POST",
+                                       data={"action": "save"},
+                                       content_type="application/x-www-form-urlencoded"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time() - 0.05
+            with _with_activity_endpoint("forms.view_edit_form"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware.update_session_activity") as mock_touch:
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                mock_log.assert_not_called()
+                mock_touch.assert_called_once_with("action")
                 assert resp.status_code == 200
 
     def test_after_request_non_deferred_page_view_increments_session(self, app):
@@ -1166,7 +1191,7 @@ class TestActivityRegisteredHooks:
 
     def test_after_request_deferred_non_page_view_on_close(self, app):
         with app.test_request_context("/dashboard", method="POST",
-                                       data={"action": "save"},
+                                       data={"action": "submit"},
                                        content_type="application/x-www-form-urlencoded"):
             g.activity_user_id = 1
             g.activity_session_id = "sess-abc"

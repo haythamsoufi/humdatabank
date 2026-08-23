@@ -258,6 +258,7 @@ def test_stored_rate_for_refreshes_when_missing():
 def test_refresh_and_persist_writes_rate():
     aes = MagicMock()
     aes.id = 5
+    aes.completion_rate = 10.0
     metrics = CompletionMetrics(filled_items=3, total_items=4, completion_rate=75.0)
     with patch(
         'app.services.assignments.completion_service.db.session.get',
@@ -270,11 +271,35 @@ def test_refresh_and_persist_writes_rate():
         AssignmentCompletionService,
         'compute_for_assignment',
         return_value=metrics,
-    ), patch('app.services.assignments.completion_service.db.session.flush'):
+    ), patch('app.services.assignments.completion_service.db.session.flush') as flush:
         rate = AssignmentCompletionService.refresh_and_persist(5)
 
     assert rate == 75.0
     assert aes.completion_rate == 75.0
+    flush.assert_called_once()
+
+
+def test_refresh_and_persist_skips_write_when_unchanged():
+    aes = MagicMock()
+    aes.id = 5
+    aes.completion_rate = 95.9
+    metrics = CompletionMetrics(filled_items=47, total_items=49, completion_rate=95.918)
+    with patch(
+        'app.services.assignments.completion_service.db.session.get',
+        return_value=aes,
+    ), patch.object(
+        AssignmentCompletionService,
+        '_template_context_for_aes',
+        return_value=(33, 37),
+    ), patch.object(
+        AssignmentCompletionService,
+        'compute_for_assignment',
+        return_value=metrics,
+    ), patch('app.services.assignments.completion_service.db.session.flush') as flush:
+        rate = AssignmentCompletionService.refresh_and_persist(5)
+
+    assert rate == 95.9
+    flush.assert_not_called()
 
 
 def test_backfill_persisted_rates_batches_updates(app, db_session):

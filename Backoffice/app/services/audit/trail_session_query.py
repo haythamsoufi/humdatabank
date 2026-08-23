@@ -17,6 +17,11 @@ from typing import Any
 from sqlalchemy import and_, or_
 
 from app.models import AdminActionLog, User, UserActivityLog, UserSessionLog
+from app.utils.activity_logging_skip import (
+    SKIP_ACTIVITY_ENDPOINTS,
+    SKIP_ACTIVITY_ENDPOINT_SUFFIXES,
+    SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS,
+)
 from app.utils.datetime_helpers import ensure_utc, utcnow
 
 
@@ -63,12 +68,24 @@ def _admin_row_matches_scope(row, scope: dict[str, Any]) -> bool:
 # Auth events live on Login Logs; do not surface them in the unified audit trail.
 AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES = ('login', 'logout')
 
+# Hidden unless the reviewer explicitly filters for them (same idea as page_view).
+AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = ('page_view', 'form_saved', 'form_save')
+
 
 def apply_audit_trail_user_activity_noise_filters(activity_query):
     """
     Endpoint / type exclusions shared by audit trail UserActivityLog queries.
     Keep in sync with ``analytics.audit_trail``.
     """
+    suffix_noise = or_(
+        *[
+            UserActivityLog.endpoint.like(
+                f"%.{suffix.replace('_', r'\_')}",
+                escape="\\",
+            )
+            for suffix in sorted(SKIP_ACTIVITY_ENDPOINT_SUFFIXES)
+        ]
+    )
     return (
         activity_query.filter(
             ~UserActivityLog.activity_type.in_(AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES)
@@ -76,59 +93,31 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
         .filter(
             ~(
                 (UserActivityLog.activity_type == 'presence_heartbeat')
-                | (UserActivityLog.endpoint == 'forms_api.api_presence_heartbeat')
+                | UserActivityLog.endpoint.in_(tuple(SKIP_ACTIVITY_ENDPOINTS))
                 | (
-                    UserActivityLog.endpoint.in_(
-                        (
-                            'mobile_api.device_heartbeat',
-                            'notifications.device_heartbeat',
-                            'admin_analytics_api.session_logs_list_api',
-                            'admin_analytics_api.session_log_page_view_paths_api',
-                            'admin_analytics_api.login_logs_list_api',
-                            'user_management.api_users_profile_summary',
-                            'main.api_users_profile_summary',
-                            'forms_api.api_presence_active_users',
-                            'utilities.refresh_csrf_token',
-                            'utilities.refresh_csrf_token_get',
-                            'forms_api.api_search_indicator_bank',
-                            'forms_api.get_lookup_list_options',
-                            'forms_api.get_lookup_list_config_ui',
-                            'forms_api.api_render_dynamic_indicator',
-                            'user_management.get_user_entities',
-                            'user_management.get_ns_hierarchy',
-                            'user_management.get_secretariat_hierarchy',
-                            'user_management.get_secretariat_regions_hierarchy',
-                            'ai_v2.chat',
-                            'ai_v2.issue_token',
-                            'ai_documents.list_ifrc_api_documents',
-                            'ai_documents.list_ifrc_api_types',
-                            'ai_ws',
-                            'ai_management.list_system_documents',
-                            'settings.api_check_updates',
-                            'utilities.api_translation_services',
-                        )
-                    )
+                    UserActivityLog.endpoint.in_(tuple(SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS))
+                    & (UserActivityLog.activity_type != "profile_update")
                 )
+                | suffix_noise
             )
         )
         .filter(~(UserActivityLog.activity_type == 'api_usage'))
         .filter(
             ~(
                 (UserActivityLog.endpoint.ilike('/api/ai/documents/workflows%'))
-                | (UserActivityLog.url_path.ilike('/api/ai/documents/workflows%'))
+                | (
+                    UserActivityLog.url_path.isnot(None)
+                    & UserActivityLog.url_path.ilike('/api/ai/documents/workflows%')
+                )
             )
         )
         .filter(
             ~(
                 (UserActivityLog.endpoint.ilike('/api/forms/lookup-lists/reporting_currency/options%'))
-                | (UserActivityLog.url_path.ilike('/api/forms/lookup-lists/reporting_currency/options%'))
-            )
-        )
-        .filter(~(UserActivityLog.endpoint == 'forms.search_matrix_rows'))
-        .filter(
-            ~(
-                (UserActivityLog.endpoint == 'notifications.mark_notifications_read')
-                | (UserActivityLog.endpoint == 'main.mark_notifications_read')
+                | (
+                    UserActivityLog.url_path.isnot(None)
+                    & UserActivityLog.url_path.ilike('/api/forms/lookup-lists/reporting_currency/options%')
+                )
             )
         )
     )
@@ -168,7 +157,7 @@ def count_audit_visible_entries_for_sessions(
     activity_query = (
         UserActivityLog.query.filter(UserActivityLog.timestamp >= global_min)
         .filter(UserActivityLog.timestamp <= global_max)
-        .filter(UserActivityLog.activity_type != 'page_view')
+        .filter(~UserActivityLog.activity_type.in_(AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES))
         .filter(
             or_(
                 UserActivityLog.user_session_id.in_(session_ids),

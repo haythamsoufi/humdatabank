@@ -16,6 +16,7 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "public.health_check",
         "forms_api.api_presence_sync",
         "forms_api.api_presence_leave",
+        "forms_api.api_presence_active_users",
         "main.api_get_notifications_count",
         "main.api_get_notifications",
         "notifications.api_get_notification_count",
@@ -72,8 +73,38 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         # Session keepalive for entry-form users: session['last_activity'] is updated
         # directly inside the handler; this entry only suppresses the UserActivityLog row.
         "forms_api.api_session_keepalive",
+        # Wizard checkpoints and UI plumbing — not reconstructable accountability events.
+        "upr_excel_import.analyze",
+        "upr_excel_import.preview",
+        "upr_excel_import.upload",
+        "upr_excel_import.cancel_job",
+        "upr_visuals.assignment_narrative",
+        "upr_visuals.cancel",
+        "pb_progress.data_source",
+        "pb_progress.mapping_sync",
+        "utilities.preview_indicator_import",
+        "notifications.mark_notifications_unread",
+        "notifications.api_admin_check_user_devices",
+        "notifications.api_view_notification",
+        "admin_communication.api_notification_type_preview",
+        "admin_communication.api_campaign_email_templates_seed",
+        "settings.api_settings_email_templates_seed",
+        "settings.api_settings_email_template_test_send",
+        "settings.api_settings_email_template_preview",
     }
 )
+
+# Automatic middleware should not write these (explicit log_user_activity still does).
+SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
+    {
+        "auth.complete_profile",
+        "auth.account_settings",
+    }
+)
+
+# Draft saves are inferred from form action=save; skip the row, not the endpoint
+# (submit / approve / reopen on the same route must still be recorded).
+SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_saved", "form_save"})
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
 
@@ -96,7 +127,7 @@ def should_skip_activity_endpoint(endpoint: str | None) -> bool:
     """Return True if automatic activity logging should not record this endpoint."""
     if not endpoint:
         return False
-    if endpoint in SKIP_ACTIVITY_ENDPOINTS:
+    if endpoint in SKIP_ACTIVITY_ENDPOINTS or endpoint in SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS:
         return True
     for prefix in SKIP_ACTIVITY_ENDPOINT_PREFIXES:
         if endpoint.startswith(prefix):
@@ -105,6 +136,13 @@ def should_skip_activity_endpoint(endpoint: str | None) -> bool:
     if suffix in SKIP_ACTIVITY_ENDPOINT_SUFFIXES:
         return True
     return False
+
+
+def should_skip_activity_type(activity_type: str | None) -> bool:
+    """Return True if this inferred activity type should not write an audit row."""
+    if not activity_type:
+        return False
+    return activity_type in SKIP_ACTIVITY_TYPES
 
 
 def should_exclude_from_activity_catalog(method: str | None, endpoint: str | None) -> bool:

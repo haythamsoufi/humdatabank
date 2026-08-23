@@ -19,7 +19,9 @@ def _iso_datetime(dt: Any) -> str:
 
 
 def _humanize_activity_label(value: str) -> str:
-    return value.replace('_', ' ').title()
+    from app.utils.audit_trail_labels import activity_type_display_label
+
+    return activity_type_display_label(value)
 
 
 def build_audit_trail_grid_rows(entries: list[dict]) -> list[dict]:
@@ -97,8 +99,14 @@ def build_audit_trail_multiselect_data(
     if filters.get('activity_type'):
         selected_activity = list(filters['activity_type'])
     else:
+        from app.services.audit.trail_session_query import (
+            AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
+        )
+
         selected_activity = [
-            item['value'] for item in unique_activity if item['value'] != 'page_view'
+            item['value']
+            for item in unique_activity
+            if item['value'] not in AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES
         ]
 
     if filters.get('risk_level'):

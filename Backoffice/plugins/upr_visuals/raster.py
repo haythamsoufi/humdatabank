@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import gc
 import io
+import json
 import logging
 import mimetypes
 import os
 import re
+import subprocess
+import sys
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -30,11 +34,15 @@ PNG_EXPORT_SCALE = 8.0
 # Combined All visuals stacks A4 pages into one strip. Paint/GDI+ allows
 # 32,767 px; WinUI Snipping Tool and Photos use Direct3D textures (16,384).
 MAX_PNG_EDGE = 16384
-_IMG_SRC_RE = re.compile(r'(<img\b[^>]*?\bsrc=["\'])([^"\']+)(["\'])', re.IGNORECASE)
+_IMG_SRC_RE = re.compile(
+    r'((?:<img\b[^>]*?\bsrc=|<image\b[^>]*?\b(?:xlink:)?href=)["\'])([^"\']+)(["\'])',
+    re.IGNORECASE,
+)
 _PLUGIN_STATIC_URL = "/upr-visuals/static/"
 _NS_LOGO_API_PREFIX = "/api/v1/uploads/ns/"
 
 _PLUGIN_DIR = Path(__file__).resolve().parent
+_BACKOFFICE_ROOT = _PLUGIN_DIR.parents[1]
 _CSS_PATH = _PLUGIN_DIR / "static" / "css" / "upr-visuals.css"
 _APP_STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "static"
 _APP_FONTS_DIR = _APP_STATIC_DIR / "fonts"
@@ -55,7 +63,7 @@ def _first_font(*paths: Path) -> Path | None:
     return None
 
 
-def _font_face(family: str, path: Path | None, weight: int) -> str | None:
+def _font_face(family: str, path: Path | None, weight: int, *, style: str = "normal") -> str | None:
     if path is None or not path.is_file():
         return None
     # file:// — WeasyPrint 69 often fails to parse huge unquoted data:font URIs.
@@ -63,8 +71,20 @@ def _font_face(family: str, path: Path | None, weight: int) -> str | None:
     return (
         f"@font-face {{ font-family: '{family}'; "
         f"src: url('{uri}') format('truetype'); "
-        f"font-weight: {weight}; font-style: normal; }}"
+        f"font-weight: {weight}; font-style: {style}; }}"
     )
+
+
+def _font_faces(family: str, path: Path | None, weight: int) -> list[str]:
+    """Normal + italic faces. Missing italic TTFs reuse roman so WeasyPrint does not fall to Times."""
+    faces = [_font_face(family, path, weight), _font_face(family, path, weight, style="italic")]
+    return [face for face in faces if face]
+
+
+_EXPORT_BODY_FONT_CSS = (
+    'html, body, table, th, td, p, h1, h2, h3, h4, li {'
+    ' font-family: "Open Sans", "Segoe UI", sans-serif; }'
+)
 
 
 @lru_cache(maxsize=1)
@@ -73,27 +93,46 @@ def _font_css() -> str:
         _APP_FONTS_DIR,
         _PLUGIN_DIR.parents[0] / "pb_progress" / "visuals" / "report" / "fonts",
     )
-    faces = [
-        _font_face("Open Sans", _first_font(*(folder / "OpenSans-Regular.ttf" for folder in open_sans_dirs)), 400),
-        _font_face("Open Sans", _first_font(*(folder / "OpenSans-Bold.ttf" for folder in open_sans_dirs)), 700),
-        _font_face(
+    faces: list[str] = []
+    faces.extend(
+        _font_faces("Open Sans", _first_font(*(folder / "OpenSans-Regular.ttf" for folder in open_sans_dirs)), 400)
+    )
+    faces.extend(
+        _font_faces("Open Sans", _first_font(*(folder / "OpenSans-Bold.ttf" for folder in open_sans_dirs)), 700)
+    )
+    tajawal_regular = _first_font(
+        _PLUGIN_FONTS_DIR / "Tajawal-Regular.ttf",
+        _APP_FONTS_DIR / "Tajawal-Regular.ttf",
+        *(folder / "Tajawal-Regular.ttf" for folder in open_sans_dirs),
+    )
+    tajawal_bold = _first_font(
+        _PLUGIN_FONTS_DIR / "Tajawal-Bold.ttf",
+        _APP_FONTS_DIR / "Tajawal-Bold.ttf",
+        *(folder / "Tajawal-Bold.ttf" for folder in open_sans_dirs),
+    )
+    faces.extend(_font_faces("Tajawal", tajawal_regular, 400))
+    faces.extend(_font_faces("Tajawal", tajawal_bold, 700))
+    faces.extend(
+        _font_faces(
             "Montserrat",
             _first_font(
                 _PLUGIN_FONTS_DIR / "Montserrat-Regular.ttf",
                 _APP_FONTS_DIR / "Montserrat-Regular.ttf",
             ),
             400,
-        ),
-        _font_face(
+        )
+    )
+    faces.extend(
+        _font_faces(
             "Montserrat",
             _first_font(
                 _PLUGIN_FONTS_DIR / "Montserrat-Bold.ttf",
                 _APP_FONTS_DIR / "Montserrat-Bold.ttf",
             ),
             700,
-        ),
-    ]
-    return "\n".join(face for face in faces if face)
+        )
+    )
+    return "\n".join(faces)
 
 
 _PRINT_DROP_AT = ("@media", "@keyframes", "@-webkit-keyframes")
@@ -136,18 +175,255 @@ _PORTRAIT_KEEP_TOGETHER_CSS = (
     ".upr-support-table .upr-ns { white-space: normal; overflow-wrap: anywhere; }"
     ".upr-support-th--plan span { writing-mode: horizontal-tb; transform: none; }"
     ".upr-reach-row{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; }"
+    ".upr-combined-body{ padding-left:0; padding-right:0; }"
+    ".upr-combined-section{ padding-left:8mm; padding-right:8mm; box-sizing:border-box; }"
+    ".upr-combined-section--reach{ padding-left:0; padding-right:0; }"
     ".upr-combined-section > .upr-block--reach{"
-    " margin-left:-8mm; margin-right:-8mm; width:calc(100% + 16mm); max-width:none;"
+    " margin-left:0; margin-right:0; width:100%; max-width:none;"
     " padding:1.15rem 8mm 1.35rem; }"
-    ".upr-reach-icon,.upr-reach-icon--img{ width:3.35rem; height:3.35rem; }"
-    ".upr-reach-icon--img img{ width:2.05rem; height:2.05rem; }"
+    ".upr-reach-icon,.upr-reach-icon--img,.upr-reach-icon svg{ width:56px; height:56px; }"
     ".upr-fin-hero,.upr-fin-grid{ width:100%; max-width:100%; }"
     ".upr-fin-grid{ table-layout:fixed; border-collapse:collapse; }"
     ".upr-fin-grid--with-sources .upr-fin-col-overview-plot{ width:22%; }"
-    ".upr-fin-grid .upr-bar-label{ white-space:nowrap; }"
+    ".upr-fin-grid .upr-bar-label{ white-space:normal; overflow-wrap:anywhere; overflow:hidden; }"
+    ".upr-fin-col-source-plot{ min-width:6em; }"
     ".upr-bar-track{ display:flex; flex-wrap:nowrap; align-items:center; width:100%; white-space:nowrap; }"
     ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
 )
+
+
+def _rtl_print_css(lang: str | None = None) -> str:
+    """WeasyPrint-safe RTL overrides.
+
+    Financial tables stay ``direction: ltr`` + ``table-layout: fixed``.
+    WeasyPrint reverses RTL table columns and then paints rowspan/Arabic
+    into neighbouring cells. Hero and network rows emit plot-first in HTML
+    so labels sit on the right; tracks pack to the right and values use
+    ``order: -1`` so the number sits to the left of the bar. Unreported
+    values are right-aligned in the plot so they sit next to those labels.
+
+    Indicator ``.upr-bars`` tables are RTL so labels sit on the right;
+    tracks stay LTR and pack to the right so bars grow toward those labels.
+    Values use ``order: -1`` so the number sits to the left of the bar.
+
+    Reach icons cannot use CSS ``border-radius`` + ``overflow: hidden`` —
+    WeasyPrint clips those rings into crescents. Rings are SVG; cells stay visible.
+    """
+    from plugins.upr_visuals.i18n import is_rtl
+
+    if not is_rtl(lang):
+        return ""
+    return """
+html[dir="rtl"] .upr-fin-grid,
+html[dir="rtl"] .upr-fin-net {
+  direction: ltr;
+  table-layout: fixed;
+}
+html[dir="rtl"] .upr-bars {
+  direction: rtl;
+  table-layout: fixed;
+}
+html[dir="rtl"] .upr-reach-row,
+html[dir="rtl"] .upr-support-table,
+html[dir="rtl"] .upr-source-table,
+html[dir="rtl"] .upr-year-table {
+  direction: ltr;
+  table-layout: fixed;
+}
+html[dir="rtl"] .upr-num,
+html[dir="rtl"] .upr-bar-value,
+html[dir="rtl"] .upr-support-total {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+html[dir="rtl"] .upr-amt {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.25em;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+html[dir="rtl"] .upr-support-table tbody .upr-num {
+  text-align: right;
+  overflow: hidden;
+}
+html[dir="rtl"] .upr-support-table tbody td.upr-num .upr-amt {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+}
+html[dir="rtl"] .upr-support-table td.upr-support-total {
+  text-align: right;
+  overflow: visible;
+}
+html[dir="rtl"] .upr-support-total .upr-amt {
+  display: flex;
+  width: 100%;
+  justify-content: flex-end;
+}
+html[dir="rtl"] .upr-support-col-ns { width: 22%; }
+html[dir="rtl"] .upr-support-col-num { width: 16%; }
+html[dir="rtl"] .upr-support-col-dot { width: 9%; }
+html[dir="rtl"] .upr-fin-col-overview-label { width: 16%; }
+html[dir="rtl"] .upr-fin-col-overview-plot { width: 28%; }
+html[dir="rtl"] .upr-fin-grid--with-sources .upr-fin-col-overview-plot { width: 28%; }
+html[dir="rtl"] .upr-fin-col-source-label { width: 28%; }
+html[dir="rtl"] .upr-fin-col-source-plot { width: 28%; }
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-label,
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-label { width: 50%; }
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-plot,
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-plot { width: 50%; }
+html[dir="rtl"] .upr-fin-grid--half td.upr-bar-label,
+html[dir="rtl"] .upr-fin-hero .upr-bar-row .upr-bar-label {
+  padding-inline-start: 0.5em;
+  padding-inline-end: 0;
+}
+html[dir="rtl"] .upr-fin-grid--half td.upr-bar-plot,
+html[dir="rtl"] .upr-fin-hero .upr-bar-row .upr-bar-plot {
+  padding-inline-end: 0.5em;
+  padding-inline-start: 0;
+  text-align: right;
+}
+html[dir="rtl"] .upr-fin-grid--half .upr-bar-yes,
+html[dir="rtl"] .upr-fin-grid--half .upr-not-reported,
+html[dir="rtl"] .upr-fin-net .upr-bar-yes,
+html[dir="rtl"] .upr-fin-net .upr-not-reported,
+html[dir="rtl"] .upr-bars .upr-bar-yes {
+  display: block;
+  text-align: right;
+}
+html[dir="rtl"] .upr-fin-net-col-entity { width: 22%; }
+html[dir="rtl"] .upr-fin-net-col-bucket { width: 16%; }
+html[dir="rtl"] .upr-fin-net-col-metric { width: 16%; }
+html[dir="rtl"] .upr-fin-net-col-plot { width: 46%; }
+html[dir="rtl"] .upr-fin-grid .upr-bar-label,
+html[dir="rtl"] .upr-fin-hero .upr-bar-label,
+html[dir="rtl"] .upr-bars .upr-bar-label,
+html[dir="rtl"] .upr-fin-net__entity,
+html[dir="rtl"] .upr-fin-net__bucket {
+  white-space: normal;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: none;
+  min-width: 0;
+}
+html[dir="rtl"] .upr-bar-plot,
+html[dir="rtl"] .upr-fin-net__plot {
+  overflow: hidden;
+}
+html[dir="rtl"] .upr-bar-plot .upr-bar-yes,
+html[dir="rtl"] .upr-fin-net__plot .upr-bar-yes {
+  white-space: nowrap;
+}
+html[dir="rtl"] .upr-bar-track {
+  direction: ltr;
+}
+html[dir="rtl"] .upr-bars .upr-bar-track,
+html[dir="rtl"] .upr-fin-net .upr-bar-track {
+  justify-content: flex-end;
+}
+html[dir="rtl"] .upr-bars .upr-bar-value,
+html[dir="rtl"] .upr-fin-net .upr-bar-value {
+  order: -1;
+}
+html[dir="rtl"] .upr-fin-grid .upr-bar-track {
+  justify-content: flex-end;
+}
+html[dir="rtl"] .upr-fin-grid .upr-bar-value {
+  order: -1;
+}
+html[dir="rtl"] .upr-doc-header__titles,
+html[dir="rtl"] .upr-doc-header__subtitle,
+html[dir="rtl"] .upr-doc-header__country,
+html[dir="rtl"] .upr-fin-grid th,
+html[dir="rtl"] .upr-fin-grid td.upr-bar-label,
+html[dir="rtl"] .upr-fin-net__entity,
+html[dir="rtl"] .upr-fin-net__bucket,
+html[dir="rtl"] .upr-fin-net__metric {
+  text-align: right;
+}
+html[dir="rtl"] .upr-bars .upr-bar-label,
+html[dir="rtl"] .upr-block--bars .upr-bar-label,
+html[dir="rtl"] .upr-block--emergency .upr-bar-label {
+  text-align: left;
+}
+html[dir="rtl"] .upr-block__title,
+html[dir="rtl"] .upr-block__title--center,
+html[dir="rtl"] .upr-block__subtitle--center,
+html[dir="rtl"] .upr-fin-unit,
+html[dir="rtl"] .upr-fin-ns {
+  text-align: center;
+}
+html[dir="rtl"] .upr-block--support .upr-block__title,
+html[dir="rtl"] .upr-block--support .upr-kpi,
+html[dir="rtl"] .upr-block--support .upr-kpi__label,
+html[dir="rtl"] .upr-block--support .upr-kpi__value {
+  text-align: center;
+}
+html[dir="rtl"] .upr-block--support .upr-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+html[dir="rtl"] .upr-block--support .upr-kpi__icon,
+html[dir="rtl"] .upr-block--support .upr-kpi__icon--img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+html[dir="rtl"] .upr-block--support .upr-kpi__value {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+html[dir="rtl"] .upr-reach-row {
+  direction: ltr;
+}
+html[dir="rtl"] .upr-reach-label,
+html[dir="rtl"] .upr-reach-icon-wrap,
+html[dir="rtl"] .upr-reach-value,
+html[dir="rtl"] .upr-reach-band--icons td {
+  text-align: center;
+  overflow: visible;
+}
+html[dir="rtl"] .upr-reach-icon-wrap {
+  min-height: 4.25rem;
+  padding: 0.35rem 0.15rem 0.2rem;
+}
+html[dir="rtl"] .upr-reach-icon,
+html[dir="rtl"] .upr-reach-icon--img,
+html[dir="rtl"] .upr-reach-icon svg {
+  overflow: visible;
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin-left: auto;
+  margin-right: auto;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+html[dir="rtl"] .upr-fin-hero-split {
+  direction: rtl;
+}
+html[dir="rtl"] .upr-fin-hero-split .upr-fin-grid {
+  direction: ltr;
+}
+html[dir="rtl"] .upr-reach-divider {
+  width: 2px;
+  min-width: 2px;
+  max-width: 2px;
+  padding: 0;
+  border: none;
+  background: #011e41;
+}
+html[dir="rtl"] .upr-reach-band--labels .upr-reach-divider {
+  background: transparent;
+  border: none;
+}
+"""
 
 
 def _css_for_print(css: str) -> str:
@@ -180,7 +456,85 @@ def _css_for_print(css: str) -> str:
                     break
             j += 1
         i = j
+    return _strip_print_unsupported(_drop_unused_print_rules("".join(out)))
+
+
+_PRINT_DROP_SELECTOR_MARKERS = (
+    "::-webkit-",
+    "::-moz-",
+    ".upr-visuals-embed",
+    ".upr-visuals-lang",
+    ".upr-visuals-download",
+    ".upr-visuals-narrative",
+    "#upr-visuals-narrative",
+)
+_PRINT_DROP_DECL_RE = re.compile(
+    r"(?i)([;{])\s*(?:box-shadow|overflow-x|-webkit-overflow-scrolling|scrollbar-width)\s*:[^;}]*"
+)
+
+
+def _is_print_chrome_selector(selector: str) -> bool:
+    return any(marker in selector for marker in _PRINT_DROP_SELECTOR_MARKERS)
+
+
+def _drop_unused_print_rules(css: str) -> str:
+    """Drop UI-only selectors. Keep siblings in the same rule (e.g. ``.upr-dashboard``)."""
+    out: list[str] = []
+    i = 0
+    while i < len(css):
+        brace = css.find("{", i)
+        if brace < 0:
+            out.append(css[i:])
+            break
+        raw_selector = css[i:brace]
+        depth = 0
+        j = brace
+        while j < len(css):
+            if css[j] == "{":
+                depth += 1
+            elif css[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    j += 1
+                    break
+            j += 1
+        parts = raw_selector.split(",")
+        kept = [part for part in parts if part.strip() and not _is_print_chrome_selector(part)]
+        if not kept:
+            i = j
+            continue
+        if len(kept) != len(parts):
+            lead_len = len(raw_selector) - len(raw_selector.lstrip())
+            rebuilt = ",".join(kept)
+            if lead_len and not rebuilt[:1].isspace():
+                rebuilt = raw_selector[:lead_len] + rebuilt.lstrip()
+            out.append(rebuilt + css[brace:j])
+        else:
+            out.append(css[i:j])
+        i = j
     return "".join(out)
+_WEASYPRINT_IGNORED_RE = re.compile(r"^Ignored `.+` at \d+:\d+, .+$")
+_OWN_CHILD_LINE_RE = re.compile(r"^(?:DEBUG|INFO|WARNING|ERROR) |^UPR (?:PNG|export) ")
+
+
+def _strip_print_unsupported(css: str) -> str:
+    """Drop declarations WeasyPrint warns about and does not paint."""
+    return _PRINT_DROP_DECL_RE.sub(r"\1", css)
+
+
+def summarize_child_log(text: str) -> str:
+    """Keep unexpected child output; drop WeasyPrint CSS noise and our own progress lines."""
+    keep: list[str] = []
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _WEASYPRINT_IGNORED_RE.match(stripped):
+            continue
+        if _OWN_CHILD_LINE_RE.match(stripped):
+            continue
+        keep.append(line)
+    return "\n".join(keep).strip()
 
 
 @lru_cache(maxsize=1)
@@ -205,7 +559,10 @@ def _pdf_page_css(dashboard_id: str) -> str:
     portrait = _is_portrait_export(dashboard_id)
     orientation = "portrait" if portrait else "landscape"
     margin = A4_COMBINED_MARGIN_MM if portrait else A4_MARGIN_MM
+    from plugins.upr_visuals.i18n import current_export_language
+
     keep_together = _PORTRAIT_KEEP_TOGETHER_CSS if portrait else ""
+    rtl_print = _rtl_print_css(current_export_language())
     if portrait:
         page = (
             f"@page {{ size: A4 portrait; margin: {A4_COMBINED_FOLLOWING_MARGIN_MM}mm 0; }}\n"
@@ -224,7 +581,9 @@ def _pdf_page_css(dashboard_id: str) -> str:
     return (
         page
         + "html, body { margin: 0; padding: 0; background: #fff; }\n"
+        + f"{_EXPORT_BODY_FONT_CSS}\n"
         f"{keep_together}"
+        f"{rtl_print}"
     )
 
 
@@ -339,17 +698,33 @@ def _rewrite_export_images(html: str) -> str:
     return _IMG_SRC_RE.sub(_replace, html)
 
 
-def _wrap(dashboard_html: str, width: int | None = None, *, dashboard_id: str = "") -> str:
+def _wrap(
+    dashboard_html: str,
+    width: int | None = None,
+    *,
+    dashboard_id: str = "",
+    title: str = "",
+) -> str:
+    from html import escape
+
+    from plugins.upr_visuals.i18n import current_export_language, rtl_css, rtl_document_attrs
+
     keep_together = _PORTRAIT_KEEP_TOGETHER_CSS if _is_portrait_export(dashboard_id) else ""
+    lang = current_export_language()
+    attrs = rtl_document_attrs(lang)
+    title_html = f"<title>{escape((title or '').strip())}</title>" if (title or "").strip() else ""
     return (
-        "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+        f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'><head><meta charset='utf-8'>"
+        f"{title_html}"
         "<style>"
-        f"{_font_css()}\n{_print_css()}\n"
+        f"{_font_css()}\n{_print_css()}\n{rtl_css(lang)}\n"
         "html, body { margin: 0; padding: 0; background: #fff; }"
+        f"{_EXPORT_BODY_FONT_CSS}"
         ".upr-dashboard { width: 100%; max-width: none; }"
         ".upr-vis-page { width: auto; max-width: none; min-height: 0; "
-        "padding: 0; margin: 0; box-shadow: none; }"
+        "padding: 0; margin: 0; }"
         f"{keep_together}"
+        f"{_rtl_print_css(lang)}"
         "</style></head><body>"
         f"{_rewrite_export_images(dashboard_html)}</body></html>"
     )
@@ -479,14 +854,21 @@ def _stitch_pixmaps(pixmaps: list) -> object:
     return fitz.Pixmap(pixmaps[0].colorspace, width, height, bytes(canvas), 0)
 
 
-def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.0) -> bytes:
+def render_pdf_bytes(
+    dashboard_html: str,
+    *,
+    dashboard_id: str,
+    zoom: float = 1.0,
+    title: str = "",
+    full_fonts: bool = False,
+) -> bytes:
     try:
         from weasyprint import CSS, HTML
     except ImportError as exc:
         raise RuntimeError("WeasyPrint is required for UPR visual export.") from exc
 
     _page_size(dashboard_id)
-    document_html = _wrap(dashboard_html, dashboard_id=dashboard_id)
+    document_html = _wrap(dashboard_html, dashboard_id=dashboard_id, title=title)
     page_css = CSS(string=_pdf_page_css(dashboard_id))
     pdf_buffer = io.BytesIO()
     HTML(
@@ -497,7 +879,7 @@ def render_pdf_bytes(dashboard_html: str, *, dashboard_id: str, zoom: float = 1.
         pdf_buffer,
         stylesheets=[page_css],
         optimize_images=False,
-        full_fonts=True,
+        full_fonts=full_fonts,
         hinting=True,
         zoom=zoom,
     )
@@ -530,18 +912,131 @@ def render_png(
     bake_zoom = 1.0 if _is_portrait_export(dashboard_id) else scale
     pdf_bytes = render_pdf_bytes(dashboard_html, dashboard_id=dashboard_id, zoom=bake_zoom)
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    pixmap = None
     try:
         if bake_zoom == 1.0:
             render_scale = _png_render_scale(doc, scale=scale)
             matrix = fitz.Matrix(render_scale, render_scale)
-            pixmaps = [page.get_pixmap(matrix=matrix, alpha=False) for page in doc]
         else:
-            pixmaps = [page.get_pixmap(alpha=False) for page in doc]
-        if len(pixmaps) > 1:
-            pixmaps = [_trim_pixmap(pixmap, keep_width=True) for pixmap in pixmaps]
-        pixmap = pixmaps[0] if len(pixmaps) == 1 else _stitch_pixmaps(pixmaps)
+            render_scale = bake_zoom
+            matrix = None
+        logger.info(
+            "UPR PNG %s: %s page(s), scale=%.2f",
+            dashboard_id,
+            doc.page_count,
+            render_scale,
+        )
+        for page in doc:
+            page_pix = (
+                page.get_pixmap(matrix=matrix, alpha=False)
+                if matrix is not None
+                else page.get_pixmap(alpha=False)
+            )
+            if doc.page_count > 1:
+                page_pix = _trim_pixmap(page_pix, keep_width=True)
+            if pixmap is None:
+                pixmap = page_pix
+            else:
+                pixmap = _stitch_pixmaps([pixmap, page_pix])
+        if pixmap is None:
+            raise RuntimeError(f"PNG render produced no pages for {dashboard_id}")
         pixmap = _trim_pixmap(pixmap, keep_width=True)
         pixmap.save(str(output_path))
+    except MemoryError as exc:
+        logger.exception("UPR PNG out of memory for %s", dashboard_id)
+        raise RuntimeError(f"PNG render ran out of memory for {dashboard_id}") from exc
     finally:
+        pixmap = None
         doc.close()
+        gc.collect()
+    return output_path
+
+
+def render_png_job_file(job_path: str | Path) -> None:
+    """Child-process entry: read a JSON job file and write the PNG."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("weasyprint").setLevel(logging.ERROR)
+    job = json.loads(Path(job_path).read_text(encoding="utf-8"))
+    html = Path(job["html_path"]).read_text(encoding="utf-8")
+    render_png(
+        html,
+        Path(job["output_path"]),
+        dashboard_id=str(job["dashboard_id"]),
+        scale=float(job.get("scale") or PNG_EXPORT_SCALE),
+    )
+
+
+def render_png_isolated(
+    dashboard_html: str,
+    output_path: Path,
+    *,
+    dashboard_id: str,
+    scale: float = PNG_EXPORT_SCALE,
+    timeout: float = 120.0,
+) -> Path:
+    """Rasterize in a child process so a Cairo/PyMuPDF abort cannot kill Flask."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    job_path = output_path.with_suffix(output_path.suffix + ".job.json")
+    html_path = output_path.with_suffix(output_path.suffix + ".html")
+    html_path.write_text(dashboard_html, encoding="utf-8")
+    job_path.write_text(
+        json.dumps(
+            {
+                "html_path": str(html_path),
+                "output_path": str(output_path),
+                "dashboard_id": dashboard_id,
+                "scale": scale,
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    pythonpath = os.pathsep.join(
+        path for path in (str(_BACKOFFICE_ROOT), env.get("PYTHONPATH", "")) if path
+    )
+    env["PYTHONPATH"] = pythonpath
+    cmd = [
+        sys.executable,
+        "-c",
+        "from plugins.upr_visuals.raster import render_png_job_file; "
+        "render_png_job_file(__import__('sys').argv[1])",
+        str(job_path),
+    ]
+    logger.info("UPR PNG start %s", dashboard_id)
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=str(_BACKOFFICE_ROOT),
+            env=env,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+    except subprocess.TimeoutExpired as exc:
+        logger.error("UPR PNG timed out after %.0fs: %s", timeout, dashboard_id)
+        raise TimeoutError(f"PNG render timed out for {dashboard_id}") from exc
+    finally:
+        for path in (job_path, html_path):
+            try:
+                path.unlink()
+            except OSError:
+                pass
+    child_log = ((completed.stderr or "") + (completed.stdout or "")).strip()
+    useful = summarize_child_log(child_log)
+    if useful:
+        logger.warning("UPR PNG %s child:\n%s", dashboard_id, useful[-4000:])
+    if completed.returncode:
+        logger.error(
+            "UPR PNG renderer crashed for %s (exit %s)",
+            dashboard_id,
+            completed.returncode,
+        )
+        raise RuntimeError(
+            useful or child_log or f"PNG renderer crashed (exit {completed.returncode})"
+        )
+    if not output_path.is_file() or output_path.stat().st_size <= 0:
+        raise RuntimeError(f"PNG renderer produced no file for {dashboard_id}")
+    logger.info("UPR PNG done %s (%s bytes)", dashboard_id, output_path.stat().st_size)
     return output_path

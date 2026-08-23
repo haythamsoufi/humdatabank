@@ -8,7 +8,7 @@ from pathlib import Path
 from plugins.upr_visuals.errors import UprVisualsError
 from plugins.upr_visuals.idml.constants import _STYLE_RUNS
 from plugins.upr_visuals.idml.narrative_style import folio_label, folio_text
-from plugins.upr_visuals.raster import _PLUGIN_DIR, _PLUGIN_FONTS_DIR, _font_css
+from plugins.upr_visuals.raster import _PLUGIN_DIR, _PLUGIN_FONTS_DIR, _font_css, _restricted_url_fetcher
 
 _APP_FONTS_DIR = Path(__file__).resolve().parents[3] / "app" / "static" / "fonts"
 
@@ -83,8 +83,11 @@ def _table_html(rows: list[list[list[dict]]]) -> str:
 
 
 def _narrative_css() -> str:
+    from plugins.upr_visuals.i18n import current_export_language, rtl_css
+
     return f"""
 {_font_css()}
+{rtl_css(current_export_language())}
 @page {{
   size: A4;
   margin: 32pt 34pt 40pt 34pt;
@@ -164,26 +167,35 @@ html, body {{
 """
 
 
-def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "") -> bytes:
+def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "", full_fonts: bool = False) -> bytes:
     try:
         from weasyprint import CSS, HTML
     except ImportError as exc:
         raise UprVisualsError("WeasyPrint is required for UPR visual export.") from exc
 
+    from plugins.upr_visuals.i18n import current_export_language, rtl_document_attrs
+
     _ = folio
+    lang = current_export_language()
+    attrs = rtl_document_attrs(lang)
     body = "".join(_para_html(para) for para in styled)
     html = (
-        "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'></head>"
+        f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'>"
+        f"<head><meta charset='utf-8'></head>"
         f"<body>{body}</body></html>"
     )
     from io import BytesIO
 
     buffer = BytesIO()
-    HTML(string=html, base_url=_PLUGIN_DIR.resolve().as_uri() + "/").write_pdf(
+    HTML(
+        string=html,
+        base_url=_PLUGIN_DIR.resolve().as_uri() + "/",
+        url_fetcher=_restricted_url_fetcher,
+    ).write_pdf(
         buffer,
         stylesheets=[CSS(string=_narrative_css())],
         optimize_images=False,
-        full_fonts=True,
+        full_fonts=full_fonts,
         hinting=True,
     )
     return buffer.getvalue()
@@ -199,23 +211,72 @@ def _montserrat_regular() -> Path | None:
     return None
 
 
+def _folio_has_rtl(text: str) -> bool:
+    return any("\u0590" <= char <= "\u08ff" or "\ufb1d" <= char <= "\ufefc" for char in text)
+
+
+def _folio_font_path(*, rtl: bool) -> Path | None:
+    """Montserrat for Latin folios; Tajawal / system Arabic fonts for RTL."""
+    import os
+
+    candidates: list[Path] = []
+    if rtl:
+        windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        candidates.extend(
+            [
+                _PLUGIN_FONTS_DIR / "Tajawal-Regular.ttf",
+                _APP_FONTS_DIR / "Tajawal-Regular.ttf",
+                windir / "Fonts" / "arial.ttf",
+                windir / "Fonts" / "arialuni.ttf",
+                windir / "Fonts" / "tahoma.ttf",
+                windir / "Fonts" / "segoeui.ttf",
+                Path("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf"),
+                Path("/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf"),
+                Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            ]
+        )
+    candidates.extend(
+        [
+            _PLUGIN_FONTS_DIR / "Montserrat-Regular.ttf",
+            _APP_FONTS_DIR / "Montserrat-Regular.ttf",
+        ]
+    )
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
 def apply_report_folios(out, *, folio: str = "") -> None:
     """Stamp ``{label}    /    {n}`` from page 2 onward. Page 1 is the cover."""
     import fitz
 
     label = folio or folio_label({})
-    font_path = _montserrat_regular()
+    rtl = _folio_has_rtl(label)
+    font_path = _folio_font_path(rtl=rtl)
+    folio_rect = fitz.Rect(34.0, 803.7, 563.9, 817.7)
+    archive = fitz.Archive(str(font_path.parent)) if rtl and font_path is not None else None
+    css = ""
+    if archive is not None and font_path is not None:
+        css = (
+            f"@font-face {{ font-family: FolioFont; src: url({font_path.name}); }}"
+            "div { font-family: FolioFont, sans-serif; font-size: 8pt; text-align: center; "
+            "direction: rtl; color: #000; }"
+        )
     for index in range(1, out.page_count):
         page = out[index]
+        text = folio_text(label, index + 1)
+        if archive is not None:
+            page.insert_htmlbox(folio_rect, f"<div>{escape(text)}</div>", css=css, archive=archive)
+            continue
         if font_path is not None:
             page.insert_font(fontname="mont", fontfile=str(font_path))
             fontname = "mont"
         else:
             fontname = "helv"
-        rect = fitz.Rect(34.0, 803.7, 563.9, 817.7)
         page.insert_textbox(
-            rect,
-            folio_text(label, index + 1),
+            folio_rect,
+            text,
             fontname=fontname,
             fontsize=8,
             color=(0, 0, 0),

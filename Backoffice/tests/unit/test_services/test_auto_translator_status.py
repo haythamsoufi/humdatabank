@@ -14,12 +14,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import requests
+
 from app.services.translation.auto_translator import (
     STATUS_PROBE_TIMEOUT_SECONDS,
     AutoTranslator,
     GoogleTranslateService,
     IFRCTranslationService,
     LibreTranslateService,
+    _ENGINE_BATCH_WORKERS,
 )
 
 pytestmark = [pytest.mark.unit]
@@ -163,6 +166,22 @@ class TestCheckServiceStatusNonBlocking:
         assert tr._test_service(svc) is False
 
 
+class TestServiceSessionReuse:
+    """Each service pools persistent connections instead of a fresh TCP+TLS
+    handshake per translate_text()/translate_batch() call."""
+
+    def test_service_gets_a_pooled_session(self):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        assert isinstance(svc.session, requests.Session)
+        adapter = svc.session.get_adapter('https://ifrc.example.org/api/translate')
+        assert adapter.poolmanager.connection_pool_kw.get('maxsize') >= _ENGINE_BATCH_WORKERS
+
+    def test_each_instance_has_its_own_session(self):
+        svc_a = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        svc_b = GoogleTranslateService(api_key='k')
+        assert svc_a.session is not svc_b.session
+
+
 class TestServiceHealthProbes:
     """check_health must be a cheap, tightly-bounded call — never a translation."""
 
@@ -241,6 +260,69 @@ class TestServiceHealthProbes:
             assert svc.check_health() is False
 
 
+class TestIfrcRetriesTransientFailures:
+    """translate_text() must retry 429/502/503/504 like LibreTranslateService,
+    instead of dropping the fragment on the first rate-limit response."""
+
+    def _response(self, status_code, *, translated=None, text=""):
+        resp = MagicMock()
+        resp.status_code = status_code
+        resp.text = text
+        if translated is not None:
+            resp.headers = {'Content-Type': 'application/json'}
+            resp.json.return_value = [{"translations": [{"text": translated}]}]
+        else:
+            resp.headers = {'Content-Type': 'text/plain'}
+        return resp
+
+    def test_retries_rate_limit_then_succeeds(self, monkeypatch):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        mock_post = MagicMock(
+            side_effect=[
+                self._response(429, text="rate limited"),
+                self._response(200, translated="Salut"),
+            ]
+        )
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+
+        assert svc.translate_text("Hello", "fr") == "Salut"
+        assert mock_post.call_count == 2
+
+    def test_retries_upstream_5xx_like_libretranslate(self, monkeypatch):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        mock_post = MagicMock(
+            side_effect=[
+                self._response(503, text="upstream down"),
+                self._response(200, translated="Salut"),
+            ]
+        )
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+
+        assert svc.translate_text("Hello", "fr") == "Salut"
+        assert mock_post.call_count == 2
+
+    def test_gives_up_after_three_rate_limit_responses(self, monkeypatch):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        mock_post = MagicMock(return_value=self._response(429, text="rate limited"))
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+        sleeps = []
+        monkeypatch.setattr('time.sleep', lambda s: sleeps.append(s))
+
+        assert svc.translate_text("Hello", "fr") is None
+        assert mock_post.call_count == 3
+        assert sleeps == [0.6, 1.2]
+
+    def test_non_transient_error_does_not_retry(self, monkeypatch):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        mock_post = MagicMock(return_value=self._response(401, text="unauthorized"))
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+
+        assert svc.translate_text("Hello", "fr") is None
+        assert mock_post.call_count == 1
+
+
 class TestEngineBatchParallel:
     def test_ifrc_batch_preserves_order(self):
         svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
@@ -282,3 +364,16 @@ class TestEngineBatchParallel:
         release.set()
         worker.join(timeout=2)
         assert peak >= 2
+
+
+def test_language_has_machine_translation_skips_romansh():
+    from app.services.translation.auto_translator import (
+        IFRCTranslationService,
+        language_has_machine_translation,
+    )
+
+    assert language_has_machine_translation("de") is True
+    assert language_has_machine_translation("rm") is False
+    svc = IFRCTranslationService.__new__(IFRCTranslationService)
+    svc.service_name = "ifrc"
+    assert svc.translate_text("Not reported", "rm") is None

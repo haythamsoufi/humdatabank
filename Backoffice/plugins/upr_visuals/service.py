@@ -1,42 +1,40 @@
-"""Bulk PNG generation jobs and single-dashboard PNG/PDF/IDML export for UPR visuals."""
+"""Single-dashboard PNG/PDF/InDesign export for UPR visuals."""
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
-import threading
+import time
 import uuid
-import zipfile
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
+from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
-from typing import Any, ClassVar, Callable
+from typing import Any, Callable
 
 from flask import current_app
-from werkzeug.exceptions import NotFound
 
-from app.services.platform import storage_service
-from app.utils.datetime_helpers import utcnow
-from plugins.upr_visuals.catalog import DASHBOARD_BY_ID, dashboards_for_kind, kind_for_template
-from plugins.upr_visuals.data import UprVisualsError, build_payload, filename_from_visual_title
-from plugins.upr_visuals.raster import render_pdf_bytes, render_png
+from plugins.upr_visuals.catalog import DASHBOARD_BY_ID
+from plugins.upr_visuals.data import (
+    UprVisualsError,
+    build_payload,
+    filename_from_visual_title,
+    title_for_export_filename,
+)
+from plugins.upr_visuals.export_job import run_isolated
+from plugins.upr_visuals.i18n import export_locale, localize_export, translate_styled_blocks
+from plugins.upr_visuals.raster import render_pdf_bytes, render_png_isolated
 from plugins.upr_visuals.render import render_dashboard_html
 
 logger = logging.getLogger(__name__)
 
 STORAGE_CATEGORY = "upr_visuals"
-STATUS_NAME = "status.json"
 RENDER_TIMEOUT_SECONDS = 120
-
-_lock = threading.Lock()
-_jobs: dict[str, dict[str, Any]] = {}
-_threads: dict[str, threading.Thread] = {}
 
 
 def visual_export_filename(meta: dict[str, Any], dashboard_id: str, ext: str) -> str:
     suffix = ext.lstrip(".").lower()
     if dashboard_id == "combined":
-        title = str(meta.get("document_title") or "").strip()
+        title = title_for_export_filename(meta)
         if title:
             return filename_from_visual_title(title, suffix)
     iso3 = filename_from_visual_title(str(meta.get("iso3") or "UNK"), "png")[:-4]
@@ -49,287 +47,315 @@ def visual_export_filename(meta: dict[str, Any], dashboard_id: str, ext: str) ->
 
 
 class UprVisualsService:
-    _lock: ClassVar[threading.Lock] = _lock
-
     @classmethod
-    def start_bulk(
-        cls,
-        *,
-        assigned_form_id: int,
-        dashboard_ids: list[str],
-        aes_ids: list[int] | None = None,
-    ) -> str:
-        from plugins.upr_visuals.data import get_assigned_form_for_bulk
-
-        assigned = get_assigned_form_for_bulk(int(assigned_form_id))
-        job_id = str(uuid.uuid4())
-        kind = kind_for_template(int(assigned.template_id))
-        allowed = {spec.id for spec in dashboards_for_kind(kind)}
-        selected = [did for did in dashboard_ids if did in allowed] or ["combined"]
-        now = utcnow().isoformat()
-        status = {
-            "job_id": job_id,
-            "status": "queued",
-            "assigned_form_id": assigned.id,
-            "template_id": int(assigned.template_id),
-            "period_name": assigned.period_name,
-            "dashboard_ids": selected,
-            "aes_ids": [int(i) for i in (aes_ids or [])],
-            "progress": 0,
-            "total": 0,
-            "message": "Queued",
-            "zip_key": None,
-            "error": None,
-            "created_at": now,
-            "finished_at": None,
-        }
-        with cls._lock:
-            if any(job.get("status") in {"queued", "running"} for job in _jobs.values()):
-                raise RuntimeError("A UPR visuals export is already running.")
-            _jobs[job_id] = status
-
-        app = current_app._get_current_object()
-        thread = threading.Thread(
-            target=cls._run_bulk,
-            args=(app, job_id),
-            daemon=True,
-            name=f"upr-visuals-{job_id[:8]}",
-        )
-        _threads[job_id] = thread
-        thread.start()
-        return job_id
-
-    @classmethod
-    def get_status(cls, job_id: str | None = None) -> dict[str, Any]:
-        with cls._lock:
-            if job_id:
-                return dict(_jobs.get(job_id) or {})
-            running = [job for job in _jobs.values() if job.get("status") in {"queued", "running"}]
-            if running:
-                return dict(running[-1])
-            if _jobs:
-                latest = max(_jobs.values(), key=lambda job: job.get("created_at") or "")
-                return dict(latest)
-        return {}
-
-    @classmethod
-    def cancel(cls, job_id: str) -> bool:
-        with cls._lock:
-            job = _jobs.get(job_id)
-            if not job or job.get("status") not in {"queued", "running"}:
-                return False
-            job["status"] = "cancelled"
-            job["finished_at"] = utcnow().isoformat()
-            job["message"] = "Cancelled"
-            return True
-
-    @classmethod
-    def serve_zip(cls, job_id: str):
-        job = cls.get_status(job_id)
-        key = job.get("zip_key")
-        if not key:
-            raise NotFound("Export is not ready.")
-        if not storage_service.exists(STORAGE_CATEGORY, key):
-            raise NotFound("Export is not ready.")
-        return storage_service.stream_response(
-            STORAGE_CATEGORY,
-            key,
-            filename="upr-visuals.zip",
-            mimetype="application/zip",
-            as_attachment=True,
-        )
-
-    @classmethod
-    def png_bytes(cls, aes_id: int, dashboard_id: str) -> tuple[bytes, str]:
-        payload, html = cls._dashboard_html(aes_id, dashboard_id)
-        filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "png")
-        tmp = Path(current_app.instance_path) / "upr_visuals_tmp" / f"{uuid.uuid4().hex}_{filename}"
-        tmp.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            render_png(html, tmp, dashboard_id=dashboard_id)
-            return tmp.read_bytes(), filename
-        finally:
+    def png_bytes(cls, aes_id: int, dashboard_id: str, *, lang: str = "en") -> tuple[bytes, str]:
+        with export_locale(lang):
+            payload, html = cls._dashboard_html(aes_id, dashboard_id)
+            filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "png")
+            tmp = Path(current_app.instance_path) / "upr_visuals_tmp" / f"{uuid.uuid4().hex}_{filename}"
+            tmp.parent.mkdir(parents=True, exist_ok=True)
             try:
-                tmp.unlink()
-            except OSError:
-                pass
-
-    @classmethod
-    def pdf_bytes(cls, aes_id: int, dashboard_id: str) -> tuple[bytes, str]:
-        payload, html = cls._dashboard_html(aes_id, dashboard_id)
-        filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "pdf")
-        return render_pdf_bytes(html, dashboard_id=dashboard_id), filename
-
-    @classmethod
-    def idml_zip_bytes(cls, aes_id: int, word_bytes: bytes | None = None) -> tuple[bytes, str]:
-        from plugins.upr_visuals.data import filename_from_visual_title
-        from plugins.upr_visuals.idml import build_indesign_package
-
-        payload, html = cls._dashboard_html(aes_id, "combined")
-        pdf_bytes = render_pdf_bytes(html, dashboard_id="combined")
-        work_dir = Path(current_app.instance_path) / "upr_visuals_tmp" / f"idml_{uuid.uuid4().hex}"
-        work_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            result = build_indesign_package(
-                payload=payload,
-                pdf_bytes=pdf_bytes,
-                work_dir=work_dir,
-                word_bytes=word_bytes,
-            )
-        finally:
-            shutil.rmtree(work_dir, ignore_errors=True)
-        title = str((payload.get("meta") or {}).get("document_title") or result.get("title") or "UPR visuals")
-        stem = filename_from_visual_title(title, "zip")[:-4]
-        return result["zip_bytes"], f"{stem} - InDesign.zip"
-
-    @classmethod
-    def narrative_pdf_bytes(cls, aes_id: int, word_bytes: bytes) -> tuple[bytes, str]:
-        from plugins.upr_visuals.idml import (
-            folio_label,
-            load_word_paragraphs,
-            merge_report_pdfs,
-            render_narrative_pdf_bytes,
-            style_narrative_blocks,
-        )
-
-        payload, html = cls._dashboard_html(aes_id, "combined")
-        meta = payload.get("meta") or {}
-        visuals = render_pdf_bytes(html, dashboard_id="combined")
-        styled = style_narrative_blocks(
-            load_word_paragraphs(word_bytes),
-            country_name=str(meta.get("country_name") or ""),
-        )
-        narrative = render_narrative_pdf_bytes(styled, folio=folio_label(meta))
-        data = merge_report_pdfs(visuals, narrative, folio=folio_label(meta)) if styled else visuals
-        filename = visual_export_filename(meta, "combined", "pdf")
-        return data, filename
-
-    @classmethod
-    def _dashboard_html(cls, aes_id: int, dashboard_id: str) -> tuple[dict[str, Any], str]:
-        payload = build_payload(aes_id, inline_icons=True)
-        if dashboard_id not in DASHBOARD_BY_ID:
-            raise UprVisualsError(f"Unknown dashboard: {dashboard_id}")
-        return payload, render_dashboard_html(payload, dashboard_id)
-
-    @classmethod
-    def _render_with_timeout(cls, fn: Callable[[], Any], timeout: float = RENDER_TIMEOUT_SECONDS) -> Any:
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(fn)
-            return future.result(timeout=timeout)
-
-    @classmethod
-    def _run_bulk(cls, app, job_id: str) -> None:
-        work_root = Path(app.instance_path) / "upr_visuals_tmp"
-        job_dir = work_root / job_id
-        zip_path = work_root / f"{job_id}.zip"
-        with app.app_context():
-            job = cls.get_status(job_id)
-            try:
-                cls._update(job_id, status="running", message="Loading assignments…")
-                from plugins.upr_visuals.data import list_countries_for_bulk
-
-                assignments = list_countries_for_bulk(job["assigned_form_id"])
-                wanted = set(job.get("aes_ids") or [])
-                if wanted:
-                    assignments = [row for row in assignments if row["aes_id"] in wanted]
-                dashboards = job.get("dashboard_ids") or ["combined"]
-                total = max(len(assignments) * len(dashboards), 1)
-                cls._update(job_id, total=total, message="Rendering…")
-                job_dir.mkdir(parents=True, exist_ok=True)
-                done = 0
-                errors: list[str] = []
-                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                    for row in assignments:
-                        if cls.get_status(job_id).get("status") == "cancelled":
-                            return
-                        try:
-                            payload = build_payload(row["aes_id"], inline_icons=True)
-                        except Exception as exc:
-                            logger.warning("UPR visuals skip aes %s: %s", row["aes_id"], exc)
-                            errors.append(f"aes {row['aes_id']}: {exc}")
-                            try:
-                                from app.extensions import db
-
-                                db.session.rollback()
-                            except Exception:
-                                pass
-                            done += len(dashboards)
-                            cls._update(job_id, progress=done)
-                            continue
-                        meta = payload["meta"]
-                        iso3 = meta.get("iso3") or "UNK"
-                        round_code = meta.get("round_code") or "round"
-                        folder = f"{iso3}_{round_code}"
-                        available = {item.get("id") for item in payload.get("dashboards") or []}
-                        for dashboard_id in dashboards:
-                            if cls.get_status(job_id).get("status") == "cancelled":
-                                return
-                            if str(dashboard_id).startswith("emergency_") and dashboard_id not in available:
-                                done += 1
-                                cls._update(job_id, progress=done)
-                                continue
-                            tmp = job_dir / f"{dashboard_id}.png"
-                            try:
-                                html = render_dashboard_html(payload, dashboard_id)
-                                cls._render_with_timeout(
-                                    lambda html=html, tmp=tmp, dashboard_id=dashboard_id: render_png(
-                                        html, tmp, dashboard_id=dashboard_id
-                                    )
-                                )
-                                zf.write(tmp, arcname=f"{folder}/{dashboard_id}.png")
-                            except FuturesTimeoutError:
-                                logger.warning(
-                                    "UPR visuals render timed out for aes %s dashboard %s",
-                                    row["aes_id"],
-                                    dashboard_id,
-                                )
-                                errors.append(f"aes {row['aes_id']} {dashboard_id}: timed out")
-                            except Exception as exc:
-                                logger.warning(
-                                    "UPR visuals skip aes %s dashboard %s: %s",
-                                    row["aes_id"],
-                                    dashboard_id,
-                                    exc,
-                                )
-                                errors.append(f"aes {row['aes_id']} {dashboard_id}: {exc}")
-                            finally:
-                                try:
-                                    tmp.unlink()
-                                except OSError:
-                                    pass
-                            done += 1
-                            cls._update(job_id, progress=done, message=f"{iso3} · {dashboard_id}")
-                zip_key = f"exports/{job_id}/upr-visuals.zip"
-                storage_service.upload(STORAGE_CATEGORY, zip_key, zip_path.read_bytes())
-                cls._update(
-                    job_id,
-                    status="completed",
-                    progress=total,
-                    zip_key=zip_key,
-                    message="Done",
-                    error="; ".join(errors) if errors else None,
-                    finished_at=utcnow().isoformat(),
-                )
-            except Exception as exc:
-                logger.exception("UPR visuals bulk export failed")
-                cls._update(
-                    job_id,
-                    status="failed",
-                    error=str(exc),
-                    message="Failed",
-                    finished_at=utcnow().isoformat(),
-                )
+                render_png_isolated(html, tmp, dashboard_id=dashboard_id)
+                return tmp.read_bytes(), filename
             finally:
-                shutil.rmtree(job_dir, ignore_errors=True)
                 try:
-                    zip_path.unlink()
+                    tmp.unlink()
                 except OSError:
                     pass
 
     @classmethod
-    def _update(cls, job_id: str, **fields: Any) -> None:
-        with cls._lock:
-            job = _jobs.get(job_id)
-            if not job:
-                return
-            job.update(fields)
+    def pdf_bytes(cls, aes_id: int, dashboard_id: str, *, lang: str = "en") -> tuple[bytes, str]:
+        with export_locale(lang):
+            payload, html = cls._dashboard_html(aes_id, dashboard_id)
+            meta = payload.get("meta") or {}
+            filename = visual_export_filename(meta, dashboard_id, "pdf")
+            return (
+                render_pdf_bytes(
+                    html,
+                    dashboard_id=dashboard_id,
+                    title=str(meta.get("document_title") or ""),
+                ),
+                filename,
+            )
+
+    @classmethod
+    def idml_zip_bytes(cls, aes_id: int, word_bytes: bytes | None = None, *, lang: str = "en") -> tuple[bytes, str]:
+        from plugins.upr_visuals.data import filename_from_visual_title
+
+        with export_locale(lang):
+            payload, html = cls._dashboard_html(aes_id, "combined")
+            title = title_for_export_filename(payload.get("meta") or {}) or "UPR visuals"
+            filename = f"{filename_from_visual_title(title, 'zip')[:-4]} - InDesign.zip"
+            work_dir = Path(current_app.instance_path) / "upr_visuals_tmp" / f"idml_{uuid.uuid4().hex}"
+            work_dir.mkdir(parents=True, exist_ok=True)
+            html_path = work_dir / "in.html"
+            payload_path = work_dir / "payload.json"
+            output = work_dir / filename
+            html_path.write_text(html, encoding="utf-8")
+            payload_path.write_text(json.dumps(payload), encoding="utf-8")
+            job: dict[str, Any] = {
+                "kind": "idml",
+                "html_path": str(html_path),
+                "payload_path": str(payload_path),
+                "output_path": str(output),
+                "work_dir": str(work_dir / "package"),
+                "dashboard_id": "combined",
+                "lang": lang,
+            }
+            if word_bytes:
+                word_path = work_dir / "narrative.docx"
+                word_path.write_bytes(word_bytes)
+                job["word_path"] = str(word_path)
+            try:
+                cls._render_with_timeout(lambda: run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS))
+                return output.read_bytes(), filename
+            finally:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+    @classmethod
+    def narrative_pdf_bytes(
+        cls,
+        aes_id: int,
+        word_bytes: bytes,
+        *,
+        lang: str = "en",
+        on_progress: Callable[..., Any] | None = None,
+    ) -> tuple[bytes, str]:
+        from plugins.upr_visuals.idml import (
+            folio_label,
+            load_word_paragraphs,
+            merge_report_pdfs,
+            style_narrative_blocks,
+        )
+
+        total = 5
+
+        def notify(step: int, message: str, *, log: bool = True, **extra: Any) -> None:
+            if log:
+                logger.info("UPR narrative PDF %s/%s %s", step, total, message)
+            if on_progress:
+                on_progress(step=step, total=total, message=message, **extra)
+
+        with export_locale(lang):
+            def on_chrome(*, done: int, total: int, lang: str, elapsed: int | None = None, **_k: Any) -> None:
+                notify(
+                    1,
+                    f"Translating visuals… {done} of {total}" if total else "Loading assignment data…",
+                    log=done in {0, total},
+                    elapsed=elapsed,
+                    chunk_done=done,
+                    chunk_total=total,
+                )
+
+            notify(1, "Loading assignment data…")
+            payload, html = cls._dashboard_html(
+                aes_id,
+                "combined",
+                on_progress=on_chrome if lang != "en" else None,
+            )
+            meta = payload.get("meta") or {}
+            filename = visual_export_filename(meta, "combined", "pdf")
+            if lang != "en":
+                def on_translate(*, done: int, total: int, lang: str, elapsed: int | None = None, **_k: Any) -> None:
+                    notify(
+                        2,
+                        f"Translating narrative… {done} of {total}",
+                        log=done in {0, total},
+                        elapsed=elapsed,
+                        chunk_done=done,
+                        chunk_total=total,
+                    )
+
+                notify(2, "Translating narrative…")
+                styled = translate_styled_blocks(
+                    style_narrative_blocks(
+                        load_word_paragraphs(word_bytes),
+                        country_name=str(meta.get("country_name") or ""),
+                    ),
+                    on_progress=on_translate,
+                )
+            else:
+                notify(2, "Reading Word document…")
+                styled = translate_styled_blocks(
+                    style_narrative_blocks(
+                        load_word_paragraphs(word_bytes),
+                        country_name=str(meta.get("country_name") or ""),
+                    )
+                )
+            work_dir = Path(current_app.instance_path) / "upr_visuals_tmp" / f"nar_{uuid.uuid4().hex}"
+            work_dir.mkdir(parents=True, exist_ok=True)
+            html_path = work_dir / "in.html"
+            payload_path = work_dir / "payload.json"
+            styled_path = work_dir / "styled.json"
+            visuals_path = work_dir / "visuals.pdf"
+            narrative_path = work_dir / "narrative.pdf"
+            html_path.write_text(html, encoding="utf-8")
+            payload_path.write_text(json.dumps(payload), encoding="utf-8")
+            styled_path.write_text(json.dumps(styled), encoding="utf-8")
+            try:
+                notify(3, "Rendering visuals and narrative…")
+                cls._render_isolated_parallel(
+                    [
+                        {
+                            "kind": "pdf",
+                            "html_path": str(html_path),
+                            "output_path": str(visuals_path),
+                            "dashboard_id": "combined",
+                            "lang": lang,
+                        },
+                        {
+                            "kind": "narrative_pages",
+                            "payload_path": str(payload_path),
+                            "styled_path": str(styled_path),
+                            "output_path": str(narrative_path),
+                            "lang": lang,
+                        },
+                    ],
+                    on_tick=lambda elapsed: notify(
+                        3,
+                        "Rendering visuals and narrative…",
+                        log=False,
+                        elapsed=elapsed,
+                    ),
+                )
+                notify(5, "Combining PDF…")
+                visuals = visuals_path.read_bytes()
+                narrative = narrative_path.read_bytes()
+                data = merge_report_pdfs(visuals, narrative, folio=folio_label(meta)) if styled else visuals
+                return data, filename
+            finally:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+    @classmethod
+    def _dashboard_html(
+        cls,
+        aes_id: int,
+        dashboard_id: str,
+        *,
+        on_progress: Callable[..., Any] | None = None,
+    ) -> tuple[dict[str, Any], str]:
+        def build() -> tuple[dict[str, Any], str]:
+            payload = build_payload(aes_id, inline_icons=True)
+            if dashboard_id not in DASHBOARD_BY_ID:
+                raise UprVisualsError(f"Unknown dashboard: {dashboard_id}")
+            return payload, render_dashboard_html(payload, dashboard_id)
+
+        return localize_export(build, on_progress=on_progress)
+
+    @classmethod
+    def _render_with_timeout(cls, fn: Callable[[], Any], timeout: float = RENDER_TIMEOUT_SECONDS) -> Any:
+        _ = timeout
+        return fn()
+
+    @classmethod
+    def _render_isolated_parallel(
+        cls,
+        jobs: list[dict[str, Any]],
+        *,
+        timeout: float = RENDER_TIMEOUT_SECONDS,
+        on_tick: Callable[[int], None] | None = None,
+    ) -> list[Path]:
+        """Run isolated WeasyPrint children side by side.
+
+        Progress stays on this thread so Flask/DB session use stays single-threaded.
+        Each child still enforces *timeout* on its own process.
+        """
+        if not jobs:
+            return []
+        if len(jobs) == 1:
+            return [cls._render_with_timeout(lambda: run_isolated(jobs[0], timeout=timeout))]
+
+        started = time.monotonic()
+        with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+            futures = [pool.submit(run_isolated, job, timeout=timeout) for job in jobs]
+            pending = set(futures)
+            while pending:
+                done, pending = wait(pending, timeout=1)
+                if on_tick:
+                    on_tick(int(time.monotonic() - started))
+            return [fut.result() for fut in futures]
+
+    @classmethod
+    def _render_bulk_item(
+        cls,
+        job_dir: Path,
+        *,
+        payload: dict[str, Any],
+        html: str,
+        dashboard_id: str,
+        folder: str,
+        export_format: str,
+        word_path: Path | None,
+        lang: str = "en",
+    ) -> tuple[Path, str]:
+        meta = payload.get("meta") or {}
+        token = uuid.uuid4().hex[:10]
+        if export_format == "png":
+            tmp = job_dir / f"{token}_{dashboard_id}.png"
+            cls._render_with_timeout(
+                lambda: render_png_isolated(
+                    html, tmp, dashboard_id=dashboard_id, timeout=RENDER_TIMEOUT_SECONDS
+                )
+            )
+            return tmp, f"{folder}/{dashboard_id}.png"
+
+        if export_format == "pdf":
+            filename = visual_export_filename(meta, dashboard_id, "pdf")
+            tmp = job_dir / f"{token}_{filename}"
+            html_path = tmp.with_suffix(tmp.suffix + ".html")
+            html_path.write_text(html, encoding="utf-8")
+            job: dict[str, Any] = {
+                "kind": "narrative_pdf" if word_path else "pdf",
+                "html_path": str(html_path),
+                "output_path": str(tmp),
+                "dashboard_id": dashboard_id,
+            }
+            if word_path:
+                payload_path = tmp.with_suffix(tmp.suffix + ".payload.json")
+                payload_path.write_text(json.dumps(payload), encoding="utf-8")
+                job["kind"] = "narrative_pdf"
+                job["payload_path"] = str(payload_path)
+                job["word_path"] = str(word_path)
+                job["lang"] = lang
+            try:
+                cls._render_with_timeout(lambda: run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS))
+            finally:
+                for key in ("html_path", "payload_path"):
+                    raw = job.get(key)
+                    if not raw:
+                        continue
+                    try:
+                        Path(raw).unlink()
+                    except OSError:
+                        pass
+            return tmp, f"{folder}/{filename}"
+
+        title = title_for_export_filename(meta) or "UPR visuals"
+        filename = f"{filename_from_visual_title(title, 'zip')[:-4]} - InDesign.zip"
+        tmp = job_dir / f"{token}_{filename}"
+        html_path = tmp.with_suffix(".html")
+        payload_path = tmp.with_suffix(".payload.json")
+        html_path.write_text(html, encoding="utf-8")
+        payload_path.write_text(json.dumps(payload), encoding="utf-8")
+        work_dir = job_dir / f"idml_{token}"
+        job = {
+            "kind": "idml",
+            "html_path": str(html_path),
+            "payload_path": str(payload_path),
+            "output_path": str(tmp),
+            "work_dir": str(work_dir),
+            "dashboard_id": "combined",
+        }
+        if word_path:
+            job["word_path"] = str(word_path)
+        job["lang"] = lang
+        try:
+            cls._render_with_timeout(lambda: run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS))
+        finally:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            for extra in (html_path, payload_path):
+                try:
+                    extra.unlink()
+                except OSError:
+                    pass
+        return tmp, f"{folder}/{filename}"

@@ -1,14 +1,16 @@
 """Shared translation helpers for organization WTForms and routes."""
 import json
 from contextlib import suppress
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, List
 
 from flask import current_app, has_app_context
 from wtforms import StringField
 from wtforms.validators import Optional, Length
 
 from app.models import db
+from app.models.core import Country
 from app.models.organization import (
+    NationalSociety,
     SecretariatClusterOffice,
     SecretariatDepartment,
     SecretariatDivision,
@@ -18,21 +20,98 @@ from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.transactions import request_transaction_rollback
 from config.config import Config
 
+
+def iso_language_code(value: str | None) -> str:
+    """Normalize a language key to a short ISO code (`ru_RU` / `russian` → `ru`)."""
+    if value is None:
+        return ""
+    raw = str(value).strip()
+    if not raw:
+        return ""
+    return Country.normalize_language_code(raw)
+
+
+def unique_iso_language_codes(values: Iterable | None, *, exclude_en: bool = True) -> List[str]:
+    """Return de-duplicated ISO language codes, preserving order."""
+    codes: List[str] = []
+    seen = set()
+    for value in values or []:
+        code = iso_language_code(value)
+        if not code or code in seen:
+            continue
+        if exclude_en and code == "en":
+            continue
+        seen.add(code)
+        codes.append(code)
+    return codes
+
+
+def get_translation_codes() -> List[str]:
+    """Return translatable ISO codes, matching the organization admin UI when possible.
+
+    Production reads DB-backed supported languages (same source as the page columns).
+    Tests keep using ``app.config`` so fixtures remain deterministic.
+    """
+    raw: List[Any] = []
+    if has_app_context() and not current_app.config.get("TESTING"):
+        with suppress(Exception):
+            from app.services.platform.app_settings_service import get_supported_languages
+
+            raw = list(get_supported_languages(default=[]) or [])
+    if not raw and has_app_context():
+        raw = list(current_app.config.get("TRANSLATABLE_LANGUAGES") or [])
+        if not raw:
+            raw = list(current_app.config.get("SUPPORTED_LANGUAGES") or [])
+    if not raw:
+        raw = list(getattr(Config, "TRANSLATABLE_LANGUAGES", []) or [])
+        if not raw:
+            raw = list(getattr(Config, "LANGUAGES", []) or [])
+    return unique_iso_language_codes(raw, exclude_en=True)
+
+
 def get_translation_languages():
     """Return translation languages based on current supported languages."""
-    # Prefer runtime config so orgs can change languages without code changes.
-    # Must be safe to call during module import (no app context yet).
-    if has_app_context():
-        langs = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
-    else:
-        langs = []
-    langs = langs or getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
     all_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
-    return [(code, all_names.get(code, code.upper())) for code in langs]
+    display_names = getattr(Config, "LANGUAGE_DISPLAY_NAMES", {}) or {}
+    return [
+        (code, display_names.get(code) or all_names.get(code, code.upper()))
+        for code in get_translation_codes()
+    ]
 
 
-def get_translation_codes():
-    return [code for code, _ in get_translation_languages()]
+def lookup_translation(translations, lang_code: str | None) -> str:
+    """Return a non-empty translation for *lang_code*, accepting locale and legacy keys."""
+    data = normalize_translations_dict(translations)
+    wanted = iso_language_code(lang_code)
+    if not data or not wanted:
+        return ""
+
+    keys_to_try = []
+    raw = str(lang_code or "").strip()
+    if raw:
+        keys_to_try.extend((raw, raw.lower()))
+    keys_to_try.append(wanted)
+
+    seen = set()
+    for key in keys_to_try:
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for key, value in data.items():
+        if iso_language_code(key) != wanted:
+            continue
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def translation_is_present(translations, lang_code: str | None) -> bool:
+    """True when a usable translation exists for *lang_code* (including aliased keys)."""
+    return bool(lookup_translation(translations, lang_code))
 
 
 def add_translation_fields(form_cls, base_name, label_prefix, max_length):
@@ -95,59 +174,28 @@ def populate_translation_fields(form, entity, attr_name, field_prefix):
     Note: Call _clear_translation_fields() first if the entity has properties
     that fall back to English names.
     """
-    raw_translations = getattr(entity, attr_name, None)
-    translations = None
-
-    if raw_translations:
-        translations = raw_translations
-        if isinstance(raw_translations, str):
-            try:
-                translations = json.loads(raw_translations)
-            except (TypeError, ValueError):
-                translations = None
-        if not isinstance(translations, dict):
-            translations = None
+    translations = normalize_translations_dict(getattr(entity, attr_name, None))
 
     for code in get_translation_codes():
         field = getattr(form, f'{field_prefix}_{code}', None)
         if field:
-            value = ''
-            # Only set value if translation exists in name_translations JSONB field
-            # Do NOT fall back to legacy properties as they return English when translation is missing
-            if translations and code in translations:
-                translation_value = translations.get(code)
-                # Only use the value if it's a non-empty string
-                if translation_value and isinstance(translation_value, str) and translation_value.strip():
-                    value = translation_value.strip()
-            # Always set to empty string if no valid translation found (never use English as fallback)
-            field.data = value
+            # Only set value if a real translation exists (locale / legacy keys included).
+            # Do NOT fall back to English names when the translation is missing.
+            field.data = lookup_translation(translations, code)
 
 
 def count_missing_name_translations(entities) -> Dict[str, int]:
     """Count missing translations for the provided entities."""
-    counts: Dict[str, int] = {}
-    if has_app_context():
-        lang_codes = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
-    else:
-        lang_codes = getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
+    lang_codes = get_translation_codes()
+    counts: Dict[str, int] = {code: 0 for code in lang_codes}
     for entity in entities:
         base_name = getattr(entity, 'name', '')
         if not base_name or not str(base_name).strip():
             continue
 
-        raw = getattr(entity, 'name_translations', None)
-        translations: Dict[str, Any] = {}
-        if isinstance(raw, dict):
-            translations = raw
-        elif isinstance(raw, str):
-            with suppress((TypeError, ValueError, json.JSONDecodeError)):
-                parsed = json.loads(raw)
-                if isinstance(parsed, dict):
-                    translations = parsed
-
+        translations = normalize_translations_dict(getattr(entity, 'name_translations', None))
         for lang_code in lang_codes:
-            translated_value = translations.get(lang_code) if translations else None
-            if not translated_value or not str(translated_value).strip():
+            if not translation_is_present(translations, lang_code):
                 counts[lang_code] = counts.get(lang_code, 0) + 1
 
     return counts
@@ -206,11 +254,8 @@ def commit_translation_entity(entity) -> None:
 
 def count_missing_translations_for_fields(entities, fields, fields_for_entity=None) -> Dict[str, int]:
     """Count missing translations for one or more source/translation field pairs."""
-    counts: Dict[str, int] = {}
-    if has_app_context():
-        lang_codes = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
-    else:
-        lang_codes = getattr(Config, "TRANSLATABLE_LANGUAGES", []) or []
+    lang_codes = get_translation_codes()
+    counts: Dict[str, int] = {code: 0 for code in lang_codes}
 
     for entity in entities:
         for source_attr, translations_attr in entity_translation_field_pairs(entity, fields, fields_for_entity):
@@ -220,8 +265,7 @@ def count_missing_translations_for_fields(entities, fields, fields_for_entity=No
 
             translations = normalize_translations_dict(getattr(entity, translations_attr, None))
             for lang_code in lang_codes:
-                translated_value = translations.get(lang_code) if translations else None
-                if not translated_value or not str(translated_value).strip():
+                if not translation_is_present(translations, lang_code):
                     counts[lang_code] = counts.get(lang_code, 0) + 1
 
     return counts
@@ -280,10 +324,8 @@ def stream_entity_translation_events(
             if not source_value or not str(source_value).strip():
                 continue
             translations = normalize_translations_dict(getattr(entity, translations_attr, None))
-            for lang_code in Config.TRANSLATABLE_LANGUAGES:
-                if lang_code not in normalized_languages:
-                    continue
-                if lang_code in translations and str(translations.get(lang_code, '')).strip():
+            for lang_code in unique_iso_language_codes(normalized_languages, exclude_en=True):
+                if translation_is_present(translations, lang_code):
                     continue
                 total_count += 1
 
@@ -301,10 +343,8 @@ def stream_entity_translation_events(
                 continue
 
             translations = normalize_translations_dict(getattr(entity, translations_attr, None))
-            for lang_code in Config.TRANSLATABLE_LANGUAGES:
-                if lang_code not in normalized_languages:
-                    continue
-                if lang_code in translations and str(translations.get(lang_code, '')).strip():
+            for lang_code in unique_iso_language_codes(normalized_languages, exclude_en=True):
+                if translation_is_present(translations, lang_code):
                     continue
                 pending_jobs.append((entity, source_attr, translations_attr, source_value, lang_code))
 
@@ -319,6 +359,8 @@ def stream_entity_translation_events(
             outs = auto_translator.translate_batch(
                 texts, lang_code, 'en', translation_service
             )
+            if not isinstance(outs, (list, tuple)) or len(outs) != len(jobs):
+                raise ValueError("translation batch returned unexpected result")
         except Exception:
             outs = [
                 resolve_field_translation(
@@ -399,4 +441,221 @@ def stream_entity_translation_events(
 
     if emit_complete:
         yield f"data: {json.dumps({'type': 'complete', 'processed': processed_count, 'total': total_count, 'success': success_count, 'error': error_count})}\n\n"
+
+
+def organization_entity_specs() -> Dict[str, Dict[str, Any]]:
+    """Allowlisted organization entity types for bulk auto-translate persist."""
+    return {
+        "countries": {
+            "model": Country,
+            "label": "country",
+            "fields": {"name": "name_translations"},
+        },
+        "national_societies": {
+            "model": NationalSociety,
+            "label": "national_society",
+            "fields": {"name": "name_translations"},
+        },
+        "secretariat_divisions": {
+            "model": SecretariatDivision,
+            "label": "secretariat_division",
+            "fields": {"name": "name_translations"},
+        },
+        "secretariat_departments": {
+            "model": SecretariatDepartment,
+            "label": "secretariat_department",
+            "fields": {"name": "name_translations"},
+        },
+        "secretariat_regions": {
+            "model": SecretariatRegionalOffice,
+            "label": "secretariat_regional_office",
+            "fields": {
+                "name": "name_translations",
+                "short_name": "short_name_translations",
+            },
+        },
+        "secretariat_clusters": {
+            "model": SecretariatClusterOffice,
+            "label": "secretariat_cluster_office",
+            "fields": {"name": "name_translations"},
+        },
+    }
+
+
+def apply_organization_entity_translations(
+    work_items: List[Dict[str, Any]],
+    *,
+    overwrite: bool = False,
+    service_name: str | None = None,
+    auto_translator=None,
+) -> Dict[str, Any]:
+    """Translate and persist organization name JSONB fields in language batches.
+
+    ``work_items`` entries: ``id``, ``entity_type``, ``entity_id``, ``field``,
+    ``text``, ``target_languages``. Same batching contract as Manage Translations
+    (``translate_batch`` grouped by language, then one commit).
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    specs = organization_entity_specs()
+    if auto_translator is None:
+        from app.services.translation.auto_translator import get_auto_translator
+
+        auto_translator = get_auto_translator()
+
+    parsed: List[Dict[str, Any]] = []
+    ids_by_type: Dict[str, set] = {}
+    for raw in work_items or []:
+        if not isinstance(raw, dict):
+            continue
+        entity_type = str(raw.get("entity_type") or "").strip()
+        spec = specs.get(entity_type)
+        if not spec:
+            continue
+        try:
+            entity_id = int(raw.get("entity_id"))
+        except (TypeError, ValueError):
+            continue
+        field = str(raw.get("field") or "name").strip() or "name"
+        if field not in spec["fields"]:
+            continue
+        text = raw.get("text")
+        if not text or not str(text).strip():
+            continue
+        langs = unique_iso_language_codes(raw.get("target_languages") or [], exclude_en=True)
+        if not langs:
+            continue
+        item_id = raw.get("id")
+        if item_id is None:
+            item_id = f"{entity_type}:{entity_id}:{field}"
+        parsed.append({
+            "id": str(item_id),
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "field": field,
+            "translations_attr": spec["fields"][field],
+            "label": spec["label"],
+            "text": str(text).strip(),
+            "target_languages": langs,
+        })
+        ids_by_type.setdefault(entity_type, set()).add(entity_id)
+
+    entities_by_key: Dict[tuple, Any] = {}
+    for entity_type, ids in ids_by_type.items():
+        model = specs[entity_type]["model"]
+        for row in model.query.filter(model.id.in_(list(ids))).all():
+            entities_by_key[(entity_type, row.id)] = row
+
+    jobs = []
+    skipped_existing = 0
+    for item in parsed:
+        entity = entities_by_key.get((item["entity_type"], item["entity_id"]))
+        if entity is None:
+            continue
+        translations = normalize_translations_dict(getattr(entity, item["translations_attr"], None))
+        for lang in item["target_languages"]:
+            if not overwrite and translation_is_present(translations, lang):
+                skipped_existing += 1
+                continue
+            jobs.append((item, lang, entity))
+
+    by_lang: Dict[str, list] = {}
+    for job in jobs:
+        by_lang.setdefault(job[1], []).append(job)
+
+    translated_by_key: Dict[tuple, Any] = {}
+    for lang_code, lang_jobs in by_lang.items():
+        texts = [j[0]["text"] for j in lang_jobs]
+        try:
+            if len(texts) == 1:
+                outs = [auto_translator.translate_text(texts[0], lang_code, "en", service_name)]
+            else:
+                outs = auto_translator.translate_batch(texts, lang_code, "en", service_name)
+            if not isinstance(outs, (list, tuple)) or len(outs) != len(lang_jobs):
+                raise ValueError("translation batch returned unexpected result")
+        except Exception:
+            outs = [
+                resolve_field_translation(
+                    j[2],
+                    j[0]["field"],
+                    j[0]["text"],
+                    lang_code,
+                    auto_translator,
+                    service_name,
+                )
+                for j in lang_jobs
+            ]
+        for job, translated in zip(lang_jobs, outs):
+            translated_by_key[(id(job[2]), job[0]["field"], job[1])] = translated
+
+    jobs.sort(key=lambda job: 0 if job[0]["field"] == "name" else 1)
+
+    results: List[Dict[str, Any]] = []
+    success_count = 0
+    skipped_untranslatable = 0
+    dirty: List[Any] = []
+
+    for item, lang_code, entity in jobs:
+        translated = translated_by_key.get((id(entity), item["field"], lang_code))
+        if item["field"] == "short_name":
+            name = getattr(entity, "name", None)
+            if name and item["text"].strip().casefold() == str(name).strip().casefold():
+                copied = lookup_translation(getattr(entity, "name_translations", None), lang_code)
+                if copied:
+                    translated = copied
+
+        if not translated or not str(translated).strip():
+            skipped_untranslatable += 1
+            continue
+
+        translated = str(translated).strip()
+        current = dict(normalize_translations_dict(getattr(entity, item["translations_attr"], None)))
+        current[lang_code] = translated
+        setattr(entity, item["translations_attr"], current)
+        flag_modified(entity, item["translations_attr"])
+        dirty.append(entity)
+
+        try:
+            from app.services.translation.catalog_service import (
+                PROVENANCE_MACHINE,
+                record_entity_provenance,
+            )
+
+            record_entity_provenance(
+                entity_type=item["label"],
+                entity_id=int(entity.id),
+                field_name=item["translations_attr"],
+                locale=lang_code,
+                provenance=PROVENANCE_MACHINE,
+                engine=service_name,
+            )
+        except Exception:
+            current_app.logger.debug("entity provenance write skipped", exc_info=True)
+
+        success_count += 1
+        results.append({
+            "id": item["id"],
+            "entity_id": entity.id,
+            "entity_type": item["entity_type"],
+            "field": item["field"],
+            "language": lang_code,
+            "translation": translated,
+        })
+
+    if dirty:
+        seen_ids = set()
+        for entity in dirty:
+            marker = id(entity)
+            if marker in seen_ids:
+                continue
+            seen_ids.add(marker)
+            db.session.add(entity)
+        db.session.commit()
+
+    return {
+        "success_count": success_count,
+        "results": results,
+        "skipped_untranslatable": skipped_untranslatable,
+        "skipped_existing": skipped_existing,
+    }
 

@@ -171,6 +171,18 @@ describe('entry-form-progress', () => {
       expect(gapBtn().disabled).toBe(true);
       expect(gapBtn().getAttribute('aria-label')).toBe('All countable items are complete');
     });
+
+    it('does not rewrite the live region when the displayed rate is unchanged', async () => {
+      setupProgressDom();
+      displayEl().textContent = '95.9%';
+      const { applyCompletionRate } = await loadProgress();
+      const originalNode = displayEl();
+
+      expect(applyCompletionRate(95.9)).toBe(true);
+      expect(displayEl().textContent).toBe('95.9%');
+      expect(displayEl()).toBe(originalNode);
+      expect(gapBtn().dataset.completionRate).toBe('95.9');
+    });
   });
 
   describe('updateSectionStatusIcons', () => {

@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import math
+import re
 from datetime import date
 from typing import Any
+
+_LATIN_AMOUNT_RE = re.compile(r"(?P<num>\d[\d,]*(?:\.\d+)?)")
 
 
 def to_number(value: Any) -> float | None:
@@ -27,10 +31,149 @@ def to_number(value: Any) -> float | None:
 
 def format_count(value: Any) -> str:
     """Integer with thousands separators, Tableau ``n#,##0``."""
+    from plugins.upr_visuals.i18n import t
+
     number = to_number(value)
     if number is None:
-        return "Not reported"
+        return t("Not reported")
     return f"{int(round(number)):,}"
+
+
+def format_percent(value: Any) -> str:
+    """Whole-percent label for form-stored 0–100 values (``60`` → ``60%``)."""
+    from plugins.upr_visuals.i18n import t
+
+    number = to_number(value)
+    if number is None:
+        return t("Not reported")
+    if number == int(number):
+        return f"{int(number)}%"
+    text = f"{number:.1f}".rstrip("0").rstrip(".")
+    return f"{text}%"
+
+
+def _arabic_million_suffix(millions: float) -> str:
+    """Arabic plural form for the million count (IFRC Arabic style guide).
+
+    Same range rules as ``plugins.pb_progress`` ``calculations._arabic_million_suffix``.
+    The whole-number part of the count picks the form, so 10.8 uses ملايين
+    (3–10) rather than the 100+ fallback. Counts of 100+ use مليون only when
+    the value is a whole number (مليون 100); fractional counts keep مليونا
+    (مليونا 219.3). Unit words stay to the left of the Latin digits so RTL
+    pages do not paint the unit into the neighbouring label.
+
+    | Range  | Form     | Example      |
+    |--------|----------|--------------|
+    | 1      | مليون    | مليون 1      |
+    | 2      | مليونان  | مليونان 2    |
+    | 3–10   | ملايين   | ملايين 5     |
+    | 11–99  | مليونا  | مليونا 25    |
+    | 100+   | مليون    | مليون 100    |
+    """
+    count = int(math.floor(millions + 1e-9))
+    has_fraction = abs(millions - count) > 1e-9
+    if count == 1:
+        return "مليون"
+    if count == 2:
+        return "مليونان"
+    if 3 <= count <= 10:
+        return "ملايين"
+    if 11 <= count <= 99:
+        return "مليونا"
+    if count >= 100 and not has_fraction:
+        return "مليون"
+    if count >= 11:
+        return "مليونا"
+    return "مليون"
+
+
+def _format_millions_compact(number: float) -> str:
+    millions = number / 1_000_000.0
+    rounded = round(millions, 1)
+    from plugins.upr_visuals.i18n import current_export_language
+
+    if current_export_language() == "ar":
+        return f"{_arabic_million_suffix(rounded)} {rounded:g}"
+    if rounded == int(rounded):
+        return f"{int(rounded)}M"
+    text = f"{rounded:.1f}".rstrip("0").rstrip(".")
+    return f"{text}M"
+
+
+def chf_label() -> str:
+    """ISO code in Latin locales; Arabic uses the IFRC phrase فرنك سويسري."""
+    from plugins.upr_visuals.i18n import t
+
+    return t("CHF")
+
+
+def split_display_amount(amount: str) -> tuple[str, str] | None:
+    """Split a mixed Arabic amount into ``(unit, number)`` for LTR flex layout.
+
+    WeasyPrint's bidi still paints ``مليون 1`` as digits-then-unit. Callers wrap
+    the parts in separate spans so the unit stays to the left of the number.
+    """
+    text = " ".join((amount or "").split())
+    if not text or not any("\u0600" <= char <= "\u06ff" for char in text):
+        return None
+    matches = list(_LATIN_AMOUNT_RE.finditer(text))
+    if not matches:
+        return None
+    num_match = matches[-1]
+    unit = " ".join(
+        part
+        for part in (text[: num_match.start()].strip(), text[num_match.end() :].strip())
+        if part
+    )
+    if not unit:
+        return None
+    return unit, num_match.group("num")
+
+
+def _arabic_unit_left(amount: str, extra_unit: str = "") -> str:
+    """Keep Arabic unit words to the left of the Latin number.
+
+    ``1 مليون`` in an RTL document paints the unit on the right of the digits
+    and collides with neighbouring labels (e.g. Total). Emit ``مليون 1`` and
+    isolate that run as LTR at the call site.
+    """
+    text = " ".join((amount or "").split())
+    extra = (extra_unit or "").strip()
+    if not text:
+        return extra
+    parts = split_display_amount(text)
+    if parts:
+        unit, number = parts
+        return " ".join(part for part in (unit, extra, number) if part)
+    matches = list(_LATIN_AMOUNT_RE.finditer(text))
+    if not matches:
+        return " ".join(part for part in (extra, text) if part)
+    num_match = matches[-1]
+    words = " ".join(
+        part
+        for part in (
+            text[: num_match.start()].strip(),
+            text[num_match.end() :].strip(),
+            extra,
+        )
+        if part
+    )
+    return f"{words} {num_match.group('num')}".strip() if words else num_match.group("num")
+
+
+def with_chf(display: str, *, prefix: bool = False) -> str:
+    """Attach the localized CHF label. Arabic units stay to the left of digits."""
+    from plugins.upr_visuals.i18n import current_export_language
+
+    text = (display or "").strip()
+    label = chf_label()
+    if not text:
+        return label
+    if current_export_language() == "ar":
+        return _arabic_unit_left(text, label)
+    if prefix:
+        return f"{label} {text}"
+    return f"{text} {label}"
 
 
 def format_compact_chf(value: Any) -> str:
@@ -38,7 +181,7 @@ def format_compact_chf(value: Any) -> str:
 
     < 1,000 → raw integer
     < 1,000,000 → thousands as ``N,000``
-    ≥ 1,000,000 → ``N.nM`` (drop trailing ``.0``)
+    ≥ 1,000,000 → ``N.nM`` (drop trailing ``.0``); Arabic uses IFRC million words
     """
     number = to_number(value)
     if number is None or number == 0:
@@ -49,19 +192,16 @@ def format_compact_chf(value: Any) -> str:
         thousands = int(round(number / 1000.0))
         if thousands < 1000:
             return f"{thousands},000"
-    millions = number / 1_000_000.0
-    rounded = round(millions, 1)
-    if rounded == int(rounded):
-        return f"{int(rounded)}M"
-    text = f"{rounded:.1f}".rstrip("0").rstrip(".")
-    return f"{text}M"
+    return _format_millions_compact(number)
 
 
 def format_chf(value: Any) -> str:
     """Full CHF amount with thousands separators, or ``Not reported``."""
+    from plugins.upr_visuals.i18n import t
+
     number = to_number(value)
     if number is None:
-        return "Not reported"
+        return t("Not reported")
     return f"{int(round(number)):,}"
 
 
@@ -101,6 +241,14 @@ def planning_years(period_name: str | None) -> list[int]:
 def format_header_date(value: date | None = None) -> str:
     """INP/annual-report cover date, e.g. ``2 July 2026``."""
     day = value or date.today()
+    try:
+        from flask import has_app_context
+        from flask_babel import format_date
+
+        if has_app_context():
+            return format_date(day, format="d MMMM y")
+    except Exception:
+        pass
     return f"{day.day} {day.strftime('%B %Y')}"
 
 
@@ -111,27 +259,29 @@ def document_subtitle(
     plan_years: list[int] | None = None,
 ) -> str:
     """Cover line under the country name on All visuals."""
+    from plugins.upr_visuals.i18n import t
+
     years = [int(year) for year in (plan_years or []) if year]
     if kind == "plan":
         if len(years) >= 2:
-            return f"{years[0]}-{years[-1]} IFRC network country plan"
+            return t(f"{years[0]}-{years[-1]} IFRC network country plan")
         if years:
-            return f"{years[0]} IFRC network country plan"
+            return t(f"{years[0]} IFRC network country plan")
         horizon = planning_years(period_name)
         if len(horizon) >= 2:
-            return f"{horizon[0]}-{horizon[-1]} IFRC network country plan"
+            return t(f"{horizon[0]}-{horizon[-1]} IFRC network country plan")
         if horizon:
-            return f"{horizon[0]} IFRC network country plan"
-        return "IFRC network country plan"
+            return t(f"{horizon[0]} IFRC network country plan")
+        return t("IFRC network country plan")
     year = years[0] if years else _year_token(period_name or "")
     raw = (period_name or "").strip().lower()
     if raw.startswith("jan-jun"):
-        return (
+        return t(
             f"{year} IFRC network mid-year report, Jan-Jun"
             if year
             else "IFRC network mid-year report, Jan-Jun"
         )
-    return (
+    return t(
         f"{year} IFRC network annual report, Jan-Dec"
         if year
         else "IFRC network annual report, Jan-Dec"

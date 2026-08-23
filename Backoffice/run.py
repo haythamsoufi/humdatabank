@@ -141,6 +141,50 @@ if __name__ == '__main__':
 
     use_reloader = _use_dev_reloader(debug)
 
+    def _install_windows_reloader_socket_error_filter() -> None:
+        """Silence a benign, Windows-only Werkzeug reloader shutdown race.
+
+        Since Werkzeug 2.2.3 (pallets/werkzeug#2517), `run_simple()` closes the
+        listening socket in a `finally` block the instant the reloader thread
+        exits (e.g. right after detecting a file change and calling
+        `sys.exit(3)`). On Windows, closing a socket while another thread is
+        blocked inside `select()` on that same socket raises
+        `OSError: [WinError 10038] An operation was attempted on something
+        that is not a socket` inside the background thread that runs
+        `BaseWSGIServer.serve_forever()` (spawned by
+        `werkzeug._reloader.run_with_reloader`). Python prints this as
+        "Exception in thread Thread-N (serve_forever): ..." on every reload.
+
+        This is purely cosmetic: that thread is a daemon thread already being
+        torn down because the process is restarting, and the reloader child
+        binds a fresh socket and serves normally right afterwards. Upstream
+        treats this as an unavoidable Windows/timing quirk, not a bug to fix
+        (see pallets/werkzeug#2627, closed as by-design).
+
+        We only swallow this *exact* signature (WinError 10038 raised out of
+        werkzeug/serving.py) so any unrelated socket error still surfaces.
+        """
+        import threading as _threading
+
+        previous_excepthook = _threading.excepthook
+
+        def _excepthook(args) -> None:
+            exc = args.exc_value
+            tb = args.exc_traceback
+            if isinstance(exc, OSError) and getattr(exc, "winerror", None) == 10038 and tb is not None:
+                frames = []
+                while tb is not None:
+                    frames.append(tb.tb_frame.f_code.co_filename)
+                    tb = tb.tb_next
+                if any(os.path.join("werkzeug", "serving.py") in f for f in frames):
+                    return  # known reloader shutdown race; harmless (see docstring above)
+            previous_excepthook(args)
+
+        _threading.excepthook = _excepthook
+
+    if os.name == "nt" and use_reloader:
+        _install_windows_reloader_socket_error_filter()
+
     if os.environ.get("FLASK_CONFIG", "").lower() == "production":
         app.logger.warning("FLASK_CONFIG=production but running via `python run.py`.")
         app.logger.warning("For production/Azure, prefer Gunicorn (see `config/gunicorn.conf.py` and `entrypoint.sh`).")

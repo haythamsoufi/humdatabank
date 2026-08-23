@@ -67,6 +67,7 @@ def refine_activity_row_consolidated_type(
                 "data_modified",
                 "file_uploaded",
                 "settings_updated",
+                "form_validated",
             ) or (consolidated_type and str(consolidated_type).startswith("admin_")):
                 return spec.activity_type
     if consolidated_type == "request":
@@ -288,6 +289,7 @@ def create_consistent_description(
                     "data_deleted",
                     "data_modified",
                     "file_uploaded",
+                    "form_validated",
                 ) or (t.startswith("admin_")):
                     return spec.description
 
@@ -322,7 +324,7 @@ def create_consistent_description(
         if t in ("form_saved", "form_save"):
             return _form_desc("Saved", " as draft")
         if t in ("form_submitted", "form_submit"):
-            return _form_desc("submitted", " for review")
+            return _form_desc("Submitted", " for review")
 
         if t == "form_approved":
             tn, _an, cn = _resolve_form_context(context_data, endpoint, form_lookups)

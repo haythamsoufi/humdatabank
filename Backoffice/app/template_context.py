@@ -47,6 +47,12 @@ def register_template_context(app, config_class):
     from app.i18n import get_locale as current_ui_language
     app.jinja_env.globals['current_ui_language'] = current_ui_language
     try:
+        from app.forms.organization.translation_helpers import lookup_translation
+        app.jinja_env.globals['translation_lookup'] = lookup_translation
+    except Exception as e:
+        app.logger.debug("Failed to expose translation_lookup to Jinja: %s", e)
+        app.jinja_env.globals['translation_lookup'] = lambda _translations, _code=None: ""
+    try:
         from app.routes.admin.shared import user_has_permission
         app.jinja_env.globals['user_has_permission'] = user_has_permission
     except Exception as e:
@@ -150,11 +156,15 @@ def register_template_context(app, config_class):
         or the process never reloaded. Templates must match ``system_settings``."""
         try:
             from app.services.platform.app_settings_service import get_show_language_flags, get_supported_languages
+            from app.forms.organization.translation_helpers import unique_iso_language_codes
 
             langs = list(get_supported_languages(default=Config.LANGUAGES) or [])
+            supported = unique_iso_language_codes(langs, exclude_en=False)
+            if "en" not in supported:
+                supported.insert(0, "en")
             return {
-                'SUPPORTED_LANGUAGES': langs,
-                'TRANSLATABLE_LANGUAGES': [c for c in langs if c != 'en'],
+                'SUPPORTED_LANGUAGES': supported,
+                'TRANSLATABLE_LANGUAGES': [c for c in supported if c != 'en'],
                 'SHOW_LANGUAGE_FLAGS': bool(get_show_language_flags(default=True)),
             }
         except Exception as e:

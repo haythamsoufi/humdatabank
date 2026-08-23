@@ -2149,6 +2149,62 @@ def api_auto_translate():
                 )
             return json_server_error('Failed to translate or update translation files')
 
+        elif translation_type == 'organization_entity':
+            from app.forms.organization.translation_helpers import (
+                apply_organization_entity_translations,
+            )
+
+            work_items = []
+            if batch_items:
+                for raw in batch_items[:200]:
+                    if isinstance(raw, dict):
+                        work_items.append(raw)
+            if not work_items:
+                return json_bad_request(_('No items provided'))
+
+            outcome = apply_organization_entity_translations(
+                work_items,
+                overwrite=bool(data.get('overwrite')),
+                service_name=service_name,
+                auto_translator=auto_translator,
+            )
+            success_count = outcome.get('success_count') or 0
+            results = outcome.get('results') or []
+            skipped_untranslatable = outcome.get('skipped_untranslatable') or 0
+            skipped_existing = outcome.get('skipped_existing') or 0
+            translations = {
+                row['language']: row['translation']
+                for row in results
+                if row.get('language') and row.get('translation')
+            }
+
+            if success_count > 0:
+                return json_ok(
+                    translations={'label_translations': translations},
+                    results=results,
+                    updated_count=success_count,
+                    skipped_existing=skipped_existing,
+                    service_used=service_name,
+                )
+            if skipped_existing > 0 and skipped_untranslatable == 0:
+                return json_ok(
+                    translations={},
+                    updated_count=0,
+                    skipped_existing=skipped_existing,
+                    service_used=service_name,
+                )
+            if skipped_untranslatable > 0:
+                return json_ok(
+                    translations={},
+                    updated_count=0,
+                    skipped_untranslatable=skipped_untranslatable,
+                    skipped_existing=skipped_existing,
+                    service_used=service_name,
+                    untranslated=True,
+                    message='No translation available: the text may be a proper noun or technical term that does not require translation.',
+                )
+            return json_server_error('Failed to translate or update organization entities')
+
         else:
             return json_bad_request(_('Invalid translation type'))
 

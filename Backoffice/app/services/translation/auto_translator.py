@@ -17,6 +17,7 @@ import re
 import threading
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from requests.adapters import HTTPAdapter
 from typing import Dict, List, Optional, Union, Tuple
 from flask import current_app
 import time
@@ -54,6 +55,67 @@ from config import Config
 
 # Reverse mapping for display purposes
 LANGUAGE_DISPLAY_NAMES = Config.LANGUAGE_DISPLAY_NAMES
+
+# Azure Translator text API codes used by the IFRC wrapper. Romansh (rm) is not listed.
+# https://learn.microsoft.com/en-us/azure/ai-services/translator/language-support
+IFRC_AZURE_LANGS = frozenset({
+    "af", "am", "ar", "as", "az", "ba", "bg", "bn", "bo", "bs", "ca", "cs", "cy", "da",
+    "de", "dsb", "dv", "el", "en", "es", "et", "eu", "fa", "fi", "fil", "fj", "fo", "fr",
+    "ga", "gl", "gom", "gu", "ha", "he", "hi", "hne", "hr", "hsb", "ht", "hu", "hy", "id",
+    "ig", "ikt", "is", "it", "iu", "ja", "ka", "kk", "km", "kmr", "kn", "ko", "ks", "ku",
+    "ky", "ln", "lo", "lt", "lug", "lv", "lzh", "mai", "mg", "mi", "mk", "ml", "mni", "mr",
+    "ms", "mt", "mww", "my", "nb", "ne", "nl", "nso", "nya", "or", "otq", "pa", "pl", "prs",
+    "ps", "pt", "ro", "ru", "run", "rw", "sd", "si", "sk", "sl", "sm", "sn", "so", "sq",
+    "st", "sv", "sw", "ta", "te", "th", "ti", "tk", "tn", "to", "tr", "tt", "ty", "ug",
+    "uk", "ur", "uz", "vi", "xh", "yo", "yua", "yue", "zh", "zu",
+})
+
+# ISO-639-1 keys from services/nllb-sidecar ISO1_TO_FLORES200. Keep in sync with that table.
+NLLB_ISO1_LANGS = frozenset({
+    "en", "fr", "es", "ar", "ru", "zh", "hi",
+    "af", "ak", "am", "ee", "ff", "ha", "ig", "ki", "kg", "ln", "lg", "mg", "ny", "om",
+    "rn", "rw", "sg", "sn", "so", "st", "ss", "sw", "ti", "tn", "ts", "tw", "wo", "xh",
+    "yo", "zu",
+    "fa", "he", "ku", "ps", "tg", "tk", "tr", "ug", "ur", "uz", "az", "hy", "ka", "kk",
+    "ky", "mn", "kr", "ks",
+    "as", "bn", "gu", "kn", "ml", "mr", "ne", "or", "pa", "sa", "sd", "si", "ta", "te",
+    "id", "jv", "km", "lo", "ms", "my", "su", "th", "tl", "vi", "ja", "ko", "mi", "sm", "fj",
+    "sq", "be", "bs", "bg", "ca", "hr", "cs", "da", "nl", "eo", "et", "eu", "fi", "gl",
+    "de", "el", "ht", "hu", "is", "ga", "it", "lv", "lt", "lb", "mk", "mt", "nb", "nn",
+    "no", "oc", "pl", "pt", "ro", "gd", "sr", "sk", "sl", "sc", "sv", "cy", "uk", "yi",
+    "fo", "ba", "bm", "bo", "dz", "gn", "li", "lu", "qu", "ay", "tt",
+})
+
+_UNSUPPORTED_PAIR_LOGGED: set[tuple[str, str]] = set()
+
+
+def language_has_machine_translation(target_language: str, source_language: str = "en") -> bool:
+    """True when at least one configured engine can translate this pair without a guaranteed 400."""
+    target = _normalize_language_code(target_language, default="")
+    source = _normalize_language_code(source_language, default="en")
+    if not target or target == source:
+        return False
+    return target in IFRC_AZURE_LANGS or target in NLLB_ISO1_LANGS
+
+
+def _service_supports_language(service_name: str, target_language: str) -> bool:
+    code = _normalize_language_code(target_language, default="")
+    if not code:
+        return False
+    name = (service_name or "").strip().lower()
+    if name == "ifrc":
+        return code in IFRC_AZURE_LANGS
+    if name == "nllb":
+        return code in NLLB_ISO1_LANGS
+    return True
+
+
+def _log_unsupported_pair(source: str, target: str) -> None:
+    key = (source, target)
+    if key in _UNSUPPORTED_PAIR_LOGGED:
+        return
+    _UNSUPPORTED_PAIR_LOGGED.add(key)
+    logger.info("No translation engine supports %s->%s; keeping source text", source, target)
 
 
 def _normalize_language_code(lang: Optional[Union[str, object]], *, default: str = "en") -> str:
@@ -263,9 +325,23 @@ def _make_mt_protection_token(prefix: str, counter: int) -> str:
 class TranslationService:
     """Base class for translation services"""
 
+    # Every real translate_text()/translate_batch() call from a given service
+    # instance targets the same host, so pool persistent connections instead
+    # of paying for a fresh TCP+TLS handshake on every call. Sized against
+    # _ENGINE_BATCH_WORKERS so the fan-out in _translate_texts_parallel never
+    # blocks waiting for a free connection in the pool.
+    _SESSION_POOL_SIZE = max(10, _ENGINE_BATCH_WORKERS * 2)
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
         self.service_name = "base"
+        self.session = requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=self._SESSION_POOL_SIZE,
+            pool_maxsize=self._SESSION_POOL_SIZE,
+        )
+        self.session.mount("https://", adapter)
+        self.session.mount("http://", adapter)
 
     def translate_text(self, text: str, target_language: str, source_language: str = 'en') -> Optional[str]:
         """Translate text to target language"""
@@ -305,7 +381,7 @@ class GoogleTranslateService(TranslationService):
                 'source': source_language
             }
 
-            response = requests.post(self.base_url, params=params, timeout=10)
+            response = self.session.post(self.base_url, params=params, timeout=10)
             response.raise_for_status()
 
             data = response.json()
@@ -334,7 +410,7 @@ class GoogleTranslateService(TranslationService):
             for i, text in enumerate(texts):
                 params[f'q[{i}]'] = text
 
-            response = requests.post(self.base_url, params=params, timeout=10)
+            response = self.session.post(self.base_url, params=params, timeout=10)
             response.raise_for_status()
 
             data = response.json()
@@ -418,7 +494,7 @@ class LibreTranslateService(TranslationService):
             return self._supported_languages
 
         try:
-            resp = requests.get(f"{self.base_url}/languages", timeout=2)
+            resp = self.session.get(f"{self.base_url}/languages", timeout=2)
             resp.raise_for_status()
             data = resp.json()
             # Common response: [{"code":"en","name":"English"}, ...]
@@ -497,7 +573,7 @@ class LibreTranslateService(TranslationService):
                 # Retry transient failures (rate-limits / upstream flakiness) to reduce "random" misses in bulk runs.
                 last_http_error_preview: Optional[str] = None
                 for attempt in range(3):
-                    response = requests.post(f"{self.base_url}/translate", json=payload, timeout=15)
+                    response = self.session.post(f"{self.base_url}/translate", json=payload, timeout=15)
                     if response.status_code in (429, 502, 503, 504):
                         last_http_error_preview = (response.text or "")[:200]
                         time.sleep(0.6 * (attempt + 1))
@@ -592,6 +668,8 @@ class IFRCTranslationService(TranslationService):
         """Translate text using IFRC Translation API"""
         if not text or not text.strip():
             return None
+        if not _service_supports_language("ifrc", target_language):
+            return None
 
         try:
             payload = {
@@ -600,12 +678,25 @@ class IFRCTranslationService(TranslationService):
                 "To": target_language
             }
 
-            response = requests.post(
-                self.api_endpoint,
-                headers=self.headers,
-                data=json.dumps(payload),
-                timeout=30
-            )
+            # Retry transient failures (rate limit / upstream flakiness) with the same
+            # backoff schedule as LibreTranslateService, instead of dropping the fragment
+            # on the first 429 -- _ENGINE_BATCH_WORKERS is kept conservative specifically
+            # because this endpoint previously had no retry at all.
+            response = None
+            for attempt in range(3):
+                response = self.session.post(
+                    self.api_endpoint,
+                    headers=self.headers,
+                    data=json.dumps(payload),
+                    timeout=30
+                )
+                if response.status_code not in (429, 502, 503, 504) or attempt == 2:
+                    break
+                logger.debug(
+                    f"IFRC API transient {response.status_code} for '{text[:50]}...', "
+                    f"retrying (attempt {attempt + 1}/3)"
+                )
+                time.sleep(0.6 * (attempt + 1))
 
             if response.status_code == 200:
                 # Check if response is JSON before parsing
@@ -631,9 +722,9 @@ class IFRCTranslationService(TranslationService):
                         logger.warning(f"IFRC API: No translation found in response for '{text}'")
                 else:
                     logger.warning(f"IFRC API: Unexpected response format for '{text}': {response_data}")
-            elif response.status_code == 429:
-                # Rate limit exceeded - log and return None gracefully
-                logger.warning(f"IFRC API rate limit exceeded for '{text}': Too Many Requests. Response: {response.text[:200]}")
+            elif response.status_code in (429, 502, 503, 504):
+                # Exhausted the retries above.
+                logger.warning(f"IFRC API rate limit/transient error for '{text}' after retries: Status {response.status_code}. Response: {response.text[:200]}")
                 return None
             else:
                 # Check if error response is HTML
@@ -720,6 +811,8 @@ class NLLBTranslationService(TranslationService):
         target_norm = _normalize_language_code(target_language, default="en")
         if source_norm == target_norm:
             return None
+        if not _service_supports_language("nllb", target_norm):
+            return None
 
         try:
             response = requests.post(
@@ -772,6 +865,8 @@ class NLLBTranslationService(TranslationService):
         source_norm = _normalize_language_code(source_language, default="en")
         target_norm = _normalize_language_code(target_language, default="en")
         if source_norm == target_norm:
+            return [None] * len(texts)
+        if not _service_supports_language("nllb", target_norm):
             return [None] * len(texts)
 
         payload = [{"Text": t, "From": source_norm, "To": target_norm} for t in texts]
@@ -1311,7 +1406,14 @@ class AutoTranslator:
             except Exception as e:
                 logger.debug("AutoTranslator: placeholder debug log failed: %s", e)
 
-        services_to_try = self._ordered_services_to_try(service_name)
+        services_to_try = [
+            svc
+            for svc in self._ordered_services_to_try(service_name)
+            if _service_supports_language(getattr(svc, "service_name", ""), target_code)
+        ]
+        if not services_to_try:
+            _log_unsupported_pair(source_code, target_code)
+            return None
 
         debug = _debug_translation_enabled()
         for svc_idx, svc in enumerate(services_to_try):
@@ -1427,15 +1529,16 @@ class AutoTranslator:
         # Prepare output list.
         out: list[Optional[str]] = [None] * len(texts)
         try:
-            from app.services.translation.result_cache import get_cached
+            from app.services.translation.result_cache import get_cached_many
 
+            cache_hits = get_cached_many(
+                originals,
+                source_code,
+                target_code,
+                self._result_cache_engine(service_name),
+            )
             for i, original in enumerate(originals):
-                cached = get_cached(
-                    original,
-                    source_code,
-                    target_code,
-                    self._result_cache_engine(service_name),
-                )
+                cached = cache_hits.get(original)
                 if cached:
                     out[i] = self._enforce_cached_translation(
                         original, cached, target_code, source_code, service_name
@@ -1447,7 +1550,14 @@ class AutoTranslator:
             if not ok and out[i] is None:
                 out[i] = originals[i]
 
-        services_to_try = self._ordered_services_to_try(service_name)
+        services_to_try = [
+            svc
+            for svc in self._ordered_services_to_try(service_name)
+            if _service_supports_language(getattr(svc, "service_name", ""), target_code)
+        ]
+        if not services_to_try:
+            _log_unsupported_pair(source_code, target_code)
+            return [originals[i] if out[i] is None else out[i] for i in range(len(out))]
 
         # Try services, filling missing items as we go (per-item fallback).
         for svc_idx, svc in enumerate(services_to_try):
@@ -1466,6 +1576,9 @@ class AutoTranslator:
 
             if not batch_results:
                 continue
+
+            engine_key = self._result_cache_engine(service_name, svc=svc)
+            to_cache: list[tuple[str, str]] = []
 
             # Map results back and restore placeholders.
             for idx, translated in enumerate(batch_results):
@@ -1512,16 +1625,13 @@ class AutoTranslator:
                     continue
 
                 out[i] = restored
-                try:
-                    from app.services.translation.result_cache import put_cached
+                to_cache.append((originals[i], restored))
 
-                    put_cached(
-                        originals[i],
-                        source_code,
-                        target_code,
-                        self._result_cache_engine(service_name, svc=svc),
-                        restored,
-                    )
+            if to_cache:
+                try:
+                    from app.services.translation.result_cache import put_cached_many
+
+                    put_cached_many(to_cache, source_code, target_code, engine_key)
                 except Exception as e:
                     logger.debug("batch result cache write skipped: %s", e)
 

@@ -1928,6 +1928,7 @@ msgid "All language fields are already filled."
 msgstr ""
 
 #: app/templates/admin/ai/documents.html:517
+#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:21
 msgid "All languages"
 msgstr ""
 
@@ -12387,6 +12388,7 @@ msgstr ""
 #: app/templates/components/_mobile_language_menu.html:18
 #: app/templates/core/layout.html:264
 #: app/templates/forms/entry_form/partials/_entry_form_document_field.html:53
+#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:6
 msgid "Language"
 msgstr ""
 
@@ -22036,6 +22038,7 @@ msgstr ""
 #: app/templates/forms/form_builder/field_mapping.html:15
 #: app/templates/forms/form_builder/field_mapping.html:262
 #: app/templates/forms/form_builder/field_mapping.html:283
+#: plugins/upr_visuals/templates/upr_visuals/_language_select.html:12
 msgid "Suggested"
 msgstr ""
 

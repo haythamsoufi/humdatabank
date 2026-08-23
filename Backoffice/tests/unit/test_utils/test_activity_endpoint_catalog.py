@@ -19,14 +19,14 @@ def test_catalog_keys_unique_after_merge():
 def test_manual_override_traces_bulk_delete():
     s = resolve_activity_catalog_spec("POST", "ai_management.traces_bulk_delete")
     assert s is not None
-    assert s.description == "Deleted traces"
+    assert s.description == "Deleted AI traces"
     assert s.activity_type == "admin_ai"
 
 
 def test_manual_override_edit_resource():
     s = resolve_activity_catalog_spec("POST", "content_management.edit_resource")
     assert s is not None
-    assert s.description == "Edited resource"
+    assert s.description == "Edited a resource"
 
 
 def test_manual_override_embed_content():
@@ -57,7 +57,7 @@ def test_default_generated_description_verbs():
     assert default_generated_description("POST", "user_management.kickout_device") == "Kicked out Device"
     assert default_generated_description(
         "POST", "ai_documents.import_ifrc_bulk_cancel"
-    ) == "Cancelled Import Ifrc Bulk"
+    ) == "Cancelled Import IFRC Bulk"
     assert default_generated_description(
         "POST", "admin_communication.api_send_notifications"
     ) == "Sent Notifications"
@@ -65,7 +65,7 @@ def test_default_generated_description_verbs():
 
 
 def test_catalog_display_description_respects_manual_overrides():
-    assert catalog_display_description("POST", "ai_management.traces_bulk_delete") == "Deleted traces"
+    assert catalog_display_description("POST", "ai_management.traces_bulk_delete") == "Deleted AI traces"
     assert catalog_display_description("POST", "ai_documents.answer_documents") == "Answered Documents"
 
 

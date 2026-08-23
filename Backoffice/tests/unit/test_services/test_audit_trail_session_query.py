@@ -44,6 +44,39 @@ class TestApplyAuditTrailNoiseFilters:
         count = filtered.count()
         assert count >= 0
 
+    def test_excludes_wizard_endpoint_but_keeps_profile_update(self, app, db_session):
+        from app.models import UserActivityLog
+        from app.utils.datetime_helpers import utcnow
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
+        now = utcnow()
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                activity_type="request",
+                endpoint="auth.complete_profile",
+                url_path="/complete-profile",
+                ip_address="127.0.0.1",
+                timestamp=now,
+            )
+        )
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                activity_type="profile_update",
+                endpoint="auth.complete_profile",
+                url_path="/complete-profile",
+                ip_address="127.0.0.1",
+                timestamp=now,
+            )
+        )
+        db_session.commit()
+
+        visible = apply_audit_trail_user_activity_noise_filters(UserActivityLog.query).all()
+        visible_types = {row.activity_type for row in visible}
+        assert visible_types == {"profile_update"}
+
     def test_excludes_login_and_logout(self, app, db_session):
         """login/logout rows are omitted from audit trail queries."""
         from app.models import UserActivityLog
@@ -310,6 +343,62 @@ class TestCountAuditVisibleEntriesForSession:
 
         result = count_audit_visible_entries_for_session(sl)
         assert result == 0
+
+    def test_form_saved_and_wizard_endpoints_not_counted(self, app, db_session):
+        from app.models import UserActivityLog, UserSessionLog
+        from app.utils.datetime_helpers import utcnow
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
+        now = utcnow()
+        session_start = now - timedelta(hours=1)
+
+        sl = UserSessionLog(
+            session_id="test-draft-excluded-01",
+            user_id=user.id,
+            session_start=session_start,
+            session_end=now,
+            actions_performed=0,
+            ip_address="127.0.0.1",
+        )
+        db_session.add(sl)
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                user_session_id="test-draft-excluded-01",
+                activity_type="form_saved",
+                endpoint="forms.view_edit_form",
+                url_path="/forms/assignment/1",
+                ip_address="127.0.0.1",
+                timestamp=session_start + timedelta(minutes=1),
+            )
+        )
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                user_session_id="test-draft-excluded-01",
+                activity_type="admin_other",
+                endpoint="upr_excel_import.analyze",
+                url_path="/upr-excel/analyze",
+                ip_address="127.0.0.1",
+                timestamp=session_start + timedelta(minutes=2),
+            )
+        )
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                user_session_id="test-draft-excluded-01",
+                activity_type="form_submitted",
+                endpoint="forms.view_edit_form",
+                url_path="/forms/assignment/1",
+                ip_address="127.0.0.1",
+                timestamp=session_start + timedelta(minutes=3),
+            )
+        )
+        db_session.commit()
+
+        result = count_audit_visible_entries_for_session(sl)
+        assert result == 1
 
 
 class TestCountAuditVisibleEntriesForSessionsBatch:

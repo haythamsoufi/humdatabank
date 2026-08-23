@@ -199,7 +199,7 @@
 {# Use centralized is_admin_user helper from AuthorizationService #}
 {% set is_admin_user = is_admin_user() %}
 {% set can_manage_users = is_system_manager or has_permission('admin.users.edit') %}
-<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}{% if can_manage_users %} user-hover-details-enabled{% endif %}" data-language="{{ _ui_language }}">
+<body class="bg-gray-100 font-sans {% if is_focal_point %}focal-point{% endif %}{% if show_staging_banner %} has-staging-banner{% endif %}{% if can_manage_users %} user-hover-details-enabled{% endif %}" data-language="{{ _ui_language }}" data-chat-websocket-enabled="{{ 'true' if chat_websocket_enabled|default(false) else 'false' }}">
     {% include 'components/_staging_environment_banner.html' %}
     {% block outer_body %}
     <div class="flex h-screen staging-app-shell">
@@ -573,6 +573,7 @@
     {% if current_user.is_authenticated %}
     <script nonce="{{ csp_nonce() }}">
     window.NOTIFY_WS_ENABLED = {{ notify_websocket_enabled|default(false)|tojson }};
+    window.CHAT_WEBSOCKET_ENABLED = {{ chat_websocket_enabled|default(false)|tojson }};
     </script>
     {% endif %}
     <script src="{{ static_url('js/core/components.js') }}"></script>

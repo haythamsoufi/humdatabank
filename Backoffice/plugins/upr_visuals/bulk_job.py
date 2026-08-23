@@ -41,7 +41,11 @@ from plugins.upr_visuals.catalog import dashboards_for_kind, kind_for_template
 from plugins.upr_visuals.data import build_payload, filename_from_visual_title
 from plugins.upr_visuals.i18n import export_locale, parse_export_language
 from plugins.upr_visuals.render import render_dashboard_html
+from app.utils.pg_advisory_lock import acquire_transaction_advisory_lock
 from plugins.upr_visuals.service import STORAGE_CATEGORY, UprVisualsService
+
+# Transaction advisory lock for the one-at-a-time bulk queue (clear of digest/RBAC/AI-job ids).
+UPR_VISUALS_BULK_CREATE_LOCK_ID = 915100001
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +150,7 @@ def create_bulk_export_job(
     from plugins.upr_visuals.data import get_assigned_form_for_bulk
 
     _fail_orphaned_bulk_jobs()
+    acquire_transaction_advisory_lock(db.session, UPR_VISUALS_BULK_CREATE_LOCK_ID)
     inflight = (
         AIJob.query.filter(
             AIJob.job_type == BULK_EXPORT_JOB_TYPE,
@@ -298,7 +303,7 @@ def get_active_bulk_export_job() -> dict[str, Any] | None:
     job = (
         AIJob.query.filter(
             AIJob.job_type == BULK_EXPORT_JOB_TYPE,
-            AIJob.status.in_(("queued", "running")),
+            AIJob.status.in_(_ACTIVE_JOB_STATUSES),
         )
         .order_by(AIJob.created_at.desc())
         .first()
@@ -319,6 +324,7 @@ def get_active_bulk_export_job() -> dict[str, Any] | None:
 
 
 def serve_bulk_export_zip(job_id: str):
+    """Any system manager can download the singleton queue's ZIP."""
     payload = build_bulk_export_status_payload(job_id)
     key = (payload or {}).get("zip_key")
     if not key:
@@ -472,7 +478,7 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                         country_payload = build_payload(row["aes_id"], inline_icons=True)
                     except Exception as exc:
                         logger.warning("UPR visuals skip aes %s: %s", row["aes_id"], exc)
-                        errors.append(f"aes {row['aes_id']}: {exc}")
+                        errors.append(f"aes {row['aes_id']}: could not build visuals")
                         try:
                             db.session.rollback()
                         except Exception:
@@ -483,7 +489,7 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                     meta = country_payload["meta"]
                     iso3 = meta.get("iso3") or row.get("iso3") or "UNK"
                     round_code = meta.get("round_code") or "round"
-                    folder = f"{iso3}_{round_code}"
+                    folder = filename_from_visual_title(f"{iso3}_{round_code}", "png")[:-4]
                     available = {item_dash.get("id") for item_dash in country_payload.get("dashboards") or []}
                     word_path = None
                     if include_narrative:
@@ -548,7 +554,7 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                                 dashboard_id,
                                 exc,
                             )
-                            errors.append(f"aes {row['aes_id']} {dashboard_id}: {exc}")
+                            errors.append(f"aes {row['aes_id']} {dashboard_id}: render failed")
                         finally:
                             gc.collect()
                         done += 1
@@ -575,9 +581,11 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
             terminal_item_status = "completed"
         except Exception as exc:
             logger.exception("UPR visuals bulk export failed")
-            _update_job_progress(job_id, item_id, force=True, message="Failed", error=str(exc))
+            _update_job_progress(
+                job_id, item_id, force=True, message="Failed", error="Could not generate this export."
+            )
             item.status = "failed"
-            item.error = str(exc)
+            item.error = "Could not generate this export."
             terminal_item_status = "failed"
         finally:
             if item.status not in ("completed", "failed", "cancelled"):

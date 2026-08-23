@@ -17,12 +17,12 @@ from plugins.upr_visuals.i18n import (
     parse_progress_id,
     rtl_css,
     rtl_document_attrs,
-    rtl_font_link_html,
     start_visuals_progress,
     t,
     t_batch,
     translate_styled_blocks,
     update_visuals_progress,
+    uses_arabic_font,
 )
 
 
@@ -38,15 +38,17 @@ def test_parse_export_language_known_and_fallback():
 @pytest.mark.unit
 def test_is_rtl_and_document_attrs():
     assert is_rtl("ar") is True
+    assert is_rtl("he") is True
     assert is_rtl("fr") is False
+    assert uses_arabic_font("ar") is True
+    assert uses_arabic_font("fa") is True
+    assert uses_arabic_font("he") is False
     assert rtl_document_attrs("ar") == {"lang": "ar", "dir": "rtl"}
     assert rtl_document_attrs("en") == {"lang": "en", "dir": "ltr"}
-    assert "Tajawal" in rtl_css("ar")
-    assert ".upr-dashboard[dir=\"rtl\"]" in rtl_css("ar")
-    assert ".upr-doc-header__country" in rtl_css("ar")
+    assert "Tajawal" not in rtl_css("ar")
+    assert "text-align: justify" in rtl_css("ar")
+    assert "text-align: justify" in rtl_css("he")
     assert rtl_css("en") == ""
-    assert "Tajawal" in rtl_font_link_html("ar")
-    assert rtl_font_link_html("en") == ""
 
 
 @pytest.mark.unit
@@ -178,9 +180,11 @@ def test_render_dashboard_sets_rtl_dir_for_arabic(monkeypatch):
     )
     assert "dir='rtl'" in html
     assert "lang='ar'" in html
-    assert "class=\"upr-dashboard upr-dashboard--combined\"" in html
-    assert "بالفرنك السويسري (فرنك سويسري)" in html
-    assert "بالفرنك السويسري (CHF)" not in html
+    assert "upr-arabic-font" in html
+    assert 'class="upr-dashboard upr-dashboard--combined upr-arabic-font"' in html
+    assert "upr-doc-footer upr-arabic-font" in html
+    assert "بالفرنك السويسري (CHF)" in html
+    assert "بالفرنك السويسري (فرنك سويسري)" not in html
     support = render_dashboard_html(
         {
             "meta": {
@@ -206,6 +210,29 @@ def test_render_dashboard_sets_rtl_dir_for_arabic(monkeypatch):
     assert "upr-support-total' colspan=" in support[support.find("upr-support-total-row") :]
     body = support[support.find("<tbody>") : support.find("</tbody>")]
     assert body.find("upr-dot-cell") < body.find("upr-ns")
+
+
+@pytest.mark.unit
+def test_hebrew_is_rtl_without_arabic_font(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "he")
+    from plugins.upr_visuals.render import render_dashboard_html
+
+    html = render_dashboard_html(
+        {
+            "meta": {
+                "kind": "report",
+                "country_name": "Uganda",
+                "iso2": "UG",
+                "document_subtitle": "x",
+                "header_date": "2 July 2026",
+            },
+            "kpis": {},
+        },
+        "combined",
+    )
+    assert "dir='rtl'" in html
+    assert "lang='he'" in html
+    assert "upr-arabic-font" not in html
 
 
 @pytest.mark.unit
@@ -282,6 +309,22 @@ def test_parse_progress_id_and_store():
     assert rec["pending"] == 7
     assert rec["lang"] == "de"
     assert rec["elapsed"] == 4
+
+
+@pytest.mark.unit
+def test_can_machine_translate_fails_closed(monkeypatch):
+    import plugins.upr_visuals.i18n as i18n
+
+    monkeypatch.setattr(i18n, "is_system_language", lambda lang=None: False)
+    real_import = __import__
+
+    def guarded(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "app.services.translation.auto_translator":
+            raise ImportError("missing")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", guarded)
+    assert i18n.can_machine_translate("de") is False
 
 
 @pytest.mark.unit
@@ -577,7 +620,12 @@ def test_raster_wrap_sets_rtl_html(monkeypatch):
     assert "<title>أفغانستان — Unified Country Report</title>" in html
     assert "lang='ar'" in html
     assert "dir='rtl'" in html
+    assert "class='upr-arabic-font'" in html
     assert "Tajawal" in html
+    assert "html, body { font-family: \"Tajawal\"" in html
+    assert "html, body, table, th, td, p, h1, h2, h3, h4, li" not in html
+    assert ".upr-arabic-font *" in html
+    assert "@bottom-center" in html
     assert "fonts.googleapis.com" not in html
     assert "html[dir=\"rtl\"] .upr-fin-grid" in html
     from plugins.upr_visuals.raster import _rtl_print_css
@@ -608,7 +656,7 @@ def test_idml_rtl_page_binding():
     from plugins.upr_visuals.idml.xml_idml import Idml
 
     ltr_doc = Idml(rtl=False)
-    rtl_doc = Idml(rtl=True)
+    rtl_doc = Idml(rtl=True, arabic_font=True)
     table = {
         "kind": "table",
         "rows": [[[{"style": "Body", "text": "A", "runs": [{"text": "A", "href": "", "bold": False}]}]]],
@@ -622,3 +670,9 @@ def test_idml_rtl_page_binding():
     assert "Tajawal" in rtl
     assert "RightToLeftDirection" in rtl
     assert "LeftToRightDirection" in ltr
+    he_doc = Idml(rtl=True, arabic_font=False)
+    he_doc.styled_story([table])
+    he = _idml_xml_text(he_doc.package_bytes())
+    assert 'PageBinding="RightToLeft"' in he
+    assert "<AppliedFont type='string'>Tajawal</AppliedFont>" not in he
+    assert "<AppliedFont type='string'>Open Sans</AppliedFont>" in he

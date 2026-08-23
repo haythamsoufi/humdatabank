@@ -106,7 +106,9 @@
   }
 
   const LANG_STORAGE_KEY = "upr-visuals-export-lang";
-  const RTL_LANGS = { ar: 1, fa: 1, he: 1, ur: 1 };
+  // Fallbacks must match i18n.RTL_LANGS / ARABIC_FONT_LANGS.
+  const RTL_LANGS_FALLBACK = { ar: 1, fa: 1, he: 1, ur: 1 };
+  const ARABIC_FONT_LANGS_FALLBACK = { ar: 1, fa: 1, ur: 1 };
 
   function normalizeLang(value) {
     const raw = String(value || "")
@@ -116,8 +118,28 @@
     return raw.split("-")[0] || "";
   }
 
+  function langSetFromSelect(attr, fallback) {
+    const select = document.querySelector("[data-upr-lang-select]");
+    const raw = select && select.getAttribute(attr);
+    if (!raw) return fallback;
+    const set = Object.create(null);
+    String(raw)
+      .split(",")
+      .forEach((part) => {
+        const code = normalizeLang(part);
+        if (code) set[code] = 1;
+      });
+    return Object.keys(set).length ? set : fallback;
+  }
+
   function isRtlLang(value) {
-    return Boolean(RTL_LANGS[normalizeLang(value || getExportLanguage())]);
+    const code = normalizeLang(value || getExportLanguage());
+    return Boolean(langSetFromSelect("data-rtl-langs", RTL_LANGS_FALLBACK)[code]);
+  }
+
+  function isArabicFontLang(value) {
+    const code = normalizeLang(value || getExportLanguage());
+    return Boolean(langSetFromSelect("data-arabic-font-langs", ARABIC_FONT_LANGS_FALLBACK)[code]);
   }
 
   function applyExportDir(el) {
@@ -125,6 +147,7 @@
     const code = getExportLanguage();
     el.dir = isRtlLang(code) ? "rtl" : "ltr";
     el.lang = code || "en";
+    el.classList.toggle("upr-arabic-font", isArabicFontLang(code));
   }
 
   function storedExportLanguage() {
@@ -418,6 +441,7 @@
     matchLanguageOption,
     withLang,
     isRtlLang,
+    isArabicFontLang,
     applyExportDir,
     formatElapsed,
     newProgressId,

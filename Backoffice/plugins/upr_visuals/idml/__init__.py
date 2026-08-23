@@ -46,7 +46,10 @@ def read_docx_xml_member(zf: zipfile.ZipFile, name: str) -> bytes:
     """Read one named OOXML member after checking uncompressed size."""
     info = zf.getinfo(name)
     _reject_oversized_zip_member(info)
-    return zf.read(name)
+    data = zf.read(name)
+    if len(data) > DOCX_MAX_UNCOMPRESSED_BYTES:
+        raise UprVisualsError("The Word document is too large to process.")
+    return data
 
 
 def validate_docx_bytes(data: bytes) -> None:

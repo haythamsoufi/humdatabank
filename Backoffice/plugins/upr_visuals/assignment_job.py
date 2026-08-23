@@ -1,14 +1,19 @@
-"""Single-assignment narrative/InDesign export as a background AIJob.
+"""Single-assignment PNG/PDF/InDesign export as a background AIJob.
 
-WeasyPrint + Word merge take longer than the HTTP stuck-request window, so the
-assignment POST only queues work. The browser polls status and downloads when ready.
+WeasyPrint takes longer than the HTTP stuck-request window, so assignment
+routes only queue work. The browser polls status (or a wait page) and downloads
+when ready. Download is gated by assignment ACL on the route, not job.user_id,
+so anyone who can open the assignment can fetch a completed export.
 """
 
 from __future__ import annotations
 
 import logging
 import shutil
+import threading
+import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,12 +32,18 @@ from app.services.ai.ai_job_runner import (
 from app.utils.datetime_helpers import utcnow
 from plugins.upr_visuals.i18n import parse_export_language
 from plugins.upr_visuals.service import UprVisualsService
+from plugins.upr_visuals.typography import export_style_token
 
 logger = logging.getLogger(__name__)
 
 ASSIGNMENT_EXPORT_JOB_TYPE = "upr_visuals.assignment_export"
+ASSIGNMENT_EXPORT_JOB_TTL_SECONDS = 6 * 60 * 60
+REUSE_COMPLETED_SECONDS = 15 * 60
 _ACTIVE_JOB_STATUSES = ("queued", "running", "cancel_requested")
 _TERMINAL_JOB_STATUSES = frozenset({"completed", "failed", "cancelled"})
+_VISUAL_FORMATS = frozenset({"png", "pdf", "idml"})
+_last_cleanup_ts = 0.0
+_last_cleanup_lock = threading.Lock()
 
 
 def _status_str(value: Any) -> str:
@@ -41,8 +52,67 @@ def _status_str(value: Any) -> str:
     return str(value or "")
 
 
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _job_dir(job_id: str) -> Path:
     return Path(current_app.instance_path) / "upr_visuals_tmp" / str(job_id)
+
+
+def _read_job_word(job_dir: Path, word_path: str | Path) -> bytes | None:
+    raw = str(word_path or "").strip()
+    if not raw or raw in {".", ".."}:
+        return None
+    try:
+        resolved = Path(raw).resolve()
+    except OSError as exc:
+        raise RuntimeError("Export job is missing the Word document.") from exc
+    root = job_dir.resolve()
+    if root not in resolved.parents and resolved != root:
+        raise RuntimeError("Export job is missing the Word document.")
+    if not resolved.is_file():
+        raise RuntimeError("Export job is missing the Word document.")
+    return resolved.read_bytes()
+
+
+def cleanup_expired_assignment_export_jobs(now_ts: float | None = None) -> None:
+    if now_ts is None:
+        now_ts = time.time()
+    cutoff = datetime.fromtimestamp(now_ts - ASSIGNMENT_EXPORT_JOB_TTL_SECONDS, tz=timezone.utc).replace(
+        tzinfo=None
+    )
+    try:
+        expired = (
+            AIJob.query.filter(
+                AIJob.job_type == ASSIGNMENT_EXPORT_JOB_TYPE,
+                AIJob.status.in_(tuple(_TERMINAL_JOB_STATUSES)),
+                AIJob.created_at < cutoff,
+            ).all()
+        )
+        for job in expired:
+            shutil.rmtree(_job_dir(str(job.id)), ignore_errors=True)
+            db.session.delete(job)
+        if expired:
+            db.session.commit()
+            logger.info("Cleaned up %s expired UPR assignment export jobs", len(expired))
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to clean up expired UPR assignment export jobs")
+
+
+def _maybe_cleanup_expired_jobs() -> None:
+    global _last_cleanup_ts
+    now = time.time()
+    with _last_cleanup_lock:
+        if now - _last_cleanup_ts < 300:
+            return
+        _last_cleanup_ts = now
+    cleanup_expired_assignment_export_jobs(now)
 
 
 def create_assignment_export_job(
@@ -50,20 +120,33 @@ def create_assignment_export_job(
     user_id: int,
     aes_id: int,
     export_format: str,
-    word_bytes: bytes,
+    word_bytes: bytes | None = None,
     lang: str = "en",
+    dashboard_id: str = "combined",
 ) -> str:
-    fmt = "idml" if str(export_format or "").strip().lower() == "idml" else "pdf"
+    from plugins.upr_visuals.catalog import DASHBOARD_BY_ID
+    from plugins.upr_visuals.errors import UprVisualsError
+
+    fmt = str(export_format or "pdf").strip().lower()
+    if fmt not in _VISUAL_FORMATS:
+        raise UprVisualsError("Choose PNG, PDF, or InDesign.")
+    dash = str(dashboard_id or "combined").strip() or "combined"
+    if dash not in DASHBOARD_BY_ID:
+        raise UprVisualsError(f"Unknown dashboard: {dash}")
     lang = parse_export_language(lang)
     job_id = str(uuid.uuid4())
     job_dir = _job_dir(job_id)
     job_dir.mkdir(parents=True, exist_ok=True)
-    word_path = job_dir / "narrative.docx"
-    word_path.write_bytes(word_bytes)
+    word_path = ""
+    if word_bytes:
+        path = job_dir / "narrative.docx"
+        path.write_bytes(word_bytes)
+        word_path = str(path)
     now = utcnow()
     meta = {
         "aes_id": int(aes_id),
         "export_format": fmt,
+        "dashboard_id": dash,
         "lang": lang,
         "message": "Queued",
         "progress": 0,
@@ -73,12 +156,15 @@ def create_assignment_export_job(
         "output_path": None,
         "mimetype": None,
         "error": None,
+        "has_word": bool(word_bytes),
+        "style_rev": export_style_token(),
     }
     payload = {
         "aes_id": int(aes_id),
         "export_format": fmt,
+        "dashboard_id": dash,
         "lang": lang,
-        "word_path": str(word_path),
+        "word_path": word_path,
     }
     job = AIJob(
         id=job_id,
@@ -103,11 +189,98 @@ def create_assignment_export_job(
     return job_id
 
 
+def _visual_job_matches(
+    job: AIJob,
+    *,
+    aes_id: int,
+    export_format: str,
+    dashboard_id: str,
+    lang: str,
+) -> bool:
+    if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
+        return False
+    meta = dict(job.meta or {})
+    if meta.get("has_word"):
+        return False
+    return (
+        int(meta.get("aes_id") or 0) == int(aes_id)
+        and str(meta.get("export_format") or "pdf") == export_format
+        and str(meta.get("dashboard_id") or "combined") == dashboard_id
+        and str(meta.get("lang") or "en") == lang
+        and str(meta.get("style_rev") or "") == export_style_token()
+    )
+
+
+def _reusable_job_id(
+    jobs: list[Any],
+    *,
+    aes_id: int,
+    export_format: str,
+    dashboard_id: str,
+    lang: str,
+    now: datetime | None = None,
+) -> str | None:
+    fmt = str(export_format or "pdf").strip().lower()
+    dash = str(dashboard_id or "combined").strip() or "combined"
+    lang = parse_export_language(lang)
+    clock = now or utcnow()
+    for job in jobs:
+        if not _visual_job_matches(
+            job, aes_id=aes_id, export_format=fmt, dashboard_id=dash, lang=lang
+        ):
+            continue
+        status = _status_str(job.status)
+        if status in _ACTIVE_JOB_STATUSES:
+            return str(job.id)
+        if status != "completed":
+            continue
+        finished = _as_utc(job.finished_at or job.created_at)
+        if finished is None:
+            continue
+        age = (_as_utc(clock) - finished).total_seconds()
+        if age < 0 or age > REUSE_COMPLETED_SECONDS:
+            continue
+        raw_path = (job.meta or {}).get("output_path")
+        if not raw_path:
+            continue
+        try:
+            path = Path(str(raw_path)).resolve()
+        except OSError:
+            continue
+        if path.is_file() and path.stat().st_size > 0:
+            return str(job.id)
+    return None
+
+
+def find_reusable_assignment_export_job(
+    *,
+    aes_id: int,
+    export_format: str,
+    dashboard_id: str = "combined",
+    lang: str = "en",
+) -> str | None:
+    """Return a matching in-flight or freshly completed visual export, if any."""
+    jobs = (
+        AIJob.query.filter(AIJob.job_type == ASSIGNMENT_EXPORT_JOB_TYPE)
+        .order_by(AIJob.created_at.desc())
+        .limit(80)
+        .all()
+    )
+    return _reusable_job_id(
+        jobs,
+        aes_id=aes_id,
+        export_format=export_format,
+        dashboard_id=dashboard_id,
+        lang=lang,
+    )
+
+
 def start_assignment_export_job(app, job_id: str) -> None:
     start_ai_job_thread(app, str(job_id), _run_assignment_export_job)
 
 
 def ensure_assignment_export_job_running(app, job_id: str) -> None:
+    _maybe_cleanup_expired_jobs()
     reconcile_stale_ai_job(str(job_id))
     job = AIJob.query.get(str(job_id))
     if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
@@ -156,7 +329,8 @@ def build_assignment_export_status(job_id: str | None) -> dict[str, Any] | None:
     }
 
 
-def serve_assignment_export(job_id: str, *, aes_id: int):
+def serve_assignment_export(job_id: str, *, aes_id: int, as_attachment: bool = True):
+    """Serve a completed export. Caller must already have assignment ACL."""
     job = AIJob.query.get(str(job_id))
     if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
         raise NotFound("Export is not ready.")
@@ -183,7 +357,7 @@ def serve_assignment_export(job_id: str, *, aes_id: int):
     response = send_file(
         resolved,
         mimetype=mimetype,
-        as_attachment=True,
+        as_attachment=as_attachment,
         download_name=filename,
     )
     response.headers["Cache-Control"] = "no-store"
@@ -252,26 +426,30 @@ def _run_assignment_export_job(app, job_id: str) -> None:
         payload = dict(item.payload or {}) if item is not None else {}
         aes_id = int(payload.get("aes_id") or (job.meta or {}).get("aes_id") or 0)
         fmt = str(payload.get("export_format") or (job.meta or {}).get("export_format") or "pdf")
+        dashboard_id = str(
+            payload.get("dashboard_id") or (job.meta or {}).get("dashboard_id") or "combined"
+        )
         lang = parse_export_language(payload.get("lang") or (job.meta or {}).get("lang"))
-        word_path = Path(str(payload.get("word_path") or ""))
         job_dir = _job_dir(str(job_id))
+        word_path = payload.get("word_path") or ""
         started = utcnow()
         logger.info(
-            "UPR assignment export start job=%s aes=%s fmt=%s lang=%s",
+            "UPR assignment export start job=%s aes=%s fmt=%s dash=%s lang=%s",
             job_id,
             aes_id,
             fmt,
+            dashboard_id,
             lang,
         )
         try:
-            if aes_id <= 0 or not word_path.is_file():
-                raise RuntimeError("Export job is missing the Word document.")
-            word_bytes = word_path.read_bytes()
-            if fmt == "idml":
+            if aes_id <= 0:
+                raise RuntimeError("Export job is missing the assignment.")
+            word_bytes = _read_job_word(job_dir, word_path)
+            if word_bytes and fmt == "idml":
                 _report(job, "Generating InDesign package…", step=1, total=3)
                 data, filename = UprVisualsService.idml_zip_bytes(aes_id, word_bytes=word_bytes, lang=lang)
                 mimetype = "application/zip"
-            else:
+            elif word_bytes:
                 last_logged_elapsed = {"value": -10}
 
                 def on_progress(
@@ -309,6 +487,18 @@ def _run_assignment_export_job(app, job_id: str) -> None:
                     lang=lang,
                     on_progress=on_progress,
                 )
+                mimetype = "application/pdf"
+            elif fmt == "png":
+                _report(job, "Generating PNG…", step=1, total=2)
+                data, filename = UprVisualsService.png_bytes(aes_id, dashboard_id, lang=lang)
+                mimetype = "image/png"
+            elif fmt == "idml":
+                _report(job, "Generating InDesign package…", step=1, total=2)
+                data, filename = UprVisualsService.idml_zip_bytes(aes_id, lang=lang)
+                mimetype = "application/zip"
+            else:
+                _report(job, "Generating PDF…", step=1, total=2)
+                data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id, lang=lang)
                 mimetype = "application/pdf"
             output = job_dir / filename
             output.write_bytes(data)

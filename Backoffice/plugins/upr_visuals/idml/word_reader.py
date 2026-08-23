@@ -4,8 +4,26 @@ from __future__ import annotations
 
 import zipfile
 from io import BytesIO
+from urllib.parse import urlparse
 
 from plugins.upr_visuals.errors import UprVisualsError
+
+MAX_NARRATIVE_BLOCKS = 2000
+_ALLOWED_HREF_SCHEMES = frozenset({"http", "https", "mailto"})
+
+
+def safe_export_href(href: str | None) -> str:
+    """Keep only http(s) and mailto links from Word. Drop javascript:/file:/data:."""
+    raw = (href or "").strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw)
+    scheme = (parsed.scheme or "").lower()
+    if scheme == "mailto":
+        return raw if parsed.path else ""
+    if scheme in {"http", "https"} and parsed.netloc:
+        return raw
+    return ""
 
 
 def _parse_word_para(p_el, hrefs: dict[str, str], w_ns: str, r_ns: str) -> dict | None:
@@ -88,7 +106,7 @@ def load_word_paragraphs(docx_bytes: bytes) -> list[dict]:
                 hrefs = {}
             else:
                 hrefs = {
-                    rel.get("Id"): rel.get("Target") or ""
+                    rel.get("Id"): safe_export_href(rel.get("Target") or "")
                     for rel in rels_root
                     if "hyperlink" in (rel.get("Type") or "").lower()
                 }
@@ -97,6 +115,8 @@ def load_word_paragraphs(docx_bytes: bytes) -> list[dict]:
             if body is not None:
                 for child in list(body):
                     _walk_word_blocks(child, hrefs, w_ns, r_ns, blocks)
+                    if len(blocks) > MAX_NARRATIVE_BLOCKS:
+                        raise UprVisualsError("The Word document has too many paragraphs.")
     except UprVisualsError:
         raise
     except (ParseError, zipfile.BadZipFile, KeyError, ValueError) as exc:

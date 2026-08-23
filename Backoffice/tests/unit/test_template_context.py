@@ -581,6 +581,13 @@ class TestInjectNotificationsConfig:
         with app.test_request_context("/"):
             result = self._notify_ws_result(app)
         assert result.get("notify_websocket_enabled") is False
+        assert result.get("chat_websocket_enabled") is True
+
+    def test_chat_websocket_follows_config(self, app):
+        app.config["WEBSOCKET_ENABLED"] = False
+        with app.test_request_context("/"):
+            result = self._notify_ws_result(app)
+        assert result.get("chat_websocket_enabled") is False
 
 
 # ---------------------------------------------------------------------------

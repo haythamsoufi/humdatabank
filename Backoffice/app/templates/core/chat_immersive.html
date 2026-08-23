@@ -21,7 +21,7 @@
         window.CHATBOT_NAME = {{ (CHATBOT_NAME or '') | tojson }};
         window.SUPPORTED_LANGUAGES = {{ (SUPPORTED_LANGUAGES or []) | tojson | safe }};
         window.TRANSLATABLE_LANGUAGES = {{ (TRANSLATABLE_LANGUAGES or []) | tojson | safe }};
-        window.CHAT_WEBSOCKET_ENABLED = {{ 'true' if websocket_enabled|default(true) else 'false' }};
+        window.CHAT_WEBSOCKET_ENABLED = {{ 'true' if websocket_enabled|default(false) else 'false' }};
         // Verbose client-side chat logs (stream lifecycle, inflight restore, etc.).
         // chatbot/main.js gates on this; align with CLIENT_CONSOLE_LOGGING so dev can stay quiet when the env flag is off.
         window.CHATBOT_DEBUG = {{ (config.DEBUG and config.CLIENT_CONSOLE_LOGGING) | tojson }};
@@ -81,7 +81,7 @@
     <script type="module" src="{{ static_url('js/chatbot/main.js') }}"></script>
     <script src="{{ static_url('js/chatbot/immersive.js') }}" defer></script>
 </head>
-<body class="chat-immersive{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ session.get('language', 'en') }}" data-chat-websocket-enabled="{{ 'true' if websocket_enabled|default(true) else 'false' }}">
+<body class="chat-immersive{% if show_staging_banner %} has-staging-banner{% endif %}" data-language="{{ session.get('language', 'en') }}" data-chat-websocket-enabled="{{ 'true' if websocket_enabled|default(false) else 'false' }}">
     {% include 'components/_staging_environment_banner.html' %}
     {% if user_is_explicit_beta_tester(current_user) %}
     <div class="chat-immersive-beta-banner" id="chatImmersiveBetaBanner" role="banner">

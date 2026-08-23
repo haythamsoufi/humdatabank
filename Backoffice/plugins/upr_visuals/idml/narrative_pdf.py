@@ -8,16 +8,18 @@ from pathlib import Path
 from plugins.upr_visuals.errors import UprVisualsError
 from plugins.upr_visuals.idml.constants import _STYLE_RUNS
 from plugins.upr_visuals.idml.narrative_style import folio_label, folio_text
-from plugins.upr_visuals.raster import _PLUGIN_DIR, _PLUGIN_FONTS_DIR, _font_css, _restricted_url_fetcher
+from plugins.upr_visuals.raster import _PLUGIN_DIR, _PLUGIN_FONTS_DIR, _restricted_url_fetcher
 
 _APP_FONTS_DIR = Path(__file__).resolve().parents[3] / "app" / "static" / "fonts"
 
 
 def _run_html(run: dict, *, style_name: str) -> str:
+    from plugins.upr_visuals.idml.word_reader import safe_export_href
+
     text = escape(str(run.get("text") or ""))
     if not text:
         return ""
-    href = (run.get("href") or "").strip()
+    href = safe_export_href(run.get("href"))
     base = _STYLE_RUNS.get(style_name) or _STYLE_RUNS["Body"]
     bold = bool(run.get("bold")) and style_name != "AdditionalHead"
     if style_name == "ContactName":
@@ -83,11 +85,18 @@ def _table_html(rows: list[list[list[dict]]]) -> str:
 
 
 def _narrative_css() -> str:
-    from plugins.upr_visuals.i18n import current_export_language, rtl_css
+    from plugins.upr_visuals.i18n import current_export_language, rtl_css, uses_arabic_font
+    from plugins.upr_visuals.typography import (
+        ARABIC_NUMBER_STACK,
+        LATIN_NUMBER_STACK,
+        print_typography_css,
+    )
 
+    lang = current_export_language()
+    heading_stack = ARABIC_NUMBER_STACK if uses_arabic_font(lang) else LATIN_NUMBER_STACK
     return f"""
-{_font_css()}
-{rtl_css(current_export_language())}
+{print_typography_css(lang)}
+{rtl_css(lang)}
 @page {{
   size: A4;
   margin: 32pt 34pt 40pt 34pt;
@@ -96,25 +105,24 @@ html, body {{
   margin: 0;
   padding: 0;
   color: #000;
-  font-family: "Open Sans", "Segoe UI", sans-serif;
   font-size: 10pt;
   line-height: 13.5pt;
 }}
 .upr-nar-p {{ margin: 0 0 8.5pt; }}
 .upr-nar-p--QHeading {{
-  font-family: Montserrat, sans-serif; font-weight: 700; font-size: 20pt;
+  font-family: {heading_stack}; font-weight: 700; font-size: 20pt;
   line-height: 24pt; color: #ef3340; margin: 4pt 0 12pt;
 }}
 .upr-nar-p--SectionHead {{
-  font-family: Montserrat, sans-serif; font-weight: 700; font-size: 15pt;
+  font-family: {heading_stack}; font-weight: 700; font-size: 15pt;
   line-height: 18pt; color: #011e41; margin: 16pt 0 6pt;
 }}
 .upr-nar-p--TopicHead {{
-  font-family: Montserrat, sans-serif; font-weight: 700; font-size: 14pt;
+  font-family: {heading_stack}; font-weight: 700; font-size: 14pt;
   line-height: 17pt; color: #1b365d; margin: 12pt 0 6pt;
 }}
 .upr-nar-p--BandHead {{
-  font-family: Montserrat, sans-serif; font-weight: 700; font-size: 16pt;
+  font-family: {heading_stack}; font-weight: 700; font-size: 16pt;
   line-height: 20pt; color: #1b365d; margin: 14pt 0 10pt;
   border-bottom: 2pt solid #1b365d; padding-bottom: 3pt;
 }}
@@ -124,7 +132,7 @@ html, body {{
 .upr-nar-p--Body {{ text-align: justify; }}
 .upr-nar-p--Blank {{ margin: 0 0 4pt; line-height: 12pt; min-height: 12pt; }}
 .upr-nar-p--AdditionalHead {{
-  font-family: Montserrat, sans-serif; font-weight: 700; font-size: 9.5pt;
+  font-family: {heading_stack}; font-weight: 700; font-size: 9.5pt;
   line-height: 12pt; margin: 8pt 0 10pt;
 }}
 .upr-nar-p--SourceItem {{ font-size: 9.5pt; line-height: 13pt; margin: 0 0 6pt; }}
@@ -161,7 +169,7 @@ html, body {{
   background: #011e41;
   color: #fff;
   font-weight: 700;
-  text-align: left;
+  text-align: start;
 }}
 .upr-nar-table td {{ background: #f1f1f1; }}
 """
@@ -173,14 +181,16 @@ def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "", full_font
     except ImportError as exc:
         raise UprVisualsError("WeasyPrint is required for UPR visual export.") from exc
 
-    from plugins.upr_visuals.i18n import current_export_language, rtl_document_attrs
+    from plugins.upr_visuals.i18n import arabic_font_class, current_export_language, rtl_document_attrs
 
     _ = folio
     lang = current_export_language()
     attrs = rtl_document_attrs(lang)
+    font_class = arabic_font_class(lang)
+    class_attr = f" class='{font_class}'" if font_class else ""
     body = "".join(_para_html(para) for para in styled)
     html = (
-        f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'>"
+        f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'{class_attr}>"
         f"<head><meta charset='utf-8'></head>"
         f"<body>{body}</body></html>"
     )
@@ -215,23 +225,32 @@ def _folio_has_rtl(text: str) -> bool:
     return any("\u0590" <= char <= "\u08ff" or "\ufb1d" <= char <= "\ufefc" for char in text)
 
 
-def _folio_font_path(*, rtl: bool) -> Path | None:
-    """Montserrat for Latin folios; Tajawal / system Arabic fonts for RTL."""
+def _folio_has_arabic(text: str) -> bool:
+    return any("\u0600" <= char <= "\u06ff" or "\ufb50" <= char <= "\ufefc" for char in text)
+
+
+def _folio_font_path(*, rtl: bool, arabic: bool = False) -> Path | None:
+    """Montserrat for Latin; Tajawal for Arabic script; system RTL fonts otherwise."""
     import os
 
     candidates: list[Path] = []
     if rtl:
         windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        if arabic:
+            candidates.extend(
+                [
+                    _PLUGIN_FONTS_DIR / "Tajawal-Regular.ttf",
+                    _APP_FONTS_DIR / "Tajawal-Regular.ttf",
+                    Path("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf"),
+                    Path("/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf"),
+                ]
+            )
         candidates.extend(
             [
-                _PLUGIN_FONTS_DIR / "Tajawal-Regular.ttf",
-                _APP_FONTS_DIR / "Tajawal-Regular.ttf",
                 windir / "Fonts" / "arial.ttf",
                 windir / "Fonts" / "arialuni.ttf",
                 windir / "Fonts" / "tahoma.ttf",
                 windir / "Fonts" / "segoeui.ttf",
-                Path("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf"),
-                Path("/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf"),
                 Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
             ]
         )
@@ -253,7 +272,7 @@ def apply_report_folios(out, *, folio: str = "") -> None:
 
     label = folio or folio_label({})
     rtl = _folio_has_rtl(label)
-    font_path = _folio_font_path(rtl=rtl)
+    font_path = _folio_font_path(rtl=rtl, arabic=_folio_has_arabic(label))
     folio_rect = fitz.Rect(34.0, 803.7, 563.9, 817.7)
     archive = fitz.Archive(str(font_path.parent)) if rtl and font_path is not None else None
     css = ""

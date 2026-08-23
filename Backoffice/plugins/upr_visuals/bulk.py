@@ -17,6 +17,7 @@ from plugins.upr_visuals.errors import UprVisualsError
 
 EXPORT_FORMATS = frozenset({"png", "pdf", "idml"})
 MAX_NARRATIVE_FILES = 250
+MAX_BULK_NARRATIVE_BYTES = 80 * 1024 * 1024
 
 
 def list_assigned_forms_for_bulk() -> list[dict[str, Any]]:
@@ -94,13 +95,14 @@ def _alnum(value: str) -> str:
 
 
 def _docx_from_zip(data: bytes) -> dict[str, bytes]:
-    from plugins.upr_visuals.idml import DOCX_MAX_UNCOMPRESSED_BYTES, validate_docx_bytes
+    from plugins.upr_visuals.idml import DOCX_MAX_BYTES, validate_docx_bytes
 
     try:
         archive = zipfile.ZipFile(BytesIO(data))
     except zipfile.BadZipFile as exc:
         raise UprVisualsError("Upload a zip of Word documents (.docx).") from exc
     found: dict[str, bytes] = {}
+    total_bytes = 0
     with archive:
         for info in archive.infolist():
             name = info.filename.replace("\\", "/")
@@ -108,9 +110,13 @@ def _docx_from_zip(data: bytes) -> dict[str, bytes]:
                 continue
             if not name.lower().endswith(".docx"):
                 continue
-            if int(getattr(info, "file_size", 0) or 0) > DOCX_MAX_UNCOMPRESSED_BYTES:
+            declared = int(getattr(info, "file_size", 0) or 0)
+            if declared > DOCX_MAX_BYTES:
                 raise UprVisualsError("The Word document is too large to process.")
             raw = archive.read(info)
+            total_bytes += len(raw)
+            if total_bytes > MAX_BULK_NARRATIVE_BYTES:
+                raise UprVisualsError("The zip of Word documents is too large to process.")
             validate_docx_bytes(raw)
             found[_stem_key(name)] = raw
             if len(found) > MAX_NARRATIVE_FILES:

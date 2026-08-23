@@ -52,87 +52,21 @@ _APP_STATIC_URL = "/static/"
 # public FDRS GitHub repo).  Only these prefixes are fetched; all other https:// URLs
 # remain unchanged and will be blocked by _restricted_url_fetcher as before.
 _TRUSTED_REMOTE_PREFIXES = ("https://raw.githubusercontent.com/FDRS-ifrc/",)
+_MAX_REMOTE_IMAGE_BYTES = 2 * 1024 * 1024
 
 logger = logging.getLogger(__name__)
 
 
-def _first_font(*paths: Path) -> Path | None:
-    for path in paths:
-        if path.is_file():
-            return path
-    return None
-
-
-def _font_face(family: str, path: Path | None, weight: int, *, style: str = "normal") -> str | None:
-    if path is None or not path.is_file():
-        return None
-    # file:// — WeasyPrint 69 often fails to parse huge unquoted data:font URIs.
-    uri = path.resolve().as_uri()
-    return (
-        f"@font-face {{ font-family: '{family}'; "
-        f"src: url('{uri}') format('truetype'); "
-        f"font-weight: {weight}; font-style: {style}; }}"
-    )
-
-
-def _font_faces(family: str, path: Path | None, weight: int) -> list[str]:
-    """Normal + italic faces. Missing italic TTFs reuse roman so WeasyPrint does not fall to Times."""
-    faces = [_font_face(family, path, weight), _font_face(family, path, weight, style="italic")]
-    return [face for face in faces if face]
-
-
-_EXPORT_BODY_FONT_CSS = (
-    'html, body, table, th, td, p, h1, h2, h3, h4, li {'
-    ' font-family: "Open Sans", "Segoe UI", sans-serif; }'
-)
-
-
-@lru_cache(maxsize=1)
 def _font_css() -> str:
-    open_sans_dirs = (
-        _APP_FONTS_DIR,
-        _PLUGIN_DIR.parents[0] / "pb_progress" / "visuals" / "report" / "fonts",
-    )
-    faces: list[str] = []
-    faces.extend(
-        _font_faces("Open Sans", _first_font(*(folder / "OpenSans-Regular.ttf" for folder in open_sans_dirs)), 400)
-    )
-    faces.extend(
-        _font_faces("Open Sans", _first_font(*(folder / "OpenSans-Bold.ttf" for folder in open_sans_dirs)), 700)
-    )
-    tajawal_regular = _first_font(
-        _PLUGIN_FONTS_DIR / "Tajawal-Regular.ttf",
-        _APP_FONTS_DIR / "Tajawal-Regular.ttf",
-        *(folder / "Tajawal-Regular.ttf" for folder in open_sans_dirs),
-    )
-    tajawal_bold = _first_font(
-        _PLUGIN_FONTS_DIR / "Tajawal-Bold.ttf",
-        _APP_FONTS_DIR / "Tajawal-Bold.ttf",
-        *(folder / "Tajawal-Bold.ttf" for folder in open_sans_dirs),
-    )
-    faces.extend(_font_faces("Tajawal", tajawal_regular, 400))
-    faces.extend(_font_faces("Tajawal", tajawal_bold, 700))
-    faces.extend(
-        _font_faces(
-            "Montserrat",
-            _first_font(
-                _PLUGIN_FONTS_DIR / "Montserrat-Regular.ttf",
-                _APP_FONTS_DIR / "Montserrat-Regular.ttf",
-            ),
-            400,
-        )
-    )
-    faces.extend(
-        _font_faces(
-            "Montserrat",
-            _first_font(
-                _PLUGIN_FONTS_DIR / "Montserrat-Bold.ttf",
-                _APP_FONTS_DIR / "Montserrat-Bold.ttf",
-            ),
-            700,
-        )
-    )
-    return "\n".join(faces)
+    from plugins.upr_visuals.typography import export_font_face_css
+
+    return export_font_face_css()
+
+
+def _document_body_font_css(lang: str | None = None) -> str:
+    from plugins.upr_visuals.typography import document_root_font_css
+
+    return document_root_font_css(lang)
 
 
 _PRINT_DROP_AT = ("@media", "@keyframes", "@-webkit-keyframes")
@@ -193,7 +127,10 @@ _PORTRAIT_KEEP_TOGETHER_CSS = (
 
 
 def _rtl_print_css(lang: str | None = None) -> str:
-    """WeasyPrint-safe RTL overrides.
+    """WeasyPrint-safe RTL *layout* overrides (gate 1: ``is_rtl``).
+
+    Fonts are ``typography`` (Tajawal only when ``uses_arabic_font``).
+    Screen preview uses the same ``typography_css()`` via ``/upr-visuals/fonts.css``.
 
     Financial tables stay ``direction: ltr`` + ``table-layout: fixed``.
     WeasyPrint reverses RTL table columns and then paints rowspan/Arabic
@@ -341,9 +278,11 @@ html[dir="rtl"] .upr-doc-header__country,
 html[dir="rtl"] .upr-fin-grid th,
 html[dir="rtl"] .upr-fin-grid td.upr-bar-label,
 html[dir="rtl"] .upr-fin-net__entity,
-html[dir="rtl"] .upr-fin-net__bucket,
-html[dir="rtl"] .upr-fin-net__metric {
+html[dir="rtl"] .upr-fin-net__bucket {
   text-align: right;
+}
+html[dir="rtl"] .upr-fin-net__metric {
+  text-align: left;
 }
 html[dir="rtl"] .upr-bars .upr-bar-label,
 html[dir="rtl"] .upr-block--bars .upr-bar-label,
@@ -559,10 +498,12 @@ def _pdf_page_css(dashboard_id: str) -> str:
     portrait = _is_portrait_export(dashboard_id)
     orientation = "portrait" if portrait else "landscape"
     margin = A4_COMBINED_MARGIN_MM if portrait else A4_MARGIN_MM
-    from plugins.upr_visuals.i18n import current_export_language
+    from plugins.upr_visuals.i18n import current_export_language, rtl_css
+    from plugins.upr_visuals.typography import print_typography_css
 
+    lang = current_export_language()
     keep_together = _PORTRAIT_KEEP_TOGETHER_CSS if portrait else ""
-    rtl_print = _rtl_print_css(current_export_language())
+    rtl_print = _rtl_print_css(lang)
     if portrait:
         page = (
             f"@page {{ size: A4 portrait; margin: {A4_COMBINED_FOLLOWING_MARGIN_MM}mm 0; }}\n"
@@ -581,9 +522,10 @@ def _pdf_page_css(dashboard_id: str) -> str:
     return (
         page
         + "html, body { margin: 0; padding: 0; background: #fff; }\n"
-        + f"{_EXPORT_BODY_FONT_CSS}\n"
+        + f"{print_typography_css(lang)}\n"
         f"{keep_together}"
         f"{rtl_print}"
+        f"{rtl_css(lang)}"
     )
 
 
@@ -628,11 +570,17 @@ def _fetch_remote_as_data_uri(url: str) -> str:
     name = Path(unquote(parsed.path)).name or "image.png"
     try:
         with urlopen(url, timeout=10) as resp:
-            data = resp.read()
+            final = str(getattr(resp, "geturl", lambda: url)() or url)
+            if not any(final.startswith(prefix) for prefix in _TRUSTED_REMOTE_PREFIXES):
+                return ""
+            data = resp.read(_MAX_REMOTE_IMAGE_BYTES + 1)
     except Exception:
         logger.debug("UPR visuals: could not fetch remote image %s for export", url, exc_info=True)
         return ""
     if not data:
+        return ""
+    if len(data) > _MAX_REMOTE_IMAGE_BYTES:
+        logger.warning("UPR visuals: remote image exceeded %s bytes: %s", _MAX_REMOTE_IMAGE_BYTES, url)
         return ""
     mime = mimetypes.guess_type(name)[0] or "image/png"
     return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
@@ -707,23 +655,33 @@ def _wrap(
 ) -> str:
     from html import escape
 
-    from plugins.upr_visuals.i18n import current_export_language, rtl_css, rtl_document_attrs
+    from plugins.upr_visuals.i18n import (
+        arabic_font_class,
+        current_export_language,
+        rtl_css,
+        rtl_document_attrs,
+    )
+    from plugins.upr_visuals.typography import print_typography_css
 
     keep_together = _PORTRAIT_KEEP_TOGETHER_CSS if _is_portrait_export(dashboard_id) else ""
     lang = current_export_language()
     attrs = rtl_document_attrs(lang)
+    font_class = arabic_font_class(lang)
+    class_attr = f" class='{font_class}'" if font_class else ""
     title_html = f"<title>{escape((title or '').strip())}</title>" if (title or "").strip() else ""
     return (
-        f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'><head><meta charset='utf-8'>"
+        f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'{class_attr}>"
+        "<head><meta charset='utf-8'>"
         f"{title_html}"
         "<style>"
-        f"{_font_css()}\n{_print_css()}\n{rtl_css(lang)}\n"
+        f"{_print_css()}\n"
+        f"{print_typography_css(lang)}"
         "html, body { margin: 0; padding: 0; background: #fff; }"
-        f"{_EXPORT_BODY_FONT_CSS}"
         ".upr-dashboard { width: 100%; max-width: none; }"
         ".upr-vis-page { width: auto; max-width: none; min-height: 0; "
         "padding: 0; margin: 0; }"
         f"{keep_together}"
+        f"{rtl_css(lang)}"
         f"{_rtl_print_css(lang)}"
         "</style></head><body>"
         f"{_rewrite_export_images(dashboard_html)}</body></html>"
@@ -996,6 +954,9 @@ def render_png_isolated(
         path for path in (str(_BACKOFFICE_ROOT), env.get("PYTHONPATH", "")) if path
     )
     env["PYTHONPATH"] = pythonpath
+    from plugins.upr_visuals.i18n import current_export_language
+
+    env["UPR_VISUALS_LANG"] = current_export_language()
     cmd = [
         sys.executable,
         "-c",

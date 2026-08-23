@@ -56,10 +56,10 @@ def build_indesign_package(
     title = title_for_export_filename(meta) or "UPR visuals"
     idml_name = filename_from_visual_title(title, "idml")
 
-    from plugins.upr_visuals.i18n import is_rtl
+    from plugins.upr_visuals.i18n import is_rtl, uses_arabic_font
 
     pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    doc = Idml(rtl=is_rtl())
+    doc = Idml(rtl=is_rtl(), arabic_font=uses_arabic_font())
     try:
         visual_bands = build_native_pages(doc, pdf_doc, payload, links)
     finally:

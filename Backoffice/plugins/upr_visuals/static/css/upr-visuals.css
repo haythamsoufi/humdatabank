@@ -149,7 +149,6 @@
 .upr-doc-footer {
   width: 100%;
   box-sizing: border-box;
-  font-family: "Open Sans", "Segoe UI", sans-serif;
 }
 
 .upr-doc-footer__row {
@@ -1295,44 +1294,26 @@
   margin-bottom: 0.75rem;
 }
 
-html[dir="rtl"] .upr-visual-report,
-html[dir="rtl"] .upr-dashboard,
-.upr-visual-report[dir="rtl"],
-.upr-dashboard[dir="rtl"],
-.upr-vis-page[dir="rtl"],
-.upr-vis-page[dir="rtl"] .upr-dashboard,
-.upr-dashboard[dir="rtl"] .upr-doc-header__country,
-.upr-dashboard[dir="rtl"] .upr-doc-header__subtitle,
-.upr-dashboard[dir="rtl"] .upr-block__title,
-.upr-dashboard[dir="rtl"] .upr-kpi__label,
-.upr-dashboard[dir="rtl"] .upr-bar-label,
-.upr-dashboard[dir="rtl"] .upr-bar-group__title,
-.upr-dashboard[dir="rtl"] .upr-bar-yes,
-.upr-dashboard[dir="rtl"] .upr-doc-footer,
-.upr-dashboard[dir="rtl"] .upr-not-reported,
-.upr-dashboard[dir="rtl"] th,
-.upr-dashboard[dir="rtl"] td {
-  font-family: "Tajawal", "Arial", "Segoe UI", sans-serif;
+/*
+  RTL layout only. Fonts are plugins/upr_visuals/typography.py
+  (screen: /upr-visuals/fonts.css; print: raster + WeasyPrint).
+  Layout uses [dir=rtl]. Tajawal uses .upr-arabic-font (ar/fa/ur only).
+  Finance/support/reach tables are pre-reversed LTR HTML. .upr-bars uses
+  CSS direction: rtl.
+*/
+.upr-vis-page[dir="rtl"] .upr-bars,
+.upr-dashboard[dir="rtl"] .upr-bars {
+  direction: rtl;
 }
 
-.upr-vis-page[dir="rtl"] .upr-kpi__value,
-.upr-vis-page[dir="rtl"] .upr-fin-kpi__value,
-.upr-vis-page[dir="rtl"] .upr-reach-value,
-.upr-vis-page[dir="rtl"] .upr-reach-headline,
-.upr-vis-page[dir="rtl"] .upr-bar-value,
-.upr-vis-page[dir="rtl"] .upr-bar-yes.upr-num,
-.upr-vis-page[dir="rtl"] .upr-num,
-.upr-vis-page[dir="rtl"] .upr-support-total,
-.upr-dashboard[dir="rtl"] .upr-kpi__value,
-.upr-dashboard[dir="rtl"] .upr-fin-kpi__value,
-.upr-dashboard[dir="rtl"] .upr-reach-value,
-.upr-dashboard[dir="rtl"] .upr-reach-headline,
-.upr-dashboard[dir="rtl"] .upr-bar-value,
-.upr-dashboard[dir="rtl"] .upr-bar-yes.upr-num,
-.upr-dashboard[dir="rtl"] .upr-num,
-.upr-dashboard[dir="rtl"] .upr-support-total,
-.upr-dashboard[dir="rtl"] .upr-doc-footer__appeal strong {
-  font-family: "Montserrat", "Tajawal", sans-serif;
+.upr-vis-page[dir="rtl"] .upr-fin-hero-split,
+.upr-dashboard[dir="rtl"] .upr-fin-hero-split {
+  direction: rtl;
+}
+
+.upr-vis-page[dir="rtl"] .upr-fin-hero-split .upr-fin-grid,
+.upr-dashboard[dir="rtl"] .upr-fin-hero-split .upr-fin-grid {
+  direction: ltr;
 }
 
 .upr-vis-page[dir="rtl"] .upr-fin-net .upr-bar-track,
@@ -1351,15 +1332,18 @@ html[dir="rtl"] .upr-dashboard,
 
 .upr-vis-page[dir="rtl"] .upr-fin-net__entity,
 .upr-vis-page[dir="rtl"] .upr-fin-net__bucket,
-.upr-vis-page[dir="rtl"] .upr-fin-net__metric,
 .upr-dashboard[dir="rtl"] .upr-fin-net__entity,
 .upr-dashboard[dir="rtl"] .upr-fin-net__bucket,
-.upr-dashboard[dir="rtl"] .upr-fin-net__metric,
 .upr-vis-page[dir="rtl"] .upr-fin-grid .upr-bar-label,
 .upr-vis-page[dir="rtl"] .upr-fin-grid th,
 .upr-dashboard[dir="rtl"] .upr-fin-grid .upr-bar-label,
 .upr-dashboard[dir="rtl"] .upr-fin-grid th {
   text-align: right;
+}
+
+.upr-vis-page[dir="rtl"] .upr-fin-net__metric,
+.upr-dashboard[dir="rtl"] .upr-fin-net__metric {
+  text-align: left;
 }
 
 .upr-vis-page[dir="rtl"] .upr-bars .upr-bar-label,

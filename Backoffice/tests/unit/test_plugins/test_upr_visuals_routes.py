@@ -72,10 +72,14 @@ def _stub_live_pdf(monkeypatch):
     monkeypatch.setattr(routes, "_aes_or_404", lambda _aes_id: object())
     monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "en")
     monkeypatch.setattr(routes, "visuals_browser_title", lambda _aes: "NS — Unified Plan")
+    monkeypatch.setattr(routes, "_queue_visual_export", lambda *_a, **_k: "job-pdf")
     monkeypatch.setattr(
-        routes.UprVisualsService,
-        "pdf_bytes",
-        classmethod(lambda cls, aes_id, dashboard_id, lang="en": (b"%PDF-1.4", "NS.pdf")),
+        routes,
+        "_export_wait_response",
+        lambda aes_id, job_id, download=True, file_url=None: Response(
+            f"wait:{job_id}:{int(download)}",
+            mimetype="text/html; charset=utf-8",
+        ),
     )
 
 
@@ -88,9 +92,8 @@ def test_assignment_pdf_mobile_gets_inline_file(logged_in_sm_client, monkeypatch
     )
     response = logged_in_sm_client.get("/assignment/1/pdf", headers={"User-Agent": iphone})
     assert response.status_code == 200
-    assert response.mimetype == "application/pdf"
-    assert response.get_data() == b"%PDF-1.4"
-    assert response.headers["Content-Disposition"].startswith("inline;")
+    assert response.mimetype.startswith("text/html")
+    assert response.get_data(as_text=True) == "wait:job-pdf:0"
 
 
 @pytest.mark.unit
@@ -108,6 +111,28 @@ def test_assignment_pdf_desktop_gets_titled_viewer(logged_in_sm_client, monkeypa
     assert "name='viewport'" in html
     assert "raw=1" in html
     assert "upr-pdf-fallback" in html
+
+
+@pytest.mark.unit
+def test_assignment_pdf_raw_job_id_serves_completed_file(logged_in_sm_client, monkeypatch):
+    served = []
+    monkeypatch.setattr(routes, "_aes_or_404", lambda _aes_id: object())
+    monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "en")
+    monkeypatch.setattr(
+        routes,
+        "serve_assignment_export",
+        lambda job_id, aes_id, as_attachment=True: served.append((job_id, aes_id, as_attachment))
+        or Response(b"%PDF-1.4", mimetype="application/pdf"),
+    )
+    monkeypatch.setattr(
+        routes,
+        "_queue_visual_export",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("should reuse job_id")),
+    )
+    response = logged_in_sm_client.get("/assignment/1/pdf?raw=1&job_id=job-ready")
+    assert response.status_code == 200
+    assert response.get_data() == b"%PDF-1.4"
+    assert served == [("job-ready", 1, False)]
 
 
 @pytest.mark.unit
@@ -247,7 +272,7 @@ def test_narrative_route_starts_background_job(logged_in_sm_client, monkeypatch)
     monkeypatch.setattr(
         routes,
         "serve_assignment_export",
-        lambda job_id, aes_id: Response(b"%PDF", mimetype="application/pdf"),
+        lambda job_id, aes_id, as_attachment=True: Response(b"%PDF", mimetype="application/pdf"),
     )
     download = logged_in_sm_client.get("/assignment/1/visuals/narrative/file/job-nar")
     assert download.status_code == 200

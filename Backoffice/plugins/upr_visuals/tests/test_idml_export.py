@@ -66,6 +66,17 @@ def _table() -> str:
 
 
 @pytest.mark.unit
+def test_safe_export_href_allowlist():
+    from plugins.upr_visuals.idml.word_reader import safe_export_href
+
+    assert safe_export_href("https://example.test/appeal") == "https://example.test/appeal"
+    assert safe_export_href("mailto:ns@example.test") == "mailto:ns@example.test"
+    assert safe_export_href("javascript:alert(1)") == ""
+    assert safe_export_href("file:///etc/passwd") == ""
+    assert safe_export_href("data:text/html,hi") == ""
+
+
+@pytest.mark.unit
 def test_validate_docx_rejects_non_word():
     with pytest.raises(UprVisualsError):
         validate_docx_bytes(b"")

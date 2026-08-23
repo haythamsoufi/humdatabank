@@ -240,7 +240,7 @@ def api_websocket_status_public():
     """
     import os
 
-    websocket_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', True))
+    websocket_enabled = bool(current_app.config.get('WEBSOCKET_ENABLED', False))
 
     # Check if flask-sock is available
     try:

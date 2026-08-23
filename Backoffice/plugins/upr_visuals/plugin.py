@@ -79,6 +79,11 @@ class UprVisualsPlugin(BasePlugin):
                 path_predicate=lambda path: True,
                 policy=_UPR_PDF_VIEWER_CSP,
             ),
+            CspOverride(
+                endpoint="upr_visuals.assignment_narrative_file",
+                path_predicate=lambda path: True,
+                policy=_UPR_PDF_VIEWER_CSP,
+            ),
         ]
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:

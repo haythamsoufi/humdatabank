@@ -583,7 +583,10 @@ export const TransportMixin = {
         try {
             // Prefer data attribute (set by server per-page) over global to avoid cache/order issues.
             const wsFromPage = document.body && document.body.getAttribute('data-chat-websocket-enabled');
-            const wsEnabled = wsFromPage !== null ? (wsFromPage === 'true') : (window.CHAT_WEBSOCKET_ENABLED !== false);
+            // Opt-in only. Missing flag must not default to WS (prod has WEBSOCKET_ENABLED=false).
+            const wsEnabled = wsFromPage !== null
+                ? (wsFromPage === 'true')
+                : (window.CHAT_WEBSOCKET_ENABLED === true);
             // Always use streaming when possible: WS if enabled, else SSE. This ensures step events (progress) are sent.
             const useStreaming = true;
             const useWebSocket = wsEnabled && (typeof WebSocket !== 'undefined');

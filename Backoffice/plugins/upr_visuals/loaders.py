@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.exc import InvalidRequestError, ProgrammingError
 from sqlalchemy.orm import joinedload
 
 from app.extensions import db
+
+_SPEF_JOIN_ERRORS = (InvalidRequestError, ProgrammingError)
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.form_items import FormItem
 from app.models.forms import DynamicIndicatorData, FormData, FormSection
@@ -36,13 +39,19 @@ def _indicator_bank_options(root):
 
 
 def _load_dynamic_indicator_rows(aes_id: int) -> list[DynamicIndicatorData]:
+    from plugins.upr_visuals.i18n import memoized_load
+
+    return memoized_load(("dyn_rows", int(aes_id)), lambda: _load_dynamic_indicator_rows_db(aes_id))
+
+
+def _load_dynamic_indicator_rows_db(aes_id: int) -> list[DynamicIndicatorData]:
     query = DynamicIndicatorData.query.options(
         _indicator_bank_options(DynamicIndicatorData.indicator_bank),
         joinedload(DynamicIndicatorData.section),
     ).filter(DynamicIndicatorData.assignment_entity_status_id == aes_id)
     try:
         return query.all()
-    except Exception:
+    except _SPEF_JOIN_ERRORS:
         db.session.rollback()
         logger.debug("UPR visuals: falling back to dynamic rows without SPEF catalog join", exc_info=True)
         return (
@@ -69,7 +78,7 @@ def _load_items(template) -> list[FormItem]:
     ).filter(FormItem.version_id == version_id, FormItem.archived.is_(False))
     try:
         return query.all()
-    except Exception:
+    except _SPEF_JOIN_ERRORS:
         db.session.rollback()
         logger.debug("UPR visuals: falling back to items without SPEF catalog join", exc_info=True)
         return (

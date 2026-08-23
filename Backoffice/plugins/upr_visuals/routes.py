@@ -35,6 +35,7 @@ from plugins.upr_visuals.assignment_job import (
     build_assignment_export_status,
     create_assignment_export_job,
     ensure_assignment_export_job_running,
+    find_reusable_assignment_export_job,
     serve_assignment_export,
     start_assignment_export_job,
 )
@@ -47,7 +48,6 @@ from plugins.upr_visuals.bulk_job import (
     serve_bulk_export_zip,
     start_bulk_export_job,
 )
-from plugins.upr_visuals.service import UprVisualsService
 from app.models.assignments import AssignmentEntityStatus
 from app.routes.admin.shared import permission_required, system_manager_required
 from app.services.organization.authorization_service import AuthorizationService
@@ -95,6 +95,18 @@ def static_file(filename: str):
     return send_from_directory(str(_PLUGIN_DIR / "static"), filename)
 
 
+@bp.route("/upr-visuals/fonts.css", methods=["GET"])
+@login_required
+def fonts_css():
+    """@font-face + Tajawal inherit rules — same stacks WeasyPrint uses."""
+    from plugins.upr_visuals.typography import browser_stylesheet, export_style_token
+
+    response = Response(browser_stylesheet(), mimetype="text/css; charset=utf-8")
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.set_etag(export_style_token())
+    return response
+
+
 @bp.route("/assignment/<int:aes_id>/visuals/progress", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
@@ -102,7 +114,7 @@ def assignment_visuals_progress(aes_id: int):
     try:
         _aes_or_404(aes_id)
         pid = parse_progress_id(request.args.get("progress_id"))
-        rec = get_visuals_progress(pid) if pid else None
+        rec = get_visuals_progress(pid, aes_id=aes_id) if pid else None
         if rec is None:
             return json_ok(done=0, total=0, pending=0, status="unknown")
         return json_ok(
@@ -126,6 +138,7 @@ def assignment_visuals_progress(aes_id: int):
 @bp.route("/assignment/<int:aes_id>/visuals", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_payload(aes_id: int):
     try:
         lang = _requested_language(strict=False)
@@ -140,7 +153,9 @@ def assignment_payload(aes_id: int):
             return payload, html, html_by_dashboard
 
         with force_locale(lang):
-            payload, html, html_by_dashboard = localize_export(build, progress_id=progress_id)
+            payload, html, html_by_dashboard = localize_export(
+                build, progress_id=progress_id, aes_id=aes_id
+            )
         return json_ok(
             payload=payload,
             html=html,
@@ -161,6 +176,7 @@ def assignment_payload(aes_id: int):
 @bp.route("/assignment/<int:aes_id>/visuals/report", methods=["GET"])
 @login_required
 @permission_required("admin.data_explore.upr_visuals")
+@rate_limit(requests_per_minute=8, key_func=_render_rate_key)
 def assignment_report(aes_id: int):
     try:
         lang = _requested_language(strict=False)
@@ -299,11 +315,111 @@ def _pdf_viewer_response(
     )
 
 
+def _queue_visual_export(aes_id: int, export_format: str, *, dashboard_id: str = "combined") -> str:
+    lang = _requested_language(strict=True)
+    existing = find_reusable_assignment_export_job(
+        aes_id=aes_id,
+        export_format=export_format,
+        dashboard_id=dashboard_id,
+        lang=lang,
+    )
+    app = current_app._get_current_object()
+    if existing:
+        ensure_assignment_export_job_running(app, existing)
+        return existing
+    job_id = create_assignment_export_job(
+        user_id=int(getattr(current_user, "id", 0) or 0),
+        aes_id=aes_id,
+        export_format=export_format,
+        lang=lang,
+        dashboard_id=dashboard_id,
+    )
+    start_assignment_export_job(app, job_id)
+    return job_id
+
+
+def _export_wait_copy(export_format: str) -> tuple[str, str]:
+    fmt = str(export_format or "pdf").strip().lower()
+    if fmt == "png":
+        return "Preparing your image", "Rendering the dashboard…"
+    if fmt == "idml":
+        return "Preparing InDesign files", "Packaging the layout…"
+    return "Preparing your PDF", "Laying out the pages…"
+
+
+def _export_wait_response(
+    aes_id: int,
+    job_id: str,
+    *,
+    download: bool,
+    file_url: str | None = None,
+) -> Response:
+    status = build_assignment_export_status(job_id)
+    if status and status.get("status") == "completed":
+        return serve_assignment_export(job_id, aes_id=aes_id, as_attachment=download)
+    title, default_status = _export_wait_copy((status or {}).get("export_format"))
+    status_url = url_for(
+        "upr_visuals.assignment_narrative_status", aes_id=aes_id, job_id=job_id
+    )
+    if not file_url:
+        file_params: dict[str, str | int] = {"aes_id": aes_id, "job_id": job_id}
+        if not download:
+            file_params["inline"] = 1
+        file_url = url_for("upr_visuals.assignment_narrative_file", **file_params)
+    script_url = url_for("upr_visuals.static_file", filename="js/upr-visuals-export-wait.js")
+    html = (
+        "<!DOCTYPE html><html lang='en'><head>"
+        "<meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+        f"<title>{escape(title)}</title>"
+        f"<script src='{escape(script_url, quote=True)}' defer></script>"
+        "<style>"
+        "html,body{margin:0;min-height:100%;display:flex;align-items:center;justify-content:center;"
+        "font-family:system-ui,sans-serif;background:#f4f4f4;color:#011e41}"
+        ".upr-export-wait{display:flex;flex-direction:column;align-items:center;gap:.75rem;"
+        "padding:2rem 1.5rem;text-align:center;max-width:22rem}"
+        ".upr-export-wait__icon{width:4.5rem;height:4.5rem}"
+        ".upr-export-wait__sweep{transform-box:fill-box;transform-origin:center;"
+        "animation:upr-wait-spin .9s linear infinite}"
+        ".upr-export-wait__page{transform-origin:36px 36px;animation:upr-wait-pulse 1.6s ease-in-out infinite}"
+        "h1{margin:0;font-size:1.2rem;font-weight:650;letter-spacing:-.01em}"
+        "p{margin:0;color:#3d4a5c}"
+        ".upr-export-wait__elapsed{font-size:.8rem;color:#6b7785;font-variant-numeric:tabular-nums}"
+        ".upr-export-wait[data-failed='1'] .upr-export-wait__sweep,"
+        ".upr-export-wait[data-failed='1'] .upr-export-wait__page{animation:none}"
+        ".upr-export-wait[data-failed='1'] h1,.upr-export-wait[data-failed='1'] p{color:#8a1f28}"
+        "@keyframes upr-wait-spin{to{transform:rotate(360deg)}}"
+        "@keyframes upr-wait-pulse{50%{opacity:.55}}"
+        "@media (prefers-reduced-motion:reduce){"
+        ".upr-export-wait__sweep,.upr-export-wait__page{animation:none}"
+        "}"
+        "</style>"
+        "</head>"
+        f"<body data-status-url='{escape(status_url, quote=True)}' "
+        f"data-file-url='{escape(file_url, quote=True)}'>"
+        "<div class='upr-export-wait' role='status' aria-live='polite'>"
+        "<svg class='upr-export-wait__icon' viewBox='0 0 72 72' aria-hidden='true'>"
+        "<circle cx='36' cy='36' r='30' fill='none' stroke='#e4e6ea' stroke-width='3'/>"
+        "<circle class='upr-export-wait__sweep' cx='36' cy='36' r='30' fill='none' "
+        "stroke='#f5333f' stroke-width='3' stroke-linecap='round' stroke-dasharray='48 141'/>"
+        "<g class='upr-export-wait__page'>"
+        "<rect x='26' y='20' width='20' height='26' rx='2' fill='#fff' stroke='#011e41' stroke-width='1.6'/>"
+        "<path d='M30 28h12M30 33h12M30 38h8' fill='none' stroke='#011e41' "
+        "stroke-width='1.4' stroke-linecap='round'/>"
+        "</g></svg>"
+        f"<h1>{escape(title)}</h1>"
+        f"<p id='upr-export-wait-status'>{escape(default_status)}</p>"
+        "<p id='upr-export-wait-elapsed' class='upr-export-wait__elapsed'></p>"
+        "</div>"
+        "</body></html>"
+    )
+    return Response(html, mimetype="text/html; charset=utf-8", headers={"Cache-Control": "no-store"})
+
+
 def _assignment_pdf_response(aes_id: int, dashboard_id: str, *, download: bool) -> Response:
     _aes_or_404(aes_id)
-    lang = _requested_language(strict=True)
-    data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id, lang=lang)
-    return _pdf_response(data, filename, download=download)
+    job_id = _queue_visual_export(aes_id, "pdf", dashboard_id=dashboard_id)
+    return _export_wait_response(aes_id, job_id, download=download)
 
 
 @bp.route("/assignment/<int:aes_id>/png/<dashboard_id>", methods=["GET"])
@@ -313,15 +429,8 @@ def _assignment_pdf_response(aes_id: int, dashboard_id: str, *, download: bool) 
 def assignment_png(aes_id: int, dashboard_id: str):
     try:
         _aes_or_404(aes_id)
-        lang = _requested_language(strict=True)
-        data, filename = UprVisualsService.png_bytes(aes_id, dashboard_id, lang=lang)
-        return Response(
-            data,
-            mimetype="image/png",
-            headers={
-                "Content-Disposition": _content_disposition(filename, download=True),
-            },
-        )
+        job_id = _queue_visual_export(aes_id, "png", dashboard_id=dashboard_id)
+        return _export_wait_response(aes_id, job_id, download=True)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
     except HTTPException:
@@ -343,9 +452,26 @@ def assignment_pdf(aes_id: int):
     try:
         aes = _aes_or_404(aes_id)
         lang = _requested_language(strict=True)
+        existing_job = (request.args.get("job_id") or "").strip()
+        if existing_job and (_wants_download() or _wants_raw_pdf() or _prefers_native_pdf_viewer()):
+            return serve_assignment_export(
+                existing_job, aes_id=aes_id, as_attachment=_wants_download()
+            )
         if _wants_download() or _wants_raw_pdf() or _prefers_native_pdf_viewer():
-            data, filename = UprVisualsService.pdf_bytes(aes_id, dashboard_id, lang=lang)
-            return _pdf_response(data, filename, download=_wants_download())
+            job_id = _queue_visual_export(aes_id, "pdf", dashboard_id=dashboard_id)
+            file_params: dict[str, str | int] = {"aes_id": aes_id, "job_id": job_id, "lang": lang}
+            if dashboard_id != "combined":
+                file_params["dashboard"] = dashboard_id
+            if _wants_download():
+                file_params["download"] = 1
+            else:
+                file_params["raw"] = 1
+            return _export_wait_response(
+                aes_id,
+                job_id,
+                download=_wants_download(),
+                file_url=url_for("upr_visuals.assignment_pdf", **file_params),
+            )
         raw_params: dict[str, str | int] = {"aes_id": aes_id, "raw": 1, "lang": lang}
         download_params: dict[str, str | int] = {"aes_id": aes_id, "download": 1, "lang": lang}
         if dashboard_id != "combined":
@@ -380,9 +506,8 @@ def assignment_pdf(aes_id: int):
 def assignment_idml(aes_id: int):
     try:
         _aes_or_404(aes_id)
-        lang = _requested_language(strict=True)
-        data, filename = UprVisualsService.idml_zip_bytes(aes_id, lang=lang)
-        return _file_response(data, filename, mimetype="application/zip", download=True)
+        job_id = _queue_visual_export(aes_id, "idml")
+        return _export_wait_response(aes_id, job_id, download=True)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
     except HTTPException:
@@ -457,7 +582,8 @@ def assignment_narrative_status(aes_id: int):
 def assignment_narrative_file(aes_id: int, job_id: str):
     try:
         _aes_or_404(aes_id)
-        return serve_assignment_export(job_id, aes_id=aes_id)
+        inline = (request.args.get("inline") or "").strip().lower() in {"1", "true", "yes"}
+        return serve_assignment_export(job_id, aes_id=aes_id, as_attachment=not inline)
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
     except HTTPException:

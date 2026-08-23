@@ -77,6 +77,10 @@ def _label(
     )
 
 
+def _mirror_x(x: float, w: float) -> float:
+    return A4_W - x - w
+
+
 def build_cover_chrome(
     doc: Idml,
     meta: dict,
@@ -84,54 +88,61 @@ def build_cover_chrome(
     footer: dict[str, dict] | None = None,
 ) -> list[str]:
     from plugins.upr_visuals.formatters import appeal_number
+    from plugins.upr_visuals.i18n import localized_country_header, t
     from plugins.upr_visuals.render import COVER_FOOTER_NOTE, COVER_FOOTER_ORG
 
-    country = (meta.get("country_name") or "").strip().upper()
+    country = localized_country_header(meta)
     subtitle = (meta.get("document_subtitle") or "").strip()
     date_text = (meta.get("header_date") or "").strip()
-    prefix = (meta.get("header_prefix") or "IN SUPPORT OF").strip()
+    prefix = (meta.get("header_prefix") or t("IN SUPPORT OF")).strip()
     ns = (meta.get("national_society") or "").strip()
     appeal = appeal_number(meta.get("iso2") or meta.get("appeal_iso2"))
     footer = footer or {}
     L = _COVER_LAYOUT
+    rtl = bool(getattr(doc, "rtl", False))
+    start_align = "RightAlign" if rtl else "LeftAlign"
+    end_align = "LeftAlign" if rtl else "RightAlign"
+    title_x = _mirror_x(L["title_x"], L["title_w"]) if rtl else L["title_x"]
+    rule_x = _mirror_x(L["rule_x"], L["rule_w"]) if rtl else L["rule_x"]
 
     items = [
         doc.rect(0, 0, A4_W, HEADER_H, "Color/IFRCNavy"),
-        doc.rect(L["rule_x"], L["rule_y"], L["rule_w"], L["rule_h"], "Color/IFRCRed"),
+        doc.rect(rule_x, L["rule_y"], L["rule_w"], L["rule_h"], "Color/IFRCRed"),
         _label(
             doc,
             country,
-            x=L["title_x"],
+            x=title_x,
             y=L["title_y"],
             w=L["title_w"],
             h=L["title_h"],
             size="38",
             color="Color/Paper",
-            align="LeftAlign",
+            align=start_align,
         ),
         _label(
             doc,
             subtitle,
-            x=L["title_x"],
+            x=title_x,
             y=L["subtitle_y"],
             w=L["title_w"],
             h=L["subtitle_h"],
             size="12",
             color="Color/Paper",
             style="Regular",
-            align="LeftAlign",
+            align=start_align,
         ),
     ]
     ifrc = logos.get("ifrc")
+    ifrc_x = A4_W - LOGO_PAD - LOGO if rtl else LOGO_PAD
     if ifrc:
-        items.append(doc.image_frame(LOGO_PAD, LOGO_Y, LOGO, LOGO, ifrc[0], ifrc[1], ifrc[2]))
+        items.append(doc.image_frame(ifrc_x, LOGO_Y, LOGO, LOGO, ifrc[0], ifrc[1], ifrc[2]))
     ns_logo = logos.get("ns")
-    ns_x = A4_W - LOGO_PAD - LOGO
+    ns_x = LOGO_PAD if rtl else A4_W - LOGO_PAD - LOGO
     if ns_logo:
         items.append(doc.image_frame(ns_x, LOGO_Y, LOGO, LOGO, ns_logo[0], ns_logo[1], ns_logo[2]))
     if date_text:
         date_w = L["date_w"]
-        date_x = A4_W - LOGO_PAD - date_w
+        date_x = LOGO_PAD if rtl else A4_W - LOGO_PAD - date_w
         date_y = LOGO_Y + LOGO + 10.0 if ns_logo else L["date_y_no_logo"]
         items.append(
             _label(
@@ -144,35 +155,36 @@ def build_cover_chrome(
                 size="9",
                 color="Color/Paper",
                 style="Italic",
-                align="RightAlign",
+                align=end_align,
             )
         )
 
     pad_x = L["pad_x"]
     box_y = L["box_y"]
     if appeal:
-        appeal_text = f"Appeal number  {appeal}"
+        appeal_text = f"{t('Appeal number')}  {appeal}"
+        appeal_x = A4_W - pad_x - L["appeal_w"] if rtl else pad_x
         items.append(
             _label(
                 doc,
                 appeal_text,
-                x=pad_x,
+                x=appeal_x,
                 y=box_y,
                 w=L["appeal_w"],
                 h=L["appeal_h"],
                 size="8",
                 color="Color/AppealPink",
                 style="Regular",
-                align="LeftAlign",
+                align=start_align,
                 valign="CenterAlign",
                 inset=(0.0, 7.0, 0.0, 7.0),
                 stroke="Color/IFRCRed",
                 weight="0.75",
             )
         )
-    note_text = f"*{COVER_FOOTER_NOTE}"
+    note_text = f"*{t(COVER_FOOTER_NOTE)}"
     note_w, note_h = L["note_w"], L["note_h"]
-    note_x = A4_W - pad_x - note_w
+    note_x = pad_x if rtl else A4_W - pad_x - note_w
     items += [
         _label(
             doc,
@@ -192,7 +204,7 @@ def build_cover_chrome(
         ),
         _label(
             doc,
-            COVER_FOOTER_ORG,
+            t(COVER_FOOTER_ORG),
             x=pad_x,
             y=L["org_y"],
             w=A4_W - pad_x * 2,
@@ -238,9 +250,20 @@ def build_native_pages(doc: Idml, pdf_doc, payload: dict, links: Path, pdf_name:
 
     logos: dict[str, tuple[str, float, float]] = {}
     first = pdf_doc[0]
+    rtl = bool(getattr(doc, "rtl", False))
+    ifrc_box = (
+        fitz.Rect(A4_W - LOGO_PAD - LOGO, LOGO_Y, A4_W - LOGO_PAD, LOGO_Y + LOGO)
+        if rtl
+        else fitz.Rect(LOGO_PAD, LOGO_Y, LOGO_PAD + LOGO, LOGO_Y + LOGO)
+    )
+    ns_box = (
+        fitz.Rect(LOGO_PAD, LOGO_Y, LOGO_PAD + LOGO, LOGO_Y + LOGO)
+        if rtl
+        else fitz.Rect(A4_W - LOGO_PAD - LOGO, LOGO_Y, A4_W - LOGO_PAD, LOGO_Y + LOGO)
+    )
     for key, box in (
-        ("ifrc", fitz.Rect(LOGO_PAD, LOGO_Y, LOGO_PAD + LOGO, LOGO_Y + LOGO)),
-        ("ns", fitz.Rect(A4_W - LOGO_PAD - LOGO, LOGO_Y, A4_W - LOGO_PAD, LOGO_Y + LOGO)),
+        ("ifrc", ifrc_box),
+        ("ns", ns_box),
     ):
         path = links / f"logo-{key}.png"
         w, h = _save_clip(first, box, path)

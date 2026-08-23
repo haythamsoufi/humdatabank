@@ -215,6 +215,74 @@ def test_result_cache_engine_is_generation_versioned():
     assert _engine_key("nllb") != "nllb"
 
 
+def test_get_cached_many_batches_lookup_and_prefers_engine_match(db_session):
+    from app.services.translation.result_cache import get_cached_many, put_cached
+
+    put_cached("Hello", "en", "fr", "ifrc", "Bonjour")
+    put_cached("Hello", "en", "fr", "google", "Salut")  # other-engine fallback row
+    put_cached("Goodbye", "en", "fr", "ifrc", "Au revoir")
+
+    hits = get_cached_many(["Hello", "Goodbye", "Missing"], "en", "fr", "ifrc")
+
+    assert hits == {"Hello": "Bonjour", "Goodbye": "Au revoir"}
+    assert "Missing" not in hits
+
+
+def test_get_cached_many_falls_back_to_any_engine(db_session):
+    from app.services.translation.result_cache import get_cached_many, put_cached
+
+    put_cached("Hello", "en", "fr", "google", "Salut")
+
+    assert get_cached_many(["Hello"], "en", "fr", "ifrc") == {"Hello": "Salut"}
+
+
+def test_get_cached_many_empty_input_short_circuits(db_session):
+    from app.services.translation.result_cache import get_cached_many
+
+    assert get_cached_many([], "en", "fr", "ifrc") == {}
+    assert get_cached_many([None, ""], "en", "fr", "ifrc") == {}
+
+
+def test_put_cached_many_inserts_and_reads_back(db_session):
+    from app.models.translation_quality import TranslationResultCache
+    from app.services.translation.result_cache import get_cached_many, put_cached_many
+
+    put_cached_many(
+        [("Hello", "Bonjour"), ("Goodbye", "Au revoir")],
+        "en", "fr", "ifrc",
+    )
+
+    assert TranslationResultCache.query.count() == 2
+    assert get_cached_many(["Hello", "Goodbye"], "en", "fr", "ifrc") == {
+        "Hello": "Bonjour",
+        "Goodbye": "Au revoir",
+    }
+
+
+def test_put_cached_many_dedupes_repeated_text_without_integrity_error(db_session):
+    """A batch may contain the same source text twice; that must not violate the
+    (source_hash, source_lang, target_lang, engine) unique constraint."""
+    from app.models.translation_quality import TranslationResultCache
+
+    from app.services.translation.result_cache import put_cached_many
+
+    put_cached_many(
+        [("Hello", "Bonjour"), ("Hello", "Bonjour"), ("Goodbye", "Au revoir")],
+        "en", "fr", "ifrc",
+    )
+
+    assert TranslationResultCache.query.count() == 2
+
+
+def test_put_cached_many_updates_existing_row(db_session):
+    from app.services.translation.result_cache import get_cached_many, put_cached, put_cached_many
+
+    put_cached("Hello", "en", "fr", "ifrc", "Bonjour (old)")
+    put_cached_many([("Hello", "Bonjour (new)")], "en", "fr", "ifrc")
+
+    assert get_cached_many(["Hello"], "en", "fr", "ifrc") == {"Hello": "Bonjour (new)"}
+
+
 def test_term_hit_rate():
     assert simple_term_hit_rate("le point focal", "le point focal national", ["point focal"]) == 1.0
     assert simple_term_hit_rate("le point central", "le point focal national", ["point focal"]) == 0.0

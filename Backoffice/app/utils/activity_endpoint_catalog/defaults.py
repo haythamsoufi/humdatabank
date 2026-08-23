@@ -10,14 +10,25 @@ from typing import Optional
 from app.utils.activity_endpoint_overrides import endpoint_last_segment, strip_endpoint_verb_prefix
 
 
+_ACRONYM_TOKENS = frozenset({
+    "upr", "spef", "ai", "api", "pns", "ns", "aes", "ifrc", "rbac", "pdf", "idml",
+})
+
+
 def _humanize_snake_tail(tail: str) -> str:
-    """Turn ``entity_from_assignment`` → ``Entity From Assignment``."""
+    """Turn ``entity_from_assignment`` → ``Entity From Assignment`` (acronyms stay uppercase)."""
     if not tail:
         return ""
     parts = [p for p in tail.strip("_").split("_") if p]
     if not parts:
         return ""
-    return " ".join(p.capitalize() for p in parts)
+    out: list[str] = []
+    for part in parts:
+        if part.lower() in _ACRONYM_TOKENS:
+            out.append(part.upper())
+        else:
+            out.append(part.capitalize())
+    return " ".join(out)
 
 
 def _strip_outer_wrappers(segment: str) -> str:
@@ -57,6 +68,10 @@ _POST_VERB_PREFIXES: tuple[tuple[str, str], ...] = (
     ("generate_", "Generated"),
     ("cleanup_", "Cleaned up"),
     ("activate_", "Activated"),
+    ("validate_", "Validated"),
+    ("unarchive_", "Restored"),
+    ("unlink_", "Unlinked"),
+    ("analyze_", "Analyzed"),
     ("import_", "Imported"),
     ("export_", "Exported"),
     ("preview_", "Previewed"),
@@ -172,7 +187,7 @@ def activity_category_for_endpoint(endpoint: str) -> str:
         return "admin_content"
     if bp in ("embed_management",):
         return "admin_embed"
-    if bp in ("assignment_management", "excel"):
+    if bp in ("assignment_management", "excel", "upr_excel_import"):
         return "admin_assignments"
     if bp in ("organization",):
         return "admin_organization"
@@ -184,11 +199,11 @@ def activity_category_for_endpoint(endpoint: str) -> str:
         return "admin_forms"
     if bp in ("analytics", "admin_analytics_api", "data_exploration", "governance_dashboard"):
         return "admin_analytics"
-    if bp in ("utilities", "documentation", "help_docs"):
+    if bp in ("utilities", "documentation", "help_docs", "translation_review"):
         return "admin_utilities"
     if bp in ("settings", "api_key_management", "api_management", "rbac_management", "security_dashboard"):
         return "admin_settings"
-    if bp in ("plugin_management", "plugins"):
+    if bp in ("plugin_management", "plugins", "pb_progress", "upr_visuals"):
         return "admin_plugin"
     if bp.endswith("_plugin"):
         return "admin_plugin"

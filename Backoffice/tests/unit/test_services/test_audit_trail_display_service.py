@@ -351,6 +351,23 @@ class TestCreateConsistentDescription:
         desc = create_consistent_description("activity", "form_reopened", None, None)
         assert "Reopened" in desc
 
+    def test_excel_validate_uses_curated_description(self):
+        desc = create_consistent_description(
+            "activity",
+            "form_validated",
+            None,
+            "Completed Validate Upr Country Reporting Import",
+            endpoint="excel.validate_upr_country_reporting_import",
+            http_method="POST",
+        )
+        assert desc == "Checked a UPR country reporting file"
+        assert refine_activity_row_consolidated_type(
+            "form_validated",
+            "Completed Validate Upr Country Reporting Import",
+            "excel.validate_upr_country_reporting_import",
+            "POST",
+        ) == "admin_assignments"
+
     def test_activity_form_validated(self):
         desc = create_consistent_description("activity", "form_validated", None, None)
         assert "Validated" in desc

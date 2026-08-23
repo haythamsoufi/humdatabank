@@ -56,9 +56,28 @@ def _table_cell_height(paras: list[dict]) -> float:
     return max(16.0, 12.0 * lines + 6.0)
 
 
+def _rtl_font(font: str, *, rtl: bool) -> str:
+    if not rtl:
+        return font
+    return "Tajawal"
+
+
+def _flip_align(align: str, *, rtl: bool) -> str:
+    if not rtl:
+        return align
+    mapping = {
+        "LeftAlign": "RightAlign",
+        "RightAlign": "LeftAlign",
+        "LeftJustified": "RightJustified",
+        "RightJustified": "LeftJustified",
+    }
+    return mapping.get(align, align)
+
+
 class Idml:
-    def __init__(self) -> None:
+    def __init__(self, *, rtl: bool = False) -> None:
         self._n = 0x1000
+        self.rtl = bool(rtl)
         self.stories: dict[str, str] = {}
         self.spreads: list[str] = []
         self.spread_ids: list[str] = []
@@ -88,7 +107,7 @@ class Idml:
         sid = self.uid()
         ranges = []
         for run in runs:
-            font = run.get("font", "Arial")
+            font = _rtl_font(run.get("font", "Arial"), rtl=self.rtl)
             style = run.get("style", "Regular")
             size = run.get("size", "11")
             color = run.get("color", "Color/Black")
@@ -106,7 +125,7 @@ class Idml:
             '<StoryPreference OpticalMarginAlignment="false" OpticalMarginSize="12" '
             'FrameType="TextFrameType"/>'
             f'<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/$ID/NormalParagraphStyle" '
-            f'Justification="{align}">'
+            f'Justification="{_flip_align(align, rtl=self.rtl)}">'
             f"{''.join(ranges)}</ParagraphStyleRange></Story>"
         )
         self.stories[sid] = body
@@ -159,7 +178,7 @@ class Idml:
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
                     f'FillColor="{color}" PointSize="{base["size"]}" FontStyle="{font_style}"{extra}>'
-                    f"{_applied_font_xml(base['font'])}"
+                    f"{_applied_font_xml(_rtl_font(base['font'], rtl=self.rtl))}"
                     f"{inner}</CharacterStyleRange>"
                 )
             if not parts:
@@ -167,7 +186,7 @@ class Idml:
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
                     f'FillColor="{base["color"]}" PointSize="{base["size"]}" FontStyle="{base["style"]}">'
-                    f"{_applied_font_xml(base['font'])}"
+                    f"{_applied_font_xml(_rtl_font(base['font'], rtl=self.rtl))}"
                     "<Content> </Content></CharacterStyleRange>"
                 )
             parts.append(
@@ -199,7 +218,7 @@ class Idml:
         parts = [
             f'<Table Self="{tid}" HeaderRowCount="0" FooterRowCount="0" BodyRowCount="{len(rows)}" '
             f'ColumnCount="{cols}" AppliedTableStyle="TableStyle/$ID/[Basic Table]" '
-            'TableDirection="LeftToRightDirection">'
+            f'TableDirection="{"RightToLeftDirection" if self.rtl else "LeftToRightDirection"}">'
         ]
         for r, row in enumerate(rows):
             height = max((_table_cell_height(cell) for cell in row), default=18.0)
@@ -257,7 +276,7 @@ class Idml:
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
                     f'FillColor="{color}" PointSize="9" FontStyle="{style}"{extra}>'
-                    f"{_applied_font_xml('Open Sans')}"
+                    f"{_applied_font_xml(_rtl_font('Open Sans', rtl=self.rtl))}"
                     f"{inner}</CharacterStyleRange>"
                 )
             if not parts:
@@ -266,8 +285,8 @@ class Idml:
                     "<Content> </Content></CharacterStyleRange>"
                 )
             chunks.append(
-                '<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Body" '
-                'Justification="LeftAlign" SpaceBefore="0" SpaceAfter="2">'
+                f'<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Body" '
+                f'Justification="{_flip_align("LeftAlign", rtl=self.rtl)}" SpaceBefore="0" SpaceAfter="2">'
                 f"{''.join(parts)}</ParagraphStyleRange>"
             )
         return "".join(chunks)
@@ -582,13 +601,13 @@ class Idml:
                 f"{''.join(swatches)}</idPkg:Graphic>"
             ),
             "Resources/Fonts.xml": _fonts_xml(),
-            "Resources/Styles.xml": _styles_xml(),
+            "Resources/Styles.xml": _styles_xml(rtl=self.rtl),
             "Resources/Preferences.xml": (
                 '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 '<idPkg:Preferences xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="16.0">'
                 f'<DocumentPreference PageHeight="{A4_H}" PageWidth="{A4_W}" PageOrientation="Portrait" '
                 'FacingPages="false" PagesPerDocument="1" ColumnCount="1" ColumnGutter="12" '
-                'PageBinding="LeftToRight" Intent="PrintIntent"/>'
+                f'PageBinding="{"RightToLeft" if self.rtl else "LeftToRight"}" Intent="PrintIntent"/>'
                 '<PageItemDefault FillColor="Swatch/None" FillTint="-1" StrokeColor="Swatch/None" '
                 'StrokeTint="-1" StrokeWeight="0" AppliedTextObjectStyle="ObjectStyle/NoFill" '
                 'AppliedGraphicObjectStyle="ObjectStyle/NoFill"/>'
@@ -664,6 +683,12 @@ def _fonts_xml() -> str:
         'FontStyleName="Bold" FontType="TrueType" WritingScript="0" PostScriptName="Arial-BoldMT"/>'
         '<Font Self="fArialItalic" FontFamily="Arial" Name="Arial Italic" FullName="Arial Italic" '
         'FontStyleName="Italic" FontType="TrueType" WritingScript="0" PostScriptName="Arial-ItalicMT"/>'
+        "</FontFamily>"
+        '<FontFamily Self="ffTajawal" Name="Tajawal">'
+        '<Font Self="fTajReg" FontFamily="Tajawal" Name="Tajawal Regular" FullName="Tajawal Regular" '
+        'FontStyleName="Regular" FontType="TrueType" WritingScript="1" PostScriptName="Tajawal-Regular"/>'
+        '<Font Self="fTajBold" FontFamily="Tajawal" Name="Tajawal Bold" FullName="Tajawal Bold" '
+        'FontStyleName="Bold" FontType="TrueType" WritingScript="1" PostScriptName="Tajawal-Bold"/>'
         "</FontFamily></idPkg:Fonts>"
     )
 
@@ -695,8 +720,13 @@ def _para_style(
     )
 
 
-def _styles_xml() -> str:
+def _styles_xml(*, rtl: bool = False) -> str:
     band = ' RuleBelow="true" RuleBelowLineWeight="2" RuleBelowColor="Color/BannerNavy" RuleBelowOffset="3"'
+    start = "RightAlign" if rtl else "LeftAlign"
+    justified = "RightJustified" if rtl else "LeftJustified"
+    font = "Tajawal" if rtl else None
+    heading = font or "Montserrat"
+    body = font or "Open Sans"
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<idPkg:Styles xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="16.0">'
@@ -705,29 +735,29 @@ def _styles_xml() -> str:
         "</RootCharacterStyleGroup>"
         '<RootParagraphStyleGroup Self="uParagraphStyleGroup">'
         '<ParagraphStyle Self="ParagraphStyle/$ID/NormalParagraphStyle" Name="$ID/NormalParagraphStyle"/>'
-        + _para_style("QHeading", "Q Heading", size="20", style="Bold", color="Color/QRed", font="Montserrat", leading="24", space_before="4", space_after="12")
-        + _para_style("SectionHead", "Section heading", size="15", style="Bold", color="Color/IFRCNavy", font="Montserrat", leading="18", space_before="16", space_after="6")
-        + _para_style("TopicHead", "Topic heading", size="14", style="Bold", color="Color/BannerNavy", font="Montserrat", leading="17", space_before="12", space_after="6")
-        + _para_style("BandHead", "Band heading", size="16", style="Bold", color="Color/BannerNavy", font="Montserrat", leading="20", space_before="14", space_after="10", extra=band)
-        + _para_style("Subhead", "Subhead", size="10", style="Bold", color="Color/Black", font="Open Sans", leading="13.5", space_before="10", space_after="6")
+        + _para_style("QHeading", "Q Heading", size="20", style="Bold", color="Color/QRed", font=heading, leading="24", space_before="4", space_after="12", align=start)
+        + _para_style("SectionHead", "Section heading", size="15", style="Bold", color="Color/IFRCNavy", font=heading, leading="18", space_before="16", space_after="6", align=start)
+        + _para_style("TopicHead", "Topic heading", size="14", style="Bold", color="Color/BannerNavy", font=heading, leading="17", space_before="12", space_after="6", align=start)
+        + _para_style("BandHead", "Band heading", size="16", style="Bold", color="Color/BannerNavy", font=heading, leading="20", space_before="14", space_after="10", extra=band, align=start)
+        + _para_style("Subhead", "Subhead", size="10", style="Bold", color="Color/Black", font=body, leading="13.5", space_before="10", space_after="6", align=start)
         + _para_style(
             "Body",
             "Body",
             size="10",
             style="Regular",
             color="Color/Black",
-            font="Open Sans",
+            font=body,
             leading="13.5",
             space_before="0",
             space_after="8.5",
-            align="LeftJustified",
+            align=justified,
         )
-        + _para_style("AdditionalHead", "Additional information", size="9.5", style="Bold", color="Color/Black", font="Montserrat", leading="12", space_before="8", space_after="10")
-        + _para_style("SourceItem", "Source item", size="9.5", style="Regular", color="Color/Black", font="Open Sans", leading="13", space_before="0", space_after="6", align="LeftAlign")
-        + _para_style("ContactHead", "Contact heading", size="10", style="Bold", color="Color/QRed", font="Open Sans", leading="13", space_before="16", space_after="10")
-        + _para_style("ContactName", "Contact name", size="9.5", style="Bold", color="Color/Black", font="Open Sans", leading="13", space_before="10", space_after="1")
-        + _para_style("ContactDetail", "Contact detail", size="9.5", style="Regular", color="Color/Black", font="Open Sans", leading="13", space_before="0", space_after="1")
-        + _para_style("Blank", "Blank line", size="10", style="Regular", color="Color/Black", font="Open Sans", leading="12", space_before="0", space_after="4")
+        + _para_style("AdditionalHead", "Additional information", size="9.5", style="Bold", color="Color/Black", font=heading, leading="12", space_before="8", space_after="10", align=start)
+        + _para_style("SourceItem", "Source item", size="9.5", style="Regular", color="Color/Black", font=body, leading="13", space_before="0", space_after="6", align=start)
+        + _para_style("ContactHead", "Contact heading", size="10", style="Bold", color="Color/QRed", font=body, leading="13", space_before="16", space_after="10", align=start)
+        + _para_style("ContactName", "Contact name", size="9.5", style="Bold", color="Color/Black", font=body, leading="13", space_before="10", space_after="1", align=start)
+        + _para_style("ContactDetail", "Contact detail", size="9.5", style="Regular", color="Color/Black", font=body, leading="13", space_before="0", space_after="1", align=start)
+        + _para_style("Blank", "Blank line", size="10", style="Regular", color="Color/Black", font=body, leading="12", space_before="0", space_after="4", align=start)
         + "</RootParagraphStyleGroup>"
         '<RootTableStyleGroup Self="uTableStyleGroup">'
         '<TableStyle Self="TableStyle/$ID/[No Table Style]" Name="$ID/[No Table Style]"/>'

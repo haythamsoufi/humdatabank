@@ -565,6 +565,17 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
         form_section=climate,
         indicator_bank=SimpleNamespace(name="People reached with climate activities", type="number", spef_area=SimpleNamespace(code="SP1"), area="SP1"),
     )
+    cash_item = SimpleNamespace(
+        id=3,
+        label="Cash and vouchers",
+        form_section=climate,
+        indicator_bank=SimpleNamespace(
+            name="Percentage of assistance delivered using cash and vouchers.",
+            type="percentage",
+            spef_area=SimpleNamespace(code="SP2"),
+            area="SP2",
+        ),
+    )
     kpi_item = SimpleNamespace(
         id=2,
         label="Volunteers",
@@ -574,6 +585,7 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
     by_item = {
         1: SimpleNamespace(data_not_available=False, not_applicable=False, get_display_value=lambda: "1000", numeric_value=1000),
         2: SimpleNamespace(data_not_available=False, not_applicable=False, get_display_value=lambda: "50", numeric_value=50),
+        3: SimpleNamespace(data_not_available=False, not_applicable=False, get_display_value=lambda: "60", numeric_value=60),
     }
     other_dyn = SimpleNamespace(
         repeat_instance_number=None,
@@ -600,13 +612,139 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
         lambda aes_id: [other_dyn, ea_dyn],
     )
 
-    rows = _report_indicator_rows([core_item, kpi_item], by_item, ("SP1", "SP2", "EF2"), bars_only=True, aes_id=1642)
+    rows = _report_indicator_rows(
+        [core_item, kpi_item, cash_item], by_item, ("SP1", "SP2", "EF2"), bars_only=True, aes_id=1642
+    )
     labels = [row["label"] for row in rows]
     assert labels == [
         "People reached with climate activities",
         "Number of people reached - Cash Transfer Programming.",
+        "Percentage of assistance delivered using cash and vouchers.",
     ]
     assert {row["code"] for row in rows} == {"SP1", "SP2"}
+    cash = next(row for row in rows if row["kind"] == "percent")
+    assert cash["value"] == 60.0
+    assert cash["display"] == "60%"
+
+
+@pytest.mark.unit
+def test_indicator_visual_row_keeps_percent_and_skips_blank_yesno():
+    from plugins.upr_visuals.indicators import _indicator_visual_row
+
+    percent_entry = SimpleNamespace(
+        data_not_available=False,
+        not_applicable=False,
+        get_display_value=lambda: "60",
+        numeric_value=60,
+    )
+    row = _indicator_visual_row(
+        "SP2",
+        "Percentage of assistance delivered using cash and vouchers.",
+        "percentage",
+        percent_entry,
+        bars_only=True,
+    )
+    assert row["kind"] == "percent"
+    assert row["display"] == "60%"
+    assert row["value"] == 60.0
+
+    blank_yes = SimpleNamespace(
+        data_not_available=False,
+        not_applicable=False,
+        get_display_value=lambda: None,
+        numeric_value=None,
+        value=None,
+    )
+    assert _indicator_visual_row("EF2", "Has a plan", "yesno", blank_yes, bars_only=False) is None
+    assert _indicator_visual_row("SP1", "Has a plan", "yesno", blank_yes, bars_only=True) is None
+
+
+@pytest.mark.unit
+def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatch):
+    from plugins.upr_visuals.indicators import _report_emergencies
+
+    section = SimpleNamespace(
+        id=9,
+        name="Emergency Appeal Indicators",
+        section_type="repeat",
+        parent_section_id=None,
+    )
+    inst = SimpleNamespace(instance_number=1, instance_label="Quake (MDRAF007)")
+
+    class _Query:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [inst]
+
+    class _Col:
+        def __eq__(self, other):
+            return True
+
+        def in_(self, other):
+            return True
+
+        def is_(self, other):
+            return True
+
+    monkeypatch.setattr(
+        "plugins.upr_visuals.indicators.RepeatGroupInstance",
+        SimpleNamespace(
+            query=_Query(),
+            assignment_entity_status_id=_Col(),
+            section_id=_Col(),
+            is_hidden=_Col(),
+            instance_number=_Col(),
+        ),
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.indicators._load_dynamic_indicator_rows",
+        lambda aes_id: [
+            SimpleNamespace(
+                repeat_instance_number=1,
+                custom_label=None,
+                indicator_bank=SimpleNamespace(
+                    name="Percentage of assistance delivered using cash and vouchers.",
+                    type="percentage",
+                    unit="%",
+                    spef_area=SimpleNamespace(code="SP2"),
+                    area="SP2",
+                ),
+                data_not_available=False,
+                not_applicable=False,
+                get_display_value=lambda: "40",
+                numeric_value=40,
+                value="40",
+            ),
+            SimpleNamespace(
+                repeat_instance_number=1,
+                custom_label=None,
+                indicator_bank=SimpleNamespace(
+                    name="National Society has developed a strategy.",
+                    type="yesno",
+                    unit="",
+                    spef_area=SimpleNamespace(code="EF2"),
+                    area="EF2",
+                ),
+                data_not_available=False,
+                not_applicable=False,
+                get_display_value=lambda: None,
+                numeric_value=None,
+                value=None,
+            ),
+        ],
+    )
+
+    emergencies = _report_emergencies(1641, [SimpleNamespace(form_section=section)])
+    assert len(emergencies) == 1
+    indicators = emergencies[0]["indicators"]
+    assert [row["kind"] for row in indicators] == ["percent"]
+    assert indicators[0]["display"] == "40%"
+    assert indicators[0]["label"] == "Percentage of assistance delivered using cash and vouchers."
 
 
 @pytest.mark.unit
@@ -738,6 +876,26 @@ def test_filename_from_visual_title_strips_illegal_chars():
         "Bangladesh - Unified Plan - 2026.pdf"
     )
     assert filename_from_visual_title('A/B: "Plan"') == "A B Plan.pdf"
+    assert "أفغانستان" in filename_from_visual_title("أفغانستان — Unified Country Report")
+
+
+@pytest.mark.unit
+def test_visual_export_filename_keeps_localized_title():
+    from plugins.upr_visuals.service import visual_export_filename
+
+    name = visual_export_filename(
+        {
+            "document_title": "أفغانستان — التقرير القطري الموحد",
+            "document_title_en": "Afghanistan — Unified Country Report",
+            "iso3": "AFG",
+        },
+        "combined",
+        "pdf",
+    )
+    assert "أفغانستان" in name
+    assert "التقرير القطري الموحد" in name
+    assert name.endswith(".pdf")
+    assert "Afghanistan" not in name
 
 
 @pytest.mark.unit
@@ -751,4 +909,54 @@ def test_visuals_browser_title_uses_country_and_assignment(monkeypatch):
         lambda _aes: SimpleNamespace(name="Bangladesh"),
     )
     assert visuals_browser_title(aes) == "Bangladesh — Unified Plan – 2026"
+
+
+@pytest.mark.unit
+def test_visuals_browser_title_keeps_localized_country(monkeypatch):
+    from plugins.upr_visuals.data import visuals_browser_title
+
+    assigned = SimpleNamespace(display_name="Unified Country Report")
+    aes = SimpleNamespace(assigned_form=assigned)
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    monkeypatch.setattr(
+        "plugins.upr_visuals.data._country_for_aes",
+        lambda _aes: SimpleNamespace(
+            name="Afghanistan",
+            iso2="AF",
+            name_translations={"ar": "أفغانستان"},
+        ),
+    )
+    title = visuals_browser_title(aes)
+    assert "أفغانستان" in title
+    assert "التقرير القطري الموحد" in title
+    assert "Unified Country Report" not in title
+
+
+@pytest.mark.unit
+def test_localized_assignment_title_uses_custom_translation(monkeypatch):
+    from plugins.upr_visuals.i18n import localized_assignment_title
+
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    assigned = SimpleNamespace(
+        custom_name="Unified Country Report",
+        custom_name_translations={"ar": "التقرير القطري الموحد"},
+        template=None,
+        period_name="2026",
+        display_name="Unified Country Report",
+    )
+    assert localized_assignment_title(assigned) == "التقرير القطري الموحد"
+
+
+@pytest.mark.unit
+def test_localized_assignment_title_uses_catalog_for_template(monkeypatch):
+    from plugins.upr_visuals.i18n import localized_assignment_title
+
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    assigned = SimpleNamespace(
+        custom_name="",
+        template=SimpleNamespace(name="Unified Country Report"),
+        period_name="2026",
+        display_name="Unified Country Report – 2026",
+    )
+    assert localized_assignment_title(assigned) == "التقرير القطري الموحد – 2026"
 

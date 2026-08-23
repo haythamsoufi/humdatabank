@@ -15,6 +15,13 @@
     dashSelectAll: document.getElementById("upr-vis-dash-select-all"),
     dashSelectNone: document.getElementById("upr-vis-dash-select-none"),
     generate: document.getElementById("upr-vis-generate"),
+    generateLabel: document.querySelector("[data-upr-generate-label]"),
+    formats: document.getElementById("upr-vis-formats"),
+    dashboardsCard: document.getElementById("upr-vis-dashboards-card"),
+    narrativePanel: document.getElementById("upr-vis-narrative-panel"),
+    includeNarrative: document.getElementById("upr-vis-include-narrative"),
+    narrativeFilesWrap: document.getElementById("upr-vis-narrative-files-wrap"),
+    narratives: document.getElementById("upr-vis-narratives"),
     cancel: document.getElementById("upr-vis-cancel"),
     status: document.getElementById("upr-vis-status"),
     pct: document.getElementById("upr-vis-pct"),
@@ -44,6 +51,7 @@
   let pollStartedAt = 0;
   let jobId = null;
   let running = false;
+  let booting = true;
   let previewDashboards = [];
   let previewHtmlCache = Object.create(null);
   let previewAesId = "";
@@ -59,14 +67,49 @@
     return text;
   }
 
-  function csrfHeaders() {
+  function csrfHeaders(json) {
+    const headers = { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" };
+    if (json !== false) headers["Content-Type"] = "application/json";
     if (shared.csrfHeaders) {
-      return shared.csrfHeaders({ "Content-Type": "application/json" });
+      return shared.csrfHeaders(headers);
     }
     const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
-    const headers = { Accept: "application/json", "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" };
     if (token) headers["X-CSRFToken"] = token;
     return headers;
+  }
+
+  function selectedFormat() {
+    const input = els.formats && els.formats.querySelector('input[name="upr-vis-format"]:checked');
+    return (input && input.value) || "png";
+  }
+
+  function includeNarrative() {
+    return Boolean(els.includeNarrative && els.includeNarrative.checked && selectedFormat() !== "png");
+  }
+
+  function needsDashboards() {
+    const format = selectedFormat();
+    return format === "png" || (format === "pdf" && !includeNarrative());
+  }
+
+  function syncFormatUI() {
+    const format = selectedFormat();
+    if (els.formats) {
+      els.formats.querySelectorAll(".upr-vis-chip").forEach((chip) => {
+        const input = chip.querySelector("input[type=radio]");
+        chip.classList.toggle("is-checked", Boolean(input && input.checked));
+      });
+    }
+    if (els.narrativePanel) els.narrativePanel.hidden = format === "png";
+    if (els.narrativeFilesWrap) els.narrativeFilesWrap.hidden = !includeNarrative();
+    if (shared.updateNarrativeTranslateHints) shared.updateNarrativeTranslateHints();
+    if (els.dashboardsCard) els.dashboardsCard.hidden = !needsDashboards();
+    if (els.generate) {
+      const labels = { png: t("generatePng"), pdf: t("generatePdf"), idml: t("generateIdml") };
+      const text = els.generate.dataset["label" + format.charAt(0).toUpperCase() + format.slice(1)] || labels[format] || t("generatePng");
+      if (els.generateLabel) els.generateLabel.textContent = text;
+    }
+    updateCounts();
   }
 
   function fetchFn(url, opts) {
@@ -104,8 +147,9 @@
     els.countryCount.textContent = countryInputs.length
       ? t("selectedCount", { selected: countrySelected, total: countryInputs.length })
       : "";
-    const ready = Boolean(els.assignment.value) && dashSelected > 0 && countrySelected > 0;
-    els.generate.disabled = running || !ready;
+    const dashOk = needsDashboards() ? dashSelected > 0 : Boolean(els.assignment.value);
+    const ready = Boolean(els.assignment.value) && dashOk && countrySelected > 0;
+    if (els.generate) els.generate.disabled = running || !ready;
   }
 
   function setCountryToolsEnabled(on) {
@@ -155,6 +199,13 @@
     els.countries.querySelectorAll("input").forEach((input) => {
       input.disabled = on;
     });
+    if (els.formats) {
+      els.formats.querySelectorAll("input").forEach((input) => {
+        input.disabled = on;
+      });
+    }
+    if (els.includeNarrative) els.includeNarrative.disabled = on;
+    if (els.narratives) els.narratives.disabled = on;
     updateCounts();
   }
 
@@ -204,7 +255,7 @@
         clearSelection(t("noAssignments"));
       } else {
         els.assignment.value = String(rows[0].id);
-        loadCountries();
+        await loadCountries();
       }
     } catch (err) {
       clearSelection(t("loadFailed"));
@@ -227,7 +278,11 @@
     els.generate.disabled = true;
     try {
       const response = await fetchFn(
-        `/admin/data-exploration/upr-visuals/countries?assigned_form_id=${encodeURIComponent(assignedFormId)}`,
+        shared.withLang
+          ? shared.withLang(
+              `/admin/data-exploration/upr-visuals/countries?assigned_form_id=${encodeURIComponent(assignedFormId)}`
+            )
+          : `/admin/data-exploration/upr-visuals/countries?assigned_form_id=${encodeURIComponent(assignedFormId)}`,
         { headers: csrfHeaders(), credentials: "same-origin" }
       );
       const data = await response.json();
@@ -319,6 +374,14 @@
     return !els.panePreview.hidden;
   }
 
+  function dismissTransientProgress() {
+    const transient = els.progress.classList.contains("is-warn") || els.progress.classList.contains("is-error");
+    const hasDownload = !els.download.classList.contains("hidden");
+    if (transient && !hasDownload) {
+      hideProgress();
+    }
+  }
+
   function setMode(mode) {
     const preview = mode === "preview";
     els.tabGenerate.classList.toggle("is-active", !preview);
@@ -328,7 +391,10 @@
     els.paneGenerate.hidden = preview;
     els.panePreview.hidden = !preview;
     if (els.countryFilter) els.countryFilter.hidden = !preview;
-    if (preview) loadPreview();
+    if (preview) {
+      dismissTransientProgress();
+      loadPreview();
+    }
   }
 
   function setPreviewStatus(text) {
@@ -472,11 +538,27 @@
     const requestedDashboard = previewDashboard;
     previewAesId = aesId;
     setPreviewStatus(t("previewLoading"));
+    const progressId = shared.newProgressId ? shared.newProgressId() : "";
+    const progressLabels = {
+      loading: t("previewLoading"),
+      translating: t("previewTranslating"),
+      remaining: t("previewRemaining"),
+    };
+    const stopWatch =
+      progressId && shared.watchVisualsProgress
+        ? shared.watchVisualsProgress(aesId, progressId, (rec, elapsed) => {
+            if (shared.formatVisualsProgress) {
+              setPreviewStatus(shared.formatVisualsProgress(progressLabels, rec, elapsed));
+            }
+          })
+        : null;
     try {
-      const response = await fetchFn(
-        `/assignment/${encodeURIComponent(aesId)}/visuals?dashboard=${encodeURIComponent(requestedDashboard)}`,
-        { headers: csrfHeaders(), credentials: "same-origin" }
-      );
+      const baseUrl = `/assignment/${encodeURIComponent(aesId)}/visuals?dashboard=${encodeURIComponent(requestedDashboard)}`;
+      const langUrl = shared.withLang ? shared.withLang(baseUrl) : baseUrl;
+      const progressUrl = progressId
+        ? langUrl + (langUrl.indexOf("?") >= 0 ? "&" : "?") + "progress_id=" + encodeURIComponent(progressId)
+        : langUrl;
+      const response = await fetchFn(progressUrl, { headers: csrfHeaders(), credentials: "same-origin" });
       const data = await response.json();
       if (!response.ok || data.success === false) {
         throw new Error(data.error || t("previewFailed"));
@@ -503,6 +585,8 @@
       els.previewBody.innerHTML = "";
       setPreviewStatus(t("previewFailed"));
       syncPreviewDownload();
+    } finally {
+      if (stopWatch) stopWatch();
     }
   }
 
@@ -541,7 +625,7 @@
     const state = status.status || "";
     if (state === "completed") return t("done");
     if (state === "failed") return status.error || t("failed");
-    if (state === "cancelled") return t("cancelled");
+    if (state === "cancelled" || state === "cancel_requested") return t("cancelled");
     if (state === "queued") return t("queued");
     return status.message || t("rendering");
   }
@@ -549,8 +633,48 @@
   function statusTone(state) {
     if (state === "completed") return "is-success";
     if (state === "failed") return "is-error";
-    if (state === "cancelled") return "is-warn";
+    if (state === "cancelled" || state === "cancel_requested") return "is-warn";
     return "";
+  }
+
+  function applyStatus(status) {
+    const total = status.total || 0;
+    const progress = status.progress || 0;
+    const pct = total ? Math.round((progress / total) * 100) : 0;
+    const state = status.status || "";
+    jobId = status.job_id || jobId;
+    showProgress(statusTone(state), statusMessage(status), pct);
+    if (state === "completed" && status.zip_key) {
+      els.download.href = `/admin/data-exploration/upr-visuals/download/${encodeURIComponent(jobId)}`;
+      els.download.classList.remove("hidden");
+    }
+    return state;
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollFailures = 0;
+    pollStartedAt = Date.now();
+    pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+    poll();
+  }
+
+  function resumeActiveJob() {
+    const status = (window.UprVisualsAdminConfig && window.UprVisualsAdminConfig.activeJob) || null;
+    if (!status || !status.job_id) return;
+    const state = status.status || "";
+    jobId = status.job_id;
+    if (state === "failed" || state === "cancelled" || state === "cancel_requested") {
+      setRunning(false);
+      return;
+    }
+    applyStatus(status);
+    if (state === "completed" && status.zip_key) {
+      setRunning(false);
+      return;
+    }
+    setRunning(true);
+    startPolling();
   }
 
   function stopPolling() {
@@ -577,20 +701,13 @@
       }
       pollFailures = 0;
       const status = data.status || {};
-      jobId = status.job_id || jobId;
-      const total = status.total || 0;
-      const progress = status.progress || 0;
-      const pct = total ? Math.round((progress / total) * 100) : 0;
-      const state = status.status || "";
-      showProgress(statusTone(state), statusMessage(status), pct);
+      const state = applyStatus(status);
 
       if (state === "completed" && status.zip_key) {
-        els.download.href = `/admin/data-exploration/upr-visuals/download/${encodeURIComponent(jobId)}`;
-        els.download.classList.remove("hidden");
         setRunning(false);
         stopPolling();
       }
-      if (state === "failed" || state === "cancelled") {
+      if (state === "failed" || state === "cancelled" || state === "cancel_requested") {
         setRunning(false);
         stopPolling();
       }
@@ -599,14 +716,24 @@
       if (pollFailures >= POLL_MAX_FAILURES) {
         stopPolling();
         setRunning(false);
-        showProgress("is-error", t("loadFailed"), 0);
+        const offline = err instanceof TypeError || /failed to fetch|networkerror/i.test(String(err));
+        showProgress("is-error", offline ? t("serverStopped") : t("loadFailed"), 0);
       }
     }
   }
 
+  if (els.formats) {
+    els.formats.addEventListener("change", syncFormatUI);
+  }
+  if (els.includeNarrative) {
+    els.includeNarrative.addEventListener("change", syncFormatUI);
+  }
+
   els.assignment.addEventListener("change", () => {
-    hideProgress();
-    els.download.classList.add("hidden");
+    if (!booting && !running) {
+      hideProgress();
+      els.download.classList.add("hidden");
+    }
     loadCountries();
   });
   els.countrySearch.addEventListener("input", filterCountries);
@@ -621,15 +748,22 @@
     previewAesId = "";
     loadPreview();
   });
+  document.addEventListener("upr-visuals:languagechange", () => {
+    previewHtmlCache = Object.create(null);
+    previewAesId = "";
+    if (shared.applyExportDir) shared.applyExportDir(els.previewBody);
+    loadPreview();
+  });
   els.generate.addEventListener("click", async () => {
     const assignedFormId = parseInt(els.assignment.value, 10);
     if (!assignedFormId) {
       showProgress("is-warn", t("needAssignment"), 0);
       return;
     }
-    const dashboardIds = selectedValues(els.dashboards);
+    const format = selectedFormat();
+    const dashboardIds = needsDashboards() ? selectedValues(els.dashboards) : ["combined"];
     const aesIds = selectedValues(els.countries).map((v) => parseInt(v, 10));
-    if (!dashboardIds.length) {
+    if (needsDashboards() && !dashboardIds.length) {
       showProgress("is-warn", t("needDashboards"), 0);
       return;
     }
@@ -641,15 +775,21 @@
     setRunning(true);
     showProgress("", t("generating"), 0);
     try {
+      const body = new FormData();
+      body.append("assigned_form_id", String(assignedFormId));
+      body.append("export_format", format);
+      body.append("include_narrative", includeNarrative() ? "1" : "0");
+      dashboardIds.forEach((id) => body.append("dashboard_ids", id));
+      aesIds.forEach((id) => body.append("aes_ids", String(id)));
+      body.append("lang", shared.getExportLanguage ? shared.getExportLanguage() : "en");
+      if (includeNarrative() && els.narratives && els.narratives.files) {
+        Array.from(els.narratives.files).forEach((file) => body.append("narratives", file));
+      }
       const response = await fetchFn("/admin/data-exploration/upr-visuals/generate", {
         method: "POST",
-        headers: csrfHeaders(),
+        headers: csrfHeaders(false),
         credentials: "same-origin",
-        body: JSON.stringify({
-          assigned_form_id: assignedFormId,
-          dashboard_ids: dashboardIds,
-          aes_ids: aesIds,
-        }),
+        body,
       });
       const data = await response.json();
       if (!response.ok || data.success === false) {
@@ -658,11 +798,7 @@
         return;
       }
       jobId = data.job_id;
-      stopPolling();
-      pollFailures = 0;
-      pollStartedAt = Date.now();
-      pollTimer = setInterval(poll, POLL_INTERVAL_MS);
-      poll();
+      startPolling();
     } catch (err) {
       setRunning(false);
       showProgress("is-error", t("startFailed"), 0);
@@ -691,6 +827,11 @@
     }
   });
 
+  if (shared.applyExportDir) shared.applyExportDir(els.previewBody);
   clearSelection(t("loadingAssignments"));
-  loadAssignments();
+  syncFormatUI();
+  loadAssignments().finally(() => {
+    resumeActiveJob();
+    booting = false;
+  });
 })();

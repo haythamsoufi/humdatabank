@@ -50,6 +50,7 @@
       submit: document.getElementById("upr-visuals-narrative-submit"),
       dropzone: document.getElementById("upr-visuals-narrative-dropzone"),
       progress: document.getElementById("upr-visuals-narrative-progress"),
+      progressBar: document.querySelector("#upr-visuals-narrative-progress .upr-visuals-narrative-progress__bar"),
       progressLabel: document.getElementById("upr-visuals-narrative-progress-label"),
     };
   }
@@ -108,16 +109,81 @@
     status.hidden = !text;
   }
 
-  function setBusy(busy, message) {
-    const { root, submit, file, dropzone, progress, progressLabel } = modalEls();
+  function formatElapsed(seconds) {
+    const s = Math.max(0, Math.floor(Number(seconds) || 0));
+    const m = Math.floor(s / 60);
+    return m + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  let liveTimer = null;
+  let liveStartedAt = 0;
+  let lastProgress = { extras: null, message: "" };
+
+  function stopLiveTimer() {
+    if (liveTimer) {
+      clearInterval(liveTimer);
+      liveTimer = null;
+    }
+    liveStartedAt = 0;
+    lastProgress = { extras: null, message: "" };
+  }
+
+  function liveElapsedSeconds(serverElapsed) {
+    const fromClient = liveStartedAt ? Math.floor((Date.now() - liveStartedAt) / 1000) : 0;
+    const fromServer = Math.max(0, Math.floor(Number(serverElapsed) || 0));
+    return Math.max(fromClient, fromServer);
+  }
+
+  function paintProgressLabel(message, extras) {
+    const { progressLabel } = modalEls();
+    if (!progressLabel) return;
+    const step = extras && Number(extras.progress);
+    const total = extras && Number(extras.total);
+    const parts = [];
+    if (total > 0 && step >= 0) parts.push(step + "/" + total);
+    if (message) parts.push(message);
+    const elapsed = liveElapsedSeconds(extras && extras.elapsed_s);
+    if (elapsed > 0) parts.push(formatElapsed(elapsed));
+    if (parts.length) progressLabel.textContent = parts.join(" · ");
+  }
+
+  function setBusy(busy, message, extras) {
+    const { root, submit, file, dropzone, progress, progressBar } = modalEls();
     root?.classList.toggle("is-generating", !!busy);
     dropzone?.classList.toggle("is-generating", !!busy);
     if (submit) submit.disabled = busy || !(file && file.files && file.files[0]);
     if (file) file.disabled = busy;
     if (dropzone) dropzone.style.pointerEvents = busy ? "none" : "";
+    if (busy && !liveStartedAt) {
+      liveStartedAt = Date.now();
+      liveTimer = setInterval(() => {
+        if (lastProgress.message || lastProgress.extras) {
+          paintProgressLabel(lastProgress.message, lastProgress.extras);
+        }
+      }, 1000);
+    }
+    if (!busy) stopLiveTimer();
     if (progress) {
       progress.hidden = !busy;
-      if (busy && progressLabel && message) progressLabel.textContent = message;
+      const step = extras && Number(extras.progress);
+      const total = extras && Number(extras.total);
+      const chunkDone = extras && Number(extras.chunk_done);
+      const chunkTotal = extras && Number(extras.chunk_total);
+      if (progressBar) {
+        const determinate = busy && total > 0 && step > 0;
+        progressBar.classList.toggle("is-determinate", determinate);
+        if (determinate) {
+          const intra = chunkTotal > 0 ? Math.min(1, chunkDone / chunkTotal) : 0;
+          const ratio = chunkTotal > 0 ? (step - 1 + intra) / total : step / total;
+          progressBar.style.width = Math.max(8, Math.min(100, Math.round(ratio * 100))) + "%";
+        } else {
+          progressBar.style.width = "";
+        }
+      }
+      if (busy) {
+        lastProgress = { extras: extras || {}, message: message || "" };
+        paintProgressLabel(message, extras);
+      }
     }
     if (busy) setModalStatus("");
   }
@@ -167,6 +233,9 @@
     if (formatEl) formatEl.value = format === "idml" ? "idml" : "pdf";
     setSubmitLabel(format === "idml" ? "idml" : "pdf");
     setModalStatus("");
+    if (global.UprVisualsShared && typeof global.UprVisualsShared.updateNarrativeTranslateHints === "function") {
+      global.UprVisualsShared.updateNarrativeTranslateHints();
+    }
     setModalOpen(true);
     ensureDropzone().then((api) => {
       if (api && typeof api.reset === "function") api.reset();
@@ -199,7 +268,12 @@
     const body = new FormData();
     body.append("file", chosen);
     body.append("format", fmt);
-    setBusy(true, fmt === "idml" ? "Generating InDesign package…" : "Generating PDF…");
+    const lang =
+      (global.UprVisualsShared && typeof global.UprVisualsShared.getExportLanguage === "function"
+        ? global.UprVisualsShared.getExportLanguage()
+        : "") || "en";
+    body.append("lang", lang);
+    setBusy(true, fmt === "idml" ? "Queued InDesign package…" : "Queued PDF…");
     try {
       const headers = { "X-Requested-With": "XMLHttpRequest" };
       const token = csrfToken();
@@ -213,14 +287,14 @@
         headers,
         credentials: "same-origin",
       });
-      const type = response.headers.get("Content-Type") || "";
-      if (!response.ok || type.includes("application/json")) {
-        const data = await response.json().catch(() => ({}));
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.job_id) {
         throw new Error(data.error || "Could not generate this report.");
       }
-      const blob = await response.blob();
+      const fileResponse = await pollNarrativeJob(aesId, data.job_id, fmt);
+      const blob = await fileResponse.blob();
       const fallback = fmt === "idml" ? "UPR visuals - InDesign.zip" : "UPR visuals.pdf";
-      saveBlob(blob, filenameFromHeader(response.headers.get("Content-Disposition"), fallback));
+      saveBlob(blob, filenameFromHeader(fileResponse.headers.get("Content-Disposition"), fallback));
       setModalOpen(false);
     } catch (err) {
       setModalStatus(err && err.message ? err.message : "Could not generate this report.", true);
@@ -228,6 +302,53 @@
       setBusy(false);
       if (submit && file && file.files && file.files[0]) submit.disabled = false;
     }
+  }
+
+  const POLL_INTERVAL_MS = 1500;
+  const POLL_MAX_MS = 8 * 60 * 1000;
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function pollNarrativeJob(aesId, jobId, fmt) {
+    const started = Date.now();
+    const statusUrl =
+      `/assignment/${encodeURIComponent(aesId)}/visuals/narrative/status?job_id=${encodeURIComponent(jobId)}`;
+    while (Date.now() - started < POLL_MAX_MS) {
+      const response = await fetch(statusUrl, { credentials: "same-origin" });
+      const data = await response.json().catch(() => ({}));
+      const status = (data.status && data.status.status) || data.status || "";
+      const payload = data.status && typeof data.status === "object" ? data.status : {};
+      const message = payload.message || "";
+      if (message || payload.progress) {
+        setBusy(true, message, payload);
+      }
+      if (!response.ok) {
+        throw new Error(data.error || "Could not generate this report.");
+      }
+      if (status === "completed") {
+        const fileResponse = await fetch(
+          `/assignment/${encodeURIComponent(aesId)}/visuals/narrative/file/${encodeURIComponent(jobId)}`,
+          { credentials: "same-origin" }
+        );
+        const type = fileResponse.headers.get("Content-Type") || "";
+        if (!fileResponse.ok || type.includes("application/json")) {
+          const errBody = await fileResponse.json().catch(() => ({}));
+          throw new Error(errBody.error || "Could not generate this report.");
+        }
+        return fileResponse;
+      }
+      if (status === "failed" || status === "cancelled") {
+        throw new Error((data.status && data.status.error) || "Could not generate this report.");
+      }
+      await sleep(POLL_INTERVAL_MS);
+    }
+    throw new Error(
+      fmt === "idml"
+        ? "InDesign export is taking too long. Try again in a moment."
+        : "PDF export is taking too long. Try again in a moment."
+    );
   }
 
   function bindNarrativeModal() {
@@ -250,16 +371,23 @@
     ensureDropzone();
   }
 
+  function withLang(url) {
+    if (global.UprVisualsShared && typeof global.UprVisualsShared.withLang === "function") {
+      return global.UprVisualsShared.withLang(url);
+    }
+    return url;
+  }
+
   function startSimpleDownload(aesId, dashboardId, format) {
     if (format === "idml") {
-      window.location.href = `/assignment/${encodeURIComponent(aesId)}/idml`;
+      window.location.href = withLang(`/assignment/${encodeURIComponent(aesId)}/idml`);
       return;
     }
     const kind = format === "pdf" ? "pdf" : "png";
     const path =
       kind === "pdf" && dashboardId === "combined"
-        ? `/assignment/${encodeURIComponent(aesId)}/pdf`
-        : `/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(dashboardId)}`;
+        ? withLang(`/assignment/${encodeURIComponent(aesId)}/pdf`)
+        : withLang(`/assignment/${encodeURIComponent(aesId)}/${kind}/${encodeURIComponent(dashboardId)}`);
     if (kind === "pdf" && dashboardId === "combined") {
       window.open(path, "_blank", "noopener");
     } else {

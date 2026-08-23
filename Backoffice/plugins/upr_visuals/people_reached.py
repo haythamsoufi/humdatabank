@@ -16,6 +16,7 @@ from plugins.upr_visuals.catalog import (
     REPORT_LABEL_NEEDLES,
 )
 from plugins.upr_visuals.formatters import format_count, planning_years, to_number
+from plugins.upr_visuals.i18n import t
 from plugins.upr_visuals.icons import _spef_icon_alias, spef_icon_srcs
 from plugins.upr_visuals.loaders import _load_dynamic_indicator_rows
 from plugins.upr_visuals.matrix import (
@@ -69,7 +70,7 @@ def _plan_people_reached(items, by_item, period_name: str) -> list[dict[str, Any
             0,
             {
                 "code": "TOTAL",
-                "label": "People to be reached",
+                "label": t("People to be reached"),
                 "value": headline,
                 "display": format_count(headline),
                 "has_value": True,
@@ -165,7 +166,7 @@ def _reach_rows(by_code: dict[str, float]) -> list[dict[str, Any]]:
         rows.append(
             {
                 "code": code,
-                "label": AREA_LABELS[code],
+                "label": t(AREA_LABELS[code]),
                 "value": number,
                 "display": format_count(number) if number is not None else "",
                 "has_value": number is not None,

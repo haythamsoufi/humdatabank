@@ -1319,6 +1319,126 @@ class TestOrganizationAPIEndpoints:
         assert data["success"] is True
         assert sum(data["counts"].values()) > 0
 
+    def test_api_translation_counts_ns_missing_russian(self, logged_in_client, db_session, app):
+        from app.models.organization import NationalSociety
+
+        app.config["TRANSLATABLE_LANGUAGES"] = ["fr", "es", "ar", "ru", "zh"]
+        country = create_test_country(db_session, name="RU Count Country", iso3="RUC", iso2="RC")
+        ns = NationalSociety(
+            name="Blank Russian NS",
+            country_id=country.id,
+            is_active=True,
+            name_translations={
+                "fr": "Croix-Rouge",
+                "es": "Cruz Roja",
+                "ar": "الهلال",
+                "zh": "红十字",
+            },
+        )
+        db_session.add(ns)
+        db_session.commit()
+
+        resp = logged_in_client.get(
+            "/admin/organization/api/translation-counts?entity_type=national_societies"
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["counts"].get("ru", 0) >= 1
+
+    def test_api_auto_translate_ns_russian_when_config_omits_ru(
+        self, logged_in_client, db_session, app
+    ):
+        from app.models.organization import NationalSociety
+        from config.config import Config
+
+        country = create_test_country(db_session, name="RU Translate Country", iso3="RUT", iso2="RT")
+        ns = NationalSociety(
+            name="Needs Russian NS",
+            country_id=country.id,
+            is_active=True,
+            name_translations={"fr": "Croix-Rouge"},
+        )
+        db_session.add(ns)
+        db_session.commit()
+        ns_id = ns.id
+
+        mock_translator = MagicMock()
+        mock_translator.translate_text.return_value = "Красный Крест"
+
+        with patch.object(Config, "TRANSLATABLE_LANGUAGES", ["fr", "es", "ar", "zh"]), \
+             patch("app.services.translation.auto_translator.get_auto_translator", return_value=mock_translator):
+            resp = logged_in_client.post(
+                "/admin/organization/api/auto-translate-organizations",
+                json={
+                    "entity_type": "national_societies",
+                    "target_languages": ["ru"],
+                    "translation_service": "ifrc",
+                },
+                headers={**_json_headers(), "Accept": "text/event-stream"},
+                buffered=True,
+            )
+
+        assert resp.status_code == 200
+        db_session.expire_all()
+        refreshed = db_session.get(NationalSociety, ns_id)
+        assert refreshed is not None
+        assert (refreshed.name_translations or {}).get("ru") == "Красный Крест"
+
+    def test_api_auto_translate_organization_entity_bulk_persists_russian(
+        self, logged_in_client, db_session, app
+    ):
+        from app.models.organization import NationalSociety
+        from config.config import Config
+
+        country = create_test_country(db_session, name="Bulk API Country", iso3="BAC", iso2="BA")
+        ns = NationalSociety(
+            name="Needs Russian Bulk NS",
+            country_id=country.id,
+            is_active=True,
+            name_translations={"fr": "Croix-Rouge"},
+        )
+        db_session.add(ns)
+        db_session.commit()
+        ns_id = ns.id
+
+        mock_translator = MagicMock()
+        mock_translator.get_available_services.return_value = ["ifrc"]
+        mock_translator.check_service_status.return_value = {"ifrc": True}
+        mock_translator.get_default_service.return_value = "ifrc"
+        mock_translator.translate_text.return_value = "Красный Крест"
+
+        with patch.object(Config, "TRANSLATABLE_LANGUAGES", ["fr", "es", "ar", "zh"]), \
+             patch("app.services.translation.auto_translator.get_auto_translator", return_value=mock_translator):
+            resp = logged_in_client.post(
+                "/admin/api/auto-translate",
+                json={
+                    "type": "organization_entity",
+                    "permission_context": "organization",
+                    "permission_code": "admin.organization.manage",
+                    "translation_service": "ifrc",
+                    "overwrite": False,
+                    "items": [{
+                        "id": f"national_societies:{ns_id}:name:ru",
+                        "text": "Needs Russian Bulk NS",
+                        "entity_type": "national_societies",
+                        "entity_id": ns_id,
+                        "field": "name",
+                        "target_languages": ["ru"],
+                    }],
+                },
+                headers=_json_headers(),
+            )
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data.get("updated_count") == 1
+        db_session.expire_all()
+        refreshed = db_session.get(NationalSociety, ns_id)
+        assert refreshed is not None
+        assert (refreshed.name_translations or {}).get("ru") == "Красный Крест"
+
     def test_regional_office_translation_fields_includes_short_name(self):
         from types import SimpleNamespace
         from app.routes.admin.organization import regional_office_translation_fields

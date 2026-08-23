@@ -6,10 +6,11 @@ from typing import Any
 
 from app.plugins.base import BasePlugin, CspOverride, DataExplorerTabConfig, SeedPermission, SeedRole
 
-# Titled viewer iframes the same-origin PDF; default CSP is frame-ancestors 'none'.
+# Titled viewer iframes the same-origin PDF and may load a small viewer script.
+# Default CSP is frame-ancestors 'none'.
 _UPR_PDF_VIEWER_CSP = (
     "default-src 'self'; "
-    "script-src 'none'; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "img-src 'self'; "
     "frame-src 'self'; "
@@ -81,7 +82,14 @@ class UprVisualsPlugin(BasePlugin):
         ]
 
     def get_panel_render_context(self, flags: dict[str, bool], first_tab: str) -> dict[str, Any]:
+        can_manage = flags.get("can_manage_upr_visuals", False)
+        active_job = None
+        if can_manage:
+            from plugins.upr_visuals.bulk_job import get_active_bulk_export_job
+
+            active_job = get_active_bulk_export_job()
         return {
             "explore_first_tab": first_tab,
-            "can_manage_upr_visuals": flags.get("can_manage_upr_visuals", False),
+            "can_manage_upr_visuals": can_manage,
+            "active_upr_visuals_job": active_job,
         }

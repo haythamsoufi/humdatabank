@@ -585,6 +585,7 @@ class TestAuditTrail:
                 session_id="audit-trail-session-abc",
                 user_id=user_id,
                 is_active=False,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()
@@ -603,6 +604,54 @@ class TestAuditTrail:
         if resp.status_code == 200:
             data = _get_json(resp)
             assert "entries" in data or "success" in data
+
+    def test_default_json_hides_draft_saves(self, logged_in_client, db_session, app, admin_user):
+        from app.models import UserActivityLog
+        from app.utils.datetime_helpers import utcnow
+
+        with app.app_context():
+            db_session.add(
+                UserActivityLog(
+                    user_id=admin_user.id,
+                    activity_type="form_saved",
+                    activity_description="Completed View Edit Form",
+                    ip_address="127.0.0.1",
+                    endpoint="forms.view_edit_form",
+                    url_path="/forms/assignment/1",
+                    http_method="POST",
+                    timestamp=utcnow(),
+                )
+            )
+            db_session.add(
+                UserActivityLog(
+                    user_id=admin_user.id,
+                    activity_type="form_submitted",
+                    activity_description="Submitted form data for review",
+                    ip_address="127.0.0.1",
+                    endpoint="forms.view_edit_form",
+                    url_path="/forms/assignment/1",
+                    http_method="POST",
+                    timestamp=utcnow(),
+                )
+            )
+            db_session.commit()
+
+        hidden = logged_in_client.get(
+            "/admin/analytics/audit-trail?date_from=2020-01-01",
+            headers={"Accept": "application/json"},
+        )
+        _assert_status(hidden, 200)
+        hidden_types = {row.get("activity_type") for row in _get_json(hidden).get("entries", [])}
+        assert "form_saved" not in hidden_types
+        assert "form_submitted" in hidden_types
+
+        shown = logged_in_client.get(
+            "/admin/analytics/audit-trail?activity_type=form_saved&date_from=2020-01-01",
+            headers={"Accept": "application/json"},
+        )
+        _assert_status(shown, 200)
+        shown_types = {row.get("activity_type") for row in _get_json(shown).get("entries", [])}
+        assert "form_saved" in shown_types
 
     def test_get_requires_review_filter(self, logged_in_client, db_session):
         resp = logged_in_client.get(

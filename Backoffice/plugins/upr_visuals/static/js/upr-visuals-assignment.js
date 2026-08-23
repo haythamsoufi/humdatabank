@@ -14,6 +14,8 @@
   const shared = window.UprVisualsShared || {};
   const i18n = {
     loading: panel.dataset.loading || "Loading visuals…",
+    translating: panel.dataset.translating || "Translating visuals… {done} of {total}",
+    remaining: panel.dataset.remaining || "{pending} remaining",
     failed: panel.dataset.failed || "Could not load visuals.",
   };
   let activeDashboard = "combined";
@@ -140,8 +142,22 @@
     if (!force && showFromCache(requested)) return;
     activeDashboard = requested;
     setStatus(i18n.loading);
+    const progressId = shared.newProgressId ? shared.newProgressId() : "";
+    const stopWatch =
+      progressId && shared.watchVisualsProgress
+        ? shared.watchVisualsProgress(aesId, progressId, (rec, elapsed) => {
+            if (shared.formatVisualsProgress) {
+              setStatus(shared.formatVisualsProgress(i18n, rec, elapsed));
+            }
+          })
+        : null;
     try {
-      const data = await fetchJson(`/assignment/${aesId}/visuals?dashboard=${encodeURIComponent(requested)}`, {
+      const url = `/assignment/${aesId}/visuals?dashboard=${encodeURIComponent(requested)}`;
+      const langUrl = shared.withLang ? shared.withLang(url) : url;
+      const progressUrl = progressId
+        ? langUrl + (langUrl.indexOf("?") >= 0 ? "&" : "?") + "progress_id=" + encodeURIComponent(progressId)
+        : langUrl;
+      const data = await fetchJson(progressUrl, {
         headers: csrfHeaders(),
         credentials: "same-origin",
       });
@@ -164,6 +180,8 @@
         body.appendChild(p);
       }
       setStatus("");
+    } finally {
+      if (stopWatch) stopWatch();
     }
   }
 
@@ -195,4 +213,15 @@
     htmlCache = Object.create(null);
     loadReport({ force: true });
   });
+
+  document.addEventListener("upr-visuals:languagechange", () => {
+    htmlCache = Object.create(null);
+    if (shared.applyExportDir) shared.applyExportDir(body);
+    if (panel.classList.contains("is-visible")) {
+      loadReport({ force: true });
+    } else {
+      loaded = false;
+    }
+  });
+  if (shared.applyExportDir) shared.applyExportDir(body);
 })();

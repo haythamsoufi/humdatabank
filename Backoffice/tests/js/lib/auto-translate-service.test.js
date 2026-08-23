@@ -75,6 +75,24 @@ describe('AutoTranslateService preferred service picker', () => {
     expect(payload.items).toEqual(items);
   });
 
+  it('forwards overwrite on translate()', async () => {
+    const fetchMock = vi.fn(async () => mockJsonResponse({ success: true, updated_count: 1, results: [] }));
+    window.getFetch = () => fetchMock;
+
+    await window.AutoTranslateService.translate({
+      type: 'organization_entity',
+      text: 'Hello',
+      target_languages: ['ru'],
+      overwrite: true,
+      items: [{ id: '1', text: 'Hello', entity_id: 1, field: 'name', target_languages: ['ru'] }]
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const payload = JSON.parse(decodeURIComponent(escape(atob(body.payload))));
+    expect(payload.overwrite).toBe(true);
+    expect(payload.type).toBe('organization_entity');
+  });
+
   it('loads services on chevron click and selecting one updates the default', async () => {
     document.body.innerHTML = `
       <div class="js-auto-translate-split"

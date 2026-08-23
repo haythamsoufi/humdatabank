@@ -17,6 +17,8 @@ from app.services.platform.user_analytics_service import (
     increment_session_page_views_without_activity_log,
     increment_session_page_views_without_activity_log_deferred,
     log_user_activity_explicit,
+    update_session_activity,
+    _update_session_activity_explicit,
 )
 from app.utils.activity_endpoint_overrides import (
     resolve_post_activity_type,
@@ -32,7 +34,10 @@ from app.utils.activity_endpoint_catalog import (
 from app.utils.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
 from app.utils.activity_form_data_redaction import redact_activity_form_data
 from app.utils.page_view_paths import page_view_path_key_from_request
-from app.utils.activity_logging_skip import should_skip_activity_endpoint
+from app.utils.activity_logging_skip import (
+    should_skip_activity_endpoint,
+    should_skip_activity_type,
+)
 import time
 
 
@@ -124,8 +129,6 @@ def _determine_activity_type(method, endpoint, form_data=None):
             return 'form_approved'
         if 'reopen_assignment' in endpoint:
             return 'form_reopened'
-        if 'validate' in endpoint or 'verify' in endpoint:
-            return 'form_validated'
 
         # Entry-form (focal-point data entry) — has an explicit 'action' field
         if endpoint in ('forms.enter_data',) or 'enter_data' in endpoint:
@@ -182,6 +185,8 @@ _CATALOG_ACTIVITY_TYPE_OVERRIDABLE = frozenset(
         "ai_conversations_deleted_all",
         # Logged as settings_updated from POST segment map; catalog maps to admin_settings like other settings routes
         "settings_updated",
+        # Excel / import "validate_*" routes used to be stamped form_validated.
+        "form_validated",
     }
 )
 
@@ -550,6 +555,20 @@ def init_activity_tracking(app):
                     ):
                         return response
 
+                    # Draft / autosave: refresh last_activity only — not an audit row.
+                    if should_skip_activity_type(activity_type):
+                        def _on_close_touch():
+                            try:
+                                with app_obj.app_context():
+                                    _update_session_activity_explicit(session_id, "action")
+                            except Exception as e:
+                                app_obj.logger.warning(
+                                    "Deferred session touch after skipped activity failed: %s", e
+                                )
+
+                        response.call_on_close(_on_close_touch)
+                        return response
+
                     page_view_path_key = page_view_path_key_from_request(request)
 
                     activity_type, catalog_desc = _apply_activity_catalog(
@@ -641,6 +660,10 @@ def init_activity_tracking(app):
                 if activity_type == "page_view" and not _should_count_session_page_view_for_request(
                     request
                 ):
+                    return response
+
+                if should_skip_activity_type(activity_type):
+                    update_session_activity("action")
                     return response
 
                 activity_type, catalog_desc = _apply_activity_catalog(

@@ -26,6 +26,7 @@ from plugins.upr_visuals.matrix import (
     _split_cell_key,
     _support_area_code,
 )
+from plugins.upr_visuals.i18n import localized_ns_display_name
 from plugins.upr_visuals.pns_funding import (
     _find_country_aes_for_year,
     _load_t22_funding_by_pns,
@@ -267,6 +268,6 @@ def _ns_names(ns_ids: list[int]) -> dict[int, str]:
     if not unique:
         return {}
     rows = NationalSociety.query.filter(NationalSociety.id.in_(unique)).all()
-    return {int(row.id): row.name for row in rows}
+    return {int(row.id): localized_ns_display_name(row) for row in rows}
 
 

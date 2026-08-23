@@ -7,10 +7,13 @@ from typing import Any
 from app.models.form_items import FormItem
 from app.models.forms import DynamicIndicatorData, RepeatGroupInstance
 from plugins.upr_visuals.catalog import OTHER_INDICATORS_SECTION_NAME, OVERALL_ACTION_SECTION_NEEDLE
-from plugins.upr_visuals.formatters import format_count, to_number
+from plugins.upr_visuals.formatters import format_count, format_percent, to_number
 from plugins.upr_visuals.loaders import _load_dynamic_indicator_rows
 from plugins.upr_visuals.matrix import _area_from_item, _bank_area, _scalar_number
-from plugins.upr_visuals.people_reached import _is_people_count
+from plugins.upr_visuals.i18n import localized_form_item_label, localized_indicator_label, t
+
+_PERCENT_TYPES = frozenset({"percentage", "percent", "pct"})
+_YESNO_TYPES = frozenset({"yesno", "yes/no", "boolean"})
 
 def _section_is_overall_action(section) -> bool:
     """True when section (or an ancestor) is the T33 Overall Action Indicators block."""
@@ -32,7 +35,7 @@ def _section_is_other_indicators(section) -> bool:
 
 
 def _indicator_visual_row(area: str, label: str, meas: str, entry, *, bars_only: bool) -> dict[str, Any] | None:
-    if meas in {"yesno", "yes/no", "boolean"}:
+    if meas in _YESNO_TYPES:
         if bars_only:
             return None
         flag = _yes_no(entry)
@@ -42,11 +45,20 @@ def _indicator_visual_row(area: str, label: str, meas: str, entry, *, bars_only:
             "code": area,
             "label": label,
             "value": 1.0 if flag else 0.0,
-            "display": "Yes" if flag else "No",
+            "display": t("Yes") if flag else t("No"),
             "kind": "yesno",
         }
-    if meas in {"percentage", "percent"}:
-        return None
+    if meas in _PERCENT_TYPES:
+        number = _scalar_number(entry)
+        if number is None:
+            return None
+        return {
+            "code": area,
+            "label": label,
+            "value": number,
+            "display": format_percent(number),
+            "kind": "percent",
+        }
     number = _scalar_number(entry)
     if not number:
         return None
@@ -79,7 +91,7 @@ def _report_indicator_rows(
         if area not in areas:
             continue
         meas = (getattr(bank, "type", None) or "").strip().lower()
-        label = (getattr(bank, "name", None) or item.label or "").strip()
+        label = localized_form_item_label(item, fallback=localized_indicator_label(bank))
         row = _indicator_visual_row(area, label, meas, by_item.get(item.id), bars_only=bars_only)
         if row:
             rows.append(row)
@@ -96,7 +108,7 @@ def _report_indicator_rows(
             if area not in areas:
                 continue
             meas = (getattr(bank, "type", None) or "").strip().lower()
-            label = (dyn.custom_label or getattr(bank, "name", None) or "").strip()
+            label = (dyn.custom_label or localized_indicator_label(bank) or "").strip()
             row = _indicator_visual_row(area, label, meas, dyn, bars_only=bars_only)
             if row:
                 rows.append(row)
@@ -159,37 +171,18 @@ def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, An
         people = None
         indicators = []
         for dyn in by_slot.get(slot, []):
-            number = _scalar_number(dyn)
             bank = dyn.indicator_bank
             unit = (getattr(bank, "unit", None) or "").strip().lower() if bank else ""
-            label_text = dyn.custom_label or (bank.name if bank else "")
+            label_text = dyn.custom_label or localized_indicator_label(bank)
             meas = (getattr(bank, "type", None) or "").strip().lower() if bank else ""
-            area = _bank_area(bank)
-            if meas in {"yesno", "yes/no", "boolean"}:
-                flag = str(getattr(dyn, "value", "") or "").strip().lower() in {"yes", "true", "1"}
-                if number is not None:
-                    flag = bool(number)
-                indicators.append(
-                    {
-                        "label": label_text,
-                        "value": 1.0 if flag else 0.0,
-                        "display": "Yes" if flag else "No",
-                        "kind": "yesno",
-                        "code": area,
-                    }
-                )
+            area = _bank_area(bank) or ""
+            row = _indicator_visual_row(area, label_text, meas, dyn, bars_only=False)
+            if not row:
                 continue
-            if meas in {"percentage", "percent"} or not number:
+            indicators.append(row)
+            if row.get("kind") != "number":
                 continue
-            indicators.append(
-                {
-                    "label": label_text,
-                    "value": number,
-                    "display": format_count(number) if number is not None else "",
-                    "kind": "number",
-                    "code": area,
-                }
-            )
+            number = row.get("value")
             if people is None and "people" in unit and number is not None:
                 people = number
             elif people is None and "people reached" in (label_text or "").lower() and number is not None:
@@ -199,7 +192,7 @@ def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, An
         emergencies.append(
             {
                 "slot": slot,
-                "name": name or label or f"Emergency {slot}",
+                "name": name or label or t(f"Emergency {slot}"),
                 "code": code,
                 "people_reached": people,
                 "people_display": format_count(people) if people is not None else "",

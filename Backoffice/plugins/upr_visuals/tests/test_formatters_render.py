@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -18,14 +19,18 @@ from plugins.upr_visuals.catalog import (
 )
 from plugins.upr_visuals.formatters import (
     appeal_number,
+    chf_label,
     document_subtitle,
     format_chf,
     format_compact_chf,
     format_count,
     format_header_date,
+    format_percent,
     period_to_round,
     planning_years,
+    split_display_amount,
     to_number,
+    with_chf,
 )
 from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
 
@@ -110,6 +115,14 @@ def test_format_count_and_chf():
 
 
 @pytest.mark.unit
+def test_format_percent_uses_form_stored_whole_percents():
+    assert format_percent(60) == "60%"
+    assert format_percent(0) == "0%"
+    assert format_percent(12.5) == "12.5%"
+    assert format_percent(None) == "Not reported"
+
+
+@pytest.mark.unit
 def test_format_compact_chf_matches_tableau():
     assert format_compact_chf(0) == ""
     assert format_compact_chf(500) == "500"
@@ -119,6 +132,60 @@ def test_format_compact_chf_matches_tableau():
     assert format_compact_chf(2_000_000) == "2M"
     assert format_compact_chf(999_600) == "1M"
     assert format_compact_chf(999_499) == "999,000"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (1_000_000, "مليون 1"),
+        (2_000_000, "مليونان 2"),
+        (3_000_000, "ملايين 3"),
+        (5_000_000, "ملايين 5"),
+        (6_700_000, "ملايين 6.7"),
+        (10_000_000, "ملايين 10"),
+        (10_800_000, "ملايين 10.8"),
+        (11_000_000, "مليونا 11"),
+        (25_000_000, "مليونا 25"),
+        (73_700_000, "مليونا 73.7"),
+        (99_000_000, "مليونا 99"),
+        (99_900_000, "مليونا 99.9"),
+        (100_000_000, "مليون 100"),
+        (100_500_000, "مليونا 100.5"),
+        (184_000_000, "مليون 184"),
+        (184_400_000, "مليونا 184.4"),
+        (219_000_000, "مليون 219"),
+        (219_300_000, "مليونا 219.3"),
+        (1_500_000, "مليون 1.5"),
+        (2_500_000, "مليونان 2.5"),
+        (242000, "242,000"),
+        (500, "500"),
+    ],
+)
+def test_format_compact_chf_arabic_million_suffix(monkeypatch, value, expected):
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    assert format_compact_chf(value) == expected
+
+
+@pytest.mark.unit
+def test_chf_label_stays_iso_except_arabic(monkeypatch):
+    assert chf_label() == "CHF"
+    assert with_chf("1.2M", prefix=True) == "CHF 1.2M"
+    assert with_chf("6.7M") == "6.7M CHF"
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    assert chf_label() == "فرنك سويسري"
+    assert with_chf("6.7 ملايين", prefix=True) == "ملايين فرنك سويسري 6.7"
+    assert with_chf("ملايين 6.7") == "ملايين فرنك سويسري 6.7"
+    assert with_chf("163,000") == "فرنك سويسري 163,000"
+
+
+@pytest.mark.unit
+def test_split_display_amount_puts_arabic_unit_before_digits():
+    assert split_display_amount("مليون 1") == ("مليون", "1")
+    assert split_display_amount("1 مليون") == ("مليون", "1")
+    assert split_display_amount("ملايين فرنك سويسري 9.5") == ("ملايين فرنك سويسري", "9.5")
+    assert split_display_amount("163,000") is None
+    assert split_display_amount("60%") is None
 
 
 @pytest.mark.unit
@@ -278,6 +345,12 @@ def test_render_in_support_header():
     assert "icons/kpi-unity.png" in html
     assert "icons/kpi-voluntary-service.png" in html
     assert "fas fa-" not in html
+    css = (
+        Path(__file__).resolve().parents[1] / "static" / "css" / "upr-visuals.css"
+    ).read_text(encoding="utf-8")
+    support_kpi = css.split(".upr-block--support .upr-kpi {", 1)[1].split("}", 1)[0]
+    assert "align-items: center" in support_kpi
+    assert "flex-direction: column" in support_kpi
 
 
 @pytest.mark.unit
@@ -330,6 +403,26 @@ def test_render_reach_and_support():
     assert "upr-reach-cell--eo" in eo_html
     assert eo_html.find("Emergency Operations") < eo_html.find("upr-reach-divider")
     assert eo_html.find("upr-reach-divider") < eo_html.find("Climate and environment")
+    assert "dir='ltr'" in eo_html
+
+
+@pytest.mark.unit
+def test_reach_rtl_reverses_columns(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.render.is_rtl", lambda: True)
+    payload = _payload()
+    payload["people_reached"].insert(
+        0,
+        {
+            "code": "EO",
+            "label": "Emergency Operations",
+            "display": "8,000",
+            "has_value": True,
+        },
+    )
+    html = render_dashboard_html(payload, "reach")
+    assert html.find("Climate and environment") < html.find("upr-reach-divider")
+    assert html.find("upr-reach-divider") < html.find("Emergency Operations")
+    assert "dir='ltr'" in html
 
 
 @pytest.mark.unit
@@ -350,6 +443,9 @@ def test_reach_full_row_packs_when_all_icons_present():
     catalog["people_reached"][0]["icon_src"] = "https://example.test/sp1.png"
     catalog_html = render_dashboard_html(catalog, "reach")
     assert "upr-reach-icon--img" in catalog_html
+    assert "<image href=" in catalog_html
+    assert 'x="4" y="4" width="32" height="32"' in catalog_html
+    assert 'width="56" height="56"' in catalog_html
     assert "https://example.test/sp1.png" in catalog_html
     support = render_dashboard_html(_payload(), "support")
     assert "Netherlands Red Cross" in html or "Netherlands Red Cross" in support
@@ -375,6 +471,9 @@ def test_reach_full_row_packs_when_all_icons_present():
     assert "upr-support-total" in report_html
     assert "upr-support-total-row" in report_html
     assert "upr-support-total-gap" not in report_html
+    footer = report_html[report_html.find("upr-support-total-row") :]
+    assert "upr-support-total' colspan=" not in footer
+    assert "colspan=" in footer
     assert "<td class='upr-ns'>Total</td>" in report_html
     assert "upr-num" in report_html
     assert "<tfoot>" in report_html
@@ -386,7 +485,7 @@ def test_reach_full_row_packs_when_all_icons_present():
     empty_funding = _payload()
     empty_funding["support"][0]["funding_display"] = ""
     empty_html = render_dashboard_html(empty_funding, "support")
-    assert "<td class='upr-num'>&nbsp;</td>" in empty_html
+    assert "<td class='upr-num' dir='ltr'>&nbsp;</td>" in empty_html
     assert "upr-support-total" in empty_html
     report_reach = render_dashboard_html(report_payload, "reach")
     assert "PEOPLE REACHED" in report_reach
@@ -474,6 +573,7 @@ def test_render_plan_combined_matches_inp_cover():
     assert "upr-doc-header__logo" in html
     assert "ns-logo" not in html
     assert "UGANDA" in html
+    assert "dir='ltr'" in html
     assert "2026-2028 IFRC network country plan" in html
     assert "2 July 2026" in html
     assert "In support of Uganda Red Cross Society" in html
@@ -567,6 +667,13 @@ def test_render_report_combined_keeps_tableau_overview():
     assert "upr-combined-section--reach" in html
     assert "upr-combined-section--before-reach" in html
     assert "upr-combined-section--finance" in html
+    css = (
+        Path(__file__).resolve().parents[1] / "static" / "css" / "upr-visuals.css"
+    ).read_text(encoding="utf-8")
+    no_border = css.split(
+        ".upr-combined-section.upr-combined-section--finance:not(:last-child)", 1
+    )[1].split("}", 1)[0]
+    assert "border-bottom: none" in no_border
     assert "upr-fin-cover" in html
     assert "IFRC network Funding Requirements" not in html
     assert "2026-2028 IFRC network country plan" not in html
@@ -763,6 +870,11 @@ def test_render_report_financial_breakdown():
     assert "upr-fin-hero" in html
     assert "upr-fin-cover" in html
     assert "upr-fin-grid" in html
+    assert "upr-fin-hero-split" in html
+    assert "upr-fin-grid--half" in html
+    hero = html[html.find("upr-fin-hero") : html.find("upr-fin-network")]
+    assert hero.find("upr-bar-label") < hero.find("upr-bar-plot")
+    assert hero.find("upr-fin-col-overview-label") < hero.find("upr-fin-col-overview-plot")
     assert "upr-fin-col-source-label" in html
     assert "upr-fin-grid--with-sources" in html
     assert "Overview" in html
@@ -780,8 +892,12 @@ def test_render_report_financial_breakdown():
     assert "upr-fin-net-col-metric" in html
     assert "upr-fin-net__entity" in html
     assert "upr-fin-net__bucket" in html
-    assert "rowspan=" in html
+    assert "rowspan=" not in html
     assert "upr-fin-net__bucket-start" in html
+    css = (
+        Path(__file__).resolve().parents[1] / "static" / "css" / "upr-visuals.css"
+    ).read_text(encoding="utf-8")
+    assert ".upr-fin-net__bucket-start td:not(.upr-fin-net__entity)" in css
     assert "Not reported" in html
     assert "upr-not-reported" in html
     assert "National Society by Strategic Priority" not in html
@@ -804,6 +920,98 @@ def test_render_strategic_priority_bars():
     assert "width:100.0%" in html
     assert "width:3.7%" in html
     assert html.count("width:100.0%") == 1
+
+
+@pytest.mark.unit
+def test_render_percentage_indicators_use_label_not_bar():
+    payload = _payload()
+    payload["core_indicators"] = [
+        {
+            "code": "SP2",
+            "label": "People reached with disaster risk reduction.",
+            "value": 580,
+            "display": "580",
+            "kind": "number",
+        },
+        {
+            "code": "SP2",
+            "label": "Percentage of assistance delivered using cash and vouchers.",
+            "value": 60,
+            "display": "60%",
+            "kind": "percent",
+        },
+    ]
+    html = render_dashboard_html(payload, "strategic_priorities")
+    assert "Percentage of assistance delivered using cash and vouchers." in html
+    assert "upr-bar-yes" in html
+    assert "upr-num" in html
+    assert "60%" in html
+    assert "width:60.0%" not in html
+    assert "width:100.0%" in html
+
+
+@pytest.mark.unit
+def test_render_emergency_includes_percentage_indicators():
+    payload = _payload()
+    payload["meta"]["kind"] = "report"
+    payload["emergencies"] = [
+        {
+            "slot": 1,
+            "name": "Afghanistan Earthquake",
+            "code": "MDRAF007",
+            "indicators": [
+                {
+                    "code": "SP2",
+                    "label": "Percentage of assistance delivered using cash and vouchers.",
+                    "value": 40,
+                    "display": "40%",
+                    "kind": "percent",
+                },
+            ],
+        }
+    ]
+    html = render_dashboard_html(payload, "emergency_1")
+    assert "Percentage of assistance delivered using cash and vouchers." in html
+    assert "40%" in html
+    assert "upr-bar-yes" in html
+    assert "width:40.0%" not in html
+
+
+@pytest.mark.unit
+def test_emergency_yesno_stays_in_area_group_with_bars():
+    payload = _payload()
+    payload["meta"]["kind"] = "report"
+    payload["emergencies"] = [
+        {
+            "slot": 1,
+            "name": "Afghanistan Earthquake",
+            "code": "MDRAF007",
+            "indicators": [
+                {
+                    "code": "EF2",
+                    "label": "Diversity of National Society's staff at senior level.",
+                    "value": 12,
+                    "display": "12",
+                    "kind": "number",
+                },
+                {
+                    "code": "EF2",
+                    "label": "National Society has developed and/or implemented a strategy.",
+                    "value": 1,
+                    "display": "Yes",
+                    "kind": "yesno",
+                },
+            ],
+        }
+    ]
+    html = render_dashboard_html(payload, "emergency_1")
+    assert html.count("<div class='upr-bar-group'>") == 1
+    group = html.split("<div class='upr-bar-group'>", 1)[1]
+    assert "National Society development" in group
+    assert "upr-bar-fill" in group
+    assert "upr-bar-yes" in group
+    assert ">Yes<" in group
+    assert group.find("upr-bar-fill") < group.find("upr-bar-yes")
 
 
 @pytest.mark.unit
@@ -839,6 +1047,7 @@ def test_number_styles_use_montserrat():
         ".upr-reach-value",
         ".upr-reach-headline",
         ".upr-bar-value",
+        ".upr-bar-yes.upr-num",
         ".upr-num",
         ".upr-support-total",
         ".upr-plan-cover__country",
@@ -847,6 +1056,33 @@ def test_number_styles_use_montserrat():
     ):
         assert cls in number_block
     assert 'font-family: "Montserrat"' in number_block
+    yes_block = css.split("\n.upr-bar-yes {", 1)[1].split("}", 1)[0]
+    assert '"Open Sans"' in yes_block
+    assert "text-align: start" in yes_block
+    percent_block = css.split(".upr-bar-yes.upr-num {", 1)[1].split("}", 1)[0]
+    assert "text-align: start" in percent_block
+    rtl = css.split('.upr-vis-page[dir="rtl"]', 1)[1]
+    assert "Tajawal" in rtl
+    assert ".upr-bar-yes" in rtl
+    assert 'font-family: "Montserrat", "Tajawal"' in rtl
+    fin_label = css.split(".upr-fin-grid .upr-bar-label {", 1)[1].split("}", 1)[0]
+    assert "white-space: normal" in fin_label
+    support_total = css.split(".upr-support-table td.upr-support-total {", 1)[1].split("}", 1)[0]
+    assert "text-align: center" in support_total
+    assert "overflow: visible" in support_total
+    body_pad = css.split("\n.upr-combined-body {", 1)[1].split("}", 1)[0]
+    assert "padding: 1.15rem 0 10mm" in body_pad
+    reach_section = css.split("\n.upr-combined-section--reach {", 1)[1].split("}", 1)[0]
+    assert "padding-left: 0" in reach_section
+    assert "padding-right: 0" in reach_section
+    reach_block = css.split(".upr-combined-section > .upr-block--reach {", 1)[1].split("}", 1)[0]
+    assert "width: 100%" in reach_block
+    assert "margin-left: 0" in reach_block
+    assert "-8mm" not in reach_block
+    assert "justify-content: flex-end" in css.split(
+        ".upr-vis-page[dir=\"rtl\"] .upr-support-table tbody td.upr-num .upr-amt,", 1
+    )[1].split("}", 1)[0]
+    assert "nowrap" not in fin_label
     font_css = _font_css()
     assert "Open Sans" in font_css
     assert "file:" in font_css

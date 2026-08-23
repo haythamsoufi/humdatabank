@@ -183,6 +183,28 @@ def test_merge_report_pdfs_folios_from_page_two():
 
 
 @pytest.mark.unit
+def test_arabic_folio_stamps_readable_glyphs():
+    import fitz
+
+    from plugins.upr_visuals.idml.narrative_pdf import _folio_font_path, _folio_has_rtl
+
+    assert _folio_has_rtl("تقرير الشبكة السنوي 2026")
+    assert not _folio_has_rtl("2026 IFRC network annual report")
+    assert _folio_font_path(rtl=True) is not None
+
+    label = "تقرير الشبكة السنوي للاتحاد الدولي 2026"
+    merged = merge_report_pdfs(_blank_pdf(2), _blank_pdf(1), folio=label)
+    doc = fitz.open(stream=merged, filetype="pdf")
+    try:
+        text = doc[1].get_text()
+    finally:
+        doc.close()
+    assert any("\u0600" <= char <= "\u06ff" for char in text)
+    assert "2026" in text
+    assert "2" in text
+
+
+@pytest.mark.unit
 def test_idml_narrative_folio_continues_after_visual_pages():
     doc = Idml()
     doc.add_page([])
@@ -271,3 +293,27 @@ def test_idml_download_name_keeps_document_title():
         "zip",
     )
     assert name == "Bangladesh - Midyear Reporting 2026 - Unified Country Report.zip"
+
+
+@pytest.mark.unit
+def test_narrative_pdf_subsets_fonts_by_default(monkeypatch):
+    captured = {}
+
+    class FakeCSS:
+        def __init__(self, string=""):
+            pass
+
+    class FakeHTML:
+        def __init__(self, **_kwargs):
+            pass
+
+        def write_pdf(self, buf, **kwargs):
+            captured.update(kwargs)
+            buf.write(b"%PDF-1.4")
+
+    monkeypatch.setattr("weasyprint.CSS", FakeCSS)
+    monkeypatch.setattr("weasyprint.HTML", FakeHTML)
+    from plugins.upr_visuals.idml.narrative_pdf import render_narrative_pdf_bytes
+
+    render_narrative_pdf_bytes([{"style": "Body", "text": "Hello", "runs": [{"text": "Hello"}]}])
+    assert captured.get("full_fonts") is False

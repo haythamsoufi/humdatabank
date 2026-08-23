@@ -38,6 +38,10 @@ class TestHumanizeSnakeTail:
     def test_multi_word(self):
         assert _humanize_snake_tail("entity_from_assignment") == "Entity From Assignment"
 
+    def test_acronyms_stay_uppercase(self):
+        assert _humanize_snake_tail("upr_country_reporting") == "UPR Country Reporting"
+        assert _humanize_snake_tail("spef_lookup") == "SPEF Lookup"
+
     def test_leading_trailing_underscores(self):
         assert _humanize_snake_tail("_foo_bar_") == "Foo Bar"
 
@@ -264,6 +268,15 @@ class TestActivityCategoryForEndpoint:
     def test_auth(self):
         assert activity_category_for_endpoint("auth.login") == "admin_portal"
 
+    def test_upr_excel_import(self):
+        assert activity_category_for_endpoint("upr_excel_import.run_import") == "admin_assignments"
+
+    def test_pb_progress(self):
+        assert activity_category_for_endpoint("pb_progress.generate") == "admin_plugin"
+
+    def test_upr_visuals(self):
+        assert activity_category_for_endpoint("upr_visuals.generate") == "admin_plugin"
+
     def test_unknown_blueprint(self):
         assert activity_category_for_endpoint("unknown_bp.action") == "admin_other"
 
@@ -343,7 +356,7 @@ class TestDefaultGeneratedDescription:
         assert default_generated_description("POST", "user_management.kickout_device") == "Kicked out Device"
 
     def test_post_ends_with_cancel(self):
-        assert default_generated_description("POST", "ai_documents.import_ifrc_bulk_cancel") == "Cancelled Import Ifrc Bulk"
+        assert default_generated_description("POST", "ai_documents.import_ifrc_bulk_cancel") == "Cancelled Import IFRC Bulk"
 
     def test_post_bulk_update(self):
         result = default_generated_description("POST", "assignment_management.bulk_update_due_date_selected")
@@ -514,7 +527,7 @@ class TestDefaultGeneratedDescription:
 class TestCatalogDisplayDescription:
     def test_manual_override_exact_method(self):
         result = catalog_display_description("POST", "ai_management.traces_bulk_delete")
-        assert result == "Deleted traces"
+        assert result == "Deleted AI traces"
 
     def test_generated_fallback(self):
         result = catalog_display_description("POST", "ai_documents.answer_documents")

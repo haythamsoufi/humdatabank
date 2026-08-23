@@ -300,8 +300,10 @@
 {% set auto_translate_config = {
     'title': _('Auto-Translate All Organization Entities'),
     'description': _('Translate all blank organization names to all languages'),
-    'endpoint': url_for('organization.api_auto_translate_organizations'),
-    'item_type': 'organization entities'
+    'endpoint': url_for('utilities.api_auto_translate'),
+    'item_type': 'organization entities',
+    'permission_context': 'organization',
+    'permission_code': 'admin.organization.manage'
 } %}
 
 <!-- Debug: Auto-translate config -->
@@ -407,7 +409,7 @@ try {
             currency_code: {{ (country.currency_code or '')|tojson|safe }},
             {% set _cn = country.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            name_{{ code }}: {{ ((_cn.get(code) if _cn else '') or '')|tojson|safe }},
+            name_{{ code }}: {{ translation_lookup(_cn, code)|tojson|safe }},
             {% endfor %}
             fds_member_user_id: {{ country.fds_member_user_id|tojson|safe }},
             fds_member_name: {{ ((country.fds_member_user.name or country.fds_member_user.email) if country.fds_member_user else '')|tojson|safe }},
@@ -700,7 +702,7 @@ try {
             name: {{ (ns.name or '')|tojson|safe }},
             {% set _nt = ns.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            name_{{ code }}: {{ ((_nt.get(code) if _nt else '') or '')|tojson|safe }},
+            name_{{ code }}: {{ translation_lookup(_nt, code)|tojson|safe }},
             {% endfor %}
             country_name: {{ (ns.country.name if ns.country else '')|tojson|safe }},
             logo_url: {{ (ns_logo_url(ns) or '')|tojson|safe }},
@@ -1356,7 +1358,7 @@ try {
             name: {{ (division.name or '')|tojson|safe }},
             {% set _dv = division.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            name_{{ code }}: {{ ((_dv.get(code) if _dv else '') or '')|tojson|safe }},
+            name_{{ code }}: {{ translation_lookup(_dv, code)|tojson|safe }},
             {% endfor %}
             description: {{ (division.description or '')|tojson|safe }},
             departments_count: {{ division.departments.count() }},
@@ -1513,7 +1515,7 @@ try {
             name: {{ (department.name or '')|tojson|safe }},
             {% set _dp = department.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            name_{{ code }}: {{ ((_dp.get(code) if _dp else '') or '')|tojson|safe }},
+            name_{{ code }}: {{ translation_lookup(_dp, code)|tojson|safe }},
             {% endfor %}
             division_id: {{ department.division.id if department.division else 'null' }},
             division_name: {{ (department.division.name if department.division else '')|tojson|safe }},
@@ -1680,11 +1682,11 @@ try {
             short_name: {{ (region.short_name or '')|tojson|safe }},
             {% set _rg = region.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            name_{{ code }}: {{ ((_rg.get(code) if _rg else '') or '')|tojson|safe }},
+            name_{{ code }}: {{ translation_lookup(_rg, code)|tojson|safe }},
             {% endfor %}
             {% set _rsg = region.short_name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            short_name_{{ code }}: {{ ((_rsg.get(code) if _rsg else '') or '')|tojson|safe }},
+            short_name_{{ code }}: {{ translation_lookup(_rsg, code)|tojson|safe }},
             {% endfor %}
             description: {{ (region.description or '')|tojson|safe }},
             is_active: {{ region.is_active|tojson|safe }},
@@ -1855,7 +1857,7 @@ try {
             name: {{ (cluster.name or '')|tojson|safe }},
             {% set _cl = cluster.name_translations or {} %}
             {% for code in TRANSLATABLE_LANGUAGES %}
-            name_{{ code }}: {{ ((_cl.get(code) if _cl else '') or '')|tojson|safe }},
+            name_{{ code }}: {{ translation_lookup(_cl, code)|tojson|safe }},
             {% endfor %}
             regional_office_id: {{ cluster.regional_office.id if cluster.regional_office else 'null' }},
             regional_office_name: {{ (cluster.regional_office.name if cluster.regional_office else '')|tojson|safe }},
@@ -2557,7 +2559,11 @@ try {
                 }
                 const merged = Object.assign({}, counts);
                 Object.keys(data.counts).forEach(function(lang) {
-                    merged[lang] = data.counts[lang] || 0;
+                    const base = String(lang || '').toLowerCase().replace(/-/g, '_').split('_')[0];
+                    if (!base || base === 'en') {
+                        return;
+                    }
+                    merged[base] = Number(data.counts[lang]) || 0;
                 });
                 window.__clientLog && window.__clientLog('Merged counts for modal:', merged);
                 return merged;
@@ -2568,321 +2574,246 @@ try {
             });
         };
 
-        // Store current translation request state for pause/resume
-        let currentTranslationReader = null;
-        let currentTranslationAbortController = null;
-        let currentTranslationParams = null;
-        let itemsProcessedBeforePause = 0; // Track items processed before pause for resume
-        let successCountBeforePause = 0; // Track success count before pause
-        let errorCountBeforePause = 0; // Track error count before pause
-        let originalTotalItems = 0; // Store original total to maintain correct progress calculation
+        const ORGANIZATION_GRID_APIS = {
+            countries: function() { return window.countriesGridApi; },
+            national_societies: function() { return window.nssGridApi; },
+            secretariat_divisions: function() { return window.divisionsGridApi; },
+            secretariat_departments: function() { return window.departmentsGridApi; },
+            secretariat_regions: function() { return window.regionsGridApi; },
+            secretariat_clusters: function() { return window.clustersGridApi; },
+        };
+        const nsStructureUnsupportedMsg = {{ _("NS Structure entities do not currently support translations. Translation fields need to be added to the models first.") | tojson }};
+        const noFieldsNeedTranslationMsg = {{ _("No items found that need translation") | tojson }};
+        const translatedBatchLabel = {{ _("Translated") | tojson }};
+        const translationForLabel = {{ _("translation for") | tojson }};
+        const batchLabel = {{ _("batch") | tojson }};
+        const failedBatchLabel = {{ _("Failed to translate") | tojson }};
+        const completedLabel = {{ _("Translation completed!") | tojson }};
+        const stoppedLabel = {{ _("Translation stopped by user.") | tojson }};
 
-        // Override the generic translation function with organization-specific logic
+        function isoLanguageCode(value) {
+            return String(value || '').toLowerCase().replace(/-/g, '_').split('_')[0];
+        }
+
+        function hasTranslationValue(value) {
+            return value != null && String(value).trim() !== '';
+        }
+
+        function collectGridRows(entityType) {
+            const api = ORGANIZATION_GRID_APIS[entityType] && ORGANIZATION_GRID_APIS[entityType]();
+            const rows = [];
+            if (api && typeof api.forEachNode === 'function') {
+                api.forEachNode(function(node) {
+                    if (node && node.data) {
+                        rows.push(node.data);
+                    }
+                });
+            }
+            return rows;
+        }
+
+        function collectOrganizationTranslationJobs(entityType, selectedLanguages, overwriteExisting) {
+            const jobs = [];
+            const rows = collectGridRows(entityType);
+            const fields = entityType === 'secretariat_regions' ? ['name', 'short_name'] : ['name'];
+            rows.forEach(function(row) {
+                fields.forEach(function(field) {
+                    const source = row[field];
+                    if (!hasTranslationValue(source)) {
+                        return;
+                    }
+                    (selectedLanguages || []).forEach(function(lang) {
+                        const code = isoLanguageCode(lang);
+                        if (!code || code === 'en') {
+                            return;
+                        }
+                        const existing = row[field + '_' + code];
+                        if (!overwriteExisting && hasTranslationValue(existing)) {
+                            return;
+                        }
+                        jobs.push({
+                            id: entityType + ':' + row.id + ':' + field + ':' + code,
+                            text: String(source).trim(),
+                            entity_type: entityType,
+                            entity_id: row.id,
+                            field: field,
+                            language: code
+                        });
+                    });
+                });
+            });
+            return jobs;
+        }
+
+        function applyOrganizationTranslationResults(entityType, resultRows) {
+            const api = ORGANIZATION_GRID_APIS[entityType] && ORGANIZATION_GRID_APIS[entityType]();
+            if (!api || typeof api.forEachNode !== 'function' || !resultRows || !resultRows.length) {
+                return;
+            }
+            resultRows.forEach(function(row) {
+                if (!row || !row.translation) {
+                    return;
+                }
+                const colId = (row.field || 'name') + '_' + row.language;
+                api.forEachNode(function(node) {
+                    if (node && node.data && String(node.data.id) === String(row.entity_id) && typeof node.setDataValue === 'function') {
+                        node.setDataValue(colId, row.translation);
+                    }
+                });
+            });
+        }
+
+        function finishOrganizationTranslation(stopped) {
+            const modal = window.autoTranslateModal;
+            if (!modal || !modal.translationState) {
+                return;
+            }
+            modal.translationState.isRunning = false;
+            modal.translationState.isPaused = false;
+            modal.logProgress(stopped ? stoppedLabel : completedLabel, stopped ? 'info' : 'success');
+            jQuery('#auto-translate-pause-btn').addClass('hidden');
+            jQuery('#auto-translate-resume-btn').addClass('hidden');
+            jQuery('#auto-translate-stop-btn').addClass('hidden');
+            jQuery('#auto-translate-close-btn').removeClass('hidden');
+            if (modal.notifyCompletion) {
+                modal.notifyCompletion();
+            }
+        }
+
+        function processNextOrganizationTranslation(jobs, index, selectedService, overwriteExisting) {
+            const modal = window.autoTranslateModal;
+            if (!modal || !modal.translationState) {
+                return;
+            }
+            if (index >= jobs.length || modal.translationState.shouldStop) {
+                finishOrganizationTranslation(!!modal.translationState.shouldStop);
+                return;
+            }
+            if (modal.translationState.isPaused) {
+                setTimeout(function() {
+                    processNextOrganizationTranslation(jobs, index, selectedService, overwriteExisting);
+                }, 500);
+                return;
+            }
+
+            const BATCH = 25;
+            const slice = jobs.slice(index, index + BATCH);
+            const first = slice[0];
+            const translationPayload = {
+                type: 'organization_entity',
+                permission_context: (modal.config && modal.config.permission_context) || 'organization',
+                permission_code: (modal.config && modal.config.permission_code) || 'admin.organization.manage',
+                id: first.id,
+                text: first.text,
+                target_languages: [first.language],
+                translation_service: selectedService || 'ifrc',
+                overwrite: !!overwriteExisting,
+                items: slice.map(function(row) {
+                    return {
+                        id: row.id,
+                        text: row.text,
+                        entity_type: row.entity_type,
+                        entity_id: row.entity_id,
+                        field: row.field,
+                        target_languages: [row.language]
+                    };
+                })
+            };
+
+            const translator = (window.AutoTranslateService && typeof window.AutoTranslateService.translate === 'function')
+                ? window.AutoTranslateService
+                : null;
+            const reqPromise = translator
+                ? translator.translate(translationPayload)
+                : fetch(modal.config.endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': jQuery('meta[name=csrf-token]').attr('content')
+                    },
+                    body: JSON.stringify(translationPayload)
+                }).then(function(r) { return r.json(); });
+
+            Promise.resolve(reqPromise)
+            .then(function(data) {
+                modal.translationState.processedItems += slice.length;
+                if (data && data.success && data.untranslated) {
+                    modal.translationState.skippedCount = (modal.translationState.skippedCount || 0) + slice.length;
+                    modal.logProgress(noFieldsNeedTranslationMsg, 'warning');
+                } else if (data && data.success && (data.updated_count > 0 || (Array.isArray(data.results) && data.results.length))) {
+                    const resultRows = Array.isArray(data.results) ? data.results : [];
+                    applyOrganizationTranslationResults(currentEntityType, resultRows);
+                    const translatedCount = (typeof data.updated_count === 'number' && data.updated_count > 0)
+                        ? data.updated_count
+                        : resultRows.length;
+                    modal.translationState.successCount += translatedCount;
+                    modal.logProgress(translatedBatchLabel + ' ' + translatedCount + ' ' + translationForLabel + ' ' + batchLabel, 'success');
+                } else if (data && data.success && (data.skipped_existing > 0 || data.updated_count === 0)) {
+                    modal.translationState.skippedCount = (modal.translationState.skippedCount || 0) + slice.length;
+                } else {
+                    modal.translationState.errorCount += 1;
+                    const errMsg = failedBatchLabel + ': ' + ((data && (data.message || data.error)) || 'Unknown error');
+                    modal.translationState.errors.push(errMsg);
+                    modal.logProgress(errMsg, 'error');
+                }
+                modal.updateProgress();
+                processNextOrganizationTranslation(jobs, index + BATCH, selectedService, overwriteExisting);
+            })
+            .catch(function(err) {
+                modal.translationState.processedItems += slice.length;
+                modal.translationState.errorCount += 1;
+                const errMsg = failedBatchLabel + ': ' + (err && err.message ? err.message : 'Network error');
+                modal.translationState.errors.push(errMsg);
+                modal.logProgress(errMsg, 'error');
+                modal.updateProgress();
+                processNextOrganizationTranslation(jobs, index + BATCH, selectedService, overwriteExisting);
+            });
+        }
+
+        // Shared bulk path: same AutoTranslateService.translate + items batches as Manage Translations
         window.performPageSpecificTranslation = function(selectedLanguages, selectedService) {
-            // Ensure modal is initialized
             if (!window.autoTranslateModal) {
                 console.error('Auto-translate modal not initialized');
                 return;
             }
 
-            // Pre-define all translated strings to avoid syntax errors
             const noEntityTypeSelectedMsg = {{ _("No entity type selected") | tojson }};
-            const translatedLabel = {{ _("Translated") | tojson }};
-            const entityLabel = {{ _("entity") | tojson }};
-            const toLabel = {{ _("to") | tojson }};
-            const failedLabel = {{ _("Failed to translate") | tojson }};
-            const unknownErrorLabel = {{ _("Unknown error") | tojson }};
-            const completedLabel = {{ _("Translation completed!") | tojson }};
-            const failedMessageLabel = {{ _("Translation failed") | tojson }};
-            const errorLabel = {{ _("Error during translation") | tojson }};
-            const apiUrl = {{ url_for("organization.api_auto_translate_organizations") | tojson }};
-
             if (!currentEntityType) {
-                if (window.autoTranslateModal && window.autoTranslateModal.logProgress) {
-                    window.autoTranslateModal.logProgress(noEntityTypeSelectedMsg, 'error');
-                }
-                if (window.autoTranslateModal && window.autoTranslateModal.translationState) {
-                    window.autoTranslateModal.translationState.isRunning = false;
-                }
+                window.autoTranslateModal.logProgress(noEntityTypeSelectedMsg, 'error');
+                window.autoTranslateModal.translationState.isRunning = false;
+                return;
+            }
+            if (currentEntityType === 'ns_structure') {
+                window.autoTranslateModal.logProgress(nsStructureUnsupportedMsg, 'error');
+                window.autoTranslateModal.translationState.isRunning = false;
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
+                jQuery('#auto-translate-stop-btn').addClass('hidden');
+                jQuery('#auto-translate-close-btn').removeClass('hidden');
                 return;
             }
 
-            // Store parameters for resume
-            currentTranslationParams = {
-                selectedLanguages: selectedLanguages,
-                selectedService: selectedService
-            };
-
-            // Create abort controller for this request
-            currentTranslationAbortController = new AbortController();
-            const signal = currentTranslationAbortController.signal;
-
-            // Use HTTP streaming for real-time progress updates
-            fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                    'Accept': 'text/event-stream'
-                },
-                body: JSON.stringify({
-                    entity_type: currentEntityType,
-                    target_languages: selectedLanguages,
-                    translation_service: selectedService
-                }),
-                signal: signal  // Allow cancellation
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const reader = response.body.getReader();
-                currentTranslationReader = reader; // Store for pause/resume
-                const decoder = new TextDecoder();
-                let buffer = '';
-
-                function readStream() {
-                    reader.read().then(({ done, value }) => {
-                        if (done) {
-                            // Stream ended - if we're still running and haven't received a complete message,
-                            // mark as complete (handles edge cases where stream ends unexpectedly)
-                            if (window.autoTranslateModal.translationState.isRunning && !window.autoTranslateModal.translationState.isPaused) {
-                                window.autoTranslateModal.translationState.isRunning = false;
-                                window.autoTranslateModal.translationState.isPaused = false; // Clear pause state when stream ends
-                                // Only log completion if we actually processed items
-                                if (window.autoTranslateModal.translationState.processedItems > 0) {
-                                    window.autoTranslateModal.logProgress(completedLabel, 'success');
-                                    if (window.autoTranslateModal.notifyCompletion) {
-                                        window.autoTranslateModal.notifyCompletion();
-                                    }
-                                }
-                                jQuery('#auto-translate-pause-btn').addClass('hidden');
-                                jQuery('#auto-translate-resume-btn').addClass('hidden');
-                                jQuery('#auto-translate-stop-btn').addClass('hidden');
-                                jQuery('#auto-translate-close-btn').removeClass('hidden');
-                                // Reset pause tracking
-                                itemsProcessedBeforePause = 0;
-                                originalTotalItems = 0;
-                            }
-                            // Clear reader reference
-                            currentTranslationReader = null;
-                            currentTranslationAbortController = null;
-                            return;
-                        }
-
-                        // Check if translation was stopped
-                        if (window.autoTranslateModal.translationState.shouldStop) {
-                            reader.cancel();
-                            currentTranslationAbortController.abort();
-                            window.autoTranslateModal.translationState.isRunning = false;
-                            window.autoTranslateModal.translationState.isPaused = false; // Clear pause state when stopped
-                            window.autoTranslateModal.logProgress('Translation stopped by user.', 'info');
-                            jQuery('#auto-translate-pause-btn').addClass('hidden');
-                            jQuery('#auto-translate-resume-btn').addClass('hidden');
-                            jQuery('#auto-translate-stop-btn').addClass('hidden');
-                            jQuery('#auto-translate-close-btn').removeClass('hidden');
-                            if (window.autoTranslateModal.notifyCompletion) {
-                                window.autoTranslateModal.notifyCompletion();
-                            }
-                            // Reset pause tracking
-                            itemsProcessedBeforePause = 0;
-                            originalTotalItems = 0;
-                            currentTranslationReader = null;
-                            currentTranslationAbortController = null;
-                            return;
-                        }
-
-                        // Decode the chunk
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-                        // Process complete lines
-                        for (const line of lines) {
-                            if (line.startsWith('data: ')) {
-                                try {
-                                    const data = JSON.parse(line.substring(6));
-
-                                    if (data.type === 'start') {
-                                        // Initialize with total count
-                                        // If resuming (itemsProcessedBeforePause > 0), keep original total and preserve current counts
-                                        if (itemsProcessedBeforePause > 0) {
-                                            // We're resuming - backend sent new total (remaining items)
-                                            // Keep the original total, backend will process remaining items
-                                            // The new total from backend is just for remaining items, we keep originalTotalItems
-                                            window.autoTranslateModal.translationState.totalItems = originalTotalItems;
-                                            // Preserve current counts (they were set before pause)
-                                            // Don't reset processedItems, successCount, or errorCount
-                                        } else {
-                                            // First time starting - store as original total
-                                            originalTotalItems = data.total || 0;
-                                            window.autoTranslateModal.translationState.totalItems = originalTotalItems;
-                                            // Reset counts only on first start
-                                            window.autoTranslateModal.translationState.processedItems = 0;
-                                            window.autoTranslateModal.translationState.successCount = 0;
-                                            window.autoTranslateModal.translationState.errorCount = 0;
-                                        }
-                                        window.autoTranslateModal.updateProgress();
-                                    } else if (data.type === 'progress') {
-                                        // Update progress for each translation
-                                        const result = data.result;
-                                        // If resuming, backend's processed count is relative to remaining items
-                                        // So we need to add itemsProcessedBeforePause to get absolute count
-                                        if (itemsProcessedBeforePause > 0) {
-                                            // Backoffice counts from 0 after resume, so add our previous counts
-                                            window.autoTranslateModal.translationState.processedItems = itemsProcessedBeforePause + (data.processed || 0);
-                                            window.autoTranslateModal.translationState.successCount = successCountBeforePause + (data.success || 0);
-                                            window.autoTranslateModal.translationState.errorCount = errorCountBeforePause + (data.error || 0);
-                                        } else {
-                                            // First time running - use backend counts directly
-                                            window.autoTranslateModal.translationState.processedItems = data.processed || window.autoTranslateModal.translationState.processedItems;
-                                            window.autoTranslateModal.translationState.successCount = data.success || window.autoTranslateModal.translationState.successCount;
-                                            window.autoTranslateModal.translationState.errorCount = data.error || window.autoTranslateModal.translationState.errorCount;
-                                        }
-
-                                        if (result.success) {
-                                            const translationFieldLabels = {
-                                                name: {{ _("name") | tojson }},
-                                                short_name: {{ _("short name") | tojson }},
-                                            };
-                                            const fieldLabel = result.field
-                                                ? (' (' + (translationFieldLabels[result.field] || result.field) + ')')
-                                                : '';
-                                            window.autoTranslateModal.logProgress(
-                                                translatedLabel + ' ' + (result.entity_type || entityLabel) + ' ' + (result.entity_id || '') + fieldLabel + ' ' + toLabel + ' ' + (result.language || ''),
-                                                'success'
-                                            );
-                                        } else {
-                                            const errorMsg = failedLabel + ' ' + (result.entity_type || entityLabel) + ' ' + (result.entity_id || '') + ': ' + (result.error || unknownErrorLabel);
-                                            window.autoTranslateModal.translationState.errors.push(errorMsg);
-                                            window.autoTranslateModal.logProgress(errorMsg, 'error');
-                                        }
-
-                                        window.autoTranslateModal.updateProgress();
-                                    } else if (data.type === 'complete') {
-                                        // Translation complete
-                                        window.autoTranslateModal.translationState.isRunning = false;
-                                        window.autoTranslateModal.translationState.isPaused = false; // Clear pause state on completion
-                                        // If resuming, add itemsProcessedBeforePause to get final count
-                                        if (itemsProcessedBeforePause > 0) {
-                                            window.autoTranslateModal.translationState.processedItems = itemsProcessedBeforePause + (data.processed || 0);
-                                            window.autoTranslateModal.translationState.successCount = successCountBeforePause + (data.success || 0);
-                                            window.autoTranslateModal.translationState.errorCount = errorCountBeforePause + (data.error || 0);
-                                        } else {
-                                            window.autoTranslateModal.translationState.processedItems = data.processed || window.autoTranslateModal.translationState.processedItems;
-                                            window.autoTranslateModal.translationState.successCount = data.success || window.autoTranslateModal.translationState.successCount;
-                                            window.autoTranslateModal.translationState.errorCount = data.error || window.autoTranslateModal.translationState.errorCount;
-                                        }
-                                        window.autoTranslateModal.updateProgress();
-                                        window.autoTranslateModal.logProgress(completedLabel, 'success');
-                                        jQuery('#auto-translate-pause-btn').addClass('hidden');
-                                        jQuery('#auto-translate-resume-btn').addClass('hidden');
-                                        jQuery('#auto-translate-stop-btn').addClass('hidden');
-                                        jQuery('#auto-translate-close-btn').removeClass('hidden');
-                                        if (window.autoTranslateModal.notifyCompletion) {
-                                            window.autoTranslateModal.notifyCompletion();
-                                        }
-                                        if ((data.success || 0) > 0) {
-                                            jQuery('#auto-translate-close-btn').one('click', function() {
-                                                window.location.reload();
-                                            });
-                                        }
-                                        // Reset pause tracking
-                                        itemsProcessedBeforePause = 0;
-                                        successCountBeforePause = 0;
-                                        errorCountBeforePause = 0;
-                                        originalTotalItems = 0;
-                                        currentTranslationReader = null;
-                                        currentTranslationAbortController = null;
-                                        return;
-                                    } else if (data.type === 'error') {
-                                        // Error occurred
-                                        window.autoTranslateModal.logProgress(data.message || failedMessageLabel, 'error');
-                                        window.autoTranslateModal.translationState.isRunning = false;
-                                        window.autoTranslateModal.translationState.isPaused = false; // Clear pause state on error
-                                        jQuery('#auto-translate-pause-btn').addClass('hidden');
-                                        jQuery('#auto-translate-resume-btn').addClass('hidden');
-                                        jQuery('#auto-translate-stop-btn').addClass('hidden');
-                                        jQuery('#auto-translate-close-btn').removeClass('hidden');
-                                        // Reset pause tracking
-                                        itemsProcessedBeforePause = 0;
-                                        originalTotalItems = 0;
-                                        currentTranslationReader = null;
-                                        currentTranslationAbortController = null;
-                                        return;
-                                    }
-                                } catch (e) {
-                                    console.error('Error parsing streaming data:', e, line);
-                                }
-                            }
-                        }
-
-                        // Continue reading
-                        readStream();
-                    }).catch(error => {
-                        // Handle abort errors gracefully
-                        if (error.name === 'AbortError') {
-                            // Request was cancelled (paused or stopped) - this is expected
-                            // Don't reset pause tracking here - it's needed for resume
-                            return;
-                        }
-                        console.error('Error reading stream:', error);
-                        window.autoTranslateModal.logProgress(errorLabel + ': ' + error.message, 'error');
-                        window.autoTranslateModal.translationState.isRunning = false;
-                        window.autoTranslateModal.translationState.isPaused = false; // Clear pause state on error
-                        jQuery('#auto-translate-pause-btn').addClass('hidden');
-                        jQuery('#auto-translate-resume-btn').addClass('hidden');
-                        jQuery('#auto-translate-stop-btn').addClass('hidden');
-                        jQuery('#auto-translate-close-btn').removeClass('hidden');
-                        // Reset pause tracking
-                        itemsProcessedBeforePause = 0;
-                        originalTotalItems = 0;
-                        currentTranslationReader = null;
-                        currentTranslationAbortController = null;
-                    });
-                }
-
-                // Start reading the stream
-                readStream();
-            })
-            .catch(error => {
-                // Handle abort errors gracefully
-                if (error.name === 'AbortError') {
-                    // Request was cancelled (paused or stopped) - this is expected
-                    // Don't reset pause tracking here - it's needed for resume
-                    return;
-                }
-                console.error('Translation error:', error);
-                window.autoTranslateModal.logProgress(errorLabel + ': ' + error.message, 'error');
+            const overwriteExisting = jQuery('#overwrite-existing-translations').is(':checked');
+            const jobs = collectOrganizationTranslationJobs(currentEntityType, selectedLanguages, overwriteExisting);
+            if (!jobs.length) {
+                window.autoTranslateModal.logProgress(noFieldsNeedTranslationMsg, 'info');
                 window.autoTranslateModal.translationState.isRunning = false;
+                jQuery('#auto-translate-pause-btn').addClass('hidden');
+                jQuery('#auto-translate-resume-btn').addClass('hidden');
                 jQuery('#auto-translate-stop-btn').addClass('hidden');
                 jQuery('#auto-translate-close-btn').removeClass('hidden');
-                // Reset pause tracking
-                itemsProcessedBeforePause = 0;
-                successCountBeforePause = 0;
-                errorCountBeforePause = 0;
-                originalTotalItems = 0;
-                currentTranslationReader = null;
-                currentTranslationAbortController = null;
-            });
+                return;
+            }
+
+            window.autoTranslateModal.translationState.totalItems = jobs.length;
+            window.autoTranslateModal.updateProgress();
+            processNextOrganizationTranslation(jobs, 0, selectedService, overwriteExisting);
         };
 
         // Set up button handlers for each tab
         function openAutoTranslateModal(entityType) {
-            // Cancel any active translation when opening modal
-            if (currentTranslationReader) {
-                currentTranslationReader.cancel();
-                currentTranslationReader = null;
-            }
-            if (currentTranslationAbortController) {
-                currentTranslationAbortController.abort();
-                currentTranslationAbortController = null;
-            }
-
-            // Reset state when switching entity types
             if (currentEntityType !== entityType) {
-                // Reset translation state if modal is already initialized
                 if (window.autoTranslateModal && window.autoTranslateModal.translationState) {
                     window.autoTranslateModal.translationState.isRunning = false;
                     window.autoTranslateModal.translationState.isPaused = false;
@@ -2891,17 +2822,8 @@ try {
                     window.autoTranslateModal.translationState.errorCount = 0;
                     window.autoTranslateModal.translationState.errors = [];
                 }
-
-                // Cancel any pending counts request
-                currentTranslationParams = null;
-                // Reset pause tracking
-                itemsProcessedBeforePause = 0;
-                successCountBeforePause = 0;
-                errorCountBeforePause = 0;
-                originalTotalItems = 0;
             }
 
-            // Set the current entity type
             currentEntityType = entityType;
 
             // Use tab-specific label in the modal summary
@@ -2946,6 +2868,10 @@ try {
                 }
             }
 
+            if (window.autoTranslateModal && typeof window.autoTranslateModal.ensureServicesLoaded === 'function') {
+                window.autoTranslateModal.ensureServicesLoaded();
+            }
+
             // Show modal
             jQuery('#auto-translate-modal').removeClass('hidden');
 
@@ -2955,102 +2881,12 @@ try {
             }
         }
 
-        // Override pause/resume handlers to actually cancel/restart the backend stream
         document.addEventListener('DOMContentLoaded', function() {
-            // Wait for jQuery
             function waitForjQuery() {
                 if (typeof jQuery === 'undefined') {
                     setTimeout(waitForjQuery, 50);
                     return;
                 }
-
-                // Override pause button handler to cancel backend stream
-                jQuery(document).off('click', '#auto-translate-pause-btn').on('click', '#auto-translate-pause-btn', function() {
-                    window.autoTranslateModal.translationState.isPaused = true;
-                    jQuery('#auto-translate-pause-btn').addClass('hidden');
-                    jQuery('#auto-translate-resume-btn').removeClass('hidden');
-                    const pausedMsg = {{ _("Translation paused by user. Backoffice processing stopped.") | tojson }};
-                    window.autoTranslateModal.logProgress(pausedMsg, 'info');
-
-                    // Store current progress before pausing
-                    itemsProcessedBeforePause = window.autoTranslateModal.translationState.processedItems || 0;
-                    successCountBeforePause = window.autoTranslateModal.translationState.successCount || 0;
-                    errorCountBeforePause = window.autoTranslateModal.translationState.errorCount || 0;
-
-                    // Cancel the backend stream
-                    if (currentTranslationReader) {
-                        currentTranslationReader.cancel();
-                        currentTranslationReader = null;
-                    }
-                    if (currentTranslationAbortController) {
-                        currentTranslationAbortController.abort();
-                        currentTranslationAbortController = null;
-                    }
-                });
-
-                // Override resume button handler to restart backend stream
-                jQuery(document).off('click', '#auto-translate-resume-btn').on('click', '#auto-translate-resume-btn', function() {
-                    window.autoTranslateModal.translationState.isPaused = false;
-                    jQuery('#auto-translate-pause-btn').removeClass('hidden');
-                    jQuery('#auto-translate-resume-btn').addClass('hidden');
-                    const resumedMsg = {{ _("Translation resumed by user. Restarting backend processing...") | tojson }};
-                    window.autoTranslateModal.logProgress(resumedMsg, 'info');
-
-                    // Restart translation (backend will skip already-translated items)
-                    // Note: We preserve processedItems, successCount, errorCount - they will be updated as new items are processed
-                    if (currentTranslationParams) {
-                        // Ensure running state is set
-                        window.autoTranslateModal.translationState.isRunning = true;
-                        window.performPageSpecificTranslation(
-                            currentTranslationParams.selectedLanguages,
-                            currentTranslationParams.selectedService
-                        );
-                    } else {
-                        const noParamsMsg = {{ _("Cannot resume: translation parameters not found.") | tojson }};
-                        window.autoTranslateModal.logProgress(noParamsMsg, 'error');
-                        window.autoTranslateModal.translationState.isRunning = false;
-                        window.autoTranslateModal.translationState.isPaused = false;
-                        jQuery('#auto-translate-pause-btn').addClass('hidden');
-                        jQuery('#auto-translate-resume-btn').addClass('hidden');
-                    }
-                });
-
-                // Override stop button handler to immediately show Done button
-                jQuery(document).off('click', '#auto-translate-stop-btn').on('click', '#auto-translate-stop-btn', function() {
-                    const stopConfirmMsg = {{ _("Are you sure you want to stop the translation?") | tojson }};
-                    function doStop() {
-                        window.autoTranslateModal.translationState.shouldStop = true;
-                        window.autoTranslateModal.translationState.isRunning = false;
-                        window.autoTranslateModal.translationState.isPaused = false;
-                        const stoppedMsg = {{ _("Translation stopped by user.") | tojson }};
-                        window.autoTranslateModal.logProgress(stoppedMsg, 'info');
-
-                        // Immediately cancel backend stream and show Done button
-                        if (currentTranslationReader) {
-                            currentTranslationReader.cancel();
-                            currentTranslationReader = null;
-                        }
-                        if (currentTranslationAbortController) {
-                            currentTranslationAbortController.abort();
-                            currentTranslationAbortController = null;
-                        }
-
-                        // Show Done button immediately
-                        jQuery('#auto-translate-pause-btn').addClass('hidden');
-                        jQuery('#auto-translate-resume-btn').addClass('hidden');
-                        jQuery('#auto-translate-stop-btn').addClass('hidden');
-                        jQuery('#auto-translate-close-btn').removeClass('hidden');
-
-                        // Reset pause tracking
-                        itemsProcessedBeforePause = 0;
-                        originalTotalItems = 0;
-                    }
-                    if (window.showConfirmation) {
-                        window.showConfirmation(stopConfirmMsg, doStop, null, {{ _("Stop") | tojson }}, {{ _("Cancel") | tojson }}, {{ _("Stop Translation?") | tojson }});
-                    } else {
-                        doStop();
-                    }
-                });
 
                 // Countries button
                 jQuery('#auto-translate-all-countries-btn').on('click', function() {

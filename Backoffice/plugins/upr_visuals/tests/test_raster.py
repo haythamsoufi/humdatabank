@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from plugins.upr_visuals.raster import (
     MAX_PNG_EDGE,
     PNG_EXPORT_SCALE,
     _css_for_print,
+    summarize_child_log,
     _font_css,
     _page_size,
     _pdf_page_css,
@@ -29,6 +31,7 @@ def test_export_fonts_are_inlined():
     assert "file:" in css
     assert "Open Sans" in css
     assert "OpenSans-Regular" in css
+    assert "font-style: italic" in css
     assert PNG_EXPORT_SCALE >= 8
 
 
@@ -78,6 +81,116 @@ def test_print_css_drops_keyframes():
 
 
 @pytest.mark.unit
+def test_print_css_drops_weasyprint_unsupported_decls():
+    css = (
+        ".upr-vis-page { background: #fff; box-shadow: 0 0 0 1px #ccc; }\n"
+        ".upr-visual-report__body { overflow-x: hidden; min-width: 0; }\n"
+    )
+    printed = _css_for_print(css)
+    assert "box-shadow" not in printed
+    assert "overflow-x" not in printed
+    assert "background: #fff" in printed
+    assert "min-width: 0" in printed
+
+
+@pytest.mark.unit
+def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
+    from plugins.upr_visuals.raster import _rtl_print_css
+
+    css = _rtl_print_css("ar")
+    assert "table-layout: fixed" in css
+    assert "table-layout: auto" not in css
+    assert "overflow: hidden" in css
+    assert "direction: ltr" in css
+    assert "upr-fin-grid--half .upr-fin-col-source-label { width: 50%; }" in css
+    assert "justify-content: flex-end" in css
+    assert ".upr-bars .upr-bar-value" in css
+    assert ".upr-fin-net .upr-bar-value" in css
+    assert ".upr-fin-grid .upr-bar-value" in css
+    assert "order: -1" in css
+    assert "upr-support-table" in css
+    assert "html[dir=\"rtl\"] .upr-block--support .upr-kpi__label" in css
+    assert "html[dir=\"rtl\"] .upr-block--support .upr-kpi__value" in css
+    assert "html[dir=\"rtl\"] .upr-block__title" in css
+    assert "html[dir=\"rtl\"] .upr-block__title--center" in css
+    assert "html[dir=\"rtl\"] .upr-fin-net .upr-not-reported" in css
+    assert "html[dir=\"rtl\"] .upr-bars .upr-bar-yes" in css
+    assert "html[dir=\"rtl\"] .upr-amt" in css
+    assert "html[dir=\"rtl\"] .upr-support-table td.upr-support-total" in css
+    assert "html[dir=\"rtl\"] .upr-support-table tbody td.upr-num .upr-amt" in css
+    total_amt = css.split('html[dir="rtl"] .upr-support-total .upr-amt', 1)[1].split("}", 1)[0]
+    assert "justify-content: flex-end" in total_amt
+    assert "overflow: visible" in css.split(
+        'html[dir="rtl"] .upr-support-table td.upr-support-total {', 1
+    )[1].split("}", 1)[0]
+    assert "unicode-bidi: isolate" in css
+    assert "upr-support-col-num { width: 16%; }" in css
+    title_center = css.split('html[dir="rtl"] .upr-block__title,', 1)[1].split("}", 1)[0]
+    assert "text-align: center" in title_center
+    label_right = css.split('html[dir="rtl"] .upr-fin-grid td.upr-bar-label,', 1)[1].split("}", 1)[0]
+    assert "text-align: right" in label_right
+    bars_label = css.split('html[dir="rtl"] .upr-block--bars .upr-bar-label,', 1)[1].split("}", 1)[0]
+    assert "text-align: left" in bars_label
+    not_reported = css.split("html[dir=\"rtl\"] .upr-fin-net .upr-not-reported", 1)[1].split("}", 1)[0]
+    assert "text-align: right" in not_reported
+    assert "align-items: center" in css
+    assert "html[dir=\"rtl\"] .upr-combined-section > .upr-block--reach" not in css
+    assert not _rtl_print_css("en")
+
+
+@pytest.mark.unit
+def test_print_css_drops_webkit_scrollbar_and_embed_chrome():
+    from plugins.upr_visuals.raster import _print_css
+
+    printed = _print_css()
+    assert "::-webkit-scrollbar" not in printed
+    assert ".upr-visuals-embed__tabs" not in printed
+    assert ".upr-dashboard" in printed
+    assert 'font-family: "Open Sans", "Segoe UI", sans-serif' in printed
+
+
+@pytest.mark.unit
+def test_print_css_keeps_dashboard_font_when_grouped_with_embed_chrome():
+    css = (
+        ".upr-visual-report,\n"
+        ".upr-dashboard,\n"
+        ".upr-visuals-embed__toolbar,\n"
+        ".upr-visuals-embed__tab {\n"
+        '  font-family: "Open Sans", sans-serif;\n'
+        "}\n"
+        ".upr-visuals-embed__tabs { display: flex; }\n"
+    )
+    printed = _css_for_print(css)
+    assert 'font-family: "Open Sans"' in printed
+    assert ".upr-dashboard" in printed
+    assert ".upr-visual-report" in printed
+    assert ".upr-visuals-embed__toolbar" not in printed
+    assert ".upr-visuals-embed__tab" not in printed
+    assert ".upr-visuals-embed__tabs" not in printed
+
+
+@pytest.mark.unit
+def test_wrap_sets_document_open_sans():
+    html = _wrap('<div class="upr-dashboard">x</div>', dashboard_id="combined")
+    assert 'html, body, table, th, td, p, h1, h2, h3, h4, li' in html
+    assert 'font-family: "Open Sans", "Segoe UI", sans-serif' in html
+    page = _pdf_page_css("combined")
+    assert 'font-family: "Open Sans", "Segoe UI", sans-serif' in page
+
+
+@pytest.mark.unit
+def test_summarize_child_log_drops_weasyprint_noise():
+    raw = (
+        "Ignored `box-shadow: none` at 1670:188, unknown property.\n"
+        "INFO plugins.upr_visuals.raster: UPR PNG done reach (56204 bytes)\n"
+        "UPR PNG done reach (56204 bytes)\n"
+        "OSError: broken pipe\n"
+    )
+    assert summarize_child_log(raw) == "OSError: broken pipe"
+    assert summarize_child_log("Ignored `overflow-x: hidden` at 260:3, unknown property.") == ""
+
+
+@pytest.mark.unit
 def test_pdf_canvas_is_a4_landscape_for_single_chips():
     from plugins.upr_visuals.catalog import A4_PAGE_HEIGHT_PX, A4_PAGE_WIDTH_PX
 
@@ -110,6 +223,9 @@ def test_combined_pdf_is_portrait_and_keeps_sections_together():
     assert "upr-fin-cover" in css
     assert "table-layout: fixed" in css
     assert ".upr-reach-row" in css
+    assert ".upr-combined-section--reach{ padding-left:0; padding-right:0; }" in css
+    assert ".upr-combined-section > .upr-block--reach{" in css
+    assert "margin-left:-8mm" not in css
     assert "element(cover-footer)" in css
     assert "@page :first" in css
     assert "position: running(cover-footer)" in css
@@ -193,6 +309,59 @@ def test_png_render_scale_caps_stitched_combined_height():
 
 
 @pytest.mark.unit
+def test_render_png_job_file_calls_render_png(tmp_path, monkeypatch):
+    html_path = tmp_path / "in.html"
+    html_path.write_text("<html/>", encoding="utf-8")
+    out = tmp_path / "out.png"
+    job = tmp_path / "job.json"
+    job.write_text(
+        json.dumps(
+            {
+                "html_path": str(html_path),
+                "output_path": str(out),
+                "dashboard_id": "combined",
+                "scale": 8.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake(html, path, dashboard_id="combined", scale=8.0):
+        Path(path).write_bytes(b"png")
+        assert html == "<html/>"
+        assert dashboard_id == "combined"
+        assert scale == 8.0
+
+    monkeypatch.setattr(_raster_mod, "render_png", fake)
+    _raster_mod.render_png_job_file(job)
+    assert out.read_bytes() == b"png"
+
+
+@pytest.mark.unit
+def test_render_png_isolated_raises_on_child_crash(tmp_path, monkeypatch):
+    class Result:
+        returncode = 3221225477
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(_raster_mod.subprocess, "run", lambda *_a, **_k: Result())
+    with pytest.raises(RuntimeError, match="crashed"):
+        _raster_mod.render_png_isolated("<html/>", tmp_path / "x.png", dashboard_id="combined")
+
+
+@pytest.mark.unit
+def test_render_png_isolated_raises_on_timeout(tmp_path, monkeypatch):
+    def boom(*_a, **_k):
+        raise _raster_mod.subprocess.TimeoutExpired(cmd="png", timeout=1)
+
+    monkeypatch.setattr(_raster_mod.subprocess, "run", boom)
+    with pytest.raises(TimeoutError, match="timed out"):
+        _raster_mod.render_png_isolated(
+            "<html/>", tmp_path / "x.png", dashboard_id="combined", timeout=1
+        )
+
+
+@pytest.mark.unit
 def test_resolve_export_image_src_maps_plugin_static():
     src = resolve_export_image_src("/upr-visuals/static/icons/eo-emergency.png")
     assert src.startswith("file:")
@@ -236,6 +405,11 @@ def test_resolve_export_image_src_inlines_trusted_github(monkeypatch):
     untrusted = "https://example.test/icon.png"
     assert resolve_export_image_src(untrusted) == untrusted
 
+    from plugins.upr_visuals.raster import _restricted_url_fetcher
+
+    with pytest.raises(ValueError, match="Blocked export URL"):
+        _restricted_url_fetcher("https://fonts.googleapis.com/css2?family=Tajawal")
+
 
 @pytest.mark.unit
 def test_resolve_export_image_src_trusted_github_fetch_failure_falls_back(monkeypatch):
@@ -267,6 +441,10 @@ def test_rewrite_export_images_rewrites_plugin_src():
     rewritten = _rewrite_export_images(html)
     assert "file:" in rewritten
     assert "eo-emergency.png" in rewritten
+    svg = '<svg><image href="/upr-visuals/static/icons/eo-emergency.png"/></svg>'
+    rewritten_svg = _rewrite_export_images(svg)
+    assert "file:" in rewritten_svg
+    assert "eo-emergency.png" in rewritten_svg
 
 
 @pytest.mark.unit
@@ -286,3 +464,106 @@ def test_trim_pixmap_drops_white_margin():
     full_width = _trim_pixmap(pixmap, pad=2, keep_width=True)
     assert full_width.width == width
     assert full_width.height == 5
+
+
+@pytest.mark.unit
+def test_render_pdf_bytes_subsets_fonts_by_default(monkeypatch):
+    captured = {}
+
+    class FakeCSS:
+        def __init__(self, string=""):
+            pass
+
+    class FakeHTML:
+        def __init__(self, **_kwargs):
+            pass
+
+        def write_pdf(self, buf, **kwargs):
+            captured.update(kwargs)
+            buf.write(b"%PDF-1.4")
+
+    monkeypatch.setattr("weasyprint.CSS", FakeCSS)
+    monkeypatch.setattr("weasyprint.HTML", FakeHTML)
+    from plugins.upr_visuals.raster import render_pdf_bytes
+
+    render_pdf_bytes("<div class='upr-dashboard'/>", dashboard_id="combined")
+    assert captured.get("full_fonts") is False
+
+
+@pytest.mark.unit
+def test_render_pdf_bytes_can_embed_full_fonts(monkeypatch):
+    captured = {}
+
+    class FakeCSS:
+        def __init__(self, string=""):
+            pass
+
+    class FakeHTML:
+        def __init__(self, **_kwargs):
+            pass
+
+        def write_pdf(self, buf, **kwargs):
+            captured.update(kwargs)
+            buf.write(b"%PDF-1.4")
+
+    monkeypatch.setattr("weasyprint.CSS", FakeCSS)
+    monkeypatch.setattr("weasyprint.HTML", FakeHTML)
+    from plugins.upr_visuals.raster import render_pdf_bytes
+
+    render_pdf_bytes("<div/>", dashboard_id="combined", full_fonts=True)
+    assert captured.get("full_fonts") is True
+
+
+def _reach_preview_html(*, rtl: bool = False) -> str:
+    direction = " dir='rtl' lang='ar'" if rtl else ""
+    return (
+        f"<div class='upr-dashboard upr-dashboard--combined'{direction}>"
+        "<div class='upr-combined-body'>"
+        "<div class='upr-combined-section upr-combined-section--before-reach'>"
+        "<p>KPIs</p></div>"
+        "<div class='upr-combined-section upr-combined-section--reach'>"
+        "<section class='upr-block upr-block--reach'>"
+        "<h2 class='upr-block__title'>PEOPLE REACHED</h2>"
+        "</section></div></div></div>"
+    )
+
+
+def _widest_reach_band(pdf_bytes: bytes):
+    import fitz
+
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        page = doc[0]
+        bands = []
+        for drawing in page.get_drawings():
+            fill = drawing.get("fill")
+            if not fill or len(fill) < 3:
+                continue
+            if any(channel < 0.9 or channel > 0.98 for channel in fill[:3]):
+                continue
+            rect = fitz.Rect(drawing["rect"])
+            if rect.width > page.rect.width * 0.5:
+                bands.append(rect)
+        assert bands, "expected a People reached grey band"
+        return page.rect, max(bands, key=lambda item: item.width)
+    finally:
+        doc.close()
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("lang", ["en", "ar"])
+def test_combined_reach_band_bleeds_after_narrative_merge(monkeypatch, lang):
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: lang)
+    monkeypatch.setattr("plugins.upr_visuals.i18n.is_rtl", lambda lang_code=None: lang == "ar")
+    from plugins.upr_visuals.idml.narrative_pdf import merge_report_pdfs
+    from plugins.upr_visuals.raster import render_pdf_bytes
+
+    pdf = render_pdf_bytes(_reach_preview_html(rtl=lang == "ar"), dashboard_id="combined")
+    page_rect, band = _widest_reach_band(pdf)
+    assert band.x0 <= 1.5
+    assert page_rect.width - band.x1 <= 1.5
+
+    merged = merge_report_pdfs(pdf, pdf)
+    page_rect, band = _widest_reach_band(merged)
+    assert band.x0 <= 1.5
+    assert page_rect.width - band.x1 <= 1.5

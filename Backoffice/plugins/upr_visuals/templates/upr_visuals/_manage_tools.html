@@ -1,4 +1,4 @@
-{# Bulk PNG export — Data Explorer UPR visuals tab. #}
+{# Bulk export — Data Explorer UPR visuals tab. #}
 <div id="upr-visuals-admin" class="space-y-5">
     <div class="upr-vis-toolbar">
         <nav id="upr-vis-mode-tabs" class="upr-vis-toolbar__tabs" role="tablist" aria-label="{{ _('UPR visuals tools') }}">
@@ -44,8 +44,47 @@
     </div>
 
     <div id="upr-vis-pane-generate" class="space-y-5" role="tabpanel" aria-labelledby="upr-vis-tab-generate" hidden>
+        <section class="upr-vis-card" aria-labelledby="upr-vis-format-heading">
+            <div class="upr-vis-card__header">
+                <h4 id="upr-vis-format-heading" class="text-sm font-semibold text-gray-900">{{ _('Export type') }}</h4>
+            </div>
+            <div class="upr-vis-card__body upr-vis-dashboards" id="upr-vis-formats" role="radiogroup" aria-labelledby="upr-vis-format-heading">
+                <label class="upr-vis-chip is-checked">
+                    <input type="radio" name="upr-vis-format" value="png" checked>
+                    <span>{{ _('PNG') }}</span>
+                </label>
+                <label class="upr-vis-chip">
+                    <input type="radio" name="upr-vis-format" value="pdf">
+                    <span>{{ _('PDF') }}</span>
+                </label>
+                <label class="upr-vis-chip">
+                    <input type="radio" name="upr-vis-format" value="idml">
+                    <span>{{ _('InDesign') }}</span>
+                </label>
+            </div>
+            <div class="upr-vis-card__body" id="upr-vis-narrative-panel" hidden>
+                <label class="upr-vis-country" for="upr-vis-include-narrative">
+                    <input type="checkbox" id="upr-vis-include-narrative">
+                    <span>{{ _('Include narrative (Word)') }}</span>
+                </label>
+                <div id="upr-vis-narrative-files-wrap" class="mt-3" hidden>
+                    <label for="upr-vis-narratives" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Narrative files') }}</label>
+                    <input id="upr-vis-narratives"
+                           type="file"
+                           class="upr-vis-search"
+                           accept=".docx,.zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/zip"
+                           multiple>
+                    <p class="text-xs text-gray-500 mt-2">{{ _('Name each .docx by ISO3 (AFG.docx), or upload a zip of those files. Countries without a match still export visuals only.') }}
+                        <span data-upr-narrative-translate
+                              hidden
+                              data-template="{{ _('The Word narrative will be translated into {language} after upload, before the report is generated.')|forceescape }}"></span>
+                    </p>
+                </div>
+            </div>
+        </section>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <section class="upr-vis-card" aria-labelledby="upr-vis-dashboards-heading">
+            <section class="upr-vis-card" id="upr-vis-dashboards-card" aria-labelledby="upr-vis-dashboards-heading">
                 <div class="upr-vis-card__header">
                     <h4 id="upr-vis-dashboards-heading" class="text-sm font-semibold text-gray-900">{{ _('Dashboards') }}</h4>
                     <span id="upr-vis-dash-count" class="text-xs text-gray-500"></span>
@@ -84,8 +123,9 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2 pt-1">
-            <button type="button" id="upr-vis-generate" class="btn btn-primary btn-sm" disabled>
-                <i class="fas fa-play mr-1"></i>{{ _('Generate PNGs') }}
+            {% include "plugins/upr_visuals/upr_visuals/_language_select.html" %}
+            <button type="button" id="upr-vis-generate" class="btn btn-primary btn-sm" disabled data-label-png="{{ _('Generate PNGs')|forceescape }}" data-label-pdf="{{ _('Generate PDFs')|forceescape }}" data-label-idml="{{ _('Generate InDesign')|forceescape }}">
+                <i class="fas fa-play mr-1"></i><span data-upr-generate-label>{{ _('Generate PNGs') }}</span>
             </button>
             <button type="button" id="upr-vis-cancel" class="btn btn-secondary btn-sm hidden">
                 <i class="fas fa-stop mr-1"></i>{{ _('Cancel') }}
@@ -109,6 +149,8 @@
     <div id="upr-vis-pane-preview" class="upr-vis-preview-pane" role="tabpanel" aria-labelledby="upr-vis-tab-preview">
         <div class="upr-visuals-embed__toolbar">
             <div id="upr-vis-preview-tabs" class="upr-visuals-embed__tabs" role="tablist" aria-label="{{ _('Dashboards')|forceescape }}"></div>
+            <div class="upr-visuals-embed__tools">
+            {% include "plugins/upr_visuals/upr_visuals/_language_select.html" %}
             <div class="upr-visuals-download">
                 <button type="button" id="upr-vis-preview-download" class="btn btn-icon btn-sm btn-secondary"
                         title="{{ _('Download')|forceescape }}"
@@ -122,6 +164,7 @@
                 <div id="upr-vis-preview-download-menu" class="upr-visuals-download__menu" role="menu">
                     {% include "plugins/upr_visuals/upr_visuals/_download_menu.html" %}
                 </div>
+            </div>
             </div>
         </div>
         <p id="upr-vis-preview-status" class="text-sm text-gray-500"></p>

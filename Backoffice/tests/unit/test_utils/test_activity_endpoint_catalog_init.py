@@ -103,5 +103,5 @@ def test_manual_overrides_win_over_generated():
     """Manual overrides replace generated entries for the same (method, endpoint) key."""
     s = resolve_activity_catalog_spec("POST", "ai_management.traces_bulk_delete")
     assert s is not None
-    assert s.description == "Deleted traces"
+    assert s.description == "Deleted AI traces"
     assert s.activity_type == "admin_ai"

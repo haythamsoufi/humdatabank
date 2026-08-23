@@ -190,7 +190,9 @@ def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> lis
         if not style:
             continue
         if style == "AdditionalHead":
-            text = "ADDITIONAL INFORMATION"
+            from plugins.upr_visuals.i18n import t
+
+            text = t("ADDITIONAL INFORMATION")
             row = {"text": text, "runs": [{"text": text, "href": "", "bold": True}], "bullet": False}
         if style in {"QHeading", "BandHead"}:
             text = text.upper()
@@ -207,10 +209,12 @@ def style_narrative_blocks(blocks: list[dict], *, country_name: str = "") -> lis
 def folio_label(meta: dict) -> str:
     year = str((meta or {}).get("year") or "").strip()
     kind = str((meta or {}).get("kind") or "report")
+    from plugins.upr_visuals.i18n import t
+
     label = "unified plan" if kind == "plan" else "annual report"
     if year:
-        return f"{year} IFRC network {label}"
-    return f"IFRC network {label}"
+        return t(f"{year} IFRC network {label}")
+    return t(f"IFRC network {label}")
 
 
 def folio_text(label: str, page_number: int) -> str:

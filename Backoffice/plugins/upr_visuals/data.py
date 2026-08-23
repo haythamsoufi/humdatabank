@@ -9,9 +9,12 @@ from app.models.form_items import FormItem
 from app.models.forms import FormData
 from app.utils.api_serialization import _country_for_aes
 from plugins.upr_visuals.bulk import (
+    collect_narrative_uploads,
     get_assigned_form_for_bulk,
     list_assigned_forms_for_bulk,
     list_countries_for_bulk,
+    match_narrative_path,
+    normalize_export_format,
 )
 from plugins.upr_visuals.catalog import (
     EF_CODES,
@@ -85,6 +88,13 @@ from plugins.upr_visuals.pns_funding import (
     t22_host_funding_by_pns,
     t23_host_funding_by_pns,
 )
+from plugins.upr_visuals.i18n import (
+    current_export_language,
+    localized_assignment_title,
+    localized_country_name,
+    localized_ns_display_name,
+    t,
+)
 from plugins.upr_visuals.support import (
     _apply_support_funding,
     _expand_plan_support_years,
@@ -101,9 +111,13 @@ __all__ = [
     "assignment_supports_visuals",
     "build_payload",
     "filename_from_visual_title",
+    "collect_narrative_uploads",
     "get_assigned_form_for_bulk",
     "list_assigned_forms_for_bulk",
     "list_countries_for_bulk",
+    "match_narrative_path",
+    "normalize_export_format",
+    "title_for_export_filename",
     "visuals_browser_title",
     "visuals_document_title",
 ]
@@ -120,22 +134,30 @@ def visuals_document_title(*, country_name: str | None, assignment_title: str | 
 
 
 def visuals_browser_title(aes: AssignmentEntityStatus) -> str:
-    """Tab title for the live assignment PDF viewer."""
+    """Tab title for the live assignment PDF viewer (localized country and assignment)."""
     country = _country_for_aes(aes)
     assigned = aes.assigned_form
+    english = (getattr(country, "name", None) or "").strip()
+    localized = localized_country_name(country, fallback=english)
     return visuals_document_title(
-        country_name=getattr(country, "name", None),
-        assignment_title=assigned.display_name if assigned else "",
+        country_name=localized or english,
+        assignment_title=localized_assignment_title(assigned),
     )
 
 
+def title_for_export_filename(meta: dict[str, Any] | None = None) -> str:
+    """Download-name title; keeps the localized document title (any script)."""
+    meta = meta or {}
+    title = str(meta.get("document_title") or "").strip()
+    return title or str(meta.get("document_title_en") or "").strip()
+
+
 def filename_from_visual_title(title: str, ext: str = "pdf") -> str:
-    """ASCII download name matching the PDF page title (HTTP headers are latin-1)."""
+    """Download name matching the PDF page title. Letters from any script are kept."""
     raw = (title or "").strip() or "UPR visuals"
     raw = raw.replace("\u2014", " - ").replace("\u2013", "-")
     for char in '<>:"/\\|?*':
         raw = raw.replace(char, " ")
-    raw = raw.encode("ascii", "ignore").decode("ascii")
     raw = " ".join(raw.split()) or "UPR visuals"
     suffix = ext.lstrip(".").lower() or "pdf"
     return f"{raw}.{suffix}"
@@ -149,6 +171,9 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
     kind = kind_for_template(template_id)
     country = _country_for_aes(aes)
     ns = getattr(country, "primary_national_society", None) if country else None
+    english_country = (getattr(country, "name", None) or "").strip() if country else ""
+    country_name = localized_country_name(country, fallback=english_country) or english_country
+    ns_name = localized_ns_display_name(ns, fallback=country_name) if ns else display_ns_name(country_name)
     period_name = assigned.period_name or ""
     items = _load_items(assigned.template)
     entries = _load_entries(aes.id)
@@ -161,14 +186,20 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             "kind": kind,
             "period_name": period_name,
             "round_code": period_to_round(period_name, kind),
-            "country_name": country.name if country else "",
+            "country_name": country_name,
+            "country_name_en": english_country,
             "iso3": country.iso3 if country else "",
             "iso2": country.iso2 if country else "",
+            "lang": current_export_language(),
             "document_title": visuals_document_title(
-                country_name=country.name if country else "",
+                country_name=country_name,
+                assignment_title=localized_assignment_title(assigned),
+            ),
+            "document_title_en": visuals_document_title(
+                country_name=english_country,
                 assignment_title=assigned.display_name,
             ),
-            "national_society": display_ns_name(ns.name if ns else country.name if country else ""),
+            "national_society": ns_name or display_ns_name(country_name),
             "year": (planning_years(period_name) or [None])[0],
             "header_date": format_header_date(),
             "document_subtitle": document_subtitle(kind, period_name),
@@ -197,15 +228,15 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
             period_name=period_name,
             country_id=country.id if country else None,
         )
-        payload["meta"]["people_title"] = (
+        payload["meta"]["people_title"] = t(
             f"People to be reached in {payload['meta']['year']}"
             if payload["meta"].get("year")
             else "People to be reached"
         )
-        payload["meta"]["support_title"] = "Participating National Societies bilateral support"
-        payload["meta"]["support_funding_label"] = "Funding Requirement"
-        payload["meta"]["support_confirmed_label"] = "Confirmed Funding"
-        payload["meta"]["header_prefix"] = "In support of"
+        payload["meta"]["support_title"] = t("Participating National Societies bilateral support")
+        payload["meta"]["support_funding_label"] = t("Funding Requirement")
+        payload["meta"]["support_confirmed_label"] = t("Confirmed Funding")
+        payload["meta"]["header_prefix"] = t("In support of")
         payload["meta"]["plan_years"] = planning_years(period_name)
     else:
         payload["people_reached"] = _report_people_reached(items, by_item, aes.id)
@@ -233,17 +264,17 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
         payload["enabling_indicators"] = _report_indicator_rows(
             items, by_item, EF_CODES, bars_only=False, aes_id=aes.id
         )
-        payload["meta"]["people_title"] = "People reached"
-        payload["meta"]["support_title"] = "IFRC Network-Supported Activities"
-        payload["meta"]["support_funding_label"] = "Funding Reported"
-        payload["meta"]["header_prefix"] = "IN SUPPORT OF"
+        payload["meta"]["people_title"] = t("People reached")
+        payload["meta"]["support_title"] = t("IFRC Network-Supported Activities")
+        payload["meta"]["support_funding_label"] = t("Funding Reported")
+        payload["meta"]["header_prefix"] = t("IN SUPPORT OF")
 
     payload["support_total"] = support_total_from_rows(payload.get("support") or [])
     emergency_slots = {int(em.get("slot") or 0) for em in payload.get("emergencies") or []}
     payload["dashboards"] = [
         {
             "id": spec.id,
-            "title": _dashboard_title(spec, kind),
+            "title": t(_dashboard_title(spec, kind)),
             "description": spec.description,
             "width": spec.width,
             "height": spec.height,
@@ -277,9 +308,9 @@ def _build_kpis(items: list[FormItem], by_item: dict[int, FormData], *, kind: st
         number = _scalar_number(entry)
         kpis[key] = {
             "key": key,
-            "label": labels[key],
+            "label": t(labels[key]),
             "value": number,
-            "display": format_count(number) if number is not None else "Not reported",
+            "display": format_count(number),
             "icon": key,
         }
     return kpis

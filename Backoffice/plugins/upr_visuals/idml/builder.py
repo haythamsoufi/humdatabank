@@ -47,17 +47,19 @@ def build_indesign_package(
     word_bytes: bytes | None = None,
 ) -> dict:
     import fitz
-    from plugins.upr_visuals.data import filename_from_visual_title
+    from plugins.upr_visuals.data import filename_from_visual_title, title_for_export_filename
 
     work_dir = Path(work_dir)
     links = work_dir / "Links"
     links.mkdir(parents=True, exist_ok=True)
     meta = payload.get("meta") or {}
-    title = meta.get("document_title") or "UPR visuals"
+    title = title_for_export_filename(meta) or "UPR visuals"
     idml_name = filename_from_visual_title(title, "idml")
 
+    from plugins.upr_visuals.i18n import is_rtl
+
     pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    doc = Idml()
+    doc = Idml(rtl=is_rtl())
     try:
         visual_bands = build_native_pages(doc, pdf_doc, payload, links)
     finally:
@@ -65,9 +67,13 @@ def build_indesign_package(
 
     styled: list[dict] = []
     if word_bytes:
-        styled = style_narrative_blocks(
-            load_word_paragraphs(word_bytes),
-            country_name=str(meta.get("country_name") or ""),
+        from plugins.upr_visuals.i18n import translate_styled_blocks
+
+        styled = translate_styled_blocks(
+            style_narrative_blocks(
+                load_word_paragraphs(word_bytes),
+                country_name=str(meta.get("country_name") or ""),
+            )
         )
         add_narrative_pages(doc, styled, folio=folio_label(meta))
 

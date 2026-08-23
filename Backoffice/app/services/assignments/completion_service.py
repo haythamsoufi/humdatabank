@@ -1260,8 +1260,10 @@ class AssignmentCompletionService:
             total_items = int(metrics.total_items)
             rate = float(round(metrics.completion_rate, 1))
 
-        aes.completion_rate = rate
-        db.session.flush()
+        changed = previous is None or round(previous, 1) != round(rate, 1)
+        if changed:
+            aes.completion_rate = rate
+            db.session.flush()
         AssignmentCompletionService._log_refresh(
             assignment_entity_status_id,
             previous=previous,
@@ -1269,6 +1271,7 @@ class AssignmentCompletionService:
             filled_items=filled_items,
             total_items=total_items,
             context=context,
+            changed=changed,
         )
         return rate
 
@@ -1281,14 +1284,15 @@ class AssignmentCompletionService:
         filled_items: int,
         total_items: int,
         context: tuple[int, int] | None,
+        changed: bool,
     ) -> None:
         try:
             from flask import current_app, has_app_context
             if not has_app_context():
                 return
             template_id, version_id = context if context else (None, None)
-            changed = previous != rate
-            current_app.logger.info(
+            log = current_app.logger.info if changed else current_app.logger.debug
+            log(
                 "Recalculated completion_rate for aes_id=%s: %s -> %s "
                 "(%s/%s filled, template_id=%s version_id=%s, changed=%s)",
                 assignment_entity_status_id,

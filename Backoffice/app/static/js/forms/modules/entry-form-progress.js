@@ -142,9 +142,13 @@ export function applyCompletionRate(completionRate) {
     if (!completionDisplay || rate === null) {
         return false;
     }
-    completionDisplay.textContent = `${rate.toFixed(1)}%`;
-    completionDisplay.classList.remove(...COMPLETION_COLOR_CLASSES);
-    completionDisplay.classList.add('font-medium', ...completionColorClass(rate).split(/\s+/));
+    const nextText = `${rate.toFixed(1)}%`;
+    // Avoid re-announcing the aria-live header when the value did not change.
+    if (completionDisplay.textContent !== nextText) {
+        completionDisplay.textContent = nextText;
+        completionDisplay.classList.remove(...COMPLETION_COLOR_CLASSES);
+        completionDisplay.classList.add('font-medium', ...completionColorClass(rate).split(/\s+/));
+    }
 
     const btn = getGapButton();
     if (btn) {

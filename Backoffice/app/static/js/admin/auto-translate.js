@@ -71,6 +71,12 @@
         // next open retries rather than showing permanently stale/broken state.
         let servicesLoaded = false;
 
+        function ensureServicesLoaded() {
+            if (!servicesLoaded) {
+                loadTranslationServices();
+            }
+        }
+
         // Load available translation services
         function loadTranslationServices() {
             servicesLoaded = true;
@@ -407,9 +413,25 @@
             translationState: translationState,
             config: autoTranslateConfig,
             updateEstimatedTime: updateEstimatedTime,
+            ensureServicesLoaded: ensureServicesLoaded,
             minimize: function() { minimizeModal(); },
             restore:  function() { restoreModal(); }
         };
+
+        // Pages that open this modal with custom buttons (organization NS/countries)
+        // never click #auto-translate-all-btn, so load services whenever it is shown.
+        const modalEl = document.getElementById('auto-translate-modal');
+        if (modalEl && typeof MutationObserver !== 'undefined') {
+            const loadIfVisible = function() {
+                if (!modalEl.classList.contains('hidden')) {
+                    ensureServicesLoaded();
+                }
+            };
+            new MutationObserver(loadIfVisible).observe(modalEl, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
 
         // Log translation progress
         function logProgress(message, type = 'info') {
@@ -613,9 +635,7 @@
         // Show modal button
         jQuery('#auto-translate-all-btn').on('click', function() {
             // Fetch translation services on first open (deferred to avoid a page-load request)
-            if (!servicesLoaded) {
-                loadTranslationServices();
-            }
+            ensureServicesLoaded();
 
             // Reset overwrite checkbox to unchecked by default
             jQuery('#overwrite-existing-translations').prop('checked', false);

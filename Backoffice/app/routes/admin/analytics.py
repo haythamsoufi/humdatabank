@@ -37,6 +37,7 @@ from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_ok
 from app.services.audit.details_service import format_admin_action_details
 from app.services.audit.trail_session_query import (
+    AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
     apply_audit_trail_user_activity_noise_filters,
     count_audit_visible_entries_for_session,
@@ -548,6 +549,9 @@ def user_analytics(user_id):
         UserActivityLog.timestamp >= from_date,
     )
     activities_query = apply_audit_trail_user_activity_noise_filters(activities_query)
+    activities_query = activities_query.filter(
+        ~UserActivityLog.activity_type.in_(AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES)
+    )
     total_activities_count = activities_query.count()
     recent_activities = activities_query.order_by(
         desc(UserActivityLog.timestamp)
@@ -872,12 +876,15 @@ def audit_trail():
             )
         )
 
-    # Omit page_view at SQL when the UI will not show them (default + filtered views
-    # that exclude page_view), to avoid loading thousands of low-value rows.
-    # Same rule for session-scoped and global audit: driven by Activity Type (activity_type).
-    _need_page_views_in_results = bool(activity_type) and 'page_view' in activity_type
-    if not _need_page_views_in_results:
-        activity_query = activity_query.filter(UserActivityLog.activity_type != 'page_view')
+    # Omit page_view / draft saves at SQL unless the reviewer asked for those types.
+    _hidden_types = [
+        t for t in AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES
+        if not (activity_type and t in activity_type)
+    ]
+    if _hidden_types:
+        activity_query = activity_query.filter(
+            ~UserActivityLog.activity_type.in_(tuple(_hidden_types))
+        )
 
     if user_filter:
         # Handle multiple user selections
@@ -1036,8 +1043,8 @@ def audit_trail():
             flash(f"Invalid date format for 'to' date: {date_to}. Expected YYYY-MM-DD", "warning")
 
     MAX_ADMIN_ROWS = 5000
-    # Page-view-only view has no admin_action rows with consolidated type page_view
-    if session_row and activity_type and set(activity_type) == {'page_view'}:
+    # Views that only ask for hidden activity types have no matching admin_action rows.
+    if activity_type and set(activity_type).issubset(set(AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES)):
         admin_actions = []
     else:
         admin_actions = admin_query.order_by(AdminActionLog.timestamp.desc()).limit(MAX_ADMIN_ROWS).all()
@@ -1092,7 +1099,10 @@ def audit_trail():
     if activity_type:
         entries = [entry for entry in entries if entry['consolidated_activity_type'] in activity_type]
     else:
-        entries = [entry for entry in entries if entry['consolidated_activity_type'] != 'page_view']
+        entries = [
+            entry for entry in entries
+            if entry['consolidated_activity_type'] not in AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES
+        ]
 
     # Sort all entries by timestamp (most recent first)
     entries.sort(key=lambda x: x['timestamp'], reverse=True)

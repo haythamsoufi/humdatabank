@@ -80,7 +80,7 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
     suffix_noise = or_(
         *[
             UserActivityLog.endpoint.like(
-                f"%.{suffix.replace('_', r'\_')}",
+                "%.{0}".format(suffix.replace("_", r"\_")),
                 escape="\\",
             )
             for suffix in sorted(SKIP_ACTIVITY_ENDPOINT_SUFFIXES)

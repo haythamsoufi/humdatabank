@@ -1,12 +1,29 @@
-"""Export-language helpers for UPR visuals (MT + Backoffice locale)."""
+"""Export-language helpers for UPR visuals (MT + Backoffice locale).
+
+Language gates (do not collapse these — they answer different questions):
+
+1. ``is_rtl()`` / ``RTL_LANGS`` — document ``dir``, table column flip, print
+   layout. Hebrew is included.
+2. ``uses_arabic_font()`` / ``ARABIC_FONT_LANGS`` — Tajawal. Arabic-script
+   locales only; Hebrew stays on the Latin stack.
+3. ``current_export_language() == "ar"`` — Arabic grammar and CHF copy
+   (مليون / ملايين, فرنك سويسري) in ``formatters``.
+4. Arabic *script* (``\\u0600–\\u06ff``) — ``split_display_amount``, used when
+   a string already contains Arabic letters regardless of the export language.
+
+JS ``data-rtl-langs`` / ``data-arabic-font-langs`` on the language select must
+match ``RTL_LANGS`` / ``ARABIC_FONT_LANGS`` here.
+"""
 
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 import threading
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator
 
 logger = logging.getLogger(__name__)
@@ -14,15 +31,16 @@ logger = logging.getLogger(__name__)
 _TX_SESSION: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
     "upr_visuals_tx_session", default=None
 )
+_LOAD_MEMO: contextvars.ContextVar[dict[tuple, Any] | None] = contextvars.ContextVar(
+    "upr_visuals_load_memo", default=None
+)
 _PROGRESS_LOCK = threading.Lock()
 _PROGRESS: dict[str, dict[str, Any]] = {}
 _PROGRESS_TTL_S = 600
 
 RTL_LANGS = frozenset({"ar", "fa", "he", "ur"})
+ARABIC_FONT_LANGS = frozenset({"ar", "fa", "ur"})
 _DEFAULT_SYSTEM_LANGS = frozenset({"en", "fr", "es", "ar", "ru", "zh"})
-_TAJAWAL_FONTS_HREF = (
-    "https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap"
-)
 
 
 def normalize_language_code(value: str | None) -> str:
@@ -68,7 +86,17 @@ def current_export_language() -> str:
 
 
 def is_rtl(lang: str | None = None) -> bool:
+    """True when the export language uses a right-to-left *layout* (gate 1)."""
     return (normalize_language_code(lang) or current_export_language()) in RTL_LANGS
+
+
+def uses_arabic_font(lang: str | None = None) -> bool:
+    """True when body text should use Tajawal (gate 2). Hebrew is RTL but not this."""
+    return (normalize_language_code(lang) or current_export_language()) in ARABIC_FONT_LANGS
+
+
+def arabic_font_class(lang: str | None = None) -> str:
+    return "upr-arabic-font" if uses_arabic_font(lang) else ""
 
 
 def system_language_codes() -> set[str]:
@@ -105,7 +133,8 @@ def can_machine_translate(lang: str | None = None) -> bool:
 
         return language_has_machine_translation(code)
     except Exception:
-        return True
+        logger.warning("UPR visuals: translation engine unavailable; skipping live MT", exc_info=True)
+        return False
 
 
 def is_system_language(lang: str | None = None) -> bool:
@@ -143,6 +172,62 @@ def parse_progress_id(value: str | None) -> str:
     return ""
 
 
+def _progress_key(progress_id: str, aes_id: int | None = None) -> str:
+    pid = parse_progress_id(progress_id)
+    if not pid:
+        return ""
+    if aes_id:
+        return f"{int(aes_id)}_{pid}"
+    return pid
+
+
+def _progress_dir() -> Path | None:
+    try:
+        from flask import current_app, has_app_context
+
+        if has_app_context():
+            path = Path(current_app.instance_path) / "upr_visuals_progress"
+            path.mkdir(parents=True, exist_ok=True)
+            return path
+    except Exception:
+        logger.debug("UPR visuals: progress directory unavailable", exc_info=True)
+    return None
+
+
+def _progress_path(key: str) -> Path | None:
+    folder = _progress_dir()
+    if folder is None:
+        return None
+    return folder / f"{key}.json"
+
+
+def _read_progress_file(key: str) -> dict[str, Any] | None:
+    path = _progress_path(key)
+    if path is None or not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _write_progress_file(key: str, rec: dict[str, Any]) -> None:
+    path = _progress_path(key)
+    if path is None:
+        return
+    tmp = path.with_suffix(".json.tmp")
+    try:
+        tmp.write_text(json.dumps(rec), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        logger.debug("UPR visuals: could not persist progress %s", key, exc_info=True)
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+
+
 def _prune_visuals_progress(now: float) -> None:
     stale = [
         key
@@ -151,36 +236,45 @@ def _prune_visuals_progress(now: float) -> None:
     ]
     for key in stale:
         _PROGRESS.pop(key, None)
+        path = _progress_path(key)
+        if path is None:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            pass
 
 
-def start_visuals_progress(progress_id: str) -> None:
-    pid = parse_progress_id(progress_id)
-    if not pid:
+def start_visuals_progress(progress_id: str, *, aes_id: int | None = None) -> None:
+    key = _progress_key(progress_id, aes_id)
+    if not key:
         return
     now = time.time()
+    rec = {
+        "done": 0,
+        "total": 0,
+        "pending": 0,
+        "lang": "",
+        "elapsed": 0,
+        "status": "running",
+        "updated": now,
+        "aes_id": int(aes_id or 0),
+    }
     with _PROGRESS_LOCK:
         _prune_visuals_progress(now)
-        _PROGRESS[pid] = {
-            "done": 0,
-            "total": 0,
-            "pending": 0,
-            "lang": "",
-            "elapsed": 0,
-            "status": "running",
-            "updated": now,
-        }
+        _PROGRESS[key] = rec
+        _write_progress_file(key, rec)
 
 
-def update_visuals_progress(progress_id: str, **kw: Any) -> None:
-    pid = parse_progress_id(progress_id)
-    if not pid:
+def update_visuals_progress(progress_id: str, *, aes_id: int | None = None, **kw: Any) -> None:
+    key = _progress_key(progress_id, aes_id)
+    if not key:
         return
     now = time.time()
     with _PROGRESS_LOCK:
-        rec = _PROGRESS.get(pid)
+        rec = _PROGRESS.get(key) or _read_progress_file(key)
         if rec is None:
-            rec = {"status": "running", "updated": now}
-            _PROGRESS[pid] = rec
+            rec = {"status": "running", "updated": now, "aes_id": int(aes_id or 0)}
         if "done" in kw:
             rec["done"] = int(kw["done"] or 0)
         if "total" in kw:
@@ -193,20 +287,54 @@ def update_visuals_progress(progress_id: str, **kw: Any) -> None:
             rec["status"] = str(kw.get("status") or rec.get("status") or "running")
         rec["pending"] = max(0, int(rec.get("total") or 0) - int(rec.get("done") or 0))
         rec["updated"] = now
+        if aes_id:
+            rec["aes_id"] = int(aes_id)
+        _PROGRESS[key] = rec
+        _write_progress_file(key, rec)
 
 
-def get_visuals_progress(progress_id: str) -> dict[str, Any] | None:
-    pid = parse_progress_id(progress_id)
-    if not pid:
+def get_visuals_progress(progress_id: str, *, aes_id: int | None = None) -> dict[str, Any] | None:
+    key = _progress_key(progress_id, aes_id)
+    if not key:
         return None
     now = time.time()
     with _PROGRESS_LOCK:
         _prune_visuals_progress(now)
-        rec = _PROGRESS.get(pid)
-        return dict(rec) if rec else None
+        rec = _PROGRESS.get(key) or _read_progress_file(key)
+        if rec is None:
+            return None
+        if aes_id and int(rec.get("aes_id") or 0) not in {0, int(aes_id)}:
+            return None
+        _PROGRESS[key] = rec
+        return dict(rec)
 
 
-def localize_export(fn: Callable[[], Any], *, on_progress: Any = None, progress_id: str = "") -> Any:
+@contextmanager
+def payload_load_memo() -> Iterator[None]:
+    """Reuse AES/item/entry loads across the collect + apply localize_export passes."""
+    token = _LOAD_MEMO.set({})
+    try:
+        yield
+    finally:
+        _LOAD_MEMO.reset(token)
+
+
+def memoized_load(key: tuple, fn: Callable[[], Any]) -> Any:
+    store = _LOAD_MEMO.get()
+    if store is None:
+        return fn()
+    if key not in store:
+        store[key] = fn()
+    return store[key]
+
+
+def localize_export(
+    fn: Callable[[], Any],
+    *,
+    on_progress: Any = None,
+    progress_id: str = "",
+    aes_id: int | None = None,
+) -> Any:
     """Collect live-MT strings, batch-translate them, then run *fn* with the map.
 
     System languages and English skip the collect pass. *on_progress* matches
@@ -214,48 +342,56 @@ def localize_export(fn: Callable[[], Any], *, on_progress: Any = None, progress_
     """
     pid = parse_progress_id(progress_id)
     if pid:
-        start_visuals_progress(pid)
+        start_visuals_progress(pid, aes_id=aes_id)
 
     def emit(**kw: Any) -> None:
         if pid:
-            update_visuals_progress(pid, **kw)
+            update_visuals_progress(pid, aes_id=aes_id, **kw)
         if on_progress:
             on_progress(**kw)
 
     lang = current_export_language()
-    if lang == "en" or is_system_language(lang) or not can_machine_translate(lang):
-        result = fn()
-        if pid:
-            update_visuals_progress(pid, done=0, total=0, lang=lang, status="done")
-        return result
-
-    session: dict[str, Any] = {"phase": "collect", "texts": [], "map": {}}
-    token = _TX_SESSION.set(session)
-    try:
-        first = fn()
-        unique = list(dict.fromkeys(item for item in session["texts"] if str(item).strip()))
-        emit(done=0, total=len(unique), lang=lang, elapsed=0, status="running")
-        if not unique:
+    with payload_load_memo():
+        if lang == "en" or is_system_language(lang) or not can_machine_translate(lang):
+            result = fn()
             if pid:
-                update_visuals_progress(pid, done=0, total=0, lang=lang, status="done")
-            return first
-        translated = t_batch(unique, on_progress=emit)
-        session["map"] = {
-            src: dst for src, dst in zip(unique, translated) if dst and str(dst).strip()
-        }
-        session["phase"] = "apply"
-        result = fn()
-        if pid:
-            update_visuals_progress(
-                pid, done=len(unique), total=len(unique), lang=lang, status="done"
-            )
-        return result
-    except Exception:
-        if pid:
-            update_visuals_progress(pid, status="failed")
-        raise
-    finally:
-        _TX_SESSION.reset(token)
+                update_visuals_progress(pid, aes_id=aes_id, done=0, total=0, lang=lang, status="done")
+            return result
+
+        session: dict[str, Any] = {"phase": "collect", "texts": [], "map": {}}
+        token = _TX_SESSION.set(session)
+        try:
+            first = fn()
+            unique = list(dict.fromkeys(item for item in session["texts"] if str(item).strip()))
+            emit(done=0, total=len(unique), lang=lang, elapsed=0, status="running")
+            if not unique:
+                if pid:
+                    update_visuals_progress(
+                        pid, aes_id=aes_id, done=0, total=0, lang=lang, status="done"
+                    )
+                return first
+            translated = t_batch(unique, on_progress=emit)
+            session["map"] = {
+                src: dst for src, dst in zip(unique, translated) if dst and str(dst).strip()
+            }
+            session["phase"] = "apply"
+            result = fn()
+            if pid:
+                update_visuals_progress(
+                    pid,
+                    aes_id=aes_id,
+                    done=len(unique),
+                    total=len(unique),
+                    lang=lang,
+                    status="done",
+                )
+            return result
+        except Exception:
+            if pid:
+                update_visuals_progress(pid, aes_id=aes_id, status="failed")
+            raise
+        finally:
+            _TX_SESSION.reset(token)
 
 
 def t(text: str | None) -> str:
@@ -644,57 +780,12 @@ def rtl_document_attrs(lang: str | None = None) -> dict[str, str]:
     return {"lang": code or "en", "dir": "rtl" if is_rtl(code) else "ltr"}
 
 
-def rtl_font_link_html(lang: str | None = None) -> str:
-    if not is_rtl(lang):
-        return ""
-    return (
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-        f'<link href="{_TAJAWAL_FONTS_HREF}" rel="stylesheet">'
-    )
-
-
 def rtl_css(lang: str | None = None) -> str:
+    """RTL narrative justify. Fonts live in ``typography`` — do not add stacks here."""
     if not is_rtl(lang):
         return ""
-    body_font = '"Tajawal", "Arial", "Segoe UI", sans-serif'
-    return f"""
-html[dir="rtl"] body,
-html[dir="rtl"] .upr-dashboard,
-html[dir="rtl"] .upr-visual-report,
-.upr-dashboard[dir="rtl"],
-.upr-visual-report[dir="rtl"],
-html[dir="rtl"] .upr-nar-p {{
-  font-family: {body_font};
-}}
-html[dir="rtl"] .upr-doc-header__country,
-html[dir="rtl"] .upr-doc-header__subtitle,
-html[dir="rtl"] .upr-block__title,
-html[dir="rtl"] .upr-kpi__label,
-html[dir="rtl"] .upr-bar-label,
-html[dir="rtl"] .upr-bar-group__title,
-html[dir="rtl"] .upr-bar-yes,
-html[dir="rtl"] .upr-empty,
-html[dir="rtl"] .upr-doc-footer,
-html[dir="rtl"] .upr-not-reported,
-html[dir="rtl"] th,
-html[dir="rtl"] td,
-.upr-dashboard[dir="rtl"] .upr-doc-header__country,
-.upr-dashboard[dir="rtl"] .upr-block__title,
-.upr-dashboard[dir="rtl"] th,
-.upr-dashboard[dir="rtl"] td {{
-  font-family: {body_font};
-}}
-html[dir="rtl"] .upr-kpi__value,
-html[dir="rtl"] .upr-bar-value,
-html[dir="rtl"] .upr-bar-yes.upr-num,
-html[dir="rtl"] .upr-reach-value,
-html[dir="rtl"] .upr-reach-headline,
-html[dir="rtl"] .upr-num,
-html[dir="rtl"] .upr-support-total,
-html[dir="rtl"] .upr-doc-footer__appeal strong {{
-  font-family: "Montserrat", "Tajawal", sans-serif;
-}}
-html[dir="rtl"] .upr-nar-p--Body {{
+    return """
+html[dir="rtl"] .upr-nar-p--Body {
   text-align: justify;
-}}
+}
 """

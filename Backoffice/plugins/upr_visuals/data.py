@@ -93,6 +93,7 @@ from plugins.upr_visuals.i18n import (
     localized_assignment_title,
     localized_country_name,
     localized_ns_display_name,
+    memoized_load,
     t,
 )
 from plugins.upr_visuals.support import (
@@ -158,14 +159,16 @@ def filename_from_visual_title(title: str, ext: str = "pdf") -> str:
     raw = raw.replace("\u2014", " - ").replace("\u2013", "-")
     for char in '<>:"/\\|?*':
         raw = raw.replace(char, " ")
-    raw = " ".join(raw.split()) or "UPR visuals"
+    while ".." in raw:
+        raw = raw.replace("..", " ")
+    raw = " ".join(raw.split()).strip(" .") or "UPR visuals"
     suffix = ext.lstrip(".").lower() or "pdf"
     return f"{raw}.{suffix}"
 
 
 def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
     _set_spef_icon_mode(inline=inline_icons)
-    aes = _load_aes(aes_id)
+    aes = memoized_load(("aes", int(aes_id)), lambda: _load_aes(aes_id))
     assigned = aes.assigned_form
     template_id = int(assigned.template_id)
     kind = kind_for_template(template_id)
@@ -175,8 +178,9 @@ def build_payload(aes_id: int, *, inline_icons: bool = False) -> dict[str, Any]:
     country_name = localized_country_name(country, fallback=english_country) or english_country
     ns_name = localized_ns_display_name(ns, fallback=country_name) if ns else display_ns_name(country_name)
     period_name = assigned.period_name or ""
-    items = _load_items(assigned.template)
-    entries = _load_entries(aes.id)
+    version_id = getattr(assigned.template, "published_version_id", None) if assigned.template else None
+    items = memoized_load(("items", version_id), lambda: _load_items(assigned.template))
+    entries = memoized_load(("entries", int(aes.id)), lambda: _load_entries(aes.id))
     by_item = {row.form_item_id: row for row in entries}
 
     payload: dict[str, Any] = {

@@ -85,7 +85,7 @@ def test_run_export_job_file_pdf(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
-    def fake_pdf(_html, dashboard_id="combined", zoom=1.0):
+    def fake_pdf(_html, dashboard_id="combined", zoom=1.0, title=""):
         return b"%PDF-fake"
 
     monkeypatch.setattr("plugins.upr_visuals.export_job.render_pdf_bytes", fake_pdf)

@@ -203,6 +203,7 @@ def test_split_display_amount_puts_arabic_unit_before_digits():
     assert split_display_amount("ملايين فرنك سويسري 9.5") == ("ملايين فرنك سويسري", "9.5")
     assert split_display_amount("163,000") is None
     assert split_display_amount("60%") is None
+    assert split_display_amount("prefix 163,000", require_arabic=False) == ("prefix", "163,000")
 
 
 @pytest.mark.unit
@@ -1078,10 +1079,15 @@ def test_number_styles_use_montserrat():
     assert "text-align: start" in yes_block
     percent_block = css.split(".upr-bar-yes.upr-num {", 1)[1].split("}", 1)[0]
     assert "text-align: start" in percent_block
-    rtl = css.split('.upr-vis-page[dir="rtl"]', 1)[1]
-    assert "Tajawal" in rtl
-    assert ".upr-bar-yes" in rtl
-    assert 'font-family: "Montserrat", "Tajawal"' in rtl
+    from plugins.upr_visuals.typography import ARABIC_NUMBER_STACK, typography_css
+
+    fonts = typography_css()
+    assert "Tajawal" in fonts
+    assert ".upr-arabic-font *" in fonts
+    assert ARABIC_NUMBER_STACK in fonts
+    rtl_layout = css.split('.upr-vis-page[dir="rtl"]', 1)[1]
+    assert "direction: rtl" in rtl_layout
+    assert ".upr-fin-hero-split" in rtl_layout
     fin_label = css.split(".upr-fin-grid .upr-bar-label {", 1)[1].split("}", 1)[0]
     assert "white-space: normal" in fin_label
     support_total = css.split(".upr-support-table td.upr-support-total {", 1)[1].split("}", 1)[0]

@@ -15,8 +15,8 @@ class TestWebSocketRoutesSmoke:
         if not flask_sock_available:
             pytest.skip("flask-sock not installed in this environment")
 
-        # AI WS follows WEBSOCKET_ENABLED (fixture default is typically True).
-        if not app.config.get("WEBSOCKET_ENABLED", True):
+        # AI WS follows WEBSOCKET_ENABLED (config default is False).
+        if not app.config.get("WEBSOCKET_ENABLED", False):
             assert not _path_is_registered(app, "/api/ai/v2/ws")
             return
 

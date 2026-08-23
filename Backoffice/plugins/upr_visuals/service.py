@@ -22,7 +22,7 @@ from plugins.upr_visuals.data import (
 )
 from plugins.upr_visuals.export_job import run_isolated
 from plugins.upr_visuals.i18n import export_locale, localize_export, translate_styled_blocks
-from plugins.upr_visuals.raster import render_pdf_bytes, render_png_isolated
+from plugins.upr_visuals.raster import render_png_isolated
 from plugins.upr_visuals.render import render_dashboard_html
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,9 @@ class UprVisualsService:
             tmp = Path(current_app.instance_path) / "upr_visuals_tmp" / f"{uuid.uuid4().hex}_{filename}"
             tmp.parent.mkdir(parents=True, exist_ok=True)
             try:
-                render_png_isolated(html, tmp, dashboard_id=dashboard_id)
+                render_png_isolated(
+                    html, tmp, dashboard_id=dashboard_id, timeout=RENDER_TIMEOUT_SECONDS
+                )
                 return tmp.read_bytes(), filename
             finally:
                 try:
@@ -69,14 +71,29 @@ class UprVisualsService:
             payload, html = cls._dashboard_html(aes_id, dashboard_id)
             meta = payload.get("meta") or {}
             filename = visual_export_filename(meta, dashboard_id, "pdf")
-            return (
-                render_pdf_bytes(
-                    html,
-                    dashboard_id=dashboard_id,
-                    title=str(meta.get("document_title") or ""),
-                ),
-                filename,
-            )
+            tmp = Path(current_app.instance_path) / "upr_visuals_tmp" / f"{uuid.uuid4().hex}_{filename}"
+            tmp.parent.mkdir(parents=True, exist_ok=True)
+            html_path = tmp.with_suffix(tmp.suffix + ".html")
+            html_path.write_text(html, encoding="utf-8")
+            try:
+                run_isolated(
+                    {
+                        "kind": "pdf",
+                        "html_path": str(html_path),
+                        "output_path": str(tmp),
+                        "dashboard_id": dashboard_id,
+                        "lang": lang,
+                        "title": str(meta.get("document_title") or ""),
+                    },
+                    timeout=RENDER_TIMEOUT_SECONDS,
+                )
+                return tmp.read_bytes(), filename
+            finally:
+                for path in (tmp, html_path):
+                    try:
+                        path.unlink()
+                    except OSError:
+                        pass
 
     @classmethod
     def idml_zip_bytes(cls, aes_id: int, word_bytes: bytes | None = None, *, lang: str = "en") -> tuple[bytes, str]:
@@ -107,7 +124,7 @@ class UprVisualsService:
                 word_path.write_bytes(word_bytes)
                 job["word_path"] = str(word_path)
             try:
-                cls._render_with_timeout(lambda: run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS))
+                run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS)
                 return output.read_bytes(), filename
             finally:
                 shutil.rmtree(work_dir, ignore_errors=True)
@@ -240,12 +257,7 @@ class UprVisualsService:
                 raise UprVisualsError(f"Unknown dashboard: {dashboard_id}")
             return payload, render_dashboard_html(payload, dashboard_id)
 
-        return localize_export(build, on_progress=on_progress)
-
-    @classmethod
-    def _render_with_timeout(cls, fn: Callable[[], Any], timeout: float = RENDER_TIMEOUT_SECONDS) -> Any:
-        _ = timeout
-        return fn()
+        return localize_export(build, on_progress=on_progress, aes_id=aes_id)
 
     @classmethod
     def _render_isolated_parallel(
@@ -263,7 +275,7 @@ class UprVisualsService:
         if not jobs:
             return []
         if len(jobs) == 1:
-            return [cls._render_with_timeout(lambda: run_isolated(jobs[0], timeout=timeout))]
+            return [run_isolated(jobs[0], timeout=timeout)]
 
         started = time.monotonic()
         with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
@@ -292,10 +304,8 @@ class UprVisualsService:
         token = uuid.uuid4().hex[:10]
         if export_format == "png":
             tmp = job_dir / f"{token}_{dashboard_id}.png"
-            cls._render_with_timeout(
-                lambda: render_png_isolated(
-                    html, tmp, dashboard_id=dashboard_id, timeout=RENDER_TIMEOUT_SECONDS
-                )
+            render_png_isolated(
+                html, tmp, dashboard_id=dashboard_id, timeout=RENDER_TIMEOUT_SECONDS
             )
             return tmp, f"{folder}/{dashboard_id}.png"
 
@@ -318,7 +328,7 @@ class UprVisualsService:
                 job["word_path"] = str(word_path)
                 job["lang"] = lang
             try:
-                cls._render_with_timeout(lambda: run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS))
+                run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS)
             finally:
                 for key in ("html_path", "payload_path"):
                     raw = job.get(key)
@@ -350,7 +360,7 @@ class UprVisualsService:
             job["word_path"] = str(word_path)
         job["lang"] = lang
         try:
-            cls._render_with_timeout(lambda: run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS))
+            run_isolated(job, timeout=RENDER_TIMEOUT_SECONDS)
         finally:
             shutil.rmtree(work_dir, ignore_errors=True)
             for extra in (html_path, payload_path):

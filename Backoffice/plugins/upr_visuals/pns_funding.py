@@ -152,12 +152,22 @@ def sum_t23_host_cells(entries: list, host_ns_id: int) -> dict[str, Any]:
     }
 
 
-@lru_cache(maxsize=1)
 def _pns_report_funding_item_id() -> int | None:
     """Published T23 funding matrix — label may be blank (currently item 1433)."""
     from app.models.forms import FormTemplate
 
     template = FormTemplate.query.get(PNS_REPORT_TEMPLATE_ID)
+    version_id = getattr(template, "published_version_id", None) if template else None
+    return _pns_report_funding_item_id_for_version(version_id)
+
+
+@lru_cache(maxsize=8)
+def _pns_report_funding_item_id_for_version(version_id: int | None) -> int | None:
+    from app.models.forms import FormTemplate
+
+    template = FormTemplate.query.get(PNS_REPORT_TEMPLATE_ID)
+    if getattr(template, "published_version_id", None) != version_id:
+        return None
     items = _plain_template_items(template)
     labeled = _resolve_item(items, PNS_REPORT_LABEL_NEEDLES["funding"], 0)
     if labeled:
@@ -176,11 +186,21 @@ def _pns_report_funding_item_id() -> int | None:
     return None
 
 
-@lru_cache(maxsize=1)
 def _pns_plan_funding_item_id() -> int | None:
     from app.models.forms import FormTemplate
 
     template = FormTemplate.query.get(PNS_PLAN_TEMPLATE_ID)
+    version_id = getattr(template, "published_version_id", None) if template else None
+    return _pns_plan_funding_item_id_for_version(version_id)
+
+
+@lru_cache(maxsize=8)
+def _pns_plan_funding_item_id_for_version(version_id: int | None) -> int | None:
+    from app.models.forms import FormTemplate
+
+    template = FormTemplate.query.get(PNS_PLAN_TEMPLATE_ID)
+    if getattr(template, "published_version_id", None) != version_id:
+        return PNS_PLAN_ITEM_FALLBACKS["funding"]
     items = _plain_template_items(template)
     item = _resolve_item(items, PNS_PLAN_LABEL_NEEDLES["funding"], PNS_PLAN_ITEM_FALLBACKS["funding"])
     return item.id if item else PNS_PLAN_ITEM_FALLBACKS["funding"]

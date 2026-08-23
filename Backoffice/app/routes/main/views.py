@@ -149,7 +149,7 @@ def chat_immersive(conversation_id=None):
             return redirect(url_for("main.dashboard"))
     except Exception:
         pass
-    websocket_enabled = bool(current_app.config.get("WEBSOCKET_ENABLED", True))
+    websocket_enabled = bool(current_app.config.get("WEBSOCKET_ENABLED", False))
     try:
         from app.services.platform.app_settings_service import get_chatbot_name
         chatbot_name = get_chatbot_name(default="")

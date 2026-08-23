@@ -4378,10 +4378,14 @@ if (aiSearchForm) {
         };
 
         try {
-            // Try WebSocket first (streaming), fallback to HTTP.
-            if (typeof WebSocket === 'undefined') {
+            // Try WebSocket first only when the server opted in; otherwise HTTP.
+            const wsFromPage = document.body && document.body.getAttribute('data-chat-websocket-enabled');
+            const wsEnabled = wsFromPage !== null
+                ? (wsFromPage === 'true')
+                : (window.CHAT_WEBSOCKET_ENABLED === true);
+            if (!wsEnabled || typeof WebSocket === 'undefined') {
                 issues.push('Using standard connection');
-                throw new Error('WebSocket not supported');
+                throw new Error(wsEnabled ? 'WebSocket not supported' : 'WebSocket disabled');
             }
 
             const wsResult = await askViaWebSocket(requestPayload);

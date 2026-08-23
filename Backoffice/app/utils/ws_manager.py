@@ -107,7 +107,10 @@ class WebSocketManager:
         self._metadata_lock = threading.RLock()
         self._channel_counts: Dict[str, int] = {}
 
-        logger.info(
+        # DEBUG only: this singleton is constructed on first import even when
+        # WEBSOCKET_ENABLED=false (broadcasts no-op, diagnostics snapshot).
+        # Live occupancy is logged at INFO on connect/disconnect.
+        logger.debug(
             "[WS_POOL] WebSocketManager initialized: worker_pid=%s max_total_connections=%s "
             "max_connections_per_user=%s channel_budgets=%s gunicorn_threads=%s reserved_http_threads=%s",
             os.getpid(), self.max_total_connections, self.max_connections_per_user,

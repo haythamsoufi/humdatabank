@@ -45,7 +45,13 @@ def run_export_job_file(job_path: str | Path) -> None:
 
     if kind == "pdf":
         logger.info("UPR export child rendering visuals PDF")
-        output.write_bytes(render_pdf_bytes(html, dashboard_id=dashboard_id))
+        output.write_bytes(
+            render_pdf_bytes(
+                html,
+                dashboard_id=dashboard_id,
+                title=str(job.get("title") or ""),
+            )
+        )
         logger.info("UPR export child visuals PDF done (%s bytes)", output.stat().st_size)
         return
 

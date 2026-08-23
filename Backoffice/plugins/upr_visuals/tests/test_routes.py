@@ -57,21 +57,121 @@ def test_pdf_response_download_uses_attachment():
 
 
 @pytest.mark.unit
-def test_assignment_pdf_response_renders_live_bytes(monkeypatch):
+def test_assignment_pdf_response_queues_background_job(monkeypatch):
+    from flask import Response
+
     from plugins.upr_visuals import routes
 
+    queued = []
     monkeypatch.setattr(routes, "_aes_or_404", lambda aes_id: object())
     monkeypatch.setattr(
-        routes.UprVisualsService,
-        "pdf_bytes",
-        classmethod(lambda cls, aes_id, dashboard_id, lang="en": (b"%PDF-1.4", f"NS_{dashboard_id}.pdf")),
+        routes,
+        "_queue_visual_export",
+        lambda aes_id, fmt, dashboard_id="combined": queued.append((aes_id, fmt, dashboard_id)) or "job-pdf",
     )
-    monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "en")
+    monkeypatch.setattr(
+        routes,
+        "_export_wait_response",
+        lambda aes_id, job_id, download=True: Response(
+            f"wait:{job_id}:{download}", mimetype="text/html"
+        ),
+    )
     response = routes._assignment_pdf_response(9, "combined", download=False)
+    assert response.get_data(as_text=True) == "wait:job-pdf:False"
+    assert queued == [(9, "pdf", "combined")]
+
+
+@pytest.mark.unit
+def test_queue_visual_export_reuses_matching_job(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr_visuals import routes
+
+    started = []
+    monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "ar")
+    monkeypatch.setattr(
+        routes,
+        "find_reusable_assignment_export_job",
+        lambda **_k: "job-reuse",
+    )
+    monkeypatch.setattr(
+        routes,
+        "ensure_assignment_export_job_running",
+        lambda _app, job_id: started.append(job_id),
+    )
+    monkeypatch.setattr(
+        routes,
+        "create_assignment_export_job",
+        lambda **_k: (_ for _ in ()).throw(AssertionError("should reuse")),
+    )
+    app = Flask(__name__)
+    with app.app_context():
+        assert routes._queue_visual_export(1641, "pdf") == "job-reuse"
+    assert started == ["job-reuse"]
+
+
+@pytest.mark.unit
+def test_export_wait_copy_matches_format():
+    from plugins.upr_visuals.routes import _export_wait_copy
+
+    assert _export_wait_copy("pdf")[0] == "Preparing your PDF"
+    assert _export_wait_copy("png")[0] == "Preparing your image"
+    assert _export_wait_copy("idml")[0] == "Preparing InDesign files"
+
+
+@pytest.mark.unit
+def test_export_wait_page_has_live_status(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr_visuals import routes
+
+    monkeypatch.setattr(
+        routes, "build_assignment_export_status", lambda _job_id: {"status": "running"}
+    )
+    monkeypatch.setattr(
+        routes,
+        "url_for",
+        lambda endpoint, **_k: (
+            "/static/js/upr-visuals-export-wait.js"
+            if endpoint == "upr_visuals.static_file"
+            else "/status"
+        ),
+    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        response = routes._export_wait_response(
+            9, "job-1", download=False, file_url="/assignment/9/pdf?raw=1&job_id=job-1"
+        )
+    html = response.get_data(as_text=True)
+    assert response.mimetype.startswith("text/html")
+    assert "<title>Preparing your PDF</title>" in html
+    assert "id='upr-export-wait-status'" in html
+    assert "upr-export-wait__sweep" in html
+    assert "Usually ready in about 15 seconds." not in html
+    assert "upr-visuals-export-wait.js" in html
+
+
+@pytest.mark.unit
+def test_export_wait_serves_completed_file(monkeypatch):
+    from flask import Flask, Response
+
+    from plugins.upr_visuals import routes
+
+    served = []
+    monkeypatch.setattr(
+        routes, "build_assignment_export_status", lambda _job_id: {"status": "completed"}
+    )
+    monkeypatch.setattr(
+        routes,
+        "serve_assignment_export",
+        lambda job_id, aes_id, as_attachment=True: served.append((job_id, aes_id, as_attachment))
+        or Response(b"%PDF-1.4", mimetype="application/pdf"),
+    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        response = routes._export_wait_response(9, "job-ready", download=False)
     assert response.mimetype == "application/pdf"
-    assert response.get_data() == b"%PDF-1.4"
-    assert "NS_combined.pdf" in response.headers["Content-Disposition"]
-    assert response.headers["Content-Disposition"].startswith("inline;")
+    assert served == [("job-ready", 9, False)]
 
 
 @pytest.mark.unit
@@ -137,12 +237,28 @@ def test_file_response_zip_is_attachment():
 
 
 @pytest.mark.unit
+def test_fonts_css_is_shared_typography():
+    from flask import Flask
+
+    from plugins.upr_visuals.routes import fonts_css
+    from plugins.upr_visuals.typography import ARABIC_FAMILY, export_style_token
+
+    app = Flask(__name__)
+    with app.test_request_context("/upr-visuals/fonts.css"):
+        response = fonts_css.__wrapped__()
+    body = response.get_data(as_text=True)
+    assert response.mimetype.startswith("text/css")
+    assert ARABIC_FAMILY in body
+    assert ".upr-arabic-font *" in body
+    assert response.headers["ETag"].strip('"') == export_style_token()
+
+
+@pytest.mark.unit
 def test_pdf_viewer_csp_allows_same_origin_frame():
     from plugins.upr_visuals.plugin import UprVisualsPlugin, _UPR_PDF_VIEWER_CSP
 
     overrides = UprVisualsPlugin().get_csp_overrides()
-    assert len(overrides) == 1
-    assert overrides[0].endpoint == "upr_visuals.assignment_pdf"
-    assert "frame-ancestors 'self'" in overrides[0].policy
-    assert "script-src 'self'" in overrides[0].policy
-    assert overrides[0].policy == _UPR_PDF_VIEWER_CSP
+    endpoints = {item.endpoint for item in overrides}
+    assert endpoints == {"upr_visuals.assignment_pdf", "upr_visuals.assignment_narrative_file"}
+    assert all(item.policy == _UPR_PDF_VIEWER_CSP for item in overrides)
+    assert "frame-ancestors 'self'" in _UPR_PDF_VIEWER_CSP

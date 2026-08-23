@@ -32,11 +32,6 @@ def test_visual_export_filename_uses_iso_round_dashboard():
 
 
 @pytest.mark.unit
-def test_render_with_timeout_invokes_callable():
-    assert UprVisualsService._render_with_timeout(lambda: 42, timeout=1) == 42
-
-
-@pytest.mark.unit
 def test_render_isolated_parallel_runs_jobs_together(monkeypatch):
     barrier = threading.Barrier(2, timeout=2)
     kinds = []

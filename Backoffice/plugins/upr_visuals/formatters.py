@@ -82,6 +82,7 @@ def _format_million_digits(rounded: float) -> str:
 
 
 def _format_millions_compact(number: float) -> str:
+    """Compact millions. Gate 3: only ``ar`` uses مليون / ملايين (not other RTL)."""
     millions = number / 1_000_000.0
     rounded = round(millions, 1)
     from plugins.upr_visuals.i18n import current_export_language
@@ -101,14 +102,20 @@ def chf_label() -> str:
     return t("CHF")
 
 
-def split_display_amount(amount: str) -> tuple[str, str] | None:
-    """Split a mixed Arabic amount into ``(unit, number)`` for LTR flex layout.
+def split_display_amount(amount: str, *, require_arabic: bool = True) -> tuple[str, str] | None:
+    """Split a mixed amount into ``(unit, number)`` for LTR flex layout.
+
+    Gate 4 (script): default requires an Arabic letter (``\\u0600–\\u06ff``), not
+    ``is_rtl()`` or ``lang == "ar"``. Hebrew amounts do not split.
 
     WeasyPrint's bidi still paints ``مليون 1`` as digits-then-unit. Callers wrap
-    the parts in separate spans so the unit stays to the left of the number.
+    the parts in separate spans. Pass ``require_arabic=False`` to attach a CHF
+    label to a Latin-only amount (``163,000`` → unit ``فرنك سويسري``).
     """
     text = " ".join((amount or "").split())
-    if not text or not any("\u0600" <= char <= "\u06ff" for char in text):
+    if not text:
+        return None
+    if require_arabic and not any("\u0600" <= char <= "\u06ff" for char in text):
         return None
     matches = list(_LATIN_AMOUNT_RE.finditer(text))
     if not matches:
@@ -135,24 +142,11 @@ def _arabic_unit_left(amount: str, extra_unit: str = "") -> str:
     extra = (extra_unit or "").strip()
     if not text:
         return extra
-    parts = split_display_amount(text)
+    parts = split_display_amount(text) or split_display_amount(text, require_arabic=False)
     if parts:
         unit, number = parts
         return " ".join(part for part in (unit, extra, number) if part)
-    matches = list(_LATIN_AMOUNT_RE.finditer(text))
-    if not matches:
-        return " ".join(part for part in (extra, text) if part)
-    num_match = matches[-1]
-    words = " ".join(
-        part
-        for part in (
-            text[: num_match.start()].strip(),
-            text[num_match.end() :].strip(),
-            extra,
-        )
-        if part
-    )
-    return f"{words} {num_match.group('num')}".strip() if words else num_match.group("num")
+    return " ".join(part for part in (extra, text) if part)
 
 
 def with_chf(display: str, *, prefix: bool = False) -> str:

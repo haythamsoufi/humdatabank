@@ -129,6 +129,8 @@ def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
     assert "text-align: center" in title_center
     label_right = css.split('html[dir="rtl"] .upr-fin-grid td.upr-bar-label,', 1)[1].split("}", 1)[0]
     assert "text-align: right" in label_right
+    metric_left = css.split('html[dir="rtl"] .upr-fin-net__metric {', 1)[1].split("}", 1)[0]
+    assert "text-align: left" in metric_left
     bars_label = css.split('html[dir="rtl"] .upr-block--bars .upr-bar-label,', 1)[1].split("}", 1)[0]
     assert "text-align: left" in bars_label
     not_reported = css.split("html[dir=\"rtl\"] .upr-fin-net .upr-not-reported", 1)[1].split("}", 1)[0]
@@ -172,10 +174,26 @@ def test_print_css_keeps_dashboard_font_when_grouped_with_embed_chrome():
 @pytest.mark.unit
 def test_wrap_sets_document_open_sans():
     html = _wrap('<div class="upr-dashboard">x</div>', dashboard_id="combined")
-    assert 'html, body, table, th, td, p, h1, h2, h3, h4, li' in html
-    assert 'font-family: "Open Sans", "Segoe UI", sans-serif' in html
+    assert "html, body { font-family: \"Open Sans\", \"Segoe UI\", sans-serif; }" in html
+    assert "html, body, table, th, td, p, h1, h2, h3, h4, li" not in html
     page = _pdf_page_css("combined")
-    assert 'font-family: "Open Sans", "Segoe UI", sans-serif' in page
+    assert "html, body { font-family: \"Open Sans\", \"Segoe UI\", sans-serif; }" in page
+
+
+@pytest.mark.unit
+def test_arabic_export_uses_tajawal_body_font(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    from plugins.upr_visuals.raster import _document_body_font_css, _pdf_page_css, _wrap
+
+    assert "Tajawal" in _document_body_font_css("ar")
+    assert "p, h1" not in _document_body_font_css("ar")
+    html = _wrap('<div class="upr-dashboard">x</div>', dashboard_id="combined")
+    assert 'font-family: "Tajawal", "Arial", "Segoe UI", sans-serif' in html
+    assert ".upr-arabic-font *" in html
+    assert "@bottom-center" in html
+    page = _pdf_page_css("combined")
+    assert "Tajawal" in page
+    assert ".upr-arabic-font *" in page
 
 
 @pytest.mark.unit
@@ -344,9 +362,17 @@ def test_render_png_isolated_raises_on_child_crash(tmp_path, monkeypatch):
         stdout = ""
         stderr = ""
 
-    monkeypatch.setattr(_raster_mod.subprocess, "run", lambda *_a, **_k: Result())
+    captured = {}
+
+    def fake_run(*_a, **kwargs):
+        captured["env"] = kwargs.get("env") or {}
+        return Result()
+
+    monkeypatch.setattr(_raster_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
     with pytest.raises(RuntimeError, match="crashed"):
         _raster_mod.render_png_isolated("<html/>", tmp_path / "x.png", dashboard_id="combined")
+    assert captured["env"].get("UPR_VISUALS_LANG") == "ar"
 
 
 @pytest.mark.unit
@@ -378,7 +404,7 @@ class _FakeHTTPResponse:
     def __init__(self, data: bytes):
         self._data = data
 
-    def read(self) -> bytes:
+    def read(self, _n: int = -1) -> bytes:
         return self._data
 
     def __enter__(self):

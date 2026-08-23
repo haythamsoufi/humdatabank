@@ -402,22 +402,25 @@ def register_template_context(app, config_class):
 
     @app.context_processor
     def inject_notifications_config():
-        """Expose notification-WS enablement so layout can skip GET /notifications/api/stream/status.
+        """Expose WS flags so layout can skip notification-WS and AI-WS attempts.
 
-        Uses the centralized ``is_notifications_websocket_enabled`` helper so the
-        injected ``NOTIFY_WS_ENABLED`` matches route registration and broadcasts.
+        Notification WS is always off. ``chat_websocket_enabled`` follows
+        ``WEBSOCKET_ENABLED`` so the chatbot/docs clients do not open sockets
+        when the server did not register the routes.
         """
         try:
             from app.utils.ws_helpers import is_notifications_websocket_enabled
             from app.utils.notification_push import is_notifications_push_enabled
             return {
                 'notify_websocket_enabled': is_notifications_websocket_enabled(),
+                'chat_websocket_enabled': bool(current_app.config.get('WEBSOCKET_ENABLED', False)),
                 'notifications_push_enabled': is_notifications_push_enabled(),
             }
         except Exception as e:
             current_app.logger.debug("inject_notifications_config failed: %s", e)
             return {
                 'notify_websocket_enabled': False,
+                'chat_websocket_enabled': False,
                 'notifications_push_enabled': False,
             }
 

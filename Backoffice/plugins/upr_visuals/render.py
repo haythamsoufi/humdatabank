@@ -29,6 +29,7 @@ from plugins.upr_visuals.formatters import (
     with_chf,
 )
 from plugins.upr_visuals.i18n import (
+    arabic_font_class,
     current_export_language,
     is_rtl,
     localized_country_header,
@@ -41,6 +42,11 @@ def _export_dir_attrs() -> str:
     attrs = rtl_document_attrs()
     return f" lang='{escape(attrs['lang'])}' dir='{escape(attrs['dir'])}'"
 
+
+def _export_font_class() -> str:
+    extra = arabic_font_class()
+    return f" {extra}" if extra else ""
+
 IFRC_RED = "#d22730"
 IFRC_LOGO_SRC = "/static/IFRC_logo_square.svg"
 
@@ -50,10 +56,17 @@ def _not_reported() -> str:
 
 
 def _ltr_row(cells: list[str]) -> str:
-    """Join table cells; RTL exports reverse in LTR tables so WeasyPrint does not."""
+    """Join cells for a ``dir=ltr`` table. RTL exports reverse here.
+
+    Finance, support, and reach tables stay LTR in the DOM (WeasyPrint
+    corrupts RTL tables). Indicator ``.upr-bars`` tables are the other
+    strategy: they inherit ``direction: rtl`` from CSS and are not reversed.
+    """
     if is_rtl():
         cells = list(reversed(cells))
     return "".join(cells)
+
+
 _PLAN_REQ_BAR_CLASS = {
     "HNS": "upr-plan-req__bar--hns",
     "PNS": "upr-plan-req__bar--pns",
@@ -167,7 +180,8 @@ def render_dashboard_html(payload: dict[str, Any], dashboard_id: str) -> str:
     else:
         body = ""
     return (
-        f'<div class="upr-dashboard upr-dashboard--{escape(dashboard_id)}"'
+        f'<div class="upr-dashboard upr-dashboard--{escape(dashboard_id)}'
+        f'{_export_font_class()}"'
         f"{_export_dir_attrs()}>{body}</div>"
     )
 
@@ -186,7 +200,8 @@ def render_report_html(payload: dict[str, Any], dashboard_ids: list[str] | None 
     ns = escape(meta.get("national_society") or meta.get("country_name") or "")
     period = escape(meta.get("period_name") or "")
     return (
-        f'<article class="upr-visual-report" data-aes-id="{escape(str(meta.get("aes_id") or ""))}"'
+        f'<article class="upr-visual-report{_export_font_class()}" '
+        f'data-aes-id="{escape(str(meta.get("aes_id") or ""))}"'
         f"{_export_dir_attrs()}>"
         f'<header class="upr-visual-report__toolbar">'
         f"<div><strong>{ns}</strong> · {period} · {escape(meta.get('round_code') or '')}</div>"
@@ -342,7 +357,7 @@ def _reach(payload: dict[str, Any]) -> str:
 
 
 def _ltr_num_attr() -> str:
-    """Keep Latin digits in LTR order so Arabic units stay to their left."""
+    """Isolate Latin digits. Always LTR so mixed Arabic amounts stay unit-left."""
     return " dir='ltr'"
 
 
@@ -421,7 +436,7 @@ def _doc_footer(payload: dict[str, Any]) -> str:
             "</span>"
         )
     return (
-        "<footer class='upr-doc-footer'>"
+        f"<footer class='upr-doc-footer{_export_font_class()}'>"
         "<table class='upr-doc-footer__row'><tr>"
         f"<td class='upr-doc-footer__appeal-cell'>{appeal_html}</td>"
         "<td class='upr-doc-footer__note-cell'>"
@@ -877,9 +892,7 @@ def _financial_network(
                     cells.append(
                         f"<td class='upr-fin-net__plot'>{_bar_plot(row, color=row['color'], scale=peak)}</td>"
                     )
-                    if is_rtl():
-                        cells.reverse()
-                    table_rows.append(f"<tr class='{' '.join(classes)}'>{''.join(cells)}</tr>")
+                    table_rows.append(f"<tr class='{' '.join(classes)}'>{_ltr_row(cells)}</tr>")
                 first_bucket = False
             first_entity = False
         if not table_rows:
@@ -897,13 +910,11 @@ def _financial_network(
             "<col class='upr-fin-net-col-metric'>",
             "<col class='upr-fin-net-col-plot'>",
         ]
-        if is_rtl():
-            cols.reverse()
         return (
             "<div class='upr-fin-network'>"
             f"<h3 class='upr-block__subtitle upr-block__subtitle--center'>{escape(t('IFRC network'))}</h3>"
             f"<table class='upr-fin-net{density}' dir='ltr'><colgroup>"
-            f"{''.join(cols)}"
+            f"{_ltr_row(cols)}"
             "</colgroup><tbody>"
             f"{''.join(table_rows)}</tbody></table></div>"
         )
@@ -1090,6 +1101,9 @@ def _support_report(payload: dict[str, Any]) -> str:
     total_amount = (
         f"{_amount_html(with_chf(total_display, prefix=True))}"
     )
+    # Report totals sit next to the number column; merge the remaining cells
+    # in RTL so "Total" does not collide with the LTR amount. Plan support
+    # has two amount columns plus a year gap, so it keeps the LTR colspan.
     if is_rtl():
         foot = [
             f"<td class='upr-ns'>{escape(t('Total'))}</td>",
@@ -1246,4 +1260,5 @@ def _hbar_chart(
             f"<td class='upr-bar-plot'>{_bar_plot(row, color=row.get('color') or color, scale=scale)}</td>"
             "</tr>"
         )
+    # CSS ``direction: rtl`` (not ``_ltr_row``) so labels sit on the right.
     return f"<table class='upr-bars'><tbody>{''.join(parts)}</tbody></table>"

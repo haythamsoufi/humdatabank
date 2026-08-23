@@ -6,6 +6,7 @@ import zipfile
 from io import BytesIO
 from xml.sax.saxutils import escape
 
+from plugins.upr_visuals.idml.word_reader import safe_export_href
 from plugins.upr_visuals.idml.constants import (
     A4_H,
     A4_W,
@@ -56,10 +57,13 @@ def _table_cell_height(paras: list[dict]) -> float:
     return max(16.0, 12.0 * lines + 6.0)
 
 
-def _rtl_font(font: str, *, rtl: bool) -> str:
-    if not rtl:
+def _rtl_font(font: str, *, arabic_font: bool) -> str:
+    """Tajawal for Arabic-script stories. Visual KPI digits stay in the raster PNG."""
+    from plugins.upr_visuals.typography import ARABIC_FAMILY
+
+    if not arabic_font:
         return font
-    return "Tajawal"
+    return ARABIC_FAMILY
 
 
 def _flip_align(align: str, *, rtl: bool) -> str:
@@ -75,9 +79,10 @@ def _flip_align(align: str, *, rtl: bool) -> str:
 
 
 class Idml:
-    def __init__(self, *, rtl: bool = False) -> None:
+    def __init__(self, *, rtl: bool = False, arabic_font: bool | None = None) -> None:
         self._n = 0x1000
         self.rtl = bool(rtl)
+        self.arabic_font = False if arabic_font is None else bool(arabic_font)
         self.stories: dict[str, str] = {}
         self.spreads: list[str] = []
         self.spread_ids: list[str] = []
@@ -107,7 +112,7 @@ class Idml:
         sid = self.uid()
         ranges = []
         for run in runs:
-            font = _rtl_font(run.get("font", "Arial"), rtl=self.rtl)
+            font = _rtl_font(run.get("font", "Arial"), arabic_font=self.arabic_font)
             style = run.get("style", "Regular")
             size = run.get("size", "11")
             color = run.get("color", "Color/Black")
@@ -132,6 +137,9 @@ class Idml:
         return sid
 
     def _hyperlink_source(self, url: str, inner_xml: str) -> str:
+        url = safe_export_href(url)
+        if not url:
+            return inner_xml
         source_id = f"HyperlinkTextSource/{self.uid()}"
         dest_id = f"HyperlinkURLDestination/{self.uid()}"
         hid = self.uid()
@@ -163,7 +171,7 @@ class Idml:
                     first = False
                 if not text:
                     continue
-                href = (run.get("href") or "").strip()
+                href = safe_export_href(run.get("href"))
                 font_style = "Bold" if run.get("bold") and style_name != "AdditionalHead" else base["style"]
                 if style_name == "ContactName":
                     font_style = "Bold"
@@ -178,7 +186,7 @@ class Idml:
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
                     f'FillColor="{color}" PointSize="{base["size"]}" FontStyle="{font_style}"{extra}>'
-                    f"{_applied_font_xml(_rtl_font(base['font'], rtl=self.rtl))}"
+                    f"{_applied_font_xml(_rtl_font(base['font'], arabic_font=self.arabic_font))}"
                     f"{inner}</CharacterStyleRange>"
                 )
             if not parts:
@@ -186,7 +194,7 @@ class Idml:
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
                     f'FillColor="{base["color"]}" PointSize="{base["size"]}" FontStyle="{base["style"]}">'
-                    f"{_applied_font_xml(_rtl_font(base['font'], rtl=self.rtl))}"
+                    f"{_applied_font_xml(_rtl_font(base['font'], arabic_font=self.arabic_font))}"
                     "<Content> </Content></CharacterStyleRange>"
                 )
             parts.append(
@@ -262,7 +270,7 @@ class Idml:
                 text = run.get("text") or ""
                 if not text:
                     continue
-                href = (run.get("href") or "").strip()
+                href = safe_export_href(run.get("href"))
                 style = "Bold" if force_bold or run.get("bold") else font_style
                 color = "Color/QRed" if href and not force_bold else text_color
                 inner = f"<Content>{escape(_xml_text(text)).replace(chr(10), ' ')}</Content>"
@@ -276,7 +284,7 @@ class Idml:
                     "<CharacterStyleRange "
                     f'{_NO_CHAR_STYLE} '
                     f'FillColor="{color}" PointSize="9" FontStyle="{style}"{extra}>'
-                    f"{_applied_font_xml(_rtl_font('Open Sans', rtl=self.rtl))}"
+                    f"{_applied_font_xml(_rtl_font('Open Sans', arabic_font=self.arabic_font))}"
                     f"{inner}</CharacterStyleRange>"
                 )
             if not parts:
@@ -601,7 +609,7 @@ class Idml:
                 f"{''.join(swatches)}</idPkg:Graphic>"
             ),
             "Resources/Fonts.xml": _fonts_xml(),
-            "Resources/Styles.xml": _styles_xml(rtl=self.rtl),
+            "Resources/Styles.xml": _styles_xml(rtl=self.rtl, arabic_font=self.arabic_font),
             "Resources/Preferences.xml": (
                 '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 '<idPkg:Preferences xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="16.0">'
@@ -720,13 +728,14 @@ def _para_style(
     )
 
 
-def _styles_xml(*, rtl: bool = False) -> str:
+def _styles_xml(*, rtl: bool = False, arabic_font: bool = False) -> str:
     band = ' RuleBelow="true" RuleBelowLineWeight="2" RuleBelowColor="Color/BannerNavy" RuleBelowOffset="3"'
     start = "RightAlign" if rtl else "LeftAlign"
     justified = "RightJustified" if rtl else "LeftJustified"
-    font = "Tajawal" if rtl else None
-    heading = font or "Montserrat"
-    body = font or "Open Sans"
+    from plugins.upr_visuals.typography import idml_applied_font
+
+    heading = idml_applied_font(arabic_font=arabic_font, heading=True)
+    body = idml_applied_font(arabic_font=arabic_font, heading=False)
     return (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<idPkg:Styles xmlns:idPkg="http://ns.adobe.com/AdobeInDesign/idml/1.0/packaging" DOMVersion="16.0">'

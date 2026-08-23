@@ -554,7 +554,7 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
     ("in Swiss francs (CHF)", {
         "fr": "en francs suisses (CHF)",
         "es": "en francos suizos (CHF)",
-        "ar": "بالفرنك السويسري (فرنك سويسري)",
+        "ar": "بالفرنك السويسري (CHF)",
         "ru": "в швейцарских франках (CHF)",
         "zh": "以瑞士法郎计 (CHF)",
     }),

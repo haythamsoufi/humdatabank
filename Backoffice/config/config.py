@@ -318,7 +318,8 @@ class Config:
     SECURITY_HEADERS_ENABLED = _parse_bool(os.environ.get('SECURITY_HEADERS_ENABLED'), default=True)
 
     # WebSocket Configuration (env: true/false only)
-    # WebSocket is used for real-time notifications and AI chat streaming
+    # AI chat/docs streaming only. Notifications are HTTP polling — never WS.
+    # Default false: long-lived sockets pin gthread workers. Prod Azure is false.
     WEBSOCKET_ENABLED = _parse_bool(os.environ.get('WEBSOCKET_ENABLED'), default=False)
     # Max inbound WebSocket frame size (bytes). Enforced via flask-sock SOCK_SERVER_OPTIONS
     # and an application-level parse guard.

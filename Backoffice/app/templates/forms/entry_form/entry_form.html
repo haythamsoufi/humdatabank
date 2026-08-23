@@ -26,6 +26,7 @@
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
 {% if show_upr_visuals_assets %}
 <link rel="stylesheet" href="{{ url_for('upr_visuals.static_file', filename='css/upr-visuals.css') }}">
+<link rel="stylesheet" href="{{ url_for('upr_visuals.fonts_css') }}">
 {% endif %}
 {% if is_preview_mode %}<link rel="stylesheet" href="{{ static_url('css/year-picker.css') }}">{% endif %}
 <script nonce="{{ csp_nonce() }}">

@@ -876,6 +876,7 @@ def test_filename_from_visual_title_strips_illegal_chars():
         "Bangladesh - Unified Plan - 2026.pdf"
     )
     assert filename_from_visual_title('A/B: "Plan"') == "A B Plan.pdf"
+    assert filename_from_visual_title("../../tmp") == "tmp.pdf"
     assert "أفغانستان" in filename_from_visual_title("أفغانستان — Unified Country Report")
 
 

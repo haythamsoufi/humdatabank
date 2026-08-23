@@ -42,6 +42,7 @@ from plugins.upr_visuals.data import (
     t23_host_funding_by_pns,
 )
 from plugins.upr_visuals.catalog import SUPPORT_AREA_CODES
+from plugins.upr_visuals.people_reached import _plan_people_reached
 
 
 @pytest.mark.unit
@@ -813,6 +814,28 @@ def _people_entry(value):
         get_display_value=lambda: value,
         numeric_value=value,
     )
+
+
+@pytest.mark.unit
+def test_plan_people_reached_maps_area_codes(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.people_reached.spef_icon_srcs", lambda: {})
+    longer = SimpleNamespace(id=10, label="People to be reached through longer term programmes")
+    emergency = SimpleNamespace(id=11, label="People to be reached through Emergency Appeals")
+    by_item = {
+        10: SimpleNamespace(
+            get_display_disagg_data=lambda: {
+                "2026_SP1": 100,
+                "2026_Climate and environment": 40,
+                "2026_total": 500,
+            }
+        ),
+        11: SimpleNamespace(get_display_disagg_data=lambda: {"EO": 25}),
+    }
+    rows = _plan_people_reached([longer, emergency], by_item, "Annual 2026")
+    by_code = {row["code"]: row["value"] for row in rows if row.get("has_value")}
+    assert by_code["TOTAL"] == 500
+    assert by_code["SP1"] == 140
+    assert by_code["EO"] == 25
 
 
 @pytest.mark.unit

@@ -49,21 +49,50 @@ def visual_export_filename(meta: dict[str, Any], dashboard_id: str, ext: str) ->
 class UprVisualsService:
     @classmethod
     def png_bytes(cls, aes_id: int, dashboard_id: str, *, lang: str = "en") -> tuple[bytes, str]:
+        from plugins.upr_visuals.assignment_job import take_matching_pdf_bytes
+
+        reused = take_matching_pdf_bytes(
+            aes_id=aes_id,
+            dashboard_id=dashboard_id,
+            lang=lang,
+            timeout=RENDER_TIMEOUT_SECONDS,
+        )
         with export_locale(lang):
-            payload, html = cls._dashboard_html(aes_id, dashboard_id)
-            filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "png")
-            tmp = Path(current_app.instance_path) / "upr_visuals_tmp" / f"{uuid.uuid4().hex}_{filename}"
-            tmp.parent.mkdir(parents=True, exist_ok=True)
+            work_dir = Path(current_app.instance_path) / "upr_visuals_tmp"
+            work_dir.mkdir(parents=True, exist_ok=True)
+            stamp = uuid.uuid4().hex
+            png_path = work_dir / f"{stamp}.png"
+            pdf_path = work_dir / f"{stamp}.src.pdf"
+            dest = png_path
             try:
+                if reused:
+                    pdf_bytes, pdf_name = reused
+                    filename = Path(pdf_name).with_suffix(".png").name
+                    pdf_path.write_bytes(pdf_bytes)
+                    run_isolated(
+                        {
+                            "kind": "png_from_pdf",
+                            "pdf_path": str(pdf_path),
+                            "output_path": str(png_path),
+                            "dashboard_id": dashboard_id,
+                            "lang": lang,
+                        },
+                        timeout=RENDER_TIMEOUT_SECONDS,
+                    )
+                    return png_path.read_bytes(), filename
+                payload, html = cls._dashboard_html(aes_id, dashboard_id)
+                filename = visual_export_filename(payload.get("meta") or {}, dashboard_id, "png")
+                dest = work_dir / f"{stamp}_{filename}"
                 render_png_isolated(
-                    html, tmp, dashboard_id=dashboard_id, timeout=RENDER_TIMEOUT_SECONDS
+                    html, dest, dashboard_id=dashboard_id, timeout=RENDER_TIMEOUT_SECONDS
                 )
-                return tmp.read_bytes(), filename
+                return dest.read_bytes(), filename
             finally:
-                try:
-                    tmp.unlink()
-                except OSError:
-                    pass
+                for path in {png_path, dest, pdf_path}:
+                    try:
+                        path.unlink()
+                    except OSError:
+                        pass
 
     @classmethod
     def pdf_bytes(cls, aes_id: int, dashboard_id: str, *, lang: str = "en") -> tuple[bytes, str]:

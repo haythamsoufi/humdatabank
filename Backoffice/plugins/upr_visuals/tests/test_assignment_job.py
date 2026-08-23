@@ -13,6 +13,7 @@ from plugins.upr_visuals.assignment_job import (
     REUSE_COMPLETED_SECONDS,
     _reusable_job_id,
     _visual_job_matches,
+    take_matching_pdf_bytes,
 )
 from plugins.upr_visuals.typography import export_style_token
 
@@ -118,3 +119,65 @@ def test_find_reusable_skips_stale_completed(tmp_path):
     stale.finished_at = utcnow() - timedelta(seconds=REUSE_COMPLETED_SECONDS + 30)
     stale.created_at = stale.finished_at
     assert _pick(jobs=[stale]) is None
+
+
+def _patch_pdf_lookup(monkeypatch, job_id, job):
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.find_reusable_assignment_export_job",
+        lambda **_k: job_id,
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.AIJob",
+        SimpleNamespace(query=SimpleNamespace(get=lambda _id: job)),
+    )
+
+
+@pytest.mark.unit
+def test_take_matching_pdf_bytes_returns_completed_file(tmp_path, monkeypatch):
+    output = tmp_path / "out.pdf"
+    output.write_bytes(b"%PDF-1.4 hello")
+    _patch_pdf_lookup(
+        monkeypatch,
+        "pdf-job",
+        SimpleNamespace(
+            status="completed",
+            meta={"output_path": str(output), "filename": "AFG.pdf"},
+        ),
+    )
+    data, name = take_matching_pdf_bytes(aes_id=3129)
+    assert data == b"%PDF-1.4 hello"
+    assert name == "AFG.pdf"
+
+
+@pytest.mark.unit
+def test_take_matching_pdf_bytes_waits_for_inflight(tmp_path, monkeypatch):
+    output = tmp_path / "out.pdf"
+    output.write_bytes(b"%PDF-1.4")
+    running = SimpleNamespace(status="running", meta={})
+    done = SimpleNamespace(
+        status="completed",
+        meta={"output_path": str(output), "filename": "x.pdf"},
+    )
+    states = iter([running, done])
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.find_reusable_assignment_export_job",
+        lambda **_k: "pdf-job",
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.AIJob",
+        SimpleNamespace(query=SimpleNamespace(get=lambda _id: next(states))),
+    )
+    monkeypatch.setattr("plugins.upr_visuals.assignment_job.db.session.expire_all", lambda: None)
+    monkeypatch.setattr("plugins.upr_visuals.assignment_job.time.sleep", lambda _s: None)
+    data, name = take_matching_pdf_bytes(aes_id=3129, timeout=2)
+    assert data.startswith(b"%PDF")
+    assert name == "x.pdf"
+
+
+@pytest.mark.unit
+def test_take_matching_pdf_bytes_none_when_no_job(monkeypatch):
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.find_reusable_assignment_export_job",
+        lambda **_k: None,
+    )
+    assert take_matching_pdf_bytes(aes_id=3129) is None

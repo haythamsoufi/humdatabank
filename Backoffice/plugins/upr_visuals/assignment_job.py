@@ -275,6 +275,68 @@ def find_reusable_assignment_export_job(
     )
 
 
+def take_matching_pdf_bytes(
+    *,
+    aes_id: int,
+    dashboard_id: str = "combined",
+    lang: str = "en",
+    timeout: float = 120.0,
+) -> tuple[bytes, str] | None:
+    """Return a fresh matching PDF so PNG can skip a second WeasyPrint pass.
+
+    If a PDF export is already running for the same assignment, wait for it.
+    """
+    job_id = find_reusable_assignment_export_job(
+        aes_id=aes_id,
+        export_format="pdf",
+        dashboard_id=dashboard_id,
+        lang=lang,
+    )
+    if not job_id:
+        return None
+    deadline = time.monotonic() + max(1.0, float(timeout))
+    saw_inflight = False
+    while time.monotonic() < deadline:
+        job = AIJob.query.get(str(job_id))
+        if not job:
+            return None
+        status = _status_str(job.status)
+        if status in _ACTIVE_JOB_STATUSES:
+            if not saw_inflight:
+                logger.info(
+                    "UPR PNG waiting for in-flight PDF job=%s aes=%s dash=%s",
+                    job_id,
+                    aes_id,
+                    dashboard_id,
+                )
+            saw_inflight = True
+            db.session.expire_all()
+            time.sleep(0.4)
+            continue
+        if status != "completed":
+            return None
+        raw_path = (job.meta or {}).get("output_path")
+        filename = str((job.meta or {}).get("filename") or "visuals.pdf")
+        if not raw_path:
+            return None
+        path = Path(str(raw_path))
+        if not path.is_file() or path.stat().st_size <= 0:
+            return None
+        logger.info(
+            "UPR PNG reusing PDF job=%s aes=%s dash=%s (%s bytes)",
+            job_id,
+            aes_id,
+            dashboard_id,
+            path.stat().st_size,
+        )
+        return path.read_bytes(), filename
+    if saw_inflight:
+        logger.warning(
+            "UPR PNG timed out waiting for PDF aes=%s dash=%s", aes_id, dashboard_id
+        )
+    return None
+
+
 def start_assignment_export_job(app, job_id: str) -> None:
     start_ai_job_thread(app, str(job_id), _run_assignment_export_job)
 
@@ -489,7 +551,24 @@ def _run_assignment_export_job(app, job_id: str) -> None:
                 )
                 mimetype = "application/pdf"
             elif fmt == "png":
-                _report(job, "Generating PNG…", step=1, total=2)
+                pdf_job_id = find_reusable_assignment_export_job(
+                    aes_id=aes_id,
+                    export_format="pdf",
+                    dashboard_id=dashboard_id,
+                    lang=lang,
+                )
+                waiting_for_pdf = False
+                if pdf_job_id:
+                    pdf_job = AIJob.query.get(str(pdf_job_id))
+                    waiting_for_pdf = bool(
+                        pdf_job and _status_str(pdf_job.status) in _ACTIVE_JOB_STATUSES
+                    )
+                _report(
+                    job,
+                    "Waiting for PDF, then generating PNG…" if waiting_for_pdf else "Generating PNG…",
+                    step=1,
+                    total=2,
+                )
                 data, filename = UprVisualsService.png_bytes(aes_id, dashboard_id, lang=lang)
                 mimetype = "image/png"
             elif fmt == "idml":

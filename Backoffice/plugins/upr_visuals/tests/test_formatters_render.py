@@ -604,6 +604,8 @@ def test_render_plan_combined_matches_inp_cover():
     assert "upr-plan-req" in html
     assert "upr-plan-req__tree" in html
     assert "upr-plan-req__bar--hns" in html
+    assert "upr-plan-req__arrow" in html
+    assert "viewBox='0 0 8 10'" in html
     assert "Through Host National Society" in html
     assert "Through the IFRC" in html
     assert "*Projected funding requirements" in html

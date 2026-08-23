@@ -223,6 +223,66 @@
     return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
   }
 
+  function _skelBone(className) {
+    const el = document.createElement("div");
+    el.className = "upr-vis-skel__bone " + className;
+    return el;
+  }
+
+  function buildVisualsSkeleton() {
+    const root = document.createElement("div");
+    root.className = "upr-vis-skel";
+    root.setAttribute("role", "status");
+    root.setAttribute("aria-live", "polite");
+    root.setAttribute("aria-busy", "true");
+    const label = document.createElement("span");
+    label.className = "upr-vis-skel__label";
+    root.appendChild(label);
+
+    const cover = document.createElement("div");
+    cover.className = "upr-vis-skel__cover";
+    cover.appendChild(_skelBone("upr-vis-skel__logo"));
+    const titles = document.createElement("div");
+    titles.className = "upr-vis-skel__titles";
+    titles.appendChild(_skelBone("upr-vis-skel__line--lg"));
+    titles.appendChild(_skelBone("upr-vis-skel__line--sm"));
+    cover.appendChild(titles);
+    cover.appendChild(_skelBone("upr-vis-skel__logo"));
+    root.appendChild(cover);
+
+    const kpis = document.createElement("div");
+    kpis.className = "upr-vis-skel__kpis";
+    for (let i = 0; i < 4; i += 1) kpis.appendChild(_skelBone("upr-vis-skel__kpi"));
+    root.appendChild(kpis);
+
+    const block = document.createElement("div");
+    block.className = "upr-vis-skel__block";
+    block.appendChild(_skelBone("upr-vis-skel__line--md"));
+    [0.92, 0.7, 0.48, 0.32].forEach((width) => {
+      const row = document.createElement("div");
+      row.className = "upr-vis-skel__bar-row";
+      row.appendChild(_skelBone("upr-vis-skel__bar-label"));
+      const track = _skelBone("upr-vis-skel__bar-track");
+      track.style.width = width * 100 + "%";
+      track.style.flex = "0 1 " + width * 100 + "%";
+      row.appendChild(track);
+      block.appendChild(row);
+    });
+    root.appendChild(block);
+    return root;
+  }
+
+  function showVisualsSkeleton(container, label) {
+    if (!container) return;
+    let root = container.querySelector(":scope > .upr-vis-skel");
+    if (!root) {
+      container.replaceChildren(buildVisualsSkeleton());
+      root = container.querySelector(":scope > .upr-vis-skel");
+    }
+    const sr = root && root.querySelector(".upr-vis-skel__label");
+    if (sr) sr.textContent = label || "Loading visuals…";
+  }
+
   function formatVisualsProgress(i18n, data, elapsed) {
     const labels = i18n || {};
     const done = Math.max(0, Number(data && data.done) || 0);
@@ -447,5 +507,6 @@
     newProgressId,
     formatVisualsProgress,
     watchVisualsProgress,
+    showVisualsSkeleton,
   };
 })(window);

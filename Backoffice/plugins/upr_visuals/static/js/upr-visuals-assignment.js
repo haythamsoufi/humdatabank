@@ -50,6 +50,15 @@
     if (statusEl) statusEl.textContent = text || "";
   }
 
+  function showLoading(label) {
+    setStatus("");
+    if (shared.showVisualsSkeleton) {
+      shared.showVisualsSkeleton(body, label || i18n.loading);
+      return;
+    }
+    setStatus(label || i18n.loading);
+  }
+
   function setToggleOpen(open) {
     toggleBtn?.classList.toggle("is-active", open);
     toggleBtn?.setAttribute("aria-pressed", open ? "true" : "false");
@@ -141,13 +150,13 @@
     const requested = dashboardId;
     if (!force && showFromCache(requested)) return;
     activeDashboard = requested;
-    setStatus(i18n.loading);
+    showLoading(i18n.loading);
     const progressId = shared.newProgressId ? shared.newProgressId() : "";
     const stopWatch =
       progressId && shared.watchVisualsProgress
         ? shared.watchVisualsProgress(aesId, progressId, (rec, elapsed) => {
             if (shared.formatVisualsProgress) {
-              setStatus(shared.formatVisualsProgress(i18n, rec, elapsed));
+              showLoading(shared.formatVisualsProgress(i18n, rec, elapsed));
             }
           })
         : null;

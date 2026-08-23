@@ -53,6 +53,68 @@ def test_render_isolated_parallel_runs_jobs_together(monkeypatch):
 
 
 @pytest.mark.unit
+def test_png_bytes_reuses_matching_pdf(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    class _App:
+        instance_path = str(tmp_path)
+
+    @contextmanager
+    def fake_locale(lang):
+        yield lang
+
+    monkeypatch.setattr("plugins.upr_visuals.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr_visuals.service.export_locale", fake_locale)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.take_matching_pdf_bytes",
+        lambda **_k: (b"%PDF-reuse", "AFG_visuals.pdf"),
+    )
+
+    def fake_isolated(job, timeout=120, on_progress=None):
+        assert job["kind"] == "png_from_pdf"
+        Path(job["output_path"]).write_bytes(b"png-bytes")
+        return Path(job["output_path"])
+
+    monkeypatch.setattr("plugins.upr_visuals.service.run_isolated", fake_isolated)
+    data, filename = UprVisualsService.png_bytes(3129, "combined", lang="en")
+    assert data == b"png-bytes"
+    assert filename == "AFG_visuals.png"
+
+
+@pytest.mark.unit
+def test_png_bytes_falls_back_to_html_when_no_pdf(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    class _App:
+        instance_path = str(tmp_path)
+
+    @contextmanager
+    def fake_locale(lang):
+        yield lang
+
+    monkeypatch.setattr("plugins.upr_visuals.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr_visuals.service.export_locale", fake_locale)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.assignment_job.take_matching_pdf_bytes",
+        lambda **_k: None,
+    )
+    monkeypatch.setattr(
+        UprVisualsService,
+        "_dashboard_html",
+        classmethod(lambda cls, aes_id, dashboard_id, **_kw: ({"meta": {"iso3": "AFG", "round_code": "P26"}}, "<html/>")),
+    )
+
+    def fake_png(html, dest, dashboard_id="combined", **_kwargs):
+        assert html == "<html/>"
+        Path(dest).write_bytes(b"html-png")
+
+    monkeypatch.setattr("plugins.upr_visuals.service.render_png_isolated", fake_png)
+    data, filename = UprVisualsService.png_bytes(3129, "combined", lang="en")
+    assert data == b"html-png"
+    assert filename.endswith(".png")
+
+
+@pytest.mark.unit
 def test_render_isolated_parallel_single_job(monkeypatch):
     seen = []
 

@@ -14,12 +14,15 @@ from plugins.upr_visuals.catalog import (
     REACH_EMERGENCY_TO_SP2_NEEDLES,
     REPORT_ITEM_FALLBACKS,
     REPORT_LABEL_NEEDLES,
+    SP_CODES,
+    section_to_area,
 )
 from plugins.upr_visuals.formatters import format_count, planning_years, to_number
 from plugins.upr_visuals.i18n import t
 from plugins.upr_visuals.icons import _spef_icon_alias, spef_icon_srcs
 from plugins.upr_visuals.loaders import _load_dynamic_indicator_rows
 from plugins.upr_visuals.matrix import (
+    _area_code,
     _area_from_item,
     _bank_area,
     _matrix_cells,

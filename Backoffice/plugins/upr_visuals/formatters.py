@@ -53,38 +53,32 @@ def format_percent(value: Any) -> str:
 
 
 def _arabic_million_suffix(millions: float) -> str:
-    """Arabic plural form for the million count (IFRC Arabic style guide).
+    """Arabic unit after a numeric million count (digits, not spelled words).
 
-    Same range rules as ``plugins.pb_progress`` ``calculations._arabic_million_suffix``.
-    The whole-number part of the count picks the form, so 10.8 uses ملايين
-    (3–10) rather than the 100+ fallback. Counts of 100+ use مليون only when
-    the value is a whole number (مليون 100); fractional counts keep مليونا
-    (مليونا 219.3). Unit words stay to the left of the Latin digits so RTL
-    pages do not paint the unit into the neighbouring label.
+    Dual مليونان and accusative مليونا are for fully written-out numbers,
+    not digit labels. Any fractional count uses singular مليون.
 
-    | Range  | Form     | Example      |
-    |--------|----------|--------------|
-    | 1      | مليون    | مليون 1      |
-    | 2      | مليونان  | مليونان 2    |
-    | 3–10   | ملايين   | ملايين 5     |
-    | 11–99  | مليونا  | مليونا 25    |
-    | 100+   | مليون    | مليون 100    |
+    | Value              | Form    | Example      |
+    |--------------------|---------|--------------|
+    | 1                  | مليون   | 1 مليون      |
+    | 2                  | مليون   | 2 مليون      |
+    | integer 3–10       | ملايين  | 5 ملايين     |
+    | integer 11+        | مليون   | 25 مليون     |
+    | any fractional     | مليون   | 2.6 مليون    |
     """
     count = int(math.floor(millions + 1e-9))
     has_fraction = abs(millions - count) > 1e-9
-    if count == 1:
+    if has_fraction:
         return "مليون"
-    if count == 2:
-        return "مليونان"
     if 3 <= count <= 10:
         return "ملايين"
-    if 11 <= count <= 99:
-        return "مليونا"
-    if count >= 100 and not has_fraction:
-        return "مليون"
-    if count >= 11:
-        return "مليونا"
     return "مليون"
+
+
+def _format_million_digits(rounded: float) -> str:
+    if rounded == int(rounded):
+        return f"{int(rounded):,}"
+    return f"{rounded:.1f}".rstrip("0").rstrip(".")
 
 
 def _format_millions_compact(number: float) -> str:
@@ -93,7 +87,7 @@ def _format_millions_compact(number: float) -> str:
     from plugins.upr_visuals.i18n import current_export_language
 
     if current_export_language() == "ar":
-        return f"{_arabic_million_suffix(rounded)} {rounded:g}"
+        return f"{_format_million_digits(rounded)} {_arabic_million_suffix(rounded)}"
     if rounded == int(rounded):
         return f"{int(rounded)}M"
     text = f"{rounded:.1f}".rstrip("0").rstrip(".")
@@ -181,7 +175,7 @@ def format_compact_chf(value: Any) -> str:
 
     < 1,000 → raw integer
     < 1,000,000 → thousands as ``N,000``
-    ≥ 1,000,000 → ``N.nM`` (drop trailing ``.0``); Arabic uses IFRC million words
+    ≥ 1,000,000 → ``N.nM`` (drop trailing ``.0``); Arabic uses digit + مليون / ملايين
     """
     number = to_number(value)
     if number is None or number == 0:

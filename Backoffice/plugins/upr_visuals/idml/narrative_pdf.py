@@ -8,7 +8,7 @@ from pathlib import Path
 from plugins.upr_visuals.errors import UprVisualsError
 from plugins.upr_visuals.idml.constants import _STYLE_RUNS
 from plugins.upr_visuals.idml.narrative_style import folio_label, folio_text
-from plugins.upr_visuals.raster import _PLUGIN_DIR, _PLUGIN_FONTS_DIR, _restricted_url_fetcher
+from plugins.upr_visuals.raster import _PLUGIN_FONTS_DIR
 
 _APP_FONTS_DIR = Path(__file__).resolve().parents[3] / "app" / "static" / "fonts"
 
@@ -176,12 +176,14 @@ html, body {{
 
 
 def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "", full_fonts: bool = False) -> bytes:
-    try:
-        from weasyprint import CSS, HTML
-    except ImportError as exc:
-        raise UprVisualsError("WeasyPrint is required for UPR visual export.") from exc
-
-    from plugins.upr_visuals.i18n import arabic_font_class, current_export_language, rtl_document_attrs
+    from plugins.upr_visuals.i18n import (
+        arabic_font_class,
+        current_export_language,
+        rtl_document_attrs,
+        uses_arabic_font,
+    )
+    from plugins.upr_visuals.raster import write_weasyprint_pdf
+    from plugins.upr_visuals.typography import print_typography_css
 
     _ = folio
     lang = current_export_language()
@@ -189,26 +191,21 @@ def render_narrative_pdf_bytes(styled: list[dict], *, folio: str = "", full_font
     font_class = arabic_font_class(lang)
     class_attr = f" class='{font_class}'" if font_class else ""
     body = "".join(_para_html(para) for para in styled)
+    # Inline faces on the document (same as dashboard ``_wrap``) so WeasyPrint
+    # registers Tajawal even if a caller forgets FontConfiguration on CSS().
     html = (
         f"<!DOCTYPE html><html lang='{attrs['lang']}' dir='{attrs['dir']}'{class_attr}>"
-        f"<head><meta charset='utf-8'></head>"
+        f"<head><meta charset='utf-8'><style>{print_typography_css(lang)}</style></head>"
         f"<body>{body}</body></html>"
     )
-    from io import BytesIO
-
-    buffer = BytesIO()
-    HTML(
-        string=html,
-        base_url=_PLUGIN_DIR.resolve().as_uri() + "/",
-        url_fetcher=_restricted_url_fetcher,
-    ).write_pdf(
-        buffer,
-        stylesheets=[CSS(string=_narrative_css())],
-        optimize_images=False,
-        full_fonts=full_fonts,
-        hinting=True,
-    )
-    return buffer.getvalue()
+    try:
+        return write_weasyprint_pdf(
+            html,
+            stylesheets=[_narrative_css()],
+            full_fonts=full_fonts or uses_arabic_font(lang),
+        )
+    except RuntimeError as exc:
+        raise UprVisualsError(str(exc)) from exc
 
 
 def _montserrat_regular() -> Path | None:

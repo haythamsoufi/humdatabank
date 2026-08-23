@@ -261,8 +261,8 @@ class TestServiceHealthProbes:
 
 
 class TestIfrcRetriesTransientFailures:
-    """translate_text() must retry 429/502/503/504 like LibreTranslateService,
-    instead of dropping the fragment on the first rate-limit response."""
+    """translate_text() must retry 429/500/502/503/504 like LibreTranslateService,
+    instead of dropping the fragment on the first rate-limit or wrapper 500."""
 
     def _response(self, status_code, *, translated=None, text=""):
         resp = MagicMock()
@@ -303,6 +303,23 @@ class TestIfrcRetriesTransientFailures:
         assert svc.translate_text("Hello", "fr") == "Salut"
         assert mock_post.call_count == 2
 
+    def test_retries_wrapper_500_then_succeeds(self, monkeypatch):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        mock_post = MagicMock(
+            side_effect=[
+                self._response(
+                    500,
+                    text='{"type":"https://tools.ietf.org/html/rfc9110#section-15.6.1","title":"An error occurred while processing your request.","status":500}',
+                ),
+                self._response(200, translated="Contexte"),
+            ]
+        )
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+
+        assert svc.translate_text("Context", "fr") == "Contexte"
+        assert mock_post.call_count == 2
+
     def test_gives_up_after_three_rate_limit_responses(self, monkeypatch):
         svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
         mock_post = MagicMock(return_value=self._response(429, text="rate limited"))
@@ -321,6 +338,98 @@ class TestIfrcRetriesTransientFailures:
 
         assert svc.translate_text("Hello", "fr") is None
         assert mock_post.call_count == 1
+
+    def test_request_failure_is_warning_not_error(self, monkeypatch):
+        svc = IFRCTranslationService(api_key='k', base_url='https://ifrc.example.org')
+        monkeypatch.setattr(
+            svc.session,
+            'post',
+            MagicMock(side_effect=requests.exceptions.Timeout("timed out")),
+        )
+
+        with patch('app.services.translation.auto_translator.logger.warning') as warn, patch(
+            'app.services.translation.auto_translator.logger.error'
+        ) as err:
+            assert svc.translate_text("Context", "fr") is None
+        warn.assert_called()
+        assert any("IFRC API request failed" in str(c) for c in warn.call_args_list)
+        err.assert_not_called()
+
+
+class TestGoogleRetriesTransientFailures:
+    def _response(self, status_code, *, translated=None, text=""):
+        resp = MagicMock()
+        resp.status_code = status_code
+        resp.text = text
+        if status_code >= 400:
+            resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
+                f"{status_code}", response=resp
+            )
+        else:
+            resp.raise_for_status.return_value = None
+        if translated is not None:
+            resp.json.return_value = {"data": {"translations": [{"translatedText": translated}]}}
+        return resp
+
+    def test_retries_wrapper_500_then_succeeds(self, monkeypatch):
+        svc = GoogleTranslateService(api_key='k')
+        mock_post = MagicMock(
+            side_effect=[
+                self._response(500, text="upstream"),
+                self._response(200, translated="Contexte"),
+            ]
+        )
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+
+        assert svc.translate_text("Context", "fr") == "Contexte"
+        assert mock_post.call_count == 2
+
+    def test_exhausted_500_is_warning_not_error(self, monkeypatch):
+        svc = GoogleTranslateService(api_key='k')
+        monkeypatch.setattr(
+            svc.session, 'post', MagicMock(return_value=self._response(500, text="boom"))
+        )
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+
+        with patch('app.services.translation.auto_translator.logger.warning') as warn, patch(
+            'app.services.translation.auto_translator.logger.error'
+        ) as err:
+            assert svc.translate_text("Context", "fr") is None
+        warn.assert_called()
+        assert any("Google Translate API transient" in str(c) for c in warn.call_args_list)
+        err.assert_not_called()
+
+
+class TestLibreRetriesTransientFailures:
+    def _response(self, status_code, *, translated=None, text=""):
+        resp = MagicMock()
+        resp.status_code = status_code
+        resp.text = text
+        if status_code >= 400:
+            resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
+                f"{status_code}", response=resp
+            )
+        else:
+            resp.raise_for_status.return_value = None
+        if translated is not None:
+            resp.json.return_value = {"translatedText": translated}
+        return resp
+
+    def test_retries_500_then_succeeds(self, monkeypatch):
+        svc = LibreTranslateService(base_url='https://libre.example.org')
+        mock_post = MagicMock(
+            side_effect=[
+                self._response(500, text="upstream"),
+                self._response(200, translated="Contexte"),
+            ]
+        )
+        monkeypatch.setattr(svc.session, 'post', mock_post)
+        monkeypatch.setattr(svc, '_get_supported_languages', lambda: None)
+        monkeypatch.setattr('time.sleep', lambda _s: None)
+
+        assert svc.translate_text("Context", "fr") == "Contexte"
+        assert mock_post.call_count == 2
 
 
 class TestEngineBatchParallel:

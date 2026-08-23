@@ -26,6 +26,34 @@ import time
 # Keep this modest so Azure 429s stay rare.
 _ENGINE_BATCH_WORKERS = 6
 
+# Transient upstream HTTP. Retry these; exhausted attempts are warnings
+# because AutoTranslator already falls back to another engine.
+_TRANSIENT_HTTP = frozenset({429, 500, 502, 503, 504})
+_TRANSIENT_RETRY_ATTEMPTS = 3
+
+
+def _preview_for_log(text: str, limit: int = 50) -> str:
+    t = (text or "").replace("\n", " ").strip()
+    return t if len(t) <= limit else t[:limit] + "..."
+
+
+def _post_with_transient_retry(session, url, *, timeout: float, preview: str = "", **kwargs):
+    """POST with the shared 429/5xx backoff used by IFRC, Google, and Libre."""
+    response = None
+    for attempt in range(_TRANSIENT_RETRY_ATTEMPTS):
+        response = session.post(url, timeout=timeout, **kwargs)
+        if response.status_code not in _TRANSIENT_HTTP or attempt == _TRANSIENT_RETRY_ATTEMPTS - 1:
+            break
+        logger.debug(
+            "Transient %s for '%s', retrying (attempt %s/%s)",
+            response.status_code,
+            preview or url,
+            attempt + 1,
+            _TRANSIENT_RETRY_ATTEMPTS,
+        )
+        time.sleep(0.6 * (attempt + 1))
+    return response
+
 
 def _translate_texts_parallel(translate_one, texts: List[str], target_language: str, source_language: str) -> List[Optional[str]]:
     if not texts:
@@ -381,7 +409,19 @@ class GoogleTranslateService(TranslationService):
                 'source': source_language
             }
 
-            response = self.session.post(self.base_url, params=params, timeout=10)
+            preview = _preview_for_log(text)
+            response = _post_with_transient_retry(
+                self.session, self.base_url, timeout=10, preview=preview, params=params
+            )
+            if response.status_code in _TRANSIENT_HTTP:
+                logger.warning(
+                    "Google Translate API transient error for '%s' after retries: "
+                    "Status %s. Response: %s",
+                    preview,
+                    response.status_code,
+                    (response.text or "")[:200],
+                )
+                return None
             response.raise_for_status()
 
             data = response.json()
@@ -389,7 +429,7 @@ class GoogleTranslateService(TranslationService):
                 return data['data']['translations'][0]['translatedText']
 
         except Exception as e:
-            logger.error(f"Google Translate API error: {e}")
+            logger.warning("Google Translate API error for '%s': %s", _preview_for_log(text), e)
 
         return None
 
@@ -410,7 +450,18 @@ class GoogleTranslateService(TranslationService):
             for i, text in enumerate(texts):
                 params[f'q[{i}]'] = text
 
-            response = self.session.post(self.base_url, params=params, timeout=10)
+            preview = _preview_for_log(texts[0] if texts else "")
+            response = _post_with_transient_retry(
+                self.session, self.base_url, timeout=10, preview=preview, params=params
+            )
+            if response.status_code in _TRANSIENT_HTTP:
+                logger.warning(
+                    "Google Translate API batch transient error after retries: "
+                    "Status %s. Response: %s",
+                    response.status_code,
+                    (response.text or "")[:200],
+                )
+                return [None] * len(texts)
             response.raise_for_status()
 
             data = response.json()
@@ -418,7 +469,7 @@ class GoogleTranslateService(TranslationService):
                 return [translation['translatedText'] for translation in data['data']['translations']]
 
         except Exception as e:
-            logger.error(f"Google Translate API batch error: {e}")
+            logger.warning("Google Translate API batch error: %s", e)
 
         return [None] * len(texts)
 
@@ -571,23 +622,26 @@ class LibreTranslateService(TranslationService):
                     payload['api_key'] = self.api_key
 
                 # Retry transient failures (rate-limits / upstream flakiness) to reduce "random" misses in bulk runs.
-                last_http_error_preview: Optional[str] = None
-                for attempt in range(3):
-                    response = self.session.post(f"{self.base_url}/translate", json=payload, timeout=15)
-                    if response.status_code in (429, 502, 503, 504):
-                        last_http_error_preview = (response.text or "")[:200]
-                        time.sleep(0.6 * (attempt + 1))
-                        continue
-                    response.raise_for_status()
-
-                    data = response.json()
-                    return data.get('translatedText')
-
-                if last_http_error_preview:
+                preview = _preview_for_log(q)
+                response = _post_with_transient_retry(
+                    self.session,
+                    f"{self.base_url}/translate",
+                    timeout=15,
+                    preview=preview,
+                    json=payload,
+                )
+                if response.status_code in _TRANSIENT_HTTP:
                     logger.warning(
-                        f"LibreTranslate transient failure after retries ({source_code}->{target_norm}): {last_http_error_preview}"
+                        "LibreTranslate transient failure after retries (%s->%s): %s",
+                        source_code,
+                        target_norm,
+                        (response.text or "")[:200],
                     )
-                return None
+                    return None
+                response.raise_for_status()
+
+                data = response.json()
+                return data.get('translatedText')
 
             # First attempt: explicit source language (typical and fastest when correct).
             translated_text = _call_translate(source_norm, text)
@@ -682,33 +736,38 @@ class IFRCTranslationService(TranslationService):
             # backoff schedule as LibreTranslateService, instead of dropping the fragment
             # on the first 429 -- _ENGINE_BATCH_WORKERS is kept conservative specifically
             # because this endpoint previously had no retry at all.
-            response = None
-            for attempt in range(3):
-                response = self.session.post(
-                    self.api_endpoint,
-                    headers=self.headers,
-                    data=json.dumps(payload),
-                    timeout=30
-                )
-                if response.status_code not in (429, 502, 503, 504) or attempt == 2:
-                    break
-                logger.debug(
-                    f"IFRC API transient {response.status_code} for '{text[:50]}...', "
-                    f"retrying (attempt {attempt + 1}/3)"
-                )
-                time.sleep(0.6 * (attempt + 1))
+            preview = _preview_for_log(text)
+            response = _post_with_transient_retry(
+                self.session,
+                self.api_endpoint,
+                timeout=30,
+                preview=preview,
+                headers=self.headers,
+                data=json.dumps(payload),
+            )
 
             if response.status_code == 200:
                 # Check if response is JSON before parsing
                 content_type = response.headers.get('Content-Type', '').lower()
                 if 'application/json' not in content_type:
-                    logger.error(f"IFRC API returned non-JSON response for '{text}': Content-Type: {content_type}, Response preview: {response.text[:200]}")
+                    logger.warning(
+                        "IFRC API returned non-JSON response for '%s': Content-Type: %s, "
+                        "Response preview: %s",
+                        preview,
+                        content_type,
+                        response.text[:200],
+                    )
                     return None
 
                 try:
                     response_data = response.json()
                 except json.JSONDecodeError as e:
-                    logger.error(f"IFRC API JSON decode error for '{text}': {e}. Response preview: {response.text[:200]}")
+                    logger.warning(
+                        "IFRC API JSON decode error for '%s': %s. Response preview: %s",
+                        preview,
+                        e,
+                        response.text[:200],
+                    )
                     return None
 
                 # IFRC API returns a list with translation data
@@ -719,27 +778,43 @@ class IFRCTranslationService(TranslationService):
                         logger.debug(f"IFRC Translation: '{text}' -> '{translated_text}' ({source_language}->{target_language})")
                         return translated_text
                     else:
-                        logger.warning(f"IFRC API: No translation found in response for '{text}'")
+                        logger.warning("IFRC API: No translation found in response for '%s'", preview)
                 else:
-                    logger.warning(f"IFRC API: Unexpected response format for '{text}': {response_data}")
-            elif response.status_code in (429, 502, 503, 504):
-                # Exhausted the retries above.
-                logger.warning(f"IFRC API rate limit/transient error for '{text}' after retries: Status {response.status_code}. Response: {response.text[:200]}")
+                    logger.warning("IFRC API: Unexpected response format for '%s': %s", preview, response_data)
+            elif response.status_code in _TRANSIENT_HTTP:
+                # Exhausted the retries above. Upstream-only: we already fall
+                # back to another engine, so this is a warning not an app error.
+                logger.warning(
+                    "IFRC API transient error for '%s' after retries: Status %s. Response: %s",
+                    preview,
+                    response.status_code,
+                    response.text[:200],
+                )
                 return None
             else:
                 # Check if error response is HTML
                 content_type = response.headers.get('Content-Type', '').lower()
                 if 'text/html' in content_type:
-                    logger.error(f"IFRC API returned HTML error page for '{text}': Status {response.status_code}. This usually indicates an authentication or endpoint issue.")
+                    logger.warning(
+                        "IFRC API returned HTML error page for '%s': Status %s. "
+                        "This usually indicates an authentication or endpoint issue.",
+                        preview,
+                        response.status_code,
+                    )
                 else:
-                    logger.error(f"IFRC API error for '{text}': Status {response.status_code}, Response: {response.text[:500]}")
+                    logger.warning(
+                        "IFRC API error for '%s': Status %s, Response: %s",
+                        preview,
+                        response.status_code,
+                        response.text[:500],
+                    )
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"IFRC API request failed for '{text}': {e}")
+            logger.warning("IFRC API request failed for '%s': %s", _preview_for_log(text), e)
         except json.JSONDecodeError as e:
-            logger.error(f"IFRC API JSON decode error for '{text}': {e}")
+            logger.warning("IFRC API JSON decode error for '%s': %s", _preview_for_log(text), e)
         except Exception as e:
-            logger.error(f"IFRC API unexpected error for '{text}': {e}")
+            logger.warning("IFRC API unexpected error for '%s': %s", _preview_for_log(text), e)
 
         return None
 

@@ -56,6 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     shared-mime-info \
     fonts-dejavu-core \
     fonts-liberation \
+    fontconfig \
     openssh-server \
     && echo "root:Docker!" | chpasswd \
     && mkdir -p /var/run/sshd \
@@ -83,6 +84,20 @@ RUN python scripts/i18n/extract_update_translations.py --compile && \
 # Ensure static files are properly accessible
 RUN mkdir -p /app/app/static && \
     chmod -R 755 /app/app/static
+
+# Linux has no system Tajawal/Open Sans/Montserrat. Register the bundled TTFs
+# with fontconfig so WeasyPrint can resolve them if @font-face is missed
+# (Windows desktops often have Tajawal installed, which hid that gap locally).
+RUN mkdir -p /usr/local/share/fonts/upr-visuals && \
+    cp /app/app/static/fonts/Tajawal-Regular.ttf \
+       /app/app/static/fonts/Tajawal-Bold.ttf \
+       /app/app/static/fonts/OpenSans-Regular.ttf \
+       /app/app/static/fonts/OpenSans-Bold.ttf \
+       /usr/local/share/fonts/upr-visuals/ && \
+    cp /app/plugins/upr_visuals/fonts/Montserrat-Regular.ttf \
+       /app/plugins/upr_visuals/fonts/Montserrat-Bold.ttf \
+       /usr/local/share/fonts/upr-visuals/ && \
+    fc-cache -f
 
 # Create uploads directory for persistent storage
 RUN mkdir -p /data/uploads && \

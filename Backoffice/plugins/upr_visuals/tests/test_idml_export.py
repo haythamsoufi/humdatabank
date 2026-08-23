@@ -306,25 +306,86 @@ def test_idml_download_name_keeps_document_title():
     assert name == "Bangladesh - Midyear Reporting 2026 - Unified Country Report.zip"
 
 
-@pytest.mark.unit
-def test_narrative_pdf_subsets_fonts_by_default(monkeypatch):
-    captured = {}
-
+def _patch_weasyprint(monkeypatch, captured: dict):
     class FakeCSS:
-        def __init__(self, string=""):
-            pass
+        def __init__(self, string="", **kwargs):
+            captured["css"] = string
+            captured["css_kwargs"] = kwargs
 
     class FakeHTML:
-        def __init__(self, **_kwargs):
-            pass
+        def __init__(self, **kwargs):
+            captured["html"] = kwargs.get("string") or ""
+            captured["html_kwargs"] = kwargs
 
         def write_pdf(self, buf, **kwargs):
             captured.update(kwargs)
             buf.write(b"%PDF-1.4")
 
+    class FakeFontConfiguration:
+        pass
+
     monkeypatch.setattr("weasyprint.CSS", FakeCSS)
     monkeypatch.setattr("weasyprint.HTML", FakeHTML)
+    monkeypatch.setattr("weasyprint.text.fonts.FontConfiguration", FakeFontConfiguration)
+
+
+@pytest.mark.unit
+def test_narrative_pdf_subsets_fonts_by_default(monkeypatch):
+    captured = {}
+    _patch_weasyprint(monkeypatch, captured)
     from plugins.upr_visuals.idml.narrative_pdf import render_narrative_pdf_bytes
 
     render_narrative_pdf_bytes([{"style": "Body", "text": "Hello", "runs": [{"text": "Hello"}]}])
     assert captured.get("full_fonts") is False
+    assert captured.get("font_config") is not None
+    assert captured.get("css_kwargs", {}).get("font_config") is captured.get("font_config")
+
+
+@pytest.mark.unit
+def test_arabic_narrative_pdf_registers_tajawal(monkeypatch):
+    captured = {}
+    _patch_weasyprint(monkeypatch, captured)
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    from plugins.upr_visuals.idml.narrative_pdf import render_narrative_pdf_bytes
+
+    render_narrative_pdf_bytes(
+        [{"style": "Body", "text": "مرحبا", "runs": [{"text": "مرحبا", "href": "", "bold": False}]}]
+    )
+    html = captured.get("html") or ""
+    css = captured.get("css") or ""
+    assert "class='upr-arabic-font'" in html
+    assert "Tajawal" in html
+    assert "@font-face" in html
+    assert "Tajawal" in css
+    assert captured.get("full_fonts") is True
+    assert captured.get("font_config") is not None
+    assert captured.get("css_kwargs", {}).get("font_config") is captured.get("font_config")
+
+
+@pytest.mark.unit
+def test_arabic_narrative_pdf_embeds_tajawal(monkeypatch):
+    """Live WeasyPrint: Arabic narrative must embed Tajawal, not a system fallback."""
+    fitz = pytest.importorskip("fitz")
+    pytest.importorskip("weasyprint")
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    from plugins.upr_visuals.idml.narrative_pdf import render_narrative_pdf_bytes
+
+    pdf = render_narrative_pdf_bytes(
+        [
+            {
+                "style": "Body",
+                "text": "مرحبا بالعالم",
+                "runs": [{"text": "مرحبا بالعالم", "href": "", "bold": False}],
+            }
+        ]
+    )
+    doc = fitz.open(stream=pdf, filetype="pdf")
+    try:
+        names = " ".join(
+            str(font[3] or "") + " " + str(font[4] or "")
+            for page in doc
+            for font in page.get_fonts()
+        )
+    finally:
+        doc.close()
+    assert "Tajawal" in names

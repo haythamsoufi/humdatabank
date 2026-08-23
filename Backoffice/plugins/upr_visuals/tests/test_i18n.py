@@ -244,7 +244,7 @@ def test_rtl_financial_network_puts_bars_left_of_labels(monkeypatch):
                                         "key": "funding",
                                         "label": "التمويل",
                                         "value": 97_100_000,
-                                        "display": "مليونا 97.1",
+                                        "display": "97.1 مليون",
                                     }
                                 ],
                             }
@@ -265,7 +265,7 @@ def test_rtl_financial_network_puts_bars_left_of_labels(monkeypatch):
     assert "upr-amt__unit" in html
     assert html.find("upr-amt__unit") < html.find("upr-amt__num")
     unit = html[html.find("upr-amt__unit") : html.find("upr-amt__num")]
-    assert "مليونا" in unit
+    assert "مليون" in unit
     assert "97.1" not in unit
 
 

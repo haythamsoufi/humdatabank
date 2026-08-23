@@ -18,6 +18,8 @@ from plugins.upr_visuals.catalog import (
     section_to_area,
 )
 from plugins.upr_visuals.formatters import (
+    _arabic_million_suffix,
+    _format_millions_compact,
     appeal_number,
     chf_label,
     document_subtitle,
@@ -138,26 +140,33 @@ def test_format_compact_chf_matches_tableau():
 @pytest.mark.parametrize(
     "value,expected",
     [
-        (1_000_000, "مليون 1"),
-        (2_000_000, "مليونان 2"),
-        (3_000_000, "ملايين 3"),
-        (5_000_000, "ملايين 5"),
-        (6_700_000, "ملايين 6.7"),
-        (10_000_000, "ملايين 10"),
-        (10_800_000, "ملايين 10.8"),
-        (11_000_000, "مليونا 11"),
-        (25_000_000, "مليونا 25"),
-        (73_700_000, "مليونا 73.7"),
-        (99_000_000, "مليونا 99"),
-        (99_900_000, "مليونا 99.9"),
-        (100_000_000, "مليون 100"),
-        (100_500_000, "مليونا 100.5"),
-        (184_000_000, "مليون 184"),
-        (184_400_000, "مليونا 184.4"),
-        (219_000_000, "مليون 219"),
-        (219_300_000, "مليونا 219.3"),
-        (1_500_000, "مليون 1.5"),
-        (2_500_000, "مليونان 2.5"),
+        (1_000_000, "1 مليون"),
+        (2_000_000, "2 مليون"),
+        (2_600_000, "2.6 مليون"),
+        (3_000_000, "3 ملايين"),
+        (5_000_000, "5 ملايين"),
+        (5_200_000, "5.2 مليون"),
+        (6_700_000, "6.7 مليون"),
+        (9_800_000, "9.8 مليون"),
+        (10_000_000, "10 ملايين"),
+        (10_800_000, "10.8 مليون"),
+        (11_000_000, "11 مليون"),
+        (15_400_000, "15.4 مليون"),
+        (25_000_000, "25 مليون"),
+        (73_700_000, "73.7 مليون"),
+        (99_000_000, "99 مليون"),
+        (99_900_000, "99.9 مليون"),
+        (100_000_000, "100 مليون"),
+        (100_500_000, "100.5 مليون"),
+        (105_300_000, "105.3 مليون"),
+        (184_000_000, "184 مليون"),
+        (184_400_000, "184.4 مليون"),
+        (219_000_000, "219 مليون"),
+        (219_300_000, "219.3 مليون"),
+        (250_000_000, "250 مليون"),
+        (1_000_000_000, "1,000 مليون"),
+        (1_500_000, "1.5 مليون"),
+        (2_500_000, "2.5 مليون"),
         (242000, "242,000"),
         (500, "500"),
     ],
@@ -168,14 +177,22 @@ def test_format_compact_chf_arabic_million_suffix(monkeypatch, value, expected):
 
 
 @pytest.mark.unit
+def test_arabic_million_fraction_uses_singular_even_below_one(monkeypatch):
+    monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
+    assert _arabic_million_suffix(0.5) == "مليون"
+    assert _format_millions_compact(500_000) == "0.5 مليون"
+
+
+@pytest.mark.unit
 def test_chf_label_stays_iso_except_arabic(monkeypatch):
     assert chf_label() == "CHF"
     assert with_chf("1.2M", prefix=True) == "CHF 1.2M"
     assert with_chf("6.7M") == "6.7M CHF"
     monkeypatch.setattr("plugins.upr_visuals.i18n.current_export_language", lambda: "ar")
     assert chf_label() == "فرنك سويسري"
-    assert with_chf("6.7 ملايين", prefix=True) == "ملايين فرنك سويسري 6.7"
-    assert with_chf("ملايين 6.7") == "ملايين فرنك سويسري 6.7"
+    assert with_chf("6.7 مليون", prefix=True) == "مليون فرنك سويسري 6.7"
+    assert with_chf("مليون 6.7") == "مليون فرنك سويسري 6.7"
+    assert with_chf("5 ملايين") == "ملايين فرنك سويسري 5"
     assert with_chf("163,000") == "فرنك سويسري 163,000"
 
 

@@ -495,10 +495,23 @@ def test_resolve_export_image_src_inlines_trusted_github(monkeypatch):
     untrusted = "https://example.test/icon.png"
     assert resolve_export_image_src(untrusted) == untrusted
 
-    from plugins.upr_visuals.raster import _restricted_url_fetcher
+    from plugins.upr_visuals.raster import (
+        _APP_FONTS_DIR,
+        _PB_FONTS_DIR,
+        _is_allowed_local_path,
+        _restricted_url_fetcher,
+    )
+    from plugins.upr_visuals.typography import resolve_font_file
 
     with pytest.raises(ValueError, match="Blocked export URL"):
         _restricted_url_fetcher("https://fonts.googleapis.com/css2?family=Tajawal")
+
+    tajawal = resolve_font_file("Tajawal-Regular.ttf")
+    assert tajawal is not None
+    assert _is_allowed_local_path(tajawal)
+    assert _restricted_url_fetcher(tajawal.resolve().as_uri())
+    assert _is_allowed_local_path(_APP_FONTS_DIR / "Tajawal-Regular.ttf")
+    assert _is_allowed_local_path(_PB_FONTS_DIR / "Tajawal-Regular.ttf")
 
 
 @pytest.mark.unit
@@ -561,8 +574,8 @@ def test_render_pdf_bytes_subsets_fonts_by_default(monkeypatch):
     captured = {}
 
     class FakeCSS:
-        def __init__(self, string=""):
-            pass
+        def __init__(self, string="", **kwargs):
+            captured["css_kwargs"] = kwargs
 
     class FakeHTML:
         def __init__(self, **_kwargs):
@@ -572,12 +585,18 @@ def test_render_pdf_bytes_subsets_fonts_by_default(monkeypatch):
             captured.update(kwargs)
             buf.write(b"%PDF-1.4")
 
+    class FakeFontConfiguration:
+        pass
+
     monkeypatch.setattr("weasyprint.CSS", FakeCSS)
     monkeypatch.setattr("weasyprint.HTML", FakeHTML)
+    monkeypatch.setattr("weasyprint.text.fonts.FontConfiguration", FakeFontConfiguration)
     from plugins.upr_visuals.raster import render_pdf_bytes
 
     render_pdf_bytes("<div class='upr-dashboard'/>", dashboard_id="combined")
     assert captured.get("full_fonts") is False
+    assert captured.get("font_config") is not None
+    assert captured.get("css_kwargs", {}).get("font_config") is captured.get("font_config")
 
 
 @pytest.mark.unit
@@ -585,8 +604,8 @@ def test_render_pdf_bytes_can_embed_full_fonts(monkeypatch):
     captured = {}
 
     class FakeCSS:
-        def __init__(self, string=""):
-            pass
+        def __init__(self, string="", **kwargs):
+            captured["css_kwargs"] = kwargs
 
     class FakeHTML:
         def __init__(self, **_kwargs):
@@ -596,12 +615,17 @@ def test_render_pdf_bytes_can_embed_full_fonts(monkeypatch):
             captured.update(kwargs)
             buf.write(b"%PDF-1.4")
 
+    class FakeFontConfiguration:
+        pass
+
     monkeypatch.setattr("weasyprint.CSS", FakeCSS)
     monkeypatch.setattr("weasyprint.HTML", FakeHTML)
+    monkeypatch.setattr("weasyprint.text.fonts.FontConfiguration", FakeFontConfiguration)
     from plugins.upr_visuals.raster import render_pdf_bytes
 
     render_pdf_bytes("<div/>", dashboard_id="combined", full_fonts=True)
     assert captured.get("full_fonts") is True
+    assert captured.get("font_config") is not None
 
 
 def _reach_preview_html(*, rtl: bool = False) -> str:

@@ -46,6 +46,7 @@ _CSS_PATH = _PLUGIN_DIR / "static" / "css" / "upr-visuals.css"
 _APP_STATIC_DIR = Path(__file__).resolve().parents[2] / "app" / "static"
 _APP_FONTS_DIR = _APP_STATIC_DIR / "fonts"
 _PLUGIN_FONTS_DIR = _PLUGIN_DIR / "fonts"
+_PB_FONTS_DIR = _PLUGIN_DIR.parents[0] / "pb_progress" / "visuals" / "report" / "fonts"
 _APP_STATIC_URL = "/static/"
 # HTTPS origins trusted for export image inlining (NS logos and KPI icons from the
 # public FDRS GitHub repo).  Only these prefixes are fetched; all other https:// URLs
@@ -529,14 +530,21 @@ def _pdf_page_css(dashboard_id: str) -> str:
     )
 
 
+def _is_under(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
 def _is_allowed_local_path(path: Path) -> bool:
     try:
         resolved = path.resolve()
     except OSError:
         return False
-    plugin_root = _PLUGIN_DIR.resolve()
-    app_static = _APP_STATIC_DIR.resolve()
-    return resolved == plugin_root or plugin_root in resolved.parents or resolved == app_static or app_static in resolved.parents
+    roots = (
+        _PLUGIN_DIR.resolve(),
+        _APP_STATIC_DIR.resolve(),
+        _PB_FONTS_DIR.resolve(),
+    )
+    return any(_is_under(resolved, root) for root in roots)
 
 
 def _ns_logo_data_uri(filename: str) -> str:
@@ -819,6 +827,55 @@ def _stitch_pixmaps(pixmaps: list) -> object:
     return fitz.Pixmap(pixmaps[0].colorspace, width, height, bytes(canvas), 0)
 
 
+def write_weasyprint_pdf(
+    html: str,
+    *,
+    stylesheets: list[str],
+    full_fonts: bool = False,
+    zoom: float | None = None,
+) -> bytes:
+    """Render HTML with a shared FontConfiguration so ``@font-face`` is applied.
+
+    WeasyPrint only registers faces from ``CSS()`` when that same
+    ``FontConfiguration`` is passed to ``write_pdf``. Dashboard HTML inlines
+    faces too; narrative used to pass a bare ``CSS(string=)`` and silently
+    dropped Tajawal on Linux (Windows often hid this via a system install).
+    """
+    try:
+        from weasyprint import CSS, HTML
+        from weasyprint.text.fonts import FontConfiguration
+    except ImportError as exc:
+        raise RuntimeError("WeasyPrint is required for UPR visual export.") from exc
+
+    font_config = FontConfiguration()
+    base_url = _PLUGIN_DIR.resolve().as_uri() + "/"
+    parsed = [
+        CSS(
+            string=sheet,
+            font_config=font_config,
+            url_fetcher=_restricted_url_fetcher,
+            base_url=base_url,
+        )
+        for sheet in stylesheets
+    ]
+    pdf_buffer = io.BytesIO()
+    options: dict = {
+        "stylesheets": parsed,
+        "font_config": font_config,
+        "optimize_images": False,
+        "full_fonts": full_fonts,
+        "hinting": True,
+    }
+    if zoom is not None:
+        options["zoom"] = zoom
+    HTML(
+        string=html,
+        base_url=base_url,
+        url_fetcher=_restricted_url_fetcher,
+    ).write_pdf(pdf_buffer, **options)
+    return pdf_buffer.getvalue()
+
+
 def render_pdf_bytes(
     dashboard_html: str,
     *,
@@ -827,28 +884,14 @@ def render_pdf_bytes(
     title: str = "",
     full_fonts: bool = False,
 ) -> bytes:
-    try:
-        from weasyprint import CSS, HTML
-    except ImportError as exc:
-        raise RuntimeError("WeasyPrint is required for UPR visual export.") from exc
-
     _page_size(dashboard_id)
     document_html = _wrap(dashboard_html, dashboard_id=dashboard_id, title=title)
-    page_css = CSS(string=_pdf_page_css(dashboard_id))
-    pdf_buffer = io.BytesIO()
-    HTML(
-        string=document_html,
-        base_url=_PLUGIN_DIR.resolve().as_uri() + "/",
-        url_fetcher=_restricted_url_fetcher,
-    ).write_pdf(
-        pdf_buffer,
-        stylesheets=[page_css],
-        optimize_images=False,
+    return write_weasyprint_pdf(
+        document_html,
+        stylesheets=[_pdf_page_css(dashboard_id)],
         full_fonts=full_fonts,
-        hinting=True,
         zoom=zoom,
     )
-    return pdf_buffer.getvalue()
 
 
 def _png_render_scale(doc, *, scale: float) -> float:

@@ -15,6 +15,7 @@ import { initUniqueSectionOptions } from './modules/unique-section-options.js';
 import { initDisaggregationCalculator } from './modules/disaggregation-calculator.js';
 import { initializeFormValidation } from './modules/form-validation.js';
 import { initAjaxSave, triggerSave, isSavingForm } from './modules/ajax-save.js';
+import { installNativeSubmitTextEncoder } from './modules/question-text-waf-encode.js';
 import { initSessionKeepalive } from './modules/session-keepalive.js';
 import { initPublicDrafts } from './modules/public-drafts.js';
 import { initAuthDrafts, prepareAuthDraftsStore } from './modules/auth-drafts.js';
@@ -209,6 +210,11 @@ async function initializeEntryForm() {
 
         // Initialize AJAX save functionality
         safeInit('initAjaxSave', () => initAjaxSave());
+
+        // WAF-safe encoding for free-text question answers on the native
+        // (non-AJAX) final "Submit" path — the AJAX autosave path is covered
+        // inside ajax-save.js itself. See question-text-waf-encode.js.
+        safeInit('installNativeSubmitTextEncoder', () => installNativeSubmitTextEncoder());
 
         // Keep session alive while the user is actively filling the form.
         // The keepalive fires every 60 min (well within the 2-hour inactivity

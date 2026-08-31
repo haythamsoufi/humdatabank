@@ -649,9 +649,20 @@ class FormDataService(
             # Handle field clearing
             return cls._handle_field_clearing(question, assignment_entity_status, field_changes)
 
-        processed_value, has_value, data_not_available, not_applicable = FormItemProcessor.process_form_item_data(
-            question, request.form, assignment_entity_status.id, field_prefix=field_prefix
-        )
+        try:
+            processed_value, has_value, data_not_available, not_applicable = FormItemProcessor.process_form_item_data(
+                question, request.form, assignment_entity_status.id, field_prefix=field_prefix
+            )
+        except MatrixJsonDecodeError as e:
+            # Raised before any data_entry is touched, so a previously saved
+            # answer for this question is left untouched — see
+            # decode_b64_matrix_json's safe-failure contract.
+            current_app.logger.error(f"Question {question.id}: {e}")
+            validation_errors.append(
+                f"Question '{question.label}': submitted data could not be decoded. "
+                "Refresh the page and try again."
+            )
+            return field_changes
 
         # Check if the field was submitted (even if empty) - this allows us to clear existing values
         field_name = f'field_value[{question.id}]'

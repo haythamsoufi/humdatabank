@@ -139,11 +139,41 @@ inventing a third.
 
 | | Full-payload envelope (preferred) | Field-level `b64:` prefix |
 |---|---|---|
-| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`) |
+| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`), and (since the 2026-08 assignment-403 incident) plain `text`/`textarea` question answers |
 | **Wire format** | Whole body becomes `{"payload": "<b64 of JSON.stringify(everything)>"}`, sent as `Content-Type: application/json` | Individual `field_value[id]` values become the string `"b64:<b64 of that field's JSON>"`; rest of the request stays `multipart/form-data`/form-urlencoded |
-| **Client helper** | `btoa(unescape(encodeURIComponent(JSON.stringify(inner))))` — see `form-submit-ui.js`, `manage-settings.js` (`wrapEmailTemplateApiJsonBody`) | `__serializeMatrixData()` in `app/static/js/forms/modules/matrix/formatting.js` |
-| **Server helper** | `get_request_data()` in `app/utils/request_utils.py` — transparently unwraps `payload`/`payload_b64` into a `_JsonFormProxy` that mimics `request.form` | `decode_b64_matrix_json()` in `app/services/forms/processors/_common.py` |
+| **Client helper** | `btoa(unescape(encodeURIComponent(JSON.stringify(inner))))` — see `form-submit-ui.js`, `manage-settings.js` (`wrapEmailTemplateApiJsonBody`) | `__serializeMatrixData()` in `app/static/js/forms/modules/matrix/formatting.js`; `encodeFreeTextQuestionFields()` / `installNativeSubmitTextEncoder()` in `app/static/js/forms/modules/question-text-waf-encode.js` for question text/textarea |
+| **Server helper** | `get_request_data()` in `app/utils/request_utils.py` — transparently unwraps `payload`/`payload_b64` into a `_JsonFormProxy` that mimics `request.form` | `decode_b64_matrix_json()` in `app/services/forms/processors/_common.py` (reused as-is for question text — it's a generic base64→UTF-8 decoder; the JSON-specific `json.loads()` happens only in matrix/plugin callers, not in `FormItemProcessor._process_question_data`) |
 | **Why not the same one everywhere** | Requires the route to read every field from one `data = get_request_data()` object instead of `request.form` directly | The assignment-save pipeline reads `request.form` directly in 50+ call sites across `data_service.py` and processor mixins (`indicator.py`, `plugin.py`, `repeat_group.py`, `document.py`), **and** the same request carries real file uploads (`request.files`, see `processors/document.py`) — switching the whole endpoint to a JSON body would break uploads and requires threading a proxy through every call site. The narrower per-field prefix avoids that refactor. |
+
+### Trade-off note: extending `b64:` to free text (question `text`/`textarea`)
+
+Unlike matrix/plugin JSON, question `text`/`textarea` answers are **narrative
+text a user typed**, not structural JSON. Base64-wrapping them hides that text
+from the WAF's `REQUEST-941-*`/`REQUEST-942-*` signature inspection — the same
+trade-off already accepted for matrix/plugin fields, but now applied to
+free-form user content instead of JSON keys/values. This was a deliberate,
+scoped decision (only `text`/`textarea` **question** items, not indicators,
+choices, or repeat-group instances — see the "Known gap" comment at the top of
+`question-text-waf-encode.js`), made because:
+
+- The two 2026-08 `platform_403_forbidden` incidents (`/assignment/4100`,
+  `/assignment/1610`) could not be traced to a specific WAF `ruleId` (no
+  production WAF log access at investigation time — client-side error
+  reports only ever carry `url`/`referrer`/`user_agent`/`timestamp`, see the
+  request-body telemetry addition to `platform-error-reporter.js` below,
+  added specifically to close this gap for the *next* incident).
+- Question free text was an identified, previously-unprotected gap: the
+  matrix/plugin `b64:` convention already covers structured JSON, but plain
+  `field_value[id]` text answers were read directly off `request.form` with
+  no WAF-avoidance at all.
+- Repeat-group free-text question instances are **not** covered (see the gap
+  note in `question-text-waf-encode.js`) — their `field_value[id]` inputs get
+  renamed on JS clone before this can select them.
+
+If a false positive is later traced to a *specific* rule/argument via WAF
+logs, prefer the narrower "IT/SecOps exclusion strategy" below over expanding
+base64 coverage further — exclusions don't cost any WAF visibility on other
+routes/arguments.
 
 ### Safe-failure contract (field-level convention)
 

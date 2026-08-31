@@ -116,6 +116,49 @@
     return true;
   }
 
+  /**
+   * Best-effort summary of a fetch/XHR request body, attached to platform
+   * error reports so a future WAF 403 investigation doesn't hit the same
+   * dead end this one did: the WAF blocks the request before it reaches
+   * Flask, so the *only* place that ever saw the actual payload shape is the
+   * browser that sent it. Capturing field count / approximate byte size here
+   * lets SecOps/engineering correlate a specific incident with "large form"
+   * vs. "large single field" vs. "many arguments" WAF rule families without
+   * needing production WAF log access.
+   *
+   * @param {*} body - the `init.body` passed to fetch()
+   * @returns {{request_field_count: number|null, request_approx_bytes: number|null}|null}
+   */
+  function summarizeRequestBody(body) {
+    try {
+      if (typeof FormData !== 'undefined' && body instanceof FormData) {
+        var fieldCount = 0;
+        var approxBytes = 0;
+        var entries = (typeof body.entries === 'function') ? body.entries() : null;
+        if (!entries) return null;
+        var next = entries.next();
+        while (!next.done) {
+          var pair = next.value;
+          var key = String(pair[0] || '');
+          var value = pair[1];
+          fieldCount += 1;
+          if (value && typeof value === 'object' && typeof value.size === 'number') {
+            // File/Blob — count its byte size, not a stringified representation.
+            approxBytes += key.length + value.size;
+          } else {
+            approxBytes += key.length + String(value == null ? '' : value).length;
+          }
+          next = entries.next();
+        }
+        return { request_field_count: fieldCount, request_approx_bytes: approxBytes };
+      }
+      if (typeof body === 'string') {
+        return { request_field_count: null, request_approx_bytes: body.length };
+      }
+    } catch (_) { /* best-effort only */ }
+    return null;
+  }
+
   function requestUrlFromFetchInput(input) {
     try {
       if (typeof input === 'string') return input;
@@ -277,6 +320,17 @@
       timestamp: new Date().toISOString()
     };
 
+    // Request-body telemetry (best-effort; see summarizeRequestBody doc comment).
+    var bodySummary = o.requestBodySummary || (o.requestBody !== undefined ? summarizeRequestBody(o.requestBody) : null);
+    if (bodySummary) {
+      if (typeof bodySummary.request_field_count === 'number') {
+        payload.request_field_count = bodySummary.request_field_count;
+      }
+      if (typeof bodySummary.request_approx_bytes === 'number') {
+        payload.request_approx_bytes = bodySummary.request_approx_bytes;
+      }
+    }
+
     try {
       sendJsonBeacon(PLATFORM_ENDPOINT, payload);
     } catch (_) {}
@@ -328,6 +382,10 @@
     window[WRAP_FLAG] = true;
     window.fetch = function (input, init) {
       var reqUrl = requestUrlFromFetchInput(input);
+      // Summarize the outgoing body *before* awaiting the response — a
+      // FormData's file entries could theoretically be mutated/GC'd by the
+      // time the response resolves, and this is cheap either way.
+      var bodySummary = (init && init.body !== undefined) ? summarizeRequestBody(init.body) : null;
       return nativeFetch(input, init).then(function (response) {
         if (
           response &&
@@ -335,7 +393,7 @@
           !isPlatformErrorRequestUrl(reqUrl) &&
           typeof reportPlatformError === 'function'
         ) {
-          reportPlatformError(response, { url: reqUrl });
+          reportPlatformError(response, { url: reqUrl, requestBodySummary: bodySummary });
         }
         return response;
       });

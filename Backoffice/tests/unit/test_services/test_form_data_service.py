@@ -1533,6 +1533,118 @@ class TestProcessMatrixDataB64Safety:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# FormDataService._process_question_data — same base64 convention extended to
+# plain text/textarea question answers (narrative text), to close a WAF
+# false-positive gap the matrix/plugin fields didn't have: raw free text is
+# scanned by REQUEST-941-*/942-* signature rules for XSS/SQLi-shaped
+# punctuation. See question-text-waf-encode.js and
+# docs/runbooks/incidents/waf-403-form-payload-refactor-guide.md.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProcessQuestionDataB64Safety:
+    def _make_question(self, item_id=10, label="Narrative Answer", q_type="text"):
+        question = MagicMock()
+        question.id = item_id
+        question.label = label
+        question.type = q_type
+        question.indirect_reach = False
+        # MagicMock attributes are truthy by default — process_form_item_data()
+        # dispatches on these flags, so they must be explicit or it would route
+        # to _process_indicator_data instead of _process_question_data.
+        question.is_indicator = False
+        question.is_question = True
+        question.is_document_field = False
+        return question
+
+    def _b64(self, text):
+        import base64
+        return 'b64:' + base64.b64encode(text.encode('utf-8')).decode('ascii')
+
+    def test_valid_b64_text_is_decoded_and_saved(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        question = self._make_question()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(value="old answer")
+        raw_text = 'Report: 50% increase (see Annex 1); "coordinated" response'
+        payload = self._b64(raw_text)
+
+        with app.test_request_context(
+            '/test', method='POST', data={f'field_value[{question.id}]': payload}
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                changes = FormDataService._process_question_data(question, aes, validation_errors)
+
+        assert validation_errors == []
+        existing_entry.set_simple_value.assert_called_with(raw_text)
+        assert len(changes) == 1
+
+    def test_raw_text_without_b64_prefix_still_works(self, app):
+        """Backwards compatibility: older cached JS that hasn't picked up the
+        base64-wrapping change yet must keep working."""
+        from app.services.forms.data_service import FormDataService
+
+        question = self._make_question()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(value=None)
+
+        with app.test_request_context(
+            '/test', method='POST', data={f'field_value[{question.id}]': 'Plain unwrapped answer'}
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                FormDataService._process_question_data(question, aes, validation_errors)
+
+        assert validation_errors == []
+        existing_entry.set_simple_value.assert_called_with('Plain unwrapped answer')
+
+    def test_corrupted_b64_payload_preserves_existing_data_and_reports_error(self, app):
+        """The core safety guarantee: a decode failure must NOT wipe existing data."""
+        from app.services.forms.data_service import FormDataService
+
+        question = self._make_question()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(value="previously saved narrative")
+
+        with app.test_request_context(
+            '/test', method='POST',
+            data={f'field_value[{question.id}]': 'b64:not-valid-base64!!!'},
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                changes = FormDataService._process_question_data(question, aes, validation_errors)
+
+        # Existing data must be untouched (not wiped) and the caller must be
+        # told the save failed rather than getting a false "success".
+        existing_entry.set_simple_value.assert_not_called()
+        assert changes == []
+        assert len(validation_errors) == 1
+        assert "could not be decoded" in validation_errors[0]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RepeatGroupProcessorMixin._process_repeat_matrix_data_comprehensive — same
 # base64 convention. Unlike the top-level matrix path, returning None here is
 # already safe: the caller only writes a RepeatGroupData row when

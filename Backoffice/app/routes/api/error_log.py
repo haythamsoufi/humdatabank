@@ -133,6 +133,24 @@ def sanitize_client_error_text(value, *, max_len: int) -> Optional[str]:
     return _strip_control_chars(value, max_len=max_len)
 
 
+def _clamp_optional_int(value, *, max_value: int) -> Optional[int]:
+    """Coerce untrusted client-supplied numeric telemetry to a bounded int.
+
+    Returns None for missing/invalid/negative input rather than raising —
+    this is best-effort observability data, not something a bad value should
+    ever be able to fail the request over.
+    """
+    if value is None:
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return min(parsed, max_value)
+
+
 def sanitize_client_error_source(value) -> Optional[str]:
     """Sanitize script URL / filename from the browser."""
     text = sanitize_client_error_text(value, max_len=MAX_CLIENT_ERROR_SOURCE_CHARS)
@@ -222,6 +240,9 @@ def log_platform_error():
         "user_agent": "browser user agent (optional)",
         "timestamp": "ISO timestamp (optional)",
         "probe_delay_s": float (optional) — present only in JS recovery probes, not initial reports
+        "request_field_count": int (optional) — number of FormData entries in the request that
+            failed, from summarizeRequestBody() in platform-error-reporter.js
+        "request_approx_bytes": int (optional) — approximate serialized byte size of that request
     }
 
     When error_code is 504 and probe_delay_s is absent, a background investigation
@@ -277,6 +298,16 @@ def log_platform_error():
             except (ValueError, AttributeError):
                 timestamp = None  # Invalid timestamp, ignore it
 
+        # Best-effort request-body telemetry from the client reporter (see
+        # summarizeRequestBody() in platform-error-reporter.js). The WAF blocks
+        # the request before it reaches Flask, so the browser that sent it is
+        # the only place that ever saw the actual payload shape — this closes
+        # an observability gap where a platform_403_forbidden event previously
+        # carried no information about what was being saved. Clamped to sane
+        # bounds since this is public, unauthenticated input.
+        request_field_count = _clamp_optional_int(data.get('request_field_count'), max_value=100_000)
+        request_approx_bytes = _clamp_optional_int(data.get('request_approx_bytes'), max_value=500_000_000)
+
         # ── Recovery probe fast-path ───────────────────────────────────────────
         # JS sends follow-up beacons at T+5s and T+15s with probe_delay_s set.
         # These are cheap confirmations ("a worker is alive now") and do not
@@ -321,6 +352,11 @@ def log_platform_error():
         if timestamp:
             context_data['client_timestamp'] = timestamp
 
+        if request_field_count is not None:
+            context_data['request_field_count'] = request_field_count
+        if request_approx_bytes is not None:
+            context_data['request_approx_bytes'] = request_approx_bytes
+
         diagnostics_summary = ''
         if is_platform_5xx(error_code):
             failed_path = url or 'unknown'
@@ -344,6 +380,10 @@ def log_platform_error():
             context_data['context_truncated'] = True
 
         description = f'Platform error {error_code} occurred at {url or "unknown URL"}'
+        if request_field_count is not None or request_approx_bytes is not None:
+            size_kb = f'{request_approx_bytes / 1024:.1f}KB' if request_approx_bytes is not None else 'unknown size'
+            fields = f'{request_field_count} fields' if request_field_count is not None else 'unknown field count'
+            description = f'{description} (request body: ~{size_kb}, {fields})'
         if diagnostics_summary:
             description = f'{description}. {diagnostics_summary}'
         description = description[:500]

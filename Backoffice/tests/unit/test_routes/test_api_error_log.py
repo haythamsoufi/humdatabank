@@ -163,6 +163,40 @@ class TestSanitizeUrl:
 # POST /api/v1/platform-error
 # ---------------------------------------------------------------------------
 
+class TestClampOptionalInt:
+    """Unit tests for the _clamp_optional_int helper."""
+
+    def test_none_returns_none(self, app):
+        from app.routes.api.error_log import _clamp_optional_int
+        with app.app_context():
+            assert _clamp_optional_int(None, max_value=100) is None
+
+    def test_non_numeric_returns_none(self, app):
+        from app.routes.api.error_log import _clamp_optional_int
+        with app.app_context():
+            assert _clamp_optional_int("not-a-number", max_value=100) is None
+
+    def test_negative_returns_none(self, app):
+        from app.routes.api.error_log import _clamp_optional_int
+        with app.app_context():
+            assert _clamp_optional_int(-5, max_value=100) is None
+
+    def test_value_within_bounds_returned_as_is(self, app):
+        from app.routes.api.error_log import _clamp_optional_int
+        with app.app_context():
+            assert _clamp_optional_int(42, max_value=100) == 42
+
+    def test_value_above_max_is_clamped(self, app):
+        from app.routes.api.error_log import _clamp_optional_int
+        with app.app_context():
+            assert _clamp_optional_int(1_000_000, max_value=100) == 100
+
+    def test_numeric_string_coerced(self, app):
+        from app.routes.api.error_log import _clamp_optional_int
+        with app.app_context():
+            assert _clamp_optional_int("42", max_value=100) == 42
+
+
 class TestLogPlatformError:
     """Tests for POST /api/v1/platform-error."""
 
@@ -288,6 +322,75 @@ class TestLogPlatformError:
                 "timestamp": "not-a-valid-timestamp",
             })
         assert resp.status_code == 200
+
+    def test_request_body_telemetry_included_in_context_and_description(self, client, db_session):
+        """request_field_count / request_approx_bytes from the client reporter
+        (see summarizeRequestBody() in platform-error-reporter.js) should be
+        surfaced in both context_data and the human-readable description, so
+        a future WAF 403 investigation has evidence this one didn't."""
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://databank.ifrc.org/assignment/4100?ajax=1",
+                "request_field_count": 87,
+                "request_approx_bytes": 45000,
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert ctx.get("request_field_count") == 87
+        assert ctx.get("request_approx_bytes") == 45000
+        description = captured.get("description", "")
+        assert "87 fields" in description
+        assert "43.9KB" in description or "44.0KB" in description
+
+    def test_request_body_telemetry_omitted_when_absent(self, client, db_session):
+        """No telemetry fields sent (e.g. a non-FormData/GET failure) => no
+        placeholder keys added to context_data."""
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {"error_code": 502, "url": "https://example.com/"})
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert "request_field_count" not in ctx
+        assert "request_approx_bytes" not in ctx
+
+    def test_request_body_telemetry_invalid_values_ignored(self, client, db_session):
+        """Garbage/negative telemetry values are dropped, not trusted as-is —
+        this is public, unauthenticated input."""
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://example.com/",
+                "request_field_count": "not-a-number",
+                "request_approx_bytes": -500,
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert "request_field_count" not in ctx
+        assert "request_approx_bytes" not in ctx
 
     def test_database_log_failure_does_not_break_endpoint(self, client, db_session):
         """DB log failure is caught and endpoint still returns 200."""

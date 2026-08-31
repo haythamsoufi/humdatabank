@@ -827,6 +827,70 @@ class TestProcessQuestionData:
         assert val == "Hello World"
         assert has_val is True
 
+    def test_text_question_b64_wrapped_is_decoded(self, app):
+        """Free-text answers may arrive base64-wrapped (WAF false-positive
+        avoidance, same `b64:` convention as matrix/plugin fields — see
+        question-text-waf-encode.js)."""
+        import base64
+        from app.services.forms.processing_service import FormItemProcessor
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "text"
+        fi.indirect_reach = False
+        raw = 'Report: 50% increase (see Annex 1); "coordinated" response'
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        form_data = {"field_value[10]": wrapped}
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        assert val == raw
+        assert has_val is True
+
+    def test_textarea_question_b64_wrapped_is_decoded(self, app):
+        import base64
+        from app.services.forms.processing_service import FormItemProcessor
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "textarea"
+        fi.indirect_reach = False
+        raw = "Multi-line narrative <b>answer</b> with special chars: & < > ' \" ;"
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        form_data = {"field_value[10]": wrapped}
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        assert val == raw
+        assert has_val is True
+
+    def test_text_question_without_b64_prefix_returned_unchanged(self, app):
+        """Backwards compatibility: a bare (unwrapped) value must still work,
+        e.g. an older cached browser tab that hasn't picked up the client
+        change yet."""
+        from app.services.forms.processing_service import FormItemProcessor
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "text"
+        fi.indirect_reach = False
+        form_data = {"field_value[10]": "Plain unwrapped answer"}
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        assert val == "Plain unwrapped answer"
+        assert has_val is True
+
+    def test_text_question_invalid_b64_raises_matrix_json_decode_error(self, app):
+        """A `b64:`-prefixed value that fails to decode must raise, not
+        silently coerce to empty (which would look like the user cleared the
+        field and could wipe previously-saved data) — see the safe-failure
+        contract in decode_b64_matrix_json / waf-403-form-payload-refactor-guide.md."""
+        from app.services.forms.processing_service import FormItemProcessor
+        from app.services.forms.processors._common import MatrixJsonDecodeError
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "text"
+        fi.indirect_reach = False
+        form_data = {"field_value[10]": "b64:not-valid-base64!!!"}
+        with app.app_context():
+            with pytest.raises(MatrixJsonDecodeError):
+                FormItemProcessor._process_question_data(fi, form_data, "question_10")
+
     def test_number_question_converted(self, app):
         from app.services.forms.processing_service import FormItemProcessor
         fi = _make_form_item(item_type="question")

@@ -46,6 +46,7 @@ These runbooks cover the recurring tasks the IFRC ops team performs without need
 | [WAF 403 — form payloads](incidents/waf-403-form-payload-refactor-guide.md) | Azure Application Gateway blocking large admin/form POST bodies |
 | [Email API no-response timeouts](incidents/email-api-no-response.md) | Communication Center shows an email as "Failed" that may have actually sent; escalation ticket template |
 | [2026-08-12 — Assignment create 504 (146 countries)](incidents/2026-08-12-prod-assignment-create-gateway-timeout.md) | Bulk assignment create timed out at gateway while sync notifications/emails ran ~6 min in-request |
+| [2026-08-31 — Assignment autosave WAF 403s + escalation draft](incidents/2026-08-31-prod-assignment-waf-403-escalation.md) | `platform_403_forbidden` on `/assignment/<id>?ajax=1` autosave; app-side fixes shipped + IT/SecOps exclusion request template |
 
 ---
 

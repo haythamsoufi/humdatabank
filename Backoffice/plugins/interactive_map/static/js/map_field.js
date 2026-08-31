@@ -1874,7 +1874,18 @@ export class InteractiveMapField {
             not_applicable: notApplicable ? notApplicable.checked : false
         };
 
-        this.hiddenInput.value = JSON.stringify(mapData);
+        const json = JSON.stringify(mapData);
+        // Base64-encode to avoid WAF false-positives on nested marker/shape JSON
+        // (coordinate arrays, punctuation-heavy titles/descriptions) in
+        // form-urlencoded bodies — same convention as matrix fields
+        // (see __serializeMatrixData in modules/matrix/formatting.js).
+        // Server decodes the b64: prefix via decode_b64_matrix_json() before
+        // json.loads() in plugin_data_processor.process_plugin_field_data().
+        try {
+            this.hiddenInput.value = 'b64:' + btoa(unescape(encodeURIComponent(json)));
+        } catch (_e) {
+            this.hiddenInput.value = json;
+        }
 
         // Trigger change event for form validation
         this.hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));

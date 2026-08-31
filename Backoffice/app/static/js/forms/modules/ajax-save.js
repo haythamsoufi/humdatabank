@@ -1,6 +1,7 @@
 // AJAX Save Module - Handle form saving without page reload
 import { debugLog } from './debug.js';
 import { applyEntryFormProgress, coerceCompletionRate, refreshVisibleCompletionRate } from './entry-form-progress.js';
+import { encodeFreeTextQuestionFields } from './question-text-waf-encode.js';
 
 const MODULE_NAME = 'ajax-save';
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
@@ -174,6 +175,10 @@ async function saveFormOnce(options = {}) {
 
     // Keep original formatted numeric values to restore after sending
     let originalNumericValues = null;
+    // Restores free-text question inputs to their human-readable value after
+    // FormData has snapshotted the WAF-safe base64-wrapped version (see
+    // question-text-waf-encode.js).
+    let restoreFreeTextFields = null;
 
     try {
         debugLog(MODULE_NAME, '💾 Saving form...');
@@ -183,6 +188,11 @@ async function saveFormOnce(options = {}) {
             window.matrixHandler.collectMatrixData();
             debugLog(MODULE_NAME, '✅ Matrix data collected');
         }
+
+        // Base64-wrap free-text question answers so the WAF's XSS/SQLi
+        // signature rules don't false-positive on narrative text. Reverted
+        // in `finally` below, right after FormData has captured the value.
+        restoreFreeTextFields = encodeFreeTextQuestionFields(form);
 
         // Unformat numeric inputs (thousand separators) before collecting FormData.
         // Include type=number as well as data-numeric text inputs used by the formatter.
@@ -369,6 +379,10 @@ async function saveFormOnce(options = {}) {
                 try { input.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) { /* no-op */ }
             });
         }
+
+        // Put free-text question inputs back to human-readable text now that
+        // FormData has already captured the base64-wrapped snapshot.
+        if (restoreFreeTextFields) restoreFreeTextFields();
 
         isSaving = false;
         if (buttonStateEnabled) updateSaveButtonState(false);

@@ -1032,6 +1032,7 @@
                                                     <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white {{ 'ml-3 sm:ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
                                                          data-item-id="{{ unified_item_id }}"
                                                          data-item-type="{{ unified_item_type }}"
+                                                         {% if field.is_question %}data-question-type="{{ field.field_type_for_js }}"{% endif %}
                                                          data-layout-width="{{ field.layout_column_width or 12 }}"
                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}
@@ -1984,6 +1985,7 @@
                                                                     <div class="form-group form-item-block border p-3 sm:p-4 rounded-md bg-white {{ 'ml-3 sm:ml-6 border-l-4 border-l-blue-200 bg-blue-50' if is_sub_item else '' }} {{ 'border-l-4 border-l-green-300 bg-green-50' if is_dynamic_indicator else '' }}"
                                                                          data-item-id="{{ field.id }}"
                                                                          data-item-type="{{ 'indicator' if field.is_indicator else ('question' if field.is_question else ('matrix' if field.item_type == 'matrix' else 'document_field')) }}"
+                                                                         {% if field.is_question %}data-question-type="{{ field.field_type_for_js }}"{% endif %}
                                                                          data-layout-width="{{ field.layout_column_width or 12 }}"
                                                                          data-layout-break="{{ 'true' if field.layout_break_after else 'false' }}"
                                                                          {% if field.conditions %}data-relevance-condition='{{ field.conditions|tojson }}'{% endif %}

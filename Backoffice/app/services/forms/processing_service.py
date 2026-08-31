@@ -749,6 +749,22 @@ class FormItemProcessor:
         if raw_value is None:
             return None, False, False, False
 
+        # Free-text (text/textarea) answers may arrive base64-wrapped with a
+        # `b64:` prefix, the same WAF-false-positive-avoidance convention used
+        # for matrix/plugin field JSON (see decode_b64_matrix_json docstring).
+        # A bare value without the prefix is returned unchanged, so this is a
+        # no-op for every other question type (number, choice, checkbox, ...).
+        # MatrixJsonDecodeError intentionally propagates to the caller
+        # (data_service.py::_process_question_data), which must catch it
+        # before touching stored data — see the safe-failure contract in
+        # waf-403-form-payload-refactor-guide.md.
+        # Imported locally (not at module scope) to avoid a circular import:
+        # app.services.forms.processors's package __init__ imports
+        # FormItemProcessor from this module.
+        if isinstance(raw_value, str):
+            from app.services.forms.processors._common import decode_b64_matrix_json
+            raw_value = decode_b64_matrix_json(raw_value)
+
         # Process based on question type
         if form_item.type == 'number':
             try:

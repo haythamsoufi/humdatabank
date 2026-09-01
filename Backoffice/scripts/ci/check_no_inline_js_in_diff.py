@@ -8,6 +8,21 @@ import sys
 
 logger = logging.getLogger(__name__)
 
+# jsdom / pytest fixtures use innerHTML to mount HTML. That is not shipped to
+# browsers and is not a CSP risk. Sibling tests already work around this guard
+# with DOMParser; skip the whole tests tree instead of playing whack-a-mole.
+_TEST_PATH_MARKERS = ("/tests/",)
+_TEST_SUFFIXES = (".test.js", ".spec.js", ".test.ts", ".spec.ts")
+
+
+def should_scan_file(path: str | None) -> bool:
+    if not path or path == "/dev/null":
+        return False
+    posix = f"/{path.replace(chr(92), '/')}"
+    if any(marker in posix for marker in _TEST_PATH_MARKERS):
+        return False
+    return not posix.endswith(_TEST_SUFFIXES)
+
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("inline onclick", re.compile(r"\bonclick\s*=", re.IGNORECASE)),
@@ -44,6 +59,33 @@ def run_git_diff(base_ref: str | None = None) -> str:
     return subprocess.check_output(["git", "diff", "--unified=0"], text=True)
 
 
+def scan_diff(diff: str) -> list[str]:
+    """Return findings for added lines in production (non-test) files."""
+    findings: list[str] = []
+    current_file = None
+    for line in diff.splitlines():
+        if line.startswith("+++ b/"):
+            current_file = line[len("+++ b/") :].strip()
+            continue
+
+        if not should_scan_file(current_file):
+            continue
+
+        # Only evaluate added lines (ignore diff headers and removals)
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+
+        content = line[1:]
+        for label, rx in PATTERNS:
+            if label == "javascript: url":
+                # Ignore mentions used for validation logic (not emitted into HTML)
+                if "startswith((" in content or "startswith((" in content.replace(" ", ""):
+                    continue
+            if rx.search(content):
+                findings.append(f"{current_file or '?'}: {label}: {content.strip()}")
+    return findings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Scan git diff for inline JS / CSP-risk patterns.")
     parser.add_argument(
@@ -61,26 +103,7 @@ def main() -> int:
         logger.error("Failed to run git diff: %s", e)
         return 2
 
-    findings: list[str] = []
-
-    current_file = None
-    for line in diff.splitlines():
-        if line.startswith("+++ b/"):
-            current_file = line[len("+++ b/") :].strip()
-            continue
-
-        # Only evaluate added lines (ignore diff headers and removals)
-        if not line.startswith("+") or line.startswith("+++"):
-            continue
-
-        content = line[1:]
-        for label, rx in PATTERNS:
-            if label == "javascript: url":
-                # Ignore mentions used for validation logic (not emitted into HTML)
-                if "startswith((" in content or "startswith((" in content.replace(" ", ""):
-                    continue
-            if rx.search(content):
-                findings.append(f"{current_file or '?'}: {label}: {content.strip()}")
+    findings = scan_diff(diff)
 
     if findings:
         logger.error("ERROR: Inline-JS/CSP-risk patterns introduced in diff:")

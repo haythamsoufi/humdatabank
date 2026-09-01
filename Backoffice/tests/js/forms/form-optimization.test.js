@@ -161,6 +161,20 @@ describe('form-optimization', () => {
     expect(input.dataset.ifrcOriginalName).toBeUndefined();
   });
 
+  it('strips empty file inputs', async () => {
+    document.body.innerHTML = `
+      <form id="f">
+        <input type="file" name="file">
+      </form>`;
+    const { initFormOptimization } = await loadFormOptimization();
+    initFormOptimization();
+
+    submitForm(document.getElementById('f'));
+
+    const empty = document.querySelector('[data-ifrc-original-name="file"]');
+    expect(empty.getAttribute('name')).toBeNull();
+  });
+
   it('does not strip when submit is already defaultPrevented', async () => {
     document.body.innerHTML = `
       <form id="f">

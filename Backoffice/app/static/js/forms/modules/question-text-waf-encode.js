@@ -24,16 +24,36 @@
 // (numbers, choices, matrix/plugin, which have their own protection) are
 // untouched.
 //
-// Known gap: repeat-group instances rename `field_value[id]` inputs to
+// Repeat-group instances rename `field_value[id]` to
 // `repeat_<sectionId>_<instance>_field_<fieldIndex>_<inputIndex>` on clone
-// (see repeat-sections.js::updateRepeatFieldAttributes), so they fall outside
-// the `field_value[` selector below and are NOT covered by this module. If
-// WAF 403s are ever traced to a repeat-group free-text field, that rename
-// step needs a matching data-question-type carry-over first.
+// (see repeat-sections.js::updateRepeatFieldAttributes). Those inputs keep
+// `data-question-type` on `.form-item-block`, so the selectors below cover
+// both top-level and repeat free-text questions.
+//
+// Also wrapped (same `b64:` convention):
+//   - `*_emergency_metadata` / `field_disagg_metadata[id]` hidden JSON
+//   - `select[data-lookup-list-id="emergency_operations"]` display values
+//     (`Name (CODE)` parentheses trip REQUEST-942-*)
+//
+// Empty unused sex/age/sexage/indirect_reach inputs are stripped from the
+// AJAX FormData (and already name-stripped on native submit by
+// form-optimization.js). That cuts ~300 arguments on a typical UPR page.
 
-const FREE_TEXT_SELECTOR =
-    '.form-item-block[data-item-type="question"][data-question-type="text"] input[name^="field_value["], ' +
-    '.form-item-block[data-item-type="question"][data-question-type="textarea"] textarea[name^="field_value["]';
+const FREE_TEXT_SELECTOR = [
+    '.form-item-block[data-item-type="question"][data-question-type="text"] input[name^="field_value["]',
+    '.form-item-block[data-item-type="question"][data-question-type="textarea"] textarea[name^="field_value["]',
+    '.form-item-block[data-item-type="question"][data-question-type="text"] input[name^="repeat_"]',
+    '.form-item-block[data-item-type="question"][data-question-type="textarea"] textarea[name^="repeat_"]',
+].join(', ');
+
+const JSON_HIDDEN_SELECTOR =
+    'input[name$="_emergency_metadata"], input[name^="field_disagg_metadata["]';
+
+const EMERGENCY_SELECT_SELECTOR = 'select[data-lookup-list-id="emergency_operations"]';
+
+/** Empty unused disaggregation keys — safe to omit (backend treats missing = empty). */
+export const EMPTY_DISAGG_NAME_RE =
+    /^(?:(?:indicator|dynamic)_\d+_|repeat_\d+_\d+_field_\d+_)(?:sex_|age_|sexage_|indirect_reach$)/;
 
 /** unescape+encodeURIComponent makes btoa() safe for non-ASCII narrative text. */
 export function encodeB64(text) {
@@ -44,9 +64,41 @@ export function encodeB64(text) {
     }
 }
 
-export function findFreeTextQuestionInputs(formEl) {
+function _enabledNamedInputs(formEl, selector) {
     if (!formEl || typeof formEl.querySelectorAll !== 'function') return [];
-    return Array.from(formEl.querySelectorAll(FREE_TEXT_SELECTOR)).filter((el) => !el.disabled);
+    return Array.from(formEl.querySelectorAll(selector)).filter((el) => !el.disabled && el.name);
+}
+
+export function findFreeTextQuestionInputs(formEl) {
+    return _enabledNamedInputs(formEl, FREE_TEXT_SELECTOR);
+}
+
+export function findWafSensitiveInputs(formEl) {
+    return [
+        ...findFreeTextQuestionInputs(formEl),
+        ..._enabledNamedInputs(formEl, JSON_HIDDEN_SELECTOR),
+        ..._enabledNamedInputs(formEl, EMERGENCY_SELECT_SELECTOR),
+    ];
+}
+
+/**
+ * Drop empty unused sex/age/sexage/indirect_reach keys and empty file parts
+ * from a FormData snapshot. Does not touch total_value / standard_value /
+ * reporting_mode (those keys being present vs empty is meaningful).
+ */
+export function pruneEmptyWafRiskFields(formData) {
+    if (!formData || typeof formData.entries !== 'function') return formData;
+    const toDelete = [];
+    for (const [key, value] of formData.entries()) {
+        if (typeof File !== 'undefined' && value instanceof File) {
+            if (!value.name && value.size === 0) toDelete.push(key);
+            continue;
+        }
+        if (value !== '' && value != null) continue;
+        if (EMPTY_DISAGG_NAME_RE.test(key)) toDelete.push(key);
+    }
+    toDelete.forEach((key) => formData.delete(key));
+    return formData;
 }
 
 /**
@@ -61,19 +113,49 @@ export function findFreeTextQuestionInputs(formEl) {
  * a real browser navigation (native form submit) do not need to call
  * `restore()` since the page unloads before a repaint could show it.
  */
+function _encodeSelectInPlace(select, wrapped) {
+    // Setting select.value to a string that matches no <option> clears the
+    // control in browsers. Add a temporary option, then restore/remove it.
+    let option = Array.from(select.options).find((o) => o.value === wrapped);
+    let created = false;
+    if (!option) {
+        option = document.createElement('option');
+        option.value = wrapped;
+        option.hidden = true;
+        option.dataset.wafTemp = '1';
+        select.appendChild(option);
+        created = true;
+    }
+    select.value = wrapped;
+    return function restoreSelect() {
+        try {
+            if (created && option.parentNode) option.remove();
+        } catch (_) { /* no-op */ }
+    };
+}
+
 export function encodeFreeTextQuestionFields(formEl) {
-    const inputs = findFreeTextQuestionInputs(formEl);
+    const inputs = findWafSensitiveInputs(formEl);
     const originalValues = new Map();
+    const extraRestores = [];
 
     inputs.forEach((input) => {
         const value = input.value;
         if (!value) return; // nothing to protect on an empty field
         if (typeof value === 'string' && value.startsWith('b64:')) return; // already wrapped
         originalValues.set(input, value);
-        input.value = encodeB64(value);
+        const wrapped = encodeB64(value);
+        if (input.tagName === 'SELECT') {
+            extraRestores.push(_encodeSelectInPlace(input, wrapped));
+        } else {
+            input.value = wrapped;
+        }
     });
 
     return function restoreFreeTextQuestionFields() {
+        extraRestores.forEach((fn) => {
+            try { fn(); } catch (_) { /* no-op */ }
+        });
         originalValues.forEach((value, input) => {
             try { input.value = value; } catch (_) { /* no-op */ }
         });
@@ -100,8 +182,14 @@ export function installNativeSubmitTextEncoder() {
     document.addEventListener('submit', (event) => {
         const target = event.target;
         if (!target || typeof target.matches !== 'function' || !target.matches('form')) return;
-        // No restore call here: this submit navigates the page away, so the
-        // mutated (base64) value is never shown to the user.
-        encodeFreeTextQuestionFields(target);
+        if (event.defaultPrevented) return;
+        const restore = encodeFreeTextQuestionFields(target);
+        // Validation (or another listener) may preventDefault after we run.
+        // Restore on the next tick so the user never sees base64 in the inputs.
+        setTimeout(() => {
+            try {
+                if (event.defaultPrevented) restore();
+            } catch (_) { /* no-op */ }
+        }, 0);
     });
 }

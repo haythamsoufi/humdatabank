@@ -24,6 +24,7 @@ Targets significant coverage improvement of:
 - _is_repeat_instance_complete
 - FormDataService._is_auto_managed_request
 """
+import base64
 import json
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -598,6 +599,29 @@ class TestEmergencyOperationsMetadata:
                 field_index=0,
             )
             assert meta == {'name': 'Appeal B', 'code': 'MDRAF002'}
+
+    def test_get_emergency_metadata_from_request_accepts_b64_json(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        payload = json.dumps({'name': 'Morocco - Earthquake', 'code': 'MDRMA010'})
+        wrapped = 'b64:' + base64.b64encode(payload.encode('utf-8')).decode('ascii')
+        with app.test_request_context('/test', method='POST', data={
+            'repeat_415_1_field_0_emergency_metadata': wrapped,
+        }):
+            meta = FormDataService._get_emergency_metadata_from_request(
+                section_id=415,
+                instance_number=1,
+                field_index=0,
+            )
+            assert meta == {'name': 'Morocco - Earthquake', 'code': 'MDRMA010'}
+
+    def test_get_emergency_metadata_from_request_corrupt_b64_returns_none(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        with app.test_request_context('/test', method='POST', data={
+            'field_disagg_metadata[1313]': 'b64:not-valid-base64!!!',
+        }):
+            assert FormDataService._get_emergency_metadata_from_request(form_item_id=1313) is None
 
     def test_find_field_value_ignores_emergency_metadata(self, app):
         from app.services.forms.data_service import FormDataService
@@ -1501,6 +1525,50 @@ class TestProcessMatrixDataB64Safety:
         assert validation_errors == []
         assert existing_entry.disagg_data == {"1_col": 7}
 
+    def test_chunked_b64_payload_is_reassembled_and_decoded(self, app):
+        """Large matrix values may be split client-side (matrix-field-chunking.js)
+        across field_value[id]/__c1/__c2/... to dodge a WAF argument-length rule
+        (e.g. OWASP CRS 920370) — see get_possibly_chunked_form_value(). The
+        server must reassemble and decode them exactly as if unchunked."""
+        from app.services.forms.data_service import FormDataService
+
+        matrix = self._make_matrix()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(disagg_data=None)
+
+        full_payload = self._b64('{"1_col": 5, "2_col": 9}')
+        # Split arbitrarily mid-string, the way the client would at a fixed
+        # byte threshold — reassembly must not depend on any alignment.
+        split_at = len(full_payload) // 3
+        chunk0, chunk1, chunk2 = (
+            full_payload[:split_at],
+            full_payload[split_at:2 * split_at],
+            full_payload[2 * split_at:],
+        )
+
+        with app.test_request_context(
+            '/test', method='POST',
+            data={
+                f'field_value[{matrix.id}]': chunk0,
+                f'field_value[{matrix.id}]__c1': chunk1,
+                f'field_value[{matrix.id}]__c2': chunk2,
+            },
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                changes = FormDataService._process_matrix_data(matrix, aes, validation_errors)
+
+        assert validation_errors == []
+        assert existing_entry.disagg_data == {"1_col": 5, "2_col": 9}
+        assert len(changes) == 1
+
     def test_corrupted_b64_payload_preserves_existing_data_and_reports_error(self, app):
         """The core safety guarantee: a decode failure must NOT wipe existing data."""
         from app.services.forms.data_service import FormDataService
@@ -1679,6 +1747,54 @@ class TestProcessRepeatMatrixDataB64Safety:
         # None => should_create_data_availability_entry() is False => caller
         # leaves any existing RepeatGroupData row untouched (no silent wipe).
         assert result is None
+
+
+class TestProcessRepeatQuestionValueB64:
+    def _b64(self, text):
+        return 'b64:' + base64.b64encode(text.encode('utf-8')).decode('ascii')
+
+    def test_decodes_b64_textarea_and_emergency_display(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        field = MagicMock()
+        field.id = 8
+        notes = '* sex disaggregations are currently not available\n* PNS funding'
+        display = 'Morocco - Earthquake (MDRMA010)'
+        with app.app_context():
+            assert FormDataService._process_question_value_by_type(
+                self._b64(notes), 'textarea', field, {}, 0
+            ) == notes
+            assert FormDataService._process_question_value_by_type(
+                self._b64(display), 'single_choice', field, {}, 0
+            ) == display
+
+    def test_raw_repeat_text_without_prefix_still_works(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        field = MagicMock()
+        field.id = 8
+        with app.app_context():
+            assert FormDataService._process_question_value_by_type(
+                'Plain repeat answer', 'text', field, {}, 0
+            ) == 'Plain repeat answer'
+
+    def test_corrupt_b64_repeat_question_is_a_no_op(self, app):
+        from app.services.forms.data_service import FormDataService
+
+        field = MagicMock()
+        field.id = 8
+        field.is_indicator = False
+        field.is_question = True
+        field.is_document_field = False
+        field.item_type = 'question'
+        field.question_type = MagicMock()
+        field.question_type.value = 'textarea'
+        field_values = {'field_0_0': 'b64:not-valid-base64!!!'}
+        with app.app_context():
+            value, dna, na, meaningful = FormDataService._process_repeat_field_data_comprehensive(
+                field, field_values, 0, 1
+            )
+        assert (value, dna, na, meaningful) == (None, False, False, False)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

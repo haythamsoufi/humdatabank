@@ -1,7 +1,8 @@
 // AJAX Save Module - Handle form saving without page reload
 import { debugLog } from './debug.js';
 import { applyEntryFormProgress, coerceCompletionRate, refreshVisibleCompletionRate } from './entry-form-progress.js';
-import { encodeFreeTextQuestionFields } from './question-text-waf-encode.js';
+import { encodeFreeTextQuestionFields, pruneEmptyWafRiskFields } from './question-text-waf-encode.js';
+import { chunkLargeMatrixFields } from './matrix-field-chunking.js';
 
 const MODULE_NAME = 'ajax-save';
 const _t = (k) => (typeof window.t === 'function' ? window.t(k) : k);
@@ -179,6 +180,10 @@ async function saveFormOnce(options = {}) {
     // FormData has snapshotted the WAF-safe base64-wrapped version (see
     // question-text-waf-encode.js).
     let restoreFreeTextFields = null;
+    // Removes the temporary sibling inputs used to split large matrix values
+    // into multiple WAF-safe-length arguments after FormData has snapshotted
+    // them (see matrix-field-chunking.js).
+    let restoreChunkedMatrixFields = null;
 
     try {
         debugLog(MODULE_NAME, '💾 Saving form...');
@@ -189,10 +194,16 @@ async function saveFormOnce(options = {}) {
             debugLog(MODULE_NAME, '✅ Matrix data collected');
         }
 
-        // Base64-wrap free-text question answers so the WAF's XSS/SQLi
-        // signature rules don't false-positive on narrative text. Reverted
-        // in `finally` below, right after FormData has captured the value.
+        // Base64-wrap free-text / emergency JSON / emergency select values
+        // so WAF signature rules don't false-positive. Reverted in `finally`
+        // after FormData has captured the wrapped snapshot.
         restoreFreeTextFields = encodeFreeTextQuestionFields(form);
+
+        // Split any oversized matrix field value across multiple sibling
+        // inputs so no single WAF argument-length rule (e.g. OWASP CRS
+        // 920370) can fire, regardless of the matrix table's size. Reverted
+        // in `finally` below, right after FormData has captured the chunks.
+        restoreChunkedMatrixFields = chunkLargeMatrixFields(form);
 
         // Unformat numeric inputs (thousand separators) before collecting FormData.
         // Include type=number as well as data-numeric text inputs used by the formatter.
@@ -211,6 +222,7 @@ async function saveFormOnce(options = {}) {
 
         // Create FormData from the form (now with raw numeric values)
         const formData = new FormData(form);
+        pruneEmptyWafRiskFields(formData);
         formData.set('action', 'save'); // Ensure action is set to save
         // Mark presave requests so the backend can avoid clearing untouched fields
         // when an empty input is submitted.
@@ -383,6 +395,9 @@ async function saveFormOnce(options = {}) {
         // Put free-text question inputs back to human-readable text now that
         // FormData has already captured the base64-wrapped snapshot.
         if (restoreFreeTextFields) restoreFreeTextFields();
+        // Remove the temporary matrix-field chunk inputs now that FormData
+        // has already captured them.
+        if (restoreChunkedMatrixFields) restoreChunkedMatrixFields();
 
         isSaving = false;
         if (buttonStateEnabled) updateSaveButtonState(false);

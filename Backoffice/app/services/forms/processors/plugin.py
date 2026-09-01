@@ -8,7 +8,7 @@ from app.models import db, FormItem
 from app.utils.plugin_data_processor import plugin_data_processor
 from app.services.forms.processors._common import (
     get_english_field_name,
-    decode_b64_matrix_json,
+    read_waf_protected_form_value,
     MatrixJsonDecodeError,
 )
 from app.services.monitoring.debug import debug_manager
@@ -39,7 +39,7 @@ class PluginProcessorMixin:
                 # Get the field value from request (client may base64-encode to avoid WAF blocks,
                 # same convention as matrix fields)
                 field_name = f'field_value[{plugin_field.id}]'
-                field_value = decode_b64_matrix_json(request.form.get(field_name, ''))
+                field_value = read_waf_protected_form_value(request.form, field_name)
 
                 cls._log_verbose(f"Processing plugin field {field_name}: {field_value}")
 

@@ -78,12 +78,59 @@ The production edge uses Azure Application Gateway WAF with OWASP-managed rules.
   - Triggered by HTML/script-like patterns in submitted values.
 - `REQUEST-942-*` (SQL injection detections)
   - Triggered by punctuation-heavy or SQL-like token patterns in text blobs.
-- `REQUEST-920-*` (protocol/enforcement anomalies)
-  - Triggered by unusual encoding, malformed inputs, or argument characteristics.
+- `REQUEST-920-*` (protocol/enforcement anomalies), specifically the
+  **per-argument size family** — distinct from whole-body size limits:
+  - `920360` "Argument name too long" (`tx.arg_name_length`, CRS example default `100`)
+  - `920370` "Argument value too long" (`tx.arg_length`, CRS example default `400`)
+  - `920380` "Too many arguments in request" (`tx.max_num_args`, CRS example default `255`)
+  - `920390` "Total arguments size exceeded" (`tx.total_arg_length`, CRS example default `64000`)
+  - Azure's managed OWASP ruleset does not expose these `tx.*` values for
+    customer configuration (per Microsoft docs, they're "managed internally
+    by the rule set logic") — the only customer-side lever is a per-rule
+    exclusion, not raising the limit. **This is a strong, evidence-backed
+    candidate** for the assignment-save 403s: a real production save payload
+    captured 2026-09-01 contained a single matrix `field_value[id]` argument
+    whose value (JSON-then-base64-encoded per the convention below) was
+    1384 bytes — a 34% inflation over the 1033-byte raw JSON, and well past
+    the CRS *example* `tx.arg_length` default of 400 (Azure's actual
+    configured value is not publicly documented, but even the un-encoded
+    1033-byte raw JSON would already exceed that example default). Large
+    matrix tables with many rows/columns are exactly the shape that produces
+    single arguments in the 1–2 KB+ range.
 - Size-enforcement / body-inspection limits
   - Large request bodies or many arguments can increase block probability.
 
 Important: do not hardcode behavior around specific IDs only. Build payloads to be rule-friendly by default.
+
+**Base64 encoding does not help against the `920360`/`920370`/`920380`/`920390`
+family — it actively hurts it.** Base64 inflates payload size by ~33% (3 bytes
+→ 4 chars). The `b64:` convention below was designed to dodge *signature*
+rules (`941`/`942`) by hiding recognizable JSON/HTML/SQL-like tokens; it does
+nothing for a *length* rule, and for large matrix/plugin fields it makes an
+argument-length block **more** likely, not less.
+
+**App-side mitigation shipped (2026-09-01): oversized-field chunking.**
+`app/static/js/forms/modules/matrix-field-chunking.js` splits any oversized
+matrix/plugin hidden input, and any other `b64:`-prefixed value over 350
+bytes (a conservative margin under the CRS *example* `tx.arg_length` default
+of 400), across sibling form fields (`name`, `name__c1`, `name__c2`, ...)
+immediately before submission (AJAX via `ajax-save.js`, native Submit via a
+`document`-level listener from `main.js`). That includes long narrative
+answers *after* they are base64-wrapped — encoding without chunking would
+make a length block *more* likely. `read_waf_protected_form_value()` in
+`app/services/forms/processors/_common.py` reassembles then decodes
+transparently (matrix, plugin, question, repeat-group, emergency metadata).
+Repeat-group parsing skips `__cN` sibling keys so they are not mistaken for
+new fields. Native encode/chunk listeners no-op when submit is already
+cancelled and restore on the next tick if a later handler `preventDefault`s,
+so a failed validation cannot leave base64 in the visible inputs.
+
+If a future incident's WAF logs still point at `920360`/`920370`/`920380`/
+`920390` after this ships (e.g. a plugin field, or a single matrix *row/cell*
+that is itself over the threshold even after chunking would help elsewhere),
+the fix is a scoped WAF exclusion for `argument: field_value[*]` on this path
+(see "IT/SecOps exclusion strategy" below) — expanding base64 coverage
+further will not fix a length-based block and may worsen it.
 
 ### App-side constraints to follow
 
@@ -139,10 +186,10 @@ inventing a third.
 
 | | Full-payload envelope (preferred) | Field-level `b64:` prefix |
 |---|---|---|
-| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`), and (since the 2026-08 assignment-403 incident) plain `text`/`textarea` question answers |
+| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`), `text`/`textarea` question answers (including repeat-group instances), emergency-operations select values, and `*_emergency_metadata` / `field_disagg_metadata[id]` JSON |
 | **Wire format** | Whole body becomes `{"payload": "<b64 of JSON.stringify(everything)>"}`, sent as `Content-Type: application/json` | Individual `field_value[id]` values become the string `"b64:<b64 of that field's JSON>"`; rest of the request stays `multipart/form-data`/form-urlencoded |
 | **Client helper** | `btoa(unescape(encodeURIComponent(JSON.stringify(inner))))` — see `form-submit-ui.js`, `manage-settings.js` (`wrapEmailTemplateApiJsonBody`) | `__serializeMatrixData()` in `app/static/js/forms/modules/matrix/formatting.js`; `encodeFreeTextQuestionFields()` / `installNativeSubmitTextEncoder()` in `app/static/js/forms/modules/question-text-waf-encode.js` for question text/textarea |
-| **Server helper** | `get_request_data()` in `app/utils/request_utils.py` — transparently unwraps `payload`/`payload_b64` into a `_JsonFormProxy` that mimics `request.form` | `decode_b64_matrix_json()` in `app/services/forms/processors/_common.py` (reused as-is for question text — it's a generic base64→UTF-8 decoder; the JSON-specific `json.loads()` happens only in matrix/plugin callers, not in `FormItemProcessor._process_question_data`) |
+| **Server helper** | `get_request_data()` in `app/utils/request_utils.py` — transparently unwraps `payload`/`payload_b64` into a `_JsonFormProxy` that mimics `request.form` | `get_possibly_chunked_form_value()` then `decode_b64_matrix_json()` in `app/services/forms/processors/_common.py` (reused as-is for question text — it's a generic base64→UTF-8 decoder; the JSON-specific `json.loads()` happens only in matrix/plugin callers, not in `FormItemProcessor._process_question_data`). Matrix values may also arrive split across `field_value[id]` / `__c1` / `__c2` — reassemble *before* decode. |
 | **Why not the same one everywhere** | Requires the route to read every field from one `data = get_request_data()` object instead of `request.form` directly | The assignment-save pipeline reads `request.form` directly in 50+ call sites across `data_service.py` and processor mixins (`indicator.py`, `plugin.py`, `repeat_group.py`, `document.py`), **and** the same request carries real file uploads (`request.files`, see `processors/document.py`) — switching the whole endpoint to a JSON body would break uploads and requires threading a proxy through every call site. The narrower per-field prefix avoids that refactor. |
 
 ### Trade-off note: extending `b64:` to free text (question `text`/`textarea`)
@@ -153,8 +200,8 @@ from the WAF's `REQUEST-941-*`/`REQUEST-942-*` signature inspection — the same
 trade-off already accepted for matrix/plugin fields, but now applied to
 free-form user content instead of JSON keys/values. This was a deliberate,
 scoped decision (only `text`/`textarea` **question** items, not indicators,
-choices, or repeat-group instances — see the "Known gap" comment at the top of
-`question-text-waf-encode.js`), made because:
+choices — repeat-group text/textarea, emergency-operations selects, and
+emergency metadata JSON are now covered too), made because:
 
 - The two 2026-08 `platform_403_forbidden` incidents (`/assignment/4100`,
   `/assignment/1610`) could not be traced to a specific WAF `ruleId` (no
@@ -166,9 +213,11 @@ choices, or repeat-group instances — see the "Known gap" comment at the top of
   matrix/plugin `b64:` convention already covers structured JSON, but plain
   `field_value[id]` text answers were read directly off `request.form` with
   no WAF-avoidance at all.
-- Repeat-group free-text question instances are **not** covered (see the gap
-  note in `question-text-waf-encode.js`) — their `field_value[id]` inputs get
-  renamed on JS clone before this can select them.
+- AJAX save now also **omits empty unused sex/age/sexage/indirect_reach
+  arguments** (and empty file parts) before `fetch`. Native submit already
+  name-strips empty demographics via `form-optimization.js`. A typical UPR
+  page drops ~300 arguments this way — argument-count / anomaly-score
+  `REQUEST-920-*` blocks are not fixable by base64 alone.
 
 If a false positive is later traced to a *specific* rule/argument via WAF
 logs, prefer the narrower "IT/SecOps exclusion strategy" below over expanding

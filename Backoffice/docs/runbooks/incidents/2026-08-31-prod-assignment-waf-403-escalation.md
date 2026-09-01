@@ -64,11 +64,14 @@ evidence.
    - **Trade-off, accepted deliberately:** this hides question free text
      from WAF signature inspection, same as matrix/plugin JSON already does.
      See the "Trade-off note" added to the main guide.
-   - **Known gap, not covered:** repeat-group instances (their
-     `field_value[id]` inputs get renamed to
-     `repeat_<sectionId>_<instance>_field_<fieldIndex>_<inputIndex>` on JS
-     clone before this selector can see them — see the comment at the top of
-     `question-text-waf-encode.js`).
+   - **Follow-up (2026-09-01):** the `b64:` wrap of `field_value[1414]` did
+     **not** clear production 403s on `/assignment/1703` (same AppGW block
+     after deploy). Remaining triggers were raw `*_emergency_metadata` JSON,
+     emergency-operations `Name (CODE)` select values, repeat-group free
+     text, ~300 empty sex/age arguments on the AJAX save path, **and** a
+     1384-byte b64-wrapped matrix `field_value[id]` that sits in the
+     `920370` "Argument value too long" range. Those are now wrapped,
+     omitted, or split across `__cN` chunks — see the main guide.
 
 3. **Also shipped: request-body telemetry on platform-error reports.** The
    client reporter's payload previously carried no information about *what*
@@ -87,11 +90,13 @@ evidence.
 Base64-wrapping is a tactical, app-side mitigation (see "Why not the same one
 everywhere" in the main guide) — it cannot fix a WAF **body-size** or
 **argument-count** limit (`REQUEST-920-*` family / `max_request_body_size_in_kb`
-policy setting), only content-signature false positives. If either
-occurrence above was actually a size/argument-count block rather than a
-signature false positive, only a WAF policy change (or a payload-size
-reduction refactor — see "Recommended Standard" in the main guide, not
-attempted in this change given its scope/risk) will fix it.
+policy setting), only content-signature false positives. **Per-argument
+length** (`920370`) is mitigated for oversized matrix/plugin hidden fields
+and any other `b64:`-wrapped value (narrative text, emergency metadata)
+via chunking (`matrix-field-chunking.js` + `read_waf_protected_form_value()`).
+If a recurrence is actually a whole-body size or argument-*count* block,
+only a WAF policy change (or a payload-size reduction refactor — see
+"Recommended Standard" in the main guide) will fix it.
 
 ### Escalation request — send to IT/SecOps (Azure Application Gateway WAF policy owner)
 

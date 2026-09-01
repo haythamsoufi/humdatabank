@@ -7,7 +7,12 @@ from typing import Dict, List
 from flask import request
 from app.models import db, FormData, FormItem
 from app.services.forms.processing_service import FormItemProcessor
-from app.services.forms.processors._common import get_english_field_name
+from app.services.forms.processors._common import (
+    MatrixJsonDecodeError,
+    decode_b64_matrix_json,
+    get_english_field_name,
+    get_possibly_chunked_form_value,
+)
 from app.services.monitoring.debug import debug_manager
 
 logger = debug_manager.get_logger(__name__)
@@ -278,13 +283,27 @@ class IndicatorProcessorMixin:
     def _get_emergency_metadata_from_request(cls, form_item_id=None, section_id=None, instance_number=None, field_index=None):
         metadata_raw = None
         if section_id is not None and instance_number is not None and field_index is not None:
-            metadata_raw = request.form.get(
-                f'repeat_{section_id}_{instance_number}_field_{field_index}_emergency_metadata'
+            metadata_raw = get_possibly_chunked_form_value(
+                request.form,
+                f'repeat_{section_id}_{instance_number}_field_{field_index}_emergency_metadata',
+                default=None,
             )
         elif form_item_id is not None:
-            metadata_raw = request.form.get(f'field_disagg_metadata[{form_item_id}]')
+            metadata_raw = get_possibly_chunked_form_value(
+                request.form,
+                f'field_disagg_metadata[{form_item_id}]',
+                default=None,
+            )
 
         if not metadata_raw or not str(metadata_raw).strip():
+            return None
+
+        try:
+            metadata_raw = decode_b64_matrix_json(str(metadata_raw).strip())
+        except MatrixJsonDecodeError:
+            logger.error(
+                "Emergency metadata could not be base64-decoded; falling back to display value"
+            )
             return None
 
         try:

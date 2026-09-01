@@ -139,7 +139,7 @@ jobs:
           fi
           python scripts/ci/select_pytest_targets.py --base-ref "$BASE" --github-output
 
-  # ── pytest (changed files only; "fast" fallback for shared infra) ───────────
+  # ── pytest (changed files only — no full-suite fallback) ───────────────────
   tests:
     name: pytest
     needs: select_tests
@@ -202,11 +202,12 @@ jobs:
         run: |
           echo "mode=${{ needs.select_tests.outputs.mode }}"
           echo "reason=${{ needs.select_tests.outputs.reason }}"
-          if [ "${{ needs.select_tests.outputs.mode }}" = "fast" ]; then
-            pytest -m "not slow" --no-cov -n auto
-          else
-            pytest --no-cov -n auto ${{ needs.select_tests.outputs.targets }}
+          echo "targets=${{ needs.select_tests.outputs.targets }}"
+          if [ -z "${{ needs.select_tests.outputs.targets }}" ]; then
+            echo "No pytest targets — refusing to run the full suite"
+            exit 0
           fi
+          pytest --no-cov -n auto ${{ needs.select_tests.outputs.targets }}
 
       - name: Upload test results
         uses: actions/upload-artifact@v6

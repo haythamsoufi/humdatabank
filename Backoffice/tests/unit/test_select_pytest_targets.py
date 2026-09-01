@@ -33,26 +33,27 @@ class TestPlanPytestRun:
         )
         assert plan.mode == "skip"
 
-    def test_conftest_falls_back_to_fast(self):
+    def test_conftest_alone_does_not_run_the_suite(self):
         plan = plan_pytest_run(["Backoffice/tests/conftest.py"], BACKOFFICE_ROOT)
-        assert plan.mode == "fast"
-        assert plan.needs_render_libs is True
-        assert "conftest.py" in plan.reason
+        assert plan.mode == "skip"
+        assert plan.targets == ()
 
-    def test_workflow_falls_back_to_fast(self):
+    def test_workflow_maps_to_selector_tests_only(self):
         plan = plan_pytest_run([WORKFLOW_PATH], BACKOFFICE_ROOT)
-        assert plan.mode == "fast"
+        assert plan.mode == "selected"
+        assert plan.targets == ("tests/unit/test_select_pytest_targets.py",)
+        assert plan.needs_render_libs is False
 
-    def test_requirements_falls_back_to_fast(self):
+    def test_requirements_alone_skips(self):
         plan = plan_pytest_run(["Backoffice/requirements.txt"], BACKOFFICE_ROOT)
-        assert plan.mode == "fast"
+        assert plan.mode == "skip"
 
-    def test_migrations_fall_back_to_fast(self):
+    def test_migrations_alone_do_not_run_the_suite(self):
         plan = plan_pytest_run(
             ["Backoffice/migrations/versions/abc123_example.py"],
             BACKOFFICE_ROOT,
         )
-        assert plan.mode == "fast"
+        assert plan.mode == "skip"
 
     def test_changed_test_file_is_selected(self):
         rel = "tests/unit/test_select_pytest_targets.py"

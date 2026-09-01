@@ -3,10 +3,10 @@
 
 Modes
 -----
-skip      No Python / test-infra change (CSS, templates, docs, …).
-selected  Run only test files that match the changed paths.
-fast      Shared fixtures, deps, app factory, migrations, or the CI workflow
-          itself changed — run ``pytest -m "not slow"`` (not the 6-hour suite).
+skip      No matching tests (CSS, templates, docs, or unmapped Python).
+selected  Run only the test files that match the changed paths.
+
+There is no full-suite / ``not slow`` fallback — that still takes too long.
 
 Usage (from repo root or Backoffice/):
     python Backoffice/scripts/ci/select_pytest_targets.py --base-ref "$BASE"
@@ -27,19 +27,7 @@ BACKOFFICE_ROOT = SCRIPT_PATH.parents[2]
 REPO_ROOT = BACKOFFICE_ROOT.parent
 
 WORKFLOW_PATH = ".github/workflows/backoffice-ci.yml"
-
-BLAST_RADIUS = frozenset(
-    {
-        "pytest.ini",
-        "requirements.txt",
-        "requirements-dev.txt",
-        "app/__init__.py",
-        "app/extensions.py",
-        "app/config.py",
-        "config.py",
-        "tests/conftest.py",
-    }
-)
+SELECTOR_TEST = "tests/unit/test_select_pytest_targets.py"
 
 IGNORE_SUFFIXES = frozenset(
     {
@@ -77,15 +65,6 @@ IGNORE_SUFFIXES = frozenset(
         ".xlsx",
         ".xls",
         ".csv",
-    }
-)
-
-# These stay blast-radius even though the suffix is otherwise ignored.
-KEEP_DESPITE_SUFFIX = frozenset(
-    {
-        "pytest.ini",
-        "requirements.txt",
-        "requirements-dev.txt",
     }
 )
 
@@ -127,20 +106,6 @@ def to_backoffice_rel(raw: str) -> str | None:
     return None
 
 
-def is_blast_radius(rel: str) -> bool:
-    if rel == WORKFLOW_PATH:
-        return True
-    if rel in BLAST_RADIUS or rel in KEEP_DESPITE_SUFFIX:
-        return True
-    if rel.startswith("migrations/"):
-        return True
-    if rel.endswith("/conftest.py") and (
-        rel.startswith("tests/") or "/tests/" in rel
-    ):
-        return True
-    return False
-
-
 def is_pytest_file(rel: str) -> bool:
     name = Path(rel).name
     if not name.endswith(".py"):
@@ -149,11 +114,9 @@ def is_pytest_file(rel: str) -> bool:
 
 
 def is_ignorable(rel: str) -> bool:
-    if is_blast_radius(rel) or is_pytest_file(rel):
+    if rel == WORKFLOW_PATH or is_pytest_file(rel):
         return False
     suffix = Path(rel).suffix.lower()
-    if rel in KEEP_DESPITE_SUFFIX:
-        return False
     if suffix in IGNORE_SUFFIXES:
         return True
     # Static / template trees never have a pytest counterpart worth running.
@@ -222,8 +185,10 @@ def _plugin_targets(rel: str, root: Path, test_files: list[Path]) -> set[str]:
 
 
 def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
-    if not rel or rel == WORKFLOW_PATH:
+    if not rel:
         return set()
+    if rel == WORKFLOW_PATH or rel == "scripts/ci/select_pytest_targets.py":
+        return {SELECTOR_TEST} if (root / SELECTOR_TEST).is_file() else set()
     full = root / rel
     if is_pytest_file(rel):
         return {_posix(rel)} if full.is_file() else set()
@@ -235,7 +200,7 @@ def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
         if path.name in names
     }
     hits.update(_plugin_targets(rel, root, test_files))
-    if rel.startswith("scripts/"):
+    if rel.startswith("scripts/") and not rel.startswith("scripts/ci/"):
         layout = root / "tests" / "unit" / "test_scripts_layout.py"
         if layout.is_file():
             hits.add("tests/unit/test_scripts_layout.py")
@@ -243,7 +208,7 @@ def map_changed_file(rel: str, root: Path, test_files: list[Path]) -> set[str]:
 
 
 def plan_pytest_run(changed_paths: list[str], root: Path | None = None) -> PytestPlan:
-    """Decide skip / selected / fast from repo-relative changed paths."""
+    """Decide skip vs selected from repo-relative changed paths."""
     root = root or BACKOFFICE_ROOT
     rels: list[str] = []
     for raw in changed_paths:
@@ -253,15 +218,6 @@ def plan_pytest_run(changed_paths: list[str], root: Path | None = None) -> Pytes
 
     if not rels:
         return PytestPlan("skip", (), "No Backoffice files in the diff", False)
-
-    blast = [rel for rel in rels if is_blast_radius(rel)]
-    if blast:
-        return PytestPlan(
-            "fast",
-            (),
-            "Shared test/app infra changed: " + ", ".join(blast[:8]),
-            True,
-        )
 
     actionable = [rel for rel in rels if not is_ignorable(rel)]
     if not actionable:
@@ -354,10 +310,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.base_ref and empty_base:
         plan = PytestPlan(
-            "fast",
+            "skip",
             (),
-            "No base SHA available — running fast suite",
-            True,
+            "No base SHA available — skipping pytest rather than the full suite",
+            False,
         )
     else:
         try:

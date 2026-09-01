@@ -16,6 +16,7 @@ import { initDisaggregationCalculator } from './modules/disaggregation-calculato
 import { initializeFormValidation } from './modules/form-validation.js';
 import { initAjaxSave, triggerSave, isSavingForm } from './modules/ajax-save.js';
 import { installNativeSubmitTextEncoder } from './modules/question-text-waf-encode.js';
+import { installNativeSubmitMatrixChunker } from './modules/matrix-field-chunking.js';
 import { initSessionKeepalive } from './modules/session-keepalive.js';
 import { initPublicDrafts } from './modules/public-drafts.js';
 import { initAuthDrafts, prepareAuthDraftsStore } from './modules/auth-drafts.js';
@@ -215,6 +216,11 @@ async function initializeEntryForm() {
         // (non-AJAX) final "Submit" path — the AJAX autosave path is covered
         // inside ajax-save.js itself. See question-text-waf-encode.js.
         safeInit('installNativeSubmitTextEncoder', () => installNativeSubmitTextEncoder());
+
+        // Split oversized matrix field_value[id] blobs on the same native
+        // Submit path so an argument-length WAF rule cannot fire. AJAX path
+        // is covered inside ajax-save.js. See matrix-field-chunking.js.
+        safeInit('installNativeSubmitMatrixChunker', () => installNativeSubmitMatrixChunker());
 
         // Keep session alive while the user is actively filling the form.
         // The keepalive fires every 60 min (well within the 2-hour inactivity

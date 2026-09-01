@@ -46,6 +46,96 @@ class TestDecodeB64MatrixJson:
             decode_b64_matrix_json('b64:not-valid-base64!!!')
 
 
+class TestGetPossiblyChunkedFormValue:
+    """WAF workaround: matrix-field-chunking.js may split a large field_value[id]
+    across field_value[id]/__c1/__c2/... to dodge a WAF argument-length rule
+    (e.g. OWASP CRS 920370 "Argument value too long") — base64 (above) helps
+    against signature rules but *inflates* size, making a length rule more
+    likely for large tables, not less. See "Azure App Gateway WAF Rules the
+    App Should Respect" in waf-403-form-payload-refactor-guide.md.
+    """
+
+    def test_missing_field_returns_default(self):
+        from app.services.forms.processors._common import get_possibly_chunked_form_value
+        assert get_possibly_chunked_form_value({}, 'field_value[1]') == ''
+        assert get_possibly_chunked_form_value({}, 'field_value[1]', default='fallback') == 'fallback'
+
+    def test_unchunked_value_returned_unchanged(self):
+        """No __c1 present: behaves exactly like form.get(field_name) always did."""
+        from app.services.forms.processors._common import get_possibly_chunked_form_value
+        form = {'field_value[1]': 'b64:aGVsbG8='}
+        assert get_possibly_chunked_form_value(form, 'field_value[1]') == 'b64:aGVsbG8='
+
+    def test_chunks_are_reassembled_in_order(self):
+        from app.services.forms.processors._common import get_possibly_chunked_form_value
+        form = {
+            'field_value[1]': 'b64:AAAA',
+            'field_value[1]__c1': 'BBBB',
+            'field_value[1]__c2': 'CCCC',
+        }
+        assert get_possibly_chunked_form_value(form, 'field_value[1]') == 'b64:AAAABBBBCCCC'
+
+    def test_stops_at_first_missing_chunk_index(self):
+        """A gap (e.g. __c1 present, __c2 absent, __c3 present) must not be
+        bridged — reassembly stops at the first missing index, matching how
+        the client only ever emits a contiguous 1..N sequence."""
+        from app.services.forms.processors._common import get_possibly_chunked_form_value
+        form = {
+            'field_value[1]': 'b64:AAAA',
+            'field_value[1]__c1': 'BBBB',
+            'field_value[1]__c3': 'DDDD',  # __c2 missing — must be ignored
+        }
+        assert get_possibly_chunked_form_value(form, 'field_value[1]') == 'b64:AAAABBBB'
+
+    def test_does_not_touch_a_different_fields_chunks(self):
+        from app.services.forms.processors._common import get_possibly_chunked_form_value
+        form = {
+            'field_value[1]': 'b64:AAAA',
+            'field_value[2]__c1': 'unrelated',
+        }
+        assert get_possibly_chunked_form_value(form, 'field_value[1]') == 'b64:AAAA'
+
+    def test_integrates_with_decode_b64_matrix_json(self):
+        """End-to-end: chunk, reassemble, decode — matches what
+        FormDataService._process_matrix_data does."""
+        from app.services.forms.processors._common import (
+            get_possibly_chunked_form_value,
+            decode_b64_matrix_json,
+        )
+        original = '{"1_col": 5, "2_col": 9}'
+        full_b64 = 'b64:' + base64.b64encode(original.encode('utf-8')).decode('ascii')
+        midpoint = len(full_b64) // 2
+        form = {
+            'field_value[1]': full_b64[:midpoint],
+            'field_value[1]__c1': full_b64[midpoint:],
+        }
+        reassembled = get_possibly_chunked_form_value(form, 'field_value[1]')
+        assert decode_b64_matrix_json(reassembled) == original
+
+    def test_is_waf_chunk_field_name(self):
+        from app.services.forms.processors._common import is_waf_chunk_field_name
+        assert is_waf_chunk_field_name('field_value[1]__c1') is True
+        assert is_waf_chunk_field_name('repeat_415_1_field_0_0__c12') is True
+        assert is_waf_chunk_field_name('field_value[1]') is False
+        assert is_waf_chunk_field_name('csrf_token') is False
+        assert is_waf_chunk_field_name('field_value[1]__clear') is False
+
+    def test_read_waf_protected_form_value_reassembles_and_decodes(self):
+        from app.services.forms.processors._common import read_waf_protected_form_value
+        original = '{"1_col": 5}'
+        full_b64 = 'b64:' + base64.b64encode(original.encode('utf-8')).decode('ascii')
+        midpoint = len(full_b64) // 2
+        form = {
+            'field_value[1]': full_b64[:midpoint],
+            'field_value[1]__c1': full_b64[midpoint:],
+        }
+        assert read_waf_protected_form_value(form, 'field_value[1]') == original
+
+    def test_read_waf_protected_missing_returns_default_none(self):
+        from app.services.forms.processors._common import read_waf_protected_form_value
+        assert read_waf_protected_form_value({}, 'field_value[1]', default=None) is None
+
+
 class TestProcessorMixinDelegation:
     """Verify FormDataService delegates to processor mixins via MRO."""
 

@@ -19,6 +19,8 @@ from app.services.forms.processing_service import (
 from app.services.forms.processors._common import (
     get_english_field_name,
     decode_b64_matrix_json,
+    get_possibly_chunked_form_value,
+    is_waf_chunk_field_name,
     MatrixJsonDecodeError,
 )
 from app.services.monitoring.debug import debug_manager, performance_monitor
@@ -73,6 +75,12 @@ class RepeatGroupProcessorMixin:
 
         for field_name in request.form.keys():
             if field_name.startswith(f'repeat_{section.id}_') and field_name not in processed_fields:
+                if is_waf_chunk_field_name(field_name):
+                    # Sibling chunks (name__c1, __c2, ...) are reassembled onto
+                    # the base field below — do not parse them as their own keys
+                    # (split('_') would turn field_0_0__c1 into a phantom suffix).
+                    processed_fields.add(field_name)
+                    continue
                 parts = field_name.split('_')
                 if len(parts) >= 4 and parts[3] == 'field':
                     section_id = int(parts[1])
@@ -83,6 +91,12 @@ class RepeatGroupProcessorMixin:
 
                         # Get all values for this field name (handles both single and multi-choice)
                         field_values = request.form.getlist(field_name)
+                        # Single-value fields may be split across __cN for WAF
+                        # argument-length limits. Multi-choice uses getlist as-is
+                        # (those values are short and never chunked).
+                        if len(field_values) <= 1:
+                            assembled = get_possibly_chunked_form_value(request.form, field_name)
+                            field_values = [assembled] if assembled is not None else []
 
                         if len(parts) >= 6:
                             input_index = '_'.join(parts[5:])
@@ -476,18 +490,27 @@ class RepeatGroupProcessorMixin:
         data_not_available = field_values.get(f'field_{field_index}_data_not_available') == '1'
         not_applicable = field_values.get(f'field_{field_index}_not_applicable') == '1'
 
-        # Handle different field types
-        if field.is_indicator:
-            final_value_to_store = cls._process_repeat_indicator_data_comprehensive(field, field_values, field_index)
-        elif field.is_question:
-            final_value_to_store = cls._process_repeat_question_data_comprehensive(field, field_values, field_index)
-        elif field.is_document_field:
-            final_value_to_store = cls._process_repeat_document_data_comprehensive(field, field_values, field_index)
-        elif field.item_type == 'matrix':
-            final_value_to_store = cls._process_repeat_matrix_data_comprehensive(field, field_values, field_index)
-        else:
-            # Unknown field type - try to find any value
-            final_value_to_store = None
+        try:
+            # Handle different field types
+            if field.is_indicator:
+                final_value_to_store = cls._process_repeat_indicator_data_comprehensive(field, field_values, field_index)
+            elif field.is_question:
+                final_value_to_store = cls._process_repeat_question_data_comprehensive(field, field_values, field_index)
+            elif field.is_document_field:
+                final_value_to_store = cls._process_repeat_document_data_comprehensive(field, field_values, field_index)
+            elif field.item_type == 'matrix':
+                final_value_to_store = cls._process_repeat_matrix_data_comprehensive(field, field_values, field_index)
+            else:
+                # Unknown field type - try to find any value
+                final_value_to_store = None
+        except MatrixJsonDecodeError:
+            logger.error(
+                "Repeat field %s (index %s) submitted a b64: value that could not be decoded; "
+                "leaving existing data untouched",
+                getattr(field, 'id', None),
+                field_index,
+            )
+            return None, False, False, False
 
         # Determine if we have meaningful data
         has_meaningful_data = unified_should_create(final_value_to_store, data_not_available, not_applicable)
@@ -578,6 +601,11 @@ class RepeatGroupProcessorMixin:
         """Process question value based on its type"""
         if isinstance(raw_value, str) and raw_value.strip() == '':
             return None
+
+        if isinstance(raw_value, str) and raw_value.startswith('b64:'):
+            raw_value = decode_b64_matrix_json(raw_value)
+            if isinstance(raw_value, str) and raw_value.strip() == '':
+                return None
 
         if question_type == 'number':
             return cls._process_numeric_value(raw_value, field)

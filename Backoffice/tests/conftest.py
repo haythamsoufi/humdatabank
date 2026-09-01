@@ -79,6 +79,36 @@ def _disengage_db_connections():
             action()
 
 
+def _terminate_stale_backends():
+    """Force-close leaked ``idle in transaction`` sessions on our own database.
+
+    Each pytest-xdist worker owns its own isolated test database (see the
+    per-worker DB isolation in ``pytest_configure`` below), so a session
+    sitting ``idle in transaction`` against it is never legitimate
+    concurrent work — it's a previous test's connection that leaked
+    without a rollback/close (e.g. an exception between a raw
+    ``db.session.delete(...)``/cascade DELETE and the commit that never
+    ran). Left alone, the locks it holds make the ``DROP TABLE ... CASCADE``
+    in ``_nuclear_drop_postgres_schema`` below block forever: this is what
+    hung a real CI ``pytest`` job for 6+ hours until GitHub's job timeout
+    force-cancelled it (2026-08-31 CI incident) instead of failing fast.
+    Only targets stuck transactions (``idle in transaction`` for 5+
+    seconds), never active connections — e.g. the AUTOCOMMIT advisory-lock
+    connection from ``_acquire_test_db_lock`` shows as plain ``idle``, not
+    ``idle in transaction``, so it is left alone.
+    """
+    if db.engine.dialect.name != "postgresql":
+        return
+    with suppress(Exception):
+        with db.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+                "AND state IN ('idle in transaction', 'idle in transaction (aborted)') "
+                "AND state_change < now() - interval '5 seconds'"
+            ))
+
+
 def _drop_legacy_test_artifacts():
     """Drop objects that sometimes survive generic schema cleanup."""
     for _ in range(3):
@@ -101,8 +131,14 @@ def _nuclear_drop_postgres_schema():
     last_error = None
     for _ in range(2):
         _disengage_db_connections()
+        _terminate_stale_backends()
         try:
             with db.engine.begin() as conn:
+                # Defense in depth: even if a leaked session somehow survives
+                # _terminate_stale_backends() above, fail fast instead of
+                # blocking indefinitely on a lock the DROP CASCADE needs.
+                conn.execute(text("SET LOCAL lock_timeout = '15s'"))
+                conn.execute(text("SET LOCAL statement_timeout = '60s'"))
                 conn.execute(_PG_NUCLEAR_DROP_SQL)
             return
         except Exception as exc:
@@ -160,6 +196,7 @@ def _acquire_test_db_lock(engine):
     got = conn.execute(text(f"SELECT pg_try_advisory_lock({_TEST_DB_LOCK_KEY})")).scalar()
     if not got:
         import sys
+        import time as _time_mod
         print(
             "\nWARNING: waiting for exclusive test-DB lock "
             "(another pytest process is using the same TEST_DATABASE_URL).\n"
@@ -168,7 +205,28 @@ def _acquire_test_db_lock(engine):
             file=sys.stderr,
             flush=True,
         )
-        conn.execute(text(f"SELECT pg_advisory_lock({_TEST_DB_LOCK_KEY})"))
+        # Bounded poll instead of an unconditional, unbounded pg_advisory_lock()
+        # wait: a leaked lock-holder (crashed/killed previous test run against
+        # this same per-worker-isolated database) would otherwise stall this
+        # worker — and eventually the whole CI job — forever (see 2026-08-31 CI
+        # incident: a 6h+ pytest job hang GitHub's job timeout had to
+        # force-cancel instead of it failing fast).
+        deadline = _time_mod.monotonic() + 120
+        while _time_mod.monotonic() < deadline:
+            got = conn.execute(text(f"SELECT pg_try_advisory_lock({_TEST_DB_LOCK_KEY})")).scalar()
+            if got:
+                break
+            _time_mod.sleep(1)
+        if not got:
+            # After 2 minutes, treat the holder as leaked rather than
+            # legitimate concurrent work and reclaim the database instead of
+            # blocking indefinitely.
+            with suppress(Exception):
+                conn.execute(text(
+                    "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND pid <> pg_backend_pid()"
+                ))
+            conn.execute(text(f"SELECT pg_advisory_lock({_TEST_DB_LOCK_KEY})"))
     return conn, lock_engine
 
 
@@ -196,6 +254,13 @@ def _reset_test_schema(app):
 
 def _run_test_schema_reset():
     """Schema drop/create body (caller holds pg advisory lock when on PostgreSQL)."""
+    # Clear leaked idle-in-transaction lock-holders *before* the plain
+    # metadata.drop_all()/db.drop_all() below — neither sets a lock_timeout,
+    # so without this they can block on the same locks a leaked transaction
+    # is holding for as long as that leaked connection stays open (this is
+    # what actually stalled a real CI pytest job for 6h+ until GitHub's job
+    # timeout force-cancelled it — see 2026-08-31 CI incident notes).
+    _terminate_stale_backends()
     with suppress(Exception):
         db.metadata.drop_all(bind=db.engine, checkfirst=True)
     with suppress(Exception):

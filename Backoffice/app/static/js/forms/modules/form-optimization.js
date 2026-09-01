@@ -128,6 +128,19 @@ function optimizeFormSubmission(form) {
         }
     });
 
+    const emptyFiles = form.querySelectorAll('input[type="file"]');
+    emptyFiles.forEach((input) => {
+        const empty = !input.files || input.files.length === 0
+            || (input.files.length === 1 && !input.files[0].name && input.files[0].size === 0);
+        if (input.name && empty) {
+            const originalName = input.name;
+            markRemovedName(input, originalName);
+            input.removeAttribute('name');
+            removedCount++;
+            debugLog('form-optimization', `Removed empty file field: ${originalName}`);
+        }
+    });
+
     // Remove unchecked checkboxes (except for required ones)
     const checkboxes = form.querySelectorAll('input[type="checkbox"]:not(:checked)');
     checkboxes.forEach(checkbox => {

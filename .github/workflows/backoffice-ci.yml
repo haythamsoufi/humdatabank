@@ -3,7 +3,8 @@
 # (a direct push skips PR review, so this is the only safety net catching regressions
 # for that path — see the 2026-08-07 incident where a same-day push straight to main
 # shipped an UnboundLocalError that an existing test would have caught).
-# Three parallel jobs: fast code guards, Bandit static analysis, pytest suite.
+# Jobs: fast code guards, Bandit, a cheap pytest-target selector, then pytest
+# only for files in the diff (full suite was timing out at GitHub's 6h cap).
 
 name: Backoffice CI
 
@@ -108,10 +109,43 @@ jobs:
           # shellcheck disable=SC2086
           bandit $CFG -r Backoffice/app -ll --exit-zero
 
-  # ── pytest suite ────────────────────────────────────────────────────────────
+  # ── Map the diff to pytest paths (no Postgres, no pip) ──────────────────────
+  select_tests:
+    name: Select pytest targets
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.select.outputs.skip }}
+      mode: ${{ steps.select.outputs.mode }}
+      targets: ${{ steps.select.outputs.targets }}
+      needs_render_libs: ${{ steps.select.outputs.needs_render_libs }}
+      reason: ${{ steps.select.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Select pytest targets
+        id: select
+        working-directory: Backoffice
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          python scripts/ci/select_pytest_targets.py --base-ref "$BASE" --github-output
+
+  # ── pytest (changed files only; "fast" fallback for shared infra) ───────────
   tests:
     name: pytest
+    needs: select_tests
+    if: needs.select_tests.outputs.skip != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -131,6 +165,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -145,6 +181,7 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Install P&B render system libraries
+        if: needs.select_tests.outputs.needs_render_libs == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -162,18 +199,20 @@ jobs:
           FLASK_CONFIG: testing
           SECRET_KEY: test-secret-key-for-ci
           WTF_CSRF_ENABLED: 'false'
-        run: >-
-          pytest -n auto
-          --cov=app
-          --cov-report=xml:coverage.xml
-          --cov-report=term-missing
+        run: |
+          echo "mode=${{ needs.select_tests.outputs.mode }}"
+          echo "reason=${{ needs.select_tests.outputs.reason }}"
+          if [ "${{ needs.select_tests.outputs.mode }}" = "fast" ]; then
+            pytest -m "not slow" --no-cov -n auto
+          else
+            pytest --no-cov -n auto ${{ needs.select_tests.outputs.targets }}
+          fi
 
-      - name: Upload test results and coverage
+      - name: Upload test results
         uses: actions/upload-artifact@v6
         if: always()
         with:
           name: test-results
-          path: |
-            Backoffice/coverage.xml
-            Backoffice/test_results.xml
+          path: Backoffice/test_results.xml
           retention-days: 14
+          if-no-files-found: ignore

@@ -204,10 +204,13 @@ Partial local runs should use `--cov-append` so `htmlcov/` reflects cumulative c
 
 ## Continuous Integration
 
-CI runs the full suite with parallelism and coverage (see `.github/workflows/backoffice-ci.yml`):
+CI maps the PR/push diff to test files (see `.github/workflows/backoffice-ci.yml`).
+Typical PRs run only the matching tests, without coverage. Shared infra changes
+(`tests/conftest.py`, `requirements*.txt`, `app/__init__.py`, migrations, or
+the workflow itself) fall back to the fast suite:
 
-```yaml
-pytest -n auto --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing
+```bash
+pytest -m "not slow" --no-cov -n auto
 ```
 
 ## Migration from Old Tests

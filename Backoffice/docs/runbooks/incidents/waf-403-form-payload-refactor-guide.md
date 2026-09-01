@@ -107,11 +107,35 @@ family — it actively hurts it.** Base64 inflates payload size by ~33% (3 bytes
 → 4 chars). The `b64:` convention below was designed to dodge *signature*
 rules (`941`/`942`) by hiding recognizable JSON/HTML/SQL-like tokens; it does
 nothing for a *length* rule, and for large matrix/plugin fields it makes an
-argument-length block **more** likely, not less. If a future incident's WAF
-logs point at `920360`/`920370`/`920380`/`920390` specifically (rather than
-`941`/`942`), the fix is a scoped WAF exclusion for `argument: field_value[*]`
-on this path (see "IT/SecOps exclusion strategy" below) — expanding base64
-coverage further will not fix a length-based block and may worsen it.
+argument-length block **more** likely, not less.
+
+**App-side mitigation shipped (2026-09-01): matrix field chunking.**
+`app/static/js/forms/modules/matrix-field-chunking.js` splits any matrix
+`field_value[id]` value over 350 bytes (a conservative margin under the CRS
+*example* `tx.arg_length` default of 400) across sibling form fields
+(`field_value[id]`, `field_value[id]__c1`, `field_value[id]__c2`, ...)
+immediately before submission (both the AJAX autosave path via
+`ajax-save.js` and the native "Submit" path via a `document`-level `submit`
+listener installed from `main.js`, mirroring `question-text-waf-encode.js`).
+`get_possibly_chunked_form_value()` in
+`app/services/forms/processors/_common.py` reassembles them transparently
+server-side before the existing `decode_b64_matrix_json()` call — see its
+docstring for the full reassembly contract. This directly neutralizes an
+argument-*length* rule regardless of how large the underlying table is,
+without needing to know Azure's actual (undisclosed) configured threshold —
+unlike a WAF exclusion, it requires no infra-side change and ships
+immediately. **Known gap:** only matrix fields are chunked so far; plugin
+fields use the same `b64:`/`decode_b64_matrix_json()` convention but are not
+yet chunked (extend `matrix-field-chunking.js`'s selector and the
+`processors/plugin.py` call site the same way if a plugin field is later
+implicated).
+
+If a future incident's WAF logs still point at `920360`/`920370`/`920380`/
+`920390` after this ships (e.g. a plugin field, or a single matrix *row/cell*
+that is itself over the threshold even after chunking would help elsewhere),
+the fix is a scoped WAF exclusion for `argument: field_value[*]` on this path
+(see "IT/SecOps exclusion strategy" below) — expanding base64 coverage
+further will not fix a length-based block and may worsen it.
 
 ### App-side constraints to follow
 

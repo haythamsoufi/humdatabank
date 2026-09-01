@@ -1501,6 +1501,50 @@ class TestProcessMatrixDataB64Safety:
         assert validation_errors == []
         assert existing_entry.disagg_data == {"1_col": 7}
 
+    def test_chunked_b64_payload_is_reassembled_and_decoded(self, app):
+        """Large matrix values may be split client-side (matrix-field-chunking.js)
+        across field_value[id]/__c1/__c2/... to dodge a WAF argument-length rule
+        (e.g. OWASP CRS 920370) — see get_possibly_chunked_form_value(). The
+        server must reassemble and decode them exactly as if unchunked."""
+        from app.services.forms.data_service import FormDataService
+
+        matrix = self._make_matrix()
+        aes = _make_mock_oes()
+        existing_entry = _make_form_data_entry(disagg_data=None)
+
+        full_payload = self._b64('{"1_col": 5, "2_col": 9}')
+        # Split arbitrarily mid-string, the way the client would at a fixed
+        # byte threshold — reassembly must not depend on any alignment.
+        split_at = len(full_payload) // 3
+        chunk0, chunk1, chunk2 = (
+            full_payload[:split_at],
+            full_payload[split_at:2 * split_at],
+            full_payload[2 * split_at:],
+        )
+
+        with app.test_request_context(
+            '/test', method='POST',
+            data={
+                f'field_value[{matrix.id}]': chunk0,
+                f'field_value[{matrix.id}]__c1': chunk1,
+                f'field_value[{matrix.id}]__c2': chunk2,
+            },
+        ):
+            with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
+                 patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
+                 patch("app.models.db.session.add"):
+                mock_query = MagicMock()
+                mock_query.filter_by.return_value.first.return_value = existing_entry
+                mock_model.return_value.query = mock_query
+                mock_filter.return_value = {}
+
+                validation_errors = []
+                changes = FormDataService._process_matrix_data(matrix, aes, validation_errors)
+
+        assert validation_errors == []
+        assert existing_entry.disagg_data == {"1_col": 5, "2_col": 9}
+        assert len(changes) == 1
+
     def test_corrupted_b64_payload_preserves_existing_data_and_reports_error(self, app):
         """The core safety guarantee: a decode failure must NOT wipe existing data."""
         from app.services.forms.data_service import FormDataService

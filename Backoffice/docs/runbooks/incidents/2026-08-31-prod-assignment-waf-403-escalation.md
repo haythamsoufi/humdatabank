@@ -116,6 +116,17 @@ exclusion** (`argument: field_value[*]` on this path), not more base64
 coverage — this is now reflected in items 1–2 of the escalation request
 below.
 
+**App-side mitigation shipped same day:** matrix fields are now chunked into
+multiple sub-350-byte arguments before submission (`matrix-field-chunking.js`
++ `get_possibly_chunked_form_value()`) — see "Azure App Gateway WAF Rules the
+App Should Respect" in
+[`waf-403-form-payload-refactor-guide.md`](./waf-403-form-payload-refactor-guide.md)
+for the full mechanism. This directly neutralizes a per-argument length rule
+for matrix fields without waiting on infra, but doesn't cover plugin fields
+yet and doesn't help if the real threshold is size-based at the *total body*
+level instead — the escalation below is still worth sending to confirm which
+rule actually fired and close any remaining gap.
+
 ### Escalation request — send to IT/SecOps (Azure Application Gateway WAF policy owner)
 
 > **Subject:** WAF false-positive / body-limit review — assignment entry-form autosave (`/assignment/<id>?ajax=1`)

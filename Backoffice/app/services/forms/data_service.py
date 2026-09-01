@@ -53,6 +53,7 @@ logger = debug_manager.get_logger(__name__)
 from app.services.forms.processors._common import (  # noqa: F401 re-export
     get_english_field_name,
     decode_b64_matrix_json,
+    get_possibly_chunked_form_value,
     MatrixJsonDecodeError,
 )
 
@@ -1544,9 +1545,12 @@ class FormDataService(
         field_changes = []
 
         try:
-            # Get matrix data from form (client may base64-encode to avoid WAF blocks)
+            # Get matrix data from form (client may base64-encode to avoid WAF
+            # blocks, and may additionally split large values across
+            # field_name/field_name__c1/__c2/... to avoid a WAF argument-length
+            # limit — see get_possibly_chunked_form_value's docstring).
             field_name = f'field_value[{matrix.id}]'
-            matrix_data_json = decode_b64_matrix_json(request.form.get(field_name, ''))
+            matrix_data_json = decode_b64_matrix_json(get_possibly_chunked_form_value(request.form, field_name))
 
             # Get data availability flags
             data_not_available = request.form.get(f'matrix_{matrix.id}_data_not_available') == '1'

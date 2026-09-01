@@ -260,6 +260,46 @@ describe('question-text-waf-encode', () => {
     expect(select.value).toBe(display);
   });
 
+  it('finds "Other" selects and their other-text-input companion, even without a lookup list', () => {
+    const form = buildForm(`
+      <div class="form-item-block" data-item-type="question" data-question-type="single_choice">
+        <select name="repeat_415_1_field_0_0" data-allow-other="true">
+          <option value="a">A</option>
+          <option value="__other__" selected>Other (please specify)...</option>
+        </select>
+        <input type="text" class="other-text-input" name="repeat_415_1_field_0_other_text" value="Custom answer">
+      </div>
+    `);
+
+    const names = findWafSensitiveInputs(form).map((el) => el.name);
+    expect(names).toEqual(['repeat_415_1_field_0_other_text', 'repeat_415_1_field_0_0']);
+  });
+
+  it('wraps the __other__ sentinel and typed "Other" text, and restores both on save', () => {
+    const form = buildForm(`
+      <div class="form-item-block" data-item-type="question" data-question-type="single_choice">
+        <select name="field_value[42]" data-allow-other="true">
+          <option value="a">A</option>
+          <option value="__other__" selected>Other (please specify)...</option>
+        </select>
+        <input type="text" class="other-text-input" name="field_other_text[42]" value="Cyclone &quot;Freddy&quot;; needs > 50% funding">
+      </div>
+    `);
+    const select = form.querySelector('select');
+    const otherText = form.querySelector('.other-text-input');
+    const originalOtherText = otherText.value;
+
+    const restore = encodeFreeTextQuestionFields(form);
+
+    expect(decodeB64(select.value)).toBe('__other__');
+    expect(decodeB64(otherText.value)).toBe(originalOtherText);
+
+    restore();
+
+    expect(select.value).toBe('__other__');
+    expect(otherText.value).toBe(originalOtherText);
+  });
+
   it('pruneEmptyWafRiskFields drops empty sex/age/sexage/indirect_reach and empty files', () => {
     expect(EMPTY_DISAGG_NAME_RE.test('indicator_1369_sex_male')).toBe(true);
     expect(EMPTY_DISAGG_NAME_RE.test('indicator_1369_age__5')).toBe(true);

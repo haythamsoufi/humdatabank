@@ -616,10 +616,8 @@ class RepeatGroupProcessorMixin:
         elif question_type == 'single_choice':
             single_val = str(raw_value).strip() if raw_value else None
             if single_val == '__other__':
-                other_text = field_values.get(f'field_{field_index}_other_text')
-                if isinstance(other_text, list):
-                    other_text = other_text[0] if other_text else ''
-                return str(other_text).strip() if other_text else None
+                other_text = cls._decode_other_text(field_values.get(f'field_{field_index}_other_text'))
+                return other_text.strip() if other_text else None
             return single_val
         elif question_type == 'yesno':
             return 'true' if raw_value else 'false'
@@ -652,15 +650,29 @@ class RepeatGroupProcessorMixin:
 
         other_text_key = f'field_{field_index}_other_text'
         if other_text_key in field_values:
-            other_text = field_values[other_text_key]
-            if isinstance(other_text, list):
-                other_text = other_text[0] if other_text else ''
-            other_text = str(other_text).strip() if other_text else ''
+            other_text = cls._decode_other_text(field_values[other_text_key]).strip()
             selected_options = [v for v in selected_options if v != '__other__']
             if other_text and other_text not in selected_options:
                 selected_options.append(other_text)
 
         return json.dumps(selected_options) if selected_options else None
+
+    @classmethod
+    def _decode_other_text(cls, other_text) -> str:
+        """Unwrap a ``field_*_other_text`` value that may be ``b64:``-wrapped.
+
+        question-text-waf-encode.js base64-wraps the free-text ".other-text-input"
+        companion of "Other (please specify)" answers before submission (the raw
+        typed text can otherwise trip WAF signature rules). A bare
+        ``MatrixJsonDecodeError`` from a corrupted payload propagates to the
+        existing per-instance try/except in _process_repeat_field_data_comprehensive
+        (safe-failure contract: fail the save, never silently store garbage).
+        """
+        if isinstance(other_text, list):
+            other_text = other_text[0] if other_text else ''
+        if not other_text:
+            return ''
+        return decode_b64_matrix_json(str(other_text))
 
     @classmethod
     def _store_repeat_data_entry(cls, entry, processed_value, data_not_available, not_applicable, field=None, emergency_metadata=None):

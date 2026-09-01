@@ -1459,7 +1459,9 @@ class FormDataService(
                             elif isinstance(parsed_data, list):
                                 return len(parsed_data) > 0
 
-                    return bool(stripped_value)
+                    # Exclude stringified-null sentinels (matches _has_meaningful_in_obj above) —
+                    # these can arrive verbatim from JS serialization bugs and are not real data.
+                    return stripped_value not in ('None', 'null', 'undefined')
                 elif form_data_entry.value not in [None, '', 'None']:
                     return True
             except Exception as e:
@@ -1471,7 +1473,9 @@ class FormDataService(
     @classmethod
     def _validate_repeat_section(cls, section, assignment_entity_status, hidden_field_ids=None) -> Dict[str, Any]:
         """Validate repeat sections have at least one complete instance"""
-        from app.models import RepeatGroupInstance
+        # RepeatGroupInstance is already imported at module level — do not re-import it
+        # here, since a local import would shadow (and break) test-time patching of
+        # app.services.forms.data_service.RepeatGroupInstance.
 
         if cls._is_public_submission(assignment_entity_status):
             repeat_instances = RepeatGroupInstance.query.filter_by(
@@ -1496,6 +1500,8 @@ class FormDataService(
                     'is_valid': False,
                     'errors': [f"Required section '{section.name}' has no entries. Please add at least one entry."]
                 }
+            # No entries, but nothing required either — an empty optional repeat section is valid.
+            return {'is_valid': True, 'errors': []}
 
         # Check if at least one instance has all required fields filled
         for instance in repeat_instances:

@@ -72,6 +72,21 @@ evidence.
      1384-byte b64-wrapped matrix `field_value[id]` that sits in the
      `920370` "Argument value too long" range. Those are now wrapped,
      omitted, or split across `__cN` chunks — see the main guide.
+   - **Further follow-up (2026-09-01):** after the fixes above shipped
+     (still pre-deploy at the time), a prod report on the *previous*
+     deployment identified a third, distinct trigger: the literal
+     `__other__` sentinel (`question-other-option.js`'s "Other (please
+     specify)..." value) on a repeat-group `single_choice` field, with no
+     other unusual content in that submission. This doesn't fit the
+     punctuation-signature or argument-length patterns above — see "New
+     finding (2026-09-01): the `__other__` sentinel itself trips the WAF" in
+     the main guide for the dunder/SSTI-pattern hypothesis. Fixed by
+     extending `question-text-waf-encode.js` to also wrap
+     `select[data-allow-other="true"]` and its `.other-text-input`
+     "please specify" companion, decoded on read in
+     `processing_service.py::FormItemProcessor._process_question_data` and
+     `processors/repeat_group.py`'s `_process_question_value_by_type` /
+     `_process_multiple_choice_value`.
 
 3. **Also shipped: request-body telemetry on platform-error reports.** The
    client reporter's payload previously carried no information about *what*
@@ -146,9 +161,10 @@ only a WAF policy change (or a payload-size reduction refactor — see
 
 ## Verification
 
-- `npx vitest run` — full JS suite: 633 passed, 4 pre-existing unrelated
-  failures (confirmed identical on `git stash`, not introduced by this
-  change).
+- `npx vitest run` — full JS suite: 650 passed, 4 pre-existing unrelated
+  test failures + 1 pre-existing broken test file (missing
+  `chart-payload-normalize.js` source, unrelated to forms/WAF) — all
+  confirmed identical on `git stash`, not introduced by this change.
 - `pytest tests/unit/test_services/test_form_data_service.py
   tests/unit/test_services/test_form_processing_service.py
   tests/unit/test_routes/test_api_error_log.py` — all new/updated tests
@@ -159,3 +175,17 @@ only a WAF policy change (or a payload-size reduction refactor — see
   from this environment) — recommend a staging validation pass with a
   production-like WAF policy before relying on this for the next incident
   (see "Verification Plan" in the main guide).
+
+**2026-09-01 `__other__` sentinel follow-up specifically:**
+- `npx vitest run tests/js/forms/question-text-waf-encode.test.js
+  tests/js/forms/matrix-field-chunking.test.js` — 24/24 passed, including 2
+  new tests (`select[data-allow-other="true"]` + `.other-text-input`
+  discovery, wrap/restore round-trip).
+- `pytest tests/unit/test_services/test_form_data_processors.py
+  tests/unit/test_services/test_form_processing_service.py
+  tests/unit/test_services/test_form_data_service.py` — 329 passed
+  (including 10 new tests covering the `__other__` sentinel + b64-wrapped
+  `field_other_text[id]`/`..._other_text`, top-level and repeat-group, plus
+  the `MatrixJsonDecodeError` safe-failure path); the same 10 pre-existing
+  failures above reproduce identically on `git stash` for this narrower
+  file set too.

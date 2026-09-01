@@ -315,6 +315,17 @@ class FormItem(db.Model):
         return self.unit or ''
 
     @property
+    def display_definition(self):
+        """Translated definition/description for display; falls back to the raw ORM `definition`.
+
+        `FormItemProcessor._add_translation_support` sets `_display_definition` rather than
+        mutating `definition` directly (never mutate ORM). Templates read this property so
+        the translated text is used when available without touching the stored column.
+        """
+        translated = getattr(self, '_display_definition', None)
+        return translated if translated else self.definition
+
+    @property
     def is_required_for_js(self):
         """Compatibility property for JavaScript - same as is_required."""
         return self.is_required

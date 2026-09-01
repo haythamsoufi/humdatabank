@@ -186,7 +186,7 @@ inventing a third.
 
 | | Full-payload envelope (preferred) | Field-level `b64:` prefix |
 |---|---|---|
-| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`), `text`/`textarea` question answers (including repeat-group instances), emergency-operations select values, and `*_emergency_metadata` / `field_disagg_metadata[id]` JSON |
+| **Used by** | `/admin/settings`, `manage-settings.js`, email template editor, form-builder saves | Assignment entry-form save: matrix fields, plugin fields (`field_value[id]`), `text`/`textarea` question answers (including repeat-group instances), emergency-operations select values, `*_emergency_metadata` / `field_disagg_metadata[id]` JSON, and single_choice/multiple_choice "Other" selects (`data-allow-other="true"`) plus their `.other-text-input` free-text companion |
 | **Wire format** | Whole body becomes `{"payload": "<b64 of JSON.stringify(everything)>"}`, sent as `Content-Type: application/json` | Individual `field_value[id]` values become the string `"b64:<b64 of that field's JSON>"`; rest of the request stays `multipart/form-data`/form-urlencoded |
 | **Client helper** | `btoa(unescape(encodeURIComponent(JSON.stringify(inner))))` — see `form-submit-ui.js`, `manage-settings.js` (`wrapEmailTemplateApiJsonBody`) | `__serializeMatrixData()` in `app/static/js/forms/modules/matrix/formatting.js`; `encodeFreeTextQuestionFields()` / `installNativeSubmitTextEncoder()` in `app/static/js/forms/modules/question-text-waf-encode.js` for question text/textarea |
 | **Server helper** | `get_request_data()` in `app/utils/request_utils.py` — transparently unwraps `payload`/`payload_b64` into a `_JsonFormProxy` that mimics `request.form` | `get_possibly_chunked_form_value()` then `decode_b64_matrix_json()` in `app/services/forms/processors/_common.py` (reused as-is for question text — it's a generic base64→UTF-8 decoder; the JSON-specific `json.loads()` happens only in matrix/plugin callers, not in `FormItemProcessor._process_question_data`). Matrix values may also arrive split across `field_value[id]` / `__c1` / `__c2` — reassemble *before* decode. |
@@ -223,6 +223,41 @@ If a false positive is later traced to a *specific* rule/argument via WAF
 logs, prefer the narrower "IT/SecOps exclusion strategy" below over expanding
 base64 coverage further — exclusions don't cost any WAF visibility on other
 routes/arguments.
+
+### New finding (2026-09-01): the `__other__` sentinel itself trips the WAF
+
+Prod observation: a repeat-group `single_choice` field submitted as
+`repeat_<section>_<instance>_field_<index>_<inputIndex>=__other__` (the
+literal sentinel `question-other-option.js` sends when a user picks "Other
+(please specify)...") was blocked, with nothing else unusual about that
+field. Unlike the `920370` length issue or the `941`/`942` punctuation
+signatures above, `__other__` is a 9-byte, plain-ASCII, punctuation-free
+string. Its leading/trailing double underscore reads like a Python/PHP
+"dunder" magic identifier (`__class__`, `__init__`, `__construct`,
+`__proto__`, ...) — a pattern generic RCE/SSTI/deserialization signatures
+commonly key on — so this is plausibly a *different* rule family than
+everything else in this doc. No WAF log access to confirm the exact
+`ruleId` (same access gap as the original 2026-08 incidents); treated as
+evidence-based, not confirmed, and mitigated by wrapping rather than by
+proving the rule.
+
+**Mitigation shipped:** `question-text-waf-encode.js` now also base64-wraps:
+
+- any `select[data-allow-other="true"]` — single_choice "Other" selects, a
+  superset of the pre-existing `emergency_operations`-lookup-only selector —
+  covers the `__other__` sentinel itself; and
+- `.other-text-input` — the "please specify" free-text companion input
+  (`field_other_text[id]` top-level, `repeat_<s>_<i>_field_<idx>_other_text`
+  in repeat groups) — arbitrary user-typed text, same risk class as question
+  `text`/`textarea` above.
+
+The select's own value decodes through the same generic `b64:` path every
+other `field_value[id]` already uses. The `.other-text-input` companion is
+decoded where each is read: `FormItemProcessor._process_question_data`
+(top-level `single_choice`/`multiple_choice`, `processing_service.py`) and
+`RepeatGroupProcessorMixin._process_question_value_by_type` /
+`_process_multiple_choice_value` (`processors/repeat_group.py`) — same
+`MatrixJsonDecodeError` safe-failure contract as every other field below.
 
 ### Safe-failure contract (field-level convention)
 

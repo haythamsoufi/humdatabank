@@ -223,6 +223,77 @@ class TestRepeatGroupProcessorMixin:
         }
         assert FormDataService._find_field_value(field_values, 1, ["0"]) == "actual"
 
+    # ─────────────────────────────────────────────────────────────────────
+    # "Other, please specify" — __other__ sentinel + field_*_other_text.
+    #
+    # The literal `__other__` sentinel (question-other-option.js) was itself
+    # observed tripping the WAF in prod on a repeat-group single_choice field
+    # (a bare `repeat_<section>_<instance>_field_<index>_<inputIndex>=__other__`
+    # POST body was blocked). question-text-waf-encode.js now base64-wraps
+    # both that select's value and its `.other-text-input` companion, so both
+    # must be transparently decoded here — see waf-403-form-payload-refactor-guide.md.
+    # ─────────────────────────────────────────────────────────────────────
+
+    def test_other_sentinel_reads_plain_other_text(self):
+        from app.services.forms.data_service import FormDataService
+
+        field_values = {"field_0_other_text": "Custom typed value"}
+        result = FormDataService._process_question_value_by_type(
+            "__other__", "single_choice", None, field_values, 0
+        )
+        assert result == "Custom typed value"
+
+    def test_other_sentinel_decodes_b64_wrapped_other_text(self):
+        from app.services.forms.data_service import FormDataService
+
+        raw = 'Cyclone "Freddy"; needs > 50% funding'
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        field_values = {"field_0_other_text": wrapped}
+        result = FormDataService._process_question_value_by_type(
+            "__other__", "single_choice", None, field_values, 0
+        )
+        assert result == raw
+
+    def test_other_sentinel_itself_b64_wrapped(self):
+        """The select's own raw_value (the `__other__` sentinel) is decoded by
+        the generic `b64:` handling at the top of _process_question_value_by_type
+        before the single_choice branch even runs."""
+        from app.services.forms.data_service import FormDataService
+
+        wrapped_sentinel = "b64:" + base64.b64encode(b"__other__").decode("ascii")
+        field_values = {"field_0_other_text": "Custom typed value"}
+        result = FormDataService._process_question_value_by_type(
+            wrapped_sentinel, "single_choice", None, field_values, 0
+        )
+        assert result == "Custom typed value"
+
+    def test_other_sentinel_invalid_b64_other_text_raises(self):
+        """Safe-failure contract: corrupted b64 in the other-text companion
+        must raise, not silently store an empty "Other" answer."""
+        from app.services.forms.data_service import FormDataService
+        from app.services.forms.processors._common import MatrixJsonDecodeError
+
+        field_values = {"field_0_other_text": "b64:not-valid-base64!!!"}
+        with pytest.raises(MatrixJsonDecodeError):
+            FormDataService._process_question_value_by_type(
+                "__other__", "single_choice", None, field_values, 0
+            )
+
+    def test_multiple_choice_other_sentinel_decodes_b64_wrapped_other_text(self):
+        from app.services.forms.data_service import FormDataService
+
+        raw = 'Other; "special" needs'
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        field_values = {
+            "field_0": ["opt_a", "__other__"],
+            "field_0_other_text": wrapped,
+        }
+        result = FormDataService._process_multiple_choice_value(None, field_values, 0)
+        parsed = json.loads(result)
+        assert "opt_a" in parsed
+        assert raw in parsed
+        assert "__other__" not in parsed
+
 
 class TestPluginProcessorMixin:
     def test_save_plugin_field_data_none_value_is_noop(self):

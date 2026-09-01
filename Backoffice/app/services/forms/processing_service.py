@@ -749,6 +749,12 @@ class FormItemProcessor:
         # FormItemProcessor from this module.
         from app.services.forms.processors._common import read_waf_protected_form_value
 
+        def _read_other_text() -> str:
+            # The ".other-text-input" companion of an "Other (please specify)"
+            # answer is base64-wrapped (and chunkable) by the same client-side
+            # modules as the main field — see question-text-waf-encode.js.
+            return read_waf_protected_form_value(form_data, f'field_other_text[{form_item.id}]', default='') or ''
+
         # Free-text answers may arrive base64-wrapped and/or split across
         # field_name/__c1/__c2 (see question-text-waf-encode.js and
         # matrix-field-chunking.js). default=None preserves "not submitted"
@@ -778,7 +784,7 @@ class FormItemProcessor:
             selected_options = form_data.getlist(field_name)
             # Replace the __other__ sentinel with the user-typed free text
             if '__other__' in selected_options:
-                other_text = (form_data.get(f'field_other_text[{form_item.id}]') or '').strip()
+                other_text = _read_other_text().strip()
                 selected_options = [v for v in selected_options if v != '__other__']
                 if other_text:
                     selected_options.append(other_text)
@@ -788,7 +794,7 @@ class FormItemProcessor:
             single_val = str(raw_value).strip() if raw_value and isinstance(raw_value, str) else None
             # Replace the __other__ sentinel with the user-typed free text
             if single_val == '__other__':
-                single_val = (form_data.get(f'field_other_text[{form_item.id}]') or '').strip() or None
+                single_val = _read_other_text().strip() or None
             final_value = single_val
 
         elif form_item.type == 'CHECKBOX':

@@ -78,12 +78,40 @@ The production edge uses Azure Application Gateway WAF with OWASP-managed rules.
   - Triggered by HTML/script-like patterns in submitted values.
 - `REQUEST-942-*` (SQL injection detections)
   - Triggered by punctuation-heavy or SQL-like token patterns in text blobs.
-- `REQUEST-920-*` (protocol/enforcement anomalies)
-  - Triggered by unusual encoding, malformed inputs, or argument characteristics.
+- `REQUEST-920-*` (protocol/enforcement anomalies), specifically the
+  **per-argument size family** — distinct from whole-body size limits:
+  - `920360` "Argument name too long" (`tx.arg_name_length`, CRS example default `100`)
+  - `920370` "Argument value too long" (`tx.arg_length`, CRS example default `400`)
+  - `920380` "Too many arguments in request" (`tx.max_num_args`, CRS example default `255`)
+  - `920390` "Total arguments size exceeded" (`tx.total_arg_length`, CRS example default `64000`)
+  - Azure's managed OWASP ruleset does not expose these `tx.*` values for
+    customer configuration (per Microsoft docs, they're "managed internally
+    by the rule set logic") — the only customer-side lever is a per-rule
+    exclusion, not raising the limit. **This is a strong, evidence-backed
+    candidate** for the assignment-save 403s: a real production save payload
+    captured 2026-09-01 contained a single matrix `field_value[id]` argument
+    whose value (JSON-then-base64-encoded per the convention below) was
+    1384 bytes — a 34% inflation over the 1033-byte raw JSON, and well past
+    the CRS *example* `tx.arg_length` default of 400 (Azure's actual
+    configured value is not publicly documented, but even the un-encoded
+    1033-byte raw JSON would already exceed that example default). Large
+    matrix tables with many rows/columns are exactly the shape that produces
+    single arguments in the 1–2 KB+ range.
 - Size-enforcement / body-inspection limits
   - Large request bodies or many arguments can increase block probability.
 
 Important: do not hardcode behavior around specific IDs only. Build payloads to be rule-friendly by default.
+
+**Base64 encoding does not help against the `920360`/`920370`/`920380`/`920390`
+family — it actively hurts it.** Base64 inflates payload size by ~33% (3 bytes
+→ 4 chars). The `b64:` convention below was designed to dodge *signature*
+rules (`941`/`942`) by hiding recognizable JSON/HTML/SQL-like tokens; it does
+nothing for a *length* rule, and for large matrix/plugin fields it makes an
+argument-length block **more** likely, not less. If a future incident's WAF
+logs point at `920360`/`920370`/`920380`/`920390` specifically (rather than
+`941`/`942`), the fix is a scoped WAF exclusion for `argument: field_value[*]`
+on this path (see "IT/SecOps exclusion strategy" below) — expanding base64
+coverage further will not fix a length-based block and may worsen it.
 
 ### App-side constraints to follow
 

@@ -86,12 +86,35 @@ evidence.
 
 Base64-wrapping is a tactical, app-side mitigation (see "Why not the same one
 everywhere" in the main guide) — it cannot fix a WAF **body-size** or
-**argument-count** limit (`REQUEST-920-*` family / `max_request_body_size_in_kb`
-policy setting), only content-signature false positives. If either
-occurrence above was actually a size/argument-count block rather than a
-signature false positive, only a WAF policy change (or a payload-size
-reduction refactor — see "Recommended Standard" in the main guide, not
-attempted in this change given its scope/risk) will fix it.
+**argument-length/count** limit (`REQUEST-920-*` family /
+`max_request_body_size_in_kb` policy setting), only content-signature false
+positives. If either occurrence above was actually a size/argument-count
+block rather than a signature false positive, only a WAF policy change (or a
+payload-size reduction refactor — see "Recommended Standard" in the main
+guide, not attempted in this change given its scope/risk) will fix it.
+
+### 2026-09-01 update: concrete evidence for a size-based (not signature) block
+
+A real production save payload was inspected and found to contain a matrix
+`field_value[id]` argument (48-key indicator/support-planning matrix) whose
+`b64:`-wrapped value was **1384 bytes** — 34% larger than its raw JSON form
+(1033 bytes), due to base64's ~33% size overhead. This lands squarely in the
+range of OWASP CRS's `920370` "Argument value too long" rule family (example
+default `tx.arg_length=400`; Azure does not disclose its actual configured
+value, but even the *raw, un-encoded* 1033-byte JSON would already exceed
+that documented example default). See the updated "Azure App Gateway WAF
+Rules the App Should Respect" section in
+[`waf-403-form-payload-refactor-guide.md`](./waf-403-form-payload-refactor-guide.md)
+for the full rule-family breakdown (`920360`/`920370`/`920380`/`920390`).
+
+**Important implication:** base64-wrapping large matrix/plugin fields (the
+tactical fix already shipped) helps against signature rules (`941`/`942`)
+but *increases* the byte length of exactly the fields most likely to trip an
+argument-length rule. If WAF logs for a future incident point at the
+`920360`–`920390` family specifically, the correct fix is a **scoped WAF
+exclusion** (`argument: field_value[*]` on this path), not more base64
+coverage — this is now reflected in items 1–2 of the escalation request
+below.
 
 ### Escalation request — send to IT/SecOps (Azure Application Gateway WAF policy owner)
 
@@ -113,22 +136,31 @@ attempted in this change given its scope/risk) will fix it.
 > **Requested:**
 > 1. Pull the WAF diagnostic log entries for the two timestamps/paths above
 >    and share `ruleId`, `matchVariableName`, `action`, and the request body
->    size that was blocked (if size-related, e.g. `max_request_body_size_in_kb`
->    or `REQUEST-920-*` argument-count family).
-> 2. If it's a **signature false positive** (`REQUEST-941-*`/`REQUEST-942-*`):
+>    size that was blocked. **Please specifically check whether the rule is
+>    in the `920360`/`920370`/`920380`/`920390` family** ("argument name/value
+>    too long", "too many arguments", "total argument size exceeded") —
+>    we've since found a real save payload with a single form-field argument
+>    around 1.4 KB (a 48-key matrix table), which is a strong candidate for
+>    tripping a per-argument length limit rather than the whole-body size
+>    limit or a content-signature rule.
+> 2. If it's a **per-argument length rule** (`920360`–`920390`) or a
+>    **content-signature false positive** (`REQUEST-941-*`/`REQUEST-942-*`):
 >    a targeted exclusion scoped to `path: /assignment/*` (POST) +
 >    `argument: field_value[*]` — least-privilege, does not disable the rule
 >    globally or on any other route/argument.
-> 3. If it's a **body-size or argument-count limit**: please share the
->    current configured limits for this Application Gateway/WAF policy so we
->    can decide whether to ask for a policy increase or invest in a payload-
->    size-reduction refactor on our side (splitting the autosave into smaller
->    requests) instead.
+> 3. If it's the **whole-body size or overall-argument-count limit**: please
+>    share the current configured limits for this Application Gateway/WAF
+>    policy so we can decide whether to ask for a policy increase or invest
+>    in a payload-size-reduction refactor on our side (splitting the autosave
+>    into smaller requests) instead.
 >
 > We've already shipped app-side mitigations (base64-wrapping structured
 > JSON and free-text answers to dodge signature false positives) and added
 > client-side telemetry so any recurrence will carry request size/field-count
-> evidence automatically. This request is to close the loop with an
+> evidence automatically. **Note for your side:** that base64 encoding
+> increases the affected fields' byte length by ~33%, so it does not help —
+> and can slightly worsen — a per-argument-length block; only items 2/3 above
+> actually fix that class of block. This request is to close the loop with an
 > infra-side fix per your own least-privilege exclusion policy, rather than
 > relying solely on the app-side workaround long-term.
 >

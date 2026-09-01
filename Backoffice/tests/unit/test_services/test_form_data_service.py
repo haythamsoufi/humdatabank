@@ -912,9 +912,11 @@ class TestValidateRequiredField:
             # Patch FormData.query.filter_by to return None
             with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
                  patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter:
-                mock_query = MagicMock()
-                mock_query.filter_by.return_value.first.return_value = None
-                mock_model.return_value = mock_query
+                mock_model_class = MagicMock()
+                # _validate_required_field does DataModel.query.filter_by(...).first() —
+                # DataModel is the mock's return value, so `.query` must be configured too.
+                mock_model_class.query.filter_by.return_value.first.return_value = None
+                mock_model.return_value = mock_model_class
                 mock_filter.return_value = {}
 
                 result = FormDataService._validate_required_field(field, aes)
@@ -932,9 +934,9 @@ class TestValidateRequiredField:
             with patch("app.services.forms.data_service.FormDataService._get_data_model") as mock_model, \
                  patch("app.services.forms.data_service.FormDataService._get_data_query_filter") as mock_filter, \
                  patch("app.services.forms.data_service.FormDataService._has_meaningful_data", return_value=True):
-                mock_query = MagicMock()
-                mock_query.filter_by.return_value.first.return_value = entry
-                mock_model.return_value = mock_query
+                mock_model_class = MagicMock()
+                mock_model_class.query.filter_by.return_value.first.return_value = entry
+                mock_model.return_value = mock_model_class
                 mock_filter.return_value = {}
 
                 result = FormDataService._validate_required_field(field, aes)
@@ -1016,6 +1018,10 @@ class TestValidateSection:
                 field = MagicMock()
                 field.id = 1
                 field.is_required_for_js = True
+                # Must be explicit: getattr(field, 'is_image', False) on a bare MagicMock
+                # auto-vivifies a truthy attribute instead of falling back to the default,
+                # which would wrongly skip this field as an "image" and mask the assertion below.
+                field.is_image = False
 
                 section = MagicMock()
                 section.section_type = "standard"

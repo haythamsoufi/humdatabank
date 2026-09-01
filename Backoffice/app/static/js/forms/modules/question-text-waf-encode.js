@@ -34,6 +34,17 @@
 //   - `*_emergency_metadata` / `field_disagg_metadata[id]` hidden JSON
 //   - `select[data-lookup-list-id="emergency_operations"]` display values
 //     (`Name (CODE)` parentheses trip REQUEST-942-*)
+//   - `select[data-allow-other="true"]` (single_choice "Other" sentinel) and
+//     its sibling `.other-text-input` free-text field — see
+//     question-other-option.js. The literal `__other__` sentinel value is
+//     itself enough to trip the WAF (observed in prod: a
+//     `repeat_<section>_<instance>_field_<index>_<inputIndex>` field set to
+//     `__other__` alone, no other content, was blocked) — a double-underscore
+//     token reads like the Python/PHP "dunder" magic-method names
+//     (`__class__`, `__construct`, ...) that generic RCE/SSTI signatures key
+//     on, so it isn't just a size/punctuation issue like the rest of this
+//     module. Wrapping unconditionally sidesteps needing to prove the exact
+//     rule ID.
 //
 // Empty unused sex/age/sexage/indirect_reach inputs are stripped from the
 // AJAX FormData (and already name-stripped on native submit by
@@ -44,12 +55,18 @@ const FREE_TEXT_SELECTOR = [
     '.form-item-block[data-item-type="question"][data-question-type="textarea"] textarea[name^="field_value["]',
     '.form-item-block[data-item-type="question"][data-question-type="text"] input[name^="repeat_"]',
     '.form-item-block[data-item-type="question"][data-question-type="textarea"] textarea[name^="repeat_"]',
+    'input.other-text-input[name]',
 ].join(', ');
 
 const JSON_HIDDEN_SELECTOR =
     'input[name$="_emergency_metadata"], input[name^="field_disagg_metadata["]';
 
-const EMERGENCY_SELECT_SELECTOR = 'select[data-lookup-list-id="emergency_operations"]';
+// Covers every single_choice select that can carry the `__other__` sentinel
+// (any question with "allow other" enabled), plus the emergency-operations
+// lookup select specifically (its real `Name (CODE)` display value is risky
+// even without "allow other" — see comment above).
+const PROTECTED_SELECT_SELECTOR =
+    'select[data-lookup-list-id="emergency_operations"], select[data-allow-other="true"]';
 
 /** Empty unused disaggregation keys — safe to omit (backend treats missing = empty). */
 export const EMPTY_DISAGG_NAME_RE =
@@ -77,7 +94,7 @@ export function findWafSensitiveInputs(formEl) {
     return [
         ...findFreeTextQuestionInputs(formEl),
         ..._enabledNamedInputs(formEl, JSON_HIDDEN_SELECTOR),
-        ..._enabledNamedInputs(formEl, EMERGENCY_SELECT_SELECTOR),
+        ..._enabledNamedInputs(formEl, PROTECTED_SELECT_SELECTOR),
     ];
 }
 

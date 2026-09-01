@@ -717,7 +717,10 @@ class TestAddTranslationSupport:
             with patch("app.utils.form_localization.get_translation_key", return_value="fr"), \
                  patch("app.get_locale", return_value="fr"):
                 FormItemProcessor._add_translation_support(fi)
-        assert fi.definition == "Définition Française"
+        # Definition translation is display-only and must never mutate the ORM column
+        # (see FormItem.display_definition) — only `_display_definition` is set.
+        assert fi.definition == "English Definition"
+        assert fi._display_definition == "Définition Française"
 
     def test_question_label_translation_applied(self, app):
         from app.services.forms.processing_service import FormItemProcessor
@@ -1008,6 +1011,104 @@ class TestProcessQuestionData:
             val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
         assert has_val is True
         assert val == "100"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FormItemProcessor._process_question_data — single/multiple_choice "Other"
+#
+# The `__other__` sentinel (question-other-option.js) is itself enough to
+# trip the WAF (observed in prod on a repeat-group single_choice field), and
+# the free-typed "please specify" companion is arbitrary punctuation-heavy
+# text — question-text-waf-encode.js base64-wraps both the select's value and
+# the `field_other_text[id]` input, so both must be transparently decoded here.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestProcessQuestionDataOtherSentinel:
+    def test_single_choice_other_sentinel_reads_plain_other_text(self, app):
+        from app.services.forms.processing_service import FormItemProcessor
+        from werkzeug.datastructures import MultiDict
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "single_choice"
+        fi.indirect_reach = False
+        form_data = MultiDict({"field_value[10]": "__other__", "field_other_text[10]": "Custom typed value"})
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        assert val == "Custom typed value"
+        assert has_val is True
+
+    def test_single_choice_other_sentinel_decodes_b64_wrapped_other_text(self, app):
+        """field_other_text[id] arrives `b64:`-wrapped (WAF false-positive
+        avoidance for the typed free text, same convention as the main
+        field_value)."""
+        import base64
+        from app.services.forms.processing_service import FormItemProcessor
+        from werkzeug.datastructures import MultiDict
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "single_choice"
+        fi.indirect_reach = False
+        raw = 'Cyclone "Freddy"; needs > 50% funding'
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        form_data = MultiDict({"field_value[10]": "__other__", "field_other_text[10]": wrapped})
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        assert val == raw
+        assert has_val is True
+
+    def test_single_choice_other_sentinel_itself_b64_wrapped(self, app):
+        """The `__other__` sentinel on field_value[id] can itself be
+        base64-wrapped (select[data-allow-other] is a WAF-protected select)."""
+        import base64
+        from app.services.forms.processing_service import FormItemProcessor
+        from werkzeug.datastructures import MultiDict
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "single_choice"
+        fi.indirect_reach = False
+        wrapped_sentinel = "b64:" + base64.b64encode(b"__other__").decode("ascii")
+        form_data = MultiDict({"field_value[10]": wrapped_sentinel, "field_other_text[10]": "Custom typed value"})
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        assert val == "Custom typed value"
+        assert has_val is True
+
+    def test_single_choice_invalid_b64_other_text_raises(self, app):
+        """Safe-failure contract: a corrupted b64 payload must raise, not
+        silently store an empty "Other" answer."""
+        from app.services.forms.processing_service import FormItemProcessor
+        from app.services.forms.processors._common import MatrixJsonDecodeError
+        from werkzeug.datastructures import MultiDict
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "single_choice"
+        fi.indirect_reach = False
+        form_data = MultiDict({"field_value[10]": "__other__", "field_other_text[10]": "b64:not-valid-base64!!!"})
+        with app.app_context():
+            with pytest.raises(MatrixJsonDecodeError):
+                FormItemProcessor._process_question_data(fi, form_data, "question_10")
+
+    def test_multiple_choice_other_sentinel_decodes_b64_wrapped_other_text(self, app):
+        import base64
+        from app.services.forms.processing_service import FormItemProcessor
+        from werkzeug.datastructures import MultiDict
+        fi = _make_form_item(item_type="question")
+        fi.id = 10
+        fi.type = "multiple_choice"
+        fi.indirect_reach = False
+        raw = 'Other; "special" needs'
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        form_data = MultiDict([
+            ("field_value[10]", "opt_a"),
+            ("field_value[10]", "__other__"),
+            ("field_other_text[10]", wrapped),
+        ])
+        with app.app_context():
+            val, has_val, dna, na = FormItemProcessor._process_question_data(fi, form_data, "question_10")
+        parsed = json.loads(val)
+        assert "opt_a" in parsed
+        assert raw in parsed
+        assert "__other__" not in parsed
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -28,7 +28,6 @@
     <script src="{{ static_url('js/core/csrf.js') }}" defer></script>
     <script src="{{ static_url('js/core/debug-indexeddb.js') }}" defer></script>
     <script src="{{ static_url('js/lib/indexeddb-error-guard.js') }}" defer></script>
-    <script src="{{ static_url('js/forms/modules/debug.js') }}" type="module"></script>
     <script nonce="{{ csp_nonce() }}">
         // Inject organization branding for JavaScript
         window.ORG_NAME = {{ ORG_NAME | tojson }};
@@ -59,7 +58,6 @@
     <script src="{{ static_url('js/chatbot/messages.js') }}" defer></script>
     <script src="{{ static_url('js/tours/interactive-tour.js') }}" defer></script>
     <script src="{{ static_url('js/tours/workflow-tour-parser.js') }}" defer></script>
-    <script type="module" src="{{ static_url('js/chatbot/main.js') }}"></script>
     {% endif %}
     <link rel="manifest" href="{{ url_for('main.manifest') }}">
     <script nonce="{{ csp_nonce() }}">
@@ -187,6 +185,19 @@
     {# AG Grid skeleton/loading styles — must load in head so ag_grid_body_wrap paints at full height before extra_js #}
     <link rel="stylesheet" href="{{ static_url('libs/ag-grid/ag-grid-common-styles.css') }}">
     {% block head %}{% endblock %}
+    {# type="module" scripts MUST come after {% block head %}: browsers reject/ignore any
+       <script type="importmap"> added once a module has already started loading (Chrome
+       throws "import map is added after module script load was triggered"). entry_form.html
+       injects a scoped import map as the first thing in its head block override so relative
+       imports under js/forms/ keep ?v=<ASSET_VERSION> — if a module script tag appeared
+       earlier in this base layout, that import map would be silently dropped for the whole
+       page and every nested import (main.js, ajax-save.js, matrix/*.js, ...) would resolve to
+       bare, unversioned CDN URLs. Those get cached by Azure Blob Storage's
+       "max-age=31536000, immutable" header and never refresh until a user clears site data. #}
+    <script src="{{ static_url('js/forms/modules/debug.js') }}" type="module"></script>
+    {% if current_user.is_authenticated and not skip_layout_chatbot|default(false) %}
+    <script type="module" src="{{ static_url('js/chatbot/main.js') }}"></script>
+    {% endif %}
     {% block extra_css %}{% endblock %}
 </head>
 {% set is_system_manager = current_user.is_authenticated and current_user_has_role('system_manager') %}

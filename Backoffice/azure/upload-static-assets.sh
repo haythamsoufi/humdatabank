@@ -26,7 +26,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SOURCE_DIR="${STATIC_SOURCE_DIR:-${REPO_ROOT}/Backoffice/app/static}"
 CONTAINER="${STATIC_BLOB_CONTAINER:-static}"
+# Blob metadata can't vary by request query string the way the Flask static route
+# does (see app/static_serving.py): a blob at js/forms/modules/foo.js is the same
+# object whether a client asks for it with ?v=... or bare. Relative ES-module
+# imports (import './foo.js') resolve to that bare URL unless every referencing
+# module's document also carries a correctly-scoped <script type="importmap">
+# — a single mispositioned type="module" tag anywhere earlier in <head> makes the
+# browser drop the import map for the whole page (see core/layout.html). CSS/JS
+# are the only extensions ever reachable through that bare, unversioned path, so
+# they get a revalidate-on-every-load policy instead of a year-long immutable one:
+# a stale deploy then self-heals on the next request (fast 304, same ETag) rather
+# than being frozen in every visitor's HTTP cache for up to a year.
 CACHE_CONTROL="max-age=31536000, public, immutable"
+CACHE_CONTROL_REVALIDATE="max-age=0, public, must-revalidate"
 
 if [[ -z "${AZURE_STORAGE_CONNECTION_STRING:-}" ]]; then
   echo "ERROR: AZURE_STORAGE_CONNECTION_STRING is not set." >&2
@@ -170,7 +182,7 @@ _apply_cache_control_headers() {
   parallel="${STATIC_CACHE_CONTROL_PARALLEL:-32}"
   echo "Setting Cache-Control metadata on ${count} synced blob(s) (parallel=${parallel}) ..."
 
-  export CONTAINER SOURCE_DIR CACHE_CONTROL AZURE_STORAGE_CONNECTION_STRING
+  export CONTAINER SOURCE_DIR CACHE_CONTROL CACHE_CONTROL_REVALIDATE AZURE_STORAGE_CONNECTION_STRING
 
   set +e
   tr -d '\r' < "$list_file" \
@@ -182,10 +194,17 @@ _apply_cache_control_headers() {
           echo "WARN: skipping Cache-Control for missing local file: ${rel}" >&2
           exit 0
         fi
+        # .js/.css can be reached bare (no ?v=) via relative ES-module imports —
+        # see CACHE_CONTROL_REVALIDATE comment above. Everything else is only ever
+        # requested through static_url()/versioned <link>/<script> tags.
+        case "${rel}" in
+          *.js|*.css) cc="${CACHE_CONTROL_REVALIDATE}" ;;
+          *) cc="${CACHE_CONTROL}" ;;
+        esac
         if ! az storage blob update \
           --container-name "${CONTAINER}" \
           --name "${rel}" \
-          --content-cache-control "${CACHE_CONTROL}" \
+          --content-cache-control "${cc}" \
           --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
           --only-show-errors \
           --output none; then
@@ -221,10 +240,21 @@ _upload_with_azcopy() {
     # copy (not sync) so --cache-control is applied during upload. Quoted
     # "${SOURCE_DIR}/*" is passed to AzCopy (not expanded by bash) so files
     # land at the container root, same as azcopy sync with a trailing slash.
+    # Two passes (include/exclude-pattern match filename only, not path) so
+    # .js/.css get the revalidate header instead of a year-long immutable one
+    # — see CACHE_CONTROL_REVALIDATE comment above.
     echo "STATIC_FORCE_UPLOAD=1 — AzCopy copy with Cache-Control (no set-properties)."
     azcopy copy "${SOURCE_DIR}/*" "${dest}" \
       --recursive \
       --overwrite=true \
+      --include-pattern="*.js;*.css" \
+      --cache-control="${CACHE_CONTROL_REVALIDATE}" \
+      --log-level=WARNING \
+      --output-type=text
+    azcopy copy "${SOURCE_DIR}/*" "${dest}" \
+      --recursive \
+      --overwrite=true \
+      --exclude-pattern="*.js;*.css" \
       --cache-control="${CACHE_CONTROL}" \
       --log-level=WARNING \
       --output-type=text
@@ -253,12 +283,16 @@ _upload_with_azcopy() {
 }
 
 _upload_with_az_cli() {
+  # Fallback only (CI always installs AzCopy — see deploy-to-webapp.yml). upload-batch
+  # has no per-pattern --cache-control, so every file gets the revalidate policy here
+  # rather than risk immutable-caching a bare .js/.css URL — see CACHE_CONTROL_REVALIDATE
+  # comment above. Costs images/fonts an extra conditional GET in this rarely-used path.
   echo "Syncing static assets with az storage blob upload-batch (fallback; use AzCopy for faster CI) ..."
   az storage blob upload-batch \
     --destination "${CONTAINER}" \
     --source "${SOURCE_DIR}" \
     --connection-string "${AZURE_STORAGE_CONNECTION_STRING}" \
-    --content-cache-control "${CACHE_CONTROL}" \
+    --content-cache-control "${CACHE_CONTROL_REVALIDATE}" \
     --max-connections 32 \
     --overwrite \
     --only-show-errors \

@@ -175,6 +175,47 @@ describe('ajax-save', () => {
     expect(preventDefault).toHaveBeenCalled();
   });
 
+  it('does not leave b64: visible in textareas while save is in flight', async () => {
+    document.body.innerHTML = `
+      <form id="focalDataEntryForm" action="/forms/entry/1">
+        <input name="csrf_token" value="tok">
+        <div class="form-item-block" data-item-type="question" data-question-type="textarea">
+          <textarea name="field_value[2]">Narrative with punctuation;</textarea>
+        </div>
+        <button type="submit" name="action" value="save"><span>Save</span></button>
+      </form>`;
+    window.showFlashMessage = vi.fn();
+    window.t = (k) => k;
+
+    const originalText = 'Narrative with punctuation;';
+    let releaseFetch;
+    const fetchStarted = new Promise((resolve) => {
+      fetch.mockImplementation(() => {
+        resolve();
+        return new Promise((resolveFetch) => {
+          releaseFetch = resolveFetch;
+        });
+      });
+    });
+
+    const mod = await loadAjaxSave();
+    mod.initAjaxSave();
+    const savePromise = mod.saveFormBeforeSubmit({ toast: false, buttonState: false });
+
+    await fetchStarted;
+
+    const textarea = document.querySelector('textarea[name="field_value[2]"]');
+    expect(textarea.value).toBe(originalText);
+
+    const posted = fetch.mock.calls[0][1].body;
+    expect(posted.get('field_value[2]').startsWith('b64:')).toBe(true);
+    expect(posted.get('field_value[2]')).not.toBe(originalText);
+
+    releaseFetch(mockFetchResponse({ ok: true, status: 200 }));
+    await savePromise;
+    expect(textarea.value).toBe(originalText);
+  });
+
   it('shows friendly error when ok response body is HTML not JSON', async () => {
     fetch.mockResolvedValue(mockFetchResponse({
       ok: true,

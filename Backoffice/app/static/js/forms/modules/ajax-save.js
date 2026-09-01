@@ -195,14 +195,14 @@ async function saveFormOnce(options = {}) {
         }
 
         // Base64-wrap free-text / emergency JSON / emergency select values
-        // so WAF signature rules don't false-positive. Reverted in `finally`
-        // after FormData has captured the wrapped snapshot.
+        // so WAF signature rules don't false-positive. Reverted immediately
+        // after FormData snapshots the wrapped values (not after fetch).
         restoreFreeTextFields = encodeFreeTextQuestionFields(form);
 
         // Split any oversized matrix field value across multiple sibling
         // inputs so no single WAF argument-length rule (e.g. OWASP CRS
         // 920370) can fire, regardless of the matrix table's size. Reverted
-        // in `finally` below, right after FormData has captured the chunks.
+        // immediately after FormData snapshots the chunks.
         restoreChunkedMatrixFields = chunkLargeMatrixFields(form);
 
         // Unformat numeric inputs (thousand separators) before collecting FormData.
@@ -222,6 +222,20 @@ async function saveFormOnce(options = {}) {
 
         // Create FormData from the form (now with raw numeric values)
         const formData = new FormData(form);
+
+        // FormData has snapshotted the WAF-wrapped / chunked values. Put the
+        // live controls back *before* we await fetch — otherwise the browser
+        // paints `b64:…` (or a truncated first chunk) into visible textareas
+        // for the whole round-trip. finally{} is only a safety net.
+        if (restoreFreeTextFields) {
+            restoreFreeTextFields();
+            restoreFreeTextFields = null;
+        }
+        if (restoreChunkedMatrixFields) {
+            restoreChunkedMatrixFields();
+            restoreChunkedMatrixFields = null;
+        }
+
         pruneEmptyWafRiskFields(formData);
         formData.set('action', 'save'); // Ensure action is set to save
         // Mark presave requests so the backend can avoid clearing untouched fields
@@ -392,11 +406,9 @@ async function saveFormOnce(options = {}) {
             });
         }
 
-        // Put free-text question inputs back to human-readable text now that
-        // FormData has already captured the base64-wrapped snapshot.
+        // Safety net: restore if FormData construction threw before the
+        // early restore above (normal path already cleared these to null).
         if (restoreFreeTextFields) restoreFreeTextFields();
-        // Remove the temporary matrix-field chunk inputs now that FormData
-        // has already captured them.
         if (restoreChunkedMatrixFields) restoreChunkedMatrixFields();
 
         isSaving = false;

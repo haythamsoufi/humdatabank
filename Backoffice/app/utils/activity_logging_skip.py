@@ -80,6 +80,7 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "upr_excel_import.cancel_job",
         # Pre-import file check; the following import POST is the accountability event.
         "excel.validate_upr_country_reporting_import",
+        # Middleware skip only — assignment_narrative writes via _log_upr_visuals_generation.
         "upr_visuals.assignment_narrative",
         "upr_visuals.cancel",
         "pb_progress.data_source",

@@ -8,7 +8,8 @@ The route is kept for local development and as a safe fallback.
 
 Cache strategy
 --------------
-All static files emitted by static_url() include a ?v=<ASSET_VERSION> cache-buster.
+All static files emitted by static_url() include a ?v=<ASSET_VERSION>.<content-hash>
+cache-buster so a file byte change is always a new URL, even if ASSET_VERSION is pinned.
   • Versioned (?v=…)   → max-age=31536000, immutable (browser never re-validates)
   • Unversioned JS/CSS → max-age=0 + must-revalidate  (re-check on every load)
   • Unversioned other  → max-age=3600                 (1-hour heuristic)

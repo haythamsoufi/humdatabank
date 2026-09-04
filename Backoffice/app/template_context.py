@@ -442,7 +442,8 @@ def register_template_context(app, config_class):
         Production: set STATIC_CDN_URL=https://<account>.blob.core.windows.net/static
                     (or an Azure CDN / Front Door URL pointing at that container).
         """
-        asset_version = str(app.config.get('ASSET_VERSION') or 'v1')
+        from app.static_version import asset_query_version
+        asset_version = asset_query_version(app, filename)
         cdn_base = (app.config.get('STATIC_CDN_URL') or '').rstrip('/')
         if cdn_base:
             return f"{cdn_base}/{filename}?v={asset_version}"

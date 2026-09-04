@@ -45,6 +45,15 @@ from app.services.monitoring.worker_investigation import (
 )
 from app.extensions import limiter
 from app.utils.datetime_helpers import utcnow
+from app.utils.platform_error_telemetry import (  # noqa: F401
+    clamp_optional_int as _clamp_optional_int,
+    format_platform_error_description_extras,
+    sanitize_ajax_save_telemetry,
+    sanitize_field_name_list,
+    sanitize_form_field_name,
+    sanitize_script_delivery,
+    sanitize_version_token,
+)
 
 PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
 
@@ -131,24 +140,6 @@ def sanitize_url(url):
 def sanitize_client_error_text(value, *, max_len: int) -> Optional[str]:
     """Sanitize free-text client error fields (message, stack)."""
     return _strip_control_chars(value, max_len=max_len)
-
-
-def _clamp_optional_int(value, *, max_value: int) -> Optional[int]:
-    """Coerce untrusted client-supplied numeric telemetry to a bounded int.
-
-    Returns None for missing/invalid/negative input rather than raising —
-    this is best-effort observability data, not something a bad value should
-    ever be able to fail the request over.
-    """
-    if value is None:
-        return None
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        return None
-    if parsed < 0:
-        return None
-    return min(parsed, max_value)
 
 
 def sanitize_client_error_source(value) -> Optional[str]:
@@ -243,6 +234,18 @@ def log_platform_error():
         "request_field_count": int (optional) — number of FormData entries in the request that
             failed, from summarizeRequestBody() in platform-error-reporter.js
         "request_approx_bytes": int (optional) — approximate serialized byte size of that request
+        "request_b64_field_count": int (optional) — FormData values starting with b64:
+        "request_unwrapped_field_count": int (optional) — wrap-candidate fields sent raw
+        "request_longest_field_bytes": int (optional) — largest single field value
+        "request_longest_field_name": str (optional) — name of that field (no value)
+        "request_unwrapped_field_names": list[str] (optional) — raw wrap-candidate names
+        "asset_version": str (optional) — window.ASSET_VERSION from the page that reported
+        "page_url": str (optional) — window.location.href (page, not the failed request)
+        "ajax_save_script_url": str (optional) — loaded ajax-save.js URL including ?v=
+        "ajax_save_script_version": str (optional) — ?v= token from that script URL
+        "ajax_save_script_delivery": "disk_cache"|"network" (optional)
+        "ajax_save_script_transfer_size": int (optional)
+        "response_server": str (optional) — Server header from the blocked response
     }
 
     When error_code is 504 and probe_delay_s is absent, a background investigation
@@ -305,8 +308,13 @@ def log_platform_error():
         # an observability gap where a platform_403_forbidden event previously
         # carried no information about what was being saved. Clamped to sane
         # bounds since this is public, unauthenticated input.
-        request_field_count = _clamp_optional_int(data.get('request_field_count'), max_value=100_000)
-        request_approx_bytes = _clamp_optional_int(data.get('request_approx_bytes'), max_value=500_000_000)
+        ajax_save_telemetry = sanitize_ajax_save_telemetry(data)
+        page_url = sanitize_url(data.get('page_url'))
+        ajax_save_script_url = sanitize_url(data.get('ajax_save_script_url'))
+        if page_url:
+            ajax_save_telemetry['page_url'] = page_url
+        if ajax_save_script_url:
+            ajax_save_telemetry['ajax_save_script_url'] = ajax_save_script_url
 
         # ── Recovery probe fast-path ───────────────────────────────────────────
         # JS sends follow-up beacons at T+5s and T+15s with probe_delay_s set.
@@ -352,10 +360,7 @@ def log_platform_error():
         if timestamp:
             context_data['client_timestamp'] = timestamp
 
-        if request_field_count is not None:
-            context_data['request_field_count'] = request_field_count
-        if request_approx_bytes is not None:
-            context_data['request_approx_bytes'] = request_approx_bytes
+        context_data.update(ajax_save_telemetry)
 
         diagnostics_summary = ''
         if is_platform_5xx(error_code):
@@ -380,10 +385,9 @@ def log_platform_error():
             context_data['context_truncated'] = True
 
         description = f'Platform error {error_code} occurred at {url or "unknown URL"}'
-        if request_field_count is not None or request_approx_bytes is not None:
-            size_kb = f'{request_approx_bytes / 1024:.1f}KB' if request_approx_bytes is not None else 'unknown size'
-            fields = f'{request_field_count} fields' if request_field_count is not None else 'unknown field count'
-            description = f'{description} (request body: ~{size_kb}, {fields})'
+        extras = format_platform_error_description_extras(ajax_save_telemetry)
+        if extras:
+            description = f'{description} ({"; ".join(extras)})'
         if diagnostics_summary:
             description = f'{description}. {diagnostics_summary}'
         description = description[:500]

@@ -61,11 +61,12 @@ pgvector==0.2.5
 # the transformers 5.x upgrade possible. Both must be upgraded together.
 # CVE-2026-1839 has no fix in any 4.x release; 5.0.0 is the minimum stable fix.
 sentence-transformers==5.4.0    # was 2.7.0 — required to allow transformers 5.x
-transformers==5.5.0             # was 5.0.0 — GHSA-fgcw-684q-jj6r (min fix: 5.5.0)
+transformers==5.10.0            # was 5.5.0 — CVE-2026-9856 path traversal in save_pretrained (min fix: 5.10.0)
 tiktoken==0.11.0
 
 # Document processing
-unstructured==0.18.27
+# unstructured removed: unused, CVE-2026-71428; 0.24.0 needs psutil>=7.2.2 + spacy/numba.
+# That also drops transitive nltk (PYSEC-2026-3740, no patched release).
 pdf2image==1.17.0
 pytesseract==0.3.13
 python-docx==1.2.0

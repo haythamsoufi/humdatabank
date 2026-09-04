@@ -1,10 +1,9 @@
 /**
- * Why the WAF ajax-save.js fix stayed stuck in returning browsers after deploy.
+ * Assignment /1593 returning-visitor contract.
  *
- * These tests encode the force-reload contract: a visitor who already has
- * ajax-save.js cached must receive the new module after a deploy, without
- * clearing site data. They load the real service worker and replay the
- * cache/deploy strategies the last ship actually used.
+ * A user who already opened the form before the WAF ajax-save fix still
+ * posts to /assignment/1593?ajax=1. They must receive the new ajax-save.js
+ * (and every other changed static file) without clearing site data.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
@@ -35,11 +34,6 @@ const OLD_MODULE = 'export function initAjaxSave(){ /* pre-WAF */ }';
 const NEW_MODULE = 'export function initAjaxSave(){ /* WAF b64 wrap */ }';
 
 class ImmutableHttpCache {
-  /**
-   * Browser HTTP cache that honors Cache-Control: immutable (RFC 8246).
-   * A later origin header change is invisible until the stored response
-   * is no longer fresh — the client does not revalidate while max-age holds.
-   */
   constructor({ now = 0 } = {}) {
     this.now = now;
     this.entries = new Map();
@@ -51,15 +45,13 @@ class ImmutableHttpCache {
       cacheControl,
       storedAt: storedAt ?? this.now,
       maxAge: parseMaxAge(cacheControl),
-      immutable: /\bimmutable\b/.test(cacheControl),
     });
   }
 
   lookup(url) {
     const entry = this.entries.get(url);
     if (!entry) return null;
-    const age = this.now - entry.storedAt;
-    if (age >= entry.maxAge) return null;
+    if (this.now - entry.storedAt >= entry.maxAge) return null;
     return entry;
   }
 
@@ -173,56 +165,29 @@ async function dispatchFetch(listeners, request) {
   return { intercepted: true, response: await pending };
 }
 
-describe('returning visitor after ajax-save.js deploy', () => {
-  describe('Azure Cache-Control flip (the 5dc91450 self-heal)', () => {
-    it('does not claim a strategy the HTTP cache cannot perform', () => {
-      expect(UPLOAD_SCRIPT).toMatch(/self-heals on the next request/);
-      expect(UPLOAD_SCRIPT).toMatch(/CACHE_CONTROL_REVALIDATE/);
+describe('assignment /1593 returning visitor after ajax-save.js deploy', () => {
+  describe('HTTP cache: a new ?v= is the only way off an immutable copy', () => {
+    it('does not claim that flipping Cache-Control self-heals the same URL', () => {
+      expect(UPLOAD_SCRIPT).not.toMatch(/self-heals on the next request/);
     });
 
-    it('must fetch the WAF-fixed ajax-save.js after origin switches immutable → must-revalidate on the same URL', () => {
-      const url = `${CDN_ORIGIN}${AJAX_SAVE_PATH}`;
+    it('fetches the WAF-fixed module when the import map / static_url query changes', () => {
       const cache = new ImmutableHttpCache({ now: 0 });
-      cache.store(url, {
-        body: OLD_MODULE,
-        cacheControl: 'max-age=31536000, public, immutable',
-      });
-
-      // One hour later the blob now has the WAF fix and the new revalidate
-      // header. The user reloads the form without clearing site data.
-      cache.now = 3600;
-      const result = cache.fetch(url, {
-        body: NEW_MODULE,
-        cacheControl: 'max-age=0, public, must-revalidate',
-      });
-
-      expect(result.body, [
-        'Returning browsers that already stored unversioned ajax-save.js as',
-        '`Cache-Control: immutable` (Azure\'s previous year-long header) will',
-        'not revalidate for up to a year. Changing the blob to',
-        '`must-revalidate` only affects *new* fetches — it cannot evict the',
-        'cached pre-WAF module. That is why the deploy did not force-reload it.',
-      ].join(' ')).toBe(NEW_MODULE);
-      expect(result.via).toBe('network');
-    });
-
-    it('does fetch the new module when the URL itself changes (?v= bump)', () => {
-      const cache = new ImmutableHttpCache({ now: 0 });
-      cache.store(`${CDN_ORIGIN}${AJAX_SAVE_PATH}?v=oldsha`, {
+      cache.store(`${CDN_ORIGIN}${AJAX_SAVE_PATH}`, {
         body: OLD_MODULE,
         cacheControl: 'max-age=31536000, public, immutable',
       });
       cache.now = 3600;
-      const result = cache.fetch(`${CDN_ORIGIN}${AJAX_SAVE_PATH}?v=newsha`, {
+      const result = cache.fetch(`${CDN_ORIGIN}${AJAX_SAVE_PATH}?v=pinned.newhash`, {
         body: NEW_MODULE,
-        cacheControl: 'max-age=0, public, must-revalidate',
+        cacheControl: 'max-age=31536000, public, immutable',
       });
       expect(result.body).toBe(NEW_MODULE);
       expect(result.via).toBe('network');
     });
   });
 
-  describe('service worker cache-first + stripped query string', () => {
+  describe('service worker', () => {
     let caches;
     let networkBody;
     let fetchImpl;
@@ -230,18 +195,15 @@ describe('returning visitor after ajax-save.js deploy', () => {
     beforeEach(() => {
       caches = createCacheStorage();
       networkBody = NEW_MODULE;
-      fetchImpl = async (input) => {
-        const url = typeof input === 'string' ? input : input.url;
-        return new Response(networkBody, {
-          status: 200,
-          headers: { 'Content-Type': 'application/javascript' },
-        });
-      };
+      fetchImpl = async () => new Response(networkBody, {
+        status: 200,
+        headers: { 'Content-Type': 'application/javascript' },
+      });
     });
 
-    it('must not serve a previously cached ajax-save.js when the page asks for a new ?v=', async () => {
+    it('does not serve a previously cached ajax-save.js when the page asks for a new ?v=', async () => {
       const { listeners } = loadServiceWorker({ caches, fetchImpl });
-      const cacheName = `ifrc-forms-ASSET_VERSION_PLACEHOLDER`;
+      const cacheName = 'ifrc-forms-ASSET_VERSION_PLACEHOLDER';
       const cache = await caches.open(cacheName);
       await cache.put(
         new Request(`${APP_ORIGIN}${AJAX_SAVE_PATH}`),
@@ -250,39 +212,41 @@ describe('returning visitor after ajax-save.js deploy', () => {
 
       const { intercepted, response } = await dispatchFetch(
         listeners,
-        new Request(`${APP_ORIGIN}${AJAX_SAVE_PATH}?v=new-deploy-sha`, {
+        new Request(`${APP_ORIGIN}${AJAX_SAVE_PATH}?v=new-deploy-sha.contenthash`, {
           method: 'GET',
           mode: 'cors',
         }),
       );
 
       expect(intercepted).toBe(true);
-      const body = await response.text();
-      expect(body, [
-        'sw.js cacheKeyForUrl() strips ?v= and the /static/ handler is',
-        'cache-first. A deploy that only changes ASSET_VERSION on the script',
-        'URL still hits the old Cache API entry, so ajax-save.js never',
-        'reloads until the SW cache *name* changes and the old bucket is',
-        'deleted — and even then only if the SW actually reinstalled.',
-      ].join(' ')).toBe(NEW_MODULE);
+      expect(await response.text()).toBe(NEW_MODULE);
     });
 
-    it('does not intercept CDN ajax-save.js, so a SW cache-version bump cannot refresh production modules', async () => {
+    it('revalidates same-origin JS even when the request URL has no new query', async () => {
+      const { listeners } = loadServiceWorker({ caches, fetchImpl });
+      const cache = await caches.open('ifrc-forms-ASSET_VERSION_PLACEHOLDER');
+      await cache.put(
+        new Request(`${APP_ORIGIN}${AJAX_SAVE_PATH}`),
+        new Response(OLD_MODULE, { status: 200 }),
+      );
+
+      const { response } = await dispatchFetch(
+        listeners,
+        new Request(`${APP_ORIGIN}${AJAX_SAVE_PATH}`, { method: 'GET', mode: 'cors' }),
+      );
+      expect(await response.text()).toBe(NEW_MODULE);
+    });
+
+    it('does not intercept CDN ajax-save.js (versioned URLs are the CDN bust)', async () => {
       const { listeners } = loadServiceWorker({ caches, fetchImpl });
       const { intercepted } = await dispatchFetch(
         listeners,
-        new Request(`${CDN_ORIGIN}${AJAX_SAVE_PATH}?v=new-deploy-sha`, {
+        new Request(`${CDN_ORIGIN}${AJAX_SAVE_PATH}?v=new-deploy-sha.contenthash`, {
           method: 'GET',
           mode: 'cors',
         }),
       );
-
-      expect(intercepted, [
-        'Production loads ajax-save.js from STATIC_CDN_URL (cross-origin).',
-        'sw.js returns early for other origins, so injecting ASSET_VERSION',
-        'into CACHE_NAME cannot evict the CDN/browser copy. Combined with',
-        'the immutable header, a SW-only deploy does nothing for form save.',
-      ].join(' ')).toBe(true);
+      expect(intercepted).toBe(false);
     });
   });
 
@@ -301,23 +265,11 @@ describe('returning visitor after ajax-save.js deploy', () => {
     });
   });
 
-  describe('upload script only rewrites Cache-Control for content-changed blobs', () => {
-    it('must update ajax-save.js metadata even when AzCopy dry-run is empty (header-only policy change)', () => {
-      const incrementalReturnsEarly = /no static files differ from blob storage; skipping sync and Cache-Control pass/.test(
-        UPLOAD_SCRIPT,
-      );
-      const forceUploadOnlyFullRewrite = /STATIC_FORCE_UPLOAD=1/.test(UPLOAD_SCRIPT)
-        && /if \[\[ "\$\{STATIC_FORCE_UPLOAD:-}" == "1" \]\]/.test(UPLOAD_SCRIPT);
-
-      expect(
-        incrementalReturnsEarly && forceUploadOnlyFullRewrite,
-        [
-          'Expected the incremental uploader to still rewrite JS Cache-Control',
-          'when file bytes are unchanged. Today a dry-run miss skips the',
-          'Cache-Control pass entirely, so existing ajax-save.js blobs keep',
-          '`max-age=31536000, immutable` — the header that froze the old module.',
-        ].join(' '),
-      ).toBe(false);
+  describe('upload script rewrites JS/CSS headers every deploy', () => {
+    it('lists local js/css for Cache-Control even when AzCopy dry-run is empty', () => {
+      expect(UPLOAD_SCRIPT).toMatch(/_list_local_js_css/);
+      expect(UPLOAD_SCRIPT).toMatch(/Always rewrite JS\/CSS Cache-Control/);
+      expect(UPLOAD_SCRIPT).not.toMatch(/skipping sync and Cache-Control pass/);
     });
   });
 });

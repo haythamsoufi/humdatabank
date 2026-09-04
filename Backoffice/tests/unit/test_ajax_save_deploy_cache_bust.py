@@ -1,22 +1,20 @@
-"""Why a deploy did not force-reload the WAF-fixed ajax-save.js.
+"""Force-reload contract for assignment form static files.
 
-These tests do not need Flask or Postgres. They exercise the real deploy
-workflow snippet, the Azure upload script, the import-map builder, and a
-browser HTTP-cache model that matches RFC 8246 ``immutable``.
+A user who already opened /assignment/1593 before the WAF ajax-save fix
+must receive the new module on the next visit. Saving then posts to
+/assignment/1593?ajax=1 with the WAF wrap instead of a 403.
 
-A passing suite here would mean a returning visitor gets the new module
-without clearing site data. Failures are the reason the last deploy did not.
+These tests do not need Flask or Postgres.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import re
-import subprocess
+import sys
+import types
 from pathlib import Path
 from types import SimpleNamespace
-
-import pytest
 
 BACKOFFICE = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKOFFICE.parent
@@ -27,18 +25,33 @@ STATIC_SERVING = BACKOFFICE / "app" / "static_serving.py"
 LAYOUT = BACKOFFICE / "app" / "templates" / "core" / "layout.html"
 ENTRY_FORM = BACKOFFICE / "app" / "templates" / "forms" / "entry_form" / "entry_form.html"
 IMPORT_MAP_PY = BACKOFFICE / "app" / "static_import_map.py"
+STATIC_VERSION_PY = BACKOFFICE / "app" / "static_version.py"
 
 AJAX_SAVE_REL = "js/forms/modules/ajax-save.js"
-OLD_MODULE = "export function initAjaxSave(){ /* pre-WAF */ }"
-NEW_MODULE = "export function initAjaxSave(){ /* WAF b64 wrap */ }"
 
 
-def _load_import_map_module():
-    spec = importlib.util.spec_from_file_location("static_import_map_under_test", IMPORT_MAP_PY)
+def _load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _load_import_map_module():
+    existing = sys.modules.get("app")
+    if existing is not None and hasattr(existing, "create_app"):
+        from app import static_import_map
+        return static_import_map
+
+    sv = _load_module("static_version_standalone", STATIC_VERSION_PY)
+    pkg = existing if isinstance(existing, types.ModuleType) else types.ModuleType("app")
+    if existing is None:
+        pkg.__path__ = [str(BACKOFFICE / "app")]
+        sys.modules["app"] = pkg
+    sys.modules["app.static_version"] = sv
+    pkg.static_version = sv
+    return _load_module("static_import_map_under_test", IMPORT_MAP_PY)
 
 
 class BrowserHttpCache:
@@ -55,7 +68,6 @@ class BrowserHttpCache:
             "cache_control": cache_control,
             "stored_at": self.now if stored_at is None else stored_at,
             "max_age": int(match.group(1)) if match else 0,
-            "immutable": "immutable" in (cache_control or ""),
         }
 
     def lookup(self, url: str) -> dict | None:
@@ -74,194 +86,32 @@ class BrowserHttpCache:
         return origin["body"], "network"
 
 
-# ---------------------------------------------------------------------------
-# 1. The deploy's "self-heal" cannot evict an already-cached immutable copy
-# ---------------------------------------------------------------------------
+class TestAssignment1593ContentChangeBustsAjaxSaveUrl:
+    """Returning visitor on /assignment/1593 must request a new ajax-save.js URL."""
 
-class TestImmutableCacheSurvivesHeaderOnlyDeploy:
-    def test_upload_script_documents_self_heal_via_must_revalidate(self):
-        script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
-        assert "self-heals on the next request" in script
-        assert "CACHE_CONTROL_REVALIDATE" in script
-        assert "max-age=31536000, public, immutable" in script
-
-    def test_same_url_must_receive_waf_fix_after_origin_flips_to_must_revalidate(self):
-        url = f"https://cdn.example/static/{AJAX_SAVE_REL}"
-        cache = BrowserHttpCache(now=0)
-        cache.store(
-            url,
-            body=OLD_MODULE,
-            cache_control="max-age=31536000, public, immutable",
+    def test_content_hash_changes_query_when_file_bytes_change(self, tmp_path):
+        sv = _load_module("static_version_under_test", STATIC_VERSION_PY)
+        ajax = tmp_path / "js" / "forms" / "modules" / "ajax-save.js"
+        ajax.parent.mkdir(parents=True)
+        ajax.write_text("export function initAjaxSave(){ /* pre-WAF */ }\n", encoding="utf-8")
+        app = SimpleNamespace(
+            static_folder=str(tmp_path),
+            root_path=str(tmp_path),
+            config={"ASSET_VERSION": "pinned-sha"},
         )
-        cache.now = 3600
-        body, via = cache.fetch(
-            url,
-            {"body": NEW_MODULE, "cache_control": "max-age=0, public, must-revalidate"},
-        )
-        assert body == NEW_MODULE, (
-            "Returning browsers that already stored unversioned ajax-save.js "
-            "as Cache-Control: immutable will not revalidate for up to a year. "
-            "Flipping the Azure blob to must-revalidate only affects new fetches "
-            "— it cannot evict the cached pre-WAF module. That is why the "
-            "deploy did not force-reload it."
-        )
-        assert via == "network"
-
-    def test_query_string_change_is_a_new_cache_key(self):
-        cache = BrowserHttpCache(now=0)
-        cache.store(
-            f"https://cdn.example/static/{AJAX_SAVE_REL}?v=oldsha",
-            body=OLD_MODULE,
-            cache_control="max-age=31536000, public, immutable",
-        )
-        cache.now = 3600
-        body, via = cache.fetch(
-            f"https://cdn.example/static/{AJAX_SAVE_REL}?v=newsha",
-            {"body": NEW_MODULE, "cache_control": "max-age=0, public, must-revalidate"},
-        )
-        assert body == NEW_MODULE
-        assert via == "network"
-
-
-# ---------------------------------------------------------------------------
-# 2. Incremental AzCopy never rewrites Cache-Control on unchanged JS blobs
-# ---------------------------------------------------------------------------
-
-class TestUploadScriptSkipsHeaderRewriteWhenBytesMatch:
-    def test_incremental_path_must_rewrite_js_headers_even_when_dry_run_is_empty(self):
-        script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
-        incremental_bails = (
-            "no static files differ from blob storage; skipping sync and Cache-Control pass."
-            in script
-        )
-        assert incremental_bails is False, (
-            "upload-static-assets.sh returns early when AzCopy dry-run finds no "
-            "byte changes, so a Cache-Control policy change never reaches the "
-            "existing ajax-save.js blob. That blob keeps "
-            "max-age=31536000, immutable — the header that froze the old module."
+        before = sv.asset_query_version(app, AJAX_SAVE_REL)
+        ajax.write_text("export function initAjaxSave(){ /* WAF b64 wrap */ }\n", encoding="utf-8")
+        sv.clear_static_version_cache()
+        after = sv.asset_query_version(app, AJAX_SAVE_REL)
+        assert before.startswith("pinned-sha.")
+        assert after.startswith("pinned-sha.")
+        assert before != after, (
+            "A returning /assignment/1593 visitor already has ajax-save.js "
+            "cached as immutable. If ?v= stays the same when the file changes, "
+            "they keep posting ?ajax=1 without the WAF wrap and get 403."
         )
 
-
-# ---------------------------------------------------------------------------
-# 3. Deploy workflow only diffs HEAD^..HEAD for static upload
-# ---------------------------------------------------------------------------
-
-_WORKFLOW_DETECT = r"""
-set -euo pipefail
-if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-  changed_files="$(git diff --name-only HEAD^..HEAD -- Backoffice/app/static || true)"
-  if [ -n "${changed_files}" ]; then
-    echo "changed=true"
-  else
-    echo "changed=false"
-  fi
-else
-  echo "changed=true"
-fi
-"""
-
-
-class TestDeployWorkflowMissesAjaxSaveInEarlierCommit:
-    def test_workflow_still_uses_tip_commit_only_diff(self):
-        workflow = WORKFLOW.read_text(encoding="utf-8")
-        assert "HEAD^..HEAD" in workflow
-        assert "Backoffice/app/static" in workflow
-        assert "fetch-depth: 2" in workflow
-
-    def test_ajax_save_change_in_parent_commit_must_still_trigger_static_upload(self, tmp_path):
-        repo = tmp_path / "deploy"
-        repo.mkdir()
-        static_file = repo / "Backoffice" / "app" / "static" / "js" / "forms" / "modules" / "ajax-save.js"
-        static_file.parent.mkdir(parents=True)
-        static_file.write_text("old\n", encoding="utf-8")
-        subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
-        subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
-        subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
-
-        static_file.write_text("waf-fix\n", encoding="utf-8")
-        subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "WAF ajax-save fix"], cwd=repo, check=True, capture_output=True)
-
-        (repo / "ci.txt").write_text("unrelated\n", encoding="utf-8")
-        subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "CI fix"], cwd=repo, check=True, capture_output=True)
-
-        result = subprocess.run(
-            ["bash", "-lc", _WORKFLOW_DETECT],
-            cwd=repo,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        assert "changed=true" in result.stdout, (
-            "deploy-to-webapp.yml diffs only HEAD^..HEAD (and checks out "
-            "fetch-depth: 2). A deploy whose tip commit is unrelated CI/docs "
-            "skips the Azure static upload even when an earlier commit in the "
-            "same push updated ajax-save.js. The app ships a new ASSET_VERSION "
-            "but the CDN blob stays on the pre-WAF module."
-        )
-
-
-# ---------------------------------------------------------------------------
-# 4. Service worker cannot bust the production CDN copy
-# ---------------------------------------------------------------------------
-
-class TestServiceWorkerCannotRefreshCdnAjaxSave:
-    def test_sw_precache_list_includes_unversioned_ajax_save(self):
-        source = SW_PATH.read_text(encoding="utf-8")
-        assert "'/static/js/forms/modules/ajax-save.js'" in source
-        assert "cacheKeyForUrl" in source
-        assert "stripping query/hash" in source or "stripping query" in source
-
-    def test_sw_skips_cross_origin_so_cdn_immutable_copies_are_untouched(self):
-        source = SW_PATH.read_text(encoding="utf-8")
-        assert "url.origin !== self.location.origin" in source
-        assert "Do not intercept cross-origin requests" in source
-
-    def test_sw_static_handler_must_not_treat_query_string_as_the_same_cache_key(self):
-        source = SW_PATH.read_text(encoding="utf-8")
-        strips_query = (
-            "return new Request(`${u.origin}${u.pathname}`)" in source
-            or 'return new Request(`${u.origin}${u.pathname}`)' in source
-        )
-        cache_first_static = "Static assets: cache-first and ignore querystring" in source
-        assert not (strips_query and cache_first_static), (
-            "sw.js stores /static/ assets under a pathname-only key and serves "
-            "them cache-first. A new ?v=<ASSET_VERSION> on ajax-save.js still "
-            "returns the previously cached pre-WAF body for same-origin "
-            "requests (CDN fallback / no STATIC_CDN_URL)."
-        )
-
-
-# ---------------------------------------------------------------------------
-# 5. Flask still freezes versioned JS for a year (same ASSET_VERSION = stuck)
-# ---------------------------------------------------------------------------
-
-class TestFlaskVersionedJsStillImmutable:
-    def test_versioned_js_must_not_be_immutable_if_the_url_can_be_reused(self):
-        source = STATIC_SERVING.read_text(encoding="utf-8")
-        marks_versioned_immutable = (
-            "if 'v=' in query_string:" in source
-            and "_IMMUTABLE" in source
-            and "max-age=31536000, public, immutable" in source
-        )
-        assert marks_versioned_immutable is False, (
-            "app/static_serving.py still sends Cache-Control: immutable for "
-            "any /static/*.js?v=… response. If ASSET_VERSION is pinned (Azure "
-            "App Setting overriding the image ENV) or a static-only upload "
-            "keeps the same ?v=, browsers will keep the old ajax-save.js for "
-            "a year even after the file on disk changes."
-        )
-
-
-# ---------------------------------------------------------------------------
-# 6. Import map actually names ajax-save.js (so a working map *would* bust)
-# ---------------------------------------------------------------------------
-
-class TestImportMapNamesAjaxSave:
-    def test_forms_import_map_rewrites_ajax_save_relative_imports(self):
+    def test_import_map_ajax_save_url_includes_content_hash(self):
         module = _load_import_map_module()
         module.clear_import_map_cache()
         app = SimpleNamespace(
@@ -279,15 +129,65 @@ class TestImportMapNamesAjaxSave:
                 if specifier.endswith("ajax-save.js"):
                     mapped.append(url)
         assert mapped, "import map must mention ajax-save.js so nested imports get ?v="
-        assert all("?v=deploy-waf-fix" in url for url in mapped)
+        assert all("?v=deploy-waf-fix." in url for url in mapped)
         assert any(url.startswith("https://cdn.example/static/") for url in mapped)
-        # App-origin scopes exist so CDN-fallback entry-form.js still cache-busts.
         assert any(url.startswith("https://databank.example/static/") for url in mapped)
 
+    def test_new_query_string_misses_immutable_http_cache(self):
+        cache = BrowserHttpCache(now=0)
+        cache.store(
+            f"https://cdn.example/static/{AJAX_SAVE_REL}",
+            body="OLD_PRE_WAF",
+            cache_control="max-age=31536000, public, immutable",
+        )
+        cache.now = 3600
+        body, via = cache.fetch(
+            f"https://cdn.example/static/{AJAX_SAVE_REL}?v=pinned-sha.newhash",
+            {"body": "NEW_WAF_FIX", "cache_control": "max-age=31536000, public, immutable"},
+        )
+        assert body == "NEW_WAF_FIX"
+        assert via == "network"
 
-# ---------------------------------------------------------------------------
-# 7. Template order — import map must precede type=module (regression lock)
-# ---------------------------------------------------------------------------
+
+class TestUploadScriptRewritesJsHeadersEveryDeploy:
+    def test_incremental_path_rewrites_js_css_when_bytes_match(self):
+        script = UPLOAD_SCRIPT.read_text(encoding="utf-8")
+        assert "_list_local_js_css" in script
+        assert "Always rewrite JS/CSS Cache-Control" in script
+        assert "skipping sync and Cache-Control pass" not in script
+
+
+class TestDeployWorkflowAlwaysUploadsStatic:
+    def test_workflow_always_marks_static_changed(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        assert 'echo "changed=true" >> "$GITHUB_OUTPUT"' in workflow
+        assert "No static file changes in latest commit; skipping static upload." not in workflow
+        assert "git diff --name-only HEAD^..HEAD -- Backoffice/app/static" not in workflow
+
+    def test_ajax_save_change_in_parent_commit_still_uploads(self, tmp_path):
+        """The live workflow no longer diffs HEAD^; upload always runs."""
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        detect = workflow.split("- name: Detect static asset changes", 1)[1]
+        detect = detect.split("- name: Set deployment target", 1)[0]
+        assert "changed=true" in detect
+        assert "changed=false" not in detect
+
+
+class TestServiceWorkerDoesNotReusePathnameOnlyCache:
+    def test_sw_keeps_query_string_in_cache_key(self):
+        source = SW_PATH.read_text(encoding="utf-8")
+        assert "u.search" in source
+        assert "stripping query/hash" not in source
+        assert "cache-first and ignore querystring" not in source
+        assert "cache: 'reload'" in source
+        assert "isCodeAsset" in source
+
+
+class TestFlaskVersionedJsIsContentAddressed:
+    def test_static_serving_documents_content_hash_bust(self):
+        source = STATIC_SERVING.read_text(encoding="utf-8")
+        assert "content-hash" in source or "content hash" in source
+
 
 class TestEntryFormImportMapOrder:
     def test_entry_form_head_starts_with_import_map(self):

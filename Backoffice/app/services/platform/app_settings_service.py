@@ -957,14 +957,16 @@ def organization_visual_asset_href(path: Optional[str], default: str = "logo.svg
     norm = _strip_visual_path_prefixes(raw)
     if not norm:
         norm = default
-    ver = str(current_app.config.get("ASSET_VERSION") or "v1")
+    from app.static_version import asset_query_version, deploy_asset_version
     if norm.lower().startswith("branding/"):
+        ver = deploy_asset_version(current_app)
         tail = norm[9:].split("/")[0].strip()
         if not tail:
             base = url_for("static", filename=default)
             return f"{base}?v={ver}"
         base = url_for("api.serve_branding_asset", filename=tail)
         return f"{base}?v={ver}"
+    ver = asset_query_version(current_app, norm)
     base = url_for("static", filename=norm)
     return f"{base}?v={ver}"
 

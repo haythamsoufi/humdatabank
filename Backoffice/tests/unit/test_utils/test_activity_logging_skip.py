@@ -105,6 +105,8 @@ class TestShouldSkipActivityEndpoint:
         from app.utils.activity_logging_skip import SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
 
         assert should_skip_activity_endpoint("upr_excel_import.analyze") is True
+        assert should_skip_activity_endpoint("excel.validate_upr_country_reporting_import") is True
+        assert should_skip_activity_endpoint("excel.import_upr_country_reporting_template") is False
         assert should_skip_activity_endpoint("upr_visuals.assignment_narrative") is True
         assert should_skip_activity_endpoint("auth.complete_profile") is True
         assert "auth.complete_profile" in SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS

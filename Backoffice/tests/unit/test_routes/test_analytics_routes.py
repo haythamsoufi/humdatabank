@@ -258,6 +258,8 @@ class TestResolveSecurityEvent:
             event = SecurityEvent(
                 event_type="failed_login",
                 severity="medium",
+                description="Failed login attempts",
+                ip_address="127.0.0.1",
                 is_resolved=False,
             )
             db_session.add(event)
@@ -434,13 +436,14 @@ class TestEndSession:
             )
         _assert_status(resp, 302, 200)
 
-    def test_session_already_ended(self, logged_in_client, db_session, app):
+    def test_session_already_ended(self, logged_in_client, db_session, app, admin_user):
         from app.models import UserSessionLog
         with app.app_context():
             session_log = UserSessionLog(
                 session_id="test-session-123",
-                user_id=None,
+                user_id=admin_user.id,
                 is_active=False,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()
@@ -459,6 +462,7 @@ class TestEndSession:
                 session_id="test-active-session-456",
                 user_id=user_id,
                 is_active=True,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()
@@ -479,6 +483,7 @@ class TestEndSession:
                 session_id="test-error-session-789",
                 user_id=user_id,
                 is_active=True,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()

@@ -244,6 +244,12 @@ class TestDetermineActivityType:
 
     def test_post_enter_data_save(self):
         assert _determine_activity_type("POST", "forms.enter_data", {"action": "save"}) == "form_saved"
+        assert _determine_activity_type(
+            "POST", "assignments.view_assignment", {"action": "save"}
+        ) == "form_saved"
+        assert _determine_activity_type(
+            "POST", "forms.view_edit_form", {"action": "save"}
+        ) == "form_saved"
 
     def test_post_enter_data_submit(self):
         assert _determine_activity_type("POST", "forms.enter_data", {"action": "submit"}) == "form_submitted"
@@ -1092,24 +1098,24 @@ class TestActivityRegisteredHooks:
                 mock_log.assert_called_once()
                 assert resp.status_code == 200
 
-    def test_after_request_skips_draft_save(self, app):
-        with app.test_request_context("/forms/assignment/1", method="POST",
+    def test_after_request_logs_entry_form_save(self, app):
+        with app.test_request_context("/assignment/1", method="POST",
                                        data={"action": "save"},
                                        content_type="application/x-www-form-urlencoded"):
             g.activity_user_id = 1
             g._auto_txn_managed = False
             g.start_time = time.time() - 0.05
-            with _with_activity_endpoint("forms.view_edit_form"), \
+            with _with_activity_endpoint("assignments.view_assignment"), \
                  patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
-                 patch("app.middleware.activity_middleware.update_session_activity") as mock_touch:
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
                 from flask import make_response
                 resp = _activity_after(app)(make_response("ok", 200))
-                mock_log.assert_not_called()
-                mock_touch.assert_called_once_with("action")
+                mock_log.assert_called_once()
+                assert mock_log.call_args[1]["activity_type"] == "form_saved"
                 assert resp.status_code == 200
 
     def test_after_request_non_deferred_page_view_increments_session(self, app):
@@ -1211,6 +1217,28 @@ class TestActivityRegisteredHooks:
                 for callback in getattr(resp, "_on_close", []):
                     callback()
                 mock_log.assert_called_once()
+
+    def test_after_request_deferred_logs_entry_form_save(self, app):
+        with app.test_request_context("/assignment/1", method="POST",
+                                       data={"action": "save"},
+                                       content_type="application/x-www-form-urlencoded"):
+            g.activity_user_id = 1
+            g.activity_session_id = "sess-abc"
+            g._auto_txn_managed = True
+            g.start_time = time.time() - 0.05
+            with _with_activity_endpoint("assignments.view_assignment"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity_explicit") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                for callback in getattr(resp, "_on_close", []):
+                    callback()
+                mock_log.assert_called_once()
+                assert mock_log.call_args[1]["activity_type"] == "form_saved"
 
     def test_after_request_deferred_dashboard_post_is_page_view(self, app):
         with app.test_request_context("/dashboard", method="POST"):

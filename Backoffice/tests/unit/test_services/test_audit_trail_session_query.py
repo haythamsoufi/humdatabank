@@ -344,7 +344,7 @@ class TestCountAuditVisibleEntriesForSession:
         result = count_audit_visible_entries_for_session(sl)
         assert result == 0
 
-    def test_form_saved_and_wizard_endpoints_not_counted(self, app, db_session):
+    def test_wizard_endpoints_not_counted_form_saved_is(self, app, db_session):
         from app.models import UserActivityLog, UserSessionLog
         from app.utils.datetime_helpers import utcnow
         from tests.factories import create_test_user
@@ -398,7 +398,8 @@ class TestCountAuditVisibleEntriesForSession:
         db_session.commit()
 
         result = count_audit_visible_entries_for_session(sl)
-        assert result == 1
+        # form_saved + form_submitted; wizard analyze endpoint is still excluded
+        assert result == 2
 
 
 class TestCountAuditVisibleEntriesForSessionsBatch:

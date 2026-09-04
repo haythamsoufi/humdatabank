@@ -112,9 +112,9 @@ class TestShouldSkipActivityEndpoint:
 
 
 class TestShouldSkipActivityType:
-    def test_form_saved_skipped(self):
-        assert should_skip_activity_type("form_saved") is True
-        assert should_skip_activity_type("form_save") is True
+    def test_form_saved_not_skipped(self):
+        assert should_skip_activity_type("form_saved") is False
+        assert should_skip_activity_type("form_save") is False
 
     def test_submit_not_skipped(self):
         assert should_skip_activity_type("form_submitted") is False

@@ -131,7 +131,11 @@ def _determine_activity_type(method, endpoint, form_data=None):
             return 'form_reopened'
 
         # Entry-form (focal-point data entry) — has an explicit 'action' field
-        if endpoint in ('forms.enter_data',) or 'enter_data' in endpoint:
+        if endpoint in (
+            'forms.enter_data',
+            'forms.view_edit_form',
+            'assignments.view_assignment',
+        ) or 'enter_data' in endpoint:
             if action == 'save':
                 return 'form_saved'
             elif action == 'submit':
@@ -555,7 +559,7 @@ def init_activity_tracking(app):
                     ):
                         return response
 
-                    # Draft / autosave: refresh last_activity only — not an audit row.
+                    # Reserved skip-types (none today): refresh last_activity only.
                     if should_skip_activity_type(activity_type):
                         def _on_close_touch():
                             try:

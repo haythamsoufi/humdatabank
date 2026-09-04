@@ -102,9 +102,10 @@ SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
     }
 )
 
-# Draft saves are inferred from form action=save; skip the row, not the endpoint
-# (submit / approve / reopen on the same route must still be recorded).
-SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_saved", "form_save"})
+# Inferred activity types that automatic middleware must not write.
+# Entry-form Save (action=save → form_saved) is an accountability event and
+# must be recorded like submit / approve / reopen on the same route.
+SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset()
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
 

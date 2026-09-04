@@ -68,8 +68,9 @@ def _admin_row_matches_scope(row, scope: dict[str, Any]) -> bool:
 # Auth events live on Login Logs; do not surface them in the unified audit trail.
 AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES = ('login', 'logout')
 
-# Hidden unless the reviewer explicitly filters for them (same idea as page_view).
-AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = ('page_view', 'form_saved', 'form_save')
+# Hidden unless the reviewer explicitly filters for them.
+# Entry-form Save (form_saved) is shown by default, like submit / reopen.
+AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = ('page_view',)
 
 
 def apply_audit_trail_user_activity_noise_filters(activity_query):

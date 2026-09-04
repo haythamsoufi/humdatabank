@@ -276,7 +276,12 @@ class TestDetermineActivityType:
         assert _determine_activity_type("POST", "forms.enter_data", {"action": "validate"}) == "form_validated"
 
     def test_post_enter_data_unknown_action(self):
-        assert _determine_activity_type("POST", "forms.enter_data", {"action": "autosave"}) == "request"
+        assert _determine_activity_type(
+            "POST", "forms.enter_data", {"action": "autosave"}
+        ) == "entry_form_request"
+        assert _determine_activity_type(
+            "POST", "assignments.view_assignment", {}
+        ) == "entry_form_request"
 
     def test_post_upload_endpoint(self):
         assert _determine_activity_type("POST", "forms.upload_document") == "file_uploaded"

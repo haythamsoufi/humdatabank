@@ -395,10 +395,22 @@ class TestCountAuditVisibleEntriesForSession:
                 timestamp=session_start + timedelta(minutes=3),
             )
         )
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                user_session_id="test-draft-excluded-01",
+                activity_type="request",
+                activity_description="Completed View Assignment",
+                endpoint="assignments.view_assignment",
+                url_path="/assignment/1",
+                ip_address="127.0.0.1",
+                timestamp=session_start + timedelta(minutes=4),
+            )
+        )
         db_session.commit()
 
         result = count_audit_visible_entries_for_session(sl)
-        # form_saved + form_submitted; wizard analyze endpoint is still excluded
+        # form_saved + form_submitted; wizard analyze and Completed View Assignment excluded
         assert result == 2
 
 

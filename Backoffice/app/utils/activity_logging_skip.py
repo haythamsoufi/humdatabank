@@ -106,7 +106,17 @@ SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
 
 # Silent save-before-submit (action=save + ifrc_presave=1 → form_presave).
 # Explicit Save (action=save without that flag → form_saved) is logged.
-SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_presave"})
+# Unmapped entry-form POSTs (no action) used to store "Completed View Assignment".
+SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_presave", "entry_form_request"})
+
+# Entry-form POSTs without a lifecycle action. Used to hide legacy "Completed View *" rows.
+ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
+    {
+        "forms.enter_data",
+        "forms.view_edit_form",
+        "assignments.view_assignment",
+    }
+)
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
 

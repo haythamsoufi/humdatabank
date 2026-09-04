@@ -169,8 +169,9 @@ def _determine_activity_type(method, endpoint, form_data=None):
             elif action == 'validate':
                 return 'form_validated'
             else:
-                # Autosave / AJAX / unknown action — not a formal submission
-                return 'request'
+                # AJAX/unknown POST on the entry form (no save/submit/reopen).
+                # Fallback text is "Completed View Assignment" — not an audit event.
+                return 'entry_form_request'
 
         # File uploads
         if 'upload' in endpoint:

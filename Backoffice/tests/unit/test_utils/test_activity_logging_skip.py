@@ -121,6 +121,9 @@ class TestShouldSkipActivityType:
     def test_silent_presave_skipped(self):
         assert should_skip_activity_type("form_presave") is True
 
+    def test_unmapped_entry_form_request_skipped(self):
+        assert should_skip_activity_type("entry_form_request") is True
+
     def test_submit_not_skipped(self):
         assert should_skip_activity_type("form_submitted") is False
 

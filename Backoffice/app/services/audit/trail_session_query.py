@@ -18,6 +18,7 @@ from sqlalchemy import and_, or_
 
 from app.models import AdminActionLog, User, UserActivityLog, UserSessionLog
 from app.utils.activity_logging_skip import (
+    ENTRY_FORM_ACTIVITY_ENDPOINTS,
     SKIP_ACTIVITY_ENDPOINTS,
     SKIP_ACTIVITY_ENDPOINT_SUFFIXES,
     SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS,
@@ -70,8 +71,18 @@ AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES = ('login', 'logout')
 
 # Hidden unless the reviewer explicitly filters for them.
 # Entry-form Save (form_saved) is shown by default, like submit / reopen.
-# form_presave is the silent save-before-submit helper and stays hidden if a row leaks.
-AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = ('page_view', 'form_presave')
+# form_presave / entry_form_request are plumbing and stay hidden if a row leaks.
+AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = (
+    'page_view',
+    'form_presave',
+    'entry_form_request',
+)
+
+# Legacy fallback text for unmapped POSTs to the assignment entry form.
+AUDIT_TRAIL_NOISE_DESCRIPTIONS = (
+    'Completed View Assignment',
+    'Completed View Edit Form',
+)
 
 
 def apply_audit_trail_user_activity_noise_filters(activity_query):
@@ -101,6 +112,15 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
                     & (UserActivityLog.activity_type != "profile_update")
                 )
                 | suffix_noise
+            )
+        )
+        .filter(
+            ~(
+                UserActivityLog.activity_description.in_(AUDIT_TRAIL_NOISE_DESCRIPTIONS)
+                | (
+                    (UserActivityLog.activity_type == 'request')
+                    & UserActivityLog.endpoint.in_(tuple(ENTRY_FORM_ACTIVITY_ENDPOINTS))
+                )
             )
         )
         .filter(~(UserActivityLog.activity_type == 'api_usage'))

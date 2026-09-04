@@ -45,6 +45,15 @@ from app.services.monitoring.worker_investigation import (
 )
 from app.extensions import limiter
 from app.utils.datetime_helpers import utcnow
+from app.utils.platform_error_telemetry import (  # noqa: F401
+    clamp_optional_int as _clamp_optional_int,
+    format_platform_error_description_extras,
+    sanitize_ajax_save_telemetry,
+    sanitize_field_name_list,
+    sanitize_form_field_name,
+    sanitize_script_delivery,
+    sanitize_version_token,
+)
 
 PLATFORM_ERROR_DIAGNOSTICS_MAX_CONTEXT_BYTES = 12000
 
@@ -131,73 +140,6 @@ def sanitize_url(url):
 def sanitize_client_error_text(value, *, max_len: int) -> Optional[str]:
     """Sanitize free-text client error fields (message, stack)."""
     return _strip_control_chars(value, max_len=max_len)
-
-
-def _clamp_optional_int(value, *, max_value: int) -> Optional[int]:
-    """Coerce untrusted client-supplied numeric telemetry to a bounded int.
-
-    Returns None for missing/invalid/negative input rather than raising —
-    this is best-effort observability data, not something a bad value should
-    ever be able to fail the request over.
-    """
-    if value is None:
-        return None
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        return None
-    if parsed < 0:
-        return None
-    return min(parsed, max_value)
-
-
-_VERSION_TOKEN_ALLOWED = frozenset(
-    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-+'
-)
-_FIELD_NAME_ALLOWED = frozenset(
-    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789[]_.-'
-)
-_SCRIPT_DELIVERY_ALLOWED = frozenset({'disk_cache', 'network'})
-_MAX_UNWRAPPED_FIELD_NAMES = 15
-
-
-def _sanitize_token(value, *, allowed: frozenset, max_len: int) -> Optional[str]:
-    """Keep only an allow-listed character set (version tokens, field names)."""
-    text = _strip_control_chars(value, max_len=max_len)
-    if not text:
-        return None
-    cleaned = ''.join(ch for ch in text if ch in allowed)
-    return cleaned[:max_len] or None
-
-
-def sanitize_version_token(value) -> Optional[str]:
-    """Sanitize deploy / content-hash tokens like ``abc123.deadbeef0123``."""
-    return _sanitize_token(value, allowed=_VERSION_TOKEN_ALLOWED, max_len=128)
-
-
-def sanitize_form_field_name(value) -> Optional[str]:
-    """Sanitize a FormData field name (never a value) for security-event context."""
-    return _sanitize_token(value, allowed=_FIELD_NAME_ALLOWED, max_len=200)
-
-
-def sanitize_script_delivery(value) -> Optional[str]:
-    """Allow only the cache-vs-network labels the reporter emits."""
-    text = _strip_control_chars(value, max_len=40)
-    if not text:
-        return None
-    return text if text in _SCRIPT_DELIVERY_ALLOWED else None
-
-
-def sanitize_field_name_list(value) -> Optional[list]:
-    """Sanitize a short list of FormData field names (no values)."""
-    if not isinstance(value, list):
-        return None
-    names = []
-    for item in value[:_MAX_UNWRAPPED_FIELD_NAMES]:
-        cleaned = sanitize_form_field_name(item)
-        if cleaned:
-            names.append(cleaned)
-    return names or None
 
 
 def sanitize_client_error_source(value) -> Optional[str]:
@@ -366,26 +308,13 @@ def log_platform_error():
         # an observability gap where a platform_403_forbidden event previously
         # carried no information about what was being saved. Clamped to sane
         # bounds since this is public, unauthenticated input.
-        request_field_count = _clamp_optional_int(data.get('request_field_count'), max_value=100_000)
-        request_approx_bytes = _clamp_optional_int(data.get('request_approx_bytes'), max_value=500_000_000)
-        request_b64_field_count = _clamp_optional_int(data.get('request_b64_field_count'), max_value=100_000)
-        request_unwrapped_field_count = _clamp_optional_int(
-            data.get('request_unwrapped_field_count'), max_value=100_000
-        )
-        request_longest_field_bytes = _clamp_optional_int(
-            data.get('request_longest_field_bytes'), max_value=500_000_000
-        )
-        request_longest_field_name = sanitize_form_field_name(data.get('request_longest_field_name'))
-        request_unwrapped_field_names = sanitize_field_name_list(data.get('request_unwrapped_field_names'))
-        asset_version = sanitize_version_token(data.get('asset_version'))
+        ajax_save_telemetry = sanitize_ajax_save_telemetry(data)
         page_url = sanitize_url(data.get('page_url'))
         ajax_save_script_url = sanitize_url(data.get('ajax_save_script_url'))
-        ajax_save_script_version = sanitize_version_token(data.get('ajax_save_script_version'))
-        ajax_save_script_delivery = sanitize_script_delivery(data.get('ajax_save_script_delivery'))
-        ajax_save_script_transfer_size = _clamp_optional_int(
-            data.get('ajax_save_script_transfer_size'), max_value=50_000_000
-        )
-        response_server = _strip_control_chars(data.get('response_server'), max_len=200)
+        if page_url:
+            ajax_save_telemetry['page_url'] = page_url
+        if ajax_save_script_url:
+            ajax_save_telemetry['ajax_save_script_url'] = ajax_save_script_url
 
         # ── Recovery probe fast-path ───────────────────────────────────────────
         # JS sends follow-up beacons at T+5s and T+15s with probe_delay_s set.
@@ -431,34 +360,7 @@ def log_platform_error():
         if timestamp:
             context_data['client_timestamp'] = timestamp
 
-        if request_field_count is not None:
-            context_data['request_field_count'] = request_field_count
-        if request_approx_bytes is not None:
-            context_data['request_approx_bytes'] = request_approx_bytes
-        if request_b64_field_count is not None:
-            context_data['request_b64_field_count'] = request_b64_field_count
-        if request_unwrapped_field_count is not None:
-            context_data['request_unwrapped_field_count'] = request_unwrapped_field_count
-        if request_longest_field_bytes is not None:
-            context_data['request_longest_field_bytes'] = request_longest_field_bytes
-        if request_longest_field_name:
-            context_data['request_longest_field_name'] = request_longest_field_name
-        if request_unwrapped_field_names:
-            context_data['request_unwrapped_field_names'] = request_unwrapped_field_names
-        if asset_version:
-            context_data['asset_version'] = asset_version
-        if page_url:
-            context_data['page_url'] = page_url
-        if ajax_save_script_url:
-            context_data['ajax_save_script_url'] = ajax_save_script_url
-        if ajax_save_script_version:
-            context_data['ajax_save_script_version'] = ajax_save_script_version
-        if ajax_save_script_delivery:
-            context_data['ajax_save_script_delivery'] = ajax_save_script_delivery
-        if ajax_save_script_transfer_size is not None:
-            context_data['ajax_save_script_transfer_size'] = ajax_save_script_transfer_size
-        if response_server:
-            context_data['response_server'] = response_server
+        context_data.update(ajax_save_telemetry)
 
         diagnostics_summary = ''
         if is_platform_5xx(error_code):
@@ -483,19 +385,7 @@ def log_platform_error():
             context_data['context_truncated'] = True
 
         description = f'Platform error {error_code} occurred at {url or "unknown URL"}'
-        extras = []
-        if request_field_count is not None or request_approx_bytes is not None:
-            size_kb = f'{request_approx_bytes / 1024:.1f}KB' if request_approx_bytes is not None else 'unknown size'
-            fields = f'{request_field_count} fields' if request_field_count is not None else 'unknown field count'
-            extras.append(f'request body: ~{size_kb}, {fields}')
-        if asset_version:
-            extras.append(f'asset v={asset_version}')
-        if ajax_save_script_version:
-            extras.append(f'ajax-save.js v={ajax_save_script_version}')
-        if request_b64_field_count is not None or request_unwrapped_field_count is not None:
-            wrapped = request_b64_field_count if request_b64_field_count is not None else '?'
-            unwrapped = request_unwrapped_field_count if request_unwrapped_field_count is not None else '?'
-            extras.append(f'{wrapped} b64-wrapped, {unwrapped} unwrapped wrap-candidates')
+        extras = format_platform_error_description_extras(ajax_save_telemetry)
         if extras:
             description = f'{description} ({"; ".join(extras)})'
         if diagnostics_summary:

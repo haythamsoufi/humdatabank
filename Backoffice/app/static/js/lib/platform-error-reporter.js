@@ -117,23 +117,153 @@
   }
 
   /**
+   * Field names that ajax-save.js is supposed to b64-wrap (or chunk) before
+   * POST. An unwrapped value here on a later 403 is the smoking gun for a
+   * stale cached module that predates the WAF wrap.
+   */
+  function isWrapCandidateFieldName(key) {
+    if (!key) return false;
+    return (
+      key.indexOf('field_value[') === 0 ||
+      key.indexOf('field_other_text[') === 0 ||
+      key.indexOf('_emergency_metadata') !== -1
+    );
+  }
+
+  function versionQueryFromUrl(urlStr) {
+    try {
+      var parsed = new URL(urlStr, (window.location && window.location.origin) || 'http://localhost');
+      var v = parsed.searchParams.get('v');
+      return v ? String(v).slice(0, 128) : null;
+    } catch (_) {
+      var match = String(urlStr || '').match(/[?&]v=([^&]+)/);
+      if (!match) return null;
+      try {
+        return decodeURIComponent(match[1]).slice(0, 128);
+      } catch (__) {
+        return match[1].slice(0, 128);
+      }
+    }
+  }
+
+  function ajaxSaveUrlFromImportMap() {
+    try {
+      var maps = document.querySelectorAll('script[type="importmap"]');
+      for (var i = 0; i < maps.length; i++) {
+        var parsed = JSON.parse(maps[i].textContent || '{}');
+        var scopes = parsed.scopes || {};
+        var scopeKeys = Object.keys(scopes);
+        for (var s = 0; s < scopeKeys.length; s++) {
+          var specifiers = scopes[scopeKeys[s]] || {};
+          var specKeys = Object.keys(specifiers);
+          for (var k = 0; k < specKeys.length; k++) {
+            var mapped = specifiers[specKeys[k]];
+            if (mapped && String(mapped).indexOf('ajax-save.js') !== -1) {
+              return String(mapped);
+            }
+          }
+        }
+        var imports = parsed.imports || {};
+        var importKeys = Object.keys(imports);
+        for (var n = 0; n < importKeys.length; n++) {
+          var href = imports[importKeys[n]];
+          if (
+            String(importKeys[n]).indexOf('ajax-save.js') !== -1 ||
+            (href && String(href).indexOf('ajax-save.js') !== -1)
+          ) {
+            return String(href);
+          }
+        }
+      }
+    } catch (_) { /* best-effort only */ }
+    return null;
+  }
+
+  /**
+   * Which ajax-save.js the tab actually loaded: Performance resource URL
+   * (includes ?v=<deploy>.<content-hash>) plus cache-vs-network hint.
+   * Falls back to the import-map target when no resource timing exists.
+   */
+  function resolveAjaxSaveScriptInfo() {
+    var info = { url: null, version: null, delivery: null, transfer_size: null };
+    try {
+      if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
+        var entries = performance.getEntriesByType('resource') || [];
+        for (var i = 0; i < entries.length; i++) {
+          var entry = entries[i];
+          if (!entry || !entry.name || String(entry.name).indexOf('ajax-save.js') === -1) {
+            continue;
+          }
+          info.url = String(entry.name);
+          if (typeof entry.transferSize === 'number') {
+            info.transfer_size = entry.transferSize;
+            if (entry.transferSize === 0 && typeof entry.encodedBodySize === 'number' && entry.encodedBodySize > 0) {
+              info.delivery = 'disk_cache';
+            } else if (entry.transferSize > 0) {
+              info.delivery = 'network';
+            }
+          }
+          break;
+        }
+      }
+    } catch (_) { /* best-effort only */ }
+    if (!info.url) {
+      info.url = ajaxSaveUrlFromImportMap();
+    }
+    if (info.url) {
+      info.version = versionQueryFromUrl(info.url);
+    }
+    return (info.url || info.version) ? info : null;
+  }
+
+  function collectClientVersionContext() {
+    var ctx = {};
+    try {
+      if (window.ASSET_VERSION) {
+        ctx.asset_version = String(window.ASSET_VERSION).slice(0, 128);
+      }
+    } catch (_) { /* best-effort only */ }
+    try {
+      if (window.location && window.location.href) {
+        ctx.page_url = String(window.location.href).slice(0, 2000);
+      }
+    } catch (_) { /* best-effort only */ }
+    try {
+      var scriptInfo = resolveAjaxSaveScriptInfo();
+      if (scriptInfo) {
+        if (scriptInfo.url) ctx.ajax_save_script_url = String(scriptInfo.url).slice(0, 2000);
+        if (scriptInfo.version) ctx.ajax_save_script_version = String(scriptInfo.version).slice(0, 128);
+        if (scriptInfo.delivery) ctx.ajax_save_script_delivery = String(scriptInfo.delivery).slice(0, 40);
+        if (typeof scriptInfo.transfer_size === 'number') {
+          ctx.ajax_save_script_transfer_size = scriptInfo.transfer_size;
+        }
+      }
+    } catch (_) { /* best-effort only */ }
+    return ctx;
+  }
+
+  /**
    * Best-effort summary of a fetch/XHR request body, attached to platform
    * error reports so a future WAF 403 investigation doesn't hit the same
    * dead end this one did: the WAF blocks the request before it reaches
    * Flask, so the *only* place that ever saw the actual payload shape is the
-   * browser that sent it. Capturing field count / approximate byte size here
-   * lets SecOps/engineering correlate a specific incident with "large form"
-   * vs. "large single field" vs. "many arguments" WAF rule families without
-   * needing production WAF log access.
+   * browser that sent it. Capturing field count / approximate byte size /
+   * b64-wrap coverage here lets SecOps/engineering tell "stale ajax-save.js"
+   * from "large form" vs. "large single field" without WAF log access.
    *
    * @param {*} body - the `init.body` passed to fetch()
-   * @returns {{request_field_count: number|null, request_approx_bytes: number|null}|null}
+   * @returns {object|null}
    */
   function summarizeRequestBody(body) {
     try {
       if (typeof FormData !== 'undefined' && body instanceof FormData) {
         var fieldCount = 0;
         var approxBytes = 0;
+        var b64FieldCount = 0;
+        var unwrappedFieldCount = 0;
+        var longestFieldBytes = 0;
+        var longestFieldName = null;
+        var unwrappedFieldNames = [];
         var entries = (typeof body.entries === 'function') ? body.entries() : null;
         if (!entries) return null;
         var next = entries.next();
@@ -141,19 +271,52 @@
           var pair = next.value;
           var key = String(pair[0] || '');
           var value = pair[1];
+          var valueBytes = 0;
+          var valueIsFile = value && typeof value === 'object' && typeof value.size === 'number';
           fieldCount += 1;
-          if (value && typeof value === 'object' && typeof value.size === 'number') {
-            // File/Blob — count its byte size, not a stringified representation.
-            approxBytes += key.length + value.size;
+          if (valueIsFile) {
+            valueBytes = value.size;
+            approxBytes += key.length + valueBytes;
           } else {
-            approxBytes += key.length + String(value == null ? '' : value).length;
+            var valueStr = String(value == null ? '' : value);
+            valueBytes = valueStr.length;
+            approxBytes += key.length + valueBytes;
+            if (valueStr.indexOf('b64:') === 0) {
+              b64FieldCount += 1;
+            } else if (isWrapCandidateFieldName(key) && valueStr.length > 0) {
+              unwrappedFieldCount += 1;
+              if (unwrappedFieldNames.length < 15) {
+                unwrappedFieldNames.push(key.slice(0, 200));
+              }
+            }
+          }
+          if (valueBytes > longestFieldBytes) {
+            longestFieldBytes = valueBytes;
+            longestFieldName = key.slice(0, 200);
           }
           next = entries.next();
         }
-        return { request_field_count: fieldCount, request_approx_bytes: approxBytes };
+        var summary = {
+          request_field_count: fieldCount,
+          request_approx_bytes: approxBytes,
+          request_b64_field_count: b64FieldCount,
+          request_unwrapped_field_count: unwrappedFieldCount,
+          request_longest_field_bytes: longestFieldBytes
+        };
+        if (longestFieldName) {
+          summary.request_longest_field_name = longestFieldName;
+        }
+        if (unwrappedFieldNames.length) {
+          summary.request_unwrapped_field_names = unwrappedFieldNames;
+        }
+        return summary;
       }
       if (typeof body === 'string') {
-        return { request_field_count: null, request_approx_bytes: body.length };
+        var stringSummary = { request_field_count: null, request_approx_bytes: body.length };
+        if (body.indexOf('b64:') === 0) {
+          stringSummary.request_b64_field_count = 1;
+        }
+        return stringSummary;
       }
     } catch (_) { /* best-effort only */ }
     return null;
@@ -320,14 +483,53 @@
       timestamp: new Date().toISOString()
     };
 
+    // Deploy + ajax-save.js version (best-effort). If a returning visitor
+    // still has the pre-WAF-wrap module cached, the page's ASSET_VERSION and
+    // the script ?v= / wrap counts will disagree.
+    var versionCtx = collectClientVersionContext();
+    var versionKeys = [
+      'asset_version',
+      'page_url',
+      'ajax_save_script_url',
+      'ajax_save_script_version',
+      'ajax_save_script_delivery'
+    ];
+    for (var vk = 0; vk < versionKeys.length; vk++) {
+      if (versionCtx[versionKeys[vk]]) {
+        payload[versionKeys[vk]] = versionCtx[versionKeys[vk]];
+      }
+    }
+    if (typeof versionCtx.ajax_save_script_transfer_size === 'number') {
+      payload.ajax_save_script_transfer_size = versionCtx.ajax_save_script_transfer_size;
+    }
+
+    try {
+      var serverHdr = response.headers && response.headers.get('server');
+      if (serverHdr) {
+        payload.response_server = String(serverHdr).slice(0, 200);
+      }
+    } catch (_) { /* best-effort only */ }
+
     // Request-body telemetry (best-effort; see summarizeRequestBody doc comment).
     var bodySummary = o.requestBodySummary || (o.requestBody !== undefined ? summarizeRequestBody(o.requestBody) : null);
     if (bodySummary) {
-      if (typeof bodySummary.request_field_count === 'number') {
-        payload.request_field_count = bodySummary.request_field_count;
+      var bodyKeys = [
+        'request_field_count',
+        'request_approx_bytes',
+        'request_b64_field_count',
+        'request_unwrapped_field_count',
+        'request_longest_field_bytes'
+      ];
+      for (var bk = 0; bk < bodyKeys.length; bk++) {
+        if (typeof bodySummary[bodyKeys[bk]] === 'number') {
+          payload[bodyKeys[bk]] = bodySummary[bodyKeys[bk]];
+        }
       }
-      if (typeof bodySummary.request_approx_bytes === 'number') {
-        payload.request_approx_bytes = bodySummary.request_approx_bytes;
+      if (bodySummary.request_longest_field_name) {
+        payload.request_longest_field_name = bodySummary.request_longest_field_name;
+      }
+      if (bodySummary.request_unwrapped_field_names && bodySummary.request_unwrapped_field_names.length) {
+        payload.request_unwrapped_field_names = bodySummary.request_unwrapped_field_names;
       }
     }
 
@@ -505,6 +707,11 @@
         user_agent: navigator.userAgent || null,
         timestamp: new Date().toISOString()
       };
+      var navVersion = collectClientVersionContext();
+      if (navVersion.asset_version) payload.asset_version = navVersion.asset_version;
+      if (navVersion.page_url) payload.page_url = navVersion.page_url;
+      if (navVersion.ajax_save_script_url) payload.ajax_save_script_url = navVersion.ajax_save_script_url;
+      if (navVersion.ajax_save_script_version) payload.ajax_save_script_version = navVersion.ajax_save_script_version;
 
       if (navigator.sendBeacon) {
         sendJsonBeacon(PLATFORM_ENDPOINT, payload);

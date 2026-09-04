@@ -70,7 +70,8 @@ AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES = ('login', 'logout')
 
 # Hidden unless the reviewer explicitly filters for them.
 # Entry-form Save (form_saved) is shown by default, like submit / reopen.
-AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = ('page_view',)
+# form_presave is the silent save-before-submit helper and stays hidden if a row leaks.
+AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES = ('page_view', 'form_presave')
 
 
 def apply_audit_trail_user_activity_noise_filters(activity_query):

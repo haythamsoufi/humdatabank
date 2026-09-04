@@ -102,10 +102,9 @@ SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
     }
 )
 
-# Inferred activity types that automatic middleware must not write.
-# Entry-form Save (action=save → form_saved) is an accountability event and
-# must be recorded like submit / approve / reopen on the same route.
-SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset()
+# Silent save-before-submit (action=save + ifrc_presave=1 → form_presave).
+# Explicit Save (action=save without that flag → form_saved) is logged.
+SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_presave"})
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
 

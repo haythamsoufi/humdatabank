@@ -15,6 +15,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from app.static_version import file_content_token, static_tree_fingerprint
+
 # Static and dynamic relative imports / re-exports (./ and ../ specifiers).
 _RELATIVE_IMPORT_RE = re.compile(
     r"""(?:import\s+(?:[\w\s{},*.$]+from\s+|)|"""
@@ -85,14 +87,17 @@ def _cached_forms_import_map(
     cdn_base: str,
     origin: str,
     asset_version: str,
+    tree_fingerprint: str,
 ) -> dict:
     static_root = Path(static_root_str)
 
     def versioned_url_for(rel_path: str) -> str:
         rel_path = rel_path.lstrip("/")
+        token = file_content_token(static_root_str, rel_path)
+        version = f"{asset_version}.{token}" if token else asset_version
         if cdn_base:
-            return f"{cdn_base}/{rel_path}?v={asset_version}"
-        return f"{origin.rstrip('/')}/static/{rel_path}?v={asset_version}"
+            return f"{cdn_base}/{rel_path}?v={version}"
+        return f"{origin.rstrip('/')}/static/{rel_path}?v={version}"
 
     return build_scoped_import_map(
         static_root=static_root,
@@ -117,7 +122,9 @@ def forms_module_import_map(app, origin: str) -> dict:
     """
     cdn_base = (app.config.get("STATIC_CDN_URL") or "").strip().rstrip("/")
     asset_version = str(app.config.get("ASSET_VERSION") or "v1")
-    static_root_str = str(_static_root(app).resolve())
+    static_root = _static_root(app).resolve()
+    static_root_str = str(static_root)
+    tree_fingerprint = static_tree_fingerprint(static_root, "js/forms")
 
     cdn_map = _cached_forms_import_map(
         static_root_str,
@@ -125,6 +132,7 @@ def forms_module_import_map(app, origin: str) -> dict:
         cdn_base,
         origin,
         asset_version,
+        tree_fingerprint,
     )
 
     if not cdn_base:
@@ -138,10 +146,13 @@ def forms_module_import_map(app, origin: str) -> dict:
         "",
         origin,
         asset_version,
+        tree_fingerprint,
     )
     merged_scopes = {**cdn_map.get("scopes", {}), **app_map.get("scopes", {})}
     return {"scopes": merged_scopes}
 
 
 def clear_import_map_cache() -> None:
+    from app.static_version import clear_static_version_cache
     _cached_forms_import_map.cache_clear()
+    clear_static_version_cache()

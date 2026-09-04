@@ -28,15 +28,13 @@ SOURCE_DIR="${STATIC_SOURCE_DIR:-${REPO_ROOT}/Backoffice/app/static}"
 CONTAINER="${STATIC_BLOB_CONTAINER:-static}"
 # Blob metadata can't vary by request query string the way the Flask static route
 # does (see app/static_serving.py): a blob at js/forms/modules/foo.js is the same
-# object whether a client asks for it with ?v=... or bare. Relative ES-module
-# imports (import './foo.js') resolve to that bare URL unless every referencing
-# module's document also carries a correctly-scoped <script type="importmap">
-# — a single mispositioned type="module" tag anywhere earlier in <head> makes the
-# browser drop the import map for the whole page (see core/layout.html). CSS/JS
-# are the only extensions ever reachable through that bare, unversioned path, so
-# they get a revalidate-on-every-load policy instead of a year-long immutable one:
-# a stale deploy then self-heals on the next request (fast 304, same ETag) rather
-# than being frozen in every visitor's HTTP cache for up to a year.
+# object whether a client asks for it with ?v=... or bare. Pages must request a
+# new ?v= (deploy token + content hash from static_url() / the forms import map)
+# when a file changes — already-cached Cache-Control: immutable responses are
+# never revalidated. CSS/JS can also be reached bare via a missed import map, so
+# they get must-revalidate for *new* fetches. That header is rewritten on every
+# deploy (even when AzCopy dry-run finds no byte changes) so existing blobs do
+# not keep a year-long immutable policy.
 CACHE_CONTROL="max-age=31536000, public, immutable"
 CACHE_CONTROL_REVALIDATE="max-age=0, public, must-revalidate"
 
@@ -117,6 +115,18 @@ _dry_run_blob_path() {
     return 0
   fi
   _blob_relative_path "$value"
+}
+
+# Every local JS/CSS file (one blob-relative path per line). Used to rewrite
+# Cache-Control even when AzCopy dry-run reports no byte changes.
+_list_local_js_css() {
+  local out_file="$1"
+  : > "$out_file"
+  find "${SOURCE_DIR}" -type f \( -name '*.js' -o -name '*.css' \) -print \
+    | while IFS= read -r abs_path; do
+        [[ -z "$abs_path" ]] && continue
+        _blob_relative_path "$abs_path"
+      done | sed '/^[[:space:]]*$/d' | sort -u >>"$out_file" || true
 }
 
 # Write blob-relative paths (one per line) for files AzCopy would copy.
@@ -263,22 +273,23 @@ _upload_with_azcopy() {
 
   _collect_dry_run_files "${dest}" "$files_to_sync"
 
-  if [[ ! -s "$files_to_sync" ]]; then
-    echo "AzCopy dry-run: no static files differ from blob storage; skipping sync and Cache-Control pass."
-    return 0
+  if [[ -s "$files_to_sync" ]]; then
+    echo "AzCopy dry-run: $(wc -l < "$files_to_sync" | tr -d ' ') file(s) to sync."
+    echo "Syncing static assets with AzCopy (parallel; skips unchanged files) ..."
+    # Trailing slash on source: sync contents of the directory into the container root.
+    # azcopy sync cannot set Cache-Control; apply it after via az storage blob update.
+    azcopy sync "${SOURCE_DIR}/" "${dest}" \
+      --recursive \
+      --delete-destination=false \
+      --log-level=WARNING \
+      --output-type=text
+  else
+    echo "AzCopy dry-run: no static file bytes differ from blob storage; skipping sync."
   fi
 
-  echo "AzCopy dry-run: $(wc -l < "$files_to_sync" | tr -d ' ') file(s) to sync."
-  echo "Syncing static assets with AzCopy (parallel; skips unchanged files) ..."
-  # Trailing slash on source: sync contents of the directory into the container root.
-  # azcopy sync cannot set Cache-Control; apply it after via az storage blob update.
-  azcopy sync "${SOURCE_DIR}/" "${dest}" \
-    --recursive \
-    --delete-destination=false \
-    --log-level=WARNING \
-    --output-type=text
-
-  tr -d '\r' < "$files_to_sync" | sed '/^[[:space:]]*$/d' | sort -u >"$cache_control_files"
+  # Always rewrite JS/CSS Cache-Control. A header-only policy change must
+  # reach ajax-save.js even when its bytes already match the blob.
+  _list_local_js_css "$cache_control_files"
   _apply_cache_control_headers "$cache_control_files"
 }
 

@@ -351,6 +351,90 @@ class TestLogPlatformError:
         assert "87 fields" in description
         assert "43.9KB" in description or "44.0KB" in description
 
+    def test_ajax_save_version_and_wrap_details_included_in_context_and_description(self, client, db_session):
+        """A repeat /assignment/<id>?ajax=1 WAF 403 should record which JS
+        the browser actually ran (page ASSET_VERSION vs ajax-save.js ?v=)
+        and whether the payload was b64-wrapped — the stale-cache signal."""
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://databank.ifrc.org/assignment/1593?ajax=1",
+                "page_url": "https://databank.ifrc.org/assignment/1593",
+                "asset_version": "deploy-waf-fix",
+                "ajax_save_script_url": (
+                    "https://cdn.example/static/js/forms/modules/ajax-save.js"
+                    "?v=deploy-waf-fix.abc123def456"
+                ),
+                "ajax_save_script_version": "deploy-waf-fix.abc123def456",
+                "ajax_save_script_delivery": "disk_cache",
+                "ajax_save_script_transfer_size": 0,
+                "response_server": "Microsoft-Azure-Application-Gateway/v2",
+                "request_field_count": 40,
+                "request_approx_bytes": 8200,
+                "request_b64_field_count": 0,
+                "request_unwrapped_field_count": 12,
+                "request_longest_field_bytes": 1800,
+                "request_longest_field_name": "field_value[1414]",
+                "request_unwrapped_field_names": ["field_value[1414]", "field_other_text[11]"],
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert ctx.get("asset_version") == "deploy-waf-fix"
+        assert ctx.get("ajax_save_script_version") == "deploy-waf-fix.abc123def456"
+        assert "ajax-save.js" in ctx.get("ajax_save_script_url", "")
+        assert ctx.get("ajax_save_script_delivery") == "disk_cache"
+        assert ctx.get("ajax_save_script_transfer_size") == 0
+        assert ctx.get("request_b64_field_count") == 0
+        assert ctx.get("request_unwrapped_field_count") == 12
+        assert ctx.get("request_longest_field_name") == "field_value[1414]"
+        assert ctx.get("request_unwrapped_field_names") == [
+            "field_value[1414]",
+            "field_other_text[11]",
+        ]
+        assert ctx.get("response_server") == "Microsoft-Azure-Application-Gateway/v2"
+        assert ctx.get("page_url") == "https://databank.ifrc.org/assignment/1593"
+        description = captured.get("description", "")
+        assert "asset v=deploy-waf-fix" in description
+        assert "ajax-save.js v=deploy-waf-fix.abc123def456" in description
+        assert "0 b64-wrapped" in description
+        assert "12 unwrapped wrap-candidates" in description
+
+    def test_ajax_save_version_telemetry_invalid_values_ignored(self, client, db_session):
+        """Public, unauthenticated input: drop garbage version / field-name data."""
+        captured = {}
+
+        def capture_call(**kwargs):
+            captured.update(kwargs)
+
+        with patch(
+            "app.services.security.monitoring.SecurityMonitor.log_security_event",
+            side_effect=capture_call,
+        ):
+            resp = self._post(client, {
+                "error_code": 403,
+                "url": "https://example.com/assignment/1?ajax=1",
+                "asset_version": "bad version\nwith\tcontrol",
+                "ajax_save_script_delivery": "totally-made-up",
+                "request_unwrapped_field_names": "not-a-list",
+                "request_longest_field_name": "field_value[1]; DROP TABLE",
+                "ajax_save_script_url": "javascript:alert(1)",
+            })
+        assert resp.status_code == 200
+        ctx = captured.get("context_data", {})
+        assert ctx.get("asset_version") == "badversionwithcontrol"
+        assert "ajax_save_script_delivery" not in ctx
+        assert "request_unwrapped_field_names" not in ctx
+        assert ctx.get("request_longest_field_name") == "field_value[1]DROPTABLE"
+        assert "ajax_save_script_url" not in ctx
+
     def test_request_body_telemetry_omitted_when_absent(self, client, db_session):
         """No telemetry fields sent (e.g. a non-FormData/GET failure) => no
         placeholder keys added to context_data."""
@@ -496,6 +580,35 @@ class TestShouldIgnoreClientError:
             source="https://example.com/a.js",
             line_no=10,
         ) == "error|boom|https://example.com/a.js|10"
+
+
+class TestSanitizePlatformErrorTelemetry:
+    def test_version_token_strips_spaces_and_controls(self):
+        from app.routes.api.error_log import sanitize_version_token
+        assert sanitize_version_token("deploy-waf-fix.abc123") == "deploy-waf-fix.abc123"
+        assert sanitize_version_token("bad version\nwith\tcontrol") == "badversionwithcontrol"
+        assert sanitize_version_token("") is None
+
+    def test_field_name_keeps_brackets_drops_punctuation(self):
+        from app.routes.api.error_log import sanitize_form_field_name
+        assert sanitize_form_field_name("field_value[1414]") == "field_value[1414]"
+        assert sanitize_form_field_name("field_value[1]; DROP TABLE") == "field_value[1]DROPTABLE"
+
+    def test_script_delivery_allow_list(self):
+        from app.routes.api.error_log import sanitize_script_delivery
+        assert sanitize_script_delivery("disk_cache") == "disk_cache"
+        assert sanitize_script_delivery("network") == "network"
+        assert sanitize_script_delivery("memory") is None
+
+    def test_field_name_list_caps_and_drops_junk(self):
+        from app.routes.api.error_log import sanitize_field_name_list
+        assert sanitize_field_name_list("nope") is None
+        assert sanitize_field_name_list(["field_value[1]", "", None, "ok_field"]) == [
+            "field_value[1]",
+            "ok_field",
+        ]
+        long_list = [f"field_value[{i}]" for i in range(20)]
+        assert len(sanitize_field_name_list(long_list)) == 15
 
 
 # ---------------------------------------------------------------------------

@@ -240,31 +240,12 @@ jobs:
 
       - name: Detect static asset changes
         id: static
-        env:
-          FORCE_STATIC_UPLOAD: ${{ inputs.force_static_upload }}
         run: |
-          set -euo pipefail
-
-          if [ "${FORCE_STATIC_UPLOAD}" = "true" ]; then
-            echo "force_static_upload enabled — will upload static assets."
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            changed_files="$(git diff --name-only HEAD^..HEAD -- Backoffice/app/static || true)"
-            if [ -n "${changed_files}" ]; then
-              echo "Static files changed in latest commit:"
-              echo "${changed_files}"
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "No static file changes in latest commit; skipping static upload."
-              echo "changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "No previous commit available; uploading static assets."
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
+          # Always sync the blob container. AzCopy is incremental for bytes;
+          # skipping on HEAD^..HEAD dropped ajax-save.js when the tip commit
+          # was unrelated CI/docs and returning visitors kept the pre-WAF module.
+          echo "Always upload static assets so CDN blobs match this deploy."
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Set deployment target
         id: config

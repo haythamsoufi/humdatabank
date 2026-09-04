@@ -55,7 +55,7 @@ def test_forms_module_import_map_uses_flask_static_without_cdn(app):
     assert result["scopes"]
     sample_scope = next(iter(result["scopes"].values()))
     sample_url = next(iter(sample_scope.values()))
-    assert "?v=abc123" in sample_url
+    assert "?v=abc123." in sample_url
     assert sample_url.startswith("http://localhost:5000/static/")
 
 
@@ -70,4 +70,4 @@ def test_forms_module_import_map_uses_cdn_when_configured(app):
     sample_scope = next(iter(result["scopes"].values()))
     sample_url = next(iter(sample_scope.values()))
     assert sample_url.startswith("https://blob.example/static/")
-    assert sample_url.endswith("?v=deploy1")
+    assert "?v=deploy1." in sample_url

@@ -90,9 +90,42 @@ function toAbsoluteUrl(pathOrUrl) {
 }
 
 function cacheKeyForUrl(u) {
-  // Normalize cache keys by stripping query/hash.
-  // This prevents storing duplicates for /static/foo.css and /static/foo.css?v=123.
-  return new Request(`${u.origin}${u.pathname}`);
+  // Keep ?v= in the Cache API key. Stripping it used to serve a stale
+  // ajax-save.js after deploy: the page asked for ?v=<new> and got the
+  // pre-WAF body stored under the bare pathname.
+  return new Request(`${u.origin}${u.pathname}${u.search}`);
+}
+
+function isCodeAsset(pathname) {
+  return /\.(js|css)$/i.test(pathname);
+}
+
+async function respondStaticAsset(request, url) {
+  const cache = await caches.open(CACHE_NAME);
+  const key = cacheKeyForUrl(url);
+  // JS/CSS must track file bytes. Network-first + cache: 'reload' bypasses
+  // a leftover HTTP immutable copy of the same URL (same-origin fallback).
+  // Versioned ?v= tokens (deploy + content hash) are a different key anyway.
+  if (isCodeAsset(url.pathname)) {
+    try {
+      const response = await fetch(request, { mode: 'same-origin', cache: 'reload' });
+      if (response && response.ok) {
+        cache.put(key, response.clone());
+      }
+      return response;
+    } catch (e) {
+      const cached = await cache.match(key);
+      if (cached) return cached;
+      throw e;
+    }
+  }
+  const cached = await cache.match(key);
+  if (cached) return cached;
+  const response = await fetch(request, { mode: 'same-origin' });
+  if (response && response.ok) {
+    cache.put(key, response.clone());
+  }
+  return response;
 }
 
 async function precacheUrls(cache, urls) {
@@ -343,40 +376,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: cache-first and ignore querystring (supports ?v=... URLs)
+  // Static assets: JS/CSS network-first (new ?v= must not hit a stale body).
   if (url.pathname.startsWith('/static/')) {
-    event.respondWith(
-      (async () => {
-        const cache = await caches.open(CACHE_NAME);
-        const key = cacheKeyForUrl(url);
-        const cached = await cache.match(key);
-        if (cached) return cached;
-        const response = await fetch(request, { mode: 'same-origin' });
-        if (response && response.ok) {
-          cache.put(key, response.clone());
-        }
-        return response;
-      })()
-    );
+    event.respondWith(respondStaticAsset(request, url));
     return;
   }
 
   // Plugin static assets are served under /plugins/static/<plugin>/...
-  // Cache them the same way as /static/ assets (cache-first, ignore querystring).
   if (url.pathname.startsWith('/plugins/') && url.pathname.includes('/static/')) {
-    event.respondWith(
-      (async () => {
-        const cache = await caches.open(CACHE_NAME);
-        const key = cacheKeyForUrl(url);
-        const cached = await cache.match(key);
-        if (cached) return cached;
-        const response = await fetch(request, { mode: 'same-origin' });
-        if (response && response.ok) {
-          cache.put(key, response.clone());
-        }
-        return response;
-      })()
-    );
+    event.respondWith(respondStaticAsset(request, url));
     return;
   }
 

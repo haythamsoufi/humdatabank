@@ -113,6 +113,29 @@ class TestApplyAuditTrailNoiseFilters:
         visible_types = {row.activity_type for row in visible}
         assert visible_types == {"data_modified"}
 
+    def test_null_description_stays_visible(self, app, db_session):
+        """NULL descriptions must not be dropped by the legacy-noise IN() filter."""
+        from app.models import UserActivityLog
+        from app.utils.datetime_helpers import utcnow
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                activity_type="data_modified",
+                activity_description=None,
+                endpoint="analytics.audit_trail",
+                url_path="/admin/analytics/audit-trail",
+                ip_address="127.0.0.1",
+                timestamp=utcnow(),
+            )
+        )
+        db_session.commit()
+
+        visible = apply_audit_trail_user_activity_noise_filters(UserActivityLog.query).all()
+        assert [row.activity_type for row in visible] == ["data_modified"]
+
 
 # ---------------------------------------------------------------------------
 # count_audit_visible_entries_for_session

@@ -115,12 +115,15 @@ def apply_audit_trail_user_activity_noise_filters(activity_query):
             )
         )
         .filter(
+            or_(
+                UserActivityLog.activity_description.is_(None),
+                ~UserActivityLog.activity_description.in_(AUDIT_TRAIL_NOISE_DESCRIPTIONS),
+            )
+        )
+        .filter(
             ~(
-                UserActivityLog.activity_description.in_(AUDIT_TRAIL_NOISE_DESCRIPTIONS)
-                | (
-                    (UserActivityLog.activity_type == 'request')
-                    & UserActivityLog.endpoint.in_(tuple(ENTRY_FORM_ACTIVITY_ENDPOINTS))
-                )
+                (UserActivityLog.activity_type == 'request')
+                & UserActivityLog.endpoint.in_(tuple(ENTRY_FORM_ACTIVITY_ENDPOINTS))
             )
         )
         .filter(~(UserActivityLog.activity_type == 'api_usage'))

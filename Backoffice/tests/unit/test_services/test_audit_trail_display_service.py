@@ -460,6 +460,28 @@ class TestCreateConsistentDescription:
         )
         assert "form" in desc.lower() or "Saved" in desc
 
+    def test_upr_visuals_assignment_export_keeps_original_description(self):
+        desc = create_consistent_description(
+            "activity",
+            "admin_plugin",
+            None,
+            "Generated UPR visuals (PDF)",
+            endpoint="upr_visuals.assignment_pdf",
+            http_method="GET",
+        )
+        assert desc == "Generated UPR visuals (PDF)"
+
+    def test_upr_visuals_generate_keeps_more_specific_description(self):
+        desc = create_consistent_description(
+            "activity",
+            "admin_plugin",
+            None,
+            "Generated UPR visuals (PNG with narrative)",
+            endpoint="upr_visuals.generate",
+            http_method="POST",
+        )
+        assert desc == "Generated UPR visuals (PNG with narrative)"
+
     def test_catalog_spec_overrides_description(self):
         desc = create_consistent_description(
             "activity",

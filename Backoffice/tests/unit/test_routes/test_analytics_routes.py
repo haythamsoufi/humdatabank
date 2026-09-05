@@ -258,6 +258,8 @@ class TestResolveSecurityEvent:
             event = SecurityEvent(
                 event_type="failed_login",
                 severity="medium",
+                description="Failed login attempts",
+                ip_address="127.0.0.1",
                 is_resolved=False,
             )
             db_session.add(event)
@@ -434,13 +436,14 @@ class TestEndSession:
             )
         _assert_status(resp, 302, 200)
 
-    def test_session_already_ended(self, logged_in_client, db_session, app):
+    def test_session_already_ended(self, logged_in_client, db_session, app, admin_user):
         from app.models import UserSessionLog
         with app.app_context():
             session_log = UserSessionLog(
                 session_id="test-session-123",
-                user_id=None,
+                user_id=admin_user.id,
                 is_active=False,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()
@@ -459,6 +462,7 @@ class TestEndSession:
                 session_id="test-active-session-456",
                 user_id=user_id,
                 is_active=True,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()
@@ -479,6 +483,7 @@ class TestEndSession:
                 session_id="test-error-session-789",
                 user_id=user_id,
                 is_active=True,
+                ip_address="127.0.0.1",
             )
             db_session.add(session_log)
             db_session.commit()
@@ -605,7 +610,7 @@ class TestAuditTrail:
             data = _get_json(resp)
             assert "entries" in data or "success" in data
 
-    def test_default_json_hides_draft_saves(self, logged_in_client, db_session, app, admin_user):
+    def test_default_json_includes_entry_form_saves(self, logged_in_client, db_session, app, admin_user):
         from app.models import UserActivityLog
         from app.utils.datetime_helpers import utcnow
 
@@ -614,10 +619,10 @@ class TestAuditTrail:
                 UserActivityLog(
                     user_id=admin_user.id,
                     activity_type="form_saved",
-                    activity_description="Completed View Edit Form",
+                    activity_description="Saved form data as draft",
                     ip_address="127.0.0.1",
-                    endpoint="forms.view_edit_form",
-                    url_path="/forms/assignment/1",
+                    endpoint="assignments.view_assignment",
+                    url_path="/assignment/1",
                     http_method="POST",
                     timestamp=utcnow(),
                 )
@@ -628,30 +633,30 @@ class TestAuditTrail:
                     activity_type="form_submitted",
                     activity_description="Submitted form data for review",
                     ip_address="127.0.0.1",
-                    endpoint="forms.view_edit_form",
-                    url_path="/forms/assignment/1",
+                    endpoint="assignments.view_assignment",
+                    url_path="/assignment/1",
                     http_method="POST",
                     timestamp=utcnow(),
                 )
             )
             db_session.commit()
 
-        hidden = logged_in_client.get(
+        default = logged_in_client.get(
             "/admin/analytics/audit-trail?date_from=2020-01-01",
             headers={"Accept": "application/json"},
         )
-        _assert_status(hidden, 200)
-        hidden_types = {row.get("activity_type") for row in _get_json(hidden).get("entries", [])}
-        assert "form_saved" not in hidden_types
-        assert "form_submitted" in hidden_types
+        _assert_status(default, 200)
+        default_types = {row.get("activity_type") for row in _get_json(default).get("entries", [])}
+        assert "form_saved" in default_types
+        assert "form_submitted" in default_types
 
-        shown = logged_in_client.get(
+        filtered = logged_in_client.get(
             "/admin/analytics/audit-trail?activity_type=form_saved&date_from=2020-01-01",
             headers={"Accept": "application/json"},
         )
-        _assert_status(shown, 200)
-        shown_types = {row.get("activity_type") for row in _get_json(shown).get("entries", [])}
-        assert "form_saved" in shown_types
+        _assert_status(filtered, 200)
+        filtered_types = {row.get("activity_type") for row in _get_json(filtered).get("entries", [])}
+        assert "form_saved" in filtered_types
 
     def test_get_requires_review_filter(self, logged_in_client, db_session):
         resp = logged_in_client.get(

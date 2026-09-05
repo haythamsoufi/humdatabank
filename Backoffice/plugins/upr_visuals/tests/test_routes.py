@@ -104,10 +104,114 @@ def test_queue_visual_export_reuses_matching_job(monkeypatch):
         "create_assignment_export_job",
         lambda **_k: (_ for _ in ()).throw(AssertionError("should reuse")),
     )
+    logged = []
+    monkeypatch.setattr(
+        routes,
+        "_log_upr_visuals_generation",
+        lambda **kwargs: logged.append(kwargs),
+    )
     app = Flask(__name__)
     with app.app_context():
         assert routes._queue_visual_export(1641, "pdf") == "job-reuse"
     assert started == ["job-reuse"]
+    assert logged == []
+
+
+@pytest.mark.unit
+def test_queue_visual_export_logs_new_job(monkeypatch):
+    from flask import Flask
+
+    from plugins.upr_visuals import routes
+
+    logged = []
+    monkeypatch.setattr(routes, "_requested_language", lambda *, strict=False: "en")
+    monkeypatch.setattr(routes, "find_reusable_assignment_export_job", lambda **_k: None)
+    monkeypatch.setattr(routes, "create_assignment_export_job", lambda **_k: "job-new")
+    monkeypatch.setattr(routes, "start_assignment_export_job", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        routes,
+        "_log_upr_visuals_generation",
+        lambda **kwargs: logged.append(kwargs),
+    )
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        assert routes._queue_visual_export(12, "png", dashboard_id="reach") == "job-new"
+    assert logged == [{"export_format": "png", "aes_id": 12, "dashboard_id": "reach"}]
+
+
+@pytest.mark.unit
+def test_upr_visuals_generation_description():
+    from plugins.upr_visuals.routes import _upr_visuals_generation_description
+
+    assert _upr_visuals_generation_description("pdf") == "Generated UPR visuals (PDF)"
+    assert _upr_visuals_generation_description("png", narrative=True) == (
+        "Generated UPR visuals (PNG with narrative)"
+    )
+    assert _upr_visuals_generation_description("idml") == "Generated UPR visuals (InDesign)"
+
+
+@pytest.mark.unit
+def test_log_upr_visuals_generation_writes_audit_row(monkeypatch):
+    from flask import Flask
+    from types import SimpleNamespace
+
+    from plugins.upr_visuals import routes
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.platform.user_analytics_service.log_user_activity",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    class DummyAES:
+        query = SimpleNamespace(get=lambda _id: None)
+
+    monkeypatch.setattr(routes, "AssignmentEntityStatus", DummyAES)
+    app = Flask(__name__)
+    with app.app_context():
+        routes._log_upr_visuals_generation(
+            export_format="pdf",
+            aes_id=5,
+            narrative=True,
+        )
+        routes._log_upr_visuals_generation(export_format="idml", aes_id=5)
+    assert [c["description"] for c in calls] == [
+        "Generated UPR visuals (PDF with narrative)",
+        "Generated UPR visuals (InDesign)",
+    ]
+    assert calls[0]["activity_type"] == "admin_plugin"
+    assert calls[0]["context_data"]["aes_id"] == 5
+    assert calls[0]["context_data"]["export_format"] == "pdf"
+
+
+@pytest.mark.unit
+def test_log_upr_visuals_generation_includes_entity(monkeypatch):
+    from flask import Flask
+    from types import SimpleNamespace
+
+    from plugins.upr_visuals import routes
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.platform.user_analytics_service.log_user_activity",
+        lambda **kwargs: calls.append(kwargs),
+    )
+    aes = SimpleNamespace(entity_type="country", entity_id=12)
+
+    class DummyAES:
+        query = SimpleNamespace(get=lambda _id: aes)
+
+    monkeypatch.setattr(routes, "AssignmentEntityStatus", DummyAES)
+    monkeypatch.setattr(
+        "app.services.organization.entity_service.EntityService.get_entity_display_name",
+        staticmethod(lambda _type, _id: "Kenya"),
+    )
+    app = Flask(__name__)
+    with app.app_context():
+        routes._log_upr_visuals_generation(export_format="png", aes_id=7, dashboard_id="reach")
+    assert calls[0]["description"] == "Generated UPR visuals (PNG)"
+    assert calls[0]["context_data"]["entity_name"] == "Kenya"
+    assert calls[0]["context_data"]["dashboard_id"] == "reach"
 
 
 @pytest.mark.unit

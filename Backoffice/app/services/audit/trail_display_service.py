@@ -291,6 +291,8 @@ def create_consistent_description(
                     "file_uploaded",
                     "form_validated",
                 ) or (t.startswith("admin_")):
+                    if original_description and original_description.startswith(spec.description):
+                        return original_description
                     return spec.description
 
         if t == "page_view" or "view" in t.lower():

@@ -78,6 +78,9 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "upr_excel_import.preview",
         "upr_excel_import.upload",
         "upr_excel_import.cancel_job",
+        # Pre-import file check; the following import POST is the accountability event.
+        "excel.validate_upr_country_reporting_import",
+        # Middleware skip only — assignment_narrative writes via _log_upr_visuals_generation.
         "upr_visuals.assignment_narrative",
         "upr_visuals.cancel",
         "pb_progress.data_source",
@@ -102,9 +105,19 @@ SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
     }
 )
 
-# Draft saves are inferred from form action=save; skip the row, not the endpoint
-# (submit / approve / reopen on the same route must still be recorded).
-SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_saved", "form_save"})
+# Silent save-before-submit (action=save + ifrc_presave=1 → form_presave).
+# Explicit Save (action=save without that flag → form_saved) is logged.
+# Unmapped entry-form POSTs (no action) used to store "Completed View Assignment".
+SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_presave", "entry_form_request"})
+
+# Entry-form POSTs without a lifecycle action. Used to hide legacy "Completed View *" rows.
+ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
+    {
+        "forms.enter_data",
+        "forms.view_edit_form",
+        "assignments.view_assignment",
+    }
+)
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
 

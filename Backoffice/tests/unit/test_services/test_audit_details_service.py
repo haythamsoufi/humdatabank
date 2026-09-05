@@ -28,11 +28,13 @@ from app.services.audit.details_service import (
     _normalize_config_for_compare,
     _normalize_form_item_snapshot_for_compare,
     _prune_dict_diff,
+    format_activity_log_details,
     format_admin_action_details,
     format_api_key_admin_action_details,
     format_form_item_update_audit_details,
     format_rbac_admin_action_details,
     format_user_update_audit_details,
+    humanize_audit_details_dict,
 )
 
 
@@ -503,6 +505,48 @@ class TestFormatAdminActionDetails:
     def test_none_action_type_returns_none(self):
         assert format_admin_action_details(None, {}, {}) is None
 
+    def test_access_request_approve_is_humanized(self):
+        result = format_admin_action_details(
+            "access_request_approve",
+            None,
+            {
+                "country_id": 193,
+                "country_name": "Testland",
+                "status": "approved",
+                "user_email": "willow.sylvester@ifrc.org",
+                "user_id": 284,
+            },
+        )
+        assert result == {
+            "Country": "Testland",
+            "Email": "willow.sylvester@ifrc.org",
+            "Status": "Approved",
+        }
+        assert "country_id" not in result
+        assert "user_id" not in result
+
+    def test_unknown_action_with_payload_is_humanized(self):
+        result = format_admin_action_details(
+            "cleanup_sessions",
+            None,
+            {"sessions_cleaned": 3, "cleanup_time": "2026-01-01T00:00:00"},
+        )
+        assert result == {
+            "Sessions cleaned": 3,
+            "Cleanup time": "2026-01-01T00:00:00",
+        }
+
+    def test_old_and_new_show_before_after(self):
+        result = format_admin_action_details(
+            "settings_updated",
+            {"status": "pending"},
+            {"status": "approved"},
+        )
+        assert result == {
+            "Status (before)": "Pending",
+            "Status (after)": "Approved",
+        }
+
 
 # ---------------------------------------------------------------------------
 # format_user_update_audit_details
@@ -856,3 +900,113 @@ class TestPermissionsForRoleIdsWithMocking:
             with patch("app.models.rbac.RbacRole", side_effect=Exception):
                 result = _permissions_for_role_ids([1])
                 assert result == []
+
+
+class TestHumanizeAuditDetailsDict:
+    def test_none_and_empty(self):
+        assert humanize_audit_details_dict(None) is None
+        assert humanize_audit_details_dict({}) is None
+
+    def test_drops_technical_request_metadata(self):
+        assert (
+            humanize_audit_details_dict(
+                {
+                    "endpoint": "assignments.view_assignment",
+                    "method": "POST",
+                    "status_code": 200,
+                    "url_path": "/assignment/12",
+                }
+            )
+            is None
+        )
+
+    def test_prefers_names_over_ids(self):
+        result = humanize_audit_details_dict(
+            {
+                "country_id": 193,
+                "country_name": "Testland",
+                "user_id": 284,
+                "user_email": "willow.sylvester@ifrc.org",
+                "status": "approved",
+            }
+        )
+        assert result == {
+            "Country": "Testland",
+            "Email": "willow.sylvester@ifrc.org",
+            "Status": "Approved",
+        }
+
+    def test_drops_lone_numeric_ids(self):
+        assert humanize_audit_details_dict({"country_id": 193, "user_id": "284"}) is None
+
+    def test_bool_and_status_are_readable(self):
+        result = humanize_audit_details_dict(
+            {"auto_resolved": True, "status": "rejected"}
+        )
+        assert result == {
+            "Automatically resolved": "Yes",
+            "Status": "Rejected",
+        }
+
+
+class TestFormatActivityLogDetails:
+    def test_technical_only_context_is_hidden(self):
+        assert (
+            format_activity_log_details(
+                {
+                    "endpoint": "main.dashboard",
+                    "method": "GET",
+                    "status_code": 200,
+                }
+            )
+            is None
+        )
+
+    def test_entity_and_country_from_context(self):
+        result = format_activity_log_details(
+            {
+                "endpoint": "assignments.save_assignment",
+                "method": "POST",
+                "status_code": 200,
+                "entity_type": "country",
+                "entity_id": 193,
+                "entity_name": "Testland",
+                "country_id": 193,
+                "country_name": "Testland",
+            }
+        )
+        assert result == {"Country": "Testland"}
+
+    def test_non_country_entity_is_kept(self):
+        result = format_activity_log_details(
+            {
+                "entity_type": "ns_branch",
+                "entity_id": 9,
+                "entity_name": "Nairobi Branch",
+            }
+        )
+        assert result == {
+            "Entity type": "Ns Branch",
+            "Entity": "Nairobi Branch",
+        }
+
+    def test_promotes_safe_form_data_fields(self):
+        result = format_activity_log_details(
+            {
+                "endpoint": "assignments.view_assignment",
+                "method": "POST",
+                "form_data": {
+                    "action": "save",
+                    "csrf_token": "secret",
+                    "assignment_entity_status_id": "12",
+                    "country_name": "Testland",
+                    "indicator_42": "999",
+                },
+            }
+        )
+        assert result == {
+            "Action": "Save",
+            "Country": "Testland",
+        }
+        assert "indicator_42" not in (result or {})
+        assert "csrf_token" not in (result or {})

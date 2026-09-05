@@ -35,7 +35,10 @@ from app.middleware.activity_middleware import track_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_ok
-from app.services.audit.details_service import format_admin_action_details
+from app.services.audit.details_service import (
+    format_activity_log_details,
+    format_admin_action_details,
+)
 from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
@@ -977,6 +980,7 @@ def audit_trail():
                 'risk_level': _audit_trail_risk_level_for_activity_row(log),
                 'requires_review': False,
                 'context_data': log.context_data,
+                'details': format_activity_log_details(enhanced_context),
                 'entity_type': entity_type,
                 'entity_id': entity_id,
                 'entity_name': entity_name,
@@ -1072,8 +1076,6 @@ def audit_trail():
             details_payload = format_admin_action_details(
                 action.action_type, action.old_values, action.new_values
             )
-            if details_payload is None:
-                details_payload = action.old_values or action.new_values
 
             entries.append({
                 'id': action_id,

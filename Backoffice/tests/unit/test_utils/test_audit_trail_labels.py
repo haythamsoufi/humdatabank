@@ -10,6 +10,8 @@ def test_known_types_use_friendly_labels(app):
         assert activity_type_display_label("admin_ai") == "AI"
         assert activity_type_display_label("request") == "Back-office action"
         assert activity_type_display_label("form_saved") == "Draft save"
+        assert activity_type_display_label("form_sent_for_review") == "Sent for review"
+        assert activity_type_display_label("form_returned_for_revision") == "Returned for revision"
         assert activity_type_display_label("access_request_approve") == "Access approved"
         assert activity_type_display_label("admin_system") == "Indicators & lists"
 

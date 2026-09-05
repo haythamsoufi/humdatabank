@@ -649,6 +649,12 @@ class TestAuditTrail:
         default_types = {row.get("activity_type") for row in _get_json(default).get("entries", [])}
         assert "form_saved" in default_types
         assert "form_submitted" in default_types
+        saved_endpoints = {
+            row.get("endpoint")
+            for row in _get_json(default).get("entries", [])
+            if row.get("activity_type") == "form_saved"
+        }
+        assert saved_endpoints == {"assignments.save_assignment"}
 
         filtered = logged_in_client.get(
             "/admin/analytics/audit-trail?activity_type=form_saved&date_from=2020-01-01",

@@ -283,23 +283,38 @@ class TestDetermineActivityType:
             "POST", "assignments.view_assignment", {}
         ) == "entry_form_request"
 
+    def test_post_send_for_review(self):
+        assert _determine_activity_type(
+            "POST", "assignments.view_assignment", {"action": "send_for_review"}
+        ) == "form_sent_for_review"
+
+    def test_post_return_assignment_for_revision(self):
+        assert _determine_activity_type(
+            "POST", "main.return_assignment_for_revision"
+        ) == "form_returned_for_revision"
+
+    def test_post_public_submission_edit_save(self):
+        assert _determine_activity_type(
+            "POST", "forms.edit_public_submission", {"action": "save"}
+        ) == "form_saved"
+
+    def test_post_fill_public_form(self):
+        assert _determine_activity_type("POST", "forms.fill_public_form") == "form_submitted"
+
+    def test_post_documents_entity_select(self):
+        assert _determine_activity_type(
+            "POST", "main.documents_submit", {"entity_select": "country:1"}
+        ) == "country_selected"
+
     def test_post_upload_endpoint(self):
         assert _determine_activity_type("POST", "forms.upload_document") == "file_uploaded"
 
-    def test_post_generic_save_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "save"}) == "form_saved"
-
-    def test_post_generic_submit_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "submit"}) == "form_submitted"
-
-    def test_post_generic_approve_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "approve"}) == "form_approved"
-
-    def test_post_generic_reopen_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "reopen"}) == "form_reopened"
-
-    def test_post_generic_validate_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "validate"}) == "form_validated"
+    def test_post_generic_action_not_treated_as_form_lifecycle(self):
+        assert _determine_activity_type("POST", "admin.settings", {"action": "save"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "submit"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "approve"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "reopen"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "validate"}) == "request"
 
     def test_post_specific_override_from_resolver(self):
         with patch(
@@ -369,7 +384,7 @@ class TestApplyActivityCatalog:
             # "form_saved" is NOT in _CATALOG_ACTIVITY_TYPE_OVERRIDABLE
             at, desc = _apply_activity_catalog("POST", "admin.create_user", "form_saved")
             assert at == "form_saved"
-            assert desc == "Some admin thing"
+            assert desc is None
 
     def test_catalog_spec_no_activity_type_keeps_original(self):
         spec = MagicMock()
@@ -1095,13 +1110,13 @@ class TestActivityRegisteredHooks:
                 assert g.activity_user_id is None
 
     def test_after_request_non_deferred_logs_activity(self, app):
-        with app.test_request_context("/dashboard", method="POST",
+        with app.test_request_context("/forms/submit", method="POST",
                                        data={"action": "submit"},
                                        content_type="application/x-www-form-urlencoded"):
             g.activity_user_id = 1
             g._auto_txn_managed = False
             g.start_time = time.time() - 0.05
-            with _with_activity_endpoint(), \
+            with _with_activity_endpoint("forms.submit_entry"), \
                  patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
@@ -1133,6 +1148,9 @@ class TestActivityRegisteredHooks:
                 resp = _activity_after(app)(make_response("ok", 200))
                 mock_log.assert_called_once()
                 assert mock_log.call_args[1]["activity_type"] == "form_saved"
+                assert mock_log.call_args[1]["context_data"]["endpoint"] == (
+                    "assignments.save_assignment"
+                )
                 assert resp.status_code == 200
 
     def test_after_request_skips_silent_presave(self, app):
@@ -1172,13 +1190,33 @@ class TestActivityRegisteredHooks:
                 _activity_after(app)(make_response("ok", 200))
                 mock_inc.assert_called_once()
 
-    def test_after_request_uses_audit_activity_description(self, app):
+    def test_after_request_non_deferred_dashboard_post_increments_session(self, app):
         with app.test_request_context("/dashboard", method="POST"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time() - 0.05
+            with _with_activity_endpoint("main.dashboard"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_count_session_page_view_for_request",
+                       return_value=True), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware.increment_session_page_views_without_activity_log") as mock_inc, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                mock_log.assert_not_called()
+                mock_inc.assert_called_once()
+
+    def test_after_request_uses_audit_activity_description(self, app):
+        with app.test_request_context("/forms/submit", method="POST"):
             g.activity_user_id = 1
             g._auto_txn_managed = False
             g.start_time = time.time()
             g.audit_activity_description = "Custom audit text"
-            with _with_activity_endpoint(), \
+            with _with_activity_endpoint("forms.submit_entry"), \
                  patch("app.middleware.activity_middleware.is_static_asset_request",
                        return_value=False), \
                  patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
@@ -1276,6 +1314,7 @@ class TestActivityRegisteredHooks:
                     callback()
                 mock_log.assert_called_once()
                 assert mock_log.call_args[1]["activity_type"] == "form_saved"
+                assert mock_log.call_args[1]["endpoint"] == "assignments.save_assignment"
 
     def test_after_request_deferred_skips_silent_presave(self, app):
         with app.test_request_context("/assignment/1", method="POST",

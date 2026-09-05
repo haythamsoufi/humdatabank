@@ -1,7 +1,8 @@
 """
-Human-readable formatting for admin audit log JSON (old_values / new_values).
+Human-readable formatting for audit-trail Details (admin old/new values and
+activity ``context_data``).
 
-Used by the audit trail to replace raw IDs with names/labels where possible.
+Used by the audit trail to replace raw JSON / IDs with names and labels.
 """
 
 from __future__ import annotations
@@ -516,13 +517,281 @@ def format_api_key_admin_action_details(
     return None
 
 
+# Request/middleware metadata already shown in other audit-trail columns.
+_TECHNICAL_DETAIL_KEYS = frozenset(
+    {
+        "endpoint",
+        "method",
+        "http_method",
+        "status_code",
+        "response_status_code",
+        "url_path",
+        "form_data",
+        "csrf_token",
+        "device_token_preview",
+        "assignment_entity_status_id",
+        "aes_id",
+        "template_id",
+        "ifrc_presave",
+    }
+)
+
+_ALWAYS_HIDE_KEY_SUBSTRINGS = (
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "csrf",
+    "api_key",
+    "apikey",
+    "authorization",
+    "private_key",
+)
+
+# Known payload keys → reviewer-facing labels.
+_DETAIL_KEY_LABELS = {
+    "auto_resolved": "Automatically resolved",
+    "cleanup_time": "Cleanup time",
+    "client_name": "Client",
+    "country_name": "Country",
+    "country_id": "Country",
+    "country_ids": "Countries",
+    "device_name": "Device",
+    "device_id": "Device",
+    "email": "Email",
+    "entity_name": "Entity",
+    "entity_permissions": "Non-country entity access",
+    "entity_select": "Entity",
+    "entity_type": "Entity type",
+    "expires_at": "Expires at",
+    "is_active": "Active",
+    "is_revoked": "Revoked",
+    "key_prefix": "Key prefix",
+    "name": "Name",
+    "platform": "Platform",
+    "pre_provisioned_for_sso": "Pre-provisioned for SSO",
+    "profile_color": "Profile color",
+    "rate_limit_per_minute": "Rate limit / min",
+    "rbac_role_ids": "Roles",
+    "sessions_cleaned": "Sessions cleaned",
+    "status": "Status",
+    "title": "Title",
+    "user_email": "Email",
+    "user_name": "User",
+    "assignment_title": "Assignment",
+    "template_name": "Template",
+    "action": "Action",
+}
+
+# Promote a few safe, named fields from redacted activity form_data.
+_FORM_DATA_DETAIL_KEYS = (
+    "action",
+    "country_id",
+    "country_name",
+    "entity_select",
+    "entity_name",
+    "entity_type",
+    "assignment_title",
+    "template_name",
+    "title",
+)
+
+
+def _looks_like_db_id(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    if isinstance(value, str) and value.strip().isdigit():
+        return True
+    return False
+
+
+def _is_hidden_detail_key(key: str) -> bool:
+    k = (key or "").strip()
+    if not k or k in _TECHNICAL_DETAIL_KEYS:
+        return True
+    lower = k.lower()
+    return any(s in lower for s in _ALWAYS_HIDE_KEY_SUBSTRINGS)
+
+
+def _humanize_detail_key(key: str) -> str:
+    if key in _DETAIL_KEY_LABELS:
+        return _DETAIL_KEY_LABELS[key]
+    readable = (key or "").replace("_", " ").strip()
+    if not readable:
+        return key
+    return readable[:1].upper() + readable[1:]
+
+
+def _humanize_detail_scalar(value: Any) -> Any:
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if "@" in text:
+            return text
+        lowered = text.lower()
+        if lowered in {
+            "approved",
+            "rejected",
+            "pending",
+            "active",
+            "inactive",
+            "true",
+            "false",
+            "save",
+            "submit",
+            "sent_for_review",
+            "send_for_review",
+            "return_for_revision",
+        }:
+            return lowered.replace("_", " ").title()
+        return text
+    return value
+
+
+def _drop_redundant_id_keys(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Omit ``foo_id`` when a name/email/title sibling is present, and lone numeric IDs."""
+    out = dict(payload)
+    for key in list(out):
+        if not key.endswith("_id") or key.endswith("_ids"):
+            continue
+        prefix = key[: -len("_id")]
+        if any(
+            sibling in out
+            for sibling in (
+                f"{prefix}_name",
+                f"{prefix}_email",
+                f"{prefix}_title",
+                f"{prefix}_code",
+            )
+        ):
+            out.pop(key, None)
+            continue
+        if _looks_like_db_id(out.get(key)):
+            out.pop(key, None)
+    return out
+
+
+def _resolve_known_id_lists(key: str, value: Any) -> Optional[Any]:
+    if key == "country_ids" and isinstance(value, list):
+        names = _country_names(value)
+        return names or None
+    if key == "rbac_role_ids" and isinstance(value, list):
+        labels = _role_labels(value)
+        return labels or None
+    if key == "entity_permissions" and isinstance(value, list):
+        lines = _format_entity_permission_entries(value)
+        return lines or None
+    return value
+
+
+def _useful_form_data_fields(form_data: Any) -> Dict[str, Any]:
+    if not isinstance(form_data, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    for key in _FORM_DATA_DETAIL_KEYS:
+        if key in form_data and form_data[key] not in (None, ""):
+            out[key] = form_data[key]
+    return out
+
+
+def humanize_audit_details_dict(payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Turn a stored audit JSON object into labelled, reviewer-facing fields.
+
+    Drops request metadata, secrets, and redundant numeric IDs. Returns None
+    when nothing useful remains (so the UI can hide Details).
+    """
+    if not isinstance(payload, dict) or not payload:
+        return None
+
+    merged = dict(payload)
+    extras = _useful_form_data_fields(merged.pop("form_data", None))
+    for key, value in extras.items():
+        merged.setdefault(key, value)
+
+    merged = _drop_redundant_id_keys(merged)
+
+    out: Dict[str, Any] = {}
+    for key, raw in merged.items():
+        if _is_hidden_detail_key(key):
+            continue
+        value = _resolve_known_id_lists(key, raw)
+        if value is None or value == "" or value == []:
+            continue
+        if isinstance(value, list) and all(isinstance(x, str) for x in value):
+            display: Any = value
+        elif isinstance(value, (dict, list)):
+            # Keep small structured values; the grid renderer prints them as lines.
+            display = value
+        else:
+            display = _humanize_detail_scalar(value)
+            if display is None or display == "":
+                continue
+            if key == "entity_type" and isinstance(display, str):
+                display = display.replace("_", " ").title()
+        label = _humanize_detail_key(key)
+        if label in out and key.endswith("_id"):
+            continue
+        out[label] = display
+
+    country = out.get("Country")
+    if country and out.get("Entity") == country:
+        out.pop("Entity", None)
+        entity_type = out.get("Entity type")
+        if isinstance(entity_type, str) and entity_type.lower() == "country":
+            out.pop("Entity type", None)
+
+    return out or None
+
+
+def _merge_old_and_new_details(
+    old_values: Optional[Dict[str, Any]],
+    new_values: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    humanized_old = humanize_audit_details_dict(old_values)
+    humanized_new = humanize_audit_details_dict(new_values)
+    if not humanized_old:
+        return humanized_new
+    if not humanized_new:
+        return humanized_old
+
+    out: Dict[str, Any] = {}
+    labels = list(dict.fromkeys([*humanized_old.keys(), *humanized_new.keys()]))
+    for label in labels:
+        before = humanized_old.get(label)
+        after = humanized_new.get(label)
+        if before == after:
+            out[label] = after
+        elif before is None:
+            out[label] = after
+        elif after is None:
+            out[f"{label} (before)"] = before
+        else:
+            out[f"{label} (before)"] = before
+            out[f"{label} (after)"] = after
+    return out or None
+
+
+def format_activity_log_details(
+    context_data: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Humanize ``UserActivityLog.context_data`` for the audit-trail Details panel."""
+    return humanize_audit_details_dict(context_data)
+
+
 def format_admin_action_details(
     action_type: Optional[str],
     old_values: Optional[Dict[str, Any]],
     new_values: Optional[Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
     """
-    Return a display-friendly details dict, or None to keep raw JSON fallback.
+    Return a display-friendly details dict, or None when there is nothing useful
+    to show (the UI hides Details in that case).
     """
     if action_type == "user_update":
         try:
@@ -535,9 +804,13 @@ def format_admin_action_details(
         except Exception:
             return None
     if action_type and action_type.startswith("rbac_"):
-        return format_rbac_admin_action_details(action_type, old_values, new_values)
+        special = format_rbac_admin_action_details(action_type, old_values, new_values)
+        if special is not None:
+            return special
     if action_type in ("api_key_create", "api_key_revoke"):
-        return format_api_key_admin_action_details(
+        special = format_api_key_admin_action_details(
             action_type or "", old_values, new_values
         )
-    return None
+        if special is not None:
+            return special
+    return _merge_old_and_new_details(old_values, new_values)

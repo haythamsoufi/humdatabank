@@ -19744,6 +19744,10 @@ msgstr "Return this assignment to the National Society for changes?"
 msgid "Return to form builder"
 msgstr "Return to form builder"
 
+#: app/utils/audit_trail_labels.py:45
+msgid "Returned for revision"
+msgstr "Returned for revision"
+
 #: app/templates/core/dashboard/_assignments_tab.html:307
 #: app/templates/forms/entry_form/entry_form.html:613
 msgid "Returning…"

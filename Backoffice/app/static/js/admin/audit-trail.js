@@ -373,30 +373,73 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
         return '<div class="audit-details-user-update audit-details-form-item">' + parts.join('') + '</div>';
     }
 
-    /** Flat key–value admin details (RBAC, API keys, etc.) */
+    function formatStructuredDetailValue(value) {
+        if (value === null || value === undefined || value === '') {
+            return '';
+        }
+        if (typeof value === 'boolean') {
+            return value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            var scalars = value.every(function (item) {
+                return item === null || item === undefined || typeof item !== 'object';
+            });
+            if (scalars) {
+                return value
+                    .filter(function (item) { return item !== null && item !== undefined && item !== ''; })
+                    .map(function (item) { return String(item); })
+                    .join(', ');
+            }
+            return value.map(function (item) {
+                return typeof item === 'object' ? formatStructuredDetailValue(item) : String(item);
+            }).filter(Boolean).join('; ');
+        }
+        if (typeof value === 'object') {
+            return Object.keys(value).filter(function (k) {
+                return value[k] !== null && value[k] !== undefined && value[k] !== '';
+            }).map(function (k) {
+                var label = /[ _]/.test(k) || k !== k.toLowerCase() ? k : humanizeToken(k);
+                return label + ': ' + formatStructuredDetailValue(value[k]);
+            }).join('; ');
+        }
+        return String(value);
+    }
+
+    /** Flat key–value details (admin actions and activity context). */
     function renderSimpleStructuredAuditHtml(d) {
         var keys = Object.keys(d).filter(function (k) {
             return Object.prototype.hasOwnProperty.call(d, k) && d[k] !== undefined && d[k] !== null && d[k] !== '';
         });
-        keys.sort();
         if (!keys.length) {
-            try {
-                return '<pre class="text-xs text-gray-700 details-pre">' + escapeHtml(JSON.stringify(d, null, 2)) + '</pre>';
-            } catch (e) {
-                return renderTextCell(String(d));
-            }
+            return '<span class="text-sm text-gray-500">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
         }
         var rows = keys.map(function (k) {
-            var v = d[k];
-            var vs = typeof v === 'object' ? JSON.stringify(v) : String(v);
+            var label = /[ _]/.test(k) || k !== k.toLowerCase() ? k : humanizeToken(k);
+            var vs = formatStructuredDetailValue(d[k]);
             return '<p class="text-xs text-gray-900 audit-form-item-kv-line"><span class="audit-form-item-kv-label">' +
-                escapeHtml(k) + ':</span> <span class="break-words">' + escapeHtml(vs) + '</span></p>';
+                escapeHtml(label) + ':</span> <span class="break-words">' + escapeHtml(vs) + '</span></p>';
         }).join('');
         return '<div class="audit-details-user-update">' + rows + '</div>';
     }
 
-    function renderDetailsValue(details, entry) {
+    function hasDisplayableDetails(details) {
         if (details === null || details === undefined) {
+            return false;
+        }
+        if (typeof details === 'object' && !Array.isArray(details)) {
+            return Object.keys(details).some(function (k) {
+                var v = details[k];
+                return v !== null && v !== undefined && v !== '';
+            });
+        }
+        if (Array.isArray(details)) {
+            return details.length > 0;
+        }
+        return String(details).trim() !== '';
+    }
+
+    function renderDetailsValue(details, entry) {
+        if (!hasDisplayableDetails(details)) {
             return '<span class="text-sm text-gray-500">' + EMPTY_VALUE_PLACEHOLDER + '</span>';
         }
         if (typeof details === 'object' && details !== null && !Array.isArray(details)) {
@@ -406,18 +449,10 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
             if (entry && entry.type === 'admin_action' && entry.action_type === 'form_item_update') {
                 return renderFormItemUpdateDetailsHtml(details);
             }
-            var at = entry && entry.action_type ? String(entry.action_type) : '';
-            if (at.indexOf('rbac_') === 0 || at === 'api_key_create' || at === 'api_key_revoke') {
-                return renderSimpleStructuredAuditHtml(details);
-            }
-            try {
-                return '<pre class="text-xs text-gray-700 details-pre">' + escapeHtml(JSON.stringify(details, null, 2)) + '</pre>';
-            } catch (e) {
-                return renderTextCell(String(details));
-            }
+            return renderSimpleStructuredAuditHtml(details);
         }
         if (typeof details === 'boolean') {
-            return renderTextCell(details ? 'true' : 'false');
+            return renderTextCell(details ? 'Yes' : 'No');
         }
         return renderTextCell(String(details));
     }
@@ -909,7 +944,7 @@ $(document).ready(function() {
             cellRenderer: function(params) {
                 const valueText = isNilOrEmpty(params.value) ? EMPTY_VALUE_PLACEHOLDER : String(params.value);
                 let html = '<div class="text-sm text-gray-900" style="word-wrap: break-word; overflow-wrap: break-word; white-space: normal;" title="' + escapeHtml(valueText) + '">' + escapeHtml(valueText) + '</div>';
-                if (params.data.details !== null && params.data.details !== undefined) {
+                if (hasDisplayableDetails(params.data.details)) {
                     const detailsId = 'details-' + params.data.id;
                     html += '<button class="text-xs text-blue-500 hover:text-blue-700 mt-1 toggle-details-btn" type="button" data-details-id="' + detailsId + '">' + cfg.t.view_details_5d5cd268 + '</button>';
                     html += '<div class="hidden mt-2 p-3 bg-gray-100 rounded-md border border-gray-200 min-w-0 max-w-full overflow-x-auto" id="' + detailsId + '">';

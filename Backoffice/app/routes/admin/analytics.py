@@ -35,7 +35,10 @@ from app.middleware.activity_middleware import track_admin_action
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
 from app.utils.api_pagination import validate_pagination_params
 from app.utils.api_responses import json_ok
-from app.services.audit.details_service import format_admin_action_details
+from app.services.audit.details_service import (
+    format_activity_log_details,
+    format_admin_action_details,
+)
 from app.services.audit.trail_session_query import (
     AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES,
     AUDIT_TRAIL_EXCLUDED_ACTIVITY_TYPES,
@@ -46,6 +49,7 @@ from app.services.audit.trail_display_service import (
     build_form_context_lookups_from_activity_logs,
     consolidate_activity_type,
     create_consistent_description,
+    display_audit_endpoint,
     extract_entity_info,
     refine_activity_row_consolidated_type,
 )
@@ -967,13 +971,16 @@ def audit_trail():
                 'consolidated_activity_type': consolidated_type,
                 'description': log.activity_description,
                 'consistent_description': consistent_desc,
-                'endpoint': log.endpoint,
+                'endpoint': display_audit_endpoint(
+                    log.endpoint, log.activity_type, consolidated_type
+                ),
                 'http_method': log.http_method,
                 'ip_address': log.ip_address,
                 'response_status_code': log.response_status_code,
                 'risk_level': _audit_trail_risk_level_for_activity_row(log),
                 'requires_review': False,
                 'context_data': log.context_data,
+                'details': format_activity_log_details(enhanced_context),
                 'entity_type': entity_type,
                 'entity_id': entity_id,
                 'entity_name': entity_name,
@@ -1069,8 +1076,6 @@ def audit_trail():
             details_payload = format_admin_action_details(
                 action.action_type, action.old_values, action.new_values
             )
-            if details_payload is None:
-                details_payload = action.old_values or action.new_values
 
             entries.append({
                 'id': action_id,

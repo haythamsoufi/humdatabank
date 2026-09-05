@@ -14,6 +14,7 @@ from app.utils.activity_logging_skip import (
     SKIP_ACTIVITY_ENDPOINT_PREFIXES,
     SKIP_ACTIVITY_ENDPOINT_SUFFIXES,
     SKIP_ACTIVITY_ENDPOINTS,
+    audit_endpoint_for_activity,
     should_exclude_from_activity_catalog,
     should_skip_activity_endpoint,
     should_skip_activity_path,
@@ -130,6 +131,41 @@ class TestShouldSkipActivityType:
     def test_none_and_empty_not_skipped(self):
         assert should_skip_activity_type(None) is False
         assert should_skip_activity_type("") is False
+
+
+class TestAuditEndpointForActivity:
+    def test_form_saved_on_view_assignment_is_save_assignment(self):
+        assert (
+            audit_endpoint_for_activity("assignments.view_assignment", "form_saved")
+            == "assignments.save_assignment"
+        )
+
+    def test_legacy_form_save_type_maps(self):
+        assert (
+            audit_endpoint_for_activity("forms.enter_data", "form_save")
+            == "assignments.save_assignment"
+        )
+
+    def test_form_submitted_on_view_assignment(self):
+        assert (
+            audit_endpoint_for_activity("assignments.view_assignment", "form_submitted")
+            == "assignments.submit_assignment"
+        )
+
+    def test_unrelated_endpoint_unchanged(self):
+        assert (
+            audit_endpoint_for_activity("settings.manage_settings", "form_saved")
+            == "settings.manage_settings"
+        )
+
+    def test_none_endpoint_unchanged(self):
+        assert audit_endpoint_for_activity(None, "form_saved") is None
+
+    def test_already_remapped_endpoint_unchanged(self):
+        assert (
+            audit_endpoint_for_activity("assignments.save_assignment", "form_saved")
+            == "assignments.save_assignment"
+        )
 
 
 # ---------------------------------------------------------------------------

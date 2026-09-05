@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 from user_agents import parse
 from app.utils.constants import DEFAULT_SESSION_CLEANUP_LOCK_ID
 from app.utils.activity_types import normalize_activity_type
+from app.utils.activity_logging_skip import audit_endpoint_for_activity
 from app.utils.page_view_paths import (
     merge_page_view_path_count,
     page_view_path_key_from_request,
@@ -447,15 +448,17 @@ def log_user_activity(activity_type, description=None, context_data=None, respon
     try:
         client_info = get_client_info()
 
+        normalized_activity_type = normalize_activity_type(activity_type)
+
         # Safely constrain string fields to column limits
-        endpoint_val = (request.endpoint or '')[:255] if request.endpoint else None
+        raw_endpoint = request.endpoint
+        remapped = audit_endpoint_for_activity(raw_endpoint, normalized_activity_type)
+        endpoint_val = (remapped or '')[:255] if remapped else None
         method_val = (request.method or '')[:10] if request.method else None
         url_path_val = (request.path or '')[:500] if request.path else None
         referrer_val = (request.referrer or '')[:500] if request.referrer else None
         ip_address_val = (client_info.get('ip_address') or '')[:45]
         user_agent_val = client_info.get('user_agent')  # Text field, no limit
-
-        normalized_activity_type = normalize_activity_type(activity_type)
 
         activity_log = UserActivityLog(
             user_id=current_user.id,
@@ -614,7 +617,8 @@ def log_user_activity_explicit(
     normalized_activity_type = normalize_activity_type(activity_type)
 
     # Safely constrain string fields to column limits
-    endpoint_val = (endpoint or '')[:255] if endpoint else None
+    remapped = audit_endpoint_for_activity(endpoint, normalized_activity_type)
+    endpoint_val = (remapped or '')[:255] if remapped else None
     method_val = (http_method or '')[:10] if http_method else None
     url_path_val = (url_path or '')[:500] if url_path else None
     referrer_val = (referrer or '')[:500] if referrer else None
@@ -661,9 +665,12 @@ def log_user_activity_for_user(user_id, activity_type, description=None, context
         return
     try:
         has_ctx = has_request_context()
+        normalized_activity_type = normalize_activity_type(activity_type)
+
         if has_ctx:
             client_info = get_client_info()
-            endpoint_val = (request.endpoint or '')[:255] if request.endpoint else None
+            remapped = audit_endpoint_for_activity(request.endpoint, normalized_activity_type)
+            endpoint_val = (remapped or '')[:255] if remapped else None
             method_val = (request.method or '')[:10] if request.method else None
             url_path_val = (request.path or '')[:500] if request.path else None
             referrer_val = (request.referrer or '')[:500] if request.referrer else None
@@ -676,8 +683,6 @@ def log_user_activity_for_user(user_id, activity_type, description=None, context
             referrer_val = None
             ip_address_val = 'unknown'
             user_agent_val = None
-
-        normalized_activity_type = normalize_activity_type(activity_type)
 
         activity_log = UserActivityLog(
             user_id=user_id,

@@ -1133,6 +1133,9 @@ class TestActivityRegisteredHooks:
                 resp = _activity_after(app)(make_response("ok", 200))
                 mock_log.assert_called_once()
                 assert mock_log.call_args[1]["activity_type"] == "form_saved"
+                assert mock_log.call_args[1]["context_data"]["endpoint"] == (
+                    "assignments.save_assignment"
+                )
                 assert resp.status_code == 200
 
     def test_after_request_skips_silent_presave(self, app):
@@ -1276,6 +1279,7 @@ class TestActivityRegisteredHooks:
                     callback()
                 mock_log.assert_called_once()
                 assert mock_log.call_args[1]["activity_type"] == "form_saved"
+                assert mock_log.call_args[1]["endpoint"] == "assignments.save_assignment"
 
     def test_after_request_deferred_skips_silent_presave(self, app):
         with app.test_request_context("/assignment/1", method="POST",

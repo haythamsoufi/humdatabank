@@ -20,7 +20,10 @@ from app.utils.rate_limiting import mobile_rate_limit
 from app.utils.sql_utils import safe_ilike_pattern
 from app.utils.datetime_helpers import utcnow
 from app.routes.api.mobile import mobile_bp
-from app.services.audit.trail_display_service import create_consistent_description
+from app.services.audit.trail_display_service import (
+    create_consistent_description,
+    display_audit_endpoint,
+)
 from app.services.notification.push import PushNotificationService
 from app.services.platform.user_analytics_query_service import (
     execute_end_session,
@@ -278,7 +281,9 @@ def audit_trail():
                     'activity_type': log.activity_type,
                     'description': log.activity_description,
                     'consistent_description': consistent_desc,
-                    'endpoint': log.endpoint,
+                    'endpoint': display_audit_endpoint(
+                        log.endpoint, log.activity_type
+                    ),
                     'http_method': getattr(log, "http_method", None),
                     'ip_address': log.ip_address,
                     'details': log.context_data,

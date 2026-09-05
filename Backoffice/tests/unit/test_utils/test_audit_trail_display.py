@@ -3,9 +3,24 @@
 from app.services.audit.trail_display_service import (
     consolidate_activity_type,
     create_consistent_description,
+    display_audit_endpoint,
     refine_activity_row_consolidated_type,
     _extract_aes_and_template_ids_from_context,
 )
+
+
+def test_display_audit_endpoint_remaps_draft_save():
+    assert (
+        display_audit_endpoint("assignments.view_assignment", "form_saved")
+        == "assignments.save_assignment"
+    )
+
+
+def test_display_audit_endpoint_uses_consolidated_type():
+    assert (
+        display_audit_endpoint("forms.view_edit_form", "form_save", "form_saved")
+        == "assignments.save_assignment"
+    )
 
 
 def test_consolidate_activity_type_legacy_form_save():

@@ -111,6 +111,7 @@ SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
 SKIP_ACTIVITY_TYPES: frozenset[str] = frozenset({"form_presave", "entry_form_request"})
 
 # Entry-form POSTs without a lifecycle action. Used to hide legacy "Completed View *" rows.
+# These Flask view names also handle save/submit/approve — audit logs remap them below.
 ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
     {
         "forms.enter_data",
@@ -118,6 +119,33 @@ ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "assignments.view_assignment",
     }
 )
+
+# Dual-purpose entry-form routes keep a view_* Flask name. Audit rows should show
+# the lifecycle action, not the GET view function (form_saved ≠ view_assignment).
+ENTRY_FORM_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
+    "form_saved": "assignments.save_assignment",
+    "form_submitted": "assignments.submit_assignment",
+    "form_approved": "assignments.approve_assignment",
+    "form_reopened": "assignments.reopen_assignment",
+    "form_validated": "assignments.validate_assignment",
+}
+
+
+def audit_endpoint_for_activity(endpoint: str | None, activity_type: str | None) -> str | None:
+    """Return the endpoint string stored/shown on an audit row.
+
+    Entry-form save/submit POSTs hit ``assignments.view_assignment`` (same URL as
+    GET). Replace that view name with the action so the trail does not look like
+    a page view.
+    """
+    if not endpoint:
+        return endpoint
+    if endpoint not in ENTRY_FORM_ACTIVITY_ENDPOINTS:
+        return endpoint
+    from app.utils.activity_types import normalize_activity_type
+
+    normalized = normalize_activity_type(activity_type) if activity_type else None
+    return ENTRY_FORM_ACTION_AUDIT_ENDPOINTS.get(normalized or "", endpoint)
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")
 

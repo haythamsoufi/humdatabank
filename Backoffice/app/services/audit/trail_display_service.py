@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.utils.activity_types import normalize_activity_type
+from app.utils.activity_logging_skip import audit_endpoint_for_activity
 from app.utils.activity_endpoint_overrides import (
     description_for_activity_type,
     infer_activity_type_from_legacy_description,
@@ -26,6 +27,17 @@ class FormContextLookups:
 
     aes_by_id: Dict[int, Dict[str, Optional[str]]]
     template_name_by_id: Dict[int, str]
+
+
+def display_audit_endpoint(
+    endpoint: Optional[str],
+    activity_type: Optional[str],
+    consolidated_type: Optional[str] = None,
+) -> str:
+    """Endpoint shown on the audit trail (action name, not the dual-purpose view)."""
+    return audit_endpoint_for_activity(
+        endpoint, consolidated_type or activity_type
+    ) or ""
 
 
 def consolidate_activity_type(

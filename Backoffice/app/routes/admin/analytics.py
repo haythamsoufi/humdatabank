@@ -46,6 +46,7 @@ from app.services.audit.trail_display_service import (
     build_form_context_lookups_from_activity_logs,
     consolidate_activity_type,
     create_consistent_description,
+    display_audit_endpoint,
     extract_entity_info,
     refine_activity_row_consolidated_type,
 )
@@ -967,7 +968,9 @@ def audit_trail():
                 'consolidated_activity_type': consolidated_type,
                 'description': log.activity_description,
                 'consistent_description': consistent_desc,
-                'endpoint': log.endpoint,
+                'endpoint': display_audit_endpoint(
+                    log.endpoint, log.activity_type, consolidated_type
+                ),
                 'http_method': log.http_method,
                 'ip_address': log.ip_address,
                 'response_status_code': log.response_status_code,

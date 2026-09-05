@@ -35,6 +35,7 @@ from app.utils.activity_endpoint_catalog.defaults import describe_get_request_wi
 from app.utils.activity_form_data_redaction import redact_activity_form_data
 from app.utils.page_view_paths import page_view_path_key_from_request
 from app.utils.activity_logging_skip import (
+    audit_endpoint_for_activity,
     should_skip_activity_endpoint,
     should_skip_activity_type,
 )
@@ -327,7 +328,7 @@ def track_activity(activity_type=None, description=None, admin_action=False, ris
 
                     # Gather context data
                     context_data = {
-                        'endpoint': request.endpoint,
+                        'endpoint': audit_endpoint_for_activity(request.endpoint, act_type),
                         'method': request.method,
                         'status_code': status_code
                     }
@@ -610,8 +611,9 @@ def init_activity_tracking(app):
                     if _audit_desc:
                         description = _audit_desc
 
+                    audit_endpoint = audit_endpoint_for_activity(endpoint, activity_type)
                     context_data = {
-                        'endpoint': request.endpoint,
+                        'endpoint': audit_endpoint,
                         'method': request.method,
                         'status_code': response.status_code
                     }
@@ -640,7 +642,7 @@ def init_activity_tracking(app):
                                         context_data=context_data,
                                         response_time_ms=response_time_ms,
                                         status_code=response.status_code,
-                                        endpoint=endpoint,
+                                        endpoint=audit_endpoint,
                                         http_method=method,
                                         url_path=url_path,
                                         referrer=referrer,
@@ -708,8 +710,9 @@ def init_activity_tracking(app):
                     description = _audit_desc
 
                 # Gather context data
+                audit_endpoint = audit_endpoint_for_activity(request.endpoint, activity_type)
                 context_data = {
-                    'endpoint': request.endpoint,
+                    'endpoint': audit_endpoint,
                     'method': request.method,
                     'status_code': response.status_code
                 }

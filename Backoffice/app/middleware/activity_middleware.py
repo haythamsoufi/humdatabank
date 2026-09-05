@@ -102,6 +102,28 @@ def _should_count_session_page_view_for_request(req) -> bool:
 # Shared helpers (used by both deferred and non-deferred tracking paths)
 # ---------------------------------------------------------------------------
 
+def _form_field(form_data, key):
+    """Read a single form value as a stripped string."""
+    if not form_data:
+        return ""
+    raw = form_data.get(key, "")
+    if raw is None:
+        return ""
+    return str(raw).strip()
+
+
+def _is_silent_entry_presave(form_data):
+    """True for save-before-submit (``ifrc_presave=1``), not an explicit Save click."""
+    return _form_field(form_data, "ifrc_presave") == "1"
+
+
+def _activity_type_for_save_action(form_data):
+    """Explicit Save → form_saved; silent presave-before-submit → form_presave."""
+    if _is_silent_entry_presave(form_data):
+        return "form_presave"
+    return "form_saved"
+
+
 def _determine_activity_type(method, endpoint, form_data=None):
     """Derive a specific, user-friendly activity type from request context.
 
@@ -109,7 +131,7 @@ def _determine_activity_type(method, endpoint, form_data=None):
     audit trail's activityMap.
     """
     endpoint = endpoint or ''
-    action = (form_data or {}).get('action', '').lower().strip()
+    action = _form_field(form_data, "action").lower()
 
     if method == 'GET':
         return 'page_view'
@@ -131,9 +153,13 @@ def _determine_activity_type(method, endpoint, form_data=None):
             return 'form_reopened'
 
         # Entry-form (focal-point data entry) — has an explicit 'action' field
-        if endpoint in ('forms.enter_data',) or 'enter_data' in endpoint:
+        if endpoint in (
+            'forms.enter_data',
+            'forms.view_edit_form',
+            'assignments.view_assignment',
+        ) or 'enter_data' in endpoint:
             if action == 'save':
-                return 'form_saved'
+                return _activity_type_for_save_action(form_data)
             elif action == 'submit':
                 return 'form_submitted'
             elif action == 'approve':
@@ -143,8 +169,9 @@ def _determine_activity_type(method, endpoint, form_data=None):
             elif action == 'validate':
                 return 'form_validated'
             else:
-                # Autosave / AJAX / unknown action — not a formal submission
-                return 'request'
+                # AJAX/unknown POST on the entry form (no save/submit/reopen).
+                # Fallback text is "Completed View Assignment" — not an audit event.
+                return 'entry_form_request'
 
         # File uploads
         if 'upload' in endpoint:
@@ -152,7 +179,7 @@ def _determine_activity_type(method, endpoint, form_data=None):
 
         # Generic: use the form action field
         if action == 'save':
-            return 'form_saved'
+            return _activity_type_for_save_action(form_data)
         if action == 'submit':
             return 'form_submitted'
         if action == 'approve':
@@ -555,7 +582,7 @@ def init_activity_tracking(app):
                     ):
                         return response
 
-                    # Draft / autosave: refresh last_activity only — not an audit row.
+                    # Reserved skip-types (none today): refresh last_activity only.
                     if should_skip_activity_type(activity_type):
                         def _on_close_touch():
                             try:

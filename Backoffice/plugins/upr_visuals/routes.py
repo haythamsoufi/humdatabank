@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from html import escape
 
-from flask import Response, current_app, has_request_context, redirect, request, send_from_directory, url_for
+from flask import Response, current_app, g, has_request_context, redirect, request, send_from_directory, url_for
 from flask_babel import force_locale, gettext as _
 from flask_login import current_user, login_required
 from werkzeug.exceptions import HTTPException, NotFound
@@ -71,6 +71,61 @@ def _requested_language(*, strict: bool = False) -> str:
         if strict:
             raise UprVisualsError(str(exc)) from exc
         return "en"
+
+
+_UPR_VISUALS_FORMAT_LABELS = {"pdf": "PDF", "png": "PNG", "idml": "InDesign"}
+
+
+def _upr_visuals_format_label(export_format: str) -> str:
+    key = (export_format or "").strip().lower()
+    return _UPR_VISUALS_FORMAT_LABELS.get(key, key.upper() or "export")
+
+
+def _upr_visuals_generation_description(export_format: str, *, narrative: bool = False) -> str:
+    fmt = _upr_visuals_format_label(export_format)
+    if narrative:
+        return f"Generated UPR visuals ({fmt} with narrative)"
+    return f"Generated UPR visuals ({fmt})"
+
+
+def _log_upr_visuals_generation(
+    *,
+    export_format: str,
+    aes_id: int | None = None,
+    dashboard_id: str | None = None,
+    narrative: bool = False,
+    assigned_form_id: int | None = None,
+) -> None:
+    """Write an audit-trail row for a newly queued UPR visuals export."""
+    try:
+        from app.services.organization.entity_service import EntityService
+        from app.services.platform.user_analytics_service import log_user_activity
+
+        description = _upr_visuals_generation_description(export_format, narrative=narrative)
+        context: dict = {"export_format": (export_format or "").strip().lower()}
+        if aes_id:
+            context["aes_id"] = int(aes_id)
+            try:
+                aes = AssignmentEntityStatus.query.get(int(aes_id))
+                if aes:
+                    context["entity_type"] = aes.entity_type
+                    context["entity_id"] = aes.entity_id
+                    context["entity_name"] = EntityService.get_entity_display_name(
+                        aes.entity_type, aes.entity_id
+                    )
+            except Exception as exc:
+                current_app.logger.debug("UPR visuals audit entity context skipped: %s", exc)
+        if dashboard_id and dashboard_id != "combined":
+            context["dashboard_id"] = dashboard_id
+        if assigned_form_id:
+            context["assigned_form_id"] = int(assigned_form_id)
+        log_user_activity(
+            activity_type="admin_plugin",
+            description=description,
+            context_data=context,
+        )
+    except Exception as exc:
+        current_app.logger.debug("UPR visuals audit log skipped: %s", exc)
 
 
 def _render_rate_key() -> str:
@@ -335,6 +390,11 @@ def _queue_visual_export(aes_id: int, export_format: str, *, dashboard_id: str =
         dashboard_id=dashboard_id,
     )
     start_assignment_export_job(app, job_id)
+    _log_upr_visuals_generation(
+        export_format=export_format,
+        aes_id=aes_id,
+        dashboard_id=dashboard_id,
+    )
     return job_id
 
 
@@ -557,6 +617,11 @@ def assignment_narrative(aes_id: int):
             lang=lang,
         )
         start_assignment_export_job(current_app._get_current_object(), job_id)
+        _log_upr_visuals_generation(
+            export_format=fmt,
+            aes_id=aes_id,
+            narrative=True,
+        )
         return json_accepted(job_id=job_id, status=build_assignment_export_status(job_id))
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
@@ -730,6 +795,9 @@ def generate():
             lang=lang,
         )
         start_bulk_export_job(current_app._get_current_object(), job_id)
+        g.audit_activity_description = _upr_visuals_generation_description(
+            export_format, narrative=include_narrative
+        )
         return json_accepted(job_id=job_id, status=build_bulk_export_status_payload(job_id))
     except UprVisualsError as exc:
         return json_bad_request(str(exc))

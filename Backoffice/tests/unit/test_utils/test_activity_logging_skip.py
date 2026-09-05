@@ -105,6 +105,8 @@ class TestShouldSkipActivityEndpoint:
         from app.utils.activity_logging_skip import SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
 
         assert should_skip_activity_endpoint("upr_excel_import.analyze") is True
+        assert should_skip_activity_endpoint("excel.validate_upr_country_reporting_import") is True
+        assert should_skip_activity_endpoint("excel.import_upr_country_reporting_template") is False
         assert should_skip_activity_endpoint("upr_visuals.assignment_narrative") is True
         assert should_skip_activity_endpoint("auth.complete_profile") is True
         assert "auth.complete_profile" in SKIP_AUTOMATIC_ACTIVITY_ENDPOINTS
@@ -112,9 +114,15 @@ class TestShouldSkipActivityEndpoint:
 
 
 class TestShouldSkipActivityType:
-    def test_form_saved_skipped(self):
-        assert should_skip_activity_type("form_saved") is True
-        assert should_skip_activity_type("form_save") is True
+    def test_form_saved_not_skipped(self):
+        assert should_skip_activity_type("form_saved") is False
+        assert should_skip_activity_type("form_save") is False
+
+    def test_silent_presave_skipped(self):
+        assert should_skip_activity_type("form_presave") is True
+
+    def test_unmapped_entry_form_request_skipped(self):
+        assert should_skip_activity_type("entry_form_request") is True
 
     def test_submit_not_skipped(self):
         assert should_skip_activity_type("form_submitted") is False

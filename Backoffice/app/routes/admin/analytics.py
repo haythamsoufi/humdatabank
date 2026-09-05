@@ -876,7 +876,7 @@ def audit_trail():
             )
         )
 
-    # Omit page_view / draft saves at SQL unless the reviewer asked for those types.
+    # Omit page_view at SQL unless the reviewer asked for those types.
     _hidden_types = [
         t for t in AUDIT_TRAIL_DEFAULT_HIDDEN_ACTIVITY_TYPES
         if not (activity_type and t in activity_type)

@@ -113,6 +113,29 @@ class TestApplyAuditTrailNoiseFilters:
         visible_types = {row.activity_type for row in visible}
         assert visible_types == {"data_modified"}
 
+    def test_null_description_stays_visible(self, app, db_session):
+        """NULL descriptions must not be dropped by the legacy-noise IN() filter."""
+        from app.models import UserActivityLog
+        from app.utils.datetime_helpers import utcnow
+        from tests.factories import create_test_user
+
+        user = create_test_user(db_session)
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                activity_type="data_modified",
+                activity_description=None,
+                endpoint="analytics.audit_trail",
+                url_path="/admin/analytics/audit-trail",
+                ip_address="127.0.0.1",
+                timestamp=utcnow(),
+            )
+        )
+        db_session.commit()
+
+        visible = apply_audit_trail_user_activity_noise_filters(UserActivityLog.query).all()
+        assert [row.activity_type for row in visible] == ["data_modified"]
+
 
 # ---------------------------------------------------------------------------
 # count_audit_visible_entries_for_session
@@ -344,7 +367,7 @@ class TestCountAuditVisibleEntriesForSession:
         result = count_audit_visible_entries_for_session(sl)
         assert result == 0
 
-    def test_form_saved_and_wizard_endpoints_not_counted(self, app, db_session):
+    def test_wizard_endpoints_not_counted_form_saved_is(self, app, db_session):
         from app.models import UserActivityLog, UserSessionLog
         from app.utils.datetime_helpers import utcnow
         from tests.factories import create_test_user
@@ -395,10 +418,23 @@ class TestCountAuditVisibleEntriesForSession:
                 timestamp=session_start + timedelta(minutes=3),
             )
         )
+        db_session.add(
+            UserActivityLog(
+                user_id=user.id,
+                user_session_id="test-draft-excluded-01",
+                activity_type="request",
+                activity_description="Completed View Assignment",
+                endpoint="assignments.view_assignment",
+                url_path="/assignment/1",
+                ip_address="127.0.0.1",
+                timestamp=session_start + timedelta(minutes=4),
+            )
+        )
         db_session.commit()
 
         result = count_audit_visible_entries_for_session(sl)
-        assert result == 1
+        # form_saved + form_submitted; wizard analyze and Completed View Assignment excluded
+        assert result == 2
 
 
 class TestCountAuditVisibleEntriesForSessionsBatch:

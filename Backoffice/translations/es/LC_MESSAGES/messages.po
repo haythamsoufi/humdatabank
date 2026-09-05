@@ -19934,6 +19934,10 @@ msgstr "¿Devolver esta asignación a la Sociedad Nacional para que cambie?"
 msgid "Return to form builder"
 msgstr "Volver al constructor de forma"
 
+#: app/utils/audit_trail_labels.py:45
+msgid "Returned for revision"
+msgstr ""
+
 #: app/templates/core/dashboard/_assignments_tab.html:307
 #: app/templates/forms/entry_form/entry_form.html:613
 msgid "Returning…"

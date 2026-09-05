@@ -80,6 +80,15 @@ SKIP_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "upr_excel_import.cancel_job",
         # Pre-import file check; the following import POST is the accountability event.
         "excel.validate_upr_country_reporting_import",
+        "excel.validate_unified_country_plan_import",
+        # Admin mutations that already write AdminActionLog (avoid duplicate trail rows).
+        "analytics.end_session",
+        "analytics.cleanup_sessions",
+        "analytics.resolve_security_event",
+        "security.resolve_security_event",
+        # Read-only / UI plumbing POSTs.
+        "data_exploration.get_ai_opinions_for_rows",
+        "plugin_management.render_plugin_field_builder",
         # Middleware skip only — assignment_narrative writes via _log_upr_visuals_generation.
         "upr_visuals.assignment_narrative",
         "upr_visuals.cancel",
@@ -117,6 +126,7 @@ ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
         "forms.enter_data",
         "forms.view_edit_form",
         "assignments.view_assignment",
+        "forms.edit_public_submission",
     }
 )
 
@@ -125,10 +135,32 @@ ENTRY_FORM_ACTIVITY_ENDPOINTS: frozenset[str] = frozenset(
 ENTRY_FORM_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
     "form_saved": "assignments.save_assignment",
     "form_submitted": "assignments.submit_assignment",
+    "form_sent_for_review": "assignments.send_assignment_for_review",
+    "form_returned_for_revision": "assignments.return_assignment_for_revision",
     "form_approved": "assignments.approve_assignment",
     "form_reopened": "assignments.reopen_assignment",
     "form_validated": "assignments.validate_assignment",
 }
+
+PUBLIC_SUBMISSION_ACTION_AUDIT_ENDPOINTS: dict[str, str] = {
+    "form_saved": "forms.save_public_submission",
+    "form_submitted": "forms.submit_public_submission",
+}
+
+# Dedicated assignment POSTs keep a main.* Flask name; show the assignments.* action.
+DEDICATED_ASSIGNMENT_AUDIT_ENDPOINTS: dict[str, str] = {
+    "main.approve_assignment": "assignments.approve_assignment",
+    "main.reopen_assignment": "assignments.reopen_assignment",
+    "main.return_assignment_for_revision": "assignments.return_assignment_for_revision",
+}
+
+# POSTs on these blueprints already write AdminActionLog — skip automatic UserActivityLog.
+ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING: tuple[str, ...] = (
+    "user_management.",
+    "form_builder.",
+    "rbac_management.",
+    "api_key_management.",
+)
 
 
 def audit_endpoint_for_activity(endpoint: str | None, activity_type: str | None) -> str | None:
@@ -140,11 +172,16 @@ def audit_endpoint_for_activity(endpoint: str | None, activity_type: str | None)
     """
     if not endpoint:
         return endpoint
+    dedicated = DEDICATED_ASSIGNMENT_AUDIT_ENDPOINTS.get(endpoint)
+    if dedicated:
+        return dedicated
     if endpoint not in ENTRY_FORM_ACTIVITY_ENDPOINTS:
         return endpoint
     from app.utils.activity_types import normalize_activity_type
 
     normalized = normalize_activity_type(activity_type) if activity_type else None
+    if endpoint == "forms.edit_public_submission":
+        return PUBLIC_SUBMISSION_ACTION_AUDIT_ENDPOINTS.get(normalized or "", endpoint)
     return ENTRY_FORM_ACTION_AUDIT_ENDPOINTS.get(normalized or "", endpoint)
 
 SKIP_ACTIVITY_ENDPOINT_PREFIXES: tuple[str, ...] = ("static", "plugin_static")

@@ -283,23 +283,38 @@ class TestDetermineActivityType:
             "POST", "assignments.view_assignment", {}
         ) == "entry_form_request"
 
+    def test_post_send_for_review(self):
+        assert _determine_activity_type(
+            "POST", "assignments.view_assignment", {"action": "send_for_review"}
+        ) == "form_sent_for_review"
+
+    def test_post_return_assignment_for_revision(self):
+        assert _determine_activity_type(
+            "POST", "main.return_assignment_for_revision"
+        ) == "form_returned_for_revision"
+
+    def test_post_public_submission_edit_save(self):
+        assert _determine_activity_type(
+            "POST", "forms.edit_public_submission", {"action": "save"}
+        ) == "form_saved"
+
+    def test_post_fill_public_form(self):
+        assert _determine_activity_type("POST", "forms.fill_public_form") == "form_submitted"
+
+    def test_post_documents_entity_select(self):
+        assert _determine_activity_type(
+            "POST", "main.documents_submit", {"entity_select": "country:1"}
+        ) == "country_selected"
+
     def test_post_upload_endpoint(self):
         assert _determine_activity_type("POST", "forms.upload_document") == "file_uploaded"
 
-    def test_post_generic_save_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "save"}) == "form_saved"
-
-    def test_post_generic_submit_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "submit"}) == "form_submitted"
-
-    def test_post_generic_approve_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "approve"}) == "form_approved"
-
-    def test_post_generic_reopen_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "reopen"}) == "form_reopened"
-
-    def test_post_generic_validate_action(self):
-        assert _determine_activity_type("POST", "admin.settings", {"action": "validate"}) == "form_validated"
+    def test_post_generic_action_not_treated_as_form_lifecycle(self):
+        assert _determine_activity_type("POST", "admin.settings", {"action": "save"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "submit"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "approve"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "reopen"}) == "request"
+        assert _determine_activity_type("POST", "admin.settings", {"action": "validate"}) == "request"
 
     def test_post_specific_override_from_resolver(self):
         with patch(
@@ -369,7 +384,7 @@ class TestApplyActivityCatalog:
             # "form_saved" is NOT in _CATALOG_ACTIVITY_TYPE_OVERRIDABLE
             at, desc = _apply_activity_catalog("POST", "admin.create_user", "form_saved")
             assert at == "form_saved"
-            assert desc == "Some admin thing"
+            assert desc is None
 
     def test_catalog_spec_no_activity_type_keeps_original(self):
         spec = MagicMock()

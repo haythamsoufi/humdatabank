@@ -53,6 +53,22 @@ def test_extract_aes_from_enter_data_url():
     assert tid is None
 
 
+def test_extract_aes_from_assignment_url():
+    aes_id, tid = _extract_aes_and_template_ids_from_context(
+        {"url_path": "/assignment/17", "form_data": {}}
+    )
+    assert aes_id == 17
+    assert tid is None
+
+
+def test_extract_aes_from_assignment_entity_status_id():
+    aes_id, tid = _extract_aes_and_template_ids_from_context(
+        {"form_data": {"assignment_entity_status_id": "9"}}
+    )
+    assert aes_id == 9
+    assert tid is None
+
+
 def test_create_consistent_description_page_view_strip_prefix():
     d = create_consistent_description(
         "activity",
@@ -64,6 +80,20 @@ def test_create_consistent_description_page_view_strip_prefix():
     )
     assert "Session ·" in d
     assert "Notification" in d
+
+
+def test_create_consistent_description_send_for_review_not_page_view():
+    desc = create_consistent_description(
+        "activity",
+        "form_sent_for_review",
+        None,
+        "Sent assignment for review",
+        "assignments.view_assignment",
+        {},
+    )
+    assert "review" in desc.lower()
+    assert not desc.startswith("Viewed")
+    assert consolidate_activity_type("form_sent_for_review") == "form_sent_for_review"
 
 
 def test_create_consistent_description_form_saved_uses_lookups():

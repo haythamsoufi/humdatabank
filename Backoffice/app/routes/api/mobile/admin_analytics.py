@@ -23,6 +23,7 @@ from app.routes.api.mobile import mobile_bp
 from app.services.audit.trail_display_service import (
     create_consistent_description,
     display_audit_endpoint,
+    refine_activity_row_consolidated_type,
 )
 from app.services.notification.push import PushNotificationService
 from app.services.platform.user_analytics_query_service import (
@@ -263,6 +264,12 @@ def audit_trail():
 
             for log in paginated.items:
                 ctx = log.context_data if isinstance(log.context_data, dict) else {}
+                consolidated_type = refine_activity_row_consolidated_type(
+                    log.activity_type,
+                    log.activity_description,
+                    log.endpoint,
+                    getattr(log, "http_method", None),
+                )
                 consistent_desc = create_consistent_description(
                     "activity",
                     log.activity_type,
@@ -278,11 +285,11 @@ def audit_trail():
                     'timestamp': log.timestamp.isoformat() if log.timestamp else None,
                     'user_email': log.user.email if log.user else None,
                     'user_name': log.user.name if log.user else None,
-                    'activity_type': log.activity_type,
+                    'activity_type': consolidated_type,
                     'description': log.activity_description,
                     'consistent_description': consistent_desc,
                     'endpoint': display_audit_endpoint(
-                        log.endpoint, log.activity_type
+                        log.endpoint, log.activity_type, consolidated_type
                     ),
                     'http_method': getattr(log, "http_method", None),
                     'ip_address': log.ip_address,

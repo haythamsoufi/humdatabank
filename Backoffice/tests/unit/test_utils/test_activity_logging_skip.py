@@ -107,6 +107,9 @@ class TestShouldSkipActivityEndpoint:
 
         assert should_skip_activity_endpoint("upr_excel_import.analyze") is True
         assert should_skip_activity_endpoint("excel.validate_upr_country_reporting_import") is True
+        assert should_skip_activity_endpoint("excel.validate_unified_country_plan_import") is True
+        assert should_skip_activity_endpoint("analytics.end_session") is True
+        assert should_skip_activity_endpoint("data_exploration.get_ai_opinions_for_rows") is True
         assert should_skip_activity_endpoint("excel.import_upr_country_reporting_template") is False
         assert should_skip_activity_endpoint("upr_visuals.assignment_narrative") is True
         assert should_skip_activity_endpoint("auth.complete_profile") is True
@@ -165,6 +168,26 @@ class TestAuditEndpointForActivity:
         assert (
             audit_endpoint_for_activity("assignments.save_assignment", "form_saved")
             == "assignments.save_assignment"
+        )
+
+    def test_send_for_review_on_view_assignment(self):
+        assert (
+            audit_endpoint_for_activity(
+                "assignments.view_assignment", "form_sent_for_review"
+            )
+            == "assignments.send_assignment_for_review"
+        )
+
+    def test_dedicated_approve_route_remapped(self):
+        assert (
+            audit_endpoint_for_activity("main.approve_assignment", "form_approved")
+            == "assignments.approve_assignment"
+        )
+
+    def test_public_submission_save_remapped(self):
+        assert (
+            audit_endpoint_for_activity("forms.edit_public_submission", "form_saved")
+            == "forms.save_public_submission"
         )
 
 

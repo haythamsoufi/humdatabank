@@ -573,7 +573,12 @@ def _update_session_activity_explicit(
         if normalized_activity_type == 'page_view':
             session_log.page_views += 1
             merge_page_view_path_count(session_log, page_view_path_key or "/")
-        elif normalized_activity_type in ['form_submitted', 'form_saved', 'data_save']:
+        elif normalized_activity_type in [
+            'form_submitted',
+            'form_saved',
+            'form_sent_for_review',
+            'data_save',
+        ]:
             session_log.forms_submitted += 1
             session_log.actions_performed += 1
         elif normalized_activity_type == 'file_uploaded':
@@ -765,7 +770,12 @@ def update_session_activity(activity_type, page_view_path_key: Optional[str] = N
                 merge_page_view_path_count(
                     session_log, page_view_path_key or "/"
                 )
-            elif normalized_activity_type in ['form_submitted', 'form_saved', 'data_save']:
+            elif normalized_activity_type in [
+                'form_submitted',
+                'form_saved',
+                'form_sent_for_review',
+                'data_save',
+            ]:
                 session_log.forms_submitted += 1
                 session_log.actions_performed += 1
             elif normalized_activity_type == 'file_uploaded':

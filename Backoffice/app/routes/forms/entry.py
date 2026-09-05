@@ -10,7 +10,7 @@ import json
 import re
 import time
 
-from flask import current_app, flash, redirect, render_template, request, stream_template, url_for
+from flask import current_app, flash, g, redirect, render_template, request, stream_template, url_for
 from flask_babel import _
 from flask_login import current_user, login_required
 from flask_wtf import FlaskForm
@@ -777,6 +777,10 @@ def handle_assignment_form(aes_id):
                 submission_result = FormDataService.process_form_submission(
                     assignment_entity_status, all_sections, csrf_form
                 )
+                if submission_result.get("sent_for_review"):
+                    g.audit_activity_type = "form_sent_for_review"
+                elif submission_result.get("submitted"):
+                    g.audit_activity_type = "form_submitted"
                 if not submission_result['success']:
                     for error in submission_result['validation_errors']:
                         flash(error, "danger")

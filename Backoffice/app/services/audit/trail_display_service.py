@@ -49,12 +49,12 @@ def consolidate_activity_type(
         normalized_activity_type = normalize_activity_type(activity_type)
         if normalized_activity_type:
             return normalized_activity_type
-        if "view" in activity_type.lower():
+        if activity_type.endswith("_view") or activity_type.startswith("view_"):
             return "page_view"
         return activity_type
 
     if action_type:
-        if "view" in action_type.lower():
+        if action_type.endswith("_view") or action_type.startswith("view_"):
             return "page_view"
         return action_type
 
@@ -106,7 +106,9 @@ def _extract_aes_and_template_ids_from_context(
     try:
         form_data = context_data.get("form_data", {}) or {}
         aes_raw = (
-            form_data.get("aes_id")
+            form_data.get("assignment_entity_status_id")
+            or context_data.get("assignment_entity_status_id")
+            or form_data.get("aes_id")
             or context_data.get("aes_id")
             or form_data.get("assignment_id")
             or context_data.get("assignment_id")
@@ -119,7 +121,10 @@ def _extract_aes_and_template_ids_from_context(
         elif not aes_raw:
             url_path = context_data.get("url_path") or ""
             if url_path:
-                m = re.search(r"/enter_data/(\d+)", url_path)
+                m = (
+                    re.search(r"/assignment/(\d+)", url_path)
+                    or re.search(r"/enter_data/(\d+)", url_path)
+                )
                 if m:
                     aes_id = int(m.group(1))
 
@@ -307,7 +312,7 @@ def create_consistent_description(
                         return original_description
                     return spec.description
 
-        if t == "page_view" or "view" in t.lower():
+        if t == "page_view":
             if original_description and (
                 original_description.startswith("Viewed ")
                 or original_description.startswith("Fetched ")
@@ -339,6 +344,10 @@ def create_consistent_description(
             return _form_desc("Saved", " as draft")
         if t in ("form_submitted", "form_submit"):
             return _form_desc("Submitted", " for review")
+        if t == "form_sent_for_review":
+            return _form_desc("Sent", " for review")
+        if t == "form_returned_for_revision":
+            return _form_desc("Returned", " for revision")
 
         if t == "form_approved":
             tn, _an, cn = _resolve_form_context(context_data, endpoint, form_lookups)

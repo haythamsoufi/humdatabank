@@ -19066,6 +19066,10 @@ msgstr ""
 msgid "Return to form builder"
 msgstr ""
 
+#: app/utils/audit_trail_labels.py:45
+msgid "Returned for revision"
+msgstr ""
+
 #: app/templates/core/dashboard/_assignments_tab.html:307
 #: app/templates/forms/entry_form/entry_form.html:613
 msgid "Returning…"

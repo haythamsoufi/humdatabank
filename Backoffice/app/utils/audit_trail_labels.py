@@ -41,6 +41,8 @@ def activity_type_display_label(value: str) -> str:
         "form_saved": _("Draft save"),
         "form_save": _("Draft save"),
         "form_submitted": _("Form submitted"),
+        "form_sent_for_review": _("Sent for review"),
+        "form_returned_for_revision": _("Returned for revision"),
         "form_approved": _("Form approved"),
         "form_reopened": _("Form reopened"),
         "form_validated": _("Form validated"),

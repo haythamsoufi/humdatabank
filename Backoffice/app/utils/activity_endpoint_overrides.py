@@ -26,6 +26,7 @@ POST_ENDPOINT_SEGMENT_TO_ACTIVITY_TYPE: Dict[str, str] = {
     "select_country": "country_selected",
     "reopen_assignment": "form_reopened",
     "approve_assignment": "form_approved",
+    "return_assignment_for_revision": "form_returned_for_revision",
     # API keys (admin) — aligns with AdminActionLog action_type / audit badge keys
     "create_api_key": "api_key_create",
     "revoke_api_key": "api_key_revoke",
@@ -51,6 +52,7 @@ LEGACY_PERFORMED_TITLE_TO_ACTIVITY_TYPE: Dict[str, str] = {
     "Select Country": "country_selected",
     "Reopen Assignment": "form_reopened",
     "Approve Assignment": "form_approved",
+    "Return Assignment For Revision": "form_returned_for_revision",
 }
 
 # Legacy ``Submitted {Title}`` lines (generic request type) → activity_type
@@ -72,6 +74,8 @@ ACTIVITY_TYPE_DESCRIPTIONS: Dict[str, str] = {
     "ai_conversations_deleted_all": "Deleted all AI chat conversations",
     "api_key_create": "Created an API key",
     "api_key_revoke": "Revoked an API key",
+    "form_sent_for_review": "Sent assignment for review",
+    "form_returned_for_revision": "Returned assignment for revision",
 }
 
 

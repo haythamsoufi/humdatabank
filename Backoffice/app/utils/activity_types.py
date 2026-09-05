@@ -26,6 +26,8 @@ CANONICAL_ACTIVITY_TYPES = {
     "profile_update",
     "form_saved",
     "form_submitted",
+    "form_sent_for_review",
+    "form_returned_for_revision",
     "form_approved",
     "form_reopened",
     "form_validated",

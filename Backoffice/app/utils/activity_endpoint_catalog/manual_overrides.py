@@ -150,8 +150,12 @@ MANUAL_ACTIVITY_OVERRIDES: dict[tuple[str, str], ActivityEndpointSpec] = {
         description="Retried failed email deliveries",
         activity_type="admin_notifications",
     ),
-    ("POST", "forms.view_edit_form"): ActivityEndpointSpec(
-        description="Updated form data",
+    ("POST", "forms.fill_public_form"): ActivityEndpointSpec(
+        description="Submitted a public form response",
+        activity_type="form_submitted",
+    ),
+    ("POST", "forms.edit_public_submission"): ActivityEndpointSpec(
+        description="Edited a public submission",
         activity_type="admin_forms",
     ),
     ("POST", "analytics.end_session"): ActivityEndpointSpec(

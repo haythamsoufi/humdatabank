@@ -55,6 +55,7 @@ def _safe_partial_module(blueprint: str) -> str:
 def main() -> None:
     from app import create_app
     from app.utils.activity_logging_skip import (
+        ENTRY_FORM_ACTIVITY_ENDPOINTS,
         should_exclude_from_activity_catalog,
         should_skip_activity_path,
     )
@@ -78,7 +79,7 @@ def main() -> None:
                 continue
             if should_skip_activity_path(str(rule.rule or "")):
                 continue
-            if ep == "forms.enter_data":
+            if ep in ENTRY_FORM_ACTIVITY_ENDPOINTS:
                 continue
             if ep in ("favicon", "test_static_file"):
                 continue

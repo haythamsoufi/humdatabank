@@ -35,6 +35,9 @@ from app.utils.activity_endpoint_catalog.defaults import describe_get_request_wi
 from app.utils.activity_form_data_redaction import redact_activity_form_data
 from app.utils.page_view_paths import page_view_path_key_from_request
 from app.utils.activity_logging_skip import (
+    ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING,
+    ENTRY_FORM_ACTIVITY_ENDPOINTS,
+    audit_endpoint_for_activity,
     should_skip_activity_endpoint,
     should_skip_activity_type,
 )
@@ -147,47 +150,41 @@ def _determine_activity_type(method, endpoint, form_data=None):
 
     if method == 'POST':
         # Dedicated assignment lifecycle endpoints (no 'action' form field)
+        if 'return_assignment_for_revision' in endpoint:
+            return 'form_returned_for_revision'
         if 'approve_assignment' in endpoint:
             return 'form_approved'
         if 'reopen_assignment' in endpoint:
             return 'form_reopened'
 
-        # Entry-form (focal-point data entry) — has an explicit 'action' field
-        if endpoint in (
-            'forms.enter_data',
-            'forms.view_edit_form',
-            'assignments.view_assignment',
-        ) or 'enter_data' in endpoint:
+        # Entry-form / public-submission edit — explicit 'action' field
+        if endpoint in ENTRY_FORM_ACTIVITY_ENDPOINTS or 'enter_data' in endpoint:
             if action == 'save':
                 return _activity_type_for_save_action(form_data)
-            elif action == 'submit':
+            if action == 'submit':
                 return 'form_submitted'
-            elif action == 'approve':
+            if action == 'send_for_review':
+                return 'form_sent_for_review'
+            if action == 'approve':
                 return 'form_approved'
-            elif action == 'reopen':
+            if action == 'reopen':
                 return 'form_reopened'
-            elif action == 'validate':
+            if action == 'validate':
                 return 'form_validated'
-            else:
-                # AJAX/unknown POST on the entry form (no save/submit/reopen).
-                # Fallback text is "Completed View Assignment" — not an audit event.
-                return 'entry_form_request'
+            # AJAX/unknown POST on the entry form (no save/submit/reopen).
+            # Fallback text is "Completed View Assignment" — not an audit event.
+            return 'entry_form_request'
+
+        if endpoint == 'forms.fill_public_form':
+            return 'form_submitted'
+
+        # Documents library entity switch is workspace selection, not a document mutation.
+        if endpoint == 'main.documents_submit' and _form_field(form_data, "entity_select"):
+            return 'country_selected'
 
         # File uploads
         if 'upload' in endpoint:
             return 'file_uploaded'
-
-        # Generic: use the form action field
-        if action == 'save':
-            return _activity_type_for_save_action(form_data)
-        if action == 'submit':
-            return 'form_submitted'
-        if action == 'approve':
-            return 'form_approved'
-        if action == 'reopen':
-            return 'form_reopened'
-        if action == 'validate':
-            return 'form_validated'
 
         # Known POST endpoints (settings, devices, access, …) — before generic ``request``
         specific = resolve_post_activity_type(endpoint)
@@ -235,6 +232,11 @@ def _apply_activity_catalog(method: str, endpoint: str | None, activity_type: st
     at = activity_type
     if spec.activity_type and at in _CATALOG_ACTIVITY_TYPE_OVERRIDABLE:
         at = spec.activity_type
+        return at, spec.description
+    # Keep lifecycle descriptions (form_saved / form_submitted / …) instead of
+    # a dual-purpose catalog line such as "Updated form data".
+    if at not in _CATALOG_ACTIVITY_TYPE_OVERRIDABLE:
+        return at, None
     return at, spec.description
 
 
@@ -255,6 +257,8 @@ def _build_activity_description(method, endpoint, activity_type):
     descriptions = {
         'form_saved':      "Saved form data as draft",
         'form_submitted':  "Submitted form data for review",
+        'form_sent_for_review': "Sent assignment for review",
+        'form_returned_for_revision': "Returned assignment for revision",
         'form_approved':   "Approved form submission",
         'form_reopened':   "Reopened form for editing",
         'form_validated':  "Validated form data",
@@ -327,7 +331,7 @@ def track_activity(activity_type=None, description=None, admin_action=False, ris
 
                     # Gather context data
                     context_data = {
-                        'endpoint': request.endpoint,
+                        'endpoint': audit_endpoint_for_activity(request.endpoint, act_type),
                         'method': request.method,
                         'status_code': status_code
                     }
@@ -448,19 +452,31 @@ def _extract_entity_into_context(app, req, context_data):
             return False
 
     try:
-        # ── 1. Look for AES id in POST form data ──────────────────────────
-        if req.method == 'POST' and req.form:
+        payload = {}
+        if req.method in ("POST", "PUT", "PATCH", "DELETE"):
+            if req.form:
+                payload = req.form
+            else:
+                try:
+                    from app.utils.request_utils import get_json_or_form
+
+                    payload = get_json_or_form() or {}
+                except Exception:
+                    payload = {}
+
+        # ── 1. Look for AES id in POST form / JSON body ───────────────────
+        if payload:
             # All naming variants used across the codebase
             aes_raw = (
-                req.form.get('assignment_entity_status_id') or
-                req.form.get('aes_id')
+                payload.get('assignment_entity_status_id') or
+                payload.get('aes_id')
             )
             if aes_raw and str(aes_raw).isdigit():
                 if _store_from_aes(aes_raw):
                     return
 
             # Direct country_id in form (admin forms, etc.)
-            c_raw = req.form.get('country_id')
+            c_raw = payload.get('country_id')
             if c_raw and str(c_raw).isdigit():
                 if _store_from_country(c_raw):
                     return
@@ -552,9 +568,12 @@ def init_activity_tracking(app):
                     response_time_ms = int((time.time() - g.start_time) * 1000)
 
                     # Determine activity type based on request
+                    _audit_type = getattr(g, "audit_activity_type", None)
                     if endpoint == 'main.dashboard' and request.method == 'POST':
                         # Dashboard POST requests are UI interactions only (filtering/selection)
                         activity_type = 'page_view'
+                    elif _audit_type:
+                        activity_type = _audit_type
                     else:
                         form_data = request.form if request.form else None
                         activity_type = _determine_activity_type(request.method, endpoint, form_data)
@@ -566,10 +585,7 @@ def init_activity_tracking(app):
                     # Skip POSTs to blueprints that call log_admin_action for mutations, so we do not
                     # duplicate UserActivityLog + AdminActionLog. Assignment and AI admin POSTs are
                     # not skipped — they rely on automatic activity logging.
-                    admin_routes_with_explicit_logging = (
-                        'user_management.',
-                        'form_builder.',
-                    )
+                    admin_routes_with_explicit_logging = ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING
                     is_admin_route_with_logging = any(
                         request.endpoint and request.endpoint.startswith(p)
                         for p in admin_routes_with_explicit_logging
@@ -610,8 +626,9 @@ def init_activity_tracking(app):
                     if _audit_desc:
                         description = _audit_desc
 
+                    audit_endpoint = audit_endpoint_for_activity(endpoint, activity_type)
                     context_data = {
-                        'endpoint': request.endpoint,
+                        'endpoint': audit_endpoint,
                         'method': request.method,
                         'status_code': response.status_code
                     }
@@ -640,7 +657,7 @@ def init_activity_tracking(app):
                                         context_data=context_data,
                                         response_time_ms=response_time_ms,
                                         status_code=response.status_code,
-                                        endpoint=endpoint,
+                                        endpoint=audit_endpoint,
                                         http_method=method,
                                         url_path=url_path,
                                         referrer=referrer,
@@ -663,20 +680,23 @@ def init_activity_tracking(app):
                 response_time_ms = int((time.time() - g.start_time) * 1000)
 
                 # Determine activity type based on request
-                activity_type = _determine_activity_type(
-                    request.method, request.endpoint,
-                    request.form if request.form else None
-                )
+                _audit_type = getattr(g, "audit_activity_type", None)
+                if request.endpoint == "main.dashboard" and request.method == "POST":
+                    activity_type = "page_view"
+                elif _audit_type:
+                    activity_type = _audit_type
+                else:
+                    activity_type = _determine_activity_type(
+                        request.method, request.endpoint,
+                        request.form if request.form else None
+                    )
 
                 # Skip background / noisy endpoints
                 if _should_skip_auto_activity_request(request):
                     return response
 
                 # See deferred path: only blueprints with explicit log_admin_action on POST.
-                admin_routes_with_explicit_logging = (
-                    'user_management.',
-                    'form_builder.',
-                )
+                admin_routes_with_explicit_logging = ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING
                 is_admin_route_with_logging = any(
                     request.endpoint and request.endpoint.startswith(p)
                     for p in admin_routes_with_explicit_logging
@@ -708,8 +728,9 @@ def init_activity_tracking(app):
                     description = _audit_desc
 
                 # Gather context data
+                audit_endpoint = audit_endpoint_for_activity(request.endpoint, activity_type)
                 context_data = {
-                    'endpoint': request.endpoint,
+                    'endpoint': audit_endpoint,
                     'method': request.method,
                     'status_code': response.status_code
                 }

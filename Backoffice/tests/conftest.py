@@ -79,6 +79,41 @@ def _disengage_db_connections():
             action()
 
 
+def _is_lost_db_connection(exc: BaseException) -> bool:
+    """True when the test database went away (CI flake during worker teardown)."""
+    text = str(exc).lower()
+    return any(
+        needle in text
+        for needle in (
+            "server closed the connection unexpectedly",
+            "connection already closed",
+            "ssl connection has been closed unexpectedly",
+            "terminating connection due to administrator command",
+            "connection not open",
+        )
+    )
+
+
+def _safe_pop_app_context(app, ctx) -> None:
+    """Pop the session-scoped app context without failing a green suite.
+
+    Flask-SQLAlchemy rolls back on context teardown. If Postgres already
+    dropped the worker connection (shared test-DB lock, OOM, idle timeout),
+    that rollback raises and pytest reports ERROR on whichever test ran last.
+    """
+    _disengage_db_connections()
+    try:
+        ctx.pop()
+    except Exception as exc:
+        if _is_lost_db_connection(exc):
+            logging.getLogger(__name__).warning(
+                "Ignoring lost test-DB connection during app fixture teardown: %s",
+                exc,
+            )
+            return
+        raise
+
+
 def _terminate_stale_backends():
     """Force-close leaked ``idle in transaction`` sessions on our own database.
 
@@ -422,8 +457,12 @@ def app():
 
     _register_error_trigger_routes(app)
 
-    with app.app_context():
+    ctx = app.app_context()
+    ctx.push()
+    try:
         yield app
+    finally:
+        _safe_pop_app_context(app, ctx)
 
 
 @pytest.fixture(scope='function')

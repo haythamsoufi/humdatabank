@@ -74,10 +74,10 @@
         {% if is_paginated and page_id != 'default' and page %}
             <div class="border-l-4 border-amber-500 rounded-lg shadow-sm mb-6 mt-8 page-banner-wrapper" style="background: linear-gradient(to right, #fefce8, #fef3c7);">
                 <div class="px-6 py-4">
-                    <div class="flex items-center justify-between page-banner-row cursor-pointer">
-                        <div class="flex items-center">
-                            <i class="fas fa-file-alt fa-2x text-amber-600 mr-3"></i>
-                            <h2 class="text-xl font-bold text-amber-800">{{ _('Page') }} {{ page.order }}. {{ page.name }}</h2>
+                    <div class="flex flex-wrap items-center justify-between gap-3 page-banner-row cursor-pointer">
+                        <div class="flex items-center min-w-0">
+                            <i class="fas fa-file-alt fa-2x text-amber-600 mr-3 flex-shrink-0"></i>
+                            <h2 class="text-xl font-bold text-amber-800 break-words">{{ _('Page') }} {{ page.order }}. {{ page.name }}</h2>
                             <span class="ml-3 text-sm text-amber-600 px-3 py-1 rounded-full" style="background-color: #fde68a;">
                                 {{ page_sections|length }} {{ _('section') if page_sections|length == 1 else _('sections') }}
                             </span>
@@ -100,7 +100,7 @@
     {% set is_section_archived = item_s_f.section.archived if hasattr(item_s_f.section, 'archived') and item_s_f.section.archived else False %}
     <div class="bg-white rounded-lg shadow-md border border-gray-200 section-item mb-6 archived-section-container {% if is_section_archived %}opacity-60 bg-gray-100{% endif %}" data-section-id="{{ item_s_f.section.id }}" {% if is_section_archived %}data-archived="true"{% endif %}>
         <div class="p-6">
-            <div class="section-header-row flex justify-between items-center mb-4 pb-4 border-b">
+            <div class="section-header-row flex justify-between items-center flex-wrap gap-2 mb-4 pb-4 border-b">
                 <div class="flex items-center section-header-banner cursor-pointer flex-1 min-w-0">
                     <button type="button" class="section-toggle fb-icon-btn fb-icon-btn--neutral flex-shrink-0 mr-2" aria-expanded="true" title="{{ _('Collapse section')|forceescape }}">
                         <i class="fas fa-chevron-down w-4 h-4 transition-transform duration-200"></i>
@@ -125,7 +125,7 @@
                         <span class="ml-3">{{ status_label(_('Standard'), 'neutral') }}</span>
                     {% endif %}
                 </div>
-                <div class="space-x-2 flex items-center">
+                <div class="section-header-actions space-x-2 flex items-center flex-shrink-0">
                     {% if is_section_archived %}
                         {# Show unarchive button for archived sections #}
                         <form action="{{ url_for('form_builder.unarchive_section', section_id=item_s_f.section.id) }}" method="POST" class="inline-block">
@@ -302,7 +302,7 @@
                                 </span>
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
+                        <td class="fb-col-properties px-4 py-3 text-sm text-gray-700 break-words w-1/4">
                             {# Show relevance conditions if present #}
                             {% set relevance_obj = item_instance.relevance_condition if item_instance.relevance_condition is mapping else (item_instance.relevance_condition | fromjson if item_instance.relevance_condition else {}) %}
                             {% if relevance_obj is mapping and relevance_obj.get('conditions', []) | length > 0 %}
@@ -419,7 +419,7 @@
                                     <span class="fb-table-label-cell__text {% if is_sub_item or is_subsection_item %}text-gray-600{% else %}font-medium {{ 'text-gray-500' if is_archived else '' }}{% endif %}">{{ item_label_content(item_type, item_instance) }}</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-700 break-words w-1/4">
+                            <td class="fb-col-properties px-4 py-3 text-sm text-gray-700 break-words w-1/4">
                                 {% if is_archived %}
                                     <p class="mb-1">
                                         <span>{{ status_label(_('Archived'), 'neutral') }}</span>

@@ -12,6 +12,8 @@ class TestExcelIoUiMarkup:
         assert 'class="excel-io-dropzone' in html
         assert 'id="excel-import-dropzone"' in html
         assert 'id="kobo-import-dropzone"' in html
+        assert "nt-access-btn" in html
+        assert 'id="template-access-btn"' in html
 
     def test_indicator_bank_renders_excel_io_modal(self, logged_in_sm_client):
         resp = logged_in_sm_client.get("/admin/indicator_bank")

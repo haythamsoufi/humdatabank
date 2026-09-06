@@ -143,11 +143,11 @@
     <div id="splitView" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <!-- Sectors Section -->
         <div class="bg-white p-6 shadow-md border border-gray-200">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 min-w-0">
                     <i class="fas fa-layer-group text-purple-600 mr-2"></i>{{ _('Sectors') }}
                 </h2>
-                <div class="flex items-center">
+                <div class="flex items-center flex-shrink-0">
                     {{ status_label(sectors|length ~ ' ' ~ (_('sector') if sectors|length == 1 else _('sectors')), 'info') }}
                     <button class="new-sector-btn add-button purple" title="{{ _('Add New Sector')|forceescape }}">
                         <i class="fas fa-plus"></i>
@@ -159,8 +159,8 @@
                 <div class="space-y-3">
                     {% for sector in sectors %}
                     <div class="sector-card p-4 rounded-lg bg-gray-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                            <div class="flex items-center space-x-3 min-w-0">
                                 <!-- Logo or Icon -->
                                 {% if sector.logo_path %}
                                     <img src="{{ sector_logo_url(sector) }}"
@@ -210,11 +210,11 @@
 
         <!-- Sub-Sectors Section -->
         <div class="bg-white p-6 shadow-md border border-gray-200">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-gray-800">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 min-w-0">
                     <i class="fas fa-sitemap text-indigo-600 mr-2"></i>{{ _('Sub-Sectors') }}
                 </h2>
-                <div class="flex items-center">
+                <div class="flex items-center flex-shrink-0">
                     {{ status_label(subsectors|length ~ ' ' ~ (_('sub-sector') if subsectors|length == 1 else _('sub-sectors')), 'info') }}
                     <button class="new-subsector-btn add-button indigo" title="{{ _('Add New Sub-Sector')|forceescape }}">
                         <i class="fas fa-plus"></i>
@@ -226,8 +226,8 @@
                 <div class="space-y-3">
                     {% for subsector in subsectors %}
                     <div class="subsector-card p-4 rounded-lg bg-gray-50">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                            <div class="flex items-center space-x-3 min-w-0">
                                 <!-- Logo or Icon -->
                                 {% if subsector.icon_class %}
                                     <div class="w-8 h-8 flex items-center justify-center bg-indigo-100 rounded">
@@ -276,7 +276,7 @@
         <div class="bg-white p-6 shadow-md border border-gray-200">
             {% for sector in sectors %}
             <div class="mb-8 last:mb-0">
-                <div class="bg-gray-50 p-4 rounded-lg mb-4 flex items-center justify-between">
+                <div class="bg-gray-50 p-4 rounded-lg mb-4 flex flex-wrap items-center justify-between gap-2 min-w-0">
                     <div class="flex items-center space-x-4">
                         {% if sector.logo_path %}
                             <img src="{{ sector_logo_url(sector) }}"
@@ -311,7 +311,7 @@
                 <div class="pl-14 space-y-3">
                     {% set sector_subs = (subsectors_by_sector|default({})).get(sector.id, []) %}
                     {% for subsector in sector_subs %}
-                            <div class="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-all flex items-center justify-between">
+                            <div class="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-all flex flex-wrap items-center justify-between gap-2 min-w-0">
                                 <div class="flex items-center space-x-4">
                                     {% if subsector.icon_class %}
                                         <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center">

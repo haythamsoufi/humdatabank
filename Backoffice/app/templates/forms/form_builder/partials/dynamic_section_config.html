@@ -4,7 +4,7 @@
 
 <div id="dynamic-indicators-config-{{ section_id }}" class="dynamic-indicators-config bg-indigo-50 border border-indigo-200 rounded-lg">
     <!-- Collapsible Header -->
-    <div class="dynamic-config-header flex items-center justify-between p-4 cursor-pointer hover:bg-indigo-100 transition-colors" data-section-id="{{ section_id }}">
+    <div class="dynamic-config-header flex flex-wrap items-center justify-between gap-2 p-4 cursor-pointer hover:bg-indigo-100 transition-colors" data-section-id="{{ section_id }}">
         <div class="flex items-center space-x-3">
             <h4 class="text-sm font-medium text-indigo-800">Dynamic Indicators Configuration</h4>
             <div id="dynamic-config-summary-{{ section_id }}" class="dynamic-config-summary text-xs text-gray-600 hidden bg-gray-100 px-2 py-1 rounded border border-gray-200">
@@ -55,9 +55,9 @@
         </div>
 
         {# Header with add filter button #}
-        <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center space-x-2">
-                <label class="text-sm text-gray-600 whitespace-nowrap">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="flex items-center space-x-2 min-w-0">
+                <label class="text-sm text-gray-600">
                     Filter indicators:
                 </label>
             </div>

@@ -108,7 +108,7 @@ function createModalShell(title, options = {}) {
     const maxW = { md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl', '2xl': 'max-w-2xl' }[maxWidth] || 'max-w-md';
 
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 flex items-center justify-center p-4';
+    modal.className = 'fixed inset-0 flex items-center justify-center p-4 hd-modal-overlay';
     modal.style.zIndex = String(zIndex);
     modal.style.display = 'flex';
 
@@ -116,7 +116,7 @@ function createModalShell(title, options = {}) {
     backdrop.className = 'absolute inset-0 modal-backdrop transition-opacity';
 
     const modalContent = document.createElement('div');
-    modalContent.className = `relative bg-white rounded-lg shadow-xl w-full ${maxW} transform transition-all`;
+    modalContent.className = `relative bg-white rounded-lg shadow-xl w-full ${maxW} transform transition-all hd-modal-panel`;
 
     const innerDiv = document.createElement('div');
     innerDiv.className = 'p-6';

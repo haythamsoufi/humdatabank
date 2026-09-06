@@ -4,6 +4,8 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-width: 0;
+    max-width: 100%;
 }
 
 /* ── Method picker ─────────────────────────────────────────────────────── */
@@ -244,7 +246,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 0.75rem;
     width: 100%;
+    min-height: 2.75rem;
     padding: 0.625rem 0.875rem;
     text-align: left;
     background: #fff;
@@ -252,6 +256,11 @@
     font-size: 0.875rem;
     color: #374151;
     cursor: pointer;
+    position: relative;
+    z-index: 1;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.15);
+    box-sizing: border-box;
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -271,6 +280,7 @@
     align-items: center;
     gap: 0.5rem;
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 .nt-access-btn__left i {
@@ -279,9 +289,19 @@
 }
 
 .nt-access-btn__summary {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+@media (min-width: 769px) {
+    .nt-access-btn__summary {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
 }
 
 /* ── Clone template picker ─────────────────────────────────────────────── */

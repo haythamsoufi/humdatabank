@@ -150,6 +150,12 @@ html[dir="rtl"] #aiChatbotFAB {
     right: auto !important;
 }
 
+/* RTL admin side-menu FAB — opposite corner from the chatbot */
+html[dir="rtl"] #mobileMenuFAB {
+    right: calc(1.5rem + env(safe-area-inset-right, 0px)) !important;
+    left: auto !important;
+}
+
 /* RTL Chat Widget Positioning */
 html[dir="rtl"] #aiChatWidget {
     left: 2rem !important;
@@ -161,6 +167,11 @@ html[dir="rtl"] #aiChatWidget {
     html[dir="rtl"] #aiChatbotFAB {
         left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
         right: auto !important;
+    }
+
+    html[dir="rtl"] #mobileMenuFAB {
+        right: calc(1.5rem + env(safe-area-inset-right, 0px)) !important;
+        left: auto !important;
     }
 
     /* RTL Mobile Chat Widget positioning */

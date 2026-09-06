@@ -102,6 +102,7 @@
     position: fixed;
     bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     left: calc(1.5rem + env(safe-area-inset-left, 0px));
+    right: auto;
     width: 3.5rem;
     height: 3.5rem;
     padding: 0 !important;
@@ -466,16 +467,26 @@ html[dir="rtl"] #mobileFloatingMenuNav .mobile-language-menu-btn__chevron {
         font-size: 1.25rem;
     }
 
-    /* LTR positioning for mobile */
+    /* LTR: chatbot bottom-right, admin menu bottom-left */
     html[dir="ltr"] #aiChatbotFAB {
         right: calc(1.5rem + env(safe-area-inset-right, 0px));
         left: auto;
     }
 
-    /* RTL positioning for mobile */
+    html[dir="ltr"] #mobileMenuFAB {
+        left: calc(1.5rem + env(safe-area-inset-left, 0px));
+        right: auto;
+    }
+
+    /* RTL: swap corners so the pair stays opposite */
     html[dir="rtl"] #aiChatbotFAB {
         left: calc(1.5rem + env(safe-area-inset-left, 0px)) !important;
         right: auto !important;
+    }
+
+    html[dir="rtl"] #mobileMenuFAB {
+        right: calc(1.5rem + env(safe-area-inset-right, 0px)) !important;
+        left: auto !important;
     }
 
     /* Ensure flash messages don't overlap with mobile menu FAB on left */

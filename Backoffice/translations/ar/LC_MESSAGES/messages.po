@@ -493,7 +493,7 @@ msgstr "الوصول التجريبي إلى الذكاء الاصطناعي"
 #: app/templates/components/_sidebar_nav_categories.html:259
 #: app/templates/components/_sidebar_nav_categories.html:261
 msgid "AI Dashboard"
-msgstr "AI Dashboard"
+msgstr "لوحة معلومات الذكاء الاصطناعي"
 
 #: app/templates/admin/ai/documents.html:9
 #: app/templates/admin/ai/documents.html:21
@@ -525,12 +525,12 @@ msgstr "جلسة الذكاء الاصطناعي — resolve_ai_identity()"
 
 #: app/templates/components/_sidebar_nav_categories.html:255
 msgid "AI System"
-msgstr "AI System"
+msgstr "نظام الذكاء الاصطناعي"
 
 #: app/templates/admin/ai/dashboard.html:5
 #: app/templates/admin/ai/dashboard.html:9
 msgid "AI System Dashboard"
-msgstr "AI System Dashboard"
+msgstr "لوحة معلومات نظام الذكاء الاصطناعي"
 
 #: app/templates/components/_ai_policy_modal.html:4
 msgid "AI Use Policy"

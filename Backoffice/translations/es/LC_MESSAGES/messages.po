@@ -540,12 +540,12 @@ msgstr "Sesión de IA — resolve_ai_identity()"
 
 #: app/templates/components/_sidebar_nav_categories.html:255
 msgid "AI System"
-msgstr "AI System"
+msgstr "Sistema de IA"
 
 #: app/templates/admin/ai/dashboard.html:5
 #: app/templates/admin/ai/dashboard.html:9
 msgid "AI System Dashboard"
-msgstr "Panel de mando del sistema AI"
+msgstr "Panel de mando del sistema de IA"
 
 #: app/templates/components/_ai_policy_modal.html:4
 msgid "AI Use Policy"

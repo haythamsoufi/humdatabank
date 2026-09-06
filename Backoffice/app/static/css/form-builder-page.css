@@ -1,5 +1,190 @@
 /* Form builder page - loading gate, section collapse, drag-and-drop (moved from inline template styles) */
 
+/* Contain wide tables so they scroll locally instead of stretching the page
+   (overflow-x:hidden on #pageContentContainer otherwise clips tap targets). */
+#form-builder-ui,
+#form-builder-loading {
+    min-width: 0;
+    max-width: 100%;
+}
+
+#form-builder-ui .fb-template-details,
+#form-builder-ui .section-item,
+#form-builder-ui .page-banner-wrapper {
+    min-width: 0;
+    max-width: 100%;
+}
+
+#form-builder-ui .overflow-x-auto {
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Template access: full-width, 44px tap target, text wraps instead of overflowing */
+.fb-access-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    text-align: left;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(59, 130, 246, 0.15);
+    box-sizing: border-box;
+}
+
+.fb-access-btn:hover {
+    background: #f9fafb;
+}
+
+.fb-access-btn:focus {
+    outline: none;
+}
+
+.fb-access-btn:focus-visible {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #3b82f6;
+}
+
+.fb-access-btn__left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.fb-access-btn__icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #60a5fa;
+    flex-shrink: 0;
+}
+
+.fb-access-btn__summary,
+.fb-access-btn__left > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.fb-access-btn__chevron {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #9ca3af;
+    flex-shrink: 0;
+}
+
+html[dir="rtl"] .fb-access-btn__chevron {
+    transform: scaleX(-1);
+}
+
+@media (max-width: 768px) {
+    /* Tighter page chrome so cards and controls fit a phone width */
+    #form-builder-page.container {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+
+    #form-builder-ui .fb-template-details,
+    #form-builder-ui .section-item > .p-6,
+    #form-builder-ui .page-banner-wrapper .px-6 {
+        padding: 1rem;
+    }
+
+    #form-builder-ui .fb-template-details-header {
+        align-items: flex-start;
+    }
+
+    #form-builder-ui .fb-template-details-actions .btn {
+        min-height: 2.75rem;
+    }
+
+    #form-builder-status-banners > .rounded-lg.flex {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #form-builder-status-banners > .rounded-lg.flex > .ml-4 {
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    #form-builder-status-banners .btn {
+        min-height: 2.75rem;
+    }
+
+    #form-builder-ui .fb-toolbar {
+        align-items: flex-start;
+    }
+
+    #form-builder-ui .fb-toolbar-toggles {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    /* Section / page titles wrap; action icons stay on their own row if needed */
+    #form-builder-ui .section-header-row {
+        align-items: flex-start;
+    }
+
+    #form-builder-ui .section-header-banner {
+        flex-wrap: wrap;
+        row-gap: 0.25rem;
+    }
+
+    #form-builder-ui .section-header-banner h3 {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    #form-builder-ui .page-banner-row h2 {
+        font-size: 1.05rem;
+        overflow-wrap: anywhere;
+    }
+
+    /* Hide the dense Properties column; remaining columns stay usable */
+    #form-builder-ui .fb-col-properties {
+        display: none;
+    }
+
+    #form-builder-ui table.table-fixed {
+        table-layout: auto;
+        width: 100%;
+    }
+
+    #form-builder-ui table th,
+    #form-builder-ui table td {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    #form-builder-ui .page-row {
+        flex-wrap: wrap;
+    }
+
+    .executive-page-header:has(#versions-modal-btn) .main-title {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem 0.5rem;
+    }
+
+    .executive-page-header #versions-modal-btn {
+        margin-left: 0;
+    }
+}
+
+
 .form-builder-loading #form-builder-ui {
     display: none !important;
 }

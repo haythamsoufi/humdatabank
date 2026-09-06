@@ -173,6 +173,21 @@ button.close-modal:not(.rounded-full):not(.rounded-pill) {
   -webkit-backdrop-filter: blur(2px);
 }
 
+/* Keep dynamically created confirm / access modals usable on phones */
+@media (max-width: 768px) {
+  .hd-modal-overlay {
+    align-items: flex-end;
+    padding: 0.75rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hd-modal-panel {
+    max-height: calc(100vh - 1.5rem - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /*
  * .modal-action-btn: legacy helper for sizing modal footer buttons.
  * Rounded override removed — all system buttons use sharp corners.

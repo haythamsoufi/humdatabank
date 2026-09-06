@@ -92,7 +92,7 @@
     (function(){ try { document.documentElement.classList.add('form-builder-loading'); } catch(e) {} })();
 </script>
 
-<div class="container mx-auto px-4 py-6">
+<div id="form-builder-page" class="container mx-auto px-4 py-6">
 
     {# Loading skeleton (shown until JS signals formBuilderInitialized) #}
     {# IMPORTANT: loader is visible by default, UI is hidden by default (works even if <head> styles don't render) #}
@@ -289,9 +289,9 @@
 
     {# Notice: Draft version - prompt to deploy #}
     {% if selected_version_is_draft %}
-    <div class="mb-6 rounded-lg border border-blue-300 bg-blue-50 text-blue-800 p-4 flex items-start justify-between">
-        <div class="flex items-start">
-            <i class="fas fa-info-circle mr-3 mt-1"></i>
+    <div class="mb-6 rounded-lg border border-blue-300 bg-blue-50 text-blue-800 p-4 flex items-start justify-between gap-3">
+        <div class="flex items-start min-w-0">
+            <i class="fas fa-info-circle mr-3 mt-1 flex-shrink-0"></i>
             <div>
                 <p class="font-semibold">{{ _('You are editing a draft version') }}</p>
                 <p class="text-sm mt-1">{{ _('This version is not yet published. When you\'re ready, deploy it to make it the live version.') }}</p>
@@ -303,7 +303,7 @@
                 {% endif %}
             </div>
         </div>
-        <div class="ml-4 flex-shrink-0 flex items-center gap-2">
+        <div class="ml-4 flex-shrink-0 flex flex-wrap items-center gap-2">
             <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-block deploy-version-form-banner">
                 <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
                 <input type="hidden" name="version_id" value="{{ active_version_id }}">
@@ -415,9 +415,9 @@
 
     {# Notice: Published/Archived version guard with quick open-versions action #}
     {% if not selected_version_is_draft %}
-    <div class="mb-6 rounded-lg border {% if selected_version_status == 'archived' %}border-yellow-300 bg-yellow-50 text-yellow-800{% else %}border-red-400 bg-red-50 text-red-800{% endif %} p-4 flex items-start justify-between">
-        <div class="flex items-start">
-            <i class="fas {% if selected_version_status == 'archived' %}fa-lock{% else %}fa-exclamation-triangle{% endif %} mr-3 mt-1"></i>
+    <div class="mb-6 rounded-lg border {% if selected_version_status == 'archived' %}border-yellow-300 bg-yellow-50 text-yellow-800{% else %}border-red-400 bg-red-50 text-red-800{% endif %} p-4 flex items-start justify-between gap-3">
+        <div class="flex items-start min-w-0">
+            <i class="fas {% if selected_version_status == 'archived' %}fa-lock{% else %}fa-exclamation-triangle{% endif %} mr-3 mt-1 flex-shrink-0"></i>
             <div>
                 {% if selected_version_status == 'archived' %}
                     <p class="font-semibold">{{ _('Archived version: all edits and additions are disabled') }}</p>
@@ -428,7 +428,7 @@
                 {% endif %}
             </div>
         </div>
-        <div class="ml-4 flex-shrink-0 flex items-center gap-2">
+        <div class="ml-4 flex-shrink-0 flex flex-wrap items-center gap-2">
             {% if selected_version_status == 'archived' %}
             <form method="POST" action="{{ url_for('form_builder.deploy_template_version', template_id=template.id) }}" class="inline-block deploy-version-form-banner-archived">
                 <input type="hidden" name="csrf_token" value="{{ section_form.csrf_token.current_token }}">
@@ -659,7 +659,7 @@
 </script>
 
 {# Add Section Button and Toggle Archived Items #}
-<div class="mb-8 flex items-center justify-between gap-3">
+<div class="fb-toolbar mb-8 flex items-center justify-between gap-3 flex-wrap">
     <div class="flex items-center flex-wrap gap-3">
         <button type="button" id="add-section-btn" class="btn btn-success">
             <i class="fas fa-plus" aria-hidden="true"></i>
@@ -688,7 +688,7 @@
         {% endif %}
     </div>
 
-    <div class="flex items-center gap-2 ml-auto">
+    <div class="fb-toolbar-toggles flex items-center flex-wrap gap-2 sm:ml-auto">
         <button type="button"
                 id="toggle-all-pages-btn"
                 class="inline-flex items-center py-1.5 text-gray-600 text-sm font-medium hover:text-gray-900 transition-colors focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1332,6 +1332,31 @@
             const templateAccessSummary = document.getElementById('template-access-summary');
             const ownerField = document.getElementById('template-owner-field');
             const sharedFieldsContainer = document.getElementById('template-shared-fields');
+
+            function openTemplateAccessModal() {
+                if (!templateAccessBtn || !templateAccessSummary) return;
+                templateAccessBtn.click();
+            }
+
+            const templateAccessViewBtn = document.getElementById('template-access-view-btn');
+            if (templateAccessViewBtn) {
+                templateAccessViewBtn.addEventListener('click', function() {
+                    const editBtn = document.getElementById('edit-template-details-btn');
+                    const editBlocked = editBtn && (editBtn.disabled || editBtn.getAttribute('aria-disabled') === 'true' || editBtn.classList.contains('pointer-events-none'));
+                    if (editBlocked) {
+                        return;
+                    }
+                    const formContainer = document.getElementById('edit-template-details-form-container');
+                    const isHidden = !formContainer || formContainer.classList.contains('hidden') || formContainer.style.display === 'none';
+                    if (isHidden && editBtn) {
+                        editBtn.click();
+                    }
+                    // Let edit mode paint before opening the modal so hidden fields are in the live form.
+                    requestAnimationFrame(function() {
+                        openTemplateAccessModal();
+                    });
+                });
+            }
 
             if (templateAccessBtn && templateAccessSummary) {
                 // Update summary text based on current values

@@ -15,8 +15,9 @@
         ]
     ) }}
 
-    <div class="bg-white border border-gray-200 shadow-sm overflow-hidden">
+    <div class="bg-white border border-gray-200 shadow-sm overflow-hidden min-w-0 max-w-full">
         {% if alerts %}
+        <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 text-sm">
             <thead class="bg-gray-50">
                 <tr>
@@ -41,6 +42,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <div class="p-6 text-sm text-gray-500">{{ _('No active alerts right now.') }}</div>
         {% endif %}

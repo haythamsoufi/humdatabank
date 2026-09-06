@@ -539,8 +539,8 @@
     <!-- API URL Builder -->
     <div class="settings-panel hidden" id="panel-builder">
     <div class="p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-800">{{ _('API URL Builder') }}</h2>
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <h2 class="text-xl font-semibold text-gray-800 min-w-0">{{ _('API URL Builder') }}</h2>
             <button id="showDocsBtn" class="btn btn-primary">
                 <i class="fas fa-book"></i>
                 {{ _('Documentation') }}
@@ -753,9 +753,9 @@
     <!-- Request Volume Chart -->
     <div class="settings-panel hidden" id="panel-volume">
     <div class="p-6">
-         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-800">{{ _('Request Volume') }}</h2>
-            <div class="flex gap-3">
+         <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+            <h2 class="text-xl font-semibold text-gray-800 min-w-0">{{ _('Request Volume') }}</h2>
+            <div class="flex flex-wrap gap-3">
                 <select id="endpointSelector" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-auto py-2.5 pl-2.5 pr-9">
                     <option value="all" selected>{{ _('All Endpoints') }}</option>
                     {% for endpoint in endpoints %}

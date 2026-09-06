@@ -36,8 +36,9 @@
 </div>
 {% endif %}
 
-<div class="bg-white shadow border border-gray-200 overflow-hidden">
+<div class="bg-white shadow border border-gray-200 overflow-hidden min-w-0 max-w-full">
     {% if items %}
+    <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-200" id="embed-table">
         <thead class="bg-gray-50">
             <tr>
@@ -101,6 +102,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     <div class="text-center py-16">
         <i class="fas fa-code text-4xl text-gray-300 mb-4"></i>

@@ -186,6 +186,19 @@ button.close-modal:not(.rounded-full):not(.rounded-pill) {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* modal_shell() overlays: avoid vertical centering clipping the header/actions */
+  [role="dialog"].modal-backdrop.flex {
+    align-items: flex-start;
+    padding-top: 0.75rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-shell-content {
+    max-height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /*

@@ -9,9 +9,9 @@
     title=_('Conversation traces'),
     icon='fas fa-comments',
     breadcrumbs=[
-        {'name': 'Admin', 'url': url_for('admin.admin_dashboard')},
-        {'name': 'AI System', 'url': url_for('ai_management.ai_dashboard')},
-        {'name': 'Traces', 'url': url_for('ai_management.reasoning_traces')},
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('AI System'), 'url': url_for('ai_management.ai_dashboard')},
+        {'name': _('Traces'), 'url': url_for('ai_management.reasoning_traces')},
         {'name': 'Conversation ' ~ conversation_id[:16] ~ '…'}
     ],
     actions=[

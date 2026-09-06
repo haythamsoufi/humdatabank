@@ -479,7 +479,7 @@ msgstr ""
 #: app/templates/components/_sidebar_nav_categories.html:259
 #: app/templates/components/_sidebar_nav_categories.html:261
 msgid "AI Dashboard"
-msgstr ""
+msgstr "एआई डैशबोर्ड"
 
 #: app/templates/admin/ai/documents.html:9
 #: app/templates/admin/ai/documents.html:21
@@ -511,12 +511,12 @@ msgstr ""
 
 #: app/templates/components/_sidebar_nav_categories.html:255
 msgid "AI System"
-msgstr ""
+msgstr "एआई सिस्टम"
 
 #: app/templates/admin/ai/dashboard.html:5
 #: app/templates/admin/ai/dashboard.html:9
 msgid "AI System Dashboard"
-msgstr ""
+msgstr "एआई सिस्टम डैशबोर्ड"
 
 #: app/templates/components/_ai_policy_modal.html:4
 msgid "AI Use Policy"

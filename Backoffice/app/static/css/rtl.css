@@ -1381,7 +1381,7 @@ html[dir="rtl"] #edit-translation-modal {
     direction: rtl;
 }
 
-html[dir="rtl"] #edit-translation-modal .flex.justify-between {
+html[dir="rtl"] #edit-translation-modal .flex.justify-between:not(.modal-action-bar) {
     flex-direction: row-reverse;
 }
 

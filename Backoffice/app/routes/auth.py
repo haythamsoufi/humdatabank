@@ -1761,6 +1761,9 @@ def kickout_own_device(device_id):
         return json_ok(message='Device session ended successfully')
 
     except Exception as e:
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            raise
         from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
         return handle_json_view_exception(
             e,
@@ -1797,6 +1800,9 @@ def remove_own_device(device_id):
         return json_ok(message='Device removed successfully')
 
     except Exception as e:
+        from werkzeug.exceptions import HTTPException
+        if isinstance(e, HTTPException):
+            raise
         return handle_json_view_exception(
             e,
             'An internal error occurred.',

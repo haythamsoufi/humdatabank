@@ -441,15 +441,22 @@ class TestAccountSettingsPost:
         mock_form.name.data = "Updated Name"
         mock_form.title.data = "Manager"
         mock_form.chatbot_enabled.data = True
+        mock_form.translation_review_tool_enabled.data = False
         mock_form.profile_color.data = "#FF0000"
 
         with app.test_request_context("/account-settings", method="POST"):
             login_user(User.query.get(user_id))
             with patch("app.routes.auth.AccountSettingsForm", return_value=mock_form), \
+                 patch("app.forms.auth_forms.RequestCountryAccessForm", return_value=MagicMock()), \
+                 patch(
+                     "app.services.translation_review.assignment_service.user_has_manage_translations",
+                     return_value=False,
+                 ), \
                  patch("app.routes.auth.redirect", side_effect=lambda loc: loc) as mock_redirect, \
                  patch("app.routes.auth.url_for", return_value="/account-settings"), \
                  patch("app.routes.auth.log_user_activity"), \
                  patch("app.routes.auth.user_has_ai_beta_access", return_value=False), \
+                 patch("app.routes.auth.render_template", return_value=_mock_html_response()), \
                  patch("app.services.notification.service.NotificationService.get_notification_preferences", return_value={}), \
                  patch("app.routes.notifications.get_notification_types_for_user", return_value={"for_user": []}), \
                  patch("app.routes.notifications.get_notification_type_labels", return_value={}):
@@ -549,9 +556,13 @@ class TestRemoveOwnDevice:
             f"/account-settings/devices/{device_id}/remove", method="DELETE"
         ):
             login_user(User.query.get(user_id))
-            resp, status = remove_own_device(device_id)
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ):
+                resp, status = _view_result(remove_own_device(device_id))
         assert status == 200
-        assert resp.get_json()["ok"] is True
+        assert resp.get_json()["success"] is True
 
     def test_remove_device_not_found_aborts(self, app, admin_user, db_session):
         from app.routes.auth import remove_own_device
@@ -563,7 +574,10 @@ class TestRemoveOwnDevice:
 
         with app.test_request_context("/account-settings/devices/999999/remove", method="DELETE"):
             login_user(User.query.get(user_id))
-            with pytest.raises(NotFound):
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ), pytest.raises(NotFound):
                 remove_own_device(999999)
 
     def test_remove_device_db_error_returns_500(self, app, admin_user, db_session):
@@ -587,10 +601,13 @@ class TestRemoveOwnDevice:
             f"/account-settings/devices/{device_id}/remove", method="DELETE"
         ):
             login_user(User.query.get(user_id))
-            with patch("app.routes.auth.db") as mock_db:
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ), patch("app.routes.auth.db") as mock_db:
                 mock_db.session.delete = MagicMock()
                 mock_db.session.flush.side_effect = Exception("db error")
-                resp, status = remove_own_device(device_id)
+                resp, status = _view_result(remove_own_device(device_id))
         assert status == 500
 
 
@@ -623,7 +640,11 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
             f"/account-settings/devices/{device_id}/kickout", method="POST"
         ):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ):
+                resp, status = _view_result(kickout_own_device(device_id))
         assert status == 400
 
     def test_kickout_db_error_returns_500(self, app, admin_user, db_session):
@@ -647,9 +668,12 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
             f"/account-settings/devices/{device_id}/kickout", method="POST"
         ):
             login_user(User.query.get(user_id))
-            with patch("app.routes.auth.db") as mock_db:
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ), patch("app.routes.auth.db") as mock_db:
                 mock_db.session.flush.side_effect = Exception("db err")
-                resp, status = kickout_own_device(device_id)
+                resp, status = _view_result(kickout_own_device(device_id))
         assert status == 500
 
 
@@ -827,16 +851,17 @@ class TestAzureCallbackCoverage:
                 azure_callback()
         mock_redirect.assert_called_with("/login")
 
-    def test_callback_error_other_renders_error_template(self, app):
+    def test_callback_error_other_redirects_to_login(self, app):
         from app.routes.auth import azure_callback
 
         with app.test_request_context(
             "/auth/azure/callback?error=server_error&error_description=Some+other+error"
         ):
             with patch("app.routes.auth._b2c_get_required_config", return_value={"tenant": "t", "policy": "p"}), \
-                 patch("app.routes.auth.render_template", return_value=_mock_html_response()) as mock_render:
+                 patch("app.routes.auth.redirect", side_effect=lambda loc: loc) as mock_redirect, \
+                 patch("app.routes.auth.url_for", return_value="/login"):
                 azure_callback()
-        mock_render.assert_called()
+        mock_redirect.assert_called_with("/login")
 
     def test_callback_missing_code_redirects(self, app):
         from app.routes.auth import azure_callback

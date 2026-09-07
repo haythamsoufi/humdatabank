@@ -28885,3 +28885,8 @@ msgstr "⚠️ Copy this key now - it will not be shown again!"
 #: app/templates/admin/indicator_bank/sectors_subsectors.html:1013
 msgid "✓"
 msgstr "✓"
+
+#: app/templates/admin/ai/conversation_traces.html:14
+#: app/templates/admin/ai/trace_detail.html:20
+msgid "Traces"
+msgstr "Traces"

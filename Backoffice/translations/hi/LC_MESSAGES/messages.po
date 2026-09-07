@@ -29566,3 +29566,8 @@ msgstr ""
 #~ "This permanently deletes the obsolete (#~) entry for this message from every"
 #~ " locale .po file. Active strings are not affected. Continue?"
 #~ msgstr ""
+
+#: app/templates/admin/ai/conversation_traces.html:14
+#: app/templates/admin/ai/trace_detail.html:20
+msgid "Traces"
+msgstr ""

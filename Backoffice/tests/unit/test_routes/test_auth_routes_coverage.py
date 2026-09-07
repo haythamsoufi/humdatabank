@@ -441,15 +441,22 @@ class TestAccountSettingsPost:
         mock_form.name.data = "Updated Name"
         mock_form.title.data = "Manager"
         mock_form.chatbot_enabled.data = True
+        mock_form.translation_review_tool_enabled.data = False
         mock_form.profile_color.data = "#FF0000"
 
         with app.test_request_context("/account-settings", method="POST"):
             login_user(User.query.get(user_id))
             with patch("app.routes.auth.AccountSettingsForm", return_value=mock_form), \
+                 patch("app.forms.auth_forms.RequestCountryAccessForm", return_value=MagicMock()), \
+                 patch(
+                     "app.services.translation_review.assignment_service.user_has_manage_translations",
+                     return_value=False,
+                 ), \
                  patch("app.routes.auth.redirect", side_effect=lambda loc: loc) as mock_redirect, \
                  patch("app.routes.auth.url_for", return_value="/account-settings"), \
                  patch("app.routes.auth.log_user_activity"), \
                  patch("app.routes.auth.user_has_ai_beta_access", return_value=False), \
+                 patch("app.routes.auth.render_template", return_value=_mock_html_response()), \
                  patch("app.services.notification.service.NotificationService.get_notification_preferences", return_value={}), \
                  patch("app.routes.notifications.get_notification_types_for_user", return_value={"for_user": []}), \
                  patch("app.routes.notifications.get_notification_type_labels", return_value={}):
@@ -549,9 +556,13 @@ class TestRemoveOwnDevice:
             f"/account-settings/devices/{device_id}/remove", method="DELETE"
         ):
             login_user(User.query.get(user_id))
-            resp, status = remove_own_device(device_id)
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ):
+                resp, status = _view_result(remove_own_device(device_id))
         assert status == 200
-        assert resp.get_json()["ok"] is True
+        assert resp.get_json()["success"] is True
 
     def test_remove_device_not_found_aborts(self, app, admin_user, db_session):
         from app.routes.auth import remove_own_device
@@ -563,7 +574,10 @@ class TestRemoveOwnDevice:
 
         with app.test_request_context("/account-settings/devices/999999/remove", method="DELETE"):
             login_user(User.query.get(user_id))
-            with pytest.raises(NotFound):
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ), pytest.raises(NotFound):
                 remove_own_device(999999)
 
     def test_remove_device_db_error_returns_500(self, app, admin_user, db_session):
@@ -587,10 +601,13 @@ class TestRemoveOwnDevice:
             f"/account-settings/devices/{device_id}/remove", method="DELETE"
         ):
             login_user(User.query.get(user_id))
-            with patch("app.routes.auth.db") as mock_db:
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ), patch("app.routes.auth.db") as mock_db:
                 mock_db.session.delete = MagicMock()
                 mock_db.session.flush.side_effect = Exception("db error")
-                resp, status = remove_own_device(device_id)
+                resp, status = _view_result(remove_own_device(device_id))
         assert status == 500
 
 
@@ -623,7 +640,11 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
             f"/account-settings/devices/{device_id}/kickout", method="POST"
         ):
             login_user(User.query.get(user_id))
-            resp, status = kickout_own_device(device_id)
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ):
+                resp, status = _view_result(kickout_own_device(device_id))
         assert status == 400
 
     def test_kickout_db_error_returns_500(self, app, admin_user, db_session):
@@ -647,9 +668,12 @@ class TestKickoutOwnDeviceAlreadyLoggedOut:
             f"/account-settings/devices/{device_id}/kickout", method="POST"
         ):
             login_user(User.query.get(user_id))
-            with patch("app.routes.auth.db") as mock_db:
+            with patch(
+                "app.utils.notification_push.is_notifications_push_enabled",
+                return_value=True,
+            ), patch("app.routes.auth.db") as mock_db:
                 mock_db.session.flush.side_effect = Exception("db err")
-                resp, status = kickout_own_device(device_id)
+                resp, status = _view_result(kickout_own_device(device_id))
         assert status == 500
 
 
@@ -827,16 +851,17 @@ class TestAzureCallbackCoverage:
                 azure_callback()
         mock_redirect.assert_called_with("/login")
 
-    def test_callback_error_other_renders_error_template(self, app):
+    def test_callback_error_other_redirects_to_login(self, app):
         from app.routes.auth import azure_callback
 
         with app.test_request_context(
             "/auth/azure/callback?error=server_error&error_description=Some+other+error"
         ):
             with patch("app.routes.auth._b2c_get_required_config", return_value={"tenant": "t", "policy": "p"}), \
-                 patch("app.routes.auth.render_template", return_value=_mock_html_response()) as mock_render:
+                 patch("app.routes.auth.redirect", side_effect=lambda loc: loc) as mock_redirect, \
+                 patch("app.routes.auth.url_for", return_value="/login"):
                 azure_callback()
-        mock_render.assert_called()
+        mock_redirect.assert_called_with("/login")
 
     def test_callback_missing_code_redirects(self, app):
         from app.routes.auth import azure_callback
@@ -929,6 +954,77 @@ class TestAzureCallbackCoverage:
                 azure_callback()
         mock_redirect.assert_called()
 
+    def test_callback_success_keeps_id_token_out_of_cookie(self, app):
+        import jwt as _jwt
+        import time as _time
+        from flask import session
+        from app.routes.auth import azure_callback
+        from app.utils.session_persistence import (
+            B2C_ID_TOKEN_SESSION_KEY,
+            pop_oauth_logout_hint,
+            reset_oauth_logout_hint_cache_for_tests,
+        )
+
+        reset_oauth_logout_hint_cache_for_tests()
+        user = MagicMock()
+        user.id = 42
+        user.email = "admin@example.com"
+        user.name = "Admin"
+        user.title = "Admin"
+        user.is_active = True
+        user.is_authenticated = True
+        user.is_anonymous = False
+        user.get_id.return_value = "42"
+
+        state = _jwt.encode(
+            {
+                "_state": "inner",
+                "verifier": "v",
+                "nonce": "n",
+                "next": "/admin/",
+                "mobile": False,
+                "iat": int(_time.time()),
+                "exp": int(_time.time()) + 600,
+            },
+            app.config["SECRET_KEY"],
+            algorithm="HS256",
+        )
+        meta = {"token_endpoint": "http://token", "userinfo_endpoint": None, "jwks_uri": "http://jwks"}
+        tokens = {"id_token": "header.payload.sig", "access_token": "at"}
+        claims = {"email": user.email, "name": user.name}
+
+        with app.test_request_context(f"/auth/azure/callback?code=c&state={state}"):
+            with patch("app.routes.auth._b2c_get_required_config", return_value={
+                    "tenant": "t", "policy": "p", "client_id": "cid",
+                    "client_secret": "cs", "redirect_uri": "http://r", "scope": "openid",
+                }), \
+                 patch("app.routes.auth._b2c_metadata", return_value=meta), \
+                 patch("app.routes.auth.requests.post") as mock_post, \
+                 patch("app.routes.auth._verify_and_decode_id_token", return_value=claims), \
+                 patch("app.services.UserService.get_by_email", return_value=user), \
+                 patch(
+                     "app.services.platform.oauth_callback_guard.resolve_azure_b2c_login_session",
+                     return_value=("sid-oauth", True),
+                 ), \
+                 patch("app.routes.auth.login_user"), \
+                 patch("app.i18n.seed_session_language_from_user"), \
+                 patch("app.routes.auth.log_login_attempt"), \
+                 patch("app.routes.auth.end_other_active_sessions_for_device"), \
+                 patch("app.routes.auth.start_user_session"), \
+                 patch("app.routes.auth.log_user_activity"):
+                mock_post.return_value.json.return_value = tokens
+                mock_post.return_value.raise_for_status.return_value = None
+                result = azure_callback()
+                assert B2C_ID_TOKEN_SESSION_KEY not in session
+                assert session.get("session_id") == "sid-oauth"
+
+        assert result.status_code == 200
+        body = result.get_data(as_text=True)
+        assert "/admin/" in body
+        assert "window.location.replace" in body
+        assert pop_oauth_logout_hint("sid-oauth") == "header.payload.sig"
+        reset_oauth_logout_hint_cache_for_tests()
+
 
 # =====================================================================
 # logout — with B2C end session endpoint
@@ -964,6 +1060,45 @@ class TestLogoutB2c:
                 mock_capp.logger = MagicMock()
                 resp = logout()
         assert resp.status_code in (301, 302, 303, 307, 308)
+
+    def test_logout_uses_server_side_id_token_hint(self, app):
+        from app.routes.auth import logout
+        from app.utils.session_persistence import reset_oauth_logout_hint_cache_for_tests, store_oauth_logout_hint
+
+        reset_oauth_logout_hint_cache_for_tests()
+        user = MagicMock()
+        user.id = 42
+        user.email = "admin@example.com"
+        user.is_authenticated = True
+        user.is_active = True
+        user.is_anonymous = False
+        user.get_id.return_value = "42"
+
+        meta = {"end_session_endpoint": "https://b2c.example.com/endsession"}
+        cfg = {
+            "tenant": "t", "policy": "p", "client_id": "cid",
+            "client_secret": "cs", "redirect_uri": "http://r", "scope": "openid",
+        }
+        with app.test_request_context("/logout"):
+            from flask import session
+            login_user(user)
+            session["session_id"] = "sid-logout-hint"
+            store_oauth_logout_hint("sid-logout-hint", "stored-id-token")
+            with patch("app.routes.auth.log_user_activity"), \
+                 patch("app.routes.auth.log_logout"), \
+                 patch("app.routes.auth._b2c_get_required_config", return_value=cfg), \
+                 patch("app.routes.auth._b2c_metadata", return_value=meta), \
+                 patch("app.routes.auth.clear_mobile_app_embed_cookie", side_effect=lambda r: r), \
+                 patch("app.routes.auth.current_app") as mock_capp:
+                mock_capp.config = {
+                    **app.config,
+                    "AZURE_B2C_POST_LOGOUT_REDIRECT_URI": "https://example.com/post-logout",
+                }
+                mock_capp.logger = MagicMock()
+                resp = logout()
+        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert "id_token_hint=stored-id-token" in (resp.headers.get("Location") or "")
+        reset_oauth_logout_hint_cache_for_tests()
 
     def test_logout_with_session_duration_calculation(self, app, admin_user, db_session):
         from app.routes.auth import logout

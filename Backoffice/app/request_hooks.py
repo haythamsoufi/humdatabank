@@ -4,6 +4,10 @@ from flask import current_app, redirect, request, session, url_for
 from flask_login import current_user
 
 from app.i18n import persist_queued_language_cookie, update_session_activity
+from app.utils.session_persistence import (
+    log_oversized_session_cookie,
+    migrate_oauth_logout_hint_from_session,
+)
 from app.utils.activity_logging_skip import should_skip_activity_endpoint, should_skip_activity_path
 from app.utils.api_responses import json_ok
 from app.utils.datetime_helpers import utcnow
@@ -134,6 +138,24 @@ def register_request_hooks(app):
         if not current_user.is_authenticated:
             from app.utils.mobile_auth import _try_jwt_auth
             _try_jwt_auth()
+
+    @app.before_request
+    def _migrate_oauth_id_token_out_of_cookie():
+        """Shrink already-issued cookies that still carry a B2C ID token."""
+        if is_static_asset_request():
+            return
+        try:
+            migrate_oauth_logout_hint_from_session()
+        except Exception as e:
+            current_app.logger.debug("migrate_oauth_logout_hint_from_session failed: %s", e)
+
+    @app.after_request
+    def _log_oversized_session_cookie(response):
+        try:
+            return log_oversized_session_cookie(response)
+        except Exception as e:
+            current_app.logger.debug("log_oversized_session_cookie failed: %s", e)
+            return response
 
     @app.before_request
     def update_activity():

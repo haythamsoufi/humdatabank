@@ -511,7 +511,7 @@
             </button>
         </div>
 
-        <div class="flex-1 overflow-y-auto min-h-0">
+        <div class="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
             {# no-submit-guard: JS submit handler manages its own button loading state (disable/aria-busy/class);
                the global FormSubmitGuard would otherwise re-enable the button in the bubble phase while the
                async save is still in flight, allowing an accidental double-submit. #}
@@ -548,8 +548,8 @@
                         {# Translation fields will be dynamically loaded here #}
                     </div>
 
-                    <div class="flex justify-between items-center gap-2 pt-6 border-t border-gray-200">
-                        <div class="flex gap-2">
+                    <div class="modal-action-bar pt-6 border-t border-gray-200">
+                        <div class="modal-action-group">
                             <div class="btn-group auto-translate-split js-auto-translate-split relative"
                                  data-i18n-loading="{{ _('Loading services...')|forceescape }}"
                                  data-i18n-empty="{{ _('No translation services configured')|forceescape }}"
@@ -577,7 +577,7 @@
                                 {{ _('Clear Translations') }}
                             </button>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="modal-action-group">
                             <button type="button" class="btn btn-secondary close-edit-translation-modal" id="edit-translation-cancel-btn">
                                 {{ _('Cancel') }}
                             </button>

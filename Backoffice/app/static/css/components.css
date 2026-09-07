@@ -347,6 +347,77 @@ a.close-modal:not(.btn) {
   color: #9ca3af;
   cursor: not-allowed;
 }
+
+/* ==========================================================================
+   MODAL ACTION BAR
+   Footer rows with Auto Translate / Clear / Cancel / Save (and similar).
+   Wrap into multiple rows on phones so nowrap .btn labels do not force
+   horizontal scrolling.
+   ========================================================================== */
+.modal-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+#edit-translation-modal .flex-1.overflow-y-auto {
+  overflow-x: hidden;
+}
+
+.modal-action-bar > .modal-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .modal-action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-action-bar > .modal-action-group {
+    width: 100%;
+  }
+
+  .modal-action-bar > .modal-action-group > .btn,
+  .modal-action-bar > .modal-action-group > .auto-translate-split {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: min(100%, 9.5rem);
+  }
+
+  .modal-action-bar .auto-translate-split {
+    display: inline-flex;
+    min-width: 0;
+  }
+
+  .modal-action-bar .auto-translate-split > .btn:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* Other dialog footers that still use a single justify-end / justify-between row */
+  [role="dialog"] .flex.justify-end.space-x-3,
+  [role="dialog"] .flex.justify-end.gap-2,
+  [role="dialog"] .flex.justify-end.gap-3,
+  [role="dialog"] .flex.justify-between.items-center.gap-2,
+  [role="dialog"] .flex.justify-between.items-center.gap-3 {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  [role="dialog"] .flex.justify-end.space-x-3 > * {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 .auto-translate-service-menu-item .fa-check {
   color: #c2410c;
   font-size: 0.75rem;

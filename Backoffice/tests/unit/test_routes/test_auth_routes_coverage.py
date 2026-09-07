@@ -929,11 +929,10 @@ class TestAzureCallbackCoverage:
                 azure_callback()
         mock_redirect.assert_called()
 
-    def test_callback_success_keeps_id_token_out_of_cookie(self, app, admin_user, db_session):
+    def test_callback_success_keeps_id_token_out_of_cookie(self, app):
         import jwt as _jwt
         import time as _time
         from flask import session
-        from app.models import User
         from app.routes.auth import azure_callback
         from app.utils.session_persistence import (
             B2C_ID_TOKEN_SESSION_KEY,
@@ -942,8 +941,15 @@ class TestAzureCallbackCoverage:
         )
 
         reset_oauth_logout_hint_cache_for_tests()
-        with app.app_context():
-            user = User.query.get(admin_user.id)
+        user = MagicMock()
+        user.id = 42
+        user.email = "admin@example.com"
+        user.name = "Admin"
+        user.title = "Admin"
+        user.is_active = True
+        user.is_authenticated = True
+        user.is_anonymous = False
+        user.get_id.return_value = "42"
 
         state = _jwt.encode(
             {
@@ -1030,14 +1036,18 @@ class TestLogoutB2c:
                 resp = logout()
         assert resp.status_code in (301, 302, 303, 307, 308)
 
-    def test_logout_uses_server_side_id_token_hint(self, app, admin_user, db_session):
+    def test_logout_uses_server_side_id_token_hint(self, app):
         from app.routes.auth import logout
-        from app.models import User
         from app.utils.session_persistence import reset_oauth_logout_hint_cache_for_tests, store_oauth_logout_hint
 
         reset_oauth_logout_hint_cache_for_tests()
-        with app.app_context():
-            user = User.query.get(admin_user.id)
+        user = MagicMock()
+        user.id = 42
+        user.email = "admin@example.com"
+        user.is_authenticated = True
+        user.is_active = True
+        user.is_anonymous = False
+        user.get_id.return_value = "42"
 
         meta = {"end_session_endpoint": "https://b2c.example.com/endsession"}
         cfg = {

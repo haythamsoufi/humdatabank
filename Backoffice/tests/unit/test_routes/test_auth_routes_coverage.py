@@ -929,6 +929,71 @@ class TestAzureCallbackCoverage:
                 azure_callback()
         mock_redirect.assert_called()
 
+    def test_callback_success_keeps_id_token_out_of_cookie(self, app, admin_user, db_session):
+        import jwt as _jwt
+        import time as _time
+        from flask import session
+        from app.models import User
+        from app.routes.auth import azure_callback
+        from app.utils.session_persistence import (
+            B2C_ID_TOKEN_SESSION_KEY,
+            pop_oauth_logout_hint,
+            reset_oauth_logout_hint_cache_for_tests,
+        )
+
+        reset_oauth_logout_hint_cache_for_tests()
+        with app.app_context():
+            user = User.query.get(admin_user.id)
+
+        state = _jwt.encode(
+            {
+                "_state": "inner",
+                "verifier": "v",
+                "nonce": "n",
+                "next": "/admin/",
+                "mobile": False,
+                "iat": int(_time.time()),
+                "exp": int(_time.time()) + 600,
+            },
+            app.config["SECRET_KEY"],
+            algorithm="HS256",
+        )
+        meta = {"token_endpoint": "http://token", "userinfo_endpoint": None, "jwks_uri": "http://jwks"}
+        tokens = {"id_token": "header.payload.sig", "access_token": "at"}
+        claims = {"email": user.email, "name": user.name}
+
+        with app.test_request_context(f"/auth/azure/callback?code=c&state={state}"):
+            with patch("app.routes.auth._b2c_get_required_config", return_value={
+                    "tenant": "t", "policy": "p", "client_id": "cid",
+                    "client_secret": "cs", "redirect_uri": "http://r", "scope": "openid",
+                }), \
+                 patch("app.routes.auth._b2c_metadata", return_value=meta), \
+                 patch("app.routes.auth.requests.post") as mock_post, \
+                 patch("app.routes.auth._verify_and_decode_id_token", return_value=claims), \
+                 patch("app.services.UserService.get_by_email", return_value=user), \
+                 patch(
+                     "app.services.platform.oauth_callback_guard.resolve_azure_b2c_login_session",
+                     return_value=("sid-oauth", True),
+                 ), \
+                 patch("app.routes.auth.login_user"), \
+                 patch("app.i18n.seed_session_language_from_user"), \
+                 patch("app.routes.auth.log_login_attempt"), \
+                 patch("app.routes.auth.end_other_active_sessions_for_device"), \
+                 patch("app.routes.auth.start_user_session"), \
+                 patch("app.routes.auth.log_user_activity"):
+                mock_post.return_value.json.return_value = tokens
+                mock_post.return_value.raise_for_status.return_value = None
+                result = azure_callback()
+                assert B2C_ID_TOKEN_SESSION_KEY not in session
+                assert session.get("session_id") == "sid-oauth"
+
+        assert result.status_code == 200
+        body = result.get_data(as_text=True)
+        assert "/admin/" in body
+        assert "window.location.replace" in body
+        assert pop_oauth_logout_hint("sid-oauth") == "header.payload.sig"
+        reset_oauth_logout_hint_cache_for_tests()
+
 
 # =====================================================================
 # logout — with B2C end session endpoint
@@ -964,6 +1029,41 @@ class TestLogoutB2c:
                 mock_capp.logger = MagicMock()
                 resp = logout()
         assert resp.status_code in (301, 302, 303, 307, 308)
+
+    def test_logout_uses_server_side_id_token_hint(self, app, admin_user, db_session):
+        from app.routes.auth import logout
+        from app.models import User
+        from app.utils.session_persistence import reset_oauth_logout_hint_cache_for_tests, store_oauth_logout_hint
+
+        reset_oauth_logout_hint_cache_for_tests()
+        with app.app_context():
+            user = User.query.get(admin_user.id)
+
+        meta = {"end_session_endpoint": "https://b2c.example.com/endsession"}
+        cfg = {
+            "tenant": "t", "policy": "p", "client_id": "cid",
+            "client_secret": "cs", "redirect_uri": "http://r", "scope": "openid",
+        }
+        with app.test_request_context("/logout"):
+            from flask import session
+            login_user(user)
+            session["session_id"] = "sid-logout-hint"
+            store_oauth_logout_hint("sid-logout-hint", "stored-id-token")
+            with patch("app.routes.auth.log_user_activity"), \
+                 patch("app.routes.auth.log_logout"), \
+                 patch("app.routes.auth._b2c_get_required_config", return_value=cfg), \
+                 patch("app.routes.auth._b2c_metadata", return_value=meta), \
+                 patch("app.routes.auth.clear_mobile_app_embed_cookie", side_effect=lambda r: r), \
+                 patch("app.routes.auth.current_app") as mock_capp:
+                mock_capp.config = {
+                    **app.config,
+                    "AZURE_B2C_POST_LOGOUT_REDIRECT_URI": "https://example.com/post-logout",
+                }
+                mock_capp.logger = MagicMock()
+                resp = logout()
+        assert resp.status_code in (301, 302, 303, 307, 308)
+        assert "id_token_hint=stored-id-token" in (resp.headers.get("Location") or "")
+        reset_oauth_logout_hint_cache_for_tests()
 
     def test_logout_with_session_duration_calculation(self, app, admin_user, db_session):
         from app.routes.auth import logout

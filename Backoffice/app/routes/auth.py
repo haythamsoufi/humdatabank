@@ -1013,8 +1013,12 @@ def azure_callback():
     session['session_start'] = utcnow().isoformat()
     session['last_activity'] = utcnow().isoformat()
     session.permanent = True
+    # Do not put the Azure ID token in the Flask cookie session. Browsers
+    # silently drop cookies over ~4KB (common on mobile), which looks like
+    # "Access denied. Please log in." on the next admin click.
     if id_token:
-        session['b2c_id_token'] = id_token
+        from app.utils.session_persistence import store_oauth_logout_hint
+        store_oauth_logout_hint(session_id, id_token)
 
     login_user(user)
     from app.i18n import seed_session_language_from_user
@@ -1076,8 +1080,11 @@ def azure_callback():
             current_app.logger.error("Mobile OAuth: failed to issue JWT tokens: %s", e, exc_info=True)
             # Fall through to normal web redirect as a best-effort fallback
 
-    # Use safe redirect utility to prevent open redirect vulnerabilities
-    return safe_redirect(next_page_from_state, default_route='main.dashboard')
+    # First-party HTML continue page (not a 302): iOS Safari / some Android
+    # browsers drop cookies that were first set on a redirect following the
+    # cross-site B2C hop. A 200 document persists the session cookie.
+    from app.utils.session_persistence import first_party_post_login_response
+    return first_party_post_login_response(next_page_from_state)
 
 @bp.route("/logout")
 @login_required # Ensure user is logged in before logging out
@@ -1107,8 +1114,11 @@ def logout():
         resp = make_response(redirect(location))
         return clear_mobile_app_embed_cookie(resp)
 
-    # Grab the B2C id_token before wiping the session (needed for id_token_hint)
-    b2c_id_token = session.get('b2c_id_token')
+    # Grab the B2C id_token before wiping the session (needed for id_token_hint).
+    # Prefer the server-side hint; fall back to a leftover cookie value from
+    # sessions issued before the token was moved out of the Flask cookie.
+    from app.utils.session_persistence import pop_oauth_logout_hint
+    b2c_id_token = pop_oauth_logout_hint(_sid) or session.get('b2c_id_token')
 
     # Blacklist the session server-side so a replayed cookie is rejected immediately
     # even across workers and after server restarts (DB fallback in is_session_blacklisted).

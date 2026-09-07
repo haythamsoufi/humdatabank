@@ -66,16 +66,20 @@ If the Backoffice runs with more than one worker instance (scale-out) and uses *
 - Users experience intermittent logouts or CSRF failures despite a short session.
 - Different requests within the same user session land on different workers, each with their own session store.
 
-### Redis-backed sessions (preferred for multi-worker)
+### Flask session cookies (not Redis)
+
+Backoffice login sessions are **signed cookies**, not Redis. `REDIS_URL` shares rate limits, presence, and similar coordination — it does **not** move the Flask session out of the cookie. Keep the cookie small (do not store ID tokens or other JWTs in `session`). Browsers silently drop a cookie over ~4KB; the next click then looks like a fresh unauthenticated request.
+
+### Redis-backed coordination (preferred for multi-worker)
 
 When `REDIS_URL` is configured:
-- Sessions are stored in Redis (shared across all workers) — affinity is no longer required.
-- Cross-worker rate limiting for authenticated JSON APIs and AI routes also becomes consistent.
+- Cross-worker rate limiting for authenticated JSON APIs and AI routes becomes consistent.
+- Presence and related in-memory stores become shared.
 - **Preferred for production deployments with 2+ workers.**
 
 Without `REDIS_URL`:
-- Each worker has its own in-memory session state and rate limiter.
-- ARR Affinity must be enabled.
+- Each worker has its own in-memory rate limiter and presence store.
+- ARR Affinity must be enabled for those in-memory features.
 - AI WebSocket connections (`/api/ai/v2/ws`) require ARR affinity or single-worker deployment.
 
 ---
@@ -117,9 +121,10 @@ There is no single-user session termination command. Options:
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | Users report being logged out frequently | Session timeout set too short, or affinity broken | Check `PERMANENT_SESSION_LIFETIME` in config; enable ARR Affinity |
+| Login succeeds, then the next admin/sidebar click flashes “Access denied. Please log in.” (more common on phones) | Session cookie dropped: too large (e.g. Azure ID token stuffed into the cookie) or set on a 302 after the B2C redirect (Safari ITP) | Do not store JWTs in `session`. Azure login must finish on the first-party continue page. Check logs for “Session cookie is … bytes”. |
 | CSRF errors immediately after login | `SECRET_KEY` inconsistent across slots | Ensure `SECRET_KEY` is a slot-sticky setting in Azure App Service |
 | CSRF errors after long idle on form | Session expired (2h timeout) | Expected — user must refresh and re-login |
 | Presence indicator stuck on departed user | Redis TTL not yet expired | Wait for TTL, or manually flush the Redis key |
 | `cleanup-sessions` removes 0 sessions | Sessions expiring naturally before cleanup runs | Normal — no action needed |
 | API client `401` after `SECRET_KEY` rotation | JWT signed with old key is invalid | Client must obtain a new token (re-authenticate) |
-| Sessions not shared across workers | Redis not configured | Set `REDIS_URL` or enable ARR Affinity in Azure |
+| Sessions not shared across workers | N/A for Flask cookies (they are client-side). In-memory rate limits/presence need Redis or ARR Affinity | Set `REDIS_URL` or enable ARR Affinity in Azure |

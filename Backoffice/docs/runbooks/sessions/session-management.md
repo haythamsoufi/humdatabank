@@ -121,7 +121,7 @@ There is no single-user session termination command. Options:
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | Users report being logged out frequently | Session timeout set too short, or affinity broken | Check `PERMANENT_SESSION_LIFETIME` in config; enable ARR Affinity |
-| Login succeeds, then the next admin/sidebar click flashes “Access denied. Please log in.” (more common on phones) | Session cookie dropped: too large (e.g. Azure ID token stuffed into the cookie) or set on a 302 after the B2C redirect (Safari ITP) | Do not store JWTs in `session`. Azure login must finish on the first-party continue page. Check logs for “Session cookie is … bytes”. |
+| Login succeeds, then the next admin/sidebar click flashes “Access denied. Please log in.” (more common on phones) | Session cookie dropped by the browser for being too large (e.g. an Azure ID token stuffed into the cookie) | Do not store JWTs in `session`; keep large per-login values (e.g. the B2C `id_token` used for logout) server-side via `store_oauth_logout_hint`/`pop_oauth_logout_hint`. Check logs for “Session cookie is … bytes”. |
 | CSRF errors immediately after login | `SECRET_KEY` inconsistent across slots | Ensure `SECRET_KEY` is a slot-sticky setting in Azure App Service |
 | CSRF errors after long idle on form | Session expired (2h timeout) | Expected — user must refresh and re-login |
 | Presence indicator stuck on departed user | Redis TTL not yet expired | Wait for TTL, or manually flush the Redis key |

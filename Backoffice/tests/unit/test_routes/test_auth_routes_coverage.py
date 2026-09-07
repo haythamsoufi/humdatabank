@@ -1018,10 +1018,8 @@ class TestAzureCallbackCoverage:
                 assert B2C_ID_TOKEN_SESSION_KEY not in session
                 assert session.get("session_id") == "sid-oauth"
 
-        assert result.status_code == 200
-        body = result.get_data(as_text=True)
-        assert "/admin/" in body
-        assert "window.location.replace" in body
+        assert result.status_code == 302
+        assert result.headers["Location"] == "/admin/"
         assert pop_oauth_logout_hint("sid-oauth") == "header.payload.sig"
         reset_oauth_logout_hint_cache_for_tests()
 

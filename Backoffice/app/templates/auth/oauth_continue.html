@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="0;url={{ next_url }}">
-    <title>{{ _('Signing you in') }}</title>
+    <title>{{ _('Signing in…') }}</title>
     <style nonce="{{ csp_style_nonce() }}">
         html, body {
             margin: 0;
@@ -40,8 +40,7 @@
 </head>
 <body>
     <main class="oauth-continue">
-        <h1>{{ _('Signing you in…') }}</h1>
-        <p>{{ _('Please wait while we finish setting up your session.') }}</p>
+        <h1>{{ _('Signing in…') }}</h1>
         <p><a href="{{ next_url }}">{{ _('Continue') }}</a></p>
     </main>
     <script nonce="{{ csp_nonce() }}">

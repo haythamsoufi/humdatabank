@@ -1080,11 +1080,7 @@ def azure_callback():
             current_app.logger.error("Mobile OAuth: failed to issue JWT tokens: %s", e, exc_info=True)
             # Fall through to normal web redirect as a best-effort fallback
 
-    # First-party HTML continue page (not a 302): iOS Safari / some Android
-    # browsers drop cookies that were first set on a redirect following the
-    # cross-site B2C hop. A 200 document persists the session cookie.
-    from app.utils.session_persistence import first_party_post_login_response
-    return first_party_post_login_response(next_page_from_state)
+    return safe_redirect(next_page_from_state, default_route='main.dashboard')
 
 @bp.route("/logout")
 @login_required # Ensure user is logged in before logging out

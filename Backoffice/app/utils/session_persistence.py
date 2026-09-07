@@ -1,17 +1,14 @@
-"""Keep Flask cookie sessions small and persist them after cross-site OAuth.
+"""Keep Flask cookie sessions small enough for browsers to actually store them.
 
 The Backoffice uses Flask's signed cookie session (not Redis). Browsers cap a
 single cookie at ~4093 bytes and silently drop anything larger. Azure B2C ID
 tokens used to be stored in that cookie and routinely exceeded the limit —
-especially on mobile Safari / Chrome, which are stricter. Those browsers also
-often refuse to persist a cookie that was first set on a 302 following a
-cross-site IdP redirect.
+especially on mobile Safari / Chrome, which are stricter. The next navigation
+after login then looked unauthenticated ("Access denied. Please log in.").
 
 This module:
 - keeps the B2C ID token out of the cookie (server-side logout hint instead)
 - strips leftover ``b2c_id_token`` values from already-issued cookies
-- returns a first-party HTML continue page after OAuth so Set-Cookie lands
-  on a document response, not a redirect hop
 - logs when a session Set-Cookie is still approaching the browser limit
 """
 
@@ -23,9 +20,7 @@ import threading
 import time
 from typing import Optional
 
-from flask import current_app, has_app_context, make_response, render_template, request, session
-
-from app.utils.redirect_utils import get_safe_redirect_url
+from flask import current_app, has_app_context, request, session
 
 logger = logging.getLogger(__name__)
 
@@ -156,22 +151,6 @@ def migrate_oauth_logout_hint_from_session() -> bool:
     session.pop(B2C_ID_TOKEN_SESSION_KEY, None)
     session.modified = True
     return True
-
-
-def first_party_post_login_response(next_url: str | None, default_route: str = "main.dashboard"):
-    """Return a 200 HTML page that then navigates to the post-login destination.
-
-    iOS Safari and some Android browsers drop cookies set on a 302 that follows
-    a cross-site Azure/B2C redirect. A same-origin document response persists
-    the session cookie; the subsequent navigation is first-party.
-    """
-    safe_url = get_safe_redirect_url(next_url, default_route)
-    response = make_response(
-        render_template("auth/oauth_continue.html", next_url=safe_url)
-    )
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    return response
 
 
 def session_set_cookie_bytes(response) -> int:

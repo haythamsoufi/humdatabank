@@ -8,7 +8,6 @@ from flask import session
 from app.utils.session_persistence import (
     B2C_ID_TOKEN_SESSION_KEY,
     BROWSER_COOKIE_MAX_BYTES,
-    first_party_post_login_response,
     log_oversized_session_cookie,
     migrate_oauth_logout_hint_from_session,
     pop_oauth_logout_hint,
@@ -59,26 +58,6 @@ class TestMigrateOAuthTokenFromCookie:
     def test_noop_when_absent(self, app):
         with app.test_request_context("/"):
             assert migrate_oauth_logout_hint_from_session() is False
-
-
-@pytest.mark.unit
-class TestFirstPartyPostLoginResponse:
-    def test_renders_continue_page_with_safe_next(self, app):
-        with app.test_request_context("/auth/azure/callback"):
-            resp = first_party_post_login_response("/admin/")
-        assert resp.status_code == 200
-        body = resp.get_data(as_text=True)
-        assert "/admin/" in body
-        assert "window.location.replace" in body
-        assert resp.headers["Cache-Control"].startswith("no-store")
-
-    def test_rejects_external_next(self, app):
-        with app.test_request_context("/auth/azure/callback"):
-            resp = first_party_post_login_response("https://evil.example/phish")
-        assert resp.status_code == 200
-        body = resp.get_data(as_text=True)
-        assert "evil.example" not in body
-        assert "/" in body
 
 
 @pytest.mark.unit

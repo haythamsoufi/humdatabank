@@ -109,9 +109,9 @@
                 </div>
             {% endif %}
 
-            <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
+            <div class="modal-action-bar mt-6">
                 {% if show_auto_translate %}
-                <div class="flex gap-2">
+                <div class="modal-action-group">
                     {{ auto_translate_split_button('auto-translate-' ~ css_prefix ~ '-btn', 'Auto Translate', 'Uses AI to automatically translate text') }}
                     <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
                         <i class="fas fa-trash"></i>
@@ -119,12 +119,14 @@
                     </button>
                 </div>
                 {% else %}
-                <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
-                    <i class="fas fa-trash"></i>
-                    Clear Translations
-                </button>
+                <div class="modal-action-group">
+                    <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
+                        <i class="fas fa-trash"></i>
+                        Clear Translations
+                    </button>
+                </div>
                 {% endif %}
-                <div class="flex gap-2">
+                <div class="modal-action-group">
                     <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
                     <button type="button" id="save-{{ css_prefix }}-translations-btn" class="btn btn-success">{{ _('Save Translations') }}</button>
                 </div>
@@ -225,9 +227,9 @@
                 </table>
             </div>
 
-            <div class="flex {% if show_auto_translate %}justify-between{% else %}justify-end{% endif %} items-center gap-3 mt-6">
+            <div class="modal-action-bar mt-6">
                 {% if show_auto_translate %}
-                <div class="flex gap-2">
+                <div class="modal-action-group">
                     {{ auto_translate_split_button('auto-translate-' ~ css_prefix ~ '-btn', 'Auto Translate All', 'Uses AI to automatically translate all items') }}
                     <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
                         <i class="fas fa-trash"></i>
@@ -235,12 +237,14 @@
                     </button>
                 </div>
                 {% else %}
-                <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
-                    <i class="fas fa-trash"></i>
-                    Clear All Translations
-                </button>
+                <div class="modal-action-group">
+                    <button type="button" id="clear-{{ css_prefix }}-btn" class="btn btn-ghost-danger" title="Clear all translation fields">
+                        <i class="fas fa-trash"></i>
+                        Clear All Translations
+                    </button>
+                </div>
                 {% endif %}
-                <div class="flex gap-2">
+                <div class="modal-action-group">
                     <button type="button" class="btn btn-secondary close-modal">{{ _('Cancel') }}</button>
                     <button type="button" id="save-{{ css_prefix }}-btn" class="btn btn-success">{{ _('Save All Translations') }}</button>
                 </div>

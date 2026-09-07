@@ -90,6 +90,8 @@ Backoffice/test_results.log
 # Translation backup files (created by extraction scripts)
 *.po.bak
 *.po.bak.*
+# filelock sidecars next to .po files (runtime write locks)
+*.po.lock
 # Dockerfile baseline copy (not needed outside Docker)
 Backoffice/translations_base/
 

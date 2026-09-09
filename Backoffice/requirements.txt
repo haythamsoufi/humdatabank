@@ -28,7 +28,7 @@ pandas==2.2.3
 XlsxWriter==3.2.9                # was 3.2.3 — that version was yanked (PyPI metadata wrongly claimed Py3.6 support); no breaking changes in 3.2.4-3.2.9
 reportlab==4.4.1
 user-agents==2.2.0
-weasyprint==69.0                # was 68.0 — CVE-2026-49452 (CSS injection via presentational hints)
+weasyprint==70.0                # was 69.0 — CVE-2026-55073 (EPS rendering / URL fetcher bypass)
 requests==2.33.0                # was 2.32.3 — CVE-2024-47081, CVE-2026-25645
 PyJWT==2.13.0                   # was 2.12.1 — GHSA-xgmm-8j9v-c9wx and related PyJWT CVEs
 google-auth==2.40.3

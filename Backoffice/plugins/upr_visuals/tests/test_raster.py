@@ -491,27 +491,41 @@ def test_resolve_export_image_src_inlines_trusted_github(monkeypatch):
     kpi_icon = "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Unity.png"
     assert resolve_export_image_src(kpi_icon).startswith("data:image/png;base64,")
 
-    # Untrusted HTTPS still passes through unchanged (blocked later by _restricted_url_fetcher)
+    # Untrusted HTTPS still passes through unchanged (blocked later by the export URL policy)
     untrusted = "https://example.test/icon.png"
     assert resolve_export_image_src(untrusted) == untrusted
 
     from plugins.upr_visuals.raster import (
         _APP_FONTS_DIR,
         _PB_FONTS_DIR,
+        _check_restricted_export_url,
         _is_allowed_local_path,
-        _restricted_url_fetcher,
     )
     from plugins.upr_visuals.typography import resolve_font_file
 
     with pytest.raises(ValueError, match="Blocked export URL"):
-        _restricted_url_fetcher("https://fonts.googleapis.com/css2?family=Tajawal")
+        _check_restricted_export_url("https://fonts.googleapis.com/css2?family=Tajawal")
 
     tajawal = resolve_font_file("Tajawal-Regular.ttf")
     assert tajawal is not None
     assert _is_allowed_local_path(tajawal)
-    assert _restricted_url_fetcher(tajawal.resolve().as_uri())
+    _check_restricted_export_url(tajawal.resolve().as_uri())
     assert _is_allowed_local_path(_APP_FONTS_DIR / "Tajawal-Regular.ttf")
     assert _is_allowed_local_path(_PB_FONTS_DIR / "Tajawal-Regular.ttf")
+
+
+@pytest.mark.unit
+def test_restricted_url_fetcher_is_a_weasyprint_url_fetcher():
+    """WeasyPrint 70 rejects a plain callable, so the fetcher must subclass URLFetcher."""
+    URLFetcher = pytest.importorskip("weasyprint.urls").URLFetcher
+
+    from plugins.upr_visuals.raster import _build_restricted_url_fetcher
+
+    fetcher = _build_restricted_url_fetcher()
+    assert isinstance(fetcher, URLFetcher)
+
+    with pytest.raises(ValueError, match="Blocked export URL"):
+        fetcher.fetch("https://example.test/icon.png")
 
 
 @pytest.mark.unit

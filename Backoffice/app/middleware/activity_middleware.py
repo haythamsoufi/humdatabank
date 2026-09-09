@@ -33,7 +33,10 @@ from app.utils.activity_endpoint_catalog import (
 )
 from app.utils.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
 from app.utils.activity_form_data_redaction import redact_activity_form_data
-from app.utils.audit_context import apply_audit_details_to_context
+from app.utils.audit_context import (
+    apply_audit_details_to_context,
+    reset_request_audit_context,
+)
 from app.utils.page_view_paths import page_view_path_key_from_request
 from app.utils.activity_logging_skip import (
     ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING,
@@ -510,6 +513,7 @@ def init_activity_tracking(app):
         g.start_time = time.time()
         g.activity_user_id = None
         g.activity_session_id = None
+        reset_request_audit_context()
 
         # Skip tracking for static files and API routes
         if (is_static_asset_request() or

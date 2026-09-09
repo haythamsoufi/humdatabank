@@ -28,6 +28,20 @@ AUDIT_DETAILS_ATTR = "audit_context_extra"
 CURATED_DESCRIPTION_KEY = "audit_description_curated"
 
 
+def reset_request_audit_context() -> None:
+    """Drop any pending enrichment so it cannot leak into the next request.
+
+    ``flask.g`` is bound to the *application* context, not the request, so a
+    reused app context (CLI, tests, nested contexts) would otherwise carry one
+    request's details onto the next audit row.
+    """
+    try:
+        g.pop(AUDIT_DETAILS_ATTR, None)
+        g.pop("audit_activity_description", None)
+    except RuntimeError:
+        pass
+
+
 def set_audit_details(**fields: Any) -> None:
     """Merge reviewer-facing fields into this request's audit row details.
 

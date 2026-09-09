@@ -20,6 +20,7 @@ from app.utils.activity_endpoint_overrides import (
 )
 from app.utils.activity_endpoint_catalog import resolve_activity_catalog_spec
 from app.utils.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
+from app.utils.audit_context import has_curated_description
 
 @dataclass(frozen=True)
 class FormContextLookups:
@@ -308,7 +309,10 @@ def create_consistent_description(
                     "file_uploaded",
                     "form_validated",
                 ) or (t.startswith("admin_")):
-                    if original_description and original_description.startswith(spec.description):
+                    if original_description and (
+                        has_curated_description(context_data)
+                        or original_description.startswith(spec.description)
+                    ):
                         return original_description
                     return spec.description
 

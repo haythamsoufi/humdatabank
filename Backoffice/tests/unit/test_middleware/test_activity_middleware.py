@@ -1229,6 +1229,133 @@ class TestActivityRegisteredHooks:
                 _activity_after(app)(make_response("ok", 200))
                 assert mock_log.call_args[1]["description"] == "Custom audit text"
 
+    def test_after_request_merges_view_supplied_audit_details(self, app):
+        """set_audit_details() from a view lands in the middleware's context_data."""
+        from app.utils.audit_context import CURATED_DESCRIPTION_KEY, set_audit_details
+
+        with app.test_request_context(
+            "/admin/assignments/1/entities/bulk-update-status", method="POST"
+        ):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time()
+            g.audit_activity_description = "Updated assignment status to Approved for 3 countries"
+            set_audit_details(
+                assignment_title="UPR Country Reporting – 2025",
+                new_status="Approved",
+                status_changes=["Kenya: Pending → Approved"],
+            )
+            with _with_activity_endpoint(
+                "assignment_management.bulk_update_entity_status"
+            ), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                context = mock_log.call_args[1]["context_data"]
+                assert context["assignment_title"] == "UPR Country Reporting – 2025"
+                assert context["new_status"] == "Approved"
+                assert context["status_changes"] == ["Kenya: Pending → Approved"]
+                assert context[CURATED_DESCRIPTION_KEY] is True
+
+    def test_after_request_view_details_override_extracted_entity(self, app):
+        """A bulk action's real target beats the single entity extraction inferred."""
+        from app.utils.audit_context import set_audit_details
+
+        def _fake_extract(_app, _req, context_data):
+            context_data["entity_name"] = "Kenya"
+
+        with app.test_request_context(
+            "/admin/assignments/1/entities/bulk-update-status", method="POST"
+        ):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time()
+            set_audit_details(entity_name="Kenya, Chad, Peru")
+            with _with_activity_endpoint(
+                "assignment_management.bulk_update_entity_status"
+            ), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context",
+                       side_effect=_fake_extract):
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                assert mock_log.call_args[1]["context_data"]["entity_name"] == "Kenya, Chad, Peru"
+
+    def test_after_request_no_curated_marker_without_view_description(self, app):
+        from app.utils.audit_context import CURATED_DESCRIPTION_KEY, reset_request_audit_context
+
+        with app.test_request_context("/admin/assignments/edit/1", method="POST"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time()
+            reset_request_audit_context()
+            with _with_activity_endpoint("assignment_management.edit_assignment"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                context = mock_log.call_args[1]["context_data"]
+                assert CURATED_DESCRIPTION_KEY not in context
+                assert "assignment_title" not in context
+
+    def test_before_request_clears_pending_audit_details(self, app):
+        """g lives on the app context, so stale details must not reach the next row."""
+        from app.utils.audit_context import AUDIT_DETAILS_ATTR, set_audit_details
+
+        with app.test_request_context("/dashboard"):
+            set_audit_details(assignment_title="Stale assignment")
+            g.audit_activity_description = "Stale description"
+            with _with_activity_endpoint("main.dashboard"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False):
+                _activity_before(app)()
+            assert getattr(g, AUDIT_DETAILS_ATTR, None) is None
+            assert getattr(g, "audit_activity_description", None) is None
+
+    def test_deferred_path_merges_view_supplied_audit_details(self, app):
+        """The transaction-managed path enriches context_data the same way."""
+        from app.utils.audit_context import CURATED_DESCRIPTION_KEY, set_audit_details
+
+        with app.test_request_context("/admin/assignments/edit/1", method="POST"):
+            g.activity_user_id = 1
+            g.activity_session_id = "sid-1"
+            g._auto_txn_managed = True
+            g.start_time = time.time()
+            g.audit_activity_description = "Updated an assignment 'X': changed Due date"
+            set_audit_details(changes=["Due date (all countries): — → 2025-03-01"])
+            with _with_activity_endpoint("assignment_management.edit_assignment"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity_explicit") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                resp = _activity_after(app)(make_response("ok", 200))
+                resp.close()
+                context = mock_log.call_args[1]["context_data"]
+                assert context["changes"] == ["Due date (all countries): — → 2025-03-01"]
+                assert context[CURATED_DESCRIPTION_KEY] is True
+                assert (
+                    mock_log.call_args[1]["description"]
+                    == "Updated an assignment 'X': changed Due date"
+                )
+
     def test_after_request_error_is_swallowed(self, app):
         with app.test_request_context("/dashboard"):
             g.activity_user_id = 1

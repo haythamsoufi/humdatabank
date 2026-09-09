@@ -920,6 +920,40 @@ class TestHumanizeAuditDetailsDict:
             is None
         )
 
+    def test_drops_curated_description_marker(self):
+        """The marker steers description display; it is not a reviewer-facing field."""
+        from app.utils.audit_context import CURATED_DESCRIPTION_KEY
+
+        result = humanize_audit_details_dict(
+            {
+                "endpoint": "assignment_management.edit_assignment",
+                "method": "POST",
+                CURATED_DESCRIPTION_KEY: True,
+                "assignment_title": "UPR Country Reporting – 2025",
+            }
+        )
+        assert result == {"Assignment": "UPR Country Reporting – 2025"}
+
+    def test_assignment_change_lines_are_kept_as_a_list(self):
+        result = humanize_audit_details_dict(
+            {
+                "endpoint": "assignment_management.bulk_update_entity_status",
+                "method": "POST",
+                "new_status": "Approved",
+                "entities_updated": 2,
+                "status_changes": [
+                    "Kenya: Pending → Approved",
+                    "Chad: In Progress → Approved",
+                ],
+            }
+        )
+        assert result["New status"] == "Approved"
+        assert result["Entities updated"] == 2
+        assert result["Status changes"] == [
+            "Kenya: Pending → Approved",
+            "Chad: In Progress → Approved",
+        ]
+
     def test_prefers_names_over_ids(self):
         result = humanize_audit_details_dict(
             {

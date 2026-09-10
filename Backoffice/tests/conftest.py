@@ -30,6 +30,7 @@ from sqlalchemy.pool import NullPool
 from app import create_app, db
 from app.extensions import login
 from app.models import User
+from config.config import TestingConfig, _normalize_database_uri
 
 _PG_NUCLEAR_DROP_SQL = text("""
 DO $$
@@ -421,6 +422,18 @@ def app():
     os.environ['FLASK_CONFIG'] = 'testing'
 
     _check_test_database_reachable()
+
+    # TestingConfig.SQLALCHEMY_DATABASE_URI is evaluated when config.config is
+    # imported — which happens at the top of this file, before pytest_configure()
+    # gives each xdist worker its own database. Without re-reading the environment
+    # here, every worker would share one database and the per-worker isolation
+    # below would be dead code: parallel workers then collide on fixtures with
+    # fixed unique values (e.g. test_admin@example.com) and fight over the schema
+    # reset lock. Flask-SQLAlchemy builds engines during init_app, so this has to
+    # happen before create_app().
+    _worker_db_url = os.environ.get('TEST_DATABASE_URL') or os.environ.get('DATABASE_URL')
+    if _worker_db_url:
+        TestingConfig.SQLALCHEMY_DATABASE_URI = _normalize_database_uri(_worker_db_url)
 
     app = create_app('testing')
 

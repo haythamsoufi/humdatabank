@@ -33,6 +33,10 @@ from app.utils.activity_endpoint_catalog import (
 )
 from app.utils.activity_endpoint_catalog.defaults import describe_get_request_without_catalog
 from app.utils.activity_form_data_redaction import redact_activity_form_data
+from app.utils.audit_context import (
+    apply_audit_details_to_context,
+    reset_request_audit_context,
+)
 from app.utils.page_view_paths import page_view_path_key_from_request
 from app.utils.activity_logging_skip import (
     ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING,
@@ -509,6 +513,7 @@ def init_activity_tracking(app):
         g.start_time = time.time()
         g.activity_user_id = None
         g.activity_session_id = None
+        reset_request_audit_context()
 
         # Skip tracking for static files and API routes
         if (is_static_asset_request() or
@@ -640,6 +645,12 @@ def init_activity_tracking(app):
                     # Extract country information (mirrors the non-deferred path)
                     _extract_entity_into_context(app, request, context_data)
 
+                    # View-supplied before/after details (set_audit_details) win over
+                    # anything inferred above.
+                    apply_audit_details_to_context(
+                        context_data, description_curated=bool(_audit_desc)
+                    )
+
                     def _on_close():
                         try:
                             with app_obj.app_context():
@@ -741,6 +752,12 @@ def init_activity_tracking(app):
 
                 # Extract country information from form data, URL args, or view args
                 _extract_entity_into_context(app, request, context_data)
+
+                # View-supplied before/after details (set_audit_details) win over
+                # anything inferred above.
+                apply_audit_details_to_context(
+                    context_data, description_curated=bool(_audit_desc)
+                )
 
                 # Automatic GET "page_view" — session stats only (no per-hit audit row)
                 if activity_type == "page_view":

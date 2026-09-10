@@ -50,7 +50,7 @@ _PB_FONTS_DIR = _PLUGIN_DIR.parents[0] / "pb_progress" / "visuals" / "report" / 
 _APP_STATIC_URL = "/static/"
 # HTTPS origins trusted for export image inlining (NS logos and KPI icons from the
 # public FDRS GitHub repo).  Only these prefixes are fetched; all other https:// URLs
-# remain unchanged and will be blocked by _restricted_url_fetcher as before.
+# remain unchanged and will be blocked by _check_restricted_export_url as before.
 _TRUSTED_REMOTE_PREFIXES = ("https://raw.githubusercontent.com/FDRS-ifrc/",)
 _MAX_REMOTE_IMAGE_BYTES = 2 * 1024 * 1024
 
@@ -625,26 +625,45 @@ def resolve_export_image_src(src: str) -> str:
         if resolved.is_file() and (in_plugin or in_app_static):
             return resolved.as_uri()
     # Inline images from known trusted remote origins so they survive
-    # _restricted_url_fetcher (which blocks all http/https).
+    # _check_restricted_export_url (which blocks all http/https).
     if any(raw.startswith(p) for p in _TRUSTED_REMOTE_PREFIXES):
         return _fetch_remote_as_data_uri(raw) or raw
     return raw
 
 
-def _restricted_url_fetcher(url, timeout=10, ssl_context=None):
-    """Allow only data: and local files under the plugin / app static trees."""
-    from weasyprint.urls import default_url_fetcher
+def _check_restricted_export_url(url) -> None:
+    """Allow only data: and local files under the plugin / app static trees.
 
+    Raises ``ValueError`` for anything else, which WeasyPrint turns into a
+    skipped resource rather than a failed render.
+    """
     raw = (url or "").strip()
     if raw.startswith("data:"):
-        return default_url_fetcher(url, timeout=timeout, ssl_context=ssl_context)
+        return
     parsed = urlparse(raw)
     if parsed.scheme != "file":
         raise ValueError(f"Blocked export URL scheme: {parsed.scheme or 'unknown'}")
     local = Path(url2pathname(unquote(parsed.path)))
     if not _is_allowed_local_path(local):
         raise ValueError("Blocked export file URL outside allowed static roots")
-    return default_url_fetcher(url, timeout=timeout, ssl_context=ssl_context)
+
+
+def _build_restricted_url_fetcher(timeout=10, ssl_context=None):
+    """Build the URL fetcher enforcing :func:`_check_restricted_export_url`.
+
+    WeasyPrint 70 removed ``default_url_fetcher`` and rejects a plain callable
+    passed as ``url_fetcher``, so the policy has to live in a ``URLFetcher``
+    subclass. Built on demand because WeasyPrint is an optional dependency —
+    importing this module must not require it.
+    """
+    from weasyprint.urls import URLFetcher
+
+    class _RestrictedURLFetcher(URLFetcher):
+        def fetch(self, url, headers=None):
+            _check_restricted_export_url(url)
+            return super().fetch(url, headers)
+
+    return _RestrictedURLFetcher(timeout=timeout, ssl_context=ssl_context)
 
 
 def _rewrite_export_images(html: str) -> str:
@@ -849,11 +868,12 @@ def write_weasyprint_pdf(
 
     font_config = FontConfiguration()
     base_url = _PLUGIN_DIR.resolve().as_uri() + "/"
+    url_fetcher = _build_restricted_url_fetcher()
     parsed = [
         CSS(
             string=sheet,
             font_config=font_config,
-            url_fetcher=_restricted_url_fetcher,
+            url_fetcher=url_fetcher,
             base_url=base_url,
         )
         for sheet in stylesheets
@@ -871,7 +891,7 @@ def write_weasyprint_pdf(
     HTML(
         string=html,
         base_url=base_url,
-        url_fetcher=_restricted_url_fetcher,
+        url_fetcher=url_fetcher,
     ).write_pdf(pdf_buffer, **options)
     return pdf_buffer.getvalue()
 

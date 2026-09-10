@@ -441,6 +441,15 @@ npm run dev:safe
 - `user_activity_log` is for meaningful audit/activity events; high-frequency heartbeat noise should not be written there.
 - If a durable "last active" timestamp is needed for user features, store it on the `user` record (e.g., dedicated datetime field) with write throttling, rather than logging every heartbeat.
 
+### Adding Details to an Audit Trail Row
+Most admin mutations are recorded automatically by `activity_middleware`, which only knows the endpoint, method and status code — so the Audit Trail "Details" panel is empty unless the view says what changed.
+
+- Call `set_audit_details(**fields)` and `set_audit_description(text)` from `app.utils.audit_context`. Both enrich the single `UserActivityLog` row the middleware already writes; view-supplied keys override anything the middleware inferred.
+- Prefer humanized keys and values (resolved names, `Yes`/`No`, `before → after` strings). `details_service.humanize_audit_details_dict` renders them and hides request metadata, secrets and bare numeric IDs. See `app/services/audit/assignment_audit.py` for the pattern.
+- Only reach for `log_admin_action(old_values=..., new_values=...)` when the blueprint is listed in `ADMIN_BLUEPRINTS_WITH_EXPLICIT_LOGGING` (`activity_logging_skip.py`); otherwise you get a duplicate row, because the middleware still logs the same POST.
+- Cap collections — a bulk action can span every country on the platform.
+- Wrap enrichment so it cannot fail the mutation it describes.
+
 ## Admin Interface Architecture
 
 ### Modular Blueprint Structure

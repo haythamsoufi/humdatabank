@@ -102,8 +102,11 @@ MANUAL_ACTIVITY_OVERRIDES: dict[tuple[str, str], ActivityEndpointSpec] = {
         description="Imported system documents",
         activity_type="admin_ai",
     ),
+    # Fallback only — the view records the assignment, per-entity status transitions
+    # and due dates via set_audit_details/set_audit_description. The endpoint accepts
+    # any entity type, not just countries.
     ("POST", "assignment_management.bulk_update_entity_status"): ActivityEndpointSpec(
-        description="Updated assignment status for multiple countries",
+        description="Updated assignment status for multiple countries or entities",
         activity_type="admin_assignments",
     ),
     ("POST", "assignment_management.new_assignment"): ActivityEndpointSpec(

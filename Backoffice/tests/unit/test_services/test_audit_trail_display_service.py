@@ -372,6 +372,38 @@ class TestCreateConsistentDescription:
         desc = create_consistent_description("activity", "form_validated", None, None)
         assert "Validated" in desc
 
+    def test_view_written_description_survives_catalog_override(self):
+        """A curated row keeps its own text instead of the generic catalog line."""
+        from app.utils.audit_context import CURATED_DESCRIPTION_KEY
+
+        stored = (
+            "Updated assignment status to Approved for 3 countries "
+            "in 'UPR Country Reporting – 2025'"
+        )
+        desc = create_consistent_description(
+            "activity",
+            "admin_assignments",
+            None,
+            stored,
+            endpoint="assignment_management.bulk_update_entity_status",
+            context_data={"method": "POST", CURATED_DESCRIPTION_KEY: True},
+            http_method="POST",
+        )
+        assert desc == stored
+
+    def test_uncurated_row_still_falls_back_to_catalog_line(self):
+        """Legacy rows without the marker keep being cleaned up by the catalog."""
+        desc = create_consistent_description(
+            "activity",
+            "admin_assignments",
+            None,
+            "Performed Bulk Update Entity Status",
+            endpoint="assignment_management.bulk_update_entity_status",
+            context_data={"method": "POST"},
+            http_method="POST",
+        )
+        assert desc == "Updated assignment status for multiple countries or entities"
+
     def test_activity_request_with_inferred_type(self):
         desc = create_consistent_description(
             "activity",

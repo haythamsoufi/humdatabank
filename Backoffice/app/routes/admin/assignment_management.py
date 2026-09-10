@@ -48,6 +48,14 @@ from app.services.assignments.service import AssignmentService
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
+from app.services.audit.assignment_audit import (
+    assignment_audit_label,
+    assignment_settings_snapshot,
+    build_assignment_update_audit,
+    build_entity_status_update_audit,
+    country_due_dates_snapshot,
+)
+from app.utils.audit_context import set_audit_description, set_audit_details
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField, HiddenField
 from wtforms.validators import Optional, DataRequired
@@ -1059,6 +1067,13 @@ def edit_assignment(assignment_id):
     enabled_entity_groups = get_enabled_entity_groups()
 
     if form.validate_on_submit():
+        # Snapshot for the audit trail before any mutation; never let audit
+        # bookkeeping fail the edit itself.
+        audit_before = {}
+        audit_due_date_before = None
+        with suppress(Exception):
+            audit_before = assignment_settings_snapshot(assignment)
+            audit_due_date_before = country_due_dates_snapshot(assignment)
         try:
             assignment.template_id = form.template_id.data
             assignment.period_name = (form.period_name.data or '').strip()
@@ -1079,17 +1094,43 @@ def edit_assignment(assignment_id):
                 flash(_("This active assignment has no data owner. Consider assigning one for governance accountability."), "warning")
 
             # Update due dates for all countries in this assignment
+            audit_due_date_after = None
             if form.due_date.data:
                 for aes in assignment.country_statuses:
                     aes.due_date = form.due_date.data
+                with suppress(Exception):
+                    audit_due_date_after = country_due_dates_snapshot(assignment)
 
             db.session.flush()
+            with suppress(Exception):
+                audit_details, audit_description = build_assignment_update_audit(
+                    assignment,
+                    audit_before,
+                    assignment_settings_snapshot(assignment),
+                    country_due_date_before=audit_due_date_before,
+                    country_due_date_after=audit_due_date_after,
+                )
+                set_audit_details(**audit_details)
+                set_audit_description(audit_description)
             flash(f"Assignment '{assignment.period_name}' updated successfully.", "success")
             return redirect(url_for("assignment_management.manage_assignments"))
         except Exception as e:
             request_transaction_rollback()
             flash("An error occurred. Please try again.", "danger")
             current_app.logger.error(f"Error updating assignment {assignment_id}: {e}", exc_info=True)
+
+    if request.method == "POST":
+        # Re-rendering the form after a POST means nothing was saved. The 200
+        # response is still audited, so keep the row from claiming an update.
+        with suppress(Exception):
+            reason = "form validation failed" if form.errors else "the update could not be saved"
+            label = assignment_audit_label(assignment)
+            quoted = f" '{label}'" if label else ""
+            set_audit_details(
+                assignment_title=label,
+                changes=[f"Not saved — {reason}"],
+            )
+            set_audit_description(f"Attempted to update an assignment{quoted}: {reason}")
 
     # Get assignment country entity statuses (for backward compatibility)
     assignment_countries = assignment.country_statuses.all()
@@ -1437,7 +1478,7 @@ def bulk_update_entity_status(assignment_id):
             due_date_obj = datetime.strptime(due_date_str, '%Y-%m-%d').date()
         except (ValueError, TypeError):
             pass
-    AssignedForm.query.get_or_404(assignment_id)
+    assignment = AssignedForm.query.get_or_404(assignment_id)
     safe_ids = []
     for sid in status_ids:
         try:
@@ -1445,12 +1486,29 @@ def bulk_update_entity_status(assignment_id):
         except (ValueError, TypeError):
             continue
     updated = 0
+    audit_changes = []
     if safe_ids:
         _now = utcnow()
-        for aes in AssignmentEntityStatus.query.filter(
+        rows = AssignmentEntityStatus.query.filter(
             AssignmentEntityStatus.id.in_(safe_ids),
             AssignmentEntityStatus.assigned_form_id == assignment_id,
-        ).all():
+        ).all()
+        entity_names = {}
+        with suppress(Exception):
+            entity_names = EntityService.batch_entity_names(
+                [(aes.entity_type, aes.entity_id) for aes in rows],
+                include_hierarchy=True,
+            )
+        for aes in rows:
+            audit_change = {
+                'entity_type': aes.entity_type,
+                'entity_id': aes.entity_id,
+                'name': entity_names.get((aes.entity_type, aes.entity_id)),
+                'status_before': aes.status,
+                'status_after': normalized_status,
+                'due_before': aes.due_date,
+                'due_after': due_date_obj if due_date_obj is not None else aes.due_date,
+            }
             aes.status = normalized_status
             aes.status_timestamp = _now
             if normalized_status == AssignmentEntityStatusValue.approved:
@@ -1464,7 +1522,17 @@ def bulk_update_entity_status(assignment_id):
             if due_date_obj is not None:
                 aes.due_date = due_date_obj
             updated += 1
+            audit_changes.append(audit_change)
     db.session.flush()
+    with suppress(Exception):
+        audit_details, audit_description = build_entity_status_update_audit(
+            assignment,
+            audit_changes,
+            new_status=normalized_status,
+            new_due_date=due_date_obj,
+        )
+        set_audit_details(**audit_details)
+        set_audit_description(audit_description)
     return json_ok(updated=updated)
 
 

@@ -11,6 +11,8 @@ import copy
 import json
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from app.utils.audit_context import CURATED_DESCRIPTION_KEY
+
 # Avoid flooding the UI / JSON payload
 _MAX_PERMISSION_LINES = 120
 _MAX_ENTITY_ACCESS_LINES = 80
@@ -533,6 +535,7 @@ _TECHNICAL_DETAIL_KEYS = frozenset(
         "aes_id",
         "template_id",
         "ifrc_presave",
+        CURATED_DESCRIPTION_KEY,
     }
 )
 

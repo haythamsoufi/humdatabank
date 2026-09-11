@@ -124,6 +124,28 @@ class TestManageUsers:
         resp = logged_in_client.get("/admin/users")
         assert resp.status_code == 200
 
+    def test_grid_payload_includes_join_date(self, logged_in_client, db_session):
+        from app.utils.datetime_helpers import utcnow
+
+        joined_at = utcnow().replace(microsecond=0)
+        user = create_test_user(db_session, email="joined_at@example.com")
+        user.created_at = joined_at
+        legacy_user = create_test_user(db_session, email="legacy_no_join_date@example.com")
+        legacy_user.created_at = None
+        db_session.commit()
+
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        match = re.search(
+            r'<script type="application/json" id="users-grid-data">(.*?)</script>',
+            resp.text,
+            re.DOTALL,
+        )
+        assert match is not None
+        rows = {row["id"]: row for row in json.loads(match.group(1))}
+        assert rows[user.id]["created_at"] == joined_at.isoformat()
+        assert rows[legacy_user.id]["created_at"] == ""
+
     def test_page_handles_rbac_roles_exception(self, logged_in_client, db_session, app):
         """Cover except branch for rbac_roles_by_user_id query."""
         with patch(

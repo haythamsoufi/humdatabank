@@ -7,6 +7,7 @@ import re
 
 from flask import render_template, request, flash, redirect, url_for, current_app
 from flask_login import current_user
+from werkzeug.exceptions import HTTPException
 
 from app import db
 from app.models import User, Country, UserEntityPermission, CountryAccessRequest
@@ -1396,6 +1397,9 @@ def kickout_device(user_id, device_id):
 
         return json_ok(message='Device session ended successfully')
 
+    except HTTPException:
+        # Keep get_or_404 / first_or_404 answering 404 instead of a generic 500.
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
@@ -1447,6 +1451,9 @@ def remove_device(user_id, device_id):
 
         return json_ok(message='Device removed successfully')
 
+    except HTTPException:
+        # Keep get_or_404 / first_or_404 answering 404 instead of a generic 500.
+        raise
     except Exception as e:
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 

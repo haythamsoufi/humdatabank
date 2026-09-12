@@ -217,6 +217,13 @@
         return displayedAny ? html : '-';
     }
 
+    /** Local-timezone date text for export/clipboard; empty when the join date is unknown. */
+    function formatJoinedDate(value) {
+        if (!value) return '';
+        if (typeof DateTimeUtils === 'undefined') return String(value);
+        return DateTimeUtils.format(value, 'date');
+    }
+
     // Precompute searchable/exportable entities text and filterable entity names.
     usersData.forEach(function (user) {
         user.entities = getEntitiesPlainText(user);
@@ -311,6 +318,19 @@
             cellStyle: { 'white-space': 'nowrap' }
         },
         {
+            field: 'created_at',
+            headerName: t.joined_7d50c09f,
+            width: 140, minWidth: 120, maxWidth: 200,
+            filter: 'agDateColumnFilter',
+            filterParams: AgGridRenderers.dateFilterParams,
+            sortable: true,
+            cellRenderer: AgGridRenderers.dateOnly,
+            exportValueGetter: function (params) {
+                return formatJoinedDate(params.data && params.data.created_at);
+            },
+            cellStyle: { 'white-space': 'nowrap' }
+        },
+        {
             field: 'fds_member_names_text',
             headerName: t.fds_member_7a2c91e4,
             width: 220, minWidth: 160, maxWidth: 320,
@@ -380,7 +400,7 @@
     }
 
     function initializeGrid() {
-        var result = AgGridHelper.create('usersGrid', 'users-v3', columnDefs, usersData, {
+        var result = AgGridHelper.create('usersGrid', 'users-v4', columnDefs, usersData, {
             gridOptions: {
                 getRowClass: function (params) {
                     return (!params.data.active) ? 'inactive-user-row' : null;
@@ -408,6 +428,9 @@
                     }
                     if (colId === 'fds_member_names_text') {
                         return params.node.data.fds_member_export_text || '';
+                    }
+                    if (colId === 'created_at') {
+                        return formatJoinedDate(params.node.data.created_at);
                     }
                     return params.value != null ? params.value : '';
                 }

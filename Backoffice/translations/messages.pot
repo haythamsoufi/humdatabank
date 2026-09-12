@@ -28614,3 +28614,7 @@ msgstr ""
 msgid "Traces"
 msgstr ""
 
+
+#: app/templates/admin/user_management/users.html:370
+msgid "Joined"
+msgstr ""

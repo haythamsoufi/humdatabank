@@ -29491,3 +29491,7 @@ msgstr "✓"
 #: app/templates/admin/ai/trace_detail.html:20
 msgid "Traces"
 msgstr "Traces"
+
+#: app/templates/admin/user_management/users.html:370
+msgid "Joined"
+msgstr "Inscrit le"

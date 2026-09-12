@@ -73,6 +73,9 @@ class User(UserMixin, db.Model):
     # Soft-archive/deactivation
     active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     deactivated_at = db.Column(db.DateTime, nullable=True)
+    # Nullable: accounts that predate this column keep NULL unless the migration
+    # backfill found a creation event in the audit logs.
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=True, index=True)
 
     # User preferences
     chatbot_enabled = db.Column(db.Boolean, default=True, nullable=False)

@@ -124,6 +124,28 @@ class TestManageUsers:
         resp = logged_in_client.get("/admin/users")
         assert resp.status_code == 200
 
+    def test_grid_payload_includes_join_date(self, logged_in_client, db_session):
+        from app.utils.datetime_helpers import utcnow
+
+        joined_at = utcnow().replace(microsecond=0)
+        user = create_test_user(db_session, email="joined_at@example.com")
+        user.created_at = joined_at
+        legacy_user = create_test_user(db_session, email="legacy_no_join_date@example.com")
+        legacy_user.created_at = None
+        db_session.commit()
+
+        resp = logged_in_client.get("/admin/users")
+        assert resp.status_code == 200
+        match = re.search(
+            r'<script type="application/json" id="users-grid-data">(.*?)</script>',
+            resp.text,
+            re.DOTALL,
+        )
+        assert match is not None
+        rows = {row["id"]: row for row in json.loads(match.group(1))}
+        assert rows[user.id]["created_at"] == joined_at.isoformat()
+        assert rows[legacy_user.id]["created_at"] == ""
+
     def test_page_handles_rbac_roles_exception(self, logged_in_client, db_session, app):
         """Cover except branch for rbac_roles_by_user_id query."""
         with patch(
@@ -251,11 +273,6 @@ class TestApproveAccessRequest:
         user = create_test_user(db_session, email="approve_me@example.com")
         req = _make_access_request(db_session, user, country, status="pending")
         with patch(
-            "app.routes.admin.user_management.crud.notify_user_added_to_country",
-            side_effect=Exception("notify error"),
-        ):
-            pass
-        with patch(
             "app.services.notification.core.notify_user_added_to_country"
         ):
             resp = logged_in_client.post(
@@ -340,21 +357,28 @@ class TestRejectAccessRequest:
         assert resp.status_code == 302
 
     def test_reject_with_null_user_country(self, logged_in_client, db_session, admin_user):
-        """Cover None user/country branch in reject (user/country deleted)."""
-        from app.models import CountryAccessRequest
-        req = CountryAccessRequest(
-            user_id=999999,
-            country_id=999999,
-            status="pending",
-        )
-        db_session.add(req)
-        db_session.commit()
-        db_session.refresh(req)
-        resp = logged_in_client.post(
-            f"/admin/access-requests/{req.id}/reject",
-            follow_redirects=False,
-        )
+        """Cover None user/country branch in reject (user/country deleted).
+
+        Foreign keys make a genuinely dangling request row impossible, so the
+        referenced rows are hidden from the view instead.
+        """
+        country = create_test_country(db_session)
+        user = create_test_user(db_session, email="reject_missing_refs@example.com")
+        req = _make_access_request(db_session, user, country, status="pending")
+        with patch(
+            "app.routes.admin.user_management.crud.User"
+        ) as user_model, patch(
+            "app.routes.admin.user_management.crud.Country"
+        ) as country_model:
+            user_model.query.get.return_value = None
+            country_model.query.get.return_value = None
+            resp = logged_in_client.post(
+                f"/admin/access-requests/{req.id}/reject",
+                follow_redirects=False,
+            )
         assert resp.status_code == 302
+        db_session.refresh(req)
+        assert req.status == "rejected"
 
 
 # ---------------------------------------------------------------------------
@@ -383,18 +407,23 @@ class TestApproveAllAccessRequests:
         assert resp.status_code == 302
 
     def test_skips_invalid_user_or_country(self, logged_in_client, db_session, admin_user):
-        from app.models import CountryAccessRequest
-        bad_req = CountryAccessRequest(
-            user_id=9999998,
-            country_id=9999998,
-            status="pending",
-        )
-        db_session.add(bad_req)
-        db_session.commit()
-        resp = logged_in_client.post(
-            "/admin/access-requests/approve-all", follow_redirects=False
-        )
+        """A request whose user/country can no longer be loaded is left pending."""
+        country = create_test_country(db_session)
+        user = create_test_user(db_session, email="bulk_missing_refs@example.com")
+        req = _make_access_request(db_session, user, country, status="pending")
+        with patch(
+            "app.routes.admin.user_management.crud.User"
+        ) as user_model, patch(
+            "app.routes.admin.user_management.crud.Country"
+        ) as country_model:
+            user_model.query.get.return_value = None
+            country_model.query.get.return_value = None
+            resp = logged_in_client.post(
+                "/admin/access-requests/approve-all", follow_redirects=False
+            )
         assert resp.status_code == 302
+        db_session.refresh(req)
+        assert req.status == "pending"
 
     def test_handles_notify_exception(self, logged_in_client, db_session, admin_user):
         country = create_test_country(db_session)

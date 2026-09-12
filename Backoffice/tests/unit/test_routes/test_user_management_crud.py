@@ -143,8 +143,9 @@ class TestManageUsers:
         )
         assert match is not None
         rows = {row["id"]: row for row in json.loads(match.group(1))}
-        assert rows[user.id]["created_at"] == joined_at.isoformat()
-        assert rows[legacy_user.id]["created_at"] == ""
+        assert rows[user.id]["date_joined"] == joined_at.isoformat()
+        assert rows[legacy_user.id]["date_joined"] == ""
+        assert "Date joined" in resp.text
 
     def test_page_handles_rbac_roles_exception(self, logged_in_client, db_session, app):
         """Cover except branch for rbac_roles_by_user_id query."""

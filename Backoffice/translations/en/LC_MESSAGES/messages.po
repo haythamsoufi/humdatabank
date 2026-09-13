@@ -28892,5 +28892,5 @@ msgid "Traces"
 msgstr "Traces"
 
 #: app/templates/admin/user_management/users.html:370
-msgid "Joined"
-msgstr "Joined"
+msgid "Date joined"
+msgstr "Date joined"

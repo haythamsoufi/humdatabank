@@ -318,15 +318,15 @@
             cellStyle: { 'white-space': 'nowrap' }
         },
         {
-            field: 'created_at',
-            headerName: t.joined_7d50c09f,
+            field: 'date_joined',
+            headerName: t.date_joined_32816422 || 'Date joined',
             width: 140, minWidth: 120, maxWidth: 200,
             filter: 'agDateColumnFilter',
             filterParams: AgGridRenderers.dateFilterParams,
             sortable: true,
             cellRenderer: AgGridRenderers.dateOnly,
             exportValueGetter: function (params) {
-                return formatJoinedDate(params.data && params.data.created_at);
+                return formatJoinedDate(params.data && params.data.date_joined);
             },
             cellStyle: { 'white-space': 'nowrap' }
         },
@@ -400,7 +400,7 @@
     }
 
     function initializeGrid() {
-        var result = AgGridHelper.create('usersGrid', 'users-v4', columnDefs, usersData, {
+        var result = AgGridHelper.create('usersGrid', 'users-v5', columnDefs, usersData, {
             gridOptions: {
                 getRowClass: function (params) {
                     return (!params.data.active) ? 'inactive-user-row' : null;
@@ -429,8 +429,8 @@
                     if (colId === 'fds_member_names_text') {
                         return params.node.data.fds_member_export_text || '';
                     }
-                    if (colId === 'created_at') {
-                        return formatJoinedDate(params.node.data.created_at);
+                    if (colId === 'date_joined') {
+                        return formatJoinedDate(params.node.data.date_joined);
                     }
                     return params.value != null ? params.value : '';
                 }

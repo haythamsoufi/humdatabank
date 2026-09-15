@@ -22518,6 +22518,10 @@ msgstr ""
 msgid "Status overview"
 msgstr ""
 
+#: app/templates/admin/assignments/manage_assignment.html:1290
+msgid "Status set by"
+msgstr ""
+
 #: app/templates/admin/validation_questions.html:268
 msgid "Status updated"
 msgstr ""

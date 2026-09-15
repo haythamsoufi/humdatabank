@@ -688,6 +688,8 @@ def _pns_pending_reset_needs_update(aes: Any, *, assigned_at: Any) -> bool:
         return True
     if aes.sent_for_review_at is not None:
         return True
+    if getattr(aes, "status_changed_by_user_id", None) is not None:
+        return True
     return False
 
 
@@ -702,6 +704,7 @@ def _apply_pns_pending_reset_fields(aes: Any, *, assigned_at: Any) -> None:
     aes.approved_by_user_id = None
     aes.sent_for_review_by_user_id = None
     aes.sent_for_review_at = None
+    aes.status_changed_by_user_id = None
 
 
 def apply_pns_pending_status_resets(

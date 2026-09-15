@@ -22,6 +22,10 @@
 .EXAMPLE
     # Arbitrary remote shell command (no script upload)
     .\azure_webapp_tools.bat prod run "cd /app && python scripts/ops/backfill_stable_keys.py --dry-run"
+
+.EXAMPLE
+    # Inspect a production security event (prefer the bat shortcut)
+    .\azure_webapp_tools.bat prod security-event 894
 #>
 param(
     [Parameter(Mandatory = $true)]

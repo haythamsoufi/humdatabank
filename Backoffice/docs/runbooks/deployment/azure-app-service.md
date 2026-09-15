@@ -171,6 +171,10 @@ az webapp log tail --name <webapp-name> --resource-group <rg-name> --provider ap
 
 # Download log archive for a time window
 az webapp log download --name <webapp-name> --resource-group <rg-name> --log-file incident-logs.zip
+
+# Inspect a security-event row on the live DB (read-only)
+azure_webapp_tools.bat prod security-event 894
+azure_webapp_tools.bat prod security-event --list --unresolved --severity high
 ```
 
 ---

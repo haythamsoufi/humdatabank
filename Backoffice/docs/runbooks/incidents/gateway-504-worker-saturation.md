@@ -171,7 +171,7 @@ Presence `/sync` request volume and per-tick cost were reduced on 2026-07-17 (se
 
 ## 6. Investigation checklist (future 504)
 
-1. **Security event** → read `diagnostics_summary`, `likely_causes`, `worker_metrics.in_flight_requests` (stale paths).
+1. **Security event** → `azure_webapp_tools.bat prod security-event <id>` (read-only SSH dump). Read `diagnostics_summary`, `likely_causes`, `worker_metrics.in_flight_requests` (stale paths). Use `--json` for the full context blob.
 2. **Same UTC window** → `az webapp log tail` or downloaded docker log:
    - `WORKER TIMEOUT`
    - `[STUCK_REQUEST]` / `[SLOW_REQUEST]`

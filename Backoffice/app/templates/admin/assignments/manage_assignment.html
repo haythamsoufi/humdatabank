@@ -1166,6 +1166,7 @@
 {% for aes in assignment_entities %}
 {% set aes_display_name = assignment_entity_display.get(aes.id, '') if assignment_entity_display is defined else EntityService.get_entity_name(aes.entity_type, aes.entity_id, include_hierarchy=True) %}
 {% set fds_info = (assignment_entity_fds_members.get(aes.entity_id) if assignment_entity_fds_members is defined and aes.entity_type == 'country' else none) %}
+{% set setter_info = (assignment_entity_status_setters.get(aes.id) if assignment_entity_status_setters is defined else none) %}
 {
     "id": {{ aes.id }},
     "entity_type": {{ (aes.entity_type or '')|tojson }},
@@ -1188,6 +1189,11 @@
     "fds_member_active": {{ (fds_info.fds_member_active if fds_info else true)|tojson }},
     "fds_member_profile_color": {{ ((fds_info.fds_member_profile_color if fds_info else '') or '')|tojson }},
     "status": {{ (aes.status or '')|tojson }},
+    "status_changed_by_user_id": {{ (setter_info.status_changed_by_user_id if setter_info else none)|tojson }},
+    "status_changed_by_name": {{ ((setter_info.status_changed_by_name if setter_info else '') or '')|tojson }},
+    "status_changed_by_email": {{ ((setter_info.status_changed_by_email if setter_info else '') or '')|tojson }},
+    "status_changed_by_active": {{ (setter_info.status_changed_by_active if setter_info else true)|tojson }},
+    "status_changed_by_profile_color": {{ ((setter_info.status_changed_by_profile_color if setter_info else '') or '')|tojson }},
     "due_date": {{ (aes.due_date|datetime_iso if aes.due_date else '')|tojson }},
     "completion_rate": {{ (aes.completion_rate|float if aes.completion_rate is not none else 0)|tojson }},
     "is_public_available": {{ aes.is_public_available|tojson }},
@@ -1281,7 +1287,15 @@ window.manageAssignmentConfig = {
         searchMinChars: {{ _('Type at least 2 characters to search.')|tojson }},
         noUsersFound: {{ _('No users found.')|tojson }},
         completionRate: {{ _('Completion Rate')|tojson }},
+        statusSetBy: {{ _('Status set by')|tojson }},
         entities: {{ _('Entities')|tojson }}
+    },
+    currentUser: {
+        id: {{ (current_user.id if current_user and current_user.is_authenticated else none)|tojson }},
+        name: {{ ((current_user.name or current_user.email or '') if current_user and current_user.is_authenticated else '')|tojson }},
+        email: {{ ((current_user.email or '') if current_user and current_user.is_authenticated else '')|tojson }},
+        active: {{ ((current_user.active if current_user and current_user.is_authenticated else true))|tojson }},
+        profileColor: {{ ((current_user.profile_color or '') if current_user and current_user.is_authenticated else '')|tojson }}
     },
     statusChart: {% if assignment and assignment_overview is defined and assignment_overview %}{
         labels: [

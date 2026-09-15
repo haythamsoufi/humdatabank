@@ -585,6 +585,16 @@
             positionEntityStatusMenu(chipBtn);
         }
 
+        function applyStatusChangedByCurrentUser(row) {
+            var user = cfg.currentUser;
+            if (!row || !user || !user.id) return;
+            row.status_changed_by_user_id = user.id;
+            row.status_changed_by_name = user.name || user.email || '';
+            row.status_changed_by_email = user.email || '';
+            row.status_changed_by_active = user.active !== false;
+            row.status_changed_by_profile_color = user.profileColor || '';
+        }
+
         function updateEntityStatusInline(statusId, newStatus, chipBtn, previousStatus, params, renderer) {
             const url = cfg.urls && cfg.urls.assignmentBulkUpdateStatus;
             const numericId = Number(statusId);
@@ -613,10 +623,20 @@
                 })
                 .then(function(result) {
                     if (result.ok && result.data && result.data.success && result.data.updated > 0) {
-                        if (params && params.data) params.data.status = newStatus;
+                        if (params && params.data) {
+                            params.data.status = newStatus;
+                            applyStatusChangedByCurrentUser(params.data);
+                        }
                         if (renderer) {
                             renderer.params = params;
                             applyStatusChip(chipBtn, newStatus);
+                        }
+                        if (params && params.api && params.node) {
+                            params.api.refreshCells({
+                                rowNodes: [params.node],
+                                columns: ['status_changed_by_name'],
+                                force: true
+                            });
                         }
                     } else {
                         if (params && params.data) params.data.status = previousStatus;
@@ -752,6 +772,36 @@
                 filterValueGetter: function(params) {
                     const match = statusChoices.find(function(c) { return c.value === params.data.status; });
                     return match ? match.label : params.data.status;
+                }
+            },
+            {
+                field: 'status_changed_by_name',
+                headerName: (cfg.t && cfg.t.statusSetBy) || 'Status set by',
+                width: 220,
+                minWidth: 180,
+                maxWidth: 300,
+                filter: 'agTextColumnFilter',
+                sortable: true,
+                cellStyle: AgGridRenderers.userHoverCellStyle,
+                valueGetter: function(params) {
+                    return params.data && params.data.status_changed_by_name ? params.data.status_changed_by_name : '';
+                },
+                cellRenderer: function(params) {
+                    if (!params.data || !params.data.status_changed_by_user_id) {
+                        return '<span class="text-gray-400">-</span>';
+                    }
+                    if (typeof AgGridRenderers !== 'undefined' && AgGridRenderers.userHoverCell) {
+                        return AgGridRenderers.userHoverCell(params, {
+                            idField: 'status_changed_by_user_id',
+                            nameField: 'status_changed_by_name',
+                            emailField: 'status_changed_by_email',
+                            activeField: 'status_changed_by_active',
+                            profileColorField: 'status_changed_by_profile_color',
+                            fallbackLabel: 'Unknown User',
+                            showEmail: true
+                        });
+                    }
+                    return params.data.status_changed_by_name || '-';
                 }
             },
             {

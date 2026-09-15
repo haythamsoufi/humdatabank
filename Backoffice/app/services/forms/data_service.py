@@ -264,6 +264,14 @@ class FormDataService(
             # Update assignment status if needed
             if assignment_entity_status.status == AssignmentEntityStatusValue.pending:
                 assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
+                try:
+                    from flask_login import current_user as _progress_user
+                    if _progress_user and _progress_user.is_authenticated:
+                        assignment_entity_status.status_changed_by_user_id = _progress_user.id
+                except Exception as e:
+                    current_app.logger.debug(
+                        "status_changed_by_user_id assignment failed: %s", e
+                    )
 
             # Persist changes (middleware will commit if we're in a managed request)
             cls._commit_or_flush()
@@ -290,7 +298,10 @@ class FormDataService(
                 if validation_result['is_valid']:
                     now = utcnow()
                     from flask_login import current_user as _cu
-                    from app.services.assignments.workflow_service import should_apply_sent_for_review
+                    from app.services.assignments.workflow_service import (
+                        apply_entity_status_change,
+                        should_apply_sent_for_review,
+                    )
 
                     if (
                         not is_public_submission
@@ -312,16 +323,20 @@ class FormDataService(
                                 'submitted': False,
                             }
 
-                        assignment_entity_status.status = AssignmentEntityStatusValue.sent_for_review
-                        assignment_entity_status.status_timestamp = now
-                        assignment_entity_status.sent_for_review_at = now
+                        review_user_id = None
                         try:
                             if _cu and _cu.is_authenticated:
-                                assignment_entity_status.sent_for_review_by_user_id = _cu.id
+                                review_user_id = _cu.id
                         except Exception as e:
                             current_app.logger.debug(
                                 "sent_for_review_by_user_id assignment failed: %s", e
                             )
+                        apply_entity_status_change(
+                            assignment_entity_status,
+                            AssignmentEntityStatusValue.sent_for_review,
+                            review_user_id,
+                            now=now,
+                        )
                         cls._commit_or_flush()
                         return {
                             'success': True,
@@ -331,14 +346,18 @@ class FormDataService(
                             'sent_for_review': True,
                         }
 
-                    assignment_entity_status.status = AssignmentEntityStatusValue.submitted
-                    assignment_entity_status.status_timestamp = now
-                    assignment_entity_status.submitted_at = now
+                    submit_user_id = None
                     try:
                         if _cu and _cu.is_authenticated:
-                            assignment_entity_status.submitted_by_user_id = _cu.id
+                            submit_user_id = _cu.id
                     except Exception as e:
                         current_app.logger.debug("submitted_by_user_id assignment failed: %s", e)
+                    apply_entity_status_change(
+                        assignment_entity_status,
+                        AssignmentEntityStatusValue.submitted,
+                        submit_user_id,
+                        now=now,
+                    )
                     cls._commit_or_flush()
                     result = {
                         'success': True,

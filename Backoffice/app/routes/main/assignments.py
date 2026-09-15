@@ -9,8 +9,8 @@ from app.utils.constants import SELECTED_COUNTRY_ID_SESSION_KEY
 from app.forms.assignments import ReopenAssignmentForm, ApproveAssignmentForm
 from app.forms.auth_forms import RequestCountryAccessForm
 from flask_babel import _
-from app.utils.datetime_helpers import utcnow
 from app.utils.transactions import request_transaction_rollback
+from app.services.assignments.workflow_service import apply_entity_status_change
 from app.services.platform.app_settings_service import is_organization_email
 
 from app.routes.main import bp
@@ -71,8 +71,11 @@ def reopen_assignment(aes_id):
                 AssignmentEntityStatusValue.cancelled,
             }
             if assignment_entity_status.status in _submitted_statuses:
-                assignment_entity_status.status = AssignmentEntityStatusValue.in_progress
-                assignment_entity_status.status_timestamp = utcnow()
+                apply_entity_status_change(
+                    assignment_entity_status,
+                    AssignmentEntityStatusValue.in_progress,
+                    current_user.id,
+                )
             if round_was_closed:
                 assignment_entity_status.reopened_after_close = True
             db.session.flush()
@@ -149,9 +152,11 @@ def approve_assignment(aes_id):
 
     if assignment_entity_status:
         try:
-            assignment_entity_status.status = AssignmentEntityStatusValue.approved
-            assignment_entity_status.status_timestamp = utcnow()  # Set timestamp when status changes
-            assignment_entity_status.approved_by_user_id = current_user.id
+            apply_entity_status_change(
+                assignment_entity_status,
+                AssignmentEntityStatusValue.approved,
+                current_user.id,
+            )
             db.session.flush()
 
             # Send notification to focal points about approval
@@ -200,8 +205,11 @@ def return_assignment_for_revision(aes_id):
         return redirect(url_for("main.dashboard"))
 
     try:
-        assignment_entity_status.status = AssignmentEntityStatusValue.requires_revision
-        assignment_entity_status.status_timestamp = utcnow()
+        apply_entity_status_change(
+            assignment_entity_status,
+            AssignmentEntityStatusValue.requires_revision,
+            current_user.id,
+        )
         db.session.flush()
         try:
             notify_assignment_returned_for_revision(assignment_entity_status)

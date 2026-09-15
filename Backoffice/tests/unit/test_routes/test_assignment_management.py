@@ -420,6 +420,30 @@ class TestEditAssignment:
         assert payload[0]['completion_rate'] == 67.5
         assert payload[0]['assignment_url'] == f'/assignment/{aes_id}'
 
+    def test_entity_grid_includes_status_changed_by_user(
+        self, logged_in_client, db_session, app, admin_user
+    ):
+        with app.app_context():
+            country = create_test_country(db_session)
+            aes = create_test_assignment_entity_status(db_session, country=country)
+            aes.status_changed_by_user_id = admin_user.id
+            db_session.commit()
+            assignment_id = aes.assigned_form_id
+            expected_name = (admin_user.name or '').strip() or (admin_user.email or '').strip()
+            expected_email = admin_user.email or ''
+        resp = logged_in_client.get(f"/admin/assignments/edit/{assignment_id}")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        marker = '<script type="application/json" id="entity-management-data">'
+        start = html.find(marker)
+        assert start != -1
+        payload = json.loads(html[start + len(marker):html.find('</script>', start + len(marker))].strip())
+        assert len(payload) == 1
+        assert payload[0]['status_changed_by_user_id'] == admin_user.id
+        assert payload[0]['status_changed_by_name'] == expected_name
+        assert payload[0]['status_changed_by_email'] == expected_email
+        assert 'statusSetBy' in html
+
     def test_existing_assignment_shows_status_overview(self, logged_in_client, db_session, app):
         with app.app_context():
             country = create_test_country(db_session)
@@ -1113,7 +1137,10 @@ class TestBulkUpdateEntityStatus:
         )
         assert resp.status_code in (200, 400, 302)
 
-    def test_bulk_update_approved(self, logged_in_client, db_session, app):
+    def test_bulk_update_approved(self, logged_in_client, db_session, app, admin_user):
+        from app.models.assignments import AssignmentEntityStatus
+        from app.models.enums import AssignmentEntityStatusValue
+
         with app.app_context():
             country = create_test_country(db_session)
             aes = create_test_assignment_entity_status(db_session, country=country)
@@ -1124,6 +1151,11 @@ class TestBulkUpdateEntityStatus:
             json={"status_ids": [aes_id], "status": "approved"},
         )
         assert resp.status_code in (200, 302)
+        with app.app_context():
+            refreshed = AssignmentEntityStatus.query.get(aes_id)
+            assert refreshed.status == AssignmentEntityStatusValue.approved
+            assert refreshed.approved_by_user_id == admin_user.id
+            assert refreshed.status_changed_by_user_id == admin_user.id
 
     def test_bulk_update_submitted(self, logged_in_client, db_session, app):
         with app.app_context():
@@ -1149,7 +1181,7 @@ class TestBulkUpdateEntityStatus:
         )
         assert resp.status_code in (200, 302)
 
-    def test_bulk_update_cancelled(self, logged_in_client, db_session, app):
+    def test_bulk_update_cancelled(self, logged_in_client, db_session, app, admin_user):
         from app.models.assignments import AssignmentEntityStatus
         from app.models.enums import AssignmentEntityStatusValue
 
@@ -1166,6 +1198,7 @@ class TestBulkUpdateEntityStatus:
         with app.app_context():
             refreshed = AssignmentEntityStatus.query.get(aes_id)
             assert refreshed.status == AssignmentEntityStatusValue.cancelled
+            assert refreshed.status_changed_by_user_id == admin_user.id
 
     def test_bulk_update_with_due_date(self, logged_in_client, db_session, app):
         with app.app_context():

@@ -27,7 +27,8 @@ def should_scan_file(path: str | None) -> bool:
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("inline onclick", re.compile(r"\bonclick\s*=", re.IGNORECASE)),
     # Only flag inline HTML-style event attributes (on*= "..."), not JS property handlers (el.onclick = fn)
-    ("inline on*= handler", re.compile(r"\bon[a-zA-Z]+\s*=\s*['\"]", re.IGNORECASE)),
+    # or SQLAlchemy/Alembic FK options such as ondelete='SET NULL'.
+    ("inline on*= handler", re.compile(r"\bon(?!delete\b)[a-zA-Z]+\s*=\s*['\"]", re.IGNORECASE)),
     # Only flag literal javascript: usage in HTML/JS strings in diffs.
     # (We allow code that *mentions* "javascript:" as part of validation logic.)
     ("javascript: url", re.compile(r"javascript\s*:\s*['\"]", re.IGNORECASE)),

@@ -245,6 +245,22 @@ class TestPnsPendingResetMetadata:
             approved_by_user_id = None
             sent_for_review_by_user_id = None
             sent_for_review_at = None
+            status_changed_by_user_id = None
+
+        assert _pns_pending_reset_needs_update(_Aes(), assigned_at=assigned_at) is True
+
+    def test_needs_update_when_status_changed_by_is_set(self):
+        assigned_at = datetime(2026, 1, 15, 10, 0, 0)
+
+        class _Aes:
+            status = AssignmentEntityStatusValue.pending
+            status_timestamp = assigned_at
+            submitted_at = None
+            submitted_by_user_id = None
+            approved_by_user_id = None
+            sent_for_review_by_user_id = None
+            sent_for_review_at = None
+            status_changed_by_user_id = 5
 
         assert _pns_pending_reset_needs_update(_Aes(), assigned_at=assigned_at) is True
 
@@ -259,6 +275,7 @@ class TestPnsPendingResetMetadata:
             approved_by_user_id = 7
             sent_for_review_by_user_id = 3
             sent_for_review_at = datetime(2026, 4, 1, 8, 0, 0)
+            status_changed_by_user_id = 9
 
         aes = _Aes()
         _apply_pns_pending_reset_fields(aes, assigned_at=assigned_at)
@@ -269,6 +286,7 @@ class TestPnsPendingResetMetadata:
         assert aes.approved_by_user_id is None
         assert aes.sent_for_review_by_user_id is None
         assert aes.sent_for_review_at is None
+        assert aes.status_changed_by_user_id is None
 
 
 def _ar25_pns_funding_row(**overrides):

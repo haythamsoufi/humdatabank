@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from app.models.assignments import AssignedForm, AssignmentEntityStatus
 from app.models.enums import AssignmentEntityStatusValue, EntityType
 from app.services.assignments.workflow_service import (
+    apply_entity_status_change,
     delegation_review_source_statuses,
     resolve_submit_action,
     review_enabled,
@@ -73,3 +74,37 @@ class TestAssignmentWorkflowService:
         assert AssignmentEntityStatusValue.in_progress in sources
         assert AssignmentEntityStatusValue.requires_revision in sources
         assert AssignmentEntityStatusValue.submitted not in sources
+
+    def test_apply_entity_status_change_records_last_setter_for_any_status(self):
+        aes = MagicMock(spec=AssignmentEntityStatus)
+        apply_entity_status_change(aes, 'cancelled', user_id=11)
+        assert aes.status == AssignmentEntityStatusValue.cancelled
+        assert aes.status_changed_by_user_id == 11
+        assert aes.status_timestamp is not None
+
+    def test_apply_entity_status_change_sets_approved_accountability(self):
+        aes = MagicMock(spec=AssignmentEntityStatus)
+        apply_entity_status_change(aes, AssignmentEntityStatusValue.approved, user_id=22)
+        assert aes.approved_by_user_id == 22
+        assert aes.status_changed_by_user_id == 22
+
+    def test_apply_entity_status_change_sets_submitted_accountability(self):
+        aes = MagicMock(spec=AssignmentEntityStatus)
+        apply_entity_status_change(aes, 'submitted', user_id=33)
+        assert aes.submitted_by_user_id == 33
+        assert aes.submitted_at is not None
+        assert aes.status_changed_by_user_id == 33
+
+    def test_apply_entity_status_change_sets_sent_for_review_accountability(self):
+        aes = MagicMock(spec=AssignmentEntityStatus)
+        apply_entity_status_change(aes, 'sent_for_review', user_id=44)
+        assert aes.sent_for_review_by_user_id == 44
+        assert aes.sent_for_review_at is not None
+        assert aes.status_changed_by_user_id == 44
+
+    def test_apply_entity_status_change_without_user_leaves_setter_untouched(self):
+        aes = MagicMock(spec=AssignmentEntityStatus)
+        aes.status_changed_by_user_id = 99
+        apply_entity_status_change(aes, 'in_progress', user_id=None)
+        assert aes.status == AssignmentEntityStatusValue.in_progress
+        assert aes.status_changed_by_user_id == 99

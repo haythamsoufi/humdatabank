@@ -45,6 +45,7 @@ from app.models.forms import FormData, DynamicIndicatorData, DynamicSectionConte
 from app.utils.form_localization import get_localized_country_name, build_template_select_choices
 from app.utils.country_utils import get_countries_by_region_with_part_of
 from app.services.assignments.service import AssignmentService
+from app.services.assignments.workflow_service import apply_entity_status_change
 from app.services.organization.entity_service import EntityService
 from app.services.organization.country_service import fds_member_user_display_name
 from app.services.forms.reporting_period_service import sync_assigned_form_reporting_period
@@ -69,6 +70,25 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.utils.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
+
+def _status_changed_by_user_payload(user) -> dict:
+    """Hover-card fields for the user who last set an entity status."""
+    if not user:
+        return {
+            'status_changed_by_user_id': None,
+            'status_changed_by_name': '',
+            'status_changed_by_email': '',
+            'status_changed_by_active': True,
+            'status_changed_by_profile_color': '',
+        }
+    return {
+        'status_changed_by_user_id': user.id,
+        'status_changed_by_name': fds_member_user_display_name(user),
+        'status_changed_by_email': (user.email or ''),
+        'status_changed_by_active': bool(user.active),
+        'status_changed_by_profile_color': (user.profile_color or ''),
+    }
+
 
 def _manage_assignment_country_context():
     countries_by_region, part_of_programs, part_of_category_to_countries = get_countries_by_region_with_part_of()
@@ -1148,6 +1168,20 @@ def edit_assignment(assignment_id):
         for aes in assignment_entities
     }
 
+    setter_ids = {
+        aes.status_changed_by_user_id
+        for aes in assignment_entities
+        if aes.status_changed_by_user_id
+    }
+    setters_by_id = {}
+    if setter_ids:
+        for user in User.query.filter(User.id.in_(setter_ids)).all():
+            setters_by_id[user.id] = _status_changed_by_user_payload(user)
+    assignment_entity_status_setters = {
+        aes.id: setters_by_id.get(aes.status_changed_by_user_id)
+        for aes in assignment_entities
+    }
+
     country_ids = [
         aes.entity_id for aes in assignment_entities if aes.entity_type == 'country'
     ]
@@ -1184,6 +1218,7 @@ def edit_assignment(assignment_id):
                          assignment_entities=assignment_entities,
                          assignment_entity_display=assignment_entity_display,
                          assignment_entity_fds_members=assignment_entity_fds_members,
+                         assignment_entity_status_setters=assignment_entity_status_setters,
                          assignment_overview=assignment_overview,
                          edit_aes_form=edit_aes_form,
                          assignment_entity_status_choices=assignment_entity_status_choices,
@@ -1408,17 +1443,7 @@ def update_entity_status(assignment_id, status_id):
     is_public_available = data.get('is_public_available')
 
     if status:
-        aes.status = AssignmentEntityStatusValue.normalize(status)
-        _now = utcnow()
-        aes.status_timestamp = _now
-        if aes.status == AssignmentEntityStatusValue.approved:
-            aes.approved_by_user_id = current_user.id
-        elif aes.status == AssignmentEntityStatusValue.submitted:
-            aes.submitted_by_user_id = current_user.id
-            aes.submitted_at = _now
-        elif aes.status == AssignmentEntityStatusValue.sent_for_review:
-            aes.sent_for_review_by_user_id = current_user.id
-            aes.sent_for_review_at = _now
+        apply_entity_status_change(aes, status, current_user.id)
 
     if due_date:
         with suppress(Exception):
@@ -1509,16 +1534,7 @@ def bulk_update_entity_status(assignment_id):
                 'due_before': aes.due_date,
                 'due_after': due_date_obj if due_date_obj is not None else aes.due_date,
             }
-            aes.status = normalized_status
-            aes.status_timestamp = _now
-            if normalized_status == AssignmentEntityStatusValue.approved:
-                aes.approved_by_user_id = current_user.id
-            elif normalized_status == AssignmentEntityStatusValue.submitted:
-                aes.submitted_by_user_id = current_user.id
-                aes.submitted_at = _now
-            elif normalized_status == AssignmentEntityStatusValue.sent_for_review:
-                aes.sent_for_review_by_user_id = current_user.id
-                aes.sent_for_review_at = _now
+            apply_entity_status_change(aes, normalized_status, current_user.id, now=_now)
             if due_date_obj is not None:
                 aes.due_date = due_date_obj
             updated += 1
@@ -1544,19 +1560,8 @@ def edit_assignment_entity_status(aes_id):
 
     if form.validate():
         try:
-            normalized_status = AssignmentEntityStatusValue.normalize(form.status.data)
-            aes.status = normalized_status
-            _now = utcnow()
-            aes.status_timestamp = _now
+            apply_entity_status_change(aes, form.status.data, current_user.id)
             aes.due_date = form.due_date.data
-            if normalized_status == AssignmentEntityStatusValue.approved:
-                aes.approved_by_user_id = current_user.id
-            elif normalized_status == AssignmentEntityStatusValue.submitted:
-                aes.submitted_by_user_id = current_user.id
-                aes.submitted_at = _now
-            elif normalized_status == AssignmentEntityStatusValue.sent_for_review:
-                aes.sent_for_review_by_user_id = current_user.id
-                aes.sent_for_review_at = _now
             db.session.flush()
             flash(f"Status updated for {EntityService.get_entity_name(aes.entity_type, aes.entity_id)}.", "success")
         except Exception as e:

@@ -25,6 +25,28 @@ diff --git a/Backoffice/tests/js/forms/form-optimization.test.js b/Backoffice/te
     assert scan_diff(diff) == []
 
 
+def test_scan_diff_ignores_sqlalchemy_ondelete():
+    diff = """\
+diff --git a/Backoffice/app/models/assignments.py b/Backoffice/app/models/assignments.py
++++ b/Backoffice/app/models/assignments.py
+@@ -0,0 +1 @@
++    status_changed_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'), nullable=True)
+"""
+    assert scan_diff(diff) == []
+
+
+def test_scan_diff_still_flags_html_event_handler():
+    diff = """\
+diff --git a/Backoffice/app/templates/admin/foo.html b/Backoffice/app/templates/admin/foo.html
++++ b/Backoffice/app/templates/admin/foo.html
+@@ -0,0 +1 @@
++    <button onclick="doThing()">Go</button>
+"""
+    findings = scan_diff(diff)
+    assert findings
+    assert any("onclick" in item for item in findings)
+
+
 def test_scan_diff_flags_production_innerhtml():
     diff = """\
 diff --git a/Backoffice/app/static/js/forms/foo.js b/Backoffice/app/static/js/forms/foo.js

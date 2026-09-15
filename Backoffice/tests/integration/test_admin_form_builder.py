@@ -55,7 +55,7 @@ class TestFormBuilderEditPage:
                 body = resp.get_data(as_text=True)
                 assert "Editable Template" in body
                 assert "form-builder-page.css" in body
-                assert 'id="template-access-view-btn"' in body
+                assert 'id="template-access-view-btn"' not in body
                 assert 'id="template-access-btn"' in body
                 assert "fb-access-btn" in body
             finally:

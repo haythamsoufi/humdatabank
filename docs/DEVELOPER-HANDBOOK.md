@@ -637,6 +637,15 @@ Only a System Manager may grant/revoke the `system_manager`, `admin_full`, or `a
 az webapp log tail --name <your-webapp-name> --resource-group <your-resource-group>
 ```
 
+Repo helper (sets the right subscription): `azure_webapp_tools.bat prod logs` or `staging logs`.
+
+Inspect a `/admin/security/events/<id>` row on the live DB (read-only; uploads `scripts/ops/inspect_security_event.py` over SSH):
+
+```bash
+azure_webapp_tools.bat prod security-event 894
+azure_webapp_tools.bat prod security-event --list --unresolved --severity high
+```
+
 ### Preventing 502 / 504 errors on Azure App Service
 
 Key env vars to set in **Azure Portal → App Service → Configuration → Application settings**:

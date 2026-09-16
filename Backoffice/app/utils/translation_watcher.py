@@ -135,6 +135,31 @@ class TranslationWatcher:
         except Exception as exc:
             self.app.logger.error("TranslationWatcher: refresh failed: %s", exc)
 
+    def _db_version(self):
+        """Catalog version from the database, or None when it cannot be read."""
+        try:
+            with self.app.app_context():
+                from app.services.translation.catalog_service import read_catalog_version
+
+                return read_catalog_version()
+        except Exception as exc:
+            self.app.logger.debug("TranslationWatcher: version read failed: %s", exc)
+            return None
+
+    def _rebuild_if_stale(self) -> bool:
+        """Materialize this container's catalogs when the database is ahead.
+
+        Returns True when a rebuild happened, so the caller can refresh Babel.
+        """
+        try:
+            with self.app.app_context():
+                from app.services.translation.catalog_service import sync_catalogs_if_stale
+
+                return sync_catalogs_if_stale() is not None
+        except Exception as exc:
+            self.app.logger.error("TranslationWatcher: catalog rebuild failed: %s", exc)
+            return False
+
     # ------------------------------------------------------------------
     # Watch loop
     # ------------------------------------------------------------------
@@ -156,19 +181,30 @@ class TranslationWatcher:
         except Exception as exc:
             self.app.logger.error("TranslationWatcher: seed failed: %s", exc)
 
+        last_version = self._db_version()
+
         while self.watching:
             try:
                 changed = False
 
-                if sentinel.exists():
-                    # Fast path: single-file check.
-                    if self._changed(sentinel):
-                        changed = True
-                else:
-                    # Fallback: scan individual .po / .mo files.
-                    for f in self._fallback_files():
-                        if self._changed(f):
+                # Preferred signal: the database version counter. It reaches
+                # peer *containers*, which a local file mtime cannot now that
+                # artifacts are materialized per container.
+                version = self._db_version()
+                if version is None:
+                    # Database unreachable — fall back to the filesystem so a
+                    # shared mount (or single-container deploy) still propagates.
+                    if sentinel.exists():
+                        if self._changed(sentinel):
                             changed = True
+                    else:
+                        for f in self._fallback_files():
+                            if self._changed(f):
+                                changed = True
+                elif version != last_version:
+                    last_version = version
+                    self._rebuild_if_stale()
+                    changed = True
 
                 if changed:
                     self._reload()

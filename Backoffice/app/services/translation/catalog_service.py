@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+from contextlib import suppress
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from flask import current_app
@@ -567,8 +568,112 @@ def compile_locale_from_db(locale: str) -> int:
     os.makedirs(os.path.dirname(po_path), exist_ok=True)
     with po_file_lock(po_path):
         catalog.save(po_path)
-    finalize_translation_writes([locale], refresh=True)
+    # Rebuilding artifacts from the database is not itself a catalog change, so
+    # it must not bump the version: that would make every container's rebuild
+    # look like an edit and trigger a rebuild in every other container.
+    finalize_translation_writes([locale], refresh=True, bump_version=False)
     return len(catalog)
+
+
+CATALOG_VERSION_ROW_ID = 1
+CATALOG_VERSION_MARKER = ".catalog_version"
+
+
+def read_catalog_version() -> Optional[int]:
+    """Current catalog version, or None when the database cannot be read.
+
+    None is a "don't know" answer, not "unchanged" — callers fall back to the
+    filesystem sentinel rather than assuming catalogs are current.
+    """
+    from app.models.translation_quality import TranslationCatalogVersion
+
+    try:
+        row = db.session.get(TranslationCatalogVersion, CATALOG_VERSION_ROW_ID)
+    except Exception:
+        with suppress(Exception):
+            db.session.rollback()
+        logger.debug("read_catalog_version failed", exc_info=True)
+        return None
+    return int(row.version) if row is not None else 0
+
+
+def bump_catalog_version() -> Optional[int]:
+    """Record that catalog values changed so peer containers rebuild."""
+    from app.models.translation_quality import TranslationCatalogVersion
+
+    try:
+        updated = (
+            db.session.query(TranslationCatalogVersion)
+            .filter_by(id=CATALOG_VERSION_ROW_ID)
+            .update(
+                {TranslationCatalogVersion.version: TranslationCatalogVersion.version + 1},
+                synchronize_session=False,
+            )
+        )
+        if not updated:
+            db.session.add(
+                TranslationCatalogVersion(id=CATALOG_VERSION_ROW_ID, version=1)
+            )
+        db.session.commit()
+    except IntegrityError:
+        # Another worker seeded the row between our UPDATE and INSERT.
+        db.session.rollback()
+        try:
+            db.session.query(TranslationCatalogVersion).filter_by(
+                id=CATALOG_VERSION_ROW_ID
+            ).update(
+                {TranslationCatalogVersion.version: TranslationCatalogVersion.version + 1},
+                synchronize_session=False,
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.warning("bump_catalog_version retry failed", exc_info=True)
+            return None
+    except Exception:
+        db.session.rollback()
+        logger.warning("bump_catalog_version failed", exc_info=True)
+        return None
+    return read_catalog_version()
+
+
+def _marker_path() -> str:
+    from app.routes.admin.utilities.helpers import _translations_dir
+
+    return os.path.join(_translations_dir(), CATALOG_VERSION_MARKER)
+
+
+def read_materialized_version() -> int:
+    """Catalog version the artifacts in this container were last built from."""
+    try:
+        with open(_marker_path(), "r", encoding="ascii") as handle:
+            return int((handle.read() or "0").strip() or 0)
+    except (OSError, ValueError):
+        return -1
+
+
+def write_materialized_version(version: int) -> None:
+    try:
+        with open(_marker_path(), "w", encoding="ascii") as handle:
+            handle.write(str(int(version)))
+    except OSError:
+        logger.debug("write_materialized_version failed", exc_info=True)
+
+
+def sync_catalogs_if_stale() -> Optional[int]:
+    """Rebuild this container's artifacts when the database is ahead of them.
+
+    Returns the version materialized, or None when nothing needed doing (or the
+    version could not be read).
+    """
+    db_version = read_catalog_version()
+    if db_version is None:
+        return None
+    if read_materialized_version() >= db_version:
+        return None
+    materialize_catalogs()
+    write_materialized_version(db_version)
+    return db_version
 
 
 def materialize_catalogs(locales: Optional[Iterable[str]] = None) -> Dict[str, int]:

@@ -433,3 +433,105 @@ class TestInitTranslationWatcher:
         with patch('app.utils.translation_watcher.translation_watcher') as mock_tw:
             init_translation_watcher(app)
             mock_tw.init_app.assert_called_once_with(app)
+
+
+# ---------------------------------------------------------------------------
+# Database version signal
+#
+# Artifacts are materialized per container, so a peer container's edit never
+# changes a local file mtime. The watcher polls the catalog version instead and
+# rebuilds from the database, falling back to the sentinel when the DB is down.
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+class TestDatabaseVersionSignal:
+    def _loop_once(self, watcher, stop_after=1):
+        calls = {'n': 0}
+
+        def fake_sleep(_secs):
+            calls['n'] += 1
+            if calls['n'] >= stop_after:
+                watcher.watching = False
+
+        return fake_sleep, calls
+
+    def test_version_change_rebuilds_and_reloads(self, tmp_path):
+        app = _make_app(debug=True, translation_dir=tmp_path)
+        app.config['TRANSLATION_WATCHER_INTERVAL'] = 0
+        watcher = TranslationWatcher()
+        watcher.app = app
+        watcher.watching = True
+
+        versions = iter([1, 2, 2])
+        fake_sleep, _ = self._loop_once(watcher)
+
+        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', side_effect=lambda: next(versions)), \
+             patch.object(watcher, '_rebuild_if_stale') as mock_rebuild, \
+             patch.object(watcher, '_reload') as mock_reload:
+            watcher._watch_loop()
+
+        mock_rebuild.assert_called_once()
+        mock_reload.assert_called_once()
+
+    def test_unchanged_version_does_not_rebuild(self, tmp_path):
+        app = _make_app(debug=True, translation_dir=tmp_path)
+        app.config['TRANSLATION_WATCHER_INTERVAL'] = 0
+        watcher = TranslationWatcher()
+        watcher.app = app
+        watcher.watching = True
+
+        fake_sleep, _ = self._loop_once(watcher, stop_after=2)
+
+        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=7), \
+             patch.object(watcher, '_rebuild_if_stale') as mock_rebuild, \
+             patch.object(watcher, '_reload') as mock_reload:
+            watcher._watch_loop()
+
+        mock_rebuild.assert_not_called()
+        mock_reload.assert_not_called()
+
+    def test_unreadable_version_falls_back_to_sentinel(self, tmp_path):
+        """A database outage must not freeze translation propagation."""
+        app = _make_app(debug=True, translation_dir=tmp_path)
+        app.config['TRANSLATION_WATCHER_INTERVAL'] = 0
+        watcher = TranslationWatcher()
+        watcher.app = app
+        watcher.watching = True
+
+        sentinel = tmp_path / '.sentinel'
+        sentinel.write_text('0')
+
+        calls = {'n': 0}
+
+        def fake_sleep(_secs):
+            calls['n'] += 1
+            if calls['n'] == 1:
+                import os
+                newer = time.time() + 5
+                sentinel.write_text('1')
+                os.utime(sentinel, (newer, newer))
+            else:
+                watcher.watching = False
+
+        with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=None), \
+             patch.object(watcher, '_reload') as mock_reload:
+            watcher._watch_loop()
+
+        assert mock_reload.call_count >= 1
+
+    def test_db_version_read_failure_returns_none(self):
+        app = _make_app(debug=True)
+        watcher = TranslationWatcher()
+        watcher.app = app
+        app.app_context.side_effect = RuntimeError('no context')
+        assert watcher._db_version() is None
+
+    def test_rebuild_failure_is_logged_and_reported_false(self):
+        app = _make_app(debug=True)
+        watcher = TranslationWatcher()
+        watcher.app = app
+        app.app_context.side_effect = RuntimeError('boom')
+        assert watcher._rebuild_if_stale() is False
+        app.logger.error.assert_called()

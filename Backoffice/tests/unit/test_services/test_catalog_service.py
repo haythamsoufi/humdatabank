@@ -686,3 +686,77 @@ class TestBuildLocaleCatalog:
         target = tmp_path / "messages.mo"
         catalog.save_as_mofile(str(target))
         assert target.stat().st_size > 0
+
+
+# ---------------------------------------------------------------------------
+# Catalog version counter — the cross-container staleness signal
+# ---------------------------------------------------------------------------
+@pytest.mark.unit
+class TestCatalogVersion:
+    def test_bump_creates_then_increments(self, db_session):
+        from app.services.translation.catalog_service import (
+            bump_catalog_version,
+            read_catalog_version,
+        )
+
+        first = bump_catalog_version()
+        assert first is not None
+        second = bump_catalog_version()
+        assert second == first + 1
+        assert read_catalog_version() == second
+
+    def test_read_returns_zero_before_any_bump(self, db_session):
+        from app.services.translation.catalog_service import read_catalog_version
+
+        assert read_catalog_version() == 0
+
+    def test_materialized_marker_round_trips(self, app, tmp_path):
+        from app.services.translation.catalog_service import (
+            read_materialized_version,
+            write_materialized_version,
+        )
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            write_materialized_version(12)
+            assert read_materialized_version() == 12
+
+    def test_missing_marker_reads_as_behind_everything(self, app, tmp_path):
+        from app.services.translation.catalog_service import read_materialized_version
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            assert read_materialized_version() == -1
+
+    def test_sync_skips_rebuild_when_marker_is_current(self, app, tmp_path, db_session):
+        from app.services.translation import catalog_service
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            catalog_service.write_materialized_version(99)
+            with patch.object(catalog_service, 'read_catalog_version', return_value=99), \
+                 patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
+                assert catalog_service.sync_catalogs_if_stale() is None
+            mock_mat.assert_not_called()
+
+    def test_sync_rebuilds_when_database_is_ahead(self, app, tmp_path, db_session):
+        from app.services.translation import catalog_service
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            catalog_service.write_materialized_version(3)
+            with patch.object(catalog_service, 'read_catalog_version', return_value=4), \
+                 patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
+                assert catalog_service.sync_catalogs_if_stale() == 4
+            mock_mat.assert_called_once()
+            assert catalog_service.read_materialized_version() == 4
+
+    def test_sync_does_nothing_when_version_unreadable(self, app, tmp_path):
+        from app.services.translation import catalog_service
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            with patch.object(catalog_service, 'read_catalog_version', return_value=None), \
+                 patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
+                assert catalog_service.sync_catalogs_if_stale() is None
+            mock_mat.assert_not_called()

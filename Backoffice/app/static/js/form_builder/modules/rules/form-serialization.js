@@ -91,6 +91,80 @@ export function setHiddenField(formElement, fieldName, value, options = {}) {
 	field.value = value == null ? '' : String(value);
 }
 
+/**
+ * Flatten a validation message stored as a duplicate JSON list or a Postgres
+ * text-array literal ({"msg","msg"}) back to a single string.
+ */
+export function coerceStoredValidationMessage(value) {
+	if (value == null) return '';
+	if (Array.isArray(value)) {
+		for (let i = value.length - 1; i >= 0; i -= 1) {
+			const part = coerceStoredValidationMessage(value[i]);
+			if (part) return part;
+		}
+		return '';
+	}
+	const text = String(value).trim();
+	if (!text) return '';
+	const unwrapped = unwrapDuplicatePgTextArray(text);
+	return unwrapped != null ? unwrapped : text;
+}
+
+function unwrapDuplicatePgTextArray(raw) {
+	if (!raw.startsWith('{') || !raw.endsWith('}') || raw.includes(':')) return null;
+	const inner = raw.slice(1, -1);
+	const parts = [];
+	const re = /"((?:\\.|[^"\\])*)"/g;
+	let match;
+	while ((match = re.exec(inner)) !== null) {
+		parts.push(match[1].replace(/\\"/g, '"'));
+	}
+	if (parts.length < 2) return null;
+	if (parts.every((part) => part === parts[0])) return parts[0];
+	return null;
+}
+
+/**
+ * Write validation_message so FormData/JSON contains a single string.
+ *
+ * The visible control is a <textarea name="validation_message">. Calling
+ * setHiddenField() looks only for input[name=...] and would add a second
+ * field; formDataToJson then sends ["msg","msg"], which Postgres stores as
+ * {"msg","msg"}.
+ *
+ * When the textarea is enabled it is the canonical field. Extra hidden
+ * copies (from a previous submit in this modal session) are removed.
+ * When it is disabled (hidden UI section), a single hidden input is used.
+ *
+ * @param {HTMLFormElement} form
+ * @param {ParentNode} modalElement
+ * @param {{ isDisplayOnly?: boolean }} [options]
+ */
+export function syncValidationMessageForSubmit(form, modalElement, options = {}) {
+	if (!form) return;
+	const isDisplayOnly = !!options.isDisplayOnly;
+	const root = modalElement || form;
+	const textarea = root.querySelector('#item-validation-message');
+	const translationsInput = root.querySelector('#item-validation-message-translations');
+
+	form.querySelectorAll('input[type="hidden"][name="validation_message"]').forEach((el) => {
+		if (el !== textarea) el.remove();
+	});
+
+	if (isDisplayOnly) {
+		if (textarea) textarea.value = '';
+		if (translationsInput) translationsInput.value = '{}';
+		return;
+	}
+
+	if (textarea && textarea.disabled) {
+		setHiddenField(form, 'validation_message', textarea.value);
+	}
+	if (translationsInput) {
+		setHiddenField(form, 'validation_message_translations', translationsInput.value || '{}');
+	}
+}
+
 // Append a serialized rule into FormData (omit when empty)
 export function appendRuleToFormData(formData, fieldName, ruleBuilderElement) {
 	if (!formData || !fieldName) return;

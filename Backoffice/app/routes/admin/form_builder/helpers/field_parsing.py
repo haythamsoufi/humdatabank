@@ -2,10 +2,76 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from typing import Any, Callable, Dict, Iterable, Optional
 
 _FIELD_PREFIX_DEFAULT = object()
+
+
+def coerce_single_text(value: Any) -> Optional[str]:
+    """Flatten a scalar text field that JSON form encoding turned into a list.
+
+    Duplicate ``<textarea name>`` + hidden ``input[name]`` fields become
+    ``["msg", "msg"]`` in ``formDataToJson``. Assigned to a Text column,
+    psycopg2 stores that as a Postgres array literal
+    ``{"msg","msg"}``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        last = None
+        for item in value:
+            coerced = coerce_single_text(item)
+            if coerced:
+                last = coerced
+        return last
+    if not isinstance(value, str):
+        value = str(value)
+    stripped = value.strip()
+    if not stripped:
+        return None
+    unwrapped = _unwrap_duplicate_pg_text_array(stripped)
+    return unwrapped if unwrapped is not None else stripped
+
+
+def _unwrap_duplicate_pg_text_array(raw: str) -> Optional[str]:
+    """If *raw* is a PG text-array of identical quoted strings, return that string."""
+    if not (raw.startswith('{') and raw.endswith('}')):
+        return None
+    if ':' in raw:
+        return None
+    inner = raw[1:-1].strip()
+    if not inner:
+        return None
+    try:
+        parts = next(
+            csv.reader(io.StringIO(inner), delimiter=',', quotechar='"', escapechar='\\'),
+            [],
+        )
+    except csv.Error:
+        return None
+    parts = [p.strip() for p in parts if p is not None and str(p).strip()]
+    if len(parts) < 2:
+        return None
+    if len(set(parts)) == 1:
+        return parts[0]
+    return None
+
+
+def _scalar_form_value(value: Any, default: Any = None) -> Any:
+    """Take the last non-empty entry when JSON form encoding produced a list."""
+    if not isinstance(value, (list, tuple)):
+        return value
+    last = None
+    for item in value:
+        if item is None:
+            continue
+        text = item if isinstance(item, str) else str(item)
+        if text.strip():
+            last = item
+    return last if last is not None else default
 
 
 def get_field_value(form_data, field_name: str, prefix: str = '', default: Any = None) -> Any:
@@ -14,15 +80,16 @@ def get_field_value(form_data, field_name: str, prefix: str = '', default: Any =
 
     Falls back to the unprefixed ``field_name`` when the prefixed value is missing
     or empty. Returns ``default`` when neither key is present.
+    Duplicate JSON keys (arrays) are flattened to the last non-empty value.
     """
     if prefix:
         prefixed_name = f"{prefix}{field_name}"
         value = form_data.get(prefixed_name)
         if value is not None and value != '':
-            return value
+            return _scalar_form_value(value, default)
     if field_name in form_data or hasattr(form_data, 'getlist'):
         value = form_data.get(field_name, default)
-        return value
+        return _scalar_form_value(value, default)
     return default
 
 

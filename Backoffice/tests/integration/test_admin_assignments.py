@@ -2,12 +2,13 @@
 
 import pytest
 
-from app.models import AssignedForm, db
+from app.models import AssignedForm, AssignmentEntityStatus, db
 from app.models.rbac import RbacPermission, RbacRole, RbacRolePermission
 
 from tests.factories import (
     _grant_role_permission,
     create_test_admin,
+    create_test_assignment_entity_status,
     create_test_template,
     create_test_user,
 )
@@ -55,6 +56,23 @@ def _create_admin_with_permissions(db_session, permissions):
         _grant_role_permission(db_session, "admin_core", perm_code)
     db_session.commit()
     db_session.refresh(admin)
+    return admin
+
+
+def _create_admin_with_exact_assignment_permissions(db_session, permissions):
+    """Grant only the listed assignment permissions (revoke the factory extras)."""
+    admin = _create_admin_with_permissions(db_session, permissions)
+    extras = (
+        "admin.assignments.edit",
+        "admin.assignments.create",
+        "admin.assignments.delete",
+        "admin.assignments.entities.manage",
+        "admin.assignments.entities.status",
+        "admin.assignments.public_submissions.manage",
+    )
+    for code in extras:
+        if code not in permissions:
+            _revoke_role_permission(db_session, "admin_core", code)
     return admin
 
 
@@ -318,3 +336,114 @@ class TestTogglePublicAccess:
 
             updated = db.session.get(AssignedForm, assignment_id)
             assert updated.is_public_active is True
+
+
+@pytest.mark.integration
+class TestAssignmentDetailsVsEntityStatusPermissions:
+    def test_status_only_admin_gets_edit_link_on_list(self, client, db_session, app):
+        with app.app_context():
+            admin = _create_admin_with_exact_assignment_permissions(
+                db_session,
+                permissions=["admin.assignments.view", "admin.assignments.entities.status"],
+            )
+            assignment = _create_assignment(db_session)
+            _login(client, admin.id)
+
+            resp = client.get("/admin/assignments")
+            assert resp.status_code == 200
+            body = resp.get_data(as_text=True)
+            assert f"/admin/assignments/edit/{assignment['id']}" in body
+            assert f"/admin/assignments/{assignment['id']}/toggle_active" not in body
+
+    def test_status_only_admin_can_open_assignment_but_not_save_details(
+        self, client, db_session, app
+    ):
+        with app.app_context():
+            admin = _create_admin_with_exact_assignment_permissions(
+                db_session,
+                permissions=["admin.assignments.view", "admin.assignments.entities.status"],
+            )
+            aes = create_test_assignment_entity_status(db_session, status="pending")
+            assignment_id = aes.assigned_form_id
+            original_period = aes.assigned_form.period_name
+            _login(client, admin.id)
+
+            resp = client.get(f"/admin/assignments/edit/{assignment_id}")
+            assert resp.status_code == 200
+            body = resp.get_data(as_text=True)
+            assert "canUpdateEntityStatus: true" in body
+            assert "canEditDetails: false" in body
+            assert 'id="manageAssignmentSubmitBtn"' not in body
+
+            resp = client.post(
+                f"/admin/assignments/edit/{assignment_id}",
+                data={"period_name": "Hacked Period"},
+                follow_redirects=False,
+            )
+            assert resp.status_code in (301, 302, 303, 307, 308, 403)
+            updated = db.session.get(AssignedForm, assignment_id)
+            assert updated.period_name == original_period
+
+    def test_status_only_admin_can_update_entity_status_but_not_add_entities(
+        self, client, db_session, app
+    ):
+        with app.app_context():
+            admin = _create_admin_with_exact_assignment_permissions(
+                db_session,
+                permissions=["admin.assignments.view", "admin.assignments.entities.status"],
+            )
+            aes = create_test_assignment_entity_status(db_session, status="pending")
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+            _login(client, admin.id)
+
+            resp = client.post(
+                f"/admin/assignments/{assignment_id}/entities/bulk-update-status",
+                json={"status_ids": [aes_id], "status": "submitted"},
+            )
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["success"] is True
+            db.session.refresh(aes)
+            assert aes.status == "submitted"
+
+            resp = client.post(
+                f"/admin/assignments/{assignment_id}/entities/add",
+                json={"entity_type": "country", "entity_id": aes.entity_id + 99999},
+            )
+            assert resp.status_code in (301, 302, 303, 307, 308, 403)
+
+    def test_view_only_admin_cannot_open_assignment_edit_page(self, client, db_session, app):
+        with app.app_context():
+            admin = _create_admin_with_exact_assignment_permissions(
+                db_session,
+                permissions=["admin.assignments.view"],
+            )
+            assignment = _create_assignment(db_session)
+            _login(client, admin.id)
+
+            resp = client.get(
+                f"/admin/assignments/edit/{assignment['id']}",
+                follow_redirects=False,
+            )
+            assert resp.status_code in (301, 302, 303, 307, 308, 403)
+
+    def test_details_only_admin_cannot_update_entity_status(self, client, db_session, app):
+        with app.app_context():
+            admin = _create_admin_with_exact_assignment_permissions(
+                db_session,
+                permissions=["admin.assignments.view", "admin.assignments.edit"],
+            )
+            aes = create_test_assignment_entity_status(db_session, status="pending")
+            assignment_id = aes.assigned_form_id
+            aes_id = aes.id
+            _login(client, admin.id)
+
+            resp = client.post(
+                f"/admin/assignments/{assignment_id}/entities/bulk-update-status",
+                json={"status_ids": [aes_id], "status": "submitted"},
+            )
+            assert resp.status_code in (301, 302, 303, 307, 308, 403)
+            db.session.expire_all()
+            unchanged = db.session.get(AssignmentEntityStatus, aes_id)
+            assert unchanged.status == "pending"

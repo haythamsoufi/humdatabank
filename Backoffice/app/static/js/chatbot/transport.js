@@ -3,6 +3,8 @@
  * @module chatbot/transport
  */
 
+import { stringifyWafJsonBody } from '../lib/waf-json-body.js';
+
 export const TransportMixin = {
     _generateClientMessageId() {
         /**
@@ -1288,7 +1290,7 @@ export const TransportMixin = {
                     { type: 'message' },
                     this._buildUnifiedChatPayload(userMessage, sendOptions)
                 );
-                ws.send(JSON.stringify(payload));
+                ws.send(stringifyWafJsonBody(payload));
                 messageSent = true;
             };
 
@@ -1475,7 +1477,7 @@ export const TransportMixin = {
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: JSON.stringify(payload),
+                    body: stringifyWafJsonBody(payload),
                     signal: controller.signal,
                 });
 
@@ -1772,7 +1774,7 @@ export const TransportMixin = {
                         'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'),
                         'X-Requested-With': 'XMLHttpRequest'
                     },
-                    body: JSON.stringify(payload),
+                    body: stringifyWafJsonBody(payload),
                     signal: controller.signal
                 });
             } finally {

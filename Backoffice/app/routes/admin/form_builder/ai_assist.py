@@ -132,7 +132,12 @@ def _guess_sections_from_text(text: str) -> list:
             if title:
                 sections.append({"title": title})
         # Legacy heuristic: markdown headings or ALL-CAPS title-case lines
-        elif re.match(r"^(?:#{1,3}\s+|[A-Z][A-Za-z0-9 ,/&()-]{2,80}:?\s*)$", raw):
+        # NOTE: the markdown-heading branch requires trailing content after the
+        # ``#`` marker (``.+``) — without it, ``#{1,3}\s+`` alone can only match
+        # a bare "#"/"##"/"###" followed by nothing, so real headings like
+        # "### Method" would never match and the later ``lstrip("# ")`` cleanup
+        # below would be dead code.
+        elif re.match(r"^(?:#{1,3}\s+.+|[A-Z][A-Za-z0-9 ,/&()-]{2,80}:?\s*)$", raw):
             if not re.match(r"^\d+[\.)]\s", raw):
                 sections.append({"title": raw.lstrip("# ").strip()[:300]})
         if len(sections) >= 100:

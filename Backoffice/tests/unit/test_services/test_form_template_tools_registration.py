@@ -28,6 +28,28 @@ def _tool_names(tool_defs):
     return {td.get("function", {}).get("name") for td in tool_defs}
 
 
+@pytest.fixture(autouse=True)
+def _clear_form_builder_g_state():
+    """Prevent g.ai_form_builder_ctx / g.ai_sources_cfg from leaking into later tests
+    (in this file or any test file collected after it).
+
+    The `app` fixture is session-scoped and keeps one app context pushed for the whole
+    run. Flask's RequestContext.push() only pushes (and later pops) a *new* app context
+    when one isn't already active for this app; since every test below opens a bare
+    ``app.test_request_context(...)`` with that app context already on the stack, it
+    reuses (and mutates) the shared session-level ``g`` instead of getting an isolated
+    one. Without this cleanup, whichever of these tests runs last leaves
+    g.ai_form_builder_ctx set to a truthy dict for the remainder of the test session,
+    silently forcing *every other test's* AIToolsRegistry calls into form-builder mode.
+    """
+    yield
+    from flask import has_app_context
+
+    if has_app_context():
+        g.pop("ai_form_builder_ctx", None)
+        g.pop("ai_sources_cfg", None)
+
+
 @pytest.mark.unit
 class TestFormTemplateToolSpecs:
     def test_spec_names_match_registry_constants(self):

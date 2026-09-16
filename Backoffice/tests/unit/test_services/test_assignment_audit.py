@@ -21,7 +21,9 @@ from app.models.enums import AssignmentEntityStatusValue
 from app.services.audit.assignment_audit import (
     EMPTY_VALUE_TEXT,
     MAX_AUDIT_CHANGE_LINES,
+    NO_ASSIGNMENT_FIELD_CHANGES,
     assignment_settings_snapshot,
+    assignment_update_has_field_changes,
     build_assignment_update_audit,
     build_entity_status_update_audit,
     country_due_dates_snapshot,
@@ -184,8 +186,17 @@ class TestBuildAssignmentUpdateAudit:
         assignment = _make_assignment()
         before = assignment_settings_snapshot(assignment)
         details, description = build_assignment_update_audit(assignment, before, dict(before))
-        assert details["changes"] == ["No assignment fields changed"]
+        assert details["changes"] == [NO_ASSIGNMENT_FIELD_CHANGES]
         assert description.endswith("no fields changed")
+        assert assignment_update_has_field_changes(details) is False
+
+    def test_has_field_changes_when_a_line_is_present(self):
+        assignment = _make_assignment()
+        before = assignment_settings_snapshot(assignment)
+        details, _ = build_assignment_update_audit(
+            assignment, before, dict(before, period_name="2026")
+        )
+        assert assignment_update_has_field_changes(details) is True
 
     def test_description_keeps_catalog_text_as_prefix(self):
         """The audit trail treats the row as a richer catalog line via this prefix."""
@@ -219,7 +230,7 @@ class TestBuildAssignmentUpdateAudit:
         )
         after = dict(before, custom_name_translations={"fr": "Rapport"})
         details, _ = build_assignment_update_audit(assignment, before, after)
-        assert details["changes"] == ["No assignment fields changed"]
+        assert details["changes"] == [NO_ASSIGNMENT_FIELD_CHANGES]
 
     def test_country_due_date_change_reported(self):
         assignment = _make_assignment()
@@ -244,7 +255,7 @@ class TestBuildAssignmentUpdateAudit:
             country_due_date_before="2025-03-01",
             country_due_date_after="2025-03-01",
         )
-        assert details["changes"] == ["No assignment fields changed"]
+        assert details["changes"] == [NO_ASSIGNMENT_FIELD_CHANGES]
 
     def test_custom_name_used_in_title(self):
         assignment = _make_assignment(custom_name="Annual Report")

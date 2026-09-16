@@ -96,6 +96,7 @@ class AIChatIntegration:
         map_requested: bool = False,
         chart_requested: bool = False,
         original_message: Optional[str] = None,
+        cancelled: Optional[Any] = None,  # threading.Event-like, optional
     ) -> Tuple[str, str, List[str], Dict[str, Any]]:
         """
         Process a user query using the best available method.
@@ -108,6 +109,9 @@ class AIChatIntegration:
             preferred_language: Response language
             on_step: Optional callback(message: str) invoked before each tool run with a user-facing step message.
             original_message: User's raw message before rewriting (for trace display when different from message).
+            cancelled: Optional threading.Event; forwarded to the agent executor so a
+                user-initiated /chat/cancel stops further tool-call iterations (see
+                AIAgentExecutor.execute for the cooperative-cancel caveat).
 
         Returns:
             Tuple of (response_text, model_name, function_calls, metadata)
@@ -128,6 +132,7 @@ class AIChatIntegration:
                 platform_context=platform_context,
                 on_step=on_step,
                 original_message=original_message,
+                cancelled=cancelled,
             )
 
         # Fallback to existing LLM integration
@@ -148,6 +153,7 @@ class AIChatIntegration:
         platform_context: Optional[Dict[str, Any]] = None,
         on_step: Optional[Callable[[str], None]] = None,
         original_message: Optional[str] = None,
+        cancelled: Optional[Any] = None,  # threading.Event-like, optional
     ) -> Tuple[str, str, List[str], Dict[str, Any]]:
         """Process query using the agent executor."""
         # Keep the agent.execute() call in its own try/except so that fallback
@@ -164,6 +170,7 @@ class AIChatIntegration:
                 language=language,
                 on_step_callback=on_step,
                 original_message=original_message,
+                cancelled=cancelled,
             )
         except Exception as e:
             logger.error("Agent execution error: %s", e, exc_info=True)
@@ -263,6 +270,12 @@ class AIChatIntegration:
                 return partial_answer, self.agent.model, function_calls, metadata
 
             # No partial answer available; return timeout message.
+            # Still forward form_builder_result: extract_form_builder_result_from_steps()
+            # scans `steps` for the latest *successful* write regardless of the run's
+            # overall status, so a create/edit that committed on an earlier iteration
+            # before the timeout fired must not be silently dropped here — otherwise the
+            # client shows a bare timeout with no edit_url/undo_structure for a change
+            # that actually went through, inviting a duplicate retry.
             timeout_message = (
                 "The request took too long to process. Please try again or ask a simpler question."
             )
@@ -272,8 +285,38 @@ class AIChatIntegration:
                 'model': getattr(self.agent, 'model', None),
                 'status': 'timeout',
                 'trace_id': result.get('trace_id'),
+                'form_builder_result': result.get('form_builder_result'),
             }
             return timeout_message, self.agent.model, [], metadata
+
+        elif result.get('status') == 'cancelled':
+            # User-initiated /chat/cancel (see AIAgentExecutor.execute's cancelled check).
+            # Deliberately handled separately from the generic `else` branch below: that
+            # branch's no-partial-answer case falls back to a full direct-LLM call, which
+            # would silently ignore the user's cancel and burn another round-trip producing
+            # an answer they explicitly asked to stop. Still forward form_builder_result —
+            # a create/edit that committed on an earlier iteration before cancellation was
+            # observed must not be dropped (same reasoning as the timeout branch above).
+            partial_answer = (result.get('answer') or '').strip()
+            metadata = {
+                'used_agent': True,
+                'provider': getattr(self.agent, 'provider', 'agent'),
+                'model': getattr(self.agent, 'model', None),
+                'iterations': result.get('iterations', 0),
+                'tool_calls': result.get('tool_calls', 0),
+                'tools_used': result.get('steps', []),
+                'total_cost': result.get('total_cost', 0),
+                'status': 'cancelled',
+                'trace_id': result.get('trace_id'),
+                'form_builder_result': result.get('form_builder_result'),
+            }
+            function_calls = [
+                step.get('action')
+                for step in result.get('steps', [])
+                if step.get('action') and step.get('action') != 'finish'
+            ]
+            cancelled_message = partial_answer or "Request cancelled."
+            return cancelled_message, self.agent.model, function_calls, metadata
 
         else:
             # Agent failed but may have a partial answer from completed steps.

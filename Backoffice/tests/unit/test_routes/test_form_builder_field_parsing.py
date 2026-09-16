@@ -21,6 +21,7 @@ _spec.loader.exec_module(field_parsing)
 get_field_value = field_parsing.get_field_value
 make_field_reader = field_parsing.make_field_reader
 parse_translations_json = field_parsing.parse_translations_json
+coerce_single_text = field_parsing.coerce_single_text
 
 pytestmark = pytest.mark.unit
 
@@ -73,3 +74,28 @@ def test_parse_translations_json_invalid_returns_none():
     assert parse_translations_json('not-json', ['fr']) is None
     assert parse_translations_json('', ['fr']) is None
     assert parse_translations_json(None, ['fr']) is None
+
+
+def test_coerce_single_text_flattens_duplicate_list():
+    msg = 'Local Units must be higher than branches'
+    assert coerce_single_text([msg, msg]) == msg
+
+
+def test_coerce_single_text_unwraps_postgres_array_literal():
+    msg = 'Local Units must be higher than branches'
+    stored = '{"Local Units must be higher than branches","Local Units must be higher than branches"}'
+    assert coerce_single_text(stored) == msg
+
+
+def test_coerce_single_text_leaves_json_object_alone():
+    raw = '{"fr": "Doit être rempli"}'
+    assert coerce_single_text(raw) == raw
+
+
+def test_coerce_single_text_plain_string_unchanged():
+    assert coerce_single_text('Must be greater than zero') == 'Must be greater than zero'
+
+
+def test_get_field_value_flattens_duplicate_json_list():
+    data = _FakeFormData({'validation_message': ['Must be filled', 'Must be filled']})
+    assert get_field_value(data, 'validation_message') == 'Must be filled'

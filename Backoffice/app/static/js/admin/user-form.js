@@ -624,7 +624,8 @@
 
                             const manage = byAction.get('manage');
                             const view = byAction.get('view');
-                            if (manage && view && manage.checked) {
+                            const entityStatus = byAction.get('entity status');
+                            if (view && ((manage && manage.checked) || (entityStatus && entityStatus.checked))) {
                               implied.add(view);
                               lockSet.add(view);
                             }

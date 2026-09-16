@@ -36,6 +36,7 @@ from app.utils.activity_form_data_redaction import redact_activity_form_data
 from app.utils.audit_context import (
     apply_audit_details_to_context,
     reset_request_audit_context,
+    should_skip_request_activity_log,
 )
 from app.utils.page_view_paths import page_view_path_key_from_request
 from app.utils.activity_logging_skip import (
@@ -549,6 +550,8 @@ def init_activity_tracking(app):
         # Only log for authenticated users and successful requests
         user_id = getattr(g, 'activity_user_id', None)
         if user_id and response.status_code < 400:
+            if should_skip_request_activity_log():
+                return response
             # If requests are transaction-managed, do NOT touch the request's db.session here.
             # Instead, log activity after the response closes using a fresh app context / new transaction.
             if getattr(g, "_auto_txn_managed", False):

@@ -53,6 +53,14 @@ Optionally:
 
 - `assignment_viewer` or `assignment_approver` if they also review submissions
 
+## Recipe: Assignment entity status only
+
+Give the user:
+
+- `admin_assignments_status`
+
+They can open assignments and update entity status/due dates, but cannot change assignment details (template, period, name, data owner) or add/remove entities.
+
 ## Recipe: User manager (HR / access admin)
 
 Give the user:

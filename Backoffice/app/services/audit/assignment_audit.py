@@ -25,6 +25,9 @@ MAX_AUDIT_CHANGE_LINES = 40
 
 EMPTY_VALUE_TEXT = "—"
 
+# Details-panel placeholder when an edit POST saved but the snapshot was identical.
+NO_ASSIGNMENT_FIELD_CHANGES = "No assignment fields changed"
+
 # Lowercase plurals for descriptions ("for 3 countries in …"). EntityService
 # labels are Title Case singulars, which do not read well mid-sentence.
 _ENTITY_TYPE_PLURALS = {
@@ -290,7 +293,7 @@ def build_assignment_update_audit(
     details: Dict[str, Any] = {
         "assignment_title": assignment_title,
         "template_name": after.get("template") or before.get("template"),
-        "changes": _cap_lines(lines) if lines else ["No assignment fields changed"],
+        "changes": _cap_lines(lines) if lines else [NO_ASSIGNMENT_FIELD_CHANGES],
     }
 
     # Keep the catalog description ("Updated an assignment") as a prefix so the
@@ -301,6 +304,18 @@ def build_assignment_update_audit(
     else:
         description = f"Updated an assignment{quoted}: no fields changed"
     return details, description
+
+
+def assignment_update_has_field_changes(details: Optional[Dict[str, Any]]) -> bool:
+    """True when ``build_assignment_update_audit`` found a real before/after.
+
+    The edit view still saves on a no-op POST; callers should skip the audit
+    row in that case rather than record "no fields changed".
+    """
+    if not isinstance(details, dict):
+        return False
+    changes = details.get("changes")
+    return isinstance(changes, list) and bool(changes) and changes != [NO_ASSIGNMENT_FIELD_CHANGES]
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +359,8 @@ def build_entity_status_update_audit(
     details: Dict[str, Any] = {
         "assignment_title": assignment_audit_label(assignment),
         "template_name": _template_name(assignment),
+        # Shown in Details only when status_changes is empty (already at target);
+        # otherwise the per-entity lines already include the after-status.
         "new_status": status_label,
         "entities_updated": len(changes),
         "status_changes": _cap_lines(status_lines),

@@ -531,6 +531,101 @@ class TestApplyEdits:
         assert item.config["is_required"] is True
         assert any("New label" in c for c in result["changes"])
 
+    def test_update_item_clears_stale_options_when_leaving_choice_type(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """Regression: changing question_type away from single_choice/
+        multiple_choice without also supplying new options must not leave the
+        old options_json/options_translations behind as stale, hidden data."""
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(
+            db_session, section, template, item_type="question", type="single_choice",
+            label="Sector", options_json=["Health", "WASH"],
+            options_translations=[{"option_text": "Health", "translations": {"fr": "Santé"}}],
+        )
+
+        result = service.apply_edits(
+            template.id,
+            [{"op": "update_item", "item_id": item.id, "question_type": "text"}],
+            user,
+        )
+
+        db_session.refresh(item)
+        assert item.type == "text"
+        assert item.options_json is None
+        assert item.options_translations is None
+        assert any("cleared stale options" in c for c in result["changes"])
+
+    def test_update_item_clears_stale_lookup_list_when_leaving_choice_type(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(
+            db_session, section, template, item_type="question", type="single_choice",
+            label="Country", lookup_list_id="country_map", list_display_column="name",
+        )
+
+        service.apply_edits(
+            template.id,
+            [{"op": "update_item", "item_id": item.id, "question_type": "number"}],
+            user,
+        )
+
+        db_session.refresh(item)
+        assert item.lookup_list_id is None
+        assert item.list_display_column is None
+
+    def test_update_item_keeps_options_when_staying_a_choice_type(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """Switching single_choice <-> multiple_choice must not wipe options."""
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(
+            db_session, section, template, item_type="question", type="single_choice",
+            label="Sector", options_json=["Health", "WASH"],
+        )
+
+        service.apply_edits(
+            template.id,
+            [{"op": "update_item", "item_id": item.id, "question_type": "multiple_choice"}],
+            user,
+        )
+
+        db_session.refresh(item)
+        assert item.type == "multiple_choice"
+        assert item.options_json == ["Health", "WASH"]
+
+    def test_update_item_ignored_new_options_dont_resurrect_after_type_change(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """When the op *also* supplies new options alongside a switch to a
+        non-choice type, _apply_question_options ignores those (existing
+        behavior — options don't apply to e.g. 'text'), and the stale old
+        options must still end up cleared, not left behind."""
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(
+            db_session, section, template, item_type="question", type="single_choice",
+            label="Sector", options_json=["Health", "WASH"],
+        )
+
+        service.apply_edits(
+            template.id,
+            [{"op": "update_item", "item_id": item.id, "question_type": "text", "options": ["A", "B"]}],
+            user,
+        )
+
+        db_session.refresh(item)
+        assert item.type == "text"
+        assert item.options_json is None
+
     def test_remove_item_without_data_deletes_row(
         self, db_session, app, service, user, grant_all_rbac
     ):
@@ -799,8 +894,8 @@ class TestTranslateTemplate:
         )
 
         class FakeTranslator:
-            def translate_text(self, text, target, source="en"):
-                return f"[fr] {text}"
+            def translate_batch(self, texts, target, source="en"):
+                return [f"[fr] {t}" for t in texts]
 
         with patch(
             "app.services.translation.auto_translator.get_auto_translator",
@@ -810,6 +905,7 @@ class TestTranslateTemplate:
 
         assert result["translated"] > 0
         assert result["failed"] == 0
+        assert result["warnings"] == []
         db_session.refresh(item)
         db_session.refresh(section)
         assert item.label_translations["fr"] == "[fr] Programme name"
@@ -826,8 +922,8 @@ class TestTranslateTemplate:
         db_session.commit()
 
         class FakeTranslator:
-            def translate_text(self, text, target, source="en"):
-                return f"[fr] {text}"
+            def translate_batch(self, texts, target, source="en"):
+                return [f"[fr] {t}" for t in texts]
 
         with patch(
             "app.services.translation.auto_translator.get_auto_translator",
@@ -838,6 +934,101 @@ class TestTranslateTemplate:
         db_session.refresh(section)
         assert section.name_translations["fr"] == "Santé (manual)"
         assert result["skipped_existing"] >= 1
+
+    def test_translates_manual_choice_options(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        app.config["SUPPORTED_LANGUAGES"] = ["en", "fr"]
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version, name="Health")
+        item = create_test_item(
+            db_session, section, template, item_type="question", type="single_choice",
+            label="Sector", options_json=["Health", "WASH"],
+        )
+
+        class FakeTranslator:
+            def translate_batch(self, texts, target, source="en"):
+                return [f"[fr] {t}" for t in texts]
+
+        with patch(
+            "app.services.translation.auto_translator.get_auto_translator",
+            return_value=FakeTranslator(),
+        ):
+            result = service.translate_template(template.id, ["fr"], user)
+
+        assert result["failed"] == 0
+        db_session.refresh(item)
+        by_text = {e["option_text"]: e["translations"] for e in item.options_translations}
+        assert by_text["Health"]["fr"] == "[fr] Health"
+        assert by_text["WASH"]["fr"] == "[fr] WASH"
+
+    def test_batches_translation_calls_per_language_not_per_string(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """Regression: translate_template used to call the translator once per
+        (string, language) pair — a template with many items/sections made one
+        network round-trip per string. It must now issue exactly one
+        translate_batch() call per target language for the whole template."""
+        app.config["SUPPORTED_LANGUAGES"] = ["en", "fr", "es"]
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version, name="Health")
+        for i in range(5):
+            create_test_item(
+                db_session, section, template, item_type="question", type="text",
+                label=f"Question {i}",
+            )
+
+        calls = []
+
+        class FakeTranslator:
+            def translate_batch(self, texts, target, source="en"):
+                calls.append((target, list(texts)))
+                return [f"[{target}] {t}" for t in texts]
+
+        with patch(
+            "app.services.translation.auto_translator.get_auto_translator",
+            return_value=FakeTranslator(),
+        ):
+            result = service.translate_template(template.id, ["fr", "es"], user)
+
+        assert result["failed"] == 0
+        # Exactly one batch call per target language, regardless of item count.
+        assert len(calls) == 2
+        from config.config import Config as _Config
+
+        expected_targets = {_Config.LANGUAGE_MODEL_KEY.get(c) or c for c in ("fr", "es")}
+        assert {c[0] for c in calls} == expected_targets
+        for _target, texts in calls:
+            # template name + description + section name + 5 item labels, deduped.
+            assert len(texts) == 8
+
+    def test_item_limit_truncation_adds_warning(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        app.config["SUPPORTED_LANGUAGES"] = ["en", "fr"]
+        app.config["AI_FORM_TEMPLATE_TRANSLATE_MAX_ITEMS"] = 2
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version, name="Health")
+        for i in range(4):
+            create_test_item(
+                db_session, section, template, item_type="question", type="text",
+                label=f"Question {i}",
+            )
+
+        class FakeTranslator:
+            def translate_batch(self, texts, target, source="en"):
+                return [f"[fr] {t}" for t in texts]
+
+        with patch(
+            "app.services.translation.auto_translator.get_auto_translator",
+            return_value=FakeTranslator(),
+        ):
+            result = service.translate_template(template.id, ["fr"], user)
+
+        assert any("Only the first 2 of 4" in w for w in result["warnings"])
 
 
 # ---------------------------------------------------------------------------

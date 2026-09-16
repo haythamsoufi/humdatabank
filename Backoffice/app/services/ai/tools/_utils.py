@@ -20,6 +20,10 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from flask import current_app, g, has_request_context
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.services.ai.tools.form_template_specs import (
+    FORM_TEMPLATE_WRITE_TOOLS as _FORM_TEMPLATE_WRITE_TOOLS,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -294,14 +298,6 @@ def resolve_form_builder_context() -> Optional[Dict[str, Any]]:
     if not isinstance(raw, dict) or not raw.get("enabled"):
         return None
     return raw
-
-
-_FORM_TEMPLATE_WRITE_TOOLS = frozenset({
-    "create_form_template",
-    "edit_form_template",
-    "translate_form_template",
-    "discard_template_draft",
-})
 
 
 def extract_form_builder_result_from_steps(steps: Any) -> Optional[Dict[str, Any]]:

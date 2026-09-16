@@ -168,9 +168,19 @@ These roles provide access to specific admin modules. Assign multiple roles as n
 **Capabilities:**
 - Create, edit, and delete assignments
 - Manage assignment entities (countries/organizations)
+- Update entity status
 - Manage public submissions
 
 **When to use:** For administrators who distribute forms and manage data collection.
+
+#### Admin: Assignments Entity Status
+**Role Code:** `admin_assignments_status`
+
+**Capabilities:**
+- View assignments
+- Update entity status and due dates
+
+**When to use:** For administrators who only need to change an entity's assignment status, without editing assignment details or adding/removing entities.
 
 #### Admin: Countries & Organization Manager
 **Role Code:** `admin_countries_manager`

@@ -15,6 +15,55 @@ class TestAgentRoutingPolicy:
 
         assert AgentRoutingPolicy.first_turn_tool_choice(query="How many volunteers in Syria?") == "auto"
 
+    def test_first_turn_forces_create_when_no_template_and_permitted(self, app_ctx):
+        """Form-builder panel, no template open yet, user can create -> force create_form_template."""
+        from unittest.mock import patch
+        from app.services.ai.policies.agent_routing import AgentRoutingPolicy
+
+        with patch(
+            "app.services.ai.tools._utils.resolve_form_builder_context",
+            return_value={"enabled": True, "template_id": None},
+        ), patch(
+            "app.services.ai.tools.registry._form_template_allowed_tools",
+            return_value={"create_form_template"},
+        ):
+            choice = AgentRoutingPolicy.first_turn_tool_choice(query="Build me an intake form")
+
+        assert choice == {"type": "function", "function": {"name": "create_form_template"}}
+
+    def test_first_turn_falls_back_to_auto_when_create_not_permitted(self, app_ctx):
+        """Regression: a view/edit-only user opening the panel with no template selected must
+        not get a tool_choice naming create_form_template, since registry.py's RBAC-filtered
+        tools array for that turn won't include it either -> OpenAI would 400 on a tool_choice
+        naming a function absent from tools."""
+        from unittest.mock import patch
+        from app.services.ai.policies.agent_routing import AgentRoutingPolicy
+
+        with patch(
+            "app.services.ai.tools._utils.resolve_form_builder_context",
+            return_value={"enabled": True, "template_id": None},
+        ), patch(
+            "app.services.ai.tools.registry._form_template_allowed_tools",
+            return_value={"get_form_template_full_structure"},
+        ):
+            choice = AgentRoutingPolicy.first_turn_tool_choice(query="Build me an intake form")
+
+        assert choice == "auto"
+
+    def test_first_turn_required_when_template_open(self, app_ctx):
+        """Form-builder panel with a template already open forces some tool call (not a
+        specific one), so RBAC-filtered tool lists never risk naming an unlisted function."""
+        from unittest.mock import patch
+        from app.services.ai.policies.agent_routing import AgentRoutingPolicy
+
+        with patch(
+            "app.services.ai.tools._utils.resolve_form_builder_context",
+            return_value={"enabled": True, "template_id": 12},
+        ):
+            choice = AgentRoutingPolicy.first_turn_tool_choice(query="Add a phone number field")
+
+        assert choice == "required"
+
     def test_fast_path_enabled_by_default(self, app_ctx):
         from app.services.ai.policies.agent_routing import AgentRoutingPolicy
 

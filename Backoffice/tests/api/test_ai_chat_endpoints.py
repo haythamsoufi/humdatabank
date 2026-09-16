@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import uuid
@@ -126,6 +127,48 @@ def test_ai_chat_stream_validation(client, app, db_session):
         headers=headers,
     )
     assert resp.status_code == 400
+
+
+@pytest.mark.api
+def test_ai_chat_stream_accepts_chunked_waf_payload_envelope(client, app, db_session):
+    """POST /chat/stream unwraps {payload, payload__cN} the same way Backoffice JS sends it."""
+    user = create_test_user(db_session, email="ai_stream_waf@test.local", name="AI Stream WAF", role="user")
+    with app.app_context():
+        token = issue_ai_token(user_id=int(user.id), role="user")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    inner = {"message": "Say hello in one word.", "client": "backoffice"}
+    encoded = base64.b64encode(json.dumps(inner).encode("utf-8")).decode("ascii")
+    envelope = {"payload": encoded[:20], "payload__c1": encoded[20:]}
+
+    resp = client.post(
+        "/api/ai/v2/chat/stream",
+        json=envelope,
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert resp.content_type and "text/event-stream" in resp.content_type
+    data_lines = [ln for ln in resp.data.decode("utf-8").split("\n") if ln.startswith("data: ")]
+    assert data_lines
+    assert json.loads(data_lines[0][6:]).get("type") == "meta"
+
+
+@pytest.mark.api
+def test_ai_chat_stream_rejects_malformed_waf_envelope(client, app, db_session):
+    user = create_test_user(db_session, email="ai_stream_waf_bad@test.local", name="AI Stream WAF Bad", role="user")
+    with app.app_context():
+        token = issue_ai_token(user_id=int(user.id), role="user")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post(
+        "/api/ai/v2/chat/stream",
+        json={"payload": "!!!not-valid-base64!!!"},
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "payload" in (resp.get_json() or {}).get("error", "").lower()
 
 
 @pytest.mark.api

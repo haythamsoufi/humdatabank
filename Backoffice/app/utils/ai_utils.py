@@ -61,9 +61,13 @@ def sanitize_page_context(value: Any) -> Dict[str, Any]:
             out["pageData"] = pd
 
     # Form-builder assistant context: small, typed shape only (ints + bool).
+    # Respect an explicit enabled=False from the caller (default True when the key is
+    # simply absent, matching the shape every current caller already sends) instead of
+    # unconditionally forcing True — a caller explicitly disabling the panel must be able
+    # to turn off the RBAC-sensitive form-template tools this context gates downstream.
     form_builder = value.get("formBuilder")
     if isinstance(form_builder, dict):
-        fb: Dict[str, Any] = {"enabled": True}
+        fb: Dict[str, Any] = {"enabled": bool(form_builder.get("enabled", True))}
         for k in ("template_id", "version_id"):
             raw = form_builder.get(k)
             try:

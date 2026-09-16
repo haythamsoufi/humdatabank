@@ -3,6 +3,9 @@
 {% from "components/_status_label.html" import status_label_for_active %}
 {% from "macros/translation_modal.html" import translation_modal %}
 
+{% set can_edit_assignment_details = can_edit_assignment_details if can_edit_assignment_details is defined else (not assignment) %}
+{% set can_manage_assignment_entities = can_manage_assignment_entities if can_manage_assignment_entities is defined else (not assignment) %}
+{% set can_update_assignment_entity_status = can_update_assignment_entity_status if can_update_assignment_entity_status is defined else false %}
 {% if assignment %}
 {% set assignment_page_title = _('Edit Assignment: %(name)s', name=assignment.display_name) %}
 {% else %}
@@ -25,12 +28,14 @@
 
 {% set save_label = form.submit.label.text if form.submit and form.submit.label else _('Save') %}
 {% set header_actions = namespace(items=[]) %}
+{% if can_edit_assignment_details %}
 {% set __ = header_actions.items.append({
     'type': 'submit',
     'text': save_label,
     'classes': 'professional-action-btn professional-action-btn-blue',
     'attributes': {'id': 'manageAssignmentSubmitBtn', 'form': 'manageAssignmentForm'}
 }) %}
+{% endif %}
 
 {{ page_header(
     title=assignment_page_title,
@@ -55,9 +60,9 @@
 {% set entity_tabs = namespace(order=[]) %}
 {% if assignment and assignment_entities %}
 {% set __ = entity_tabs.order.append('manage') %}{% endif %}
-{% if has_countries or has_secretariat %}
+{% if (not assignment or can_manage_assignment_entities) and (has_countries or has_secretariat) %}
 {% set __ = entity_tabs.order.append('add_entities') %}{% endif %}
-{% if has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
+{% if (not assignment or can_manage_assignment_entities) and has_ns_structure %}{% set __ = entity_tabs.order.append('ns_structure') %}{% endif %}
 {% set show_main_tabs = entity_tabs.order|length > 0 %}
 {% set default_add_entities_subtab = 'countries' if has_countries else 'secretariat' %}
 {# Determine if we should show sub-tabs within Add Entities: hide if only one sub-tab is available #}
@@ -88,7 +93,7 @@
                 <i class="fas fa-cog mr-1.5"></i>{{ _('Manage Existing Entities') }}
             </button>
             {% endif %}
-            {% if has_countries or has_secretariat %}
+            {% if 'add_entities' in entity_tabs.order %}
             <button type="button" role="tab"
                     id="add-entities-tab"
                     data-tabs-target="#add-entities-panel"
@@ -98,7 +103,7 @@
                 <i class="fas fa-plus-circle mr-1.5"></i>{{ _('Add Entities') }}
             </button>
             {% endif %}
-            {% if has_ns_structure %}
+            {% if 'ns_structure' in entity_tabs.order %}
             <button type="button" role="tab"
                     id="ns-structure-tab"
                     data-tabs-target="#ns-structure-panel"
@@ -119,6 +124,7 @@
         {% if not assignment and form.confirm_duplicate is defined %}
             {{ form.confirm_duplicate(class="hidden", id="confirm_duplicate") }}
         {% endif %}
+        <fieldset {% if assignment and not can_edit_assignment_details %}disabled class="opacity-75"{% endif %}>
 
         {% set existing_trans = (assignment.custom_name_translations or {}) if assignment else {} %}
 
@@ -637,6 +643,7 @@
                 </p>
             </div>
         </div>
+        </fieldset>
             </form>
         </div>
 
@@ -655,18 +662,23 @@
                 </div>
                 {% endif %}
                 {# Bulk actions bar - shown when rows are selected in the grid #}
+                {% if can_manage_assignment_entities or can_update_assignment_entity_status %}
                 <div id="entity-grid-bulk-actions" class="hidden items-center gap-3 flex-wrap mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <span id="entity-grid-selected-count" class="text-sm font-semibold text-gray-800">{{ _('0 selected') }}</span>
+                    {% if can_manage_assignment_entities %}
                     <button type="button" id="entity-grid-bulk-delete-btn" class="btn btn-danger">
                         <i class="fas fa-trash mr-1"></i>{{ _('Delete selected') }}
                     </button>
+                    {% endif %}
+                    {% if can_update_assignment_entity_status %}
                     <button type="button" id="entity-grid-bulk-status-btn" class="btn btn-primary">
                         <i class="fas fa-exchange-alt mr-1"></i>{{ _('Change status') }}
                     </button>
                     <button type="button" id="entity-grid-bulk-duedate-btn" class="btn btn-primary">
                         <i class="fas fa-calendar-alt mr-1"></i>{{ _('Change due date') }}
                     </button>
-                    {% if assignment and assignment.has_public_url() %}
+                    {% endif %}
+                    {% if can_manage_assignment_entities and assignment and assignment.has_public_url() %}
                     <button type="button" id="entity-grid-bulk-public-enable-btn" class="btn btn-success">
                         <i class="fas fa-globe mr-1"></i>{{ _('Enable public reporting') }}
                     </button>
@@ -675,6 +687,7 @@
                     </button>
                     {% endif %}
                 </div>
+                {% endif %}
                 {{ ag_grid_body_wrap(
                     'entityManagementGrid',
                     loading_text=_('Loading entities...'),
@@ -685,7 +698,7 @@
             {% endif %}
 
             {# Add Entities Tab - contains Countries and Secretariat as sub-tabs #}
-            {% if has_countries or has_secretariat %}
+            {% if 'add_entities' in entity_tabs.order %}
             <div class="p-4 rounded-lg bg-gray-50 {% if show_main_tabs %}hidden{% endif %}" id="add-entities-panel" role="tabpanel" aria-labelledby="add-entities-tab">
                 {# Sub-tab navigation for Add Entities - only show if multiple sub-tabs are available #}
                 {% if show_add_entities_subtabs %}
@@ -879,7 +892,7 @@
             {% endif %}
 
             {# NS Structure Tab - Hierarchical view of Branches > Sub-branches > Local Units #}
-            {% if has_ns_structure %}
+            {% if 'ns_structure' in entity_tabs.order %}
             <div class="p-4 rounded-lg bg-gray-50 {% if show_main_tabs %}hidden{% endif %}" id="ns-structure-panel" role="tabpanel" aria-labelledby="ns-structure-tab">
                 <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                     <p class="text-xs text-blue-800">
@@ -982,7 +995,7 @@
 {% endcall %}
 {% endif %}
 
-{% if TRANSLATABLE_LANGUAGES %}
+{% if TRANSLATABLE_LANGUAGES and can_edit_assignment_details %}
 {{ translation_modal(
     modal_id='custom-name-translations-modal',
     modal_title=_('Custom Name Translations'),
@@ -995,7 +1008,7 @@
 ) }}
 {% endif %}
 
-{% if assignment %}
+{% if assignment and can_update_assignment_entity_status %}
 {% call modal_shell('edit-status-modal', (_('Edit Status for') ~ ' <span id="edit-status-modal-entity-name" class="font-bold ml-1">Entity</span>'), aria_label=_('Edit Status'), max_width='max-w-md', title_safe=true) %}
         <form id="edit-status-actual-form" method="POST" action="">
             {{ edit_aes_form.csrf_token }}
@@ -1199,10 +1212,10 @@
     "is_public_available": {{ aes.is_public_available|tojson }},
     "has_public_url": {{ (assignment.has_public_url() if assignment else false)|tojson }},
     "assignment_url": {{ (url_for('assignments.view_assignment', aes_id=aes.id) if assignment else '')|tojson }},
-    "remove_from_public_url": {{ (url_for('assignment_management.remove_country_from_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
-    "add_to_public_url": {{ (url_for('assignment_management.add_country_to_public', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
-    "remove_country_url": {{ (url_for('assignment_management.remove_country_from_assignment', assignment_id=assignment.id, country_id=aes.entity_id) if assignment and aes.entity_type == 'country' else '')|tojson }},
-    "remove_entity_url": {{ (url_for('assignment_management.remove_entity_from_assignment', assignment_id=assignment.id, status_id=aes.id) if assignment and aes.entity_type != 'country' else '')|tojson }},
+    "remove_from_public_url": {{ (url_for('assignment_management.remove_country_from_public', assignment_id=assignment.id, country_id=aes.entity_id) if can_manage_assignment_entities and assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
+    "add_to_public_url": {{ (url_for('assignment_management.add_country_to_public', assignment_id=assignment.id, country_id=aes.entity_id) if can_manage_assignment_entities and assignment and assignment.has_public_url() and aes.entity_type == 'country' else '')|tojson }},
+    "remove_country_url": {{ (url_for('assignment_management.remove_country_from_assignment', assignment_id=assignment.id, country_id=aes.entity_id) if can_manage_assignment_entities and assignment and aes.entity_type == 'country' else '')|tojson }},
+    "remove_entity_url": {{ (url_for('assignment_management.remove_entity_from_assignment', assignment_id=assignment.id, status_id=aes.id) if can_manage_assignment_entities and assignment and aes.entity_type != 'country' else '')|tojson }},
     "remove_confirm": {{ ('Are you sure you want to remove ' + aes_display_name + ' from this assignment and delete its data?')|tojson }},
     "remove_public_confirm": {{ ('Remove ' + aes_display_name + ' from public reporting?')|tojson }}
 }{% if not loop.last %},{% endif %}
@@ -1211,6 +1224,11 @@
 <script nonce="{{ csp_nonce() }}">
 window.manageAssignmentConfig = {
     assignmentId: {{ assignment.id if assignment else 'null' }},
+    permissions: {
+        canEditDetails: {{ can_edit_assignment_details|tojson }},
+        canManageEntities: {{ can_manage_assignment_entities|tojson }},
+        canUpdateEntityStatus: {{ can_update_assignment_entity_status|tojson }}
+    },
     statusChoices: [
         {%- if assignment and assignment_entity_status_choices is defined -%}
         {%- for value, label in assignment_entity_status_choices -%}

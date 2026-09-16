@@ -976,7 +976,14 @@ class Config:
     # If you need to change behavior, edit these constants in code.
     AI_DLP_ENABLED = True
     AI_DLP_MODE = "confirm"  # "warn" | "confirm" | "block"
-    AI_DLP_MAX_SCAN_CHARS = 12000
+    # Must stay >= the largest per-message cap (see AI_FORM_BUILDER_MAX_MESSAGE_CHARS
+    # default of 16000 in chat/request.py and _fb_ai_config.html): evaluate_ai_message()
+    # truncates the message to this many characters *before* scanning, so anything beyond
+    # this window is invisible to DLP regardless of AI_DLP_MODE. Previously 12000 while the
+    # form-builder panel's message cap was a separate, larger 16000 — sensitive content
+    # (email/API key/etc.) in chars 12001-16000 of a form-builder paste could reach the LLM
+    # completely unscanned. Keep in sync if either limit changes.
+    AI_DLP_MAX_SCAN_CHARS = 16000
 
     # Azure AD B2C Federation Login (OIDC)
     AZURE_B2C_TENANT = os.environ.get('AZURE_B2C_TENANT')

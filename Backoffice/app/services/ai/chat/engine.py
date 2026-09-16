@@ -59,6 +59,26 @@ def _strip_form_builder_boilerplate(text: str, *, edit_mode: bool) -> str:
     return cleaned
 
 
+def _scrub_message_for_llm(message: Optional[str], *, form_builder_assistant: bool) -> str:
+    """Redact obvious PII from a user chat message before it reaches a third-party LLM.
+
+    Form-builder mode is exempt: users routinely paste verbatim questionnaire text
+    (sample contact fields, example emails/phone numbers from a source document) that
+    the assistant must faithfully reproduce as labels/options in the generated
+    template. Generic PII scrubbing would silently corrupt that content into
+    "[redacted]" placeholders. DLP (``evaluate_ai_message``, run upstream in the route
+    layer before ``AIChatEngine.run`` is invoked) already gates genuinely sensitive
+    pastes via its warn/confirm/block modes, so skipping this redundant,
+    fidelity-breaking redaction here is safe for form-builder messages specifically.
+    """
+    text = (message or "").strip()
+    if form_builder_assistant:
+        return text
+    from app.services.ai.providers import scrub_pii_text
+
+    return scrub_pii_text(text)
+
+
 def _ai_debug_enabled() -> bool:
     try:
         v = current_app.config.get("AI_CHAT_DEBUG_LOGS", None)
@@ -987,14 +1007,14 @@ class AIChatEngine:
 
         # Privacy: minimize obvious PII before sending to third-party LLMs.
         # (DB persistence still stores the original user message for authenticated users.)
-        from app.services.ai.providers import scrub_pii_text, scrub_pii_context
+        from app.services.ai.providers import scrub_pii_context
 
-        safe_message = scrub_pii_text((message or "").strip())
         safe_page_context = scrub_pii_context(page_context or {})
         fb_page = safe_page_context.get("formBuilder") if isinstance(safe_page_context, dict) else None
         form_builder_assistant = bool(
             isinstance(fb_page, dict) and fb_page.get("enabled")
         )
+        safe_message = _scrub_message_for_llm(message, form_builder_assistant=form_builder_assistant)
         locale_code = (preferred_language or "en").split("-")[0]
 
         def _is_cancelled() -> bool:
@@ -1225,6 +1245,7 @@ class AIChatEngine:
                         map_requested=worldmap_requested,
                         chart_requested=chart_requested,
                         original_message=(message or "").strip() or None,
+                        cancelled=cancelled,
                     )
                 map_payload = None
                 chart_payload = None

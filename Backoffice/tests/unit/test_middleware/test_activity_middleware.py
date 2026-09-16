@@ -1328,6 +1328,26 @@ class TestActivityRegisteredHooks:
                 assert CURATED_DESCRIPTION_KEY not in context
                 assert "assignment_title" not in context
 
+    def test_after_request_skips_log_when_view_omits_noop_save(self, app):
+        """A no-op Update Assignment POST must not write a catalog 'updated' row."""
+        from app.utils.audit_context import skip_activity_log
+
+        with app.test_request_context("/admin/assignments/edit/1", method="POST"):
+            g.activity_user_id = 1
+            g._auto_txn_managed = False
+            g.start_time = time.time()
+            skip_activity_log()
+            with _with_activity_endpoint("assignment_management.edit_assignment"), \
+                 patch("app.middleware.activity_middleware.is_static_asset_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware._should_skip_auto_activity_request",
+                       return_value=False), \
+                 patch("app.middleware.activity_middleware.log_user_activity") as mock_log, \
+                 patch("app.middleware.activity_middleware._extract_entity_into_context"):
+                from flask import make_response
+                _activity_after(app)(make_response("ok", 200))
+                mock_log.assert_not_called()
+
     def test_before_request_clears_pending_audit_details(self, app):
         """g lives on the app context, so stale details must not reach the next row."""
         from app.utils.audit_context import AUDIT_DETAILS_ATTR, set_audit_details

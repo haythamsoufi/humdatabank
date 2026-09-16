@@ -10,6 +10,13 @@ from flask import request
 
 from app.utils.api_helpers import get_json_safe
 
+# Same bound as form-field chunk reassembly (processors/_common.py).
+_WAF_JSON_MAX_CHUNKS = 256
+
+
+class WafJsonUnwrapError(ValueError):
+    """``payload`` / ``payload_b64`` envelope was present but could not be decoded."""
+
 
 class _JsonFormProxy:
     """Drop-in replacement for ``request.form`` backed by a parsed JSON dict.
@@ -53,6 +60,59 @@ class _JsonFormProxy:
         return dict(self._data)
 
 
+def unwrap_waf_json_envelope(data, *, strict=False):
+    """Unwrap ``{payload, payload__c1, …}`` / ``payload_b64`` WAF envelopes.
+
+    Returns *data* unchanged when no envelope key is present (legacy / mobile
+    clients). ``strict=True`` raises :class:`WafJsonUnwrapError` on a present
+    but malformed envelope; ``strict=False`` logs and returns the raw dict
+    (``get_request_data`` compatibility).
+    """
+    if not isinstance(data, dict):
+        if strict:
+            raise WafJsonUnwrapError("not a JSON object")
+        return data
+
+    chunk_prefix = None
+    first = data.get("payload")
+    if isinstance(first, str) and first:
+        chunk_prefix = "payload"
+    else:
+        first = data.get("payload_b64")
+        if isinstance(first, str) and first:
+            chunk_prefix = "payload_b64"
+    if chunk_prefix is None:
+        return data
+
+    parts = [first]
+    for index in range(1, _WAF_JSON_MAX_CHUNKS + 1):
+        chunk = data.get(f"{chunk_prefix}__c{index}")
+        if chunk is None:
+            break
+        parts.append(str(chunk))
+
+    try:
+        decoded = json.loads(base64.b64decode("".join(parts)).decode("utf-8"))
+    except Exception as exc:
+        if strict:
+            raise WafJsonUnwrapError(f"malformed WAF JSON envelope: {exc}") from exc
+        try:
+            from flask import current_app
+            current_app.logger.warning(
+                "unwrap_waf_json_envelope: failed to decode payload — malformed base64 or JSON: %s",
+                exc,
+            )
+        except RuntimeError:
+            pass
+        return data
+
+    if not isinstance(decoded, dict):
+        if strict:
+            raise WafJsonUnwrapError("WAF JSON envelope did not decode to an object")
+        return data
+    return decoded
+
+
 def get_request_data():
     """Return a form-data-like object for the current request.
 
@@ -61,8 +121,8 @@ def get_request_data():
     using ``.get()`` / ``.getlist()`` / ``in`` without branching.
 
     Transparently unwraps ``{ "payload": "<base64 UTF-8 JSON>" }`` bodies
-    sent by the frontend to avoid WAF false positives on JSON-encoded config
-    strings (matrix config, translations, etc.).
+    (and ``payload__cN`` sibling chunks) sent by the frontend to avoid WAF
+    false positives on JSON-encoded config strings.
 
     Otherwise returns ``request.form`` directly.
 
@@ -73,19 +133,7 @@ def get_request_data():
         items = data.getlist('items')
     """
     if _is_json_body():
-        raw = get_json_safe() or {}
-        wrapped = raw.get("payload") or raw.get("payload_b64")
-        if wrapped and isinstance(wrapped, str):
-            try:
-                raw = json.loads(base64.b64decode(str(wrapped)).decode("utf-8"))
-            except Exception as _e:
-                from flask import current_app
-                try:
-                    current_app.logger.warning(
-                        "get_request_data: failed to decode payload_b64 — malformed base64 or JSON: %s", _e
-                    )
-                except RuntimeError:
-                    pass  # outside request context
+        raw = unwrap_waf_json_envelope(get_json_safe() or {}, strict=False)
         return _JsonFormProxy(raw)
     return request.form
 

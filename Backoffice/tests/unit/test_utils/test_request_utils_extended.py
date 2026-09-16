@@ -168,6 +168,37 @@ class TestGetRequestData:
             result = get_request_data()
             assert result.get("alt_key") == "alt_value"
 
+    def test_json_body_with_chunked_payload_reassembled(self, app):
+        from app.utils.request_utils import get_request_data
+        inner = {"message": "SELECT <script> " + ("x" * 800)}
+        encoded = base64.b64encode(json.dumps(inner).encode("utf-8")).decode("ascii")
+        body = json.dumps({
+            "payload": encoded[:350],
+            "payload__c1": encoded[350:700],
+            "payload__c2": encoded[700:],
+        })
+        with app.test_request_context(
+            "/test",
+            method="POST",
+            content_type="application/json",
+            data=body,
+        ):
+            result = get_request_data()
+            assert result.get("message") == inner["message"]
+
+
+@pytest.mark.unit
+class TestUnwrapWafJsonEnvelope:
+    def test_passthrough_without_envelope(self):
+        from app.utils.request_utils import unwrap_waf_json_envelope
+        raw = {"message": "hello"}
+        assert unwrap_waf_json_envelope(raw) is raw
+
+    def test_strict_rejects_malformed_envelope(self):
+        from app.utils.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
+        with pytest.raises(WafJsonUnwrapError):
+            unwrap_waf_json_envelope({"payload": "!!!not-b64!!!"}, strict=True)
+
 
 @pytest.mark.unit
 class TestGetRequestField:

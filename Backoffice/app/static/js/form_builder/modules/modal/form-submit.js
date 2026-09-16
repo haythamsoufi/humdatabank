@@ -1,4 +1,4 @@
-import { setHiddenRuleField, setMultiHiddenFields, setHiddenField } from '../rules/form-serialization.js';
+import { setHiddenRuleField, setMultiHiddenFields, setHiddenField, syncValidationMessageForSubmit } from '../rules/form-serialization.js';
 import { isActuallyHidden } from '../dom-visibility.js';
 import { MatrixItem } from '../items/matrix.js';
 import { ImageItem } from '../items/image.js';
@@ -99,6 +99,7 @@ export const FormSubmitMixin = {
                 } else {
                     setHiddenRuleField(form, 'validation_condition', validationBuilder);
                 }
+                syncValidationMessageForSubmit(form, this.modalElement, { isDisplayOnly });
             }
         } catch (_e) {}
 
@@ -223,14 +224,7 @@ export const FormSubmitMixin = {
             setHiddenRuleField(form, 'validation_condition', validationBuilder);
         }
 
-        const validationMessageInput = this.modalElement.querySelector('#item-validation-message');
-        if (validationMessageInput && !isDisplayOnly) {
-            setHiddenField(form, 'validation_message', validationMessageInput.value);
-        }
-        const validationMessageTranslationsInput = this.modalElement.querySelector('#item-validation-message-translations');
-        if (validationMessageTranslationsInput && !isDisplayOnly) {
-            setHiddenField(form, 'validation_message_translations', validationMessageTranslationsInput.value || '{}');
-        }
+        syncValidationMessageForSubmit(form, this.modalElement, { isDisplayOnly });
 
         if (this.currentItemType === 'matrix') {
             MatrixItem.updateConfig(this.modalElement);

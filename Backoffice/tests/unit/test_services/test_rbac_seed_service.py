@@ -47,6 +47,9 @@ class TestPermissionCatalog:
         for expected in (
             'admin.users.view',
             'admin.templates.view',
+            'admin.assignments.edit',
+            'admin.assignments.entities.status',
+            'admin.assignments.entities.manage',
             'assignment.view',
             'assignment.enter',
             'assignment.submit',
@@ -114,6 +117,7 @@ class TestBaselineRoles:
         role_codes = {r['code'] for r in self._roles()}
         for expected in (
             'system_manager', 'admin_core', 'admin_full',
+            'admin_assignments_status', 'admin_assignments_manager',
             'assignment_viewer', 'assignment_approver',
             'assignment_editor_submitter',
         ):
@@ -124,6 +128,19 @@ class TestBaselineRoles:
         roles = _baseline_roles(catalog)
         viewer = next(r for r in roles if r['code'] == 'assignment_viewer')
         assert viewer['permission_codes'] == ['assignment.view']
+
+    def test_admin_assignments_status_role_is_narrow(self):
+        catalog = _permission_catalog()
+        roles = _baseline_roles(catalog)
+        status_role = next(r for r in roles if r['code'] == 'admin_assignments_status')
+        assert status_role['permission_codes'] == [
+            'admin.assignments.view',
+            'admin.assignments.entities.status',
+        ]
+        manager = next(r for r in roles if r['code'] == 'admin_assignments_manager')
+        assert 'admin.assignments.edit' in manager['permission_codes']
+        assert 'admin.assignments.entities.status' in manager['permission_codes']
+        assert 'admin.assignments.entities.manage' in manager['permission_codes']
 
     def test_admin_core_is_subset_of_admin_permissions(self):
         catalog = _permission_catalog()

@@ -21,7 +21,7 @@ echo the ``ref -> created id`` mapping.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from flask import current_app
 
@@ -50,6 +50,11 @@ class FormTemplateAIError(Exception):
 # ---------------------------------------------------------------------------
 
 QUESTION_TYPES = {qt.value for qt in QuestionType}
+
+# Question types that carry a manual-options list / calculated-choice lookup.
+# Shared by _apply_question_options() and _op_update_item()'s stale-field
+# cleanup when a question's type changes away from one of these.
+CHOICE_QUESTION_TYPES = ("single_choice", "multiple_choice")
 
 SECTION_TYPES = {"standard", "repeat", "dynamic_indicators"}
 
@@ -758,13 +763,38 @@ class FormTemplateAIService:
 
         translator = get_auto_translator()
 
-        def _translate(text: str, code: str) -> Optional[str]:
-            target = Config.LANGUAGE_MODEL_KEY.get(code) or code
-            try:
-                return translator.translate_text(text, target, "en")
-            except Exception as exc:  # pragma: no cover - network failure path
-                logger.debug("translate_text failed (%s -> %s): %s", text[:40], code, exc)
-                return None
+        # ------------------------------------------------------------------
+        # Phase 1 (below, inside the try block): walk the template and *queue*
+        # every translatable string without making any network calls yet.
+        # Each queued field records its text, which target codes still need
+        # translation (skipping already-translated codes unless
+        # overwrite=True), and a setter to apply the merged result.
+        #
+        # Phase 2 then issues exactly one translate_batch() call per target
+        # language for the *whole* template, instead of the previous one
+        # network round-trip per (string, language) pair — a template with
+        # e.g. 40 items x 3 languages previously made ~120+ sequential calls.
+        # ------------------------------------------------------------------
+        texts_by_lang: Dict[str, List[str]] = {code: [] for code in targets}
+        seen_by_lang: Dict[str, Set[str]] = {code: set() for code in targets}
+        fields: List[Tuple[str, Dict[str, str], List[str], Callable[[Dict[str, str]], None]]] = []
+        skipped = 0
+
+        def _queue(existing: Optional[dict], text: Optional[str], apply_fn: Callable[[Dict[str, str]], None]) -> None:
+            nonlocal skipped
+            if not text or not str(text).strip():
+                return
+            text = str(text)
+            existing_map = dict(existing or {})
+            pending = [c for c in targets if overwrite or not existing_map.get(c)]
+            skipped += len(targets) - len(pending)
+            if not pending:
+                return
+            fields.append((text, existing_map, pending, apply_fn))
+            for code in pending:
+                if text not in seen_by_lang[code]:
+                    seen_by_lang[code].add(text)
+                    texts_by_lang[code].append(text)
 
         try:
             max_items = _as_int(
@@ -773,80 +803,67 @@ class FormTemplateAIService:
             draft = self._get_or_create_draft(template, user.id)
             draft.updated_by = user.id
 
-            translated = 0
-            skipped = 0
-            failed = 0
-
-            def _fill_map(current: Optional[dict], text: Optional[str]) -> Tuple[Optional[dict], int, int, int]:
-                """Return (new_map, translated, skipped, failed) for one text field."""
-                if not text or not str(text).strip():
-                    return current, 0, 0, 0
-                new_map = dict(current or {})
-                t = s = f = 0
-                for code in targets:
-                    if not overwrite and new_map.get(code):
-                        s += 1
-                        continue
-                    result = _translate(str(text), code)
-                    if result:
-                        new_map[code] = result
-                        t += 1
-                    else:
-                        f += 1
-                return (new_map or None), t, s, f
-
             # Template/version name + description
-            for attr_text, attr_map in (
-                ("name", "name_translations"),
-                ("description", "description_translations"),
-            ):
-                new_map, t, s, f = _fill_map(getattr(draft, attr_map), getattr(draft, attr_text))
-                if t:
-                    setattr(draft, attr_map, new_map)
-                translated, skipped, failed = translated + t, skipped + s, failed + f
+            _queue(draft.name_translations, draft.name, lambda m: setattr(draft, "name_translations", m))
+            _queue(
+                draft.description_translations,
+                draft.description,
+                lambda m: setattr(draft, "description_translations", m),
+            )
 
             # Pages
             pages = FormPage.query.filter_by(template_id=template.id, version_id=draft.id).all()
             for page in pages:
-                new_map, t, s, f = _fill_map(page.name_translations, page.name)
-                if t:
-                    page.name_translations = new_map
-                translated, skipped, failed = translated + t, skipped + s, failed + f
+                _queue(
+                    page.name_translations,
+                    page.name,
+                    lambda m, _page=page: setattr(_page, "name_translations", m),
+                )
 
             # Sections
             sections = FormSection.query.filter_by(
                 template_id=template.id, version_id=draft.id, archived=False
             ).all()
             for section in sections:
-                new_map, t, s, f = _fill_map(section.name_translations, section.name)
-                if t:
-                    section.name_translations = new_map
-                translated, skipped, failed = translated + t, skipped + s, failed + f
+                _queue(
+                    section.name_translations,
+                    section.name,
+                    lambda m, _section=section: setattr(_section, "name_translations", m),
+                )
 
             # Items (labels, definitions, manual options)
-            items = (
-                FormItem.query.filter_by(template_id=template.id, version_id=draft.id, archived=False)
-                .order_by(FormItem.order)
-                .limit(max_items or 200)
-                .all()
+            items_query = FormItem.query.filter_by(
+                template_id=template.id, version_id=draft.id, archived=False
             )
+            total_item_count = items_query.count()
+            items = items_query.order_by(FormItem.order).limit(max_items or 200).all()
+            items_truncated = total_item_count > len(items)
+            # Options need a second pass after translation to rebuild each
+            # item's options_translations list from its (possibly updated)
+            # by_text map — track which items actually got a new translation
+            # so unchanged items are left alone, matching the old behavior.
+            option_batches: List[Tuple[FormItem, Dict[str, Dict[str, str]]]] = []
+            changed_option_item_ids: Set[int] = set()
             for item in items:
-                new_map, t, s, f = _fill_map(item.label_translations, item.label)
-                if t:
-                    item.label_translations = new_map
-                translated, skipped, failed = translated + t, skipped + s, failed + f
+                _queue(
+                    item.label_translations,
+                    item.label,
+                    lambda m, _item=item: setattr(_item, "label_translations", m),
+                )
 
                 if item.definition:
-                    new_map, t, s, f = _fill_map(item.definition_translations, item.definition)
-                    if t:
-                        item.definition_translations = new_map
-                    translated, skipped, failed = translated + t, skipped + s, failed + f
+                    _queue(
+                        item.definition_translations,
+                        item.definition,
+                        lambda m, _item=item: setattr(_item, "definition_translations", m),
+                    )
 
                 if item.is_document_field and item.description:
-                    new_map, t, s, f = _fill_map(item.description_translations, item.description)
-                    if t:
-                        item.description_translations = new_map
-                    translated, skipped, failed = translated + t, skipped + s, failed + f
+                    _queue(
+                        item.description_translations,
+                        item.description,
+                        lambda m, _item=item: setattr(_item, "description_translations", m),
+                    )
 
                 # Manual choice options: array of {option_text, translations}
                 if item.is_question and isinstance(item.options_json, list) and item.options_json:
@@ -856,28 +873,70 @@ class FormTemplateAIService:
                         for e in existing
                         if isinstance(e, dict) and e.get("option_text")
                     }
-                    changed = False
                     for option in item.options_json:
                         opt_text = str(option).strip()
                         if not opt_text:
                             continue
-                        tr = by_text.setdefault(opt_text, {})
-                        for code in targets:
-                            if not overwrite and tr.get(code):
-                                skipped += 1
-                                continue
-                            result = _translate(opt_text, code)
-                            if result:
-                                tr[code] = result
-                                translated += 1
-                                changed = True
-                            else:
-                                failed += 1
-                    if changed:
-                        item.options_translations = [
-                            {"option_text": text, "translations": tr}
-                            for text, tr in by_text.items()
-                        ]
+                        by_text.setdefault(opt_text, {})
+
+                        def _apply_option(new_map, _by_text=by_text, _key=opt_text, _item_id=item.id) -> None:
+                            _by_text[_key] = new_map
+                            changed_option_item_ids.add(_item_id)
+
+                        _queue(by_text.get(opt_text), opt_text, _apply_option)
+                    option_batches.append((item, by_text))
+
+            # ------------------------------------------------------------------
+            # Phase 2: one batch translation call per target language.
+            # ------------------------------------------------------------------
+            results_by_lang: Dict[str, Dict[str, Optional[str]]] = {}
+            for code in targets:
+                unique_texts = texts_by_lang.get(code) or []
+                if not unique_texts:
+                    results_by_lang[code] = {}
+                    continue
+                target_model = Config.LANGUAGE_MODEL_KEY.get(code) or code
+                try:
+                    batch_result = translator.translate_batch(unique_texts, target_model, "en")
+                except Exception as exc:  # pragma: no cover - network failure path
+                    logger.debug(
+                        "translate_batch failed (%s, %d item(s)): %s", code, len(unique_texts), exc
+                    )
+                    batch_result = [None] * len(unique_texts)
+                results_by_lang[code] = dict(zip(unique_texts, batch_result))
+
+            # ------------------------------------------------------------------
+            # Phase 3: apply results back to every queued field.
+            # ------------------------------------------------------------------
+            translated = 0
+            failed = 0
+            for text, existing_map, pending_codes, apply_fn in fields:
+                new_map = dict(existing_map)
+                field_changed = False
+                for code in pending_codes:
+                    result = results_by_lang.get(code, {}).get(text)
+                    if result:
+                        new_map[code] = result
+                        translated += 1
+                        field_changed = True
+                    else:
+                        failed += 1
+                if field_changed:
+                    apply_fn(new_map)
+
+            for item, by_text in option_batches:
+                if item.id in changed_option_item_ids:
+                    item.options_translations = [
+                        {"option_text": text, "translations": tr}
+                        for text, tr in by_text.items()
+                    ]
+
+            warnings: List[str] = []
+            if items_truncated:
+                warnings.append(
+                    f"Only the first {len(items)} of {total_item_count} item(s) were translated "
+                    f"(AI_FORM_TEMPLATE_TRANSLATE_MAX_ITEMS limit); run translate again to cover the rest."
+                )
 
             summary = (
                 f"Auto-translated template content to {', '.join(targets)} "
@@ -901,6 +960,7 @@ class FormTemplateAIService:
             "translated": translated,
             "skipped_existing": skipped,
             "failed": failed,
+            "warnings": warnings,
             "edit_url": self._edit_url(template.id, draft.id),
             "note": (
                 "Translations were written to the DRAFT version. "
@@ -1280,7 +1340,7 @@ class FormTemplateAIService:
     ) -> None:
         options = schema.get("options")
         lookup_list_id = schema.get("lookup_list_id")
-        is_choice = question_type in ("single_choice", "multiple_choice")
+        is_choice = question_type in CHOICE_QUESTION_TYPES
 
         if lookup_list_id is not None and str(lookup_list_id).strip():
             # Calculated choices (phase 6)
@@ -1663,6 +1723,7 @@ class FormTemplateAIService:
             config_changed = True
 
         if op.get("question_type") is not None and item.is_question:
+            previous_type = item.type
             question_type = str(op.get("question_type")).strip().lower()
             if question_type not in QUESTION_TYPES:
                 raise FormTemplateAIError(
@@ -1670,6 +1731,22 @@ class FormTemplateAIService:
                 )
             item.type = question_type
             changed.append(f"question_type={question_type}")
+
+            # Moving away from a choice type leaves options_json/lookup_list_id
+            # etc. stale (e.g. a single_choice -> text edit would otherwise keep
+            # the old option list hidden on the item). Clear them unless the
+            # same op is also setting new options/lookup data for the new type
+            # (handled by _apply_question_options below).
+            if (
+                previous_type in CHOICE_QUESTION_TYPES
+                and question_type not in CHOICE_QUESTION_TYPES
+            ):
+                item.options_json = None
+                item.options_translations = None
+                item.lookup_list_id = None
+                item.list_display_column = None
+                item.list_filters_json = None
+                changed.append("cleared stale options/lookup (no longer a choice type)")
 
         if (op.get("options") is not None or op.get("lookup_list_id") is not None) and item.is_question:
             self._apply_question_options(item, op, item.type, warnings)

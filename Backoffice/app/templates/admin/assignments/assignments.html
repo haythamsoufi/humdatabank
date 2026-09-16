@@ -5,6 +5,8 @@
 {% set can_manage_public = current_is_system_manager or has_permission('admin.assignments.public_submissions.manage') %}
 {% set can_create_assignment = current_is_system_manager or has_permission('admin.assignments.create') %}
 {% set can_edit_assignment = current_is_system_manager or has_permission('admin.assignments.edit') %}
+{% set can_update_entity_status = current_is_system_manager or has_permission('admin.assignments.entities.status') or has_permission('admin.assignments.entities.manage') %}
+{% set can_open_assignment = can_edit_assignment or can_update_entity_status %}
 {% set can_delete_assignment = current_is_system_manager or has_permission('admin.assignments.delete') %}
 
 {% from "components/_page_header.html" import page_header %}
@@ -99,7 +101,7 @@
             "reopen_closed_url": {{ (url_for('assignment_management.reopen_closed_assignment', assignment_id=assignment.id) if can_edit_assignment else '')|tojson }},
             "generate_url": {{ (url_for('assignment_management.generate_public_url', assignment_id=assignment.id) if can_manage_public else '')|tojson }},
             "view_submissions_url": {{ (url_for('assignment_management.view_public_submissions', assignment_id=assignment.id) if can_manage_public else '')|tojson }},
-            "edit_url": {{ (url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if can_edit_assignment else '')|tojson }},
+            "edit_url": {{ (url_for('assignment_management.edit_assignment', assignment_id=assignment.id) if can_open_assignment else '')|tojson }},
             "delete_url": {{ (url_for('assignment_management.delete_assignment', assignment_id=assignment.id) if can_delete_assignment else '')|tojson }},
             "delete_confirm": {{ _('Are you sure you want to delete this assignment and all its associated country statuses and data?')|tojson }},
             "close_confirm": {{ _('Close this assignment? It can be reopened later by an admin.')|tojson }},

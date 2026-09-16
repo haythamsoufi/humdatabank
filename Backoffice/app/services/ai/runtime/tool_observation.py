@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from flask import current_app
 
@@ -37,6 +37,27 @@ _SEARCH_CHUNK_KEYS_FOR_LLM = (
     "page_number",
     "score",
 )
+
+# create/edit/translate/discard_template_draft each return a full before/after
+# serialization of the *entire* template (all pages/sections/items/translations) under
+# these two keys, purely so the SSE client can offer Undo/Redo (see
+# extract_form_builder_result_from_steps + form-builder-ai.js's _fbAiLastEditUndoRedo).
+# The LLM never needs either snapshot to reason about what happened or plan its next
+# step — it only needs success/changes/edit_url — so every multi-step form-builder turn
+# was otherwise re-sending two full template dumps to OpenAI per write, compounding as
+# the conversation grows. These are dropped from the LLM-bound observation only; the
+# original tool_result dict (and therefore form_builder_result / SSE delivery, which
+# read the *pre-compaction* dict directly — see executor.py's `steps` append) is
+# untouched.
+#
+# Reuses the canonical tool-name set from form_template_specs (single source of truth —
+# see _utils.py's extract_form_builder_result_from_steps, which imports the same set)
+# instead of yet another locally-duplicated tuple.
+from app.services.ai.tools.form_template_specs import (
+    FORM_TEMPLATE_WRITE_TOOLS as _FORM_TEMPLATE_WRITE_TOOL_NAMES,
+)
+
+_FORM_TEMPLATE_SNAPSHOT_KEYS = ("undo_structure", "redo_structure")
 
 _SENTENCE_END_RE = __import__("re").compile(r"[.!?]\s")
 
@@ -101,6 +122,30 @@ def compact_tool_observation_for_llm(
         payload = {"result": tool_result}
 
     try:
+        if tool_name in _FORM_TEMPLATE_WRITE_TOOL_NAMES:
+            result = payload.get("result") if isinstance(payload, dict) else None
+            if isinstance(result, dict) and any(k in result for k in _FORM_TEMPLATE_SNAPSHOT_KEYS):
+                # Shallow-copy so the original `result` dict (and its undo_structure /
+                # redo_structure *values*, which form_builder_result keeps references to)
+                # is never mutated — only this new top-level dict's own key bindings change.
+                slim_result = dict(result)
+                for key in _FORM_TEMPLATE_SNAPSHOT_KEYS:
+                    snapshot = slim_result.get(key)
+                    if snapshot is not None:
+                        slim_result[key] = (
+                            f"<omitted: full template snapshot ({len(_dumps(snapshot))} chars) — "
+                            "already delivered to the client for undo/redo; not needed to answer>"
+                        )
+                slim_payload = {**payload, "result": slim_result}
+                s_ft = _dumps(slim_payload)
+                if len(s_ft) <= limit:
+                    return s_ft
+                # Snapshots stripped but still over limit (e.g. huge `changes`/`warnings`
+                # lists) — fall through to the generic size-based compaction below using
+                # the already-slimmed payload rather than the original (which would just
+                # re-derive the same oversized preview from the raw snapshots again).
+                payload = slim_payload
+
         if tool_name in ("search_documents", "search_documents_hybrid"):
             raw = payload.get("result") if isinstance(payload, dict) else None
             if isinstance(raw, dict) and "result" in raw:
@@ -403,3 +448,52 @@ def compact_tool_observation_for_llm(
         logger.warning("Tool observation compaction failed for %s: %s", tool_name, e, exc_info=True)
         text = str(tool_result)
         return _dumps({"truncated": True, "preview": text[: max(1000, limit - 200)], "original_length": len(text)})
+
+
+def strip_form_builder_snapshots_for_trace(steps: Any) -> Any:
+    """
+    Return a copy of an agent run's ``steps`` list with undo_structure/redo_structure
+    (see _FORM_TEMPLATE_SNAPSHOT_KEYS above) replaced by a short marker, for persisting
+    into ``AIReasoningTrace.steps`` (a JSON column with no size cap).
+
+    These two fields are a full before/after dump of the *entire* template — every
+    page/section/item/translation — captured purely so the SSE client can offer
+    Undo/Redo for the current response (see form-builder-ai.js's _fbAiLastEditUndoRedo).
+    Nothing re-reads them from a persisted trace afterwards (the admin trace viewer at
+    admin/ai_management.py only pulls generic quality-debug fields back out of
+    trace.steps), so storing two full snapshots per form-builder write forever bloats
+    the trace table for no later benefit — this got worse the larger/more active a
+    template is, and compounds across every edit made through the assistant.
+
+    Safe by construction: only ever builds *new* dicts (shallow copies at each level
+    touched) and never mutates the input. extract_form_builder_result_from_steps() and
+    the SSE form_builder_result payload both read the original, untouched `steps` list
+    earlier in executor.py's execute() — before this function is ever called — so this
+    trimmed copy existing only for trace persistence cannot affect either of them.
+    """
+    if not isinstance(steps, list):
+        return steps
+    if not any(
+        isinstance(s, dict) and str(s.get("action") or "") in _FORM_TEMPLATE_WRITE_TOOL_NAMES for s in steps
+    ):
+        return steps  # fast path: nothing to touch, skip copying entirely
+
+    trimmed: List[Any] = []
+    for step in steps:
+        if not isinstance(step, dict) or str(step.get("action") or "") not in _FORM_TEMPLATE_WRITE_TOOL_NAMES:
+            trimmed.append(step)
+            continue
+        obs = step.get("observation")
+        inner = obs.get("result") if isinstance(obs, dict) else None
+        if not isinstance(inner, dict) or not any(k in inner for k in _FORM_TEMPLATE_SNAPSHOT_KEYS):
+            trimmed.append(step)
+            continue
+        slim_inner = dict(inner)
+        for key in _FORM_TEMPLATE_SNAPSHOT_KEYS:
+            if slim_inner.get(key) is not None:
+                slim_inner[key] = (
+                    "<omitted from trace: full template snapshot; the live SSE response "
+                    "already delivered it to the client for undo/redo>"
+                )
+        trimmed.append({**step, "observation": {**obs, "result": slim_inner}})
+    return trimmed

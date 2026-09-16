@@ -28107,6 +28107,10 @@ msgid "You do not have permission to return this assignment for revision."
 msgstr ""
 "Vous n’avez pas la permission de retourner cette mission pour révision."
 
+#: app/routes/admin/assignment_management.py:1135
+msgid "You do not have permission to update assignment details."
+msgstr ""
+
 #: app/routes/translation_review/__init__.py:79
 msgid "You do not have permission to use translation review"
 msgstr "Vous n’avez pas la permission d’utiliser la relecture de traduction"

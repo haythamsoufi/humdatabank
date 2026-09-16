@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 """
-Optional manual check: translations catalog is current and all .po files compile cleanly.
+Blocking CI gate (.github/workflows/backoffice-ci.yml): the translations catalog
+is current and all .po files compile cleanly.
+
+Why this checks files even though translation *values* now live in the database:
+`translation_string` owns msgstr text and its review workflow, but the set of
+msgids still comes from `pybabel extract` into translations/messages.pot, and
+Flask-Babel still serves requests from compiled .mo files. The database only
+learns about a new msgid after extraction writes it into the .po files and the
+catalog is imported, so no DB-side check can notice a new _() call that was
+never extracted. That gap is what check 1 below covers.
 
 Two checks:
 
@@ -104,6 +113,8 @@ def check_staleness() -> None:
                 f"{len(new_ids)} translatable string(s) are in the source code but "
                 f"missing from translations/messages.pot.\n"
                 f"  Run: py scripts/i18n/extract_update_translations.py\n"
+                f"  Translating them in the admin grid does not fix this: the catalog "
+                f"has to list the msgid before the database can hold a value for it.\n"
                 f"  New strings (first {len(sample)}):\n"
             )
             for s in sample:

@@ -3,7 +3,9 @@
 Extract translatable strings from source code/templates and update PO files.
 
 This is the canonical i18n workflow for Backoffice:
-1) Extract to a POT file (source of truth): translations/messages.pot
+1) Extract to a POT file: translations/messages.pot, which is the source of
+   truth for *which* msgids exist. Translated values are owned by the
+   translation_string table; see app/services/translation/catalog_service.py.
 2) Update all locales in translations/*/LC_MESSAGES/messages.po
    - Removed msgids are marked as obsolete (#~) by Babel during update.
 3) (Optional) Compile PO -> MO (already handled by scripts/i18n/compile_translations.py)

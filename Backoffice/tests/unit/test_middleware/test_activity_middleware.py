@@ -540,6 +540,23 @@ class TestExtractEntityIntoContext:
 
             assert ctx.get("country_id") == 2
 
+    def test_post_with_requested_country_id_in_form(self, app):
+        with app.app_context():
+            class FakeForm:
+                def get(self, key, default=None):
+                    data = {"requested_country_id": "4"}
+                    return data.get(key, default)
+
+            req = _req(method="POST", form=FakeForm())
+            ctx = {}
+
+            mock_country = MagicMock(id=4, name="Requested Country")
+            with patch("app.models.Country") as mock_cls:
+                mock_cls.query.get.return_value = mock_country
+                _extract_entity_into_context(app, req, ctx)
+
+            assert ctx.get("country_id") == 4
+
     def test_url_view_args_aes_id(self, app):
         with app.app_context():
             req = _req(method="GET", view_args={"aes_id": "10"})

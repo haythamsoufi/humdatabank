@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from flask import redirect, url_for, flash, session, current_app, request
 from flask_login import login_required, current_user
 from app.models import db, User, Country, CountryAccessRequest
@@ -12,8 +14,44 @@ from flask_babel import _
 from app.utils.transactions import request_transaction_rollback
 from app.services.assignments.workflow_service import apply_entity_status_change
 from app.services.platform.app_settings_service import is_organization_email
+from app.utils.audit_context import set_audit_details
 
 from app.routes.main import bp
+
+
+def _record_country_access_request_audit(
+    *,
+    country_names,
+    request_message,
+    created_requests,
+    skipped_already_pending,
+    skipped_already_has_access,
+    skipped_invalid,
+):
+    """Attach reviewer-facing country / comment details to the audit-trail row."""
+    with suppress(Exception):
+        fields = {}
+        names = [n for n in (country_names or []) if n]
+        if names:
+            fields["countries"] = names
+        comment = (request_message or "").strip()
+        if comment:
+            fields["comment"] = comment
+        if created_requests:
+            if all(r.status == CountryAccessRequestStatus.APPROVED for r in created_requests):
+                fields["status"] = "Auto-approved"
+            elif all(r.status == CountryAccessRequestStatus.PENDING for r in created_requests):
+                fields["status"] = "Pending review"
+            else:
+                fields["status"] = "Submitted"
+        if skipped_already_pending:
+            fields["already_pending"] = list(skipped_already_pending)
+        if skipped_already_has_access:
+            fields["already_has_access"] = list(skipped_already_has_access)
+        if skipped_invalid:
+            fields["invalid_countries"] = list(skipped_invalid)
+        if fields:
+            set_audit_details(**fields)
 
 
 @bp.route("/select_country/<int:country_id>", methods=["POST"])
@@ -282,6 +320,7 @@ def request_country_access():
                         return redirect(url_for(redirect_endpoint))
 
                 created_requests = []
+                created_country_names = []
                 skipped_already_pending = []
                 skipped_already_has_access = []
                 skipped_invalid = []
@@ -351,6 +390,7 @@ def request_country_access():
                                 current_app.logger.debug("notify_user_added_to_country failed: %s", e)
 
                         created_requests.append(access_request)
+                        created_country_names.append(country.name)
 
                         admin_user_ids = collect_entity_admin_audience_recipient_ids(
                             NotificationType.access_request_received,
@@ -439,6 +479,15 @@ def request_country_access():
                 # If no requests were created and nothing was skipped, show error
                 if not created_requests and not skipped_already_pending and not skipped_already_has_access:
                     flash(_('No valid countries were selected. Please try again.'), 'warning')
+
+                _record_country_access_request_audit(
+                    country_names=created_country_names,
+                    request_message=form.request_message.data,
+                    created_requests=created_requests,
+                    skipped_already_pending=skipped_already_pending,
+                    skipped_already_has_access=skipped_already_has_access,
+                    skipped_invalid=skipped_invalid,
+                )
             else:
                 flash(_('Please select at least one country.'), 'danger')
         except Exception as e:

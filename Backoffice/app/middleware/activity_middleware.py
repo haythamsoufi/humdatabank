@@ -479,8 +479,8 @@ def _extract_entity_into_context(app, req, context_data):
                 if _store_from_aes(aes_raw):
                     return
 
-            # Direct country_id in form (admin forms, etc.)
-            c_raw = payload.get('country_id')
+            # Direct country_id in form (admin forms, country access requests, etc.)
+            c_raw = payload.get('country_id') or payload.get('requested_country_id')
             if c_raw and str(c_raw).isdigit():
                 if _store_from_country(c_raw):
                     return

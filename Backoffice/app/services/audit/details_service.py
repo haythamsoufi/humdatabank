@@ -809,7 +809,7 @@ def humanize_audit_details_dict(payload: Optional[Dict[str, Any]]) -> Optional[D
             if key == "entity_type" and isinstance(display, str):
                 display = display.replace("_", " ").title()
         label = _humanize_detail_key(key)
-        if label in out and key.endswith("_id"):
+        if label in out and (key.endswith("_id") or key.endswith("_ids")):
             continue
         out[label] = display
 

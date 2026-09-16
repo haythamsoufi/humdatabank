@@ -330,6 +330,42 @@ class TestRecordCountryAccessRequestAudit:
             )
         mock_audit.assert_not_called()
 
+    def test_recorded_fields_are_displayable_audit_details(self, app):
+        from app.models.system import CountryAccessRequestStatus
+        from app.routes.main.assignments import _record_country_access_request_audit
+        from app.services.audit.details_service import format_activity_log_details
+        from app.utils.audit_context import apply_audit_details_to_context, reset_request_audit_context
+
+        pending = MagicMock(status=CountryAccessRequestStatus.PENDING)
+        with app.test_request_context("/request_country_access", method="POST"):
+            reset_request_audit_context()
+            _record_country_access_request_audit(
+                country_names=["Kenya", "Chad"],
+                request_message="Need access for reporting",
+                created_requests=[pending],
+                skipped_already_pending=[],
+                skipped_already_has_access=[],
+                skipped_invalid=[],
+            )
+            context = {
+                "endpoint": "main.request_country_access",
+                "method": "POST",
+                "status_code": 302,
+                "form_data": {
+                    "requested_country_id": "1",
+                    "request_message": "Need access for reporting",
+                    "csrf_token": "secret",
+                },
+            }
+            apply_audit_details_to_context(context)
+            details = format_activity_log_details(context)
+
+        assert details == {
+            "Countries": ["Kenya", "Chad"],
+            "Comment": "Need access for reporting",
+            "Status": "Pending review",
+        }
+
 
 class TestRequestCountryAccess:
     """POST /request_country_access"""

@@ -82,10 +82,25 @@ class AgentRoutingPolicy:
 
         if fb_ctx:
             if not fb_ctx.get("template_id"):
-                return {
-                    "type": "function",
-                    "function": {"name": "create_form_template"},
-                }
+                # Only force create_form_template if the *tools* list actually sent to
+                # OpenAI this turn will include it (registry.py filters form-builder
+                # tools down to _form_template_allowed_tools() by RBAC). Forcing a
+                # named function that isn't in that turn's tools array is an OpenAI
+                # 400 ("tool_choice function not found"), not a graceful denial — e.g.
+                # a user with view/edit-only permissions opening the panel with no
+                # template selected yet would hard-fail their very first message.
+                try:
+                    from app.services.ai.tools.registry import _form_template_allowed_tools
+
+                    can_create = "create_form_template" in _form_template_allowed_tools()
+                except Exception:
+                    can_create = False
+                if can_create:
+                    return {
+                        "type": "function",
+                        "function": {"name": "create_form_template"},
+                    }
+                return "auto"
             return "required"
 
         return "auto"

@@ -10,6 +10,8 @@ Tests the core AI functionality including:
 - Tools registry
 """
 
+import threading
+
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
@@ -354,6 +356,108 @@ class TestAIAgentExecutor:
                 assert result["success"] is True
                 assert "answer" in result
 
+    def test_form_builder_ctx_respects_explicit_enabled_false(self, app):
+        """Regression: executor.py used to hardcode g.ai_form_builder_ctx["enabled"]=True
+        whenever page_context.formBuilder was a dict, even when the caller explicitly sent
+        enabled=False. That silently re-activated RBAC-sensitive form-template tool gating
+        the caller had explicitly turned off (e.g. panel closed but context still attached).
+
+        NOTE: nests test_request_context() inside a fresh app_context() rather than relying
+        on the session-scoped `app` context. Flask's RequestContext.push() only pushes (and
+        later pops) a NEW app context when one isn't already active for this app — since the
+        session fixture keeps one app context pushed for the whole test run, a bare
+        `app.test_request_context()` would reuse (and mutate) that shared `g` and leak
+        g.ai_form_builder_ctx into every later test. The explicit app_context() here is
+        fresh, so test_request_context() reuses *that* one and it's cleanly discarded on exit.
+        """
+        with app.app_context(), app.test_request_context():
+            app.config['AI_AGENT_ENABLED'] = True
+            app.config['OPENAI_API_KEY'] = 'test-key'
+
+            with patch('openai.OpenAI'):
+                from app.services.ai.agent import AIAgentExecutor
+                from flask import g
+
+                agent = AIAgentExecutor()
+                captured = {}
+
+                def _capture(*args, **kwargs):
+                    captured["fb_ctx"] = getattr(g, "ai_form_builder_ctx", "UNSET")
+                    return {
+                        "success": True,
+                        "answer": "ok",
+                        "steps": [],
+                        "status": "completed",
+                        "tool_calls": 0,
+                        "iterations": 1,
+                    }
+
+                with (
+                    patch.object(agent.trace_service, "create_trace", return_value=None),
+                    patch.object(agent.trace_service, "finalize_trace", return_value=None),
+                    patch.object(agent.query_planner, "plan_simple", return_value=None),
+                    patch.object(agent, "_execute_openai_native", side_effect=_capture),
+                ):
+                    agent.execute(
+                        query="What can you do?",
+                        user_context={
+                            "role": "admin",
+                            "page_context": {
+                                "formBuilder": {"enabled": False, "template_id": 5}
+                            },
+                        },
+                        language="en",
+                    )
+
+                assert captured.get("fb_ctx") is None
+
+    def test_form_builder_ctx_set_when_enabled_true(self, app):
+        """Sanity counterpart: enabled=True still activates form-builder context+routing.
+
+        See the g-isolation note in test_form_builder_ctx_respects_explicit_enabled_false
+        for why app_context() is nested outside test_request_context() here.
+        """
+        with app.app_context(), app.test_request_context():
+            app.config['AI_AGENT_ENABLED'] = True
+            app.config['OPENAI_API_KEY'] = 'test-key'
+
+            with patch('openai.OpenAI'):
+                from app.services.ai.agent import AIAgentExecutor
+                from flask import g
+
+                agent = AIAgentExecutor()
+                captured = {}
+
+                def _capture(*args, **kwargs):
+                    captured["fb_ctx"] = getattr(g, "ai_form_builder_ctx", "UNSET")
+                    return {
+                        "success": True,
+                        "answer": "ok",
+                        "steps": [],
+                        "status": "completed",
+                        "tool_calls": 0,
+                        "iterations": 1,
+                    }
+
+                with (
+                    patch.object(agent.trace_service, "create_trace", return_value=None),
+                    patch.object(agent.trace_service, "finalize_trace", return_value=None),
+                    patch.object(agent.query_planner, "plan_simple", return_value=None),
+                    patch.object(agent, "_execute_openai_native", side_effect=_capture),
+                ):
+                    agent.execute(
+                        query="Add a phone field",
+                        user_context={
+                            "role": "admin",
+                            "page_context": {
+                                "formBuilder": {"enabled": True, "template_id": 5}
+                            },
+                        },
+                        language="en",
+                    )
+
+                assert captured.get("fb_ctx") == {"enabled": True, "template_id": 5}
+
     def test_cost_limit_respected(self, agent):
         """Test that cost limit is enforced."""
         agent.cost_limit_usd = 0.001  # Very low limit
@@ -370,6 +474,150 @@ class TestAIAgentExecutor:
 
             # Either succeeds quickly or hits cost limit
             assert 'total_cost' in result or 'answer' in result
+
+    def test_native_loop_cancelled_before_first_iteration_makes_no_llm_call(self, agent):
+        """Regression: /chat/cancel sets a threading.Event that used to be dropped on
+        the floor once the agent path was entered (process_query() didn't even accept
+        a `cancelled` kwarg). The loop must check it every iteration, same cadence as
+        the wall-clock timeout — with the event already set, iteration 1 must return
+        status='cancelled' without ever calling the LLM."""
+        cancelled = threading.Event()
+        cancelled.set()
+
+        with patch.object(
+            agent, "_agent_chat_completion", side_effect=AssertionError("LLM must not be called once cancelled")
+        ):
+            result = agent._execute_openai_native(
+                query="build me an intake form",
+                conversation_history=None,
+                user_context={},
+                language="en",
+                cancelled=cancelled,
+            )
+
+        assert result["success"] is False
+        assert result["status"] == "cancelled"
+        assert "answer" in result  # synthesized partial answer, never None/missing
+
+    def test_react_loop_cancelled_before_first_iteration_makes_no_llm_call(self, agent):
+        """Same regression coverage as the native-loop test above, for the non-OpenAI-
+        native ReAct fallback loop (_execute_custom_react), which has its own
+        independent timeout/cancel check."""
+        cancelled = threading.Event()
+        cancelled.set()
+
+        with patch.object(
+            agent, "_agent_chat_completion", side_effect=AssertionError("LLM must not be called once cancelled")
+        ):
+            result = agent._execute_custom_react(
+                query="build me an intake form",
+                conversation_history=None,
+                user_context={},
+                language="en",
+                cancelled=cancelled,
+            )
+
+        assert result["success"] is False
+        assert result["status"] == "cancelled"
+        assert "answer" in result
+
+    def test_native_loop_not_cancelled_reaches_llm(self, agent):
+        """Sanity counterpart: an unset (or absent) cancel event must not block normal
+        execution — the LLM call still happens (surfaced here as status='llm_error'
+        from the injected failure, proving the call site was actually reached rather
+        than short-circuited on a falsely-tripped cancel check)."""
+        cancelled = threading.Event()  # not set
+
+        with patch.object(agent, "_agent_chat_completion", side_effect=RuntimeError("boom (expected)")):
+            result = agent._execute_openai_native(
+                query="build me an intake form",
+                conversation_history=None,
+                user_context={},
+                language="en",
+                cancelled=cancelled,
+            )
+
+        assert result["status"] == "llm_error"
+
+    def test_crash_after_successful_write_recovers_form_builder_result(self, agent):
+        """Regression: the outer execute() except-handler (for crashes in glue code
+        *after* _execute_openai_native/_execute_custom_react already returned — e.g. a
+        bug in citation verification or payload inference) used to rebuild `result`
+        from scratch with no form_builder_result and a possibly-blank answer. A write
+        tool that already committed on an earlier iteration must still be recoverable:
+        edit_url/undo_structure surfaced, and a non-blank synthesized answer so
+        integration.py's partial-answer path (which forwards form_builder_result) is
+        taken instead of a wasteful direct-LLM fallback that would drop it."""
+        fb_observation = {
+            "success": True,
+            "result": {
+                "template_id": 42,
+                "version_id": 7,
+                "edit_url": "/admin/forms/42/edit?version=7",
+                "undo_structure": {"sections": [{"big": "snapshot"}]},
+                "redo_structure": {"sections": [{"big": "snapshot"}]},
+            },
+        }
+        fb_step = {
+            "step": 1,
+            "action": "create_form_template",
+            "action_input": {},
+            "observation": fb_observation,
+            "timestamp": "2024-01-01T00:00:00",
+        }
+
+        with (
+            patch.object(agent.trace_service, "create_trace", return_value=123),
+            patch.object(
+                agent,
+                "_execute_openai_native",
+                return_value={
+                    "success": True,
+                    "answer": "Created the template.",
+                    "steps": [fb_step],
+                    "status": "completed",
+                    "tool_calls": 1,
+                    "iterations": 1,
+                },
+            ),
+            patch.object(
+                agent.trace_service,
+                "finalize_trace",
+                side_effect=[RuntimeError("simulated crash in glue code"), None],
+            ) as mock_finalize_trace,
+        ):
+            result = agent.execute(
+                query="create an intake form",
+                user_context={
+                    "role": "admin",
+                    "page_context": {"formBuilder": {"enabled": True, "template_id": None}},
+                },
+                language="en",
+            )
+
+            # Assert mock call history while still patched (patch.object restores the
+            # real bound method on context-manager exit; the mock object itself would
+            # still report accurate history afterwards too, but asserting inside keeps
+            # this test robust to that implementation detail).
+            assert mock_finalize_trace.call_count == 2
+            # The crash-handler's own finalize_trace call (2nd call) must have the
+            # snapshot fields stripped for trace storage...
+            crash_call_kwargs = mock_finalize_trace.call_args_list[1].kwargs
+            trace_steps = crash_call_kwargs["steps"]
+
+        assert result["success"] is False
+        assert result["status"] == "error"
+        assert result["form_builder_result"]["edit_url"] == "/admin/forms/42/edit?version=7"
+        assert result["form_builder_result"]["template_id"] == 42
+        assert result["answer"]  # synthesized, never blank, so integration.py takes the
+        # "partial answer" branch (which forwards form_builder_result) instead of the
+        # no-partial-answer branch (which falls back to a wasted direct-LLM call).
+
+        assert trace_steps[0]["observation"]["result"]["undo_structure"] != fb_observation["result"]["undo_structure"]
+        assert "omitted" in trace_steps[0]["observation"]["result"]["undo_structure"]
+        # ...while the *original* step (shared with result["steps"] / form_builder_result
+        # above) must remain completely untouched.
+        assert fb_step["observation"]["result"]["undo_structure"] == {"sections": [{"big": "snapshot"}]}
 
     def test_redundant_document_search_guard_exact_duplicate(self):
         """Exact duplicate query should be flagged as redundant."""
@@ -1018,11 +1266,19 @@ class TestAIQueryPlanner:
     """Tests for the centralized LLM query planner."""
 
     def test_validate_rejects_low_confidence(self, app):
-        """Plans under confidence threshold should be rejected."""
+        """Plans under confidence threshold should be rejected.
+
+        NOTE: execution_mode="fast_path" is required here — _validate_simple_plan_dict
+        short-circuits to None for any other/missing execution_mode before it even
+        looks at confidence (see TestQueryPlannerExecutionMode in test_agent_routing.py).
+        Without it this test would pass for the wrong reason (execution_mode gate, not
+        the confidence threshold it claims to cover).
+        """
         with app.app_context():
             from app.services.ai.planning.query_planner import AIQueryPlanner
             plan = AIQueryPlanner._validate_simple_plan_dict(
                 {
+                    "execution_mode": "fast_path",
                     "is_simple": True,
                     "confidence": 0.2,
                     "tool_name": "search_documents",
@@ -1039,6 +1295,7 @@ class TestAIQueryPlanner:
             from app.services.ai.planning.query_planner import AIQueryPlanner
             plan = AIQueryPlanner._validate_simple_plan_dict(
                 {
+                    "execution_mode": "fast_path",
                     "is_simple": True,
                     "confidence": 0.95,
                     "tool_name": "search_documents",

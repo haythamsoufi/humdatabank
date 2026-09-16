@@ -30,6 +30,7 @@ from app.utils.constants import (
 )
 from app.utils.datetime_helpers import utcnow
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE
+from app.utils.request_utils import unwrap_waf_json_envelope
 from app.utils.ws_manager import ws_manager
 from app.utils.ws_helpers import (
     WsInboundPump,
@@ -609,6 +610,8 @@ def register_ai_ws(app) -> None:
                     continue
                 if not payload:
                     continue
+
+                payload = unwrap_waf_json_envelope(payload, strict=False)
 
                 if payload.get("type") == "_parse_error":
                     _ws_send_json(ws, {"type": "error", "message": payload.get("message") or "Invalid JSON"})

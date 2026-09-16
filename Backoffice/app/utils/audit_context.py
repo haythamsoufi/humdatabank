@@ -23,6 +23,10 @@ from flask import g
 # ``flask.g`` attribute holding the pending detail fields for this request.
 AUDIT_DETAILS_ATTR = "audit_context_extra"
 
+# When set, ``activity_middleware`` writes no ``UserActivityLog`` row for this
+# request (no-op saves that would otherwise look like an update).
+AUDIT_SKIP_ATTR = "audit_skip_activity_log"
+
 # Marks a row whose description was written by the view rather than the catalog,
 # so the audit trail does not replace it with the generic catalog line.
 CURATED_DESCRIPTION_KEY = "audit_description_curated"
@@ -38,8 +42,29 @@ def reset_request_audit_context() -> None:
     try:
         g.pop(AUDIT_DETAILS_ATTR, None)
         g.pop("audit_activity_description", None)
+        g.pop(AUDIT_SKIP_ATTR, None)
     except RuntimeError:
         pass
+
+
+def skip_activity_log() -> None:
+    """Omit the automatic ``UserActivityLog`` row for this request.
+
+    Use when a successful POST did not actually change anything, so the catalog
+    line ("Updated an assignment") would be misleading.
+    """
+    try:
+        setattr(g, AUDIT_SKIP_ATTR, True)
+    except RuntimeError:
+        pass
+
+
+def should_skip_request_activity_log() -> bool:
+    """True when :func:`skip_activity_log` was called in this request."""
+    try:
+        return bool(getattr(g, AUDIT_SKIP_ATTR, False))
+    except RuntimeError:
+        return False
 
 
 def set_audit_details(**fields: Any) -> None:

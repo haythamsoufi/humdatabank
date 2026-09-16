@@ -4,6 +4,10 @@
 (function () {
     'use strict';
     var cfg = window.manageAssignmentConfig || {};
+    var perms = cfg.permissions || {};
+    var canEditDetails = perms.canEditDetails !== false;
+    var canManageEntities = !!perms.canManageEntities;
+    var canUpdateEntityStatus = !!perms.canUpdateEntityStatus;
 
     $(document).ready(function() {
         var scheduleNotifBannerRefresh = null;
@@ -596,6 +600,10 @@
         }
 
         function updateEntityStatusInline(statusId, newStatus, chipBtn, previousStatus, params, renderer) {
+            if (!canUpdateEntityStatus) {
+                applyStatusChip(chipBtn, previousStatus);
+                return;
+            }
             const url = cfg.urls && cfg.urls.assignmentBulkUpdateStatus;
             const numericId = Number(statusId);
             if (!url || !numericId) {
@@ -663,11 +671,18 @@
             const chipBtn = document.createElement('button');
             chipBtn.type = 'button';
             applyStatusChip(chipBtn, params.value || '');
+            if (!canUpdateEntityStatus) {
+                chipBtn.disabled = true;
+                chipBtn.removeAttribute('aria-haspopup');
+                chipBtn.removeAttribute('aria-label');
+                const caret = chipBtn.querySelector('.entity-status-chip-caret');
+                if (caret) caret.remove();
+            }
 
             const stopGrid = function(e) { e.stopPropagation(); };
             chipBtn.addEventListener('click', function(e) {
                 stopGrid(e);
-                if (chipBtn.disabled) return;
+                if (chipBtn.disabled || !canUpdateEntityStatus) return;
                 openEntityStatusMenu(chipBtn, self, params);
             });
             chipBtn.addEventListener('mousedown', stopGrid);
@@ -680,6 +695,12 @@
         StatusDropdownCellRenderer.prototype.refresh = function(params) {
             this.params = params;
             applyStatusChip(this.chipBtn, params.value || '');
+            if (!canUpdateEntityStatus && this.chipBtn) {
+                this.chipBtn.disabled = true;
+                this.chipBtn.removeAttribute('aria-haspopup');
+                const caret = this.chipBtn.querySelector('.entity-status-chip-caret');
+                if (caret) caret.remove();
+            }
             if (entityStatusMenuAnchor === this.chipBtn) closeEntityStatusMenu();
             return true;
         };
@@ -1647,7 +1668,10 @@
         }, 100);
 
         function getDefaultAssignmentEntityTab() {
-            window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: Returning assignment-details-panel');
+            window.__clientLog && window.__clientLog('[DEBUG] getDefaultAssignmentEntityTab: resolving default tab');
+            if (!canEditDetails && document.getElementById('manage-entities-panel')) {
+                return 'manage-entities-panel';
+            }
             if (document.getElementById('assignment-details-panel')) {
                 return 'assignment-details-panel';
             }
@@ -2491,7 +2515,7 @@
             }
 
             async addEntity(entityType, entityId) {
-                if (!this.targetAssignmentId) return;
+                if (!this.targetAssignmentId || !canManageEntities) return;
 
                 try {
                     const response = await fetch(cfg.urls.assignmentAddEntity, {
@@ -2523,7 +2547,7 @@
             }
 
             async removeEntity(entityType, entityId, statusId) {
-                if (!this.targetAssignmentId) return;
+                if (!this.targetAssignmentId || !canManageEntities) return;
 
                 try {
                     const response = await fetch(cfg.urls.assignmentRemoveEntityBase + statusId, {
@@ -3035,7 +3059,7 @@
         }
 
         // Intercept form submission to save entity changes first (for existing assignments)
-        if (cfg.assignmentId) {
+        if (cfg.assignmentId && canEditDetails) {
         const mainForm = document.getElementById('manageAssignmentForm') ||
                         document.querySelector('form[action*="edit_assignment"]') ||
                         document.querySelector('form[method="POST"]');

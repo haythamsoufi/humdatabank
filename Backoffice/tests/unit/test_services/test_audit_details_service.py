@@ -948,12 +948,24 @@ class TestHumanizeAuditDetailsDict:
                 ],
             }
         )
-        assert result["New status"] == "Approved"
+        assert "New status" not in result
         assert result["Entities updated"] == 2
         assert result["Status changes"] == [
             "Kenya: Pending → Approved",
             "Chad: In Progress → Approved",
         ]
+
+    def test_new_status_kept_when_entities_already_at_target(self):
+        """Without per-entity change lines, New status is the only record of the target."""
+        result = humanize_audit_details_dict(
+            {
+                "new_status": "Cancelled",
+                "entities_updated": 1,
+                "already_at_this_status": ["Tuvalu"],
+            }
+        )
+        assert result["New status"] == "Cancelled"
+        assert result["Already at this status"] == ["Tuvalu"]
 
     def test_prefers_names_over_ids(self):
         result = humanize_audit_details_dict(

@@ -2522,7 +2522,6 @@ class AIToolsRegistry:
                 ", ".join(sorted(fb_tool_names)) or "none",
             )
             return filtered
-        fb_allowed = set()
 
         sources_norm = resolve_source_config()
         ib_mgmt_allowed = _indicator_bank_mgmt_allowed_tools()
@@ -2551,11 +2550,11 @@ class AIToolsRegistry:
             )
 
         allowed.update(ib_mgmt_allowed)
-        allowed.update(fb_allowed)
-        # The agent must be able to resolve indicator ids while building forms,
-        # even when the user disabled the databank source in the panel.
-        if fb_allowed:
-            allowed.add("search_indicator_bank")
+        # NOTE: form-builder tool gating (including the "search_indicator_bank stays
+        # available even when databank is disabled" carve-out) is handled entirely by
+        # the `if fb_ctx:` branch above, which returns before reaching this point. This
+        # branch only runs when the form-builder panel is NOT active, so there is no
+        # form-template allowance to merge in here.
 
         if docs_enabled:
             allowed.update({"list_documents", "search_documents", "analyze_unified_plans_focus_areas"})

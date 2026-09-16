@@ -736,6 +736,14 @@ class TestCreatePluginFormItem:
         assert item.validation_message == 'Must be filled'
         assert item.validation_message_translations == {'fr': 'Doit être rempli'}
 
+    def test_validation_message_duplicate_json_list_flattened(self, app, mock_db):
+        from app.utils.request_utils import _JsonFormProxy
+        template, section = _mock_template(), _mock_section()
+        msg = 'Local Units must be higher than branches'
+        form_data = _JsonFormProxy({'validation_message': [msg, msg]})
+        item = _create_plugin_form_item(template, section, form_data, 'plugin_text', 1)
+        assert item.validation_message == msg
+
     def test_order_from_form(self, app, mock_db):
         template, section = _mock_template(), _mock_section()
         form_data = ImmutableMultiDict([('order', '8')])

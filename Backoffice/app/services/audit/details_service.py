@@ -720,6 +720,21 @@ def _drop_redundant_id_keys(payload: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _drop_redundant_summary_keys(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Omit bulk-action summaries that only repeat per-entity change lines.
+
+    Assignment status updates always apply one target status. When
+    ``status_changes`` already lists ``Entity: Before → After``, a separate
+    ``new_status`` line adds nothing. Keep it when there are no change lines
+    (every selected entity was already at the requested status).
+    """
+    out = dict(payload)
+    status_changes = out.get("status_changes")
+    if isinstance(status_changes, list) and status_changes:
+        out.pop("new_status", None)
+    return out
+
+
 def _resolve_known_id_lists(key: str, value: Any) -> Optional[Any]:
     if key == "country_ids":
         ids = value if isinstance(value, list) else _parse_id_list(value)
@@ -789,6 +804,7 @@ def humanize_audit_details_dict(payload: Optional[Dict[str, Any]]) -> Optional[D
     merged.pop("request_message", None)
 
     merged = _drop_redundant_id_keys(merged)
+    merged = _drop_redundant_summary_keys(merged)
 
     out: Dict[str, Any] = {}
     for key, raw in merged.items():

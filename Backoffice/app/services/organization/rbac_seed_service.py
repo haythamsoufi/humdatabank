@@ -86,9 +86,10 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         # Assignment management (admin screens)
         ("admin.assignments.view", "View assignments (admin)", "View assignments management screens"),
         ("admin.assignments.create", "Create assignments (admin)", "Create assignments"),
-        ("admin.assignments.edit", "Edit assignments (admin)", "Edit assignment metadata and due dates"),
+        ("admin.assignments.edit", "Edit assignment details (admin)", "Edit assignment main details: template, period, name, due dates, data owner, activate/close"),
         ("admin.assignments.delete", "Delete assignments (admin)", "Delete assignments"),
-        ("admin.assignments.entities.manage", "Manage assignment entities", "Add/remove entities and update entity status settings"),
+        ("admin.assignments.entities.status", "Update assignment entity status", "Update entity status and due dates without changing assignment details or adding/removing entities"),
+        ("admin.assignments.entities.manage", "Manage assignment entities", "Add/remove entities from assignments (also allows updating entity status)"),
         ("admin.assignments.public_submissions.manage", "Manage public submissions", "Manage public submissions"),
 
         # Assignment participation (AES-level)
@@ -264,6 +265,15 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
             "permission_codes": ["admin.assignments.view"],
         },
         {
+            "code": "admin_assignments_status",
+            "name": "Admin: Assignments (Entity status)",
+            "description": "Update entity status on assignments without changing assignment details or adding/removing entities.",
+            "permission_codes": [
+                "admin.assignments.view",
+                "admin.assignments.entities.status",
+            ],
+        },
+        {
             "code": "admin_assignments_manager",
             "name": "Admin: Assignments (Manage)",
             "description": "Manage assignments (create/edit/entities/public submissions).",
@@ -272,6 +282,7 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 "admin.assignments.create",
                 "admin.assignments.edit",
                 "admin.assignments.delete",
+                "admin.assignments.entities.status",
                 "admin.assignments.entities.manage",
                 "admin.assignments.public_submissions.manage",
             ],

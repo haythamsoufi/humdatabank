@@ -11,12 +11,15 @@ from flask import Flask, g
 
 from app.utils.audit_context import (
     AUDIT_DETAILS_ATTR,
+    AUDIT_SKIP_ATTR,
     CURATED_DESCRIPTION_KEY,
     apply_audit_details_to_context,
     has_curated_description,
     reset_request_audit_context,
     set_audit_description,
     set_audit_details,
+    should_skip_request_activity_log,
+    skip_activity_log,
 )
 
 
@@ -118,9 +121,12 @@ class TestResetRequestAuditContext:
     def test_pending_details_and_description_are_dropped(self, request_ctx):
         set_audit_details(assignment_title="Annual Report")
         set_audit_description("Updated an assignment")
+        skip_activity_log()
         reset_request_audit_context()
         assert getattr(g, AUDIT_DETAILS_ATTR, None) is None
         assert getattr(g, "audit_activity_description", None) is None
+        assert getattr(g, AUDIT_SKIP_ATTR, None) is None
+        assert should_skip_request_activity_log() is False
 
     def test_safe_when_nothing_pending(self, request_ctx):
         reset_request_audit_context()
@@ -128,6 +134,17 @@ class TestResetRequestAuditContext:
 
     def test_outside_request_context_is_a_no_op(self):
         reset_request_audit_context()
+
+
+class TestSkipActivityLog:
+    def test_flag_is_set(self, request_ctx):
+        assert should_skip_request_activity_log() is False
+        skip_activity_log()
+        assert should_skip_request_activity_log() is True
+        assert getattr(g, AUDIT_SKIP_ATTR) is True
+
+    def test_outside_request_context_is_a_no_op(self):
+        skip_activity_log()
 
 
 class TestHasCuratedDescription:

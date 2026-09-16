@@ -27,10 +27,10 @@ from app.forms.assignments import (
     AssignedFormForm, AssignmentEntityStatusForm
 )
 from app.forms.shared import DeleteForm
-from app.utils.api_responses import json_error, json_bad_request, json_not_found, json_ok, json_server_error
+from app.utils.api_responses import json_error, json_bad_request, json_not_found, json_ok, json_server_error, json_forbidden
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.error_handling import handle_json_view_exception
-from app.routes.admin.shared import admin_required, permission_required
+from app.routes.admin.shared import admin_required, permission_required, permission_required_any
 from app.utils.request_utils import is_json_request
 from app.services.imports.assignment_excel_access import (
     assignment_uses_unified_country_plan_excel,
@@ -52,11 +52,12 @@ from app.services.forms.reporting_period_service import sync_assigned_form_repor
 from app.services.audit.assignment_audit import (
     assignment_audit_label,
     assignment_settings_snapshot,
+    assignment_update_has_field_changes,
     build_assignment_update_audit,
     build_entity_status_update_audit,
     country_due_dates_snapshot,
 )
-from app.utils.audit_context import set_audit_description, set_audit_details
+from app.utils.audit_context import set_audit_description, set_audit_details, skip_activity_log
 from flask_wtf import FlaskForm
 from wtforms import StringField, SelectField, SubmitField, DateField, BooleanField, HiddenField
 from wtforms.validators import Optional, DataRequired
@@ -70,6 +71,42 @@ from app.services.organization.authorization_service import AuthorizationService
 from app.utils.sql_utils import safe_ilike_pattern
 
 bp = Blueprint("assignment_management", __name__, url_prefix="/admin")
+
+ASSIGNMENT_DETAILS_PERMISSION = "admin.assignments.edit"
+ASSIGNMENT_ENTITIES_MANAGE_PERMISSION = "admin.assignments.entities.manage"
+ASSIGNMENT_ENTITY_STATUS_PERMISSION = "admin.assignments.entities.status"
+
+
+def _has_assignment_perm(code):
+    return AuthorizationService.has_rbac_permission(current_user, code)
+
+
+def _can_edit_assignment_details():
+    return _has_assignment_perm(ASSIGNMENT_DETAILS_PERMISSION)
+
+
+def _can_manage_assignment_entities():
+    return _has_assignment_perm(ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
+
+
+def _can_update_assignment_entity_status():
+    return _can_manage_assignment_entities() or _has_assignment_perm(ASSIGNMENT_ENTITY_STATUS_PERMISSION)
+
+
+def _manage_assignment_permission_context(*, is_create=False):
+    """UI flags for manage_assignment.html. Create flow keeps full details/entity add."""
+    if is_create:
+        return {
+            "can_edit_assignment_details": True,
+            "can_manage_assignment_entities": True,
+            "can_update_assignment_entity_status": False,
+        }
+    return {
+        "can_edit_assignment_details": _can_edit_assignment_details(),
+        "can_manage_assignment_entities": _can_manage_assignment_entities(),
+        "can_update_assignment_entity_status": _can_update_assignment_entity_status(),
+    }
+
 
 def _status_changed_by_user_payload(user) -> dict:
     """Hover-card fields for the user who last set an entity status."""
@@ -608,6 +645,7 @@ def new_assignment():
                                      get_localized_country_name=get_localized_country_name,
                                      enabled_entity_types=enabled_entity_groups,
                                      submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
+                                     **_manage_assignment_permission_context(is_create=True),
                                      **_manage_assignment_country_context())
 
             # Duplicate guard: never auto-reactivate. Require explicit confirmation to create a duplicate.
@@ -788,6 +826,7 @@ def new_assignment():
                          get_localized_country_name=get_localized_country_name,
                          enabled_entity_types=enabled_entity_groups,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form),
+                         **_manage_assignment_permission_context(is_create=True),
                          **_manage_assignment_country_context())
 
 
@@ -1075,7 +1114,11 @@ def assignment_notification_email_preview():
 
 
 @bp.route("/assignments/edit/<int:assignment_id>", methods=["GET", "POST"])
-@permission_required('admin.assignments.edit')
+@permission_required_any(
+    ASSIGNMENT_DETAILS_PERMISSION,
+    ASSIGNMENT_ENTITIES_MANAGE_PERMISSION,
+    ASSIGNMENT_ENTITY_STATUS_PERMISSION,
+)
 def edit_assignment(assignment_id):
     assignment = AssignedForm.query.get_or_404(assignment_id)
     form = EditAssignmentDetailsForm(obj=assignment)
@@ -1085,6 +1128,12 @@ def edit_assignment(assignment_id):
         )
         populate_standard_excel_flags_from_legacy(assignment, form)
     enabled_entity_groups = get_enabled_entity_groups()
+
+    if request.method == "POST" and not _can_edit_assignment_details():
+        if is_json_request():
+            return json_forbidden("Assignment details permission required.")
+        flash(_("You do not have permission to update assignment details."), "warning")
+        return redirect(url_for("assignment_management.edit_assignment", assignment_id=assignment_id))
 
     if form.validate_on_submit():
         # Snapshot for the audit trail before any mutation; never let audit
@@ -1130,8 +1179,13 @@ def edit_assignment(assignment_id):
                     country_due_date_before=audit_due_date_before,
                     country_due_date_after=audit_due_date_after,
                 )
-                set_audit_details(**audit_details)
-                set_audit_description(audit_description)
+                if assignment_update_has_field_changes(audit_details):
+                    set_audit_details(**audit_details)
+                    set_audit_description(audit_description)
+                else:
+                    # Successful save, identical snapshot — do not write a
+                    # "Updated an assignment: no fields changed" audit row.
+                    skip_activity_log()
             flash(f"Assignment '{assignment.period_name}' updated successfully.", "success")
             return redirect(url_for("assignment_management.manage_assignments"))
         except Exception as e:
@@ -1227,6 +1281,7 @@ def edit_assignment(assignment_id):
                          title=f"Edit Assignment: {assignment.period_name}",
                          enabled_entity_types=enabled_entity_groups,
                          submission_review_recipient_users=_submission_review_recipient_users_for_template(form, assignment),
+                         **_manage_assignment_permission_context(),
                          **_manage_assignment_country_context())
 
 @bp.route("/assignments/edit/<int:assignment_id>/add_countries", methods=["POST"])
@@ -1304,7 +1359,11 @@ def remove_country_from_assignment(assignment_id, country_id):
 # === Entity-Based Assignment Routes ===
 
 @bp.route("/assignments/<int:assignment_id>/entities", methods=["GET"])
-@permission_required('admin.assignments.entities.manage')
+@permission_required_any(
+    ASSIGNMENT_DETAILS_PERMISSION,
+    ASSIGNMENT_ENTITIES_MANAGE_PERMISSION,
+    ASSIGNMENT_ENTITY_STATUS_PERMISSION,
+)
 def get_assignment_entities(assignment_id):
     """Get all entities assigned to an assignment."""
     assignment = AssignedForm.query.get_or_404(assignment_id)
@@ -1432,7 +1491,7 @@ def remove_entity_from_assignment(assignment_id, status_id):
     return json_ok()
 
 @bp.route("/assignments/<int:assignment_id>/entities/<int:status_id>", methods=["PUT"])
-@permission_required('admin.assignments.entities.manage')
+@permission_required_any(ASSIGNMENT_ENTITY_STATUS_PERMISSION, ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
 def update_entity_status(assignment_id, status_id):
     """Update the status of an entity assignment."""
     aes = AssignmentEntityStatus.query.filter_by(id=status_id, assigned_form_id=assignment_id).first_or_404()
@@ -1449,7 +1508,7 @@ def update_entity_status(assignment_id, status_id):
         with suppress(Exception):
             aes.due_date = datetime.strptime(due_date, '%Y-%m-%d')
 
-    if is_public_available is not None:
+    if is_public_available is not None and _can_manage_assignment_entities():
         aes.is_public_available = is_public_available
 
     db.session.flush()
@@ -1485,7 +1544,7 @@ def bulk_remove_entities_from_assignment(assignment_id):
 
 
 @bp.route("/assignments/<int:assignment_id>/entities/bulk-update-status", methods=["POST"])
-@permission_required('admin.assignments.entities.manage')
+@permission_required_any(ASSIGNMENT_ENTITY_STATUS_PERMISSION, ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
 def bulk_update_entity_status(assignment_id):
     """Update the status (and optionally due_date) of multiple entity assignments."""
     data = get_json_safe()
@@ -1553,7 +1612,7 @@ def bulk_update_entity_status(assignment_id):
 
 
 @bp.route("/assignment_entity_status/edit/<int:aes_id>", methods=["POST"])
-@permission_required('admin.assignments.entities.manage')
+@permission_required_any(ASSIGNMENT_ENTITY_STATUS_PERMISSION, ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
 def edit_assignment_entity_status(aes_id):
     aes = AssignmentEntityStatus.query.get_or_404(aes_id)
     form = AssignmentEntityStatusForm(request.form)
@@ -1871,7 +1930,7 @@ def bulk_update_public_availability(assignment_id):
 
 
 @bp.route("/assignments/<int:assignment_id>/entities/bulk-update-due-date", methods=["POST"])
-@permission_required('admin.assignments.entities.manage')
+@permission_required_any(ASSIGNMENT_ENTITY_STATUS_PERMISSION, ASSIGNMENT_ENTITIES_MANAGE_PERMISSION)
 def bulk_update_due_date_selected(assignment_id):
     """Update the due_date of selected entity assignments."""
     try:

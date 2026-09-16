@@ -30,6 +30,7 @@ from app.utils.ai_tokens import issue_ai_token
 from app.utils.ai_pricing import estimate_chat_cost
 from app.utils.ai_utils import sanitize_page_context, openai_model_supports_sampling_params
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
+from app.utils.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
 from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
 from app.utils.request_validation import enforce_csrf_json
 from app.services.ai.chat.request import (
@@ -69,6 +70,14 @@ def _get_ai_chat_integration():
 
 
 ai_bp = Blueprint("ai_v2", __name__, url_prefix="/api/ai/v2")
+
+
+def _chat_json_body():
+    """Parse the chat POST body, unwrapping a WAF ``payload`` / ``payload__cN`` envelope."""
+    try:
+        return unwrap_waf_json_envelope(get_json_safe(), strict=True), None
+    except WafJsonUnwrapError:
+        return None, json_bad_request("Invalid payload encoding.")
 
 
 PUBLIC_AI_PROXY_HEADER = "X-hum-databank-AI-Proxy"
@@ -898,29 +907,13 @@ def chat():
     except Exception as e:
         # If login_user fails, proceed; RBAC in tool calls may deny access.
         logger.debug("login_user failed for bearer client: %s", e, exc_info=True)
-    data = get_json_safe()
+    data, body_error = _chat_json_body()
+    if body_error is not None:
+        return body_error
 
     parsed, err_msg, err_code = parse_chat_request(data)
     if err_msg:
         return json_error(err_msg, err_code, success=False)
-
-    # Ensure current_user reflects Bearer auth so existing RBAC helpers (used by tools) work.
-    did_login = False
-    try:
-        dbg = current_app.config.get("AI_CHAT_DEBUG_LOGS", None)
-        if dbg is None:
-            dbg = (os.getenv("AI_CHAT_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
-        if bool(dbg):
-            current_app.logger.debug(
-                "AI v2 /chat request: user=%s auth=%s conv_id_in=%s client_msg_id=%s msg_preview=%r",
-                (int(identity.user.id) if identity.is_authenticated and identity.user else None),
-                str(identity.auth_source),
-                (parsed.conversation_id or None),
-                (parsed.client_message_id or None),
-                (parsed.message or "")[:120],
-            )
-    except Exception as e:
-        logger.debug("AI_CHAT_DEBUG_LOGS check failed: %s", e)
 
     # Optional: user-selected source gating for tools (databank vs system docs vs UPR docs).
     # Stored on request-scoped g so tool registry can enforce/filter deterministically.
@@ -955,6 +948,26 @@ def chat():
         err_msg = dlp_err.get("error", "Request blocked") if isinstance(dlp_err, dict) else "Request blocked"
         extra = {k: v for k, v in (dlp_err or {}).items() if k != "error"} if isinstance(dlp_err, dict) else {}
         return json_error(err_msg, 400, **extra)
+
+    # Debug-only request log — deliberately placed *after* the DLP gate above so a
+    # blocked/confirm-required message's raw content never reaches server logs, even
+    # under AI_CHAT_DEBUG_LOGS. (DLP's own audit trail intentionally never stores the
+    # raw message either — see log_dlp_audit_event.)
+    try:
+        dbg = current_app.config.get("AI_CHAT_DEBUG_LOGS", None)
+        if dbg is None:
+            dbg = (os.getenv("AI_CHAT_DEBUG_LOGS") or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+        if bool(dbg):
+            current_app.logger.debug(
+                "AI v2 /chat request: user=%s auth=%s conv_id_in=%s client_msg_id=%s msg_preview=%r",
+                (int(identity.user.id) if identity.is_authenticated and identity.user else None),
+                str(identity.auth_source),
+                (parsed.conversation_id or None),
+                (parsed.client_message_id or None),
+                (parsed.message or "")[:120],
+            )
+    except Exception as e:
+        logger.debug("AI_CHAT_DEBUG_LOGS check failed: %s", e)
 
     if not identity.is_authenticated:
         parsed = apply_anonymous_rules(parsed)
@@ -1386,7 +1399,9 @@ def chat_stream():
     except Exception as e:
         logger.debug("login_user failed for bearer client (stream): %s", e, exc_info=True)
 
-    data = get_json_safe()
+    data, body_error = _chat_json_body()
+    if body_error is not None:
+        return body_error
     parsed, err_msg, err_code = parse_chat_request(data)
     if err_msg:
         return json_error(err_msg, err_code, success=False)

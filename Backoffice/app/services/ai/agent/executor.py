@@ -51,6 +51,9 @@ from app.services.ai.runtime.step_ux import (
 )
 from app.utils.api_helpers import service_error
 from app.services.ai.runtime.tool_observation import compact_tool_observation_for_llm as _compact_tool_observation_for_llm
+from app.services.ai.runtime.tool_observation import (
+    strip_form_builder_snapshots_for_trace as _strip_form_builder_snapshots_for_trace,
+)
 from app.services.ai.policies.response_policy import (
     contains_leaked_search_documents_tool_json as _contains_leaked_search_documents_tool_json,
     sanitize_agent_answer as _sanitize_agent_answer,
@@ -979,6 +982,7 @@ class AIAgentExecutor:
         language: str = 'en',
         on_step_callback: Optional[Callable[[str], None]] = None,
         original_message: Optional[str] = None,
+        cancelled: Optional[Any] = None,  # threading.Event-like, optional
     ) -> Dict[str, Any]:
         """
         Execute the agent for a given query.
@@ -990,6 +994,13 @@ class AIAgentExecutor:
             language: Response language
             on_step_callback: Optional callback(message: str) invoked before each tool run with a user-facing step message.
             original_message: User's raw message before query rewriting (stored in trace when different from query).
+            cancelled: Optional threading.Event checked between tool-call iterations (same
+                cadence as the wall-clock timeout below). This is a best-effort, cooperative
+                cancel: it stops the loop from starting a *new* tool call once set, but cannot
+                interrupt a single tool call/LLM request already in flight — there is no
+                cancellable transport threaded through the underlying HTTP clients. Any write
+                that already committed on a prior iteration is still surfaced via
+                form_builder_result (see extract_form_builder_result_from_steps below).
 
         Returns:
             Dictionary with answer, reasoning trace, and metadata
@@ -1038,7 +1049,12 @@ class AIAgentExecutor:
                 try:
                     page_ctx = user_context.get("page_context") if user_context else None
                     fb_ctx = page_ctx.get("formBuilder") if isinstance(page_ctx, dict) else None
-                    if isinstance(fb_ctx, dict):
+                    # Respect an explicit enabled=False from the caller instead of always
+                    # forcing True — otherwise a client that sends the formBuilder shape
+                    # with enabled:false (e.g. panel closed but context still attached)
+                    # would have it silently reactivated here, gating in the RBAC-sensitive
+                    # form-template write tools it explicitly said were not active.
+                    if isinstance(fb_ctx, dict) and fb_ctx.get("enabled", True):
                         g.ai_form_builder_ctx = {**fb_ctx, "enabled": True}
                     else:
                         g.ai_form_builder_ctx = None
@@ -1078,6 +1094,7 @@ class AIAgentExecutor:
                             on_step_callback,
                             original_message=original_message,
                             evidence_plan=None,
+                            cancelled=cancelled,
                         )
                         result["execution_path"] = "form_builder_react"
                     else:
@@ -1088,6 +1105,7 @@ class AIAgentExecutor:
                             language,
                             on_step_callback,
                             original_message=original_message,
+                            cancelled=cancelled,
                         )
                         result["execution_path"] = "form_builder_react"
                 else:
@@ -1191,6 +1209,7 @@ class AIAgentExecutor:
                                 tool_names=tool_names,
                                 documents_allowed=documents_allowed,
                                 databank_allowed=databank_allowed,
+                                cancelled=cancelled,
                             )
                             result["execution_path"] = "openai_native"
                         else:
@@ -1205,6 +1224,7 @@ class AIAgentExecutor:
                                 tool_names=tool_names,
                                 documents_allowed=documents_allowed,
                                 databank_allowed=databank_allowed,
+                                cancelled=cancelled,
                             )
                             result["execution_path"] = "react"
 
@@ -1312,7 +1332,12 @@ class AIAgentExecutor:
 
             # Resolve final answer: prefer result['answer'], else from last finish step
             final_answer_for_trace = result.get("answer")
-            steps_for_trace = result.get("steps") or []
+            # Trace-only copy: strips undo_structure/redo_structure (full template
+            # snapshots — see strip_form_builder_snapshots_for_trace's docstring) before
+            # this goes into the AIReasoningTrace.steps JSON column below. Does not affect
+            # result["steps"] itself — form_builder_result was already extracted from
+            # *that* (untouched) list earlier above, and is what the SSE client receives.
+            steps_for_trace = _strip_form_builder_snapshots_for_trace(result.get("steps") or [])
             if final_answer_for_trace is None or (isinstance(final_answer_for_trace, str) and not final_answer_for_trace.strip()):
                 for s in reversed(steps_for_trace):
                     if (s or {}).get("action") == "finish":
@@ -1480,6 +1505,17 @@ class AIAgentExecutor:
             # Preserve any steps/answer already collected before the crash.
             prior_steps = result.get('steps', []) if isinstance(result, dict) else []
             prior_answer = (result.get('answer') or '') if isinstance(result, dict) else ''
+            if not prior_answer and prior_steps:
+                # Match the timeout/max-iterations branches above: synthesize a summary
+                # from completed steps instead of leaving `answer` blank. Integration.py's
+                # generic failure handling only forwards form_builder_result (a completed
+                # write's edit_url/undo_structure) down the "has a partial answer" path —
+                # a blank answer here would otherwise fall back to a fresh direct-LLM call
+                # that silently drops it.
+                try:
+                    prior_answer = _synthesize_partial_answer(prior_steps, self.client, self.model)
+                except Exception as synth_exc:
+                    logger.debug("synthesize_partial_answer failed in crash handler: %s", synth_exc)
 
             result = {
                 'success': False,
@@ -1490,13 +1526,27 @@ class AIAgentExecutor:
                 'steps': prior_steps,
                 'answer': prior_answer or None,
             }
+            # This except handles a truly unexpected crash (outside the normal per-path
+            # result-building above), so — unlike the main success/timeout paths — nothing
+            # has extracted form_builder_result onto `result` yet. A write tool can have
+            # committed successfully on an earlier iteration before something else in the
+            # loop raised; without this, that completed create/edit would be invisible to
+            # the caller (no edit_url/undo_structure) even though it went through.
+            try:
+                from app.services.ai.tools._utils import extract_form_builder_result_from_steps
+
+                fb_result = extract_form_builder_result_from_steps(prior_steps)
+                if fb_result:
+                    result["form_builder_result"] = fb_result
+            except Exception as fb_exc:
+                logger.debug("extract_form_builder_result_from_steps failed in crash handler: %s", fb_exc)
 
             self.trace_service.finalize_trace(
                 trace_id=trace_id,
                 query=query,
                 user_id=user_id,
                 conversation_id=conversation_id,
-                steps=prior_steps,
+                steps=_strip_form_builder_snapshots_for_trace(prior_steps),
                 final_answer=prior_answer or None,
                 status='error',
                 total_cost=float(result.get('total_cost', 0) or 0),
@@ -1532,6 +1582,7 @@ class AIAgentExecutor:
         tool_names: Optional[Set[str]] = None,
         documents_allowed: bool = True,
         databank_allowed: bool = True,
+        cancelled: Optional[Any] = None,  # threading.Event-like, optional
     ) -> Dict[str, Any]:
         """Execute using OpenAI's native function calling."""
         effective_evidence_plan = evidence_plan
@@ -1597,6 +1648,26 @@ class AIAgentExecutor:
                     'success': False,
                     'error': f'Timeout exceeded ({self.timeout_seconds}s)',
                     'status': 'timeout',
+                    'steps': steps,
+                    'answer': _synthesize_partial_answer(steps, self.client, self.model),
+                    'total_cost': total_cost,
+                    'total_input_tokens': total_input_tokens,
+                    'total_output_tokens': total_output_tokens,
+                    'iterations': iterations,
+                    'tool_calls': tool_call_count,
+                }
+
+            # Cooperative cancel: stop before starting another tool call. Checked once per
+            # iteration (same cadence as the timeout above) — cannot abort a call already
+            # in flight, but bounds how many *more* side-effecting tool calls a
+            # cancelled-but-still-running request can make. form_builder_result for any
+            # write that already committed on a prior iteration is still recovered by the
+            # caller via extract_form_builder_result_from_steps(steps).
+            if cancelled is not None and cancelled.is_set():
+                return {
+                    'success': False,
+                    'error': 'Cancelled by user',
+                    'status': 'cancelled',
                     'steps': steps,
                     'answer': _synthesize_partial_answer(steps, self.client, self.model),
                     'total_cost': total_cost,
@@ -2243,6 +2314,7 @@ class AIAgentExecutor:
         tool_names: Optional[Set[str]] = None,
         documents_allowed: bool = True,
         databank_allowed: bool = True,
+        cancelled: Optional[Any] = None,  # threading.Event-like, optional
     ) -> Dict[str, Any]:
         """
         Execute using custom ReAct implementation (no function calling).
@@ -2321,6 +2393,21 @@ class AIAgentExecutor:
                     'success': False,
                     'error': f'Timeout exceeded ({self.timeout_seconds}s)',
                     'status': 'timeout',
+                    'steps': steps,
+                    'answer': _synthesize_partial_answer(steps, self.client, self.model),
+                    'total_cost': total_cost,
+                    'total_input_tokens': total_input_tokens,
+                    'total_output_tokens': total_output_tokens,
+                    'iterations': iterations,
+                    'tool_calls': tool_call_count,
+                }
+
+            # Cooperative cancel — see matching comment in _execute_openai_native.
+            if cancelled is not None and cancelled.is_set():
+                return {
+                    'success': False,
+                    'error': 'Cancelled by user',
+                    'status': 'cancelled',
                     'steps': steps,
                     'answer': _synthesize_partial_answer(steps, self.client, self.model),
                     'total_cost': total_cost,

@@ -148,7 +148,7 @@ Guides: [Manage users](user-guides/admin/manage-users.md), [Add a user](user-gui
 
 **Where:** Admin → **Manage Assignments** → `/admin/assignments` (and nested routes for public submissions, entity status, etc.).
 
-**Who:** `admin.assignments.view` (creating or changing assignments: `admin.assignments.create` / `edit`; public URL flows: `admin.assignments.public_submissions.manage`).
+**Who:** `admin.assignments.view` (creating: `admin.assignments.create`; assignment main details / activate / close: `admin.assignments.edit`; entity status only: `admin.assignments.entities.status`; add/remove entities: `admin.assignments.entities.manage`; public URL flows: `admin.assignments.public_submissions.manage`).
 
 **What you get:** Country and entity **assignment** lifecycle (`AssignmentEntityStatus` / AES), due dates, focal-point mapping, public form assignments, **public submissions** inbox and approval, and links to reporting cycles. Guides: [Create and manage assignments](user-guides/admin/manage-assignments.md), [Assignment lifecycle](user-guides/admin/assignment-lifecycle.md), [Public URL submissions](user-guides/admin/public-url-submissions.md), [Review and approve submissions](user-guides/admin/review-approve-submissions.md).
 

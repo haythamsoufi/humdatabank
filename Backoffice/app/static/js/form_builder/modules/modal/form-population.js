@@ -10,6 +10,7 @@ import {
     mountEntryFormHintPanel,
     populateDescriptionVisibility,
 } from './description-hint-ui.js';
+import { coerceStoredValidationMessage } from '../rules/form-serialization.js';
 
 function parseBool(val) {
     return val === true || val === 'true' || val === 1 || val === '1';
@@ -241,7 +242,9 @@ export const FormPopulationMixin = {
         const validationMsgInput = this.modalElement.querySelector('#item-validation-message');
         const validationMsgTranslationsInput = this.modalElement.querySelector('#item-validation-message-translations');
         if (validationMsgInput) {
-            validationMsgInput.value = (!isDisplayOnly && itemData.validation_message) ? itemData.validation_message : '';
+            validationMsgInput.value = (!isDisplayOnly && itemData.validation_message)
+                ? coerceStoredValidationMessage(itemData.validation_message)
+                : '';
         }
         if (validationMsgTranslationsInput) {
             const translations = (!isDisplayOnly && itemData.validation_message_translations)

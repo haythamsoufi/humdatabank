@@ -24,7 +24,7 @@ from .helpers import (_create_form_item, _update_indicator_fields, _update_quest
     _update_document_field_fields, _update_matrix_fields, _update_image_fields, _update_plugin_fields,
     _update_item_config, _update_version_timestamp, _ensure_template_access_or_redirect,
     is_conditions_meaningful)
-from .helpers.field_parsing import parse_translations_json
+from .helpers.field_parsing import coerce_single_text, parse_translations_json
 from config.config import Config
 import json
 
@@ -348,7 +348,7 @@ def edit_item(item_id):
     if 'validation_condition' in data and hasattr(form, 'validation_condition'):
         form.validation_condition.data = data['validation_condition'] if data['validation_condition'] != 'null' else None
     if 'validation_message' in data and hasattr(form, 'validation_message'):
-        form.validation_message.data = data['validation_message'] if data['validation_message'] else None
+        form.validation_message.data = coerce_single_text(data.get('validation_message'))
 
     if submitted_item_type == 'indicator':
         if 'label' in data and hasattr(form, 'label'):
@@ -461,7 +461,7 @@ def edit_item(item_id):
 
             rel_json = data.get('relevance_condition')
             val_json = data.get('validation_condition')
-            val_msg = data.get('validation_message')
+            val_msg = coerce_single_text(data.get('validation_message'))
 
             form_item.relevance_condition = rel_json if is_conditions_meaningful(rel_json) else None
 

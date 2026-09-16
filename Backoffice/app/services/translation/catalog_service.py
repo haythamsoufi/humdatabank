@@ -411,42 +411,185 @@ def apply_imported_updates(locale: str, msgid_to_msgstr: Dict[str, str]) -> int:
     return n
 
 
+def _plural_values_from_row(row: Any) -> Dict[int, str]:
+    """Normalize a row's JSON plural map to polib's {index: text} form."""
+    raw = getattr(row, "msgstr_plural", None) if row is not None else None
+    values: Dict[int, str] = {}
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            try:
+                values[int(key)] = value or ""
+            except (TypeError, ValueError):
+                continue
+    # gettext requires at least the singular/plural pair to be present.
+    values.setdefault(0, "")
+    values.setdefault(1, "")
+    return values
+
+
+def build_locale_catalog(
+    locale: str,
+    pot_entries: Iterable[Any],
+    rows_by_msgid: Dict[str, Any],
+    *,
+    metadata: Optional[Dict[str, str]] = None,
+) -> Any:
+    """Build a complete PO catalog for *locale* from POT msgids and DB values.
+
+    The POT decides which msgids exist and carries their source references; the
+    translation_string rows supply the text. English is the catalog source
+    language, so each of its msgstr values is simply the msgid.
+
+    Pure: touches neither the database nor the filesystem, so catalog layout
+    stays unit-testable without Postgres.
+    """
+    import polib
+
+    catalog = polib.POFile()
+    catalog.metadata = dict(metadata or {})
+    catalog.metadata.setdefault("Project-Id-Version", "Humanitarian Databank 1.0")
+    catalog.metadata["Content-Type"] = "text/plain; charset=utf-8"
+    catalog.metadata["Content-Transfer-Encoding"] = "8bit"
+    catalog.metadata["Language"] = locale
+
+    source_locale = is_source_locale(locale)
+
+    for entry in pot_entries:
+        msgid = getattr(entry, "msgid", "")
+        if not msgid or getattr(entry, "obsolete", False):
+            continue
+        row = rows_by_msgid.get(msgid)
+        occurrences = list(getattr(entry, "occurrences", None) or [])
+        flags = list(getattr(entry, "flags", None) or [])
+        msgctxt = getattr(entry, "msgctxt", None)
+        msgid_plural = getattr(entry, "msgid_plural", None)
+
+        if msgid_plural:
+            if source_locale:
+                plural_values = {0: msgid, 1: msgid_plural}
+            else:
+                plural_values = _plural_values_from_row(row)
+            catalog.append(
+                polib.POEntry(
+                    msgid=msgid,
+                    msgid_plural=msgid_plural,
+                    msgstr_plural=plural_values,
+                    msgctxt=msgctxt,
+                    occurrences=occurrences,
+                    flags=flags,
+                )
+            )
+            continue
+
+        if source_locale:
+            msgstr = msgid
+        else:
+            msgstr = (getattr(row, "msgstr", "") or "") if row is not None else ""
+        catalog.append(
+            polib.POEntry(
+                msgid=msgid,
+                msgstr=msgstr,
+                msgctxt=msgctxt,
+                occurrences=occurrences,
+                flags=flags,
+            )
+        )
+
+    return catalog
+
+
+def _existing_po_metadata(po_path: str) -> Dict[str, str]:
+    """Preserve an existing catalog's headers (notably Plural-Forms) when rewriting."""
+    import polib
+
+    if not os.path.exists(po_path):
+        return {}
+    try:
+        return dict(polib.pofile(po_path).metadata or {})
+    except Exception:
+        logger.warning("Could not read PO metadata from %s; using defaults", po_path, exc_info=True)
+        return {}
+
+
 def compile_locale_from_db(locale: str) -> int:
-    """Regenerate the .po artifact from translation_string rows, then compile .mo."""
+    """Rebuild the .po artifact for *locale* from the POT and translation_string, then compile .mo.
+
+    The catalog is regenerated rather than patched, so a missing, truncated, or
+    partially-written .po is restored from the database instead of skipped. This
+    is what makes the artifacts disposable: a container can materialize them at
+    boot rather than carrying them on persistent storage.
+
+    Returns the number of entries written.
+    """
+    import polib
+
     from app.models.translation_quality import TranslationString
-    from app.routes.admin.utilities.helpers import _translations_po_path
-    from app.utils.po_persistence import save_po_locked, finalize_translation_writes
+    from app.routes.admin.utilities.helpers import (
+        _translations_po_path,
+        _translations_pot_path,
+    )
+    from app.utils.po_lock import po_file_lock
+    from app.utils.po_persistence import finalize_translation_writes
 
     locale = (locale or "").strip().lower()
-    if not locale or locale == "en":
+    if not locale:
         return 0
+
+    pot_path = _translations_pot_path()
+    if not os.path.exists(pot_path):
+        logger.warning(
+            "compile_locale_from_db: no messages.pot at %s; cannot materialize %s",
+            pot_path, locale,
+        )
+        return 0
+
+    pot_entries = [
+        entry for entry in polib.pofile(pot_path)
+        if entry.msgid and not entry.obsolete
+    ]
+
+    rows_by_msgid: Dict[str, Any] = {}
+    if not is_source_locale(locale):
+        rows_by_msgid = {
+            row.msgid: row
+            for row in TranslationString.query.filter_by(locale=locale).all()
+            if row.msgid
+        }
+
     po_path = _translations_po_path(locale)
-    if not os.path.exists(po_path):
-        return 0
-    rows = TranslationString.query.filter_by(locale=locale).all()
-    by_msgid = {r.msgid: r for r in rows if r.msgid}
+    catalog = build_locale_catalog(
+        locale,
+        pot_entries,
+        rows_by_msgid,
+        metadata=_existing_po_metadata(po_path),
+    )
 
-    def mutator(po) -> bool:
-        changed = False
-        for entry in po:
-            if not entry.msgid or entry.obsolete:
-                continue
-            row = by_msgid.get(entry.msgid)
-            if row is None:
-                continue
-            if entry.msgstr != (row.msgstr or ""):
-                entry.msgstr = row.msgstr or ""
-                changed = True
-            if row.is_plural and row.msgstr_plural:
-                as_int = {int(k): v for k, v in row.msgstr_plural.items()}
-                if getattr(entry, "msgstr_plural", None) != as_int:
-                    entry.msgstr_plural = as_int
-                    changed = True
-        return changed
-
-    save_po_locked(po_path, mutator)
+    os.makedirs(os.path.dirname(po_path), exist_ok=True)
+    with po_file_lock(po_path):
+        catalog.save(po_path)
     finalize_translation_writes([locale], refresh=True)
-    return len(by_msgid)
+    return len(catalog)
+
+
+def materialize_catalogs(locales: Optional[Iterable[str]] = None) -> Dict[str, int]:
+    """Rebuild every locale's .po/.mo from the POT and the database.
+
+    Used at container boot so translation artifacts do not need to survive a
+    deployment: translation_string does.
+    """
+    if locales is None:
+        locales = current_app.config.get("SUPPORTED_LANGUAGES") or ["en", "fr", "es", "ar", "ru", "zh"]
+    written: Dict[str, int] = {}
+    for locale in locales:
+        code = str(locale or "").strip().lower()
+        if not code:
+            continue
+        try:
+            written[code] = compile_locale_from_db(code)
+        except Exception:
+            logger.exception("materialize_catalogs: failed to rebuild %s", code)
+            written[code] = 0
+    return written
 
 
 def get_msgstr(msgid: str, locale: str) -> str:

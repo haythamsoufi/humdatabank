@@ -22,6 +22,7 @@ from app.services.translation.catalog_service import (
     STATUS_UNREVIEWED,
     _apply_row_update,
     _is_human_protected,
+    build_locale_catalog,
 )
 
 
@@ -581,3 +582,107 @@ class TestUpsertBatchConcurrency:
 
         row = db_session.query(TranslationString).filter_by(locale=locale, msgid=msgid).one()
         assert row.msgstr == "Traduction gagnante"
+
+
+# ---------------------------------------------------------------------------
+# build_locale_catalog — pure catalog construction (no DB, no files)
+# ---------------------------------------------------------------------------
+def _pot_entry(msgid, *, msgid_plural=None, occurrences=None, flags=None, obsolete=False):
+    return SimpleNamespace(
+        msgid=msgid,
+        msgid_plural=msgid_plural,
+        msgctxt=None,
+        occurrences=occurrences or [],
+        flags=flags or [],
+        obsolete=obsolete,
+    )
+
+
+def _db_row(msgstr, *, msgstr_plural=None):
+    return SimpleNamespace(msgstr=msgstr, msgstr_plural=msgstr_plural)
+
+
+@pytest.mark.unit
+class TestBuildLocaleCatalog:
+    def test_uses_db_value_for_translated_msgid(self):
+        catalog = build_locale_catalog(
+            "fr", [_pot_entry("Hello")], {"Hello": _db_row("Bonjour")}
+        )
+        assert [(e.msgid, e.msgstr) for e in catalog] == [("Hello", "Bonjour")]
+
+    def test_msgid_without_db_row_is_written_untranslated(self):
+        """A brand new extracted string still belongs in the catalog, empty."""
+        catalog = build_locale_catalog("fr", [_pot_entry("Hello")], {})
+        assert [(e.msgid, e.msgstr) for e in catalog] == [("Hello", "")]
+
+    def test_pot_defines_membership_so_stale_db_rows_are_dropped(self):
+        catalog = build_locale_catalog(
+            "fr",
+            [_pot_entry("Kept")],
+            {"Kept": _db_row("Garde"), "Removed": _db_row("Supprime")},
+        )
+        assert [e.msgid for e in catalog] == ["Kept"]
+
+    def test_obsolete_pot_entries_are_skipped(self):
+        catalog = build_locale_catalog(
+            "fr", [_pot_entry("Gone", obsolete=True), _pot_entry("Here")], {}
+        )
+        assert [e.msgid for e in catalog] == ["Here"]
+
+    def test_english_msgstr_is_the_msgid(self):
+        """English is the source locale and has no translation_string rows."""
+        catalog = build_locale_catalog("en", [_pot_entry("Hello")], {})
+        assert [(e.msgid, e.msgstr) for e in catalog] == [("Hello", "Hello")]
+
+    def test_english_plural_uses_both_source_forms(self):
+        catalog = build_locale_catalog(
+            "en", [_pot_entry("%d file", msgid_plural="%d files")], {}
+        )
+        entry = list(catalog)[0]
+        assert entry.msgstr_plural == {0: "%d file", 1: "%d files"}
+
+    def test_plural_values_come_from_the_row(self):
+        catalog = build_locale_catalog(
+            "fr",
+            [_pot_entry("%d file", msgid_plural="%d files")],
+            {"%d file": _db_row("", msgstr_plural={"0": "%d fichier", "1": "%d fichiers"})},
+        )
+        entry = list(catalog)[0]
+        assert entry.msgstr_plural == {0: "%d fichier", 1: "%d fichiers"}
+
+    def test_plural_without_row_still_has_both_forms(self):
+        """gettext needs the singular/plural slots present even when untranslated."""
+        catalog = build_locale_catalog(
+            "fr", [_pot_entry("%d file", msgid_plural="%d files")], {}
+        )
+        assert list(catalog)[0].msgstr_plural == {0: "", 1: ""}
+
+    def test_source_references_and_flags_are_preserved(self):
+        catalog = build_locale_catalog(
+            "fr",
+            [_pot_entry("Hi %(name)s", occurrences=[("app/x.py", "12")], flags=["python-format"])],
+            {},
+        )
+        entry = list(catalog)[0]
+        assert entry.occurrences == [("app/x.py", "12")]
+        assert "python-format" in entry.flags
+
+    def test_metadata_is_preserved_and_language_forced(self):
+        catalog = build_locale_catalog(
+            "ru",
+            [_pot_entry("Hello")],
+            {},
+            metadata={"Plural-Forms": "nplurals=3; plural=(n%10==1);", "Language": "fr"},
+        )
+        assert catalog.metadata["Plural-Forms"] == "nplurals=3; plural=(n%10==1);"
+        assert catalog.metadata["Language"] == "ru"
+        assert catalog.metadata["Content-Type"] == "text/plain; charset=utf-8"
+
+    def test_catalog_compiles_to_mo(self, tmp_path):
+        """The generated catalog must survive the .mo path gettext actually reads."""
+        catalog = build_locale_catalog(
+            "fr", [_pot_entry("Hello")], {"Hello": _db_row("Bonjour")}
+        )
+        target = tmp_path / "messages.mo"
+        catalog.save_as_mofile(str(target))
+        assert target.stat().st_size > 0

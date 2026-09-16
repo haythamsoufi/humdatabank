@@ -266,6 +266,71 @@ class TestReturnAssignmentForRevision:
 # POST /request_country_access
 # ===========================================================================
 
+class TestRecordCountryAccessRequestAudit:
+    def test_records_countries_comment_and_skips(self, app):
+        from app.routes.main.assignments import _record_country_access_request_audit
+        from app.models.system import CountryAccessRequestStatus
+
+        pending = MagicMock(status=CountryAccessRequestStatus.PENDING)
+        approved = MagicMock(status=CountryAccessRequestStatus.APPROVED)
+        with app.app_context(), patch(
+            "app.routes.main.assignments.set_audit_details"
+        ) as mock_audit:
+            _record_country_access_request_audit(
+                country_names=["Kenya"],
+                request_message="  Need access  ",
+                created_requests=[pending, approved],
+                skipped_already_pending=["Chad"],
+                skipped_already_has_access=["Peru"],
+                skipped_invalid=["ID 9"],
+            )
+        mock_audit.assert_called_once_with(
+            countries=["Kenya"],
+            comment="Need access",
+            status="Submitted",
+            already_pending=["Chad"],
+            already_has_access=["Peru"],
+            invalid_countries=["ID 9"],
+        )
+
+    def test_auto_approved_status(self, app):
+        from app.routes.main.assignments import _record_country_access_request_audit
+        from app.models.system import CountryAccessRequestStatus
+
+        approved = MagicMock(status=CountryAccessRequestStatus.APPROVED)
+        with app.app_context(), patch(
+            "app.routes.main.assignments.set_audit_details"
+        ) as mock_audit:
+            _record_country_access_request_audit(
+                country_names=["Kenya"],
+                request_message=None,
+                created_requests=[approved],
+                skipped_already_pending=[],
+                skipped_already_has_access=[],
+                skipped_invalid=[],
+            )
+        mock_audit.assert_called_once_with(
+            countries=["Kenya"],
+            status="Auto-approved",
+        )
+
+    def test_skips_empty_payload(self, app):
+        from app.routes.main.assignments import _record_country_access_request_audit
+
+        with app.app_context(), patch(
+            "app.routes.main.assignments.set_audit_details"
+        ) as mock_audit:
+            _record_country_access_request_audit(
+                country_names=[],
+                request_message="   ",
+                created_requests=[],
+                skipped_already_pending=[],
+                skipped_already_has_access=[],
+                skipped_invalid=[],
+            )
+        mock_audit.assert_not_called()
+
+
 class TestRequestCountryAccess:
     """POST /request_country_access"""
 
@@ -302,6 +367,47 @@ class TestRequestCountryAccess:
              patch(f"{_NOTIF_AUDIENCE}.collect_entity_admin_audience_recipient_ids", return_value=[]):
             resp = self._post(client, {"requested_country_id": country.id}, follow_redirects=False)
         assert_redirect(resp)
+
+    def test_success_records_audit_details_with_comment(self, client, db_session, app, test_user):
+        country = create_test_country(db_session)
+        _login(client, test_user)
+        with patch("app.routes.main.assignments.is_organization_email", return_value=False), \
+             patch(f"{_APP_SETTINGS}.get_auto_approve_access_requests", return_value=False), \
+             patch(f"{_NOTIF_AUDIENCE}.collect_entity_admin_audience_recipient_ids", return_value=[]), \
+             patch("app.routes.main.assignments.set_audit_details") as mock_audit:
+            resp = self._post(
+                client,
+                {
+                    "requested_country_id": country.id,
+                    "request_message": "Need access for reporting",
+                },
+                follow_redirects=False,
+            )
+        assert_redirect(resp)
+        mock_audit.assert_called_once()
+        kwargs = mock_audit.call_args.kwargs
+        assert kwargs["countries"] == [country.name]
+        assert kwargs["comment"] == "Need access for reporting"
+        assert kwargs["status"] == "Pending review"
+
+    def test_org_user_audit_details_include_all_countries(self, client, db_session, app, test_user):
+        country1 = create_test_country(db_session)
+        country2 = create_test_country(db_session)
+        _login(client, test_user)
+        with patch("app.routes.main.assignments.is_organization_email", return_value=True), \
+             patch(f"{_APP_SETTINGS}.get_auto_approve_access_requests", return_value=False), \
+             patch(f"{_NOTIF_AUDIENCE}.collect_entity_admin_audience_recipient_ids", return_value=[]), \
+             patch("app.routes.main.assignments.set_audit_details") as mock_audit:
+            resp = self._post(
+                client,
+                {"requested_country_id": [country1.id, country2.id]},
+                follow_redirects=False,
+            )
+        assert_redirect(resp)
+        kwargs = mock_audit.call_args.kwargs
+        assert kwargs["countries"] == [country1.name, country2.name]
+        assert kwargs["status"] == "Pending review"
+        assert "comment" not in kwargs
 
     def test_non_org_user_cannot_request_multiple_countries(self, client, db_session, app, test_user):
         """A non-org user requesting 2 countries → warning flash and redirect."""

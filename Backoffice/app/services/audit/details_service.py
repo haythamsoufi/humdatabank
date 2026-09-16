@@ -554,11 +554,16 @@ _ALWAYS_HIDE_KEY_SUBSTRINGS = (
 # Known payload keys → reviewer-facing labels.
 _DETAIL_KEY_LABELS = {
     "auto_resolved": "Automatically resolved",
+    "already_has_access": "Already has access",
+    "already_pending": "Already pending",
     "cleanup_time": "Cleanup time",
     "client_name": "Client",
+    "comment": "Comment",
+    "countries": "Countries",
     "country_name": "Country",
     "country_id": "Country",
     "country_ids": "Countries",
+    "request_message": "Comment",
     "device_name": "Device",
     "device_id": "Device",
     "email": "Email",
@@ -591,6 +596,7 @@ _FORM_DATA_DETAIL_KEYS = (
     "action",
     "country_id",
     "country_name",
+    "country_ids",
     "entity_select",
     "entity_name",
     "entity_type",
@@ -598,6 +604,41 @@ _FORM_DATA_DETAIL_KEYS = (
     "template_name",
     "title",
 )
+
+
+def _parse_id_list(value: Any) -> List[int]:
+    """Parse a form or JSON id payload (scalar, list, or comma-separated) into ints."""
+    if value is None or value is False or value == "":
+        return []
+    if isinstance(value, bool):
+        return []
+    if isinstance(value, int):
+        return [value] if value > 0 else []
+    if isinstance(value, float) and value.is_integer() and value > 0:
+        return [int(value)]
+    if isinstance(value, list):
+        out: List[int] = []
+        for item in value:
+            out.extend(_parse_id_list(item))
+        return out
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                return _parse_id_list(json.loads(text))
+            except (json.JSONDecodeError, TypeError, ValueError):
+                return []
+        if "," in text:
+            out: List[int] = []
+            for part in text.split(","):
+                out.extend(_parse_id_list(part.strip()))
+            return out
+        if text.isdigit():
+            parsed = int(text)
+            return [parsed] if parsed > 0 else []
+    return []
 
 
 def _looks_like_db_id(value: Any) -> bool:
@@ -680,8 +721,9 @@ def _drop_redundant_id_keys(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _resolve_known_id_lists(key: str, value: Any) -> Optional[Any]:
-    if key == "country_ids" and isinstance(value, list):
-        names = _country_names(value)
+    if key == "country_ids":
+        ids = value if isinstance(value, list) else _parse_id_list(value)
+        names = _country_names(ids)
         return names or None
     if key == "rbac_role_ids" and isinstance(value, list):
         labels = _role_labels(value)
@@ -699,6 +741,20 @@ def _useful_form_data_fields(form_data: Any) -> Dict[str, Any]:
     for key in _FORM_DATA_DETAIL_KEYS:
         if key in form_data and form_data[key] not in (None, ""):
             out[key] = form_data[key]
+
+    requested = form_data.get("requested_country_id")
+    if (
+        requested not in (None, "", [])
+        and "country_ids" not in out
+        and "country_name" not in out
+    ):
+        ids = _parse_id_list(requested)
+        if ids:
+            out["country_ids"] = ids
+
+    message = form_data.get("request_message")
+    if message not in (None, ""):
+        out.setdefault("comment", message)
     return out
 
 
@@ -716,6 +772,21 @@ def humanize_audit_details_dict(payload: Optional[Dict[str, Any]]) -> Optional[D
     extras = _useful_form_data_fields(merged.pop("form_data", None))
     for key, value in extras.items():
         merged.setdefault(key, value)
+
+    raw_requested = merged.pop("requested_country_id", None)
+    if (
+        raw_requested not in (None, "", [])
+        and "country_ids" not in merged
+        and "countries" not in merged
+        and "country_name" not in merged
+    ):
+        ids = _parse_id_list(raw_requested)
+        if ids:
+            merged["country_ids"] = ids
+
+    if "comment" not in merged and merged.get("request_message") not in (None, ""):
+        merged["comment"] = merged["request_message"]
+    merged.pop("request_message", None)
 
     merged = _drop_redundant_id_keys(merged)
 

@@ -444,6 +444,12 @@ def extract_entity_info(
                     form_data = context_data.get("form_data", {}) or {}
                     cid = form_data.get("country_id")
                     cname = cname or form_data.get("country_name")
+                    if not cid:
+                        requested = form_data.get("requested_country_id")
+                        if isinstance(requested, list) and requested:
+                            cid = requested[0]
+                        elif requested not in (None, "") and str(requested).strip().isdigit():
+                            cid = requested
                 if cid:
                     entity_type = "country"
                     entity_id = cid

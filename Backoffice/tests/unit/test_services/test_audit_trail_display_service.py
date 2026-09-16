@@ -559,6 +559,18 @@ class TestExtractEntityInfo:
         assert etype == "country"
         assert eid == 7
 
+    def test_activity_requested_country_id_in_form_data(self):
+        ctx = {"form_data": {"requested_country_id": "9"}}
+        etype, eid, ename = extract_entity_info("activity", ctx)
+        assert etype == "country"
+        assert eid == "9"
+
+    def test_activity_requested_country_id_list_in_form_data(self):
+        ctx = {"form_data": {"requested_country_id": ["11", "22"]}}
+        etype, eid, ename = extract_entity_info("activity", ctx)
+        assert etype == "country"
+        assert eid == "11"
+
     def test_activity_entity_id_without_name_triggers_lookup(self, app):
         with app.app_context():
             ctx = {"entity_type": "country", "entity_id": 10}

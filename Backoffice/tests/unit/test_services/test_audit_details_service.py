@@ -27,6 +27,7 @@ from app.services.audit.details_service import (
     _normalize_condition_for_compare,
     _normalize_config_for_compare,
     _normalize_form_item_snapshot_for_compare,
+    _parse_id_list,
     _prune_dict_diff,
     format_activity_log_details,
     format_admin_action_details,
@@ -1044,3 +1045,79 @@ class TestFormatActivityLogDetails:
         }
         assert "indicator_42" not in (result or {})
         assert "csrf_token" not in (result or {})
+
+    def test_promotes_country_access_request_form_fields(self):
+        with patch(
+            "app.services.audit.details_service._country_names",
+            return_value=["Kenya", "Chad"],
+        ):
+            result = format_activity_log_details(
+                {
+                    "endpoint": "main.request_country_access",
+                    "method": "POST",
+                    "status_code": 302,
+                    "form_data": {
+                        "requested_country_id": ["193", "44"],
+                        "request_message": "Need access for reporting",
+                        "csrf_token": "secret",
+                    },
+                }
+            )
+        assert result == {
+            "Countries": ["Kenya", "Chad"],
+            "Comment": "Need access for reporting",
+        }
+
+    def test_promotes_single_requested_country_id_string(self):
+        with patch(
+            "app.services.audit.details_service._country_names",
+            return_value=["Kenya"],
+        ):
+            result = format_activity_log_details(
+                {
+                    "form_data": {
+                        "requested_country_id": "193",
+                        "request_message": "Please grant access",
+                    }
+                }
+            )
+        assert result == {
+            "Countries": ["Kenya"],
+            "Comment": "Please grant access",
+        }
+
+    def test_view_supplied_countries_and_comment_are_kept(self):
+        result = format_activity_log_details(
+            {
+                "endpoint": "main.request_country_access",
+                "method": "POST",
+                "countries": ["Kenya", "Chad"],
+                "comment": "Need access for the UPR round",
+                "status": "Pending review",
+            }
+        )
+        assert result == {
+            "Countries": ["Kenya", "Chad"],
+            "Comment": "Need access for the UPR round",
+            "Status": "Pending review",
+        }
+
+
+class TestParseIdList:
+    def test_none_and_empty(self):
+        assert _parse_id_list(None) == []
+        assert _parse_id_list("") == []
+        assert _parse_id_list([]) == []
+        assert _parse_id_list(False) == []
+
+    def test_int_and_numeric_string(self):
+        assert _parse_id_list(12) == [12]
+        assert _parse_id_list("12") == [12]
+        assert _parse_id_list("0") == []
+
+    def test_list_and_comma_separated(self):
+        assert _parse_id_list(["3", 8, "x"]) == [3, 8]
+        assert _parse_id_list("3, 8") == [3, 8]
+
+    def test_json_array_string(self):
+        assert _parse_id_list("[3, 8]") == [3, 8]

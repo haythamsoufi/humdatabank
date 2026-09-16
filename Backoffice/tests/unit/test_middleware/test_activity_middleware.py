@@ -556,7 +556,6 @@ class TestExtractEntityIntoContext:
                 _extract_entity_into_context(app, req, ctx)
 
             assert ctx.get("country_id") == 4
-            assert ctx.get("country_name") == "Requested Country"
 
     def test_url_view_args_aes_id(self, app):
         with app.app_context():

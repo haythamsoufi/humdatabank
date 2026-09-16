@@ -30,7 +30,9 @@ jobs:
 
   # ── Fast code guards ────────────────────────────────────────────────────────
   # Runs in seconds; catches template and JS safety regressions before anything
-  # heavier spins up.
+  # heavier spins up. The translation catalog check lives here rather than in the
+  # pytest job because select_pytest_targets.py ignores .html/.po/.pot, so a
+  # template-only change adding _('...') would otherwise skip the check entirely.
   guards:
     name: Code guards
     runs-on: ubuntu-latest
@@ -82,6 +84,16 @@ jobs:
           else
             python Backoffice/scripts/ci/check_unsafe_gettext_embedding.py --base-ref "$BASE"
           fi
+
+      # Jinja2 is required by config/babel.cfg's jinja2 extractor. Babel and polib
+      # versions are read from requirements.txt so extraction matches the app.
+      - name: Install translation catalog tooling
+        working-directory: Backoffice
+        run: pip install Jinja2 $(sed 's/#.*//' requirements.txt | grep -E '^(Babel|polib)==')
+
+      - name: Translation catalog is current and compiles
+        working-directory: Backoffice
+        run: python scripts/ci/check_translations_current.py
 
   # ── Bandit static security analysis ────────────────────────────────────────
   bandit:
@@ -186,10 +198,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
-
-      - name: Translation catalog is current and compiles
-        working-directory: Backoffice
-        run: python scripts/ci/check_translations_current.py
 
       - name: Run tests
         working-directory: Backoffice

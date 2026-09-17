@@ -30,9 +30,10 @@ limiter = Limiter(
 def resolve_translations_directory(app) -> str:
     """Absolute path to gettext catalogs (Backoffice/translations).
 
-    - Local dev: repo folder next to the ``app`` package (``../translations``).
-    - Docker/Azure: entrypoint symlinks ``/app/translations`` to persistent storage;
-      same layout relative to ``app.root_path``.
+    The same layout relative to ``app.root_path`` in every environment: the repo
+    folder next to the ``app`` package locally, and container-local storage in
+    Docker/Azure, where the entrypoint rebuilds the catalogs from
+    ``translation_string`` at boot rather than mounting them from a file share.
 
     Override with env ``BACKOFFICE_TRANSLATIONS_DIR`` (absolute path) when needed.
     """

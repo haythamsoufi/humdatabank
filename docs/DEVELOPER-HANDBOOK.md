@@ -250,7 +250,8 @@ Entity answers are stored in three data tables, all keyed by either `assignment_
 
 ### Translation Services
 - Hosted IFRC/Azure translation is the default engine for EN, FR, ES, AR, RU, ZH, HI. LibreTranslate remains a local-dev fallback. A self-hosted NLLB sidecar (`services/nllb-sidecar`, compose profile `nllb`; CTranslate2 + `facebook/nllb-200-1.3B`, no external API) is available for all mapped languages, including the core seven, when selected in the auto-translate UI. Opt in from the Backoffice with `NLLB_SIDECAR_URL` (see `services/nllb-sidecar/README.md`).
-- Gettext **values** live in `translation_string` (provenance, engine, status). `pybabel extract` / `.pot` stay the msgid source. Compiled `.mo` files remain the runtime path.
+- Gettext **values** live in `translation_string` (provenance, engine, status). `pybabel extract` / `.pot` stay the msgid source. Compiled `.mo` files remain the runtime path, but they are disposable: `flask translations compile-catalog` rebuilds every locale's `.po`/`.mo` from the POT plus the database, and `entrypoint.sh` runs it on each boot. Nothing about a container's translation state needs to survive a deployment.
+- Because msgids come from extraction and not from the database, adding a new `_()` call in Python or Jinja means running `python scripts/i18n/extract_update_translations.py` (or **Regenerate Strings** on `/admin/translations/manage`) and committing the catalog. The string cannot be translated in the admin grid until the catalog lists it.
 - Import existing catalogs with `flask translations import-catalog` (backfill `unknown_presumed_machine`), then `flask translations recover-provenance` to mark audited human edits. Seed must-terms with `flask translations seed-glossary` (Indicator Bank / Common Words → `translation_glossary_term`). Auto-translate reads those DB rows only: it keeps the English source term so the engine can set word order, then swaps unofficial renderings for the official target form. Add or edit terms on `/admin/translations/quality` — do not hardcode house terms or whole-phrase rows in code.
 - Quality dashboard: `/admin/translations/quality` — Overview, Glossary, Inbox, and Unreviewed tabs. Glossary and Inbox use AG Grid (`GET /admin/translations/api/glossary-terms` and `…/glossary-candidates`). Engine eval (gated on a filled gold set): `python Backoffice/scripts/i18n/eval_translation_engines.py`.
 - Knowledge Base language versions: on `/admin/ai/documents`, select the completed files for one publication → **Mark as same publication** (records deferred pairs; sentence-level TM stays off) → **Mine terminology**. Mining first joins shared `(ACRONYM)` expansions, then asks OpenAI to extract English glossary heads and pair them using embedding retrieval in each target document. A pair is stored only when the target wording appears in those retrieved chunks. Exact matches of an approved glossary form are dropped; a different form for the same source is flagged as a conflict. Review/accept (or edit) candidates on `/admin/translations/quality`. Accepting a conflict replaces the official term.
@@ -284,12 +285,12 @@ Permission (`user_can_use_translation_review`) and UI visibility (`user_wants_tr
 - Routes: `app/routes/translation_review/` (`/translation-review/toggle`, `/translation-review/api/string`, `/api/queue`, `/api/glossary-candidates`)
 - Hooks: `app/services/translation_review/hooks.py` (wraps Jinja + `Domain.gettext`; strips markers from non-HTML responses)
 - Frontend: `app/static/js/translation_review/core.js`, `app/static/css/translation-review.css`, included from `core/layout.html`
-- Production propagation: `app/utils/translation_watcher.py` polls shared `translations/` in all environments so every Gunicorn worker refreshes catalogs after PO/MO changes
+- Production propagation: `app/utils/translation_watcher.py` polls `translation_catalog_version` in all environments; a worker whose artifacts are behind rebuilds them from the database and refreshes Babel. Falls back to the `translations/.sentinel` mtime when the database cannot be read.
 
 **Deploy notes**
-- Run migrations: `add_rbac_language_scope`, `add_translation_review_tool_toggle`, `add_translation_quality`
+- Run migrations: `add_rbac_language_scope`, `add_translation_review_tool_toggle`, `add_translation_quality`, `add_translation_catalog_version`
 - Seed RBAC: `python -m flask rbac seed`
-- Ensure persistent translations volume is mounted (see `Backoffice/docs/setup/persistent-translations.md`)
+- No translations volume is needed. `entrypoint.sh` rebuilds `.po`/`.mo` from `messages.pot` + `translation_string` after migrations. Deployments still mounting Azure Files at `/data/translations` must run `flask translations import-catalog` **before** upgrading — see `Backoffice/docs/setup/persistent-translations.md`.
 
 ### AI System Configuration (Backoffice)
 - **Chat API**: `/api/ai/v2` (chat, stream, conversations, export/import). WebSocket: `/api/ai/v2/ws`. Health: `GET /api/ai/v2/health` (includes `agent_available`).

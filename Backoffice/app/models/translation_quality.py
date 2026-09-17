@@ -40,6 +40,22 @@ class TranslationString(db.Model):
     )
 
 
+class TranslationCatalogVersion(db.Model):
+    """Single-row counter bumped whenever catalog values change.
+
+    The .po/.mo artifacts are materialized per container, so a peer's edit no
+    longer shows up locally as a file mtime change. Workers poll this row to
+    learn that their catalogs are stale. Reading it is a primary-key lookup,
+    which keeps the poll cheap enough to run on a short interval.
+    """
+
+    __tablename__ = "translation_catalog_version"
+
+    id = db.Column(db.Integer, primary_key=True)
+    version = db.Column(db.BigInteger, nullable=False, default=1)
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+
+
 class TranslationEntityProvenance(db.Model):
     """Provenance for JSONB *_translations fields (indicators, forms, org)."""
 

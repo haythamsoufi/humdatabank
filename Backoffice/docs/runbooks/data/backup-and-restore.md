@@ -10,7 +10,7 @@ Disaster-recovery procedures for the Backoffice. Adapt schedules, retention, and
 |-------|---------------|-------------|
 | PostgreSQL database | Managed Postgres or self-hosted | **Critical** — all form data, users, submissions, AI documents |
 | Uploaded files / document library | Azure Files or local disk | **High** — publications, resources, PDF attachments |
-| Translation files | Azure Files (persistent) or local | **Medium** — regeneratable but time-consuming |
+| Translation values | PostgreSQL (`translation_string`) | Covered by the database backup — the `.po`/`.mo` files are rebuilt from it at boot and need no separate backup |
 | App Service configuration / env vars | Azure Key Vault / App Service settings | **High** — secrets and keys; back up the *inventory* and *rotation procedures*, not the values themselves |
 | Application code | Git repository | Covered by version control — not separately backed up |
 

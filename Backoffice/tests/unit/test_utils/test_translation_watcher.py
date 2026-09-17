@@ -273,7 +273,11 @@ class TestStartStopWatching:
 
 
 # ---------------------------------------------------------------------------
-# _watch_loop
+# _watch_loop — filesystem fallback
+#
+# The loop prefers the database version counter; these cases cover the branch
+# taken when it is unavailable, so each one pins _db_version to None rather than
+# depending on whether an app context happens to be active.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 class TestWatchLoop:
@@ -301,6 +305,7 @@ class TestWatchLoop:
                 watcher.watching = False
 
         with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()
 
@@ -330,6 +335,7 @@ class TestWatchLoop:
                 watcher.watching = False
 
         with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()
 
@@ -351,6 +357,7 @@ class TestWatchLoop:
                 watcher.watching = False
 
         with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_reload') as mock_reload:
             watcher._watch_loop()
 
@@ -373,6 +380,7 @@ class TestWatchLoop:
             watcher.watching = False
 
         with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_fallback_files', side_effect=RuntimeError('boom')):
             watcher._watch_loop()  # must not raise
 
@@ -399,6 +407,7 @@ class TestWatchLoop:
         (tmp_path / '.sentinel').write_text('0')
 
         with patch('app.utils.translation_watcher.time.sleep', side_effect=fake_sleep), \
+             patch.object(watcher, '_db_version', return_value=None), \
              patch.object(watcher, '_changed', side_effect=RuntimeError('boom')):
             watcher._watch_loop()
 

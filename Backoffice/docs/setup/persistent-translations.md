@@ -1,135 +1,92 @@
-# Persistent Translations
+# Translation persistence
 
-By default, translation `.po`/`.mo` files are baked into the Docker image at build time. Any edits made through the admin UI (`/admin/translations/manage`) live on the container's ephemeral filesystem and are lost when the container is replaced during a deployment.
+Admin edits made in `/admin/translations/manage` are stored in the **`translation_string`** table, so they survive container replacement the same way any other application data does. No file share or volume is involved.
 
-The entrypoint automatically detects persistent storage and manages translations so each environment keeps its own independently.
+The `.po`/`.mo` files are build artifacts. Each container rebuilds them at boot and keeps its own copy on ephemeral storage.
 
-## How It Works
+## How it works
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ Dockerfile (build time)                                      │
-│  1. Compile .po → .mo (working baseline baked into image)    │
-│  2. Copy translations/ → translations_base/ (safe copy)     │
+│  Extract messages.pot from source, compile a baseline .mo    │
+│  (the fallback if the boot rebuild cannot run)               │
 ├──────────────────────────────────────────────────────────────┤
 │ Container startup (entrypoint.sh)                            │
-│                                                              │
-│  1. Resolve TRANSLATIONS_PERSISTENT_PATH:                    │
-│     ├─ Explicit env var? → use it                            │
-│     ├─ /data/translations is a mount? → auto-detect          │
-│     └─ Neither? → use image-baked translations (no-op)       │
-│  2. Persistent path empty? → seed from translations_base     │
-│     Persistent path has files? → merge new msgids,           │
-│                                  keep admin edits            │
-│  3. Compile all .po → .mo in persistent path                 │
-│  4. Point translations/ at the persistent path               │
-│     ├─ Docker volume at /app/translations? → already there   │
-│     └─ Separate path (/data/translations)? → symlink         │
-│  5. App starts — reads/writes go to persistent storage       │
+│  1. flask db upgrade                                         │
+│  2. flask translations compile-catalog                       │
+│     messages.pot supplies the msgids                         │
+│     translation_string supplies the values                   │
+│     → writes translations/<locale>/LC_MESSAGES/messages.po   │
+│     → compiles messages.mo                                   │
+│     → records the catalog version in translations/           │
+│       .catalog_version                                       │
+├──────────────────────────────────────────────────────────────┤
+│ While running                                                │
+│  An admin edit writes translation_string, rebuilds this      │
+│  container's artifacts, and bumps translation_catalog_version│
+│  Every worker polls that counter, rebuilds when it is behind,│
+│  and calls flask_babel.refresh()                             │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Merge logic** (per locale, per `msgid`):
+The counter is what makes this work across containers: a peer's edit never changes a local file's mtime, so the database is the only signal that reaches every replica.
 
-| Scenario | Result |
-|----------|--------|
-| `msgid` in image AND persistent (non-empty `msgstr`) | Keep persistent `msgstr` (admin edits preserved) |
-| `msgid` in image but NOT in persistent | Add with image's `msgstr` (new string from developer) |
-| `msgid` in persistent but NOT in image | Mark obsolete (developer removed the string) |
+## Requirements
 
-## Azure App Service Setup
+- Run migrations on deploy so `translation_catalog_version` exists (`flask db upgrade`, which `entrypoint.sh` already does unless `SKIP_MIGRATIONS` is set).
+- Nothing else. There is no mount to configure and no `TRANSLATIONS_PERSISTENT_PATH` setting.
 
-### 1. Create an Azure File Share
+## Migrating from the Azure Files share
 
-One share per environment keeps translations independent.
+Earlier deployments kept `.po` files on an Azure Files share mounted at `/data/translations`. Edits made there are not automatically in the database, so back them up **before** deploying this change.
 
-**Portal:** Storage Account → File shares → + File share
-
-| Field | Value |
-|-------|-------|
-| Name | `translations-staging` (or `translations-prod`, etc.) |
-| Tier | Transaction optimized |
-
-**CLI:**
+1. Deploy is safe to plan only after the catalog is in the database. On the **currently running** version, load the share's catalogs into `translation_string`:
 
 ```bash
-RG="your-resource-group"
-STORAGE_ACCOUNT="yourstorageaccount"
-SHARE_NAME="translations-staging"
-
-az storage share-rm create \
-  --resource-group "$RG" \
-  --storage-account "$STORAGE_ACCOUNT" \
-  --name "$SHARE_NAME" \
-  --quota 1
+python -m flask translations import-catalog
 ```
 
-### 2. Mount the Share in the Web App (Path Mapping)
+   `import-catalog` is idempotent and never overwrites human-approved rows.
 
-**Portal (typical):** App Service → **Settings** → **Configuration** → **Path mappings** → + Add storage mount
-
-Note: Azure Portal UI labels move around occasionally. If you don’t see “Configuration → Path mappings”, look for a “Storage”, “Path mappings”, or “Storage mounts” section under App Service settings.
-
-| Field | Value |
-|-------|-------|
-| Name | `translations` |
-| Type | Azure Files |
-| Storage Account | *(your account)* |
-| Share | `translations-staging` |
-| Mount path | `/data/translations` |
-
-**CLI:**
+2. Confirm the rows landed — the Unreviewed tab on `/admin/translations/quality`, or:
 
 ```bash
-WEBAPP="your-webapp-name"
+python -m flask translations hygiene
+```
 
-az webapp config storage-account add \
+3. Deploy this version and let the entrypoint rebuild the catalogs.
+
+4. Once the deployment looks correct, remove the storage mount. On Azure App Service:
+
+```bash
+az webapp config storage-account delete \
   --resource-group "$RG" \
   --name "$WEBAPP" \
-  --custom-id translations \
-  --storage-type AzureFiles \
-  --account-name "$STORAGE_ACCOUNT" \
-  --share-name "$SHARE_NAME" \
-  --mount-path /data/translations \
-  --access-key "$(az storage account keys list -g $RG -n $STORAGE_ACCOUNT --query '[0].value' -o tsv)"
+  --custom-id translations
 ```
 
-### 3. Deploy
+   The Azure File Share itself can then be deleted. Keep it until you are satisfied the translations came through; it costs almost nothing and is the only copy of anything that failed to import.
 
-That's it. The entrypoint auto-detects the mount at `/data/translations`, seeds it on first boot, and preserves admin edits on subsequent deploys.
-
-No env vars needed — the entrypoint uses `mountpoint` to detect the Azure Files share. If you prefer a custom path, set `TRANSLATIONS_PERSISTENT_PATH` in the Web App’s **Environment variables** (App settings) and restart the app.
-
-See also: `docs/setup/azure-storage.md` for the broader Azure Storage setup (Blob uploads + Azure Files translations).
-
-## Docker Compose (local development)
-
-The `docker-compose.yml` is already configured with a named `translations_data` volume mounted at `/app/translations` and the `TRANSLATIONS_PERSISTENT_PATH` env var. Translations persist across `docker compose down && docker compose up` and across image rebuilds.
-
-The host's `Backoffice/translations/` (git-tracked `.po` files) stays intact — the named volume is at `/app/translations` which is outside the `./Backoffice/app:/app/app` bind mount.
-
-### Reset to git baseline
-
-```bash
-docker compose down -v  # removes named volumes including translations_data
-docker compose up       # seeds fresh from the image baseline
-```
+If you would rather keep a portable backup first, `/admin/translations/manage` → **Export** → **PO ZIP** downloads every locale, and **Import** restores it.
 
 ## Operations
 
-### Reset translations to the git baseline (Azure)
+### Rebuild catalogs by hand
 
-Delete the contents of the Azure File Share (Portal → Storage Account → File Shares → select share → delete contents), then restart the Web App. The next boot re-seeds from the image.
+```bash
+python -m flask translations compile-catalog            # all supported locales
+python -m flask translations compile-catalog --locale fr
+```
 
-### Migrate existing translations before enabling persistence
+Useful if a container's artifacts are suspected stale and you do not want to wait for the poll interval, or after restoring `translation_string` from a backup.
 
-If the running environment already has admin-edited translations you want to keep:
+### Reset translations to the repository baseline
 
-1. Go to `/admin/translations/manage` → **Export** → **PO ZIP** to download all locales.
-2. Set up the Azure Files mount and deploy (first boot seeds from the image baseline).
-3. Go to `/admin/translations/manage` → **Import** → upload the ZIP.
-4. Click **Compile** to regenerate `.mo` files.
+Delete the relevant `translation_string` rows and rebuild; the catalogs fall back to the msgids and committed values shipped in the image. Prefer targeting a locale rather than truncating the table, since provenance and review status live there too.
 
-### Running without persistence
+### Local development
 
-Leave `TRANSLATIONS_PERSISTENT_PATH` unset and don't mount anything at `/data/translations`. The app uses the image-baked translations as before. This is the default for plain `python run.py` local development.
+`python run.py` uses the catalogs in `Backoffice/translations/` directly and does not rebuild them at boot. Use the admin UI, or `scripts/i18n/extract_update_translations.py` when adding new strings. Note that `compile-catalog` rewrites those git-tracked files from your local database, so avoid running it in a clone you intend to commit from.
+
+See also: `docs/setup/azure-storage.md` for Azure Blob upload storage, which is unaffected by this.

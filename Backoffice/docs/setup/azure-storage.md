@@ -1,11 +1,8 @@
 # Azure Storage on App Service
 
-This guide covers two separate Azure Storage mechanisms used by this repo:
+This guide covers **Azure Blob Storage**, used for all user-uploaded files (documents, resources, logos, AI documents, etc.).
 
-1. **Azure Blob Storage** — for all user-uploaded files (documents, resources, logos, AI documents, etc.)
-2. **Azure Files (Path Mappings)** — for persistent translation files mounted into the container
-
-These are independent services. Blob Storage is accessed via the Azure SDK; Path Mappings are filesystem mounts managed by App Service.
+Translations previously needed an **Azure Files** path mapping as well. They no longer do — see [Azure Files (Path Mappings) for Translations — removed](#azure-files-path-mappings-for-translations--removed) at the end of this guide if your Web App still has that mount.
 
 ---
 
@@ -88,86 +85,24 @@ No Azure setup is needed for local development. When `AZURE_STORAGE_CONNECTION_S
 
 ---
 
-## Azure Files (Path Mappings) for Translations
+## Azure Files (Path Mappings) for Translations — removed
 
-This section explains how to mount **Azure Files** into an **Azure App Service Web App** (Linux / container) using **Path mappings** for **persistent translations**.
+Translations no longer use a file mount. Admin edits are stored in the
+`translation_string` table and each container rebuilds its own `.po`/`.mo` files
+at boot, so they persist across restarts, slot swaps, and redeployments the same
+way the rest of the application data does.
 
-### When to use Path mappings
+If your Web App still has a storage mount at `/data/translations`, it is unused.
+Follow the migration steps in
+[`persistent-translations.md`](persistent-translations.md) — which import any
+share-only edits into the database before you remove the mount — and then:
 
-Use Path mappings when you need **durable files** that must survive:
+```bash
+az webapp config storage-account delete \
+  --resource-group "$RG" \
+  --name "$WEBAPP" \
+  --custom-id translations
+```
 
-- container restarts
-- slot swaps
-- redeployments (new image)
-
-Examples in this repo:
-
-- **Translations**: mount a file share to `/data/translations` so each environment (staging/prod) maintains its own `.po`/`.mo` files.
-
-### Basic vs Advanced mode in the Portal
-
-- **Basic**: the portal provides dropdown pickers and fills most fields for you.
-- **Advanced**: you type values explicitly and can use **Key Vault references** instead of pasting storage keys.
-
-Different apps can show different defaults depending on tenant policy, Key Vault integration, or portal UI changes.
-
-### What to enter (Azure Files)
-
-In **Web App → Settings → Configuration → Path mappings → Add storage mount**:
-
-- **Storage type**: Azure Files
-- **Protocol**: SMB (typical default)
-- **Account name**: the **Storage Account name** that contains the File Share (e.g. `databankprodsa`)
-- **Share name**: the **File Share name** inside that Storage Account (e.g. `translations-prod`)
-- **Mount path**: the absolute path inside the container (for this repo: **`/data/translations`**)
-
-#### Storage access
-
-You'll usually see one of these options:
-
-- **Manual input**: paste a Storage Account access key (Storage Account → Access keys → key1/key2).
-- **Key Vault reference**: select an App Setting whose value is a Key Vault reference.
-
-##### If using Key Vault reference
-
-1. Create a Key Vault secret whose value is the **Storage Account access key**.
-2. In the Web App, create an App Setting that references it:
-
-   `@Microsoft.KeyVault(SecretUri=https://<vault>.vault.azure.net/secrets/<secret-name>/<version>)`
-
-3. In the storage mount dialog, choose that App Setting in the **App settings** dropdown.
-
-### Translation persistence in this repo
-
-Backoffice translation source files live at:
-
-- `Backoffice/translations/<lang>/LC_MESSAGES/messages.po`
-- `Backoffice/translations/messages.pot`
-
-At runtime, the container uses `/app/translations` as the active translations directory.
-
-If you mount Azure Files at `/data/translations`, the container entrypoint:
-
-- detects the mount
-- syncs/merges from the image baseline
-- compiles `.po → .mo`
-- points `/app/translations` to the mounted directory
-
-This makes translations **environment-owned**:
-
-- staging edits stay in staging
-- production edits stay in production
-
-### Recommended setup per environment
-
-- Create **one File Share per environment**, e.g.:
-  - `translations-staging`
-  - `translations-prod`
-- Mount it to the same in-container path for both environments:
-  - `/data/translations`
-
-### Troubleshooting
-
-- **Mount path is empty after deploy**: confirm the mount exists in **Path mappings** and you clicked **Save** on Configuration.
-- **Permissions / access failures**: verify the access key (or Key Vault reference) is correct and the Web App identity can read the secret.
-- **Translations still "reset" on deploy**: ensure you mounted **Azure Files** to `/data/translations` (not a different path), or explicitly set `TRANSLATIONS_PERSISTENT_PATH` to your chosen mount path.
+Blob Storage for uploads, described above, is a different mechanism and is
+unaffected.

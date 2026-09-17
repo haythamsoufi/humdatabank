@@ -72,14 +72,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . /app
 
-# Extract translatable strings from source, update PO files, compile .mo,
-# then snapshot as translations_base/ for the persistent-volume sync script.
-# Running extraction here ensures translations_base/ always matches the source
-# code in the image, even when developers forget to commit updated .po files
-# before building — preventing newly-added strings from being incorrectly
-# marked as obsolete by sync_persistent_translations.py on next deploy.
-RUN python scripts/i18n/extract_update_translations.py --compile && \
-    cp -a /app/translations /app/translations_base
+# Extract translatable strings from source and compile .mo so the image carries
+# a complete messages.pot plus a working baseline catalog. At boot the entrypoint
+# rebuilds the catalogs from translation_string; these baked files are what the
+# app falls back to if that rebuild cannot run.
+RUN python scripts/i18n/extract_update_translations.py --compile
 
 # Ensure static files are properly accessible
 RUN mkdir -p /app/app/static && \

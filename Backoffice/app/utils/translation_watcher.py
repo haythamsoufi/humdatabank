@@ -1,23 +1,21 @@
 """
-Translation file watcher for automatic multi-worker cache refresh.
+Translation catalog watcher for automatic multi-worker cache refresh.
 
 Strategy
 --------
-Rather than rescanning every locale directory on each tick (O(locales) I/O,
-unreliable on Azure Files SMB), the watcher now checks a single sentinel file
-``translations/.sentinel`` whose mtime is updated by any PO/MO write
-(via ``app.utils.po_lock.touch_translation_sentinel``).  This gives:
+The ``.po``/``.mo`` artifacts are materialized per container from
+``translation_string``, so an edit made in one container never changes a file
+on another container's disk.  The watcher therefore polls the
+``translation_catalog_version`` counter, which every catalog write bumps:
 
-* O(1) I/O per tick instead of O(locales × 2 files).
-* Reliable detection on network file systems where per-file mtime propagation
-  can lag across SMB connections.
-* Immediate cross-worker notification: the admin "Compile" route writes the
-  sentinel immediately after refreshing its own worker, so peer workers pick
-  up the change on their next poll (≤ POLL_INTERVAL_S seconds).
+* Reaches peer *containers*, not just peer workers on a shared mount.
+* O(1) per tick — a primary-key lookup, not an O(locales × 2) file scan.
+* When the counter is ahead of the version this container last built from, the
+  worker rebuilds its catalogs from the database before refreshing Babel.
 
-Fallback: if the sentinel file does not exist (first boot, non-Docker dev),
-the watcher falls back to scanning individual .po/.mo files as before, and
-creates the sentinel on first detection.
+Fallback: when the counter cannot be read (database briefly unreachable), the
+watcher reverts to the ``translations/.sentinel`` mtime, and to scanning
+individual .po/.mo files when no sentinel exists (first boot, non-Docker dev).
 """
 
 import time

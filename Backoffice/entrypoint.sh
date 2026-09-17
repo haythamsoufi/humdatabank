@@ -39,53 +39,6 @@ if [ -n "$SEED" ] && [ -f "/app/uploads.tgz" ]; then
   fi
 fi
 
-# ---------------------------------------------------------------------------
-# Persistent translations
-# On Azure, mount an Azure Files share at /data/translations via Path
-# Mappings (no extra env vars needed — the entrypoint auto-detects it).
-# For docker-compose, a named volume is mounted at /app/translations.
-# Override with TRANSLATIONS_PERSISTENT_PATH if you need a custom path.
-# ---------------------------------------------------------------------------
-TRANSLATIONS_PERSISTENT_PATH="${TRANSLATIONS_PERSISTENT_PATH:-}"
-
-# Auto-detect: use /data/translations when it is an actual mount point
-# (Azure Path Mapping) rather than just an empty image directory.
-if [ -z "$TRANSLATIONS_PERSISTENT_PATH" ] && mountpoint -q /data/translations 2>/dev/null; then
-  TRANSLATIONS_PERSISTENT_PATH="/data/translations"
-  echo "Auto-detected Azure Files mount at /data/translations"
-fi
-
-if [ -n "$TRANSLATIONS_PERSISTENT_PATH" ]; then
-  echo "=========================================="
-  echo "Syncing translations to persistent volume"
-  echo "TRANSLATIONS_PERSISTENT_PATH: $TRANSLATIONS_PERSISTENT_PATH"
-  echo "=========================================="
-  mkdir -p "$TRANSLATIONS_PERSISTENT_PATH"
-  python scripts/i18n/sync_persistent_translations.py "$TRANSLATIONS_PERSISTENT_PATH"
-  export BACKOFFICE_TRANSLATIONS_COMPILED=1
-
-  # Point /app/translations at the persistent path.  When the persistent
-  # path is already mounted directly at /app/translations (e.g. Docker
-  # named volume in docker-compose), skip the symlink — it's already there.
-  APP_TRANSLATIONS="/app/translations"
-  REAL_PERSISTENT="$(cd "$TRANSLATIONS_PERSISTENT_PATH" 2>/dev/null && pwd -P || echo "$TRANSLATIONS_PERSISTENT_PATH")"
-  REAL_APP_TRANS="$(cd "$APP_TRANSLATIONS" 2>/dev/null && pwd -P || echo "$APP_TRANSLATIONS")"
-
-  if [ "$REAL_PERSISTENT" != "$REAL_APP_TRANS" ]; then
-    if [ -d "$APP_TRANSLATIONS" ] && [ ! -L "$APP_TRANSLATIONS" ]; then
-      rm -rf "$APP_TRANSLATIONS"
-    fi
-    if [ ! -L "$APP_TRANSLATIONS" ]; then
-      ln -s "$TRANSLATIONS_PERSISTENT_PATH" "$APP_TRANSLATIONS"
-    fi
-    echo "Symlinked $APP_TRANSLATIONS -> $TRANSLATIONS_PERSISTENT_PATH"
-  else
-    echo "Persistent volume already mounted at $APP_TRANSLATIONS"
-  fi
-else
-  echo "TRANSLATIONS_PERSISTENT_PATH not set; using image-baked translations"
-fi
-
 if [ -z "${SKIP_MIGRATIONS:-}" ]; then
   echo "=========================================="
   echo "Preparing to run database migrations"
@@ -240,6 +193,25 @@ echo "=========================================="
 echo "Generating static workflow tour JSON"
 echo "=========================================="
 python -m flask workflows generate-static 2>&1 || echo "WARN: workflow tour generation failed (continuing)"
+
+# ---------------------------------------------------------------------------
+# Translation catalogs
+# translation_string holds the translated values, so the .po/.mo artifacts are
+# rebuilt from the database (plus the image's messages.pot for msgids) on every
+# boot rather than being carried on a persistent volume. Must run after
+# migrations so translation_catalog_version exists.
+#
+# On failure the image-baked catalogs stay in place, which is the same state a
+# deployment had before any admin edits — degraded, not broken.
+# ---------------------------------------------------------------------------
+echo "=========================================="
+echo "Materializing translation catalogs from the database"
+echo "=========================================="
+if python -m flask translations compile-catalog 2>&1; then
+  export BACKOFFICE_TRANSLATIONS_COMPILED=1
+else
+  echo "WARN: catalog materialization failed; using image-baked translations"
+fi
 
 # If migrations are handled externally (e.g., by a separate db-init container),
 # explicitly wait until DB is at Alembic head to avoid race conditions at startup.

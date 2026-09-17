@@ -116,10 +116,18 @@ class VariableResolutionService:
         """Return the calendar year that best represents an assignment's reporting cycle."""
         if not assigned_form:
             return None
-        if assigned_form.period_end is not None:
-            return assigned_form.period_end.year
-        if assigned_form.period_start is not None:
-            return assigned_form.period_start.year
+        # Use getattr throughout: template-preview mode passes a lightweight duck-typed
+        # stand-in (MockAssignment in app/routes/forms/entry.py) that only sets
+        # period_name — it isn't a real AssignedForm row and has no period_start/
+        # period_end/reporting_period columns. Falling through to the period_name
+        # regex parse below (rather than raising AttributeError) is exactly the
+        # intended behavior for that case.
+        period_end = getattr(assigned_form, 'period_end', None)
+        if period_end is not None:
+            return period_end.year
+        period_start = getattr(assigned_form, 'period_start', None)
+        if period_start is not None:
+            return period_start.year
         reporting_period = getattr(assigned_form, 'reporting_period', None)
         if reporting_period is not None and reporting_period.period_end is not None:
             return reporting_period.period_end.year

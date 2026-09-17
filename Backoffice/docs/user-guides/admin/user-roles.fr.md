@@ -265,7 +265,7 @@ Ces rôles fournissent l'accès à des modules d'administration spécifiques. As
 **Capacités :**
 - Gérer le système IA
 - Gérer le tableau de bord IA
-- Gérer la bibliothèque de documents
+- Gérer la base de connaissances
 - Voir les traces de raisonnement
 
 **Quand l'utiliser :** Pour les administrateurs de système IA.

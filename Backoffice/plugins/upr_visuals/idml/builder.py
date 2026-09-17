@@ -10,7 +10,7 @@ from plugins.upr_visuals.idml.constants import *  # noqa: F403
 from plugins.upr_visuals.idml.narrative_style import folio_label, style_narrative_blocks
 from plugins.upr_visuals.idml.pages import add_narrative_pages, build_cover_chrome, build_native_pages
 from plugins.upr_visuals.idml.pdf_extract import export_visual_svgs
-from plugins.upr_visuals.idml.word_reader import load_word_paragraphs
+from plugins.upr_visuals.idml.word_reader import load_narrative_paragraphs
 from plugins.upr_visuals.idml.xml_idml import Idml, _xml_text
 
 __all__ = [
@@ -22,7 +22,7 @@ __all__ = [
     "build_native_pages",
     "export_visual_svgs",
     "folio_label",
-    "load_word_paragraphs",
+    "load_narrative_paragraphs",
     "style_narrative_blocks",
     "zip_indesign_package",
 ]
@@ -71,7 +71,7 @@ def build_indesign_package(
 
         styled = translate_styled_blocks(
             style_narrative_blocks(
-                load_word_paragraphs(word_bytes),
+                load_narrative_paragraphs(word_bytes),
                 country_name=str(meta.get("country_name") or ""),
             )
         )

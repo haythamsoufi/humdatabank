@@ -28,7 +28,11 @@ from flask_login import login_required, current_user, login_user, logout_user
 from app.utils.ai_request_user import resolve_ai_identity
 from app.utils.ai_tokens import issue_ai_token
 from app.utils.ai_pricing import estimate_chat_cost
-from app.utils.ai_utils import sanitize_page_context, openai_model_supports_sampling_params
+from app.utils.ai_utils import (
+    is_form_builder_assistant_context,
+    sanitize_page_context,
+    openai_model_supports_sampling_params,
+)
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.request_utils import WafJsonUnwrapError, unwrap_waf_json_envelope
 from app.utils.api_responses import json_auth_required, json_bad_request, json_error, json_forbidden, json_not_found, json_ok, json_server_error
@@ -924,17 +928,22 @@ def chat():
 
     allow_sensitive = bool(data.get("allow_sensitive"))
 
-    # DLP: block/confirm before sending anything to external providers.
-    allowed, dlp_err, dlp_findings = evaluate_ai_message(
+    # DLP: block/confirm before sending anything to external providers. When allowed
+    # through with findings present (warn mode, or confirm mode + allow_sensitive),
+    # dlp_message has every flagged span masked — see evaluate_ai_message's docstring.
+    # Form-builder panel requests are exempt (same as the PII-scrub exemption in
+    # AIChatEngine) — see evaluate_ai_message's form_builder_assistant docstring.
+    allowed, dlp_err, dlp_findings, dlp_message = evaluate_ai_message(
         message=parsed.message,
         allow_sensitive=allow_sensitive,
+        form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
     )
     if dlp_findings:
         log_dlp_audit_event(
             user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
             action=("blocked" if (not allowed and (dlp_err or {}).get("error_type") == "dlp_blocked") else
                     "confirm_required" if (not allowed) else
-                    "send_anyway" if allow_sensitive else
+                    "sent_masked" if allow_sensitive else
                     "allowed"),
             transport="http",
             endpoint_path=(request.path or "/api/ai/v2/chat"),
@@ -948,6 +957,14 @@ def chat():
         err_msg = dlp_err.get("error", "Request blocked") if isinstance(dlp_err, dict) else "Request blocked"
         extra = {k: v for k, v in (dlp_err or {}).items() if k != "error"} if isinstance(dlp_err, dict) else {}
         return json_error(err_msg, 400, **extra)
+    # Replace with the (possibly masked) text so every downstream consumer of
+    # parsed.message below — engine.run(), history persistence, idempotency, etc. —
+    # sees it instead of the raw original. Capture whether masking actually changed
+    # anything *before* overwriting, so the client's optimistic local echo of what the
+    # user typed can be corrected via the response meta below instead of silently
+    # diverging from what got sent/persisted.
+    masked_user_message_for_client = dlp_message if dlp_message != parsed.message else None
+    parsed.message = dlp_message
 
     # Debug-only request log — deliberately placed *after* the DLP gate above so a
     # blocked/confirm-required message's raw content never reaches server logs, even
@@ -1283,6 +1300,9 @@ def chat():
                 "deduped": False,
                 "confidence": getattr(result, "confidence", None),
                 "grounding_score": getattr(result, "grounding_score", None),
+                # Tell the client what actually got sent/persisted so it can correct its
+                # optimistic local echo of the raw text the user typed before DLP masking.
+                **({"masked_user_message": masked_user_message_for_client} if masked_user_message_for_client else {}),
             },
         )
 
@@ -1418,16 +1438,20 @@ def chat_stream():
 
     # DLP: for streaming, reply with a single SSE error event (200 OK) so the client
     # can show a confirmation dialog and optionally resend with allow_sensitive/private mode.
-    allowed, dlp_err, dlp_findings = evaluate_ai_message(
+    # When allowed through with findings present, dlp_message has every flagged span
+    # masked — see evaluate_ai_message's docstring. Form-builder panel requests are
+    # exempt (same as the PII-scrub exemption in AIChatEngine).
+    allowed, dlp_err, dlp_findings, dlp_message = evaluate_ai_message(
         message=parsed.message,
         allow_sensitive=allow_sensitive,
+        form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
     )
     if dlp_findings:
         log_dlp_audit_event(
             user_id=(int(identity.user.id) if identity.is_authenticated and identity.user else None),
             action=("blocked" if (not allowed and (dlp_err or {}).get("error_type") == "dlp_blocked") else
                     "confirm_required" if (not allowed) else
-                    "send_anyway" if allow_sensitive else
+                    "sent_masked" if allow_sensitive else
                     "allowed"),
             transport="sse",
             endpoint_path=(request.path or "/api/ai/v2/chat/stream"),
@@ -1450,6 +1474,14 @@ def chat_stream():
         resp.headers["Cache-Control"] = "no-cache"
         resp.headers["X-Accel-Buffering"] = "no"
         return resp
+    # Replace with the (possibly masked) text so every downstream consumer of
+    # parsed.message below — engine.run(), history persistence, idempotency, etc. —
+    # sees it instead of the raw original. Capture whether masking actually changed
+    # anything *before* overwriting, so the client's optimistic local echo of what the
+    # user typed can be corrected via the meta SSE event below (_sse_gen) instead of
+    # silently diverging from what got sent/persisted.
+    masked_user_message_for_client = dlp_message if dlp_message != parsed.message else None
+    parsed.message = dlp_message
 
     if not identity.is_authenticated:
         parsed = apply_anonymous_rules(parsed)
@@ -2042,6 +2074,10 @@ def chat_stream():
             }
             if message:
                 _meta_out["initial_conversation_title"] = _build_initial_conversation_title(message)
+            if masked_user_message_for_client:
+                # Tell the client what actually got sent/persisted so it can correct its
+                # optimistic local echo of the raw text the user typed before DLP masking.
+                _meta_out["masked_user_message"] = masked_user_message_for_client
             yield f"data: {json.dumps(_meta_out)}\n\n"
             while True:
                 try:

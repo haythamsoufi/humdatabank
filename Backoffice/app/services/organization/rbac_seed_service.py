@@ -136,7 +136,7 @@ def _permission_catalog() -> List[Tuple[str, str, str]]:
         ("admin.audit.view", "View audit trail", "View audit trail"),
         ("admin.security.view", "View security dashboard", "View security dashboard"),
         ("admin.security.respond", "Respond to security events", "Resolve/respond to security events"),
-        ("admin.ai.manage", "Manage AI", "Manage AI system (dashboard, documents, traces, processing)"),
+        ("admin.ai.manage", "Manage AI", "Manage AI system (dashboard, knowledge base, traces, processing)"),
 
         # System / API / plugins
         ("admin.settings.manage", "Manage settings", "Manage system settings"),
@@ -487,7 +487,7 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         {
             "code": "admin_ai_manager",
             "name": "Admin: AI (Manage)",
-            "description": "Manage AI system (AI dashboard, document library, reasoning traces, processing).",
+            "description": "Manage AI system (AI dashboard, knowledge base, reasoning traces, processing).",
             "permission_codes": ["admin.ai.manage"],
         },
         {

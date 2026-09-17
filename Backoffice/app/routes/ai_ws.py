@@ -22,7 +22,7 @@ from flask import session
 from app.extensions import db
 from app.models.ai_chat import AIConversation, AIMessage
 from app.utils.ai_request_user import resolve_ai_identity
-from app.utils.ai_utils import openai_model_supports_sampling_params
+from app.utils.ai_utils import is_form_builder_assistant_context, openai_model_supports_sampling_params
 from app.utils.constants import (
     DAILY_RATE_LIMIT_WINDOW_SECONDS,
     WS_HEARTBEAT_INTERVAL_SECONDS,
@@ -764,18 +764,22 @@ def register_ai_ws(app) -> None:
                         break
                     continue
 
-                # DLP guard (must run BEFORE any persistence).
+                # DLP guard (must run BEFORE any persistence). When allowed through with
+                # findings present, dlp_message has every flagged span masked — see
+                # evaluate_ai_message's docstring. Form-builder panel requests are exempt
+                # (same as the PII-scrub exemption in AIChatEngine).
                 allow_sensitive = bool(payload.get("allow_sensitive"))
-                allowed, dlp_err, dlp_findings = evaluate_ai_message(
+                allowed, dlp_err, dlp_findings, dlp_message = evaluate_ai_message(
                     message=parsed.message,
                     allow_sensitive=allow_sensitive,
+                    form_builder_assistant=is_form_builder_assistant_context(parsed.page_context),
                 )
                 if dlp_findings:
                     log_dlp_audit_event(
                         user_id=(int(identity.user.id) if getattr(identity, "is_authenticated", False) and getattr(identity, "user", None) else None),
                         action=("blocked" if (not allowed and (dlp_err or {}).get("error_type") == "dlp_blocked") else
                                 "confirm_required" if (not allowed) else
-                                "send_anyway" if allow_sensitive else
+                                "sent_masked" if allow_sensitive else
                                 "allowed"),
                         transport="ws",
                         endpoint_path=(request.path or "/api/ai/v2/ws"),
@@ -795,6 +799,14 @@ def register_ai_ws(app) -> None:
                         logger.debug("ws.send DLP error failed: %s", e)
                         break
                     continue
+                # Replace with the (possibly masked) text so every downstream consumer of
+                # parsed.message below — title generation, persistence, engine.run(), etc. —
+                # sees it instead of the raw original. Capture whether masking actually
+                # changed anything *before* overwriting, so the client's optimistic local
+                # echo of what the user typed can be corrected via the meta message below
+                # instead of silently diverging from what got sent/persisted.
+                masked_user_message_for_client = dlp_message if dlp_message != parsed.message else None
+                parsed.message = dlp_message
 
                 if not identity.is_authenticated:
                     parsed = apply_anonymous_rules(parsed)
@@ -905,6 +917,10 @@ def register_ai_ws(app) -> None:
                 }
                 if msg:
                     _meta["initial_conversation_title"] = _build_initial_conversation_title(msg)
+                if masked_user_message_for_client:
+                    # Tell the client what actually got sent/persisted so it can correct its
+                    # optimistic local echo of the raw text the user typed before DLP masking.
+                    _meta["masked_user_message"] = masked_user_message_for_client
                 ws.send(json.dumps(_meta))
 
                 # Best-effort idempotency: if the client retries with the same client_message_id,

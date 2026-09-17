@@ -214,6 +214,15 @@ class TestRepeatGroupProcessorMixin:
         assert FormDataService._format_repeat_entry_label_text(["A", "B"]) == "A, B"
         assert FormDataService._format_repeat_entry_label_text("  x  ") == "x"
 
+    def test_format_repeat_entry_label_text_decodes_b64(self):
+        from app.services.forms.data_service import FormDataService
+
+        raw = "Afghanistan - Earthquake (MDRAF019)"
+        wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+        assert FormDataService._format_repeat_entry_label_text(wrapped) == raw
+        assert FormDataService._format_repeat_entry_label_text([wrapped]) == raw
+        assert FormDataService._format_repeat_entry_label_text("b64:not-valid!!!") == "b64:not-valid!!!"
+
     def test_find_field_value_skips_availability_flags(self):
         from app.services.forms.data_service import FormDataService
 

@@ -270,7 +270,6 @@ def apply_report_folios(out, *, folio: str = "") -> None:
     label = folio or folio_label({})
     rtl = _folio_has_rtl(label)
     font_path = _folio_font_path(rtl=rtl, arabic=_folio_has_arabic(label))
-    folio_rect = fitz.Rect(34.0, 803.7, 563.9, 817.7)
     archive = fitz.Archive(str(font_path.parent)) if rtl and font_path is not None else None
     css = ""
     if archive is not None and font_path is not None:
@@ -281,6 +280,13 @@ def apply_report_folios(out, *, folio: str = "") -> None:
         )
     for index in range(1, out.page_count):
         page = out[index]
+        rect = page.rect
+        folio_rect = fitz.Rect(
+            34.0,
+            float(rect.height) - 38.19,
+            float(rect.width) - 31.38,
+            float(rect.height) - 24.19,
+        )
         text = folio_text(label, index + 1)
         if archive is not None:
             page.insert_htmlbox(folio_rect, f"<div>{escape(text)}</div>", css=css, archive=archive)
@@ -306,7 +312,10 @@ def merge_report_pdfs(visuals_pdf: bytes, narrative_pdf: bytes, *, folio: str = 
     label = folio or folio_label({})
     out = fitz.open(stream=visuals_pdf, filetype="pdf")
     try:
-        extra = fitz.open(stream=narrative_pdf, filetype="pdf")
+        try:
+            extra = fitz.open(stream=narrative_pdf, filetype="pdf")
+        except Exception as exc:
+            raise UprVisualsError("Could not attach this PDF.") from exc
         try:
             out.insert_pdf(extra)
         finally:

@@ -4,7 +4,7 @@ Ce document explique comment fonctionne l’assistant IA Backoffice, quelles don
 
 ## Portée
 
-- **Dans le champ d’application** : chat IA (`/api/ai/v2/*`), bibliothèque de documents IA / RAG, questions-réponses workflow-doc, et les contrôles de sécurité qui les entourent (DLP, nettoyage des PII, événements d’audit).
+- **Dans le champ d’application** : chat IA (`/api/ai/v2/*`), base de connaissances IA / RAG, questions-réponses workflow-doc, et les contrôles de sécurité qui les entourent (DLP, nettoyage des PII, événements d’audit).
 - **Hors champ de contrôle** : sécurité générale de la plateforme (authentisation, RBAC, sauvegardes), sauf lorsque cela affecte directement le système d’IA.
 
 ## Architecture de haut niveau
@@ -148,6 +148,6 @@ Pour filtrer les événements DLP liés à l’IA, recherchez :
 
 - [Politique d’utilisation IA](../common/ai-use-policy.md) — Politique destinée aux utilisateurs (utilisation acceptable, responsabilités)
 - [Chatbot IA](../common/ai-chatbot.md) — Utilisation du chatbot, niveaux d’accès, RBAC et confidentialité des documents
-- [Bibliothèque de documents IA et embeddings](ai-document-library-and-embeddings.md)
+- [Base de connaissances IA et embeddings](ai-document-library-and-embeddings.md)
 - [Gestion des données et confidentialité](../../data-reporting/data-handling-and-privacy.md)
 

@@ -1082,7 +1082,10 @@ class AIAgentExecutor:
                     logger.info("Form-builder assistant mode: skipping generic fast path")
                     if callable(on_step_callback):
                         try:
-                            on_step_callback(_("This needs multiple steps — starting…"))
+                            # Not the generic databank "This needs multiple steps — starting…" —
+                            # that phrasing implies heavy multi-source research, which misdescribes
+                            # a form create/edit that's usually 1-2 tool calls.
+                            on_step_callback(_("Working on your form…"))
                         except Exception as e:
                             logger.debug("Form-builder step callback failed: %s", e)
                     if self.use_native and self.provider == "openai":

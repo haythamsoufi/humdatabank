@@ -41,7 +41,7 @@ When the user says **UPR**, **Unified Plan**, **Unified Report**, or **UPL**: us
 - Include country name, year, and “unified plan” / “unified report” / “UPR” in the query.
 - API auto-scopes to UPR/imported plan documents when the query mentions unified plan, UPL, or UPR.
 
-### 3. Public document library (chunks for Q&A)
+### 3. Public Knowledge Base (chunks for Q&A)
 
 Administrators can mark AI Knowledge Base documents **`public`**. You can search **only those** via **`searchPublicDocuments`**. Typical public corpus: Unified Plans, annual reports, and other IFRC/NS documents explicitly published for external Q&A.
 

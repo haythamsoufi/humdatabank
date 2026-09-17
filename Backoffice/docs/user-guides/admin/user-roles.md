@@ -275,7 +275,7 @@ These roles provide access to specific admin modules. Assign multiple roles as n
 **Capabilities:**
 - Manage AI system
 - Manage AI dashboard
-- Manage document library
+- Manage knowledge base
 - View reasoning traces
 
 **When to use:** For AI system administrators.

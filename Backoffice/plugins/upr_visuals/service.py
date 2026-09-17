@@ -125,11 +125,31 @@ class UprVisualsService:
                         pass
 
     @classmethod
-    def idml_zip_bytes(cls, aes_id: int, word_bytes: bytes | None = None, *, lang: str = "en") -> tuple[bytes, str]:
+    def idml_zip_bytes(
+        cls,
+        aes_id: int,
+        word_bytes: bytes | None = None,
+        *,
+        lang: str = "en",
+        audience: str | None = None,
+        word_filename: str = "",
+    ) -> tuple[bytes, str]:
+        from plugins.upr_visuals.audience import resolve_narrative_audience
         from plugins.upr_visuals.data import filename_from_visual_title
 
         with export_locale(lang):
-            payload, html = cls._dashboard_html(aes_id, "combined")
+            resolved = ""
+            if word_bytes:
+                resolved = resolve_narrative_audience(
+                    audience,
+                    filename=word_filename,
+                    data=word_bytes,
+                )
+            payload, html = cls._dashboard_html(
+                aes_id,
+                "combined",
+                narrative_audience=resolved or None,
+            )
             title = title_for_export_filename(payload.get("meta") or {}) or "UPR visuals"
             filename = f"{filename_from_visual_title(title, 'zip')[:-4]} - InDesign.zip"
             work_dir = Path(current_app.instance_path) / "upr_visuals_tmp" / f"idml_{uuid.uuid4().hex}"
@@ -149,7 +169,8 @@ class UprVisualsService:
                 "lang": lang,
             }
             if word_bytes:
-                word_path = work_dir / "narrative.docx"
+                ext = "pdf" if word_bytes.startswith(b"%PDF") else "docx"
+                word_path = work_dir / f"narrative.{ext}"
                 word_path.write_bytes(word_bytes)
                 job["word_path"] = str(word_path)
             try:
@@ -166,10 +187,13 @@ class UprVisualsService:
         *,
         lang: str = "en",
         on_progress: Callable[..., Any] | None = None,
+        audience: str | None = None,
+        word_filename: str = "",
     ) -> tuple[bytes, str]:
+        from plugins.upr_visuals.audience import resolve_narrative_audience
         from plugins.upr_visuals.idml import (
             folio_label,
-            load_word_paragraphs,
+            load_narrative_paragraphs,
             merge_report_pdfs,
             style_narrative_blocks,
         )
@@ -194,10 +218,16 @@ class UprVisualsService:
                 )
 
             notify(1, "Loading assignment data…")
+            audience = resolve_narrative_audience(
+                audience,
+                filename=word_filename,
+                data=word_bytes,
+            )
             payload, html = cls._dashboard_html(
                 aes_id,
                 "combined",
                 on_progress=on_chrome if lang != "en" else None,
+                narrative_audience=audience,
             )
             meta = payload.get("meta") or {}
             filename = visual_export_filename(meta, "combined", "pdf")
@@ -215,16 +245,16 @@ class UprVisualsService:
                 notify(2, "Translating narrative…")
                 styled = translate_styled_blocks(
                     style_narrative_blocks(
-                        load_word_paragraphs(word_bytes),
+                        load_narrative_paragraphs(word_bytes),
                         country_name=str(meta.get("country_name") or ""),
                     ),
                     on_progress=on_translate,
                 )
             else:
-                notify(2, "Reading Word document…")
+                notify(2, "Reading narrative…")
                 styled = translate_styled_blocks(
                     style_narrative_blocks(
-                        load_word_paragraphs(word_bytes),
+                        load_narrative_paragraphs(word_bytes),
                         country_name=str(meta.get("country_name") or ""),
                     )
                 )
@@ -279,9 +309,14 @@ class UprVisualsService:
         dashboard_id: str,
         *,
         on_progress: Callable[..., Any] | None = None,
+        narrative_audience: str | None = None,
     ) -> tuple[dict[str, Any], str]:
+        from plugins.upr_visuals.audience import apply_narrative_audience
+
         def build() -> tuple[dict[str, Any], str]:
             payload = build_payload(aes_id, inline_icons=True)
+            if narrative_audience in {"internal", "public"}:
+                payload = apply_narrative_audience(payload, narrative_audience)
             if dashboard_id not in DASHBOARD_BY_ID:
                 raise UprVisualsError(f"Unknown dashboard: {dashboard_id}")
             return payload, render_dashboard_html(payload, dashboard_id)

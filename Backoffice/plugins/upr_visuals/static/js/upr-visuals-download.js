@@ -49,6 +49,8 @@
       status: document.getElementById("upr-visuals-narrative-status"),
       submit: document.getElementById("upr-visuals-narrative-submit"),
       dropzone: document.getElementById("upr-visuals-narrative-dropzone"),
+      audience: document.getElementById("upr-visuals-narrative-audience"),
+      audienceHint: document.getElementById("upr-visuals-narrative-audience-hint"),
       progress: document.getElementById("upr-visuals-narrative-progress"),
       progressBar: document.querySelector("#upr-visuals-narrative-progress .upr-visuals-narrative-progress__bar"),
       progressLabel: document.getElementById("upr-visuals-narrative-progress-label"),
@@ -148,11 +150,12 @@
   }
 
   function setBusy(busy, message, extras) {
-    const { root, submit, file, dropzone, progress, progressBar } = modalEls();
+    const { root, submit, file, dropzone, progress, progressBar, audience } = modalEls();
     root?.classList.toggle("is-generating", !!busy);
     dropzone?.classList.toggle("is-generating", !!busy);
     if (submit) submit.disabled = busy || !(file && file.files && file.files[0]);
     if (file) file.disabled = busy;
+    if (audience) audience.disabled = !!busy;
     if (dropzone) dropzone.style.pointerEvents = busy ? "none" : "";
     if (busy && !liveStartedAt) {
       liveStartedAt = Date.now();
@@ -197,6 +200,75 @@
     if (labelEl) labelEl.textContent = text;
   }
 
+  const AUDIENCE_HINTS = {
+    auto: "Detected when you choose a file. Internal covers get a yellow INTERNAL banner.",
+    internal: "The cover will show a yellow INTERNAL banner so this draft is easy to spot.",
+    public: "The cover will use the public IFRC network design, without an INTERNAL banner.",
+  };
+
+  function setAudienceValue(value) {
+    const { audience, audienceHint } = modalEls();
+    if (!audience) return;
+    const next = value === "public" || value === "internal" ? value : "auto";
+    audience.value = next;
+    if (audienceHint) {
+      audienceHint.textContent = AUDIENCE_HINTS[next] || AUDIENCE_HINTS.auto;
+    }
+  }
+
+  function guessAudienceFromFilename(name) {
+    const stem = String(name || "").replace(/\.[^.]+$/, "");
+    if (/(?:^|[\s_\-.])internal(?:[\s_\-.]|$)|not[\s_\-]*for[\s_\-]*public/i.test(stem)) {
+      return "internal";
+    }
+    if (/(?:^|[\s_\-])design(?:[\s_\-.]|$)/i.test(stem)) {
+      return "public";
+    }
+    return "auto";
+  }
+
+  function audienceFromPreview(text) {
+    const raw = String(text || "");
+    if (
+      /(?:^|[\r\n])\s*Internal(?:\s+use\s+only)?\s*(?:$|[\r\n])/m.test(raw) ||
+      /\(Internal\)/.test(raw) ||
+      /internal\s+use\s+only/i.test(raw) ||
+      /not\s+for\s+(?:public|external)/i.test(raw)
+    ) {
+      return "internal";
+    }
+    if (/IFRC\s+network\s+(?:annual\s+report|country\s+plan)/i.test(raw) || /Appeal\s+code\s*:/i.test(raw)) {
+      return "public";
+    }
+    return "";
+  }
+
+  async function detectAudienceFromFile(file) {
+    const fromName = guessAudienceFromFilename(file && file.name);
+    if (fromName !== "auto") return fromName;
+    if (!file || !file.size) return "internal";
+    try {
+      const slice = file.slice(0, Math.min(file.size, 2 * 1024 * 1024));
+      const text = new TextDecoder("latin1").decode(new Uint8Array(await slice.arrayBuffer()));
+      return audienceFromPreview(text) || "internal";
+    } catch (_err) {
+      return "internal";
+    }
+  }
+
+  let narrativeSubmitting = false;
+  let audienceLockedByUser = false;
+
+  async function detectAndSetAudience(file) {
+    if (!file) return;
+    audienceLockedByUser = false;
+    try {
+      setAudienceValue(await detectAudienceFromFile(file));
+    } catch (_err) {
+      setAudienceValue("internal");
+    }
+  }
+
   function ensureDropzone() {
     if (dropzoneReady) return dropzoneReady;
     const { root, dropzone, submit } = modalEls();
@@ -208,18 +280,28 @@
     dropzoneReady = import(moduleUrl)
       .then((mod) => {
         dropzoneApi = mod.initExcelImportDropzone(dropzone, {
-          acceptExtensions: [".docx"],
+          acceptExtensions: [".docx", ".pdf"],
           variant: "neutral",
           submitBtn: submit,
           requireValidation: false,
           maxSizeBytes: 20 * 1024 * 1024,
-          invalidFileTypeLabel: "Please upload a Word document (.docx)",
+          invalidFileTypeLabel: "Please upload a Word document (.docx) or PDF",
           maxSizeLabel: "File is too large (20 MB maximum)",
+          onFileSelected(file) {
+            const icon = dropzone.querySelector(".excel-io-dropzone__file-icon");
+            const name = String(file && file.name ? file.name : "");
+            if (icon) {
+              const pdf = name.toLowerCase().endsWith(".pdf");
+              icon.classList.toggle("fa-file-pdf", pdf);
+              icon.classList.toggle("fa-file-word", !pdf);
+            }
+            detectAndSetAudience(file);
+          },
         });
         return dropzoneApi;
       })
       .catch(() => {
-        setModalStatus("Could not load the file picker. Use a .docx file of 20 MB or less.", true);
+        setModalStatus("Could not load the file picker. Use a .docx or .pdf file of 20 MB or less.", true);
         return null;
       });
     return dropzoneReady;
@@ -233,6 +315,8 @@
     if (formatEl) formatEl.value = format === "idml" ? "idml" : "pdf";
     setSubmitLabel(format === "idml" ? "idml" : "pdf");
     setModalStatus("");
+    setAudienceValue("auto");
+    audienceLockedByUser = false;
     if (global.UprVisualsShared && typeof global.UprVisualsShared.updateNarrativeTranslateHints === "function") {
       global.UprVisualsShared.updateNarrativeTranslateHints();
     }
@@ -244,30 +328,38 @@
   }
 
   async function submitNarrative() {
+    if (narrativeSubmitting) return;
     const { format, file, submit } = modalEls();
     const aesId = narrativeAesId;
     const chosen = file && file.files && file.files[0];
     if (!aesId) {
+      setBusy(false);
       setModalStatus("Select an assignment first.", true);
       return;
     }
     if (!chosen) {
-      setModalStatus("Choose a Word document (.docx).", true);
+      setBusy(false);
+      setModalStatus("Choose a Word document (.docx) or PDF.", true);
       return;
     }
     const name = (chosen.name || "").toLowerCase();
-    if (!name.endsWith(".docx")) {
-      setModalStatus("Please upload a Word document (.docx)", true);
+    if (!name.endsWith(".docx") && !name.endsWith(".pdf")) {
+      setBusy(false);
+      setModalStatus("Please upload a Word document (.docx) or PDF", true);
       return;
     }
     if (chosen.size > 20 * 1024 * 1024) {
+      setBusy(false);
       setModalStatus("File is too large (20 MB maximum)", true);
       return;
     }
+    narrativeSubmitting = true;
     const fmt = format && format.value === "idml" ? "idml" : "pdf";
     const body = new FormData();
     body.append("file", chosen);
     body.append("format", fmt);
+    const audienceEl = modalEls().audience;
+    body.append("audience", (audienceEl && audienceEl.value) || "auto");
     const lang =
       (global.UprVisualsShared && typeof global.UprVisualsShared.getExportLanguage === "function"
         ? global.UprVisualsShared.getExportLanguage()
@@ -288,6 +380,7 @@
         credentials: "same-origin",
       });
       const data = await response.json().catch(() => ({}));
+      if (data.audience) setAudienceValue(data.audience);
       if (!response.ok || !data.job_id) {
         throw new Error(data.error || "Could not generate this report.");
       }
@@ -299,6 +392,7 @@
     } catch (err) {
       setModalStatus(err && err.message ? err.message : "Could not generate this report.", true);
     } finally {
+      narrativeSubmitting = false;
       setBusy(false);
       if (submit && file && file.files && file.files[0]) submit.disabled = false;
     }
@@ -321,6 +415,7 @@
       const status = (data.status && data.status.status) || data.status || "";
       const payload = data.status && typeof data.status === "object" ? data.status : {};
       const message = payload.message || "";
+      if (payload.audience) setAudienceValue(payload.audience);
       if (typeof onStatus === "function") {
         onStatus(payload);
       } else if (message || payload.progress) {
@@ -356,7 +451,7 @@
   }
 
   function bindNarrativeModal() {
-    const { root, submit } = modalEls();
+    const { root, submit, audience, audienceHint } = modalEls();
     if (!root || root.dataset.bound === "1") return;
     root.dataset.bound = "1";
     root.querySelectorAll(".close-modal, .upr-visuals-narrative-close").forEach((el) => {
@@ -367,6 +462,11 @@
     });
     submit?.addEventListener("click", () => {
       submitNarrative();
+    });
+    audience?.addEventListener("change", () => {
+      audienceLockedByUser = true;
+      if (!audienceHint) return;
+      audienceHint.textContent = AUDIENCE_HINTS[audience.value] || AUDIENCE_HINTS.auto;
     });
     document.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;

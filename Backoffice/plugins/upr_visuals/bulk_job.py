@@ -36,6 +36,7 @@ from app.services.ai.ai_job_runner import (
 )
 from app.services.platform import storage_service
 from app.utils.datetime_helpers import utcnow
+from plugins.upr_visuals.audience import apply_narrative_audience, resolve_narrative_audience
 from plugins.upr_visuals.bulk import match_narrative_path, normalize_export_format
 from plugins.upr_visuals.catalog import dashboards_for_kind, kind_for_template
 from plugins.upr_visuals.data import build_payload, filename_from_visual_title
@@ -92,7 +93,8 @@ def _write_narrative_files(job_id: str, narrative_files: dict[str, bytes] | None
     for stem, data in (narrative_files or {}).items():
         if not data:
             continue
-        safe = filename_from_visual_title(str(stem) or "narrative", "docx")
+        ext = "pdf" if data.startswith(b"%PDF") else "docx"
+        safe = filename_from_visual_title(str(stem) or "narrative", ext)
         path = job_dir / "narratives" / safe
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
@@ -146,6 +148,7 @@ def create_bulk_export_job(
     include_narrative: bool = False,
     narrative_files: dict[str, bytes] | None = None,
     lang: str = "en",
+    audience: str | None = None,
 ) -> str:
     from plugins.upr_visuals.data import get_assigned_form_for_bulk
 
@@ -181,6 +184,7 @@ def create_bulk_export_job(
         "export_format": export_format,
         "include_narrative": include_narrative,
         "lang": lang,
+        "audience": (audience or "auto").strip().lower() or "auto",
         "progress": 0,
         "total": 0,
         "message": "Queued",
@@ -197,6 +201,7 @@ def create_bulk_export_job(
         "include_narrative": include_narrative,
         "narrative_paths": narrative_paths,
         "lang": lang,
+        "audience": (audience or "auto").strip().lower() or "auto",
     }
     job = AIJob(
         id=job_id,
@@ -500,8 +505,17 @@ def _process_bulk_export_item_sync(app, *, job_id: str, item_id: int) -> None:
                             aes_id=row["aes_id"],
                         )
                         if word_path is None or not word_path.is_file():
-                            errors.append(f"aes {row['aes_id']}: no matching Word file; exporting visuals only")
+                            errors.append(f"aes {row['aes_id']}: no matching narrative file; exporting visuals only")
                             word_path = None
+                        else:
+                            country_payload = apply_narrative_audience(
+                                country_payload,
+                                resolve_narrative_audience(
+                                    payload.get("audience"),
+                                    filename=word_path.name,
+                                    data=word_path.read_bytes(),
+                                ),
+                            )
                     for dashboard_id in dashboards:
                         if job_cancel_requested(job_id):
                             item.status = "cancelled"

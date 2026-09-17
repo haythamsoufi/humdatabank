@@ -39,6 +39,7 @@ NUMBER_SELECTORS = (
     ".upr-reach-value",
     ".upr-reach-headline",
     ".upr-bar-value",
+    ".upr-bar-value-cell",
     ".upr-bar-yes.upr-num",
     ".upr-num",
     ".upr-support-total",
@@ -49,12 +50,22 @@ NUMBER_SELECTORS = (
     ".upr-doc-footer__appeal strong",
 )
 
+# Latin section titles / SP labels are Montserrat; Arabic keeps Tajawal.
+ARABIC_COPY_SELECTORS = (
+    ".upr-block__title",
+    ".upr-block__title--center",
+    ".upr-kpi__label",
+    ".upr-reach-label",
+    ".upr-bar-group__title",
+)
+
 _FONT_CUTS: tuple[tuple[str, str, int], ...] = (
     (LATIN_FAMILY, "OpenSans-Regular.ttf", 400),
     (LATIN_FAMILY, "OpenSans-Bold.ttf", 700),
     (ARABIC_FAMILY, "Tajawal-Regular.ttf", 400),
     (ARABIC_FAMILY, "Tajawal-Bold.ttf", 700),
     (NUMBER_FAMILY, "Montserrat-Regular.ttf", 400),
+    (NUMBER_FAMILY, "Montserrat-Medium.ttf", 500),
     (NUMBER_FAMILY, "Montserrat-Bold.ttf", 700),
 )
 
@@ -169,9 +180,13 @@ def _prefixed_selectors(prefix: str, selectors: tuple[str, ...]) -> str:
 def typography_css() -> str:
     """Inherit Tajawal under ``.upr-arabic-font``; restore Montserrat on numbers."""
     numbers = _prefixed_selectors(".upr-arabic-font", NUMBER_SELECTORS)
+    copy = _prefixed_selectors(".upr-arabic-font", ARABIC_COPY_SELECTORS)
     return f"""
 .upr-arabic-font,
 .upr-arabic-font * {{
+  font-family: {ARABIC_BODY_STACK};
+}}
+{copy} {{
   font-family: {ARABIC_BODY_STACK};
 }}
 {numbers} {{

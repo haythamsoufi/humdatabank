@@ -31,6 +31,14 @@ _RE_PHONE = re.compile(r"(?<!\w)(?:\+?\d[\d\s().-]{7,}\d)(?!\w)")
 _RE_JWT = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
 _RE_BEARER = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._-]{20,}\b")
 _RE_PRIVATE_KEY = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
+# Masking-only: the detection regex above deliberately only checks for the BEGIN marker
+# (cheap presence/count check). To actually *mask* a private key we need the whole
+# armored block — BEGIN through the matching END marker — otherwise the key material
+# itself would sail through untouched right after the redacted BEGIN line.
+_RE_PRIVATE_KEY_BLOCK = re.compile(
+    r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----.*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+    re.DOTALL,
+)
 _RE_PASSWORD_ASSIGN = re.compile(r"(?i)\b(password|passwd|pwd)\b\s*[:=]\s*[^\s]{4,}")
 _RE_API_KEY_ASSIGN = re.compile(r"(?i)\b(api[_-]?key|secret|secret[_-]?key|access[_-]?key)\b\s*[:=]\s*[^\s]{6,}")
 _RE_IBAN = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{10,30}\b")
@@ -97,6 +105,61 @@ def analyze_text(text: str) -> List[DlpFinding]:
     return findings
 
 
+def mask_sensitive_text(text: str) -> str:
+    """
+    Replace every span `analyze_text()` would flag with a fixed "[REDACTED_*]"
+    placeholder, using the *same* compiled patterns (and the same Luhn gate for
+    payment cards) so masking coverage never drifts out of sync with detection —
+    anything that can trigger a DLP finding above is also fully removed here.
+
+    Used for the "confirm" (and "warn") verdicts once a message is going to be
+    forwarded anyway: callers should send/persist the returned text instead of the
+    original, so a confirmed-sensitive message never resurfaces in its raw form.
+
+    Like analyze_text(), this never returns or logs the original matched substrings —
+    only fixed placeholder tokens are substituted in.
+    """
+    if not text:
+        return text
+    t = str(text)
+
+    t = _RE_EMAIL.sub("[REDACTED_EMAIL]", t)
+    t = _RE_JWT.sub("[REDACTED_TOKEN]", t)
+    t = _RE_BEARER.sub("Bearer [REDACTED_TOKEN]", t)
+    t = _RE_PRIVATE_KEY_BLOCK.sub("[REDACTED_PRIVATE_KEY]", t)
+    # Keep the matched keyword (group 1: "password"/"api_key"/...) for readability,
+    # drop the actual secret value entirely.
+    t = _RE_PASSWORD_ASSIGN.sub(lambda m: f"{m.group(1)}: [REDACTED_PASSWORD]", t)
+    t = _RE_API_KEY_ASSIGN.sub(lambda m: f"{m.group(1)}: [REDACTED_API_KEY]", t)
+    t = _RE_IBAN.sub("[REDACTED_IBAN]", t)
+
+    # Payment card BEFORE phone: a 13-19 digit run is shaped like both a phone number
+    # and a candidate PAN (analyze_text flags most Luhn-valid PANs as *both* kinds —
+    # they're not mutually exclusive). Masking the Luhn-verified, more specific
+    # "[REDACTED_CARD]" first — and only handing whatever digits remain to the generic
+    # phone pass — surfaces the more informative label instead of always winning on
+    # left-to-right pass order.
+    def _mask_pan(m: "re.Match[str]") -> str:
+        cand = re.sub(r"[^0-9]", "", m.group(0) or "")
+        if 13 <= len(cand) <= 19 and _luhn_ok(cand):
+            return "[REDACTED_CARD]"
+        return m.group(0)  # not actually Luhn-valid — leave for the phone pass below
+
+    t = _RE_PAN_CANDIDATE.sub(_mask_pan, t)
+
+    # Same >=9-digit gate as analyze_text's phone counting, so a run of digits that
+    # wasn't counted as a "phone" finding (e.g. a year range) isn't masked either.
+    # Note this is a broad heuristic: any long-enough digit run matches it whether or
+    # not it's Luhn-valid (analyze_text has the same overlap — a non-card 16-digit
+    # reference number is *also* flagged as "phone").
+    t = _RE_PHONE.sub(
+        lambda m: "[REDACTED_PHONE]" if sum(c.isdigit() for c in m.group(0)) >= 9 else m.group(0),
+        t,
+    )
+
+    return t
+
+
 def _cfg_bool(key: str, default: bool) -> bool:
     v = current_app.config.get(key)
     if v is None:
@@ -115,15 +178,37 @@ def evaluate_ai_message(
     *,
     message: str,
     allow_sensitive: bool,
-) -> Tuple[bool, Optional[Dict[str, Any]], List[DlpFinding]]:
+    form_builder_assistant: bool = False,
+) -> Tuple[bool, Optional[Dict[str, Any]], List[DlpFinding], str]:
     """
     Evaluate a chat message and decide whether to allow it.
 
     Returns:
-      (allowed, error_payload)
+      (allowed, error_payload, findings, safe_message)
+
+      `safe_message` is `message` unchanged when nothing was flagged (or DLP is
+      disabled). Whenever the message is allowed through *with* findings — "warn"
+      mode, or "confirm" mode with `allow_sensitive=True` — it has every flagged span
+      replaced by a "[REDACTED_*]" placeholder (see mask_sensitive_text). Callers MUST
+      use `safe_message` in place of the original for everything downstream (LLM call,
+      DB persistence, conversation title, ...): the whole point of masking is that a
+      message someone chose to send past a sensitivity warning never resurfaces raw.
+      When not allowed (blocked / confirmation still required), `safe_message` is just
+      the original `message` — irrelevant since the caller must reject the request
+      and never forward or store it.
+
+    `form_builder_assistant=True` skips the DLP check entirely (same bypass the
+    form-builder panel already gets from PII scrubbing — see
+    AIChatEngine._scrub_message_for_llm). The form-builder message is frequently a
+    short instruction plus the full extracted text of an *imported* questionnaire
+    (real contact names/emails/phone-like reference numbers that belong to the
+    source document, not a secret the user is casually pasting into chat). Treating
+    that as "sensitive info to confirm/mask" both misfires on document content that
+    was never at risk and, worse, corrupts the transcription the user asked for by
+    baking "[REDACTED_*]" placeholders into the resulting form.
     """
-    if not _cfg_bool("AI_DLP_ENABLED", True):
-        return True, None, []
+    if form_builder_assistant or not _cfg_bool("AI_DLP_ENABLED", True):
+        return True, None, [], message
 
     # Bound scanning to avoid pathological payloads (we already cap message chars elsewhere).
     try:
@@ -135,7 +220,7 @@ def evaluate_ai_message(
 
     findings = analyze_text(text)
     if not findings:
-        return True, None, []
+        return True, None, [], message
 
     # Mode: warn | confirm | block
     mode = _cfg_str("AI_DLP_MODE", "confirm").strip().lower()
@@ -143,7 +228,9 @@ def evaluate_ai_message(
         mode = "confirm"
 
     if mode == "warn":
-        return True, None, findings
+        # No confirmation gate, but still must not let flagged spans reach a
+        # third-party LLM (or persistence) unmasked.
+        return True, None, findings, mask_sensitive_text(message)
 
     if mode == "block":
         return False, {
@@ -151,11 +238,13 @@ def evaluate_ai_message(
             "error": "Sensitive information detected. Please remove it before sending.",
             "error_type": "dlp_blocked",
             "dlp": {"sensitive": True, "findings": [f.__dict__ for f in findings]},
-        }, findings
+        }, findings, message
 
     # confirm
     if allow_sensitive:
-        return True, None, findings
+        # User confirmed past the warning dialog — mask the flagged spans and proceed
+        # rather than forwarding them verbatim (previously this sent the raw message).
+        return True, None, findings, mask_sensitive_text(message)
 
     return False, {
         "success": False,
@@ -166,7 +255,7 @@ def evaluate_ai_message(
             "findings": [f.__dict__ for f in findings],
             "recommendation": "remove_or_confirm",
         },
-    }, findings
+    }, findings, message
 
 
 def log_dlp_audit_event(

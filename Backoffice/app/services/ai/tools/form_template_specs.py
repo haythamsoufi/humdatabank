@@ -69,6 +69,22 @@ _ITEM_SCHEMA: Dict[str, Any] = {
         "label": {"type": "string", "description": "Field label shown to the user."},
         "order": {"type": "number", "description": "Display order (defaults to position)."},
         "is_required": {"type": "boolean", "default": False},
+        "layout_column_width": {
+            "type": "integer",
+            "enum": [12, 9, 8, 6, 4, 3],
+            "default": 12,
+            "description": (
+                "Width out of a 12-column grid (12=full [default], 9=three-quarters, 8=two-thirds, "
+                "6=half, 4=third, 3=quarter). Consecutive items in the same section whose widths sum "
+                "to exactly 12 sit side-by-side on one row automatically — see the layout guidance in "
+                "the system prompt for when to use this."
+            ),
+        },
+        "layout_break_after": {
+            "type": "boolean",
+            "default": False,
+            "description": "Force the next item onto a new row even if the current row isn't full width yet.",
+        },
         "question_type": {
             "type": "string",
             "enum": [
@@ -223,7 +239,8 @@ _OPERATION_SCHEMA: Dict[str, Any] = {
         "- add_item: section_id (or section_ref) + item (full item object)\n"
         "- update_item: item_id (or item_ref), then any of label, definition, description, order, "
         "is_required, question_type, options, lookup_list_id, indicator_bank_id, "
-        "allowed_disaggregation_options, max_documents, matrix_config, validation_message\n"
+        "allowed_disaggregation_options, max_documents, matrix_config, validation_message, "
+        "layout_column_width, layout_break_after\n"
         "- remove_item: item_id (archives instead of deleting when data exists)\n"
         "- set_relevance: item_id OR section_id + rule (null rule clears the skip logic)\n"
         "- set_validation: item_id + rule + message (null rule clears the validation)"
@@ -257,6 +274,8 @@ _OPERATION_SCHEMA: Dict[str, Any] = {
         "is_required": {"type": "boolean"},
         "question_type": {"type": "string"},
         "options": {"type": "array", "items": {"type": "string"}},
+        "layout_column_width": {"type": "integer", "enum": [12, 9, 8, 6, 4, 3]},
+        "layout_break_after": {"type": "boolean"},
         "lookup_list_id": {"type": ["string", "integer"]},
         "list_display_column": {"type": "string"},
         "list_filters": {"type": "array", "items": {"type": "object"}},

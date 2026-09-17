@@ -134,6 +134,19 @@ def test_split_appeal_label():
 
 
 @pytest.mark.unit
+def test_split_appeal_label_decodes_waf_b64():
+    import base64
+
+    raw = "Afghanistan - Earthquake (MDRAF019)"
+    wrapped = "b64:" + base64.b64encode(raw.encode("utf-8")).decode("ascii")
+    name, code = _split_appeal_label(wrapped)
+    assert name == "Afghanistan - Earthquake"
+    assert code == "MDRAF019"
+    leftover = "b64:not-valid!!!"
+    assert _split_appeal_label(leftover) == (leftover, "")
+
+
+@pytest.mark.unit
 def test_funding_entity_aliases():
     assert _funding_entity("IFRC Secretariat") == "IFRC Secretariat"
     assert _funding_entity("PNSs") == "PNS"
@@ -619,8 +632,8 @@ def test_report_indicator_rows_uses_overall_action_and_other_only(monkeypatch):
     labels = [row["label"] for row in rows]
     assert labels == [
         "People reached with climate activities",
-        "Number of people reached - Cash Transfer Programming.",
-        "Percentage of assistance delivered using cash and vouchers.",
+        "Number of people reached - Cash Transfer Programming",
+        "Percentage of assistance delivered using cash and vouchers",
     ]
     assert {row["code"] for row in rows} == {"SP1", "SP2"}
     cash = next(row for row in rows if row["kind"] == "percent")
@@ -648,6 +661,7 @@ def test_indicator_visual_row_keeps_percent_and_skips_blank_yesno():
     assert row["kind"] == "percent"
     assert row["display"] == "60%"
     assert row["value"] == 60.0
+    assert row["label"] == "Percentage of assistance delivered using cash and vouchers"
 
     blank_yes = SimpleNamespace(
         data_not_available=False,
@@ -745,7 +759,7 @@ def test_report_emergencies_includes_percentage_and_skips_blank_yesno(monkeypatc
     indicators = emergencies[0]["indicators"]
     assert [row["kind"] for row in indicators] == ["percent"]
     assert indicators[0]["display"] == "40%"
-    assert indicators[0]["label"] == "Percentage of assistance delivered using cash and vouchers."
+    assert indicators[0]["label"] == "Percentage of assistance delivered using cash and vouchers"
 
 
 @pytest.mark.unit

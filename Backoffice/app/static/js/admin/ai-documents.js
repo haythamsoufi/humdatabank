@@ -10,9 +10,9 @@ function importSystemBulkUrl(suffix, jobId) {
     if (tpl && jobId) {
         return String(tpl).replace('__JOB__', encodeURIComponent(String(jobId)));
     }
-    return tpl || ('/admin/ai/documents/import-system-bulk' + (suffix && jobId ? '/' + encodeURIComponent(String(jobId)) + '/' + suffix : ''));
+    return tpl || ('/admin/ai/knowledge-base/import-system-bulk' + (suffix && jobId ? '/' + encodeURIComponent(String(jobId)) + '/' + suffix : ''));
 }
-// Included by admin/ai/documents.html. Single source of truth for the documents grid and all AI documents page JS.
+// Included by admin/ai/knowledge_base.html. Single source of truth for the documents grid and all AI Knowledge Base page JS.
 // AG Grid helper instance
 let documentsGridHelper = null;
 let documentsGridApi = null;
@@ -247,32 +247,32 @@ function registerAiDocsJobSpecs() {
         statusUrl: function (jobId, urls) {
             var tpl = urls && urls.importSystemBulkStatus;
             if (tpl) return String(tpl).replace('__JOB__', encodeURIComponent(jobId));
-            return '/admin/ai/documents/import-system-bulk/' + encodeURIComponent(jobId) + '/status';
+            return '/admin/ai/knowledge-base/import-system-bulk/' + encodeURIComponent(jobId) + '/status';
         },
         cancelUrl: function (jobId, urls) {
             var tpl = urls && urls.importSystemBulkCancel;
             if (tpl) return String(tpl).replace('__JOB__', encodeURIComponent(jobId));
-            return '/admin/ai/documents/import-system-bulk/' + encodeURIComponent(jobId) + '/cancel';
+            return '/admin/ai/knowledge-base/import-system-bulk/' + encodeURIComponent(jobId) + '/cancel';
         },
         titleImport: true,
     });
     jobProgress.registerJobSpec('docs_bulk_reprocess', {
         storageKey: 'ai_docs_bulk_reprocess_job',
         statusUrl: function (jobId) {
-            return '/admin/ai/documents/bulk-reprocess/' + encodeURIComponent(jobId) + '/status';
+            return '/admin/ai/knowledge-base/bulk-reprocess/' + encodeURIComponent(jobId) + '/status';
         },
         cancelUrl: function (jobId) {
-            return '/admin/ai/documents/bulk-reprocess/' + encodeURIComponent(jobId) + '/cancel';
+            return '/admin/ai/knowledge-base/bulk-reprocess/' + encodeURIComponent(jobId) + '/cancel';
         },
         titleImport: false,
     });
     jobProgress.registerJobSpec('docs_bulk_reprocess_metadata', {
         storageKey: 'ai_docs_bulk_reprocess_metadata_job',
         statusUrl: function (jobId) {
-            return '/admin/ai/documents/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/status';
+            return '/admin/ai/knowledge-base/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/status';
         },
         cancelUrl: function (jobId) {
-            return '/admin/ai/documents/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/cancel';
+            return '/admin/ai/knowledge-base/bulk-reprocess-metadata/' + encodeURIComponent(jobId) + '/cancel';
         },
         titleImport: false,
         metadataOnly: true,
@@ -1039,7 +1039,7 @@ function initializeDocumentsBulkActions() {
         // Submit a hidden form so the browser downloads the ZIP normally (no large in-memory blob).
         const form = document.createElement('form');
         form.method = 'POST';
-        form.action = '/admin/ai/documents/bulk-download';
+        form.action = '/admin/ai/knowledge-base/bulk-download';
         form.style.display = 'none';
 
         const csrfInput = document.createElement('input');
@@ -1095,7 +1095,7 @@ function initializeDocumentsBulkActions() {
 
             // Start server-side bulk job (avoids per-document rate limits and survives reload).
             try {
-                const response = await csrfFetch('/admin/ai/documents/bulk-reprocess', {
+                const response = await csrfFetch('/admin/ai/knowledge-base/bulk-reprocess', {
                     method: 'POST',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
@@ -1149,7 +1149,7 @@ function initializeDocumentsBulkActions() {
             showProcessingBanner(cfg.t.reprocessing_metadata_e6c7cf5c, cfg.t.starting_8c6ce9f8, 0);
             if (processingCancelWrap) processingCancelWrap.classList.remove('hidden');
             try {
-                const response = await csrfFetch('/admin/ai/documents/bulk-reprocess-metadata', {
+                const response = await csrfFetch('/admin/ai/knowledge-base/bulk-reprocess-metadata', {
                     method: 'POST',
                     headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ids: ids })
@@ -1196,7 +1196,7 @@ function initializeDocumentsBulkActions() {
                 const title = row.title || row.filename || 'Untitled';
 
                 try {
-                    const response = await csrfFetch(`/admin/ai/documents/${id}/delete`, {
+                    const response = await csrfFetch(`/admin/ai/knowledge-base/${id}/delete`, {
                         method: 'POST',
                         headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
@@ -1270,7 +1270,7 @@ function initializeDocumentsBulkActions() {
                     );
                     updateDocumentInGrid(id, { redetect_processing: true });
                     try {
-                        const response = await csrfFetch('/admin/ai/documents/' + id + '/redetect-country', {
+                        const response = await csrfFetch('/admin/ai/knowledge-base/' + id + '/redetect-country', {
                             method: 'POST',
                             headers: { 'X-Requested-With': 'XMLHttpRequest' }
                         });
@@ -1326,7 +1326,7 @@ function initializeDocumentsBulkActions() {
             notifyDocs(cfg.t.please_select_at_least_one_document_db0de074 || 'Please select at least one document', 'warning');
             return;
         }
-        const url = (cfg.urls && cfg.urls.mineTerminology) || '/admin/ai/documents/mine-terminology';
+        const url = (cfg.urls && cfg.urls.mineTerminology) || '/admin/ai/knowledge-base/mine-terminology';
         const title = cfg.t.mining_terminology_4d8e2a11 || 'Mining terminology';
         const scanning = cfg.t.mining_scanning_chunks_7b1c9e02 || 'Reading chunks and comparing languages...';
         const failedText = cfg.t.mining_failed_e5f6a7b8 || 'Terminology mining failed';
@@ -1410,7 +1410,7 @@ function initializeDocumentsBulkActions() {
         }
 
         const proceed = async function() {
-            const url = (cfg.urls && cfg.urls.markTranslationGroup) || '/admin/ai/documents/translation-group';
+            const url = (cfg.urls && cfg.urls.markTranslationGroup) || '/admin/ai/knowledge-base/translation-group';
             try {
                 const res = await csrfFetch(url, {
                     method: 'POST',
@@ -2273,7 +2273,7 @@ const importSystemDocumentsColumnDefs = [
             const wrap = 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%';
             const docId = data.id != null ? parseInt(data.id, 10) : 0;
             const nameLine = docId ?
-                '<a href="/admin/ai/documents/download-system-document/' + docId + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
+                '<a href="/admin/ai/knowledge-base/download-system-document/' + docId + '" class="import-system-doc-filename-link text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline" style="' + wrap + '" ' +
                 'target="_blank" rel="noopener noreferrer" title="' + escapeAttr(cfg.t.view_or_download_9e34181d) + '">' + name + '</a>' :
                 '<div class="text-sm font-medium text-gray-900" style="' + wrap + '" title="' + escapeAttr(data.filename || '') + '">' + name + '</div>';
             return '<div class="flex items-start gap-2 min-w-0" style="width:100%">' +
@@ -2695,7 +2695,7 @@ async function loadSystemDocuments() {
 
     try {
         const searchQuery = searchInput ? searchInput.value : '';
-        const response = await ((window.getFetch && window.getFetch()) || fetch)('/admin/ai/documents/list-system-documents?q=' + encodeURIComponent(searchQuery) + '&limit=5000', {
+        const response = await ((window.getFetch && window.getFetch()) || fetch)('/admin/ai/knowledge-base/list-system-documents?q=' + encodeURIComponent(searchQuery) + '&limit=5000', {
             credentials: 'same-origin',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest'
@@ -4089,7 +4089,7 @@ if (toggleSourcesBtn) {
     });
 }
 
-// AI query (ask AI using document library)
+// AI query (ask AI using the knowledge base)
 const aiSearchForm = document.getElementById('aiSearchForm');
 const aiSearchQuery = document.getElementById('aiSearchQuery');
 const aiSearchMode = document.getElementById('aiSearchMode');
@@ -4549,7 +4549,7 @@ async function deleteDocument(id, title) {
     const confirmMsg = cfg.t.delete_document_137e0e00 + ' "' + safeTitle + '"?';
     const proceedWithDelete = async () => {
         try {
-            const response = await csrfFetch(`/admin/ai/documents/${id}/delete`, {
+            const response = await csrfFetch(`/admin/ai/knowledge-base/${id}/delete`, {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'
@@ -4618,7 +4618,7 @@ async function reprocessDocument(id) {
         startProcessingPoll(id);
 
         try {
-            const response = await csrfFetch(`/admin/ai/documents/${id}/reprocess`, {
+            const response = await csrfFetch(`/admin/ai/knowledge-base/${id}/reprocess`, {
                 method: 'POST',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'

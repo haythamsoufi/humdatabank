@@ -62,7 +62,7 @@ export const DlpPolicyMixin = {
         const body = document.createElement('div');
         body.className = 'humdb-dlp-modal-body';
         const p = document.createElement('p');
-        p.textContent = _t('Your message appears to include sensitive information. Choose how to proceed:');
+        p.textContent = _t('Your message appears to include sensitive information. We can mask it before sending, or you can cancel and edit your message:');
         body.appendChild(p);
         if (Array.isArray(bodyLines) && bodyLines.length) {
             const ul = document.createElement('ul');
@@ -108,7 +108,11 @@ export const DlpPolicyMixin = {
     _handleDlpChallenge(originalMessage, sendOptions, dlpPayload) {
         const findings = this._formatDlpFindings(dlpPayload);
         const title = this._uiString('sensitiveInfoTitle') || _t('Sensitive information detected');
-        const sendAnyway = this._uiString('sendAnyway') || _t('Send anyway');
+        // `allow_sensitive: true` on resend no longer sends the raw text through — the
+        // server (evaluate_ai_message / mask_sensitive_text in app/services/ai/chat/dlp.py)
+        // replaces every flagged span with a "[REDACTED_*]" placeholder before it reaches
+        // the LLM or gets persisted. Label reflects that; the wire flag name is unchanged.
+        const maskAndSend = this._uiString('maskAndSend') || _t('Mask & send');
         const cancel = this._uiString('cancel') || _t('Cancel');
 
         this._showDlpModal({
@@ -121,7 +125,7 @@ export const DlpPolicyMixin = {
                     onClick: () => {}
                 },
                 {
-                    label: sendAnyway,
+                    label: maskAndSend,
                     variant: 'danger',
                     onClick: () => {
                         const opts = Object.assign({}, sendOptions || {}, { allow_sensitive: true });

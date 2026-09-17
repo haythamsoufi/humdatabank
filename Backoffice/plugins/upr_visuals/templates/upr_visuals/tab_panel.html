@@ -8,6 +8,9 @@
     background: #fff;
     overflow: hidden;
 }
+.upr-vis-card[hidden] {
+    display: none;
+}
 .upr-vis-card__header {
     display: flex;
     align-items: baseline;
@@ -225,9 +228,102 @@
 .upr-vis-preview-pane[hidden] {
     display: none;
 }
+.upr-vis-generate-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 0.25rem;
+}
+.upr-vis-narrative-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.15rem 0;
+    font-size: 0.8125rem;
+    color: #374151;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.upr-vis-narrative-check[hidden] {
+    display: none;
+}
+.upr-vis-narrative-check input {
+    margin: 0;
+    width: 0.9rem;
+    height: 0.9rem;
+    accent-color: var(--btn-primary, #0d9488);
+}
+.upr-vis-narrative-files {
+    max-width: 40rem;
+}
+.upr-vis-narrative-files[hidden] {
+    display: none;
+}
+.upr-vis-generate-split {
+    position: relative;
+}
+.upr-vis-generate-split > #upr-vis-format-toggle {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+}
+.upr-vis-generate-split.is-open > #upr-vis-format-toggle i {
+    transform: rotate(180deg);
+}
+.upr-vis-generate-menu {
+    display: none;
+    position: absolute;
+    inset-inline-start: 0;
+    top: calc(100% + 0.25rem);
+    min-width: max(100%, 10rem);
+    padding: 0.25rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.35rem;
+    box-shadow: 0 4px 12px rgba(1, 30, 65, 0.12);
+    z-index: 30;
+}
+.upr-vis-generate-split.is-open .upr-vis-generate-menu {
+    display: block;
+}
+.upr-vis-generate-menu button {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    text-align: start;
+    border: none;
+    background: transparent;
+    color: #374151;
+    font-size: 0.8rem;
+    line-height: 1.25;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+}
+.upr-vis-generate-menu button i {
+    margin-inline-start: auto;
+    visibility: hidden;
+    font-size: 0.7rem;
+    color: #0f766e;
+}
+.upr-vis-generate-menu button:hover,
+.upr-vis-generate-menu button:focus {
+    background: #f3f4f6;
+    color: #011e41;
+}
+.upr-vis-generate-menu button[aria-checked="true"] {
+    background: #f0fdfa;
+    color: #134e4a;
+    font-weight: 600;
+}
+.upr-vis-generate-menu button[aria-checked="true"] i {
+    visibility: visible;
+}
 </style>
-<link rel="stylesheet" href="{{ url_for('upr_visuals.static_file', filename='css/upr-visuals.css') }}">
-<link rel="stylesheet" href="{{ url_for('upr_visuals.fonts_css') }}">
+<link rel="stylesheet" href="{{ upr_visuals_static_url('css/upr-visuals.css') }}">
+<link rel="stylesheet" href="{{ url_for('upr_visuals.fonts_css', v=upr_visuals_asset_v()) }}">
 
 <div id="panel-upr-visuals"
      class="explore-panel{% if explore_first_tab != 'upr-visuals' %} hidden{% endif %}"
@@ -284,7 +380,7 @@ window.UprVisualsAdminConfig = {
     }
 };
 </script>
-<script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-shared.js') }}"></script>
-<script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-download.js') }}"></script>
-<script nonce="{{ csp_nonce() }}" src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-admin.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_visuals_static_url('js/upr-visuals-shared.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_visuals_static_url('js/upr-visuals-download.js') }}"></script>
+<script nonce="{{ csp_nonce() }}" src="{{ upr_visuals_static_url('js/upr-visuals-admin.js') }}"></script>
 {% endif %}

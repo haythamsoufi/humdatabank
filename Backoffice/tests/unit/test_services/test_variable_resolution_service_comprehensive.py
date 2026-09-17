@@ -9,6 +9,7 @@ import ast
 import json
 import pytest
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from app.services.forms.variable_resolution_service import VariableResolutionService
@@ -784,6 +785,20 @@ class TestResolveMetadataVariable:
         aes.assigned_form.period_end = date(2026, 6, 30)
         aes.assigned_form.period_start = date(2025, 7, 1)
         aes.assigned_form.reporting_period = None
+        result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_year'}, aes, None)
+        assert result == '2026'
+
+    def test_assignment_year_with_bare_mock_assignment_missing_period_attrs(self):
+        """Regression: template-preview mode's MockAssignment (app/routes/forms/entry.py)
+        is a bare duck-typed object exposing only `period_name` — no period_start,
+        period_end, or reporting_period attributes at all. Unlike MagicMock (which
+        auto-stubs any attribute access), a bare object raises AttributeError, which
+        previously escaped the `assigned_form.period_end` access in
+        `_assignment_primary_year`. Must fall back to parsing the year from
+        period_name instead of raising.
+        """
+        aes = self._aes()
+        aes.assigned_form = SimpleNamespace(period_name='Jan-Jun 2026')
         result = VariableResolutionService._resolve_metadata_variable({'metadata_type': 'assignment_year'}, aes, None)
         assert result == '2026'
 

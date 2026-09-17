@@ -19,6 +19,7 @@ from plugins.upr_visuals.raster import (
     _png_render_scale,
     _rewrite_export_images,
     _stitch_pixmaps,
+    _tighten_combined_finance_html,
     _wrap,
     ink_bounds,
     resolve_export_image_src,
@@ -103,6 +104,8 @@ def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
     assert "overflow: hidden" in css
     assert "direction: ltr" in css
     assert "upr-fin-grid--half .upr-fin-col-source-label { width: 50%; }" in css
+    assert "upr-fin-grid--half .upr-fin-col-overview-label { width: 7em; }" in css
+    assert "upr-fin-grid--with-sources .upr-fin-col-overview-plot" not in css
     assert "justify-content: flex-end" in css
     assert ".upr-bars .upr-bar-value" in css
     assert ".upr-fin-net .upr-bar-value" in css
@@ -132,7 +135,7 @@ def test_rtl_print_css_keeps_fixed_columns_and_hidden_labels():
     metric_left = css.split('html[dir="rtl"] .upr-fin-net__metric {', 1)[1].split("}", 1)[0]
     assert "text-align: left" in metric_left
     bars_label = css.split('html[dir="rtl"] .upr-block--bars .upr-bar-label,', 1)[1].split("}", 1)[0]
-    assert "text-align: left" in bars_label
+    assert "text-align: start" in bars_label
     not_reported = css.split("html[dir=\"rtl\"] .upr-fin-net .upr-not-reported", 1)[1].split("}", 1)[0]
     assert "text-align: right" in not_reported
     assert "align-items: center" in css
@@ -233,7 +236,7 @@ def test_combined_pdf_is_portrait_and_keeps_sections_together():
     css = _pdf_page_css("combined")
     assert "A4 portrait" in css
     assert "margin: 10mm 0" in css
-    assert "margin: 0mm 0mm 18mm" in css
+    assert "margin: 0mm 0mm 22mm" in css
     assert "page-break-inside: avoid" in css
     assert "upr-combined-section--finance" in css
     assert "upr-combined-section--indicators" in css
@@ -262,10 +265,26 @@ def test_combined_finance_scales_as_a_unit():
     assert ".upr-combined-section--finance .upr-fin-net td" not in css
     assert ".upr-combined-section--finance .upr-fin-hero" not in css
     wrapped = _wrap('<div class="upr-combined-section--finance">x</div>', dashboard_id="combined")
+    assert ".upr-combined-body{ padding:0; }" in wrapped
     assert ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }" in wrapped
-    assert ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }" not in _wrap(
-        "<div>x</div>", dashboard_id="financial"
-    )
+    assert ".upr-combined-section--finance .upr-fin-net.upr-fin-net--airy td" not in wrapped
+    assert ".upr-fin-grid--half .upr-fin-col-overview-label{ width:7em; }" in wrapped
+    assert ".upr-fin-grid--with-sources .upr-fin-col-overview-plot" not in wrapped
+    financial = _wrap("<div>x</div>", dashboard_id="financial")
+    assert ".upr-combined-section--finance .upr-block--finance" not in financial
+
+
+@pytest.mark.unit
+def test_tighten_combined_finance_html_steps_density():
+    airy = "<table class='upr-fin-net upr-fin-net--airy' dir='ltr'>"
+    spread = _tighten_combined_finance_html(airy)
+    assert spread == "<table class='upr-fin-net upr-fin-net--spread' dir='ltr'>"
+    compact = _tighten_combined_finance_html(spread)
+    assert compact == "<table class='upr-fin-net upr-fin-net--compact' dir='ltr'>"
+    assert _tighten_combined_finance_html(compact) is None
+    plain = _tighten_combined_finance_html("<table class='upr-fin-net' dir='ltr'>")
+    assert "upr-fin-net--compact" in plain
+    assert _tighten_combined_finance_html("<div></div>") is None
 
 
 @pytest.mark.unit

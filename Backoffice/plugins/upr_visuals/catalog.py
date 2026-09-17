@@ -177,6 +177,16 @@ SUPPORT_AREA_HEADER_LINES = {
     "EFs": ("Enabling", "Functions"),
 }
 
+# People-reached column labels — match official UPR two-line wrapping.
+REACH_LABEL_LINES = {
+    "EO": ("Emergency", "Operations"),
+    "SP1": ("Climate and", "environment"),
+    "SP2": ("Disasters", "and crises"),
+    "SP3": ("Health and", "wellbeing"),
+    "SP4": ("Migration and", "displacement"),
+    "SP5": ("Values, power", "and inclusion"),
+}
+
 # Tableau plan "Detailed funding requirements" shortenings (ampersands).
 PLAN_DETAIL_SP_LABELS = {
     "SP1": "Climate and environment",
@@ -239,9 +249,9 @@ NS_DISPLAY_ALIASES = {
     "turkish red crescent society": "Turkish Red Crescent",
 }
 
-# IFRC Strategy 2030 / UPR print colours (Tableau-faithful).
-IFRC_RED = "#d22730"
-IFRC_RED_BRIGHT = "#f63441"
+# IFRC Strategy 2030 / UPR print colours (brand red #f5333f).
+IFRC_RED = "#f5333f"
+IFRC_RED_BRIGHT = "#f5333f"
 IFRC_NAVY = "#011e41"
 IFRC_GREY = "#58595b"
 
@@ -261,7 +271,7 @@ AREA_COLORS = {
     "multilateral": "#011e41",
     "funding_requirement": "#011e41",
     "funding": "#f39200",
-    "expenditure": "#e30613",
+    "expenditure": "#f5333f",
     "source": "#2a9d8f",
 }
 
@@ -295,6 +305,7 @@ A4_PAGE_HEIGHT_PX = 794
 A4_MARGIN_MM = 6
 A4_COMBINED_MARGIN_MM = 0  # first page — navy header bleeds to the page edge
 A4_COMBINED_FOLLOWING_MARGIN_MM = 10  # later pages — keep content off the paper edge
+A4_COMBINED_COVER_FOOTER_MM = 22  # first-page bottom — running footer + gap (print body pad is 0)
 A4_CONTENT_WIDTH_PX = 1047  # 297mm − 20mm margins
 # A4 portrait — All visuals (combined) PDF.
 A4_PORTRAIT_WIDTH_PX = A4_PAGE_HEIGHT_PX

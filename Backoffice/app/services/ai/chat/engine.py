@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from flask import current_app
 from flask_babel import force_locale, gettext as _
 
-from app.utils.ai_utils import openai_model_supports_sampling_params
+from app.utils.ai_utils import is_form_builder_assistant_context, openai_model_supports_sampling_params
 from app.services.ai.chat.helpers import (
     build_lightweight_system_prompt,
     format_ai_response_for_html,
@@ -1011,9 +1011,7 @@ class AIChatEngine:
 
         safe_page_context = scrub_pii_context(page_context or {})
         fb_page = safe_page_context.get("formBuilder") if isinstance(safe_page_context, dict) else None
-        form_builder_assistant = bool(
-            isinstance(fb_page, dict) and fb_page.get("enabled")
-        )
+        form_builder_assistant = is_form_builder_assistant_context(safe_page_context)
         safe_message = _scrub_message_for_llm(message, form_builder_assistant=form_builder_assistant)
         locale_code = (preferred_language or "en").split("-")[0]
 
@@ -1057,10 +1055,17 @@ class AIChatEngine:
 
         # User-visible step immediately: classification may be a network round-trip and must not block
         # the first progress signal (the UI should not look frozen for ~1–2 minutes).
+        # Form-builder panel: "Understanding your question…" reads like a databank-search
+        # assistant, not a form-building one — use wording that matches the panel instead
+        # (and matches the client's optimistic initial label so they coalesce into one step
+        # — see showTypingIndicator() in widget-ui.js).
         if safe_message and on_step and not _is_cancelled():
             try:
                 with force_locale(locale_code):
-                    _emit_step(_("Understanding your question…"))
+                    _emit_step(
+                        _("Reading your request…") if form_builder_assistant
+                        else _("Understanding your question…")
+                    )
             except Exception as e:
                 logger.debug("AIChatEngine early Understanding step failed: %s", e)
 
@@ -1078,7 +1083,12 @@ class AIChatEngine:
                      int((_time.time() - _rewrite_wall_start) * 1000))
         if not (query_used and query_used.strip()):
             query_used = (message or "").strip() or ""
-        safe_query_used = scrub_pii_text((query_used or "").strip())
+        # Use the same helper (and form-builder exemption) as `safe_message` above — `query_used`
+        # is the classifier/rewriter's version of the same user text, and safe_query_for_model
+        # below prefers it over safe_message whenever non-empty, so scrubbing it unconditionally
+        # here would silently re-introduce PII redaction into form-builder pastes despite the
+        # exemption already applied to safe_message.
+        safe_query_used = _scrub_message_for_llm(query_used, form_builder_assistant=form_builder_assistant)
         # Form-builder panel: never treat prompts as map/chart/databank visualizations.
         worldmap_requested = False
         chart_requested = False

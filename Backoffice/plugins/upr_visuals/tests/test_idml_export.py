@@ -11,13 +11,16 @@ from plugins.upr_visuals.data import UprVisualsError
 from plugins.upr_visuals.idml import (
     DOCX_MAX_BYTES,
     DOCX_MAX_UNCOMPRESSED_BYTES,
+    PDF_MAX_BYTES,
     folio_label,
     folio_text,
     load_word_paragraphs,
     merge_report_pdfs,
     read_docx_upload,
+    read_narrative_upload,
     style_narrative_blocks,
     validate_docx_bytes,
+    validate_pdf_bytes,
 )
 from plugins.upr_visuals.idml.pages import add_narrative_pages
 from plugins.upr_visuals.idml.builder import zip_indesign_package
@@ -122,6 +125,80 @@ def test_read_docx_upload_requires_docx_suffix():
     storage.seek(0)
     storage.filename = "report.docx"
     assert read_docx_upload(storage, filename="report.docx") == data
+
+
+@pytest.mark.unit
+def test_validate_pdf_rejects_non_pdf():
+    with pytest.raises(UprVisualsError):
+        validate_pdf_bytes(b"")
+    with pytest.raises(UprVisualsError):
+        validate_pdf_bytes(b"PK\x03\x04")
+    with pytest.raises(UprVisualsError):
+        validate_pdf_bytes(b"%PDF" + (b"x" * PDF_MAX_BYTES))
+
+
+@pytest.mark.unit
+def test_read_narrative_upload_accepts_pdf_and_docx():
+    pdf = _blank_pdf(1)
+    storage = io.BytesIO(pdf)
+    storage.filename = "notes.pdf"
+    assert read_narrative_upload(storage, filename="notes.pdf") == pdf
+    data = _docx_bytes(_p("Hello"))
+    storage = io.BytesIO(data)
+    storage.filename = "report.docx"
+    assert read_narrative_upload(storage, filename="report.docx") == data
+    with pytest.raises(UprVisualsError, match="Word document"):
+        read_narrative_upload(io.BytesIO(b"hello"), filename="notes.txt")
+
+
+def _text_pdf(*, heading: str, body: str, bold_contact: str = "") -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    try:
+        page = doc.new_page(width=595.28, height=841.89)
+        page.insert_text((72, 80), heading, fontsize=16, fontname="helv")
+        page.insert_text((72, 120), body, fontsize=10, fontname="helv")
+        if bold_contact:
+            page.insert_text((72, 160), bold_contact, fontsize=10, fontname="hebo")
+        return doc.tobytes()
+    finally:
+        doc.close()
+
+
+@pytest.mark.unit
+def test_load_pdf_paragraphs_styles_like_word():
+    from plugins.upr_visuals.idml.pdf_reader import load_pdf_paragraphs
+
+    blocks = load_pdf_paragraphs(
+        _text_pdf(heading="Context", body="In 2016, a crisis unfolded.")
+    )
+    texts = [row["text"] for row in blocks if row.get("text")]
+    assert "Context" in texts
+    assert any("crisis" in text for text in texts)
+    styled = style_narrative_blocks(blocks, country_name="Bangladesh")
+    assert styled[0]["style"] == "SectionHead"
+    assert styled[0]["text"] == "Context"
+    assert any(row.get("style") == "Body" and "crisis" in row["text"] for row in styled)
+
+
+@pytest.mark.unit
+def test_load_pdf_paragraphs_rejects_empty_text():
+    from plugins.upr_visuals.idml.pdf_reader import load_pdf_paragraphs
+
+    with pytest.raises(UprVisualsError, match="extractable text"):
+        load_pdf_paragraphs(_blank_pdf(1))
+
+
+@pytest.mark.unit
+def test_load_pdf_paragraphs_keeps_bold_runs():
+    from plugins.upr_visuals.idml.pdf_reader import load_pdf_paragraphs
+
+    blocks = load_pdf_paragraphs(
+        _text_pdf(heading="Context", body="In 2016, a crisis unfolded.", bold_contact="Jane Doe")
+    )
+    jane = next(row for row in blocks if "Jane" in (row.get("text") or ""))
+    assert any(run.get("bold") for run in jane.get("runs") or [])
 
 
 @pytest.mark.unit

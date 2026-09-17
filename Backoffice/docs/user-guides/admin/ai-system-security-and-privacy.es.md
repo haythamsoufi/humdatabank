@@ -4,7 +4,7 @@ Este documento explica cómo funciona el asistente de IA de backoffice, qué dat
 
 ## Alcance
 
-- **En alcance**: chat de IA (`/api/ai/v2/*`), Biblioteca de Documentos de IA / RAG, preguntas y respuestas de documentación de flujo de trabajo y los controles de seguridad que los rodean (DLP, limpieza de PII, eventos de auditoría).
+- **En alcance**: chat de IA (`/api/ai/v2/*`), Base de conocimiento de IA / RAG, preguntas y respuestas de documentación de flujo de trabajo y los controles de seguridad que los rodean (DLP, limpieza de PII, eventos de auditoría).
 - **Fuera de alcance**: seguridad general de la plataforma (autenticación, RBAC, copias de seguridad), excepto cuando afecta directamente al sistema de IA.
 
 ## Arquitectura de alto nivel
@@ -148,6 +148,6 @@ Para filtrar eventos DLP de IA, busca:
 
 - [Política de Uso de IA](../common/ai-use-policy.md) — Política orientada al usuario (uso aceptable, responsabilidades)
 - [Chatbot de IA](../common/ai-chatbot.md) — Uso del chatbot, niveles de acceso, RBAC y privacidad documental
-- [Biblioteca de documentos de IA e incrustaciones](ai-document-library-and-embeddings.md)
+- [Base de conocimientos de IA e incrustaciones](ai-document-library-and-embeddings.md)
 - [Manejo de datos y privacidad](../../data-reporting/data-handling-and-privacy.md)
 

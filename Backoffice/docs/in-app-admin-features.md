@@ -303,13 +303,13 @@ Cross-guide: [Export and download data](user-guides/admin/export-download-data.m
 
 ---
 
-### Knowledge Base (AI Document Library)
+### Knowledge Base
 
-**Where:** Admin → **Knowledge Base** → `/admin/ai/documents`.
+**Where:** Admin → **Knowledge Base** → `/admin/ai/knowledge-base`.
 
 **Who:** `admin.ai.manage`.
 
-**What you get:** Upload/update **RAG documents**, chunking, embedding status, search testing, and alignment with chat document QA. Guide: [AI Document Library and embeddings](user-guides/admin/ai-document-library-and-embeddings.md).
+**What you get:** Upload/update **RAG documents**, chunking, embedding status, search testing, and alignment with chat document QA. Guide: [AI Knowledge Base and embeddings](user-guides/admin/ai-document-library-and-embeddings.md).
 
 ---
 

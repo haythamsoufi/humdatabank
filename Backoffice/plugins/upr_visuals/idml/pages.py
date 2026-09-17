@@ -13,6 +13,7 @@ from plugins.upr_visuals.idml.constants import (
     LOGO,
     LOGO_PAD,
     LOGO_Y,
+    NS_LOGO_INSET,
     NARRATIVE_H,
     NARRATIVE_W,
     NARRATIVE_X,
@@ -87,6 +88,7 @@ def build_cover_chrome(
     logos: dict[str, tuple[str, float, float]],
     footer: dict[str, dict] | None = None,
 ) -> list[str]:
+    from plugins.upr_visuals.audience import INTERNAL_COVER_BANNER, INTERNAL_COVER_BANNER_H, is_internal_narrative
     from plugins.upr_visuals.formatters import appeal_number
     from plugins.upr_visuals.i18n import localized_country_header, t
     from plugins.upr_visuals.render import COVER_FOOTER_NOTE, COVER_FOOTER_ORG
@@ -104,15 +106,35 @@ def build_cover_chrome(
     end_align = "LeftAlign" if rtl else "RightAlign"
     title_x = _mirror_x(L["title_x"], L["title_w"]) if rtl else L["title_x"]
     rule_x = _mirror_x(L["rule_x"], L["rule_w"]) if rtl else L["rule_x"]
+    banner_h = INTERNAL_COVER_BANNER_H if is_internal_narrative(meta) else 0.0
+    logo_y = LOGO_Y + banner_h
 
     items = [
-        doc.rect(0, 0, A4_W, HEADER_H, "Color/IFRCNavy"),
-        doc.rect(rule_x, L["rule_y"], L["rule_w"], L["rule_h"], "Color/IFRCRed"),
+        doc.rect(0, 0, A4_W, HEADER_H + banner_h, "Color/IFRCNavy"),
+    ]
+    if banner_h:
+        items += [
+            doc.rect(0, 0, A4_W, banner_h, "Color/InternalGold"),
+            _label(
+                doc,
+                t(INTERNAL_COVER_BANNER),
+                x=0.0,
+                y=2.0,
+                w=A4_W,
+                h=banner_h - 3.0,
+                size="9",
+                color="Color/IFRCNavy",
+                align="CenterAlign",
+                valign="CenterAlign",
+            ),
+        ]
+    items += [
+        doc.rect(rule_x, L["rule_y"] + banner_h, L["rule_w"], L["rule_h"], "Color/IFRCRed"),
         _label(
             doc,
             country,
             x=title_x,
-            y=L["title_y"],
+            y=L["title_y"] + banner_h,
             w=L["title_w"],
             h=L["title_h"],
             size="38",
@@ -123,7 +145,7 @@ def build_cover_chrome(
             doc,
             subtitle,
             x=title_x,
-            y=L["subtitle_y"],
+            y=L["subtitle_y"] + banner_h,
             w=L["title_w"],
             h=L["subtitle_h"],
             size="12",
@@ -135,15 +157,27 @@ def build_cover_chrome(
     ifrc = logos.get("ifrc")
     ifrc_x = A4_W - LOGO_PAD - LOGO if rtl else LOGO_PAD
     if ifrc:
-        items.append(doc.image_frame(ifrc_x, LOGO_Y, LOGO, LOGO, ifrc[0], ifrc[1], ifrc[2]))
+        items.append(doc.image_frame(ifrc_x, logo_y, LOGO, LOGO, ifrc[0], ifrc[1], ifrc[2]))
     ns_logo = logos.get("ns")
     ns_x = LOGO_PAD if rtl else A4_W - LOGO_PAD - LOGO
     if ns_logo:
-        items.append(doc.image_frame(ns_x, LOGO_Y, LOGO, LOGO, ns_logo[0], ns_logo[1], ns_logo[2]))
+        items.append(doc.rect(ns_x, logo_y, LOGO, LOGO, "Color/Paper"))
+        inset = NS_LOGO_INSET
+        items.append(
+            doc.image_frame(
+                ns_x + inset,
+                logo_y + inset,
+                LOGO - 2 * inset,
+                LOGO - 2 * inset,
+                ns_logo[0],
+                ns_logo[1],
+                ns_logo[2],
+            )
+        )
     if date_text:
         date_w = L["date_w"]
         date_x = LOGO_PAD if rtl else A4_W - LOGO_PAD - date_w
-        date_y = LOGO_Y + LOGO + 10.0 if ns_logo else L["date_y_no_logo"]
+        date_y = logo_y + LOGO + 10.0 if ns_logo else L["date_y_no_logo"] + banner_h
         items.append(
             _label(
                 doc,
@@ -247,19 +281,23 @@ def build_native_pages(doc: Idml, pdf_doc, payload: dict, links: Path, pdf_name:
     _hydrate_reach_icons(payload, pdf_doc)
     meta = payload.get("meta") or {}
     svgs = export_visual_svgs(payload, links)
+    from plugins.upr_visuals.audience import INTERNAL_COVER_BANNER_H, is_internal_narrative
+
+    banner_h = INTERNAL_COVER_BANNER_H if is_internal_narrative(meta) else 0.0
+    logo_y = LOGO_Y + banner_h
 
     logos: dict[str, tuple[str, float, float]] = {}
     first = pdf_doc[0]
     rtl = bool(getattr(doc, "rtl", False))
     ifrc_box = (
-        fitz.Rect(A4_W - LOGO_PAD - LOGO, LOGO_Y, A4_W - LOGO_PAD, LOGO_Y + LOGO)
+        fitz.Rect(A4_W - LOGO_PAD - LOGO, logo_y, A4_W - LOGO_PAD, logo_y + LOGO)
         if rtl
-        else fitz.Rect(LOGO_PAD, LOGO_Y, LOGO_PAD + LOGO, LOGO_Y + LOGO)
+        else fitz.Rect(LOGO_PAD, logo_y, LOGO_PAD + LOGO, logo_y + LOGO)
     )
     ns_box = (
-        fitz.Rect(LOGO_PAD, LOGO_Y, LOGO_PAD + LOGO, LOGO_Y + LOGO)
+        fitz.Rect(LOGO_PAD, logo_y, LOGO_PAD + LOGO, logo_y + LOGO)
         if rtl
-        else fitz.Rect(A4_W - LOGO_PAD - LOGO, LOGO_Y, A4_W - LOGO_PAD, LOGO_Y + LOGO)
+        else fitz.Rect(A4_W - LOGO_PAD - LOGO, logo_y, A4_W - LOGO_PAD, logo_y + LOGO)
     )
     for key, box in (
         ("ifrc", ifrc_box),
@@ -280,7 +318,7 @@ def build_native_pages(doc: Idml, pdf_doc, payload: dict, links: Path, pdf_name:
     items_by_page: dict[int, list[str]] = {}
     items_by_page[0] = build_cover_chrome(doc, meta, logos, _measure_footer(first))
 
-    last_page, last_bottom = 0, HEADER_H + 6.0
+    last_page, last_bottom = 0, HEADER_H + banner_h + 6.0
     cover_ids = {"in_support", "reach", "financial"}
     for dashboard_id, name, svg_w, svg_h in svgs:
         if svg_w <= 0 or svg_h <= 0:

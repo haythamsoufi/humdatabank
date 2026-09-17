@@ -1,10 +1,10 @@
-# Bibliothèque de documents IA et Embeddings
+# Base de connaissances IA et embeddings
 
-Ce document décrit le fonctionnement de la bibliothèque de documents IA : comment les documents sont traités, comment les embeddings (vecteurs) sont générés, et comment ils sont utilisés pour la recherche sémantique et la génération augmentée par récupération (RAG).
+Ce document décrit le fonctionnement de la base de connaissances IA : comment les documents sont traités, comment les embeddings (vecteurs) sont générés, et comment ils sont utilisés pour la recherche sémantique et la génération augmentée par récupération (RAG).
 
 ## Aperçu
 
-La bibliothèque de documents IA permet aux administrateurs de télécharger des documents (PDF, Word, etc.) afin que le chatbot et les outils d’IA puissent répondre aux questions en utilisant ce contenu. Les documents sont :
+La base de connaissances IA permet aux administrateurs de télécharger des documents (PDF, Word, etc.) afin que le chatbot et les outils d’IA puissent répondre aux questions en utilisant ce contenu. Les documents sont :
 
 1. **Extrait** — le texte, les pages, les sections et, éventuellement, les tableaux sont extraits du fichier.
 2. **Chunked** — divisé en petits blocs de texte pour le contexte et les limites de jetons.
@@ -17,7 +17,7 @@ Lorsqu’un utilisateur pose une question, la requête est intégrée avec le m�
 
 Le traitement s’exécute lorsque vous :
 
-- **Télécharger** un document sur la page de la bibliothèque de documents IA (`/admin/ai/documents`).
+- **Télécharger** un document sur la page de la base de connaissances IA (`/admin/ai/knowledge-base`).
 - **Traiter les documents sélectionnés** importés depuis le système de gestion documentaire.
 - **Retraiter** un document existant (réextraction, re-chunk, ré-intégration).
 
@@ -77,9 +77,9 @@ Voir `Backoffice/config/config.py` pour la section complète AI/RAG et toutes op
 
 - **Recherche vectorielle :** La requête utilisateur est intégrée au même service d’intégration ; L’application effectue une recherche de similarité (par exemple Cosinus) dans PGVECTOR et retourne les chunks du top.
 - **Recherche hybride :** Combine similarité vectorielle et recherche par mots-clés pour une meilleure mémoire.
-- **RAG :** Les chunks récupérés sont transmis en contexte au LLM lors de la réponse aux questions (chatbot, Q&R de la bibliothèque de documents IA, documents de workflow).
+- **RAG :** Les chunks récupérés sont transmis en contexte au LLM lors de la réponse aux questions (chatbot, Q&R de la base de connaissances IA, documents de workflow).
 
-La page de la bibliothèque de documents IA vous permet de choisir **Vector uniquement** ou **Hybride (mots-clés et embeddings)** pour la fonction « Demander ».
+La page de la base de connaissances IA vous permet de choisir **Vector uniquement** ou **Hybride (mots-clés et embeddings)** pour la fonction « Demander ».
 
 ## Emplacements des codes de touche
 
@@ -89,7 +89,7 @@ La page de la bibliothèque de documents IA vous permet de choisir **Vector uniq
 | Fragmentation | `app/services/ai_chunking_service.py` |
 | Génération d’intégration | `app/services/ai_embedding_service.py` |
 | Stockage vectoriel et recherche | `app/services/ai_vector_store.py` |
-| UI de bibliothèque de documents IA | `app/templates/admin/ai/documents.html` |
+| UI de base de connaissances IA | `app/templates/admin/ai/knowledge_base.html` |
 
 ## Documentation associée
 

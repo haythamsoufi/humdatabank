@@ -265,7 +265,7 @@ Estos roles proporcionan acceso a módulos de administración específicos. Asig
 **Capacidades:**
 - Gestionar sistema de IA
 - Gestionar panel de IA
-- Gestionar biblioteca de documentos
+- Gestionar base de conocimiento
 - Ver rastros de razonamiento
 
 **Cuándo usar:** Para administradores de sistemas de IA.

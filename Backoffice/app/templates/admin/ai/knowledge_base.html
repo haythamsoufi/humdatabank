@@ -72,28 +72,28 @@
             <div class="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">{{ stats.total_documents or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Total') }}</div>
             {% if has_active_filters and stats_global %}
-            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.total_documents or 0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in knowledge base', total=stats_global.total_documents or 0) }}</p>
             {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-green-600 mb-1 sm:mb-2">{{ stats.completed or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Completed') }}</div>
             {% if has_active_filters and stats_global %}
-            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.completed or 0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in knowledge base', total=stats_global.completed or 0) }}</p>
             {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-yellow-600 mb-1 sm:mb-2">{{ stats.pending or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Pending') }}</div>
             {% if has_active_filters and stats_global %}
-            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.pending or 0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in knowledge base', total=stats_global.pending or 0) }}</p>
             {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center">
             <div class="text-2xl sm:text-3xl font-bold text-red-600 mb-1 sm:mb-2">{{ stats.failed or 0 }}</div>
             <div class="text-xs sm:text-sm font-medium text-gray-600">{{ _('Failed') }}</div>
             {% if has_active_filters and stats_global %}
-            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in library', total=stats_global.failed or 0) }}</p>
+            <p class="text-xs text-gray-500 mt-1">{{ _('of %(total)s in knowledge base', total=stats_global.failed or 0) }}</p>
             {% endif %}
         </div>
         <div class="bg-white p-4 sm:p-5 rounded-lg shadow-sm border border-gray-200 text-center col-span-2 sm:col-span-1">
@@ -120,7 +120,7 @@
                 </div>
                 <div class="min-w-0">
                     <h3 class="text-lg sm:text-xl font-bold leading-tight drop-shadow-sm truncate" style="color: #ffffff !important;">{{ _('AI Query Assistant') }}</h3>
-                    <p class="text-xs sm:text-sm mt-0.5 sm:mt-1 font-medium opacity-95" style="color: #ffffff !important;">{{ _('Ask questions about your document library') }}</p>
+                    <p class="text-xs sm:text-sm mt-0.5 sm:mt-1 font-medium opacity-95" style="color: #ffffff !important;">{{ _('Ask questions about your knowledge base') }}</p>
                 </div>
             </div>
         </div>
@@ -143,7 +143,7 @@
                     </div>
                     <div id="aiSearchInputShell" class="relative flex-1 flex items-center min-w-0 overflow-hidden rounded-full border-2 border-gray-300 bg-white shadow-sm transition-all duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
                         <input type="text" id="aiSearchQuery"
-                               placeholder="{{ _('Ask a question (AI will answer using the document library)...')|forceescape }}"
+                               placeholder="{{ _('Ask a question (AI will answer using the knowledge base)...')|forceescape }}"
                                class="flex-1 min-w-0 py-2.5 sm:py-3 pl-3 sm:pl-4 pr-2 border-0 bg-transparent text-sm sm:text-base focus:outline-none focus:ring-0">
                         <button type="submit" id="aiSearchBtn"
                                 class="btn btn-icon btn-sm btn-primary shrink-0 border-0 shadow-none disabled:opacity-50 disabled:cursor-not-allowed"
@@ -492,7 +492,7 @@
         </div>
     </div>
 
-    <form method="get" action="{{ url_for('ai_management.document_library') }}" class="ai-docs-filters px-4 sm:px-6 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 bg-gray-50">
+    <form method="get" action="{{ url_for('ai_management.knowledge_base') }}" class="ai-docs-filters px-4 sm:px-6 py-3 border-b border-gray-200 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3 bg-gray-50">
         <span class="text-sm font-medium text-gray-700 w-full sm:w-auto">{{ _('Filters') }}:</span>
         <select name="status" class="ai-docs-filter-control border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm py-1.5">
             <option value="">{{ _('All statuses') }}</option>
@@ -525,7 +525,7 @@
             <i class="fas fa-filter mr-1"></i>{{ _('Apply') }}
         </button>
         {% if current_status or current_file_type or current_category or current_language or search_query %}
-        <a href="{{ url_for('ai_management.document_library') }}" class="text-sm text-gray-600 hover:text-gray-900 py-2 px-1">{{ _('Clear') }}</a>
+        <a href="{{ url_for('ai_management.knowledge_base') }}" class="text-sm text-gray-600 hover:text-gray-900 py-2 px-1">{{ _('Clear') }}</a>
         {% endif %}
         </div>
     </form>

@@ -47,7 +47,7 @@ La zone d’entrée comprend un bouton **sources de données** (icône curseur) 
 | Source | Ce qu’elle inclut |
 |--------|-----------------|
 | **Banque de données** | Valeurs des indicateurs, données par pays et soumissions de formulaires stockées sur la plateforme |
-| **Documents système** | Documents téléchargés dans la bibliothèque de documents IA par les administrateurs |
+| **Documents système** | Documents téléchargés dans la base de connaissances IA par les administrateurs |
 | **Documents UPR** | Documents unifiés de planification et de rapport |
 
 Vous pouvez activer ou désactiver chaque source par message. Désactiver une source signifie que l’assistant ne recherchera ni ne récupérera cette requête.
@@ -114,7 +114,7 @@ Ce contexte circule avec chaque requête, donc l’assistant et ses outils appli
 
 ## Confidentialité des documents
 
-Les documents de la bibliothèque de documents IA disposent de contrôles de confidentialité qui déterminent qui peut les trouver via le chatbot. Ces contrôles sont définis par les administrateurs lors du téléchargement ou de la gestion de documents.
+Les documents de la base de connaissances IA disposent de contrôles de confidentialité qui déterminent qui peut les trouver via le chatbot. Ces contrôles sont définis par les administrateurs lors du téléchargement ou de la gestion de documents.
 
 ### Champs de confidentialité
 
@@ -142,7 +142,7 @@ Chaque document dispose de deux paramètres de visibilité :
 
 ### Comment la vie privée affecte les réponses des chatbots
 
-Lorsque vous posez une question impliquant la recherche de documents, l’assistant effectue une recherche de similarité (vectorielle ou hybride) avec la bibliothèque de documents IA. Avant de retourner les résultats, le système applique un **filtre d’autorisation** qui applique les règles ci-dessus. Les documents que vous n’êtes pas autorisé à consulter sont totalement exclus des résultats de recherche — l’assistant ne citera pas, ne résumera pas ou ne citera pas le contenu de documents hors de votre accédre.
+Lorsque vous posez une question impliquant la recherche de documents, l’assistant effectue une recherche de similarité (vectorielle ou hybride) avec la base de connaissances IA. Avant de retourner les résultats, le système applique un **filtre d’autorisation** qui applique les règles ci-dessus. Les documents que vous n’êtes pas autorisé à consulter sont totalement exclus des résultats de recherche — l’assistant ne citera pas, ne résumera pas ou ne citera pas le contenu de documents hors de votre accédre.
 
 Cela signifie que deux utilisateurs posant la même question peuvent recevoir des réponses différentes s’ils ont accès à des ensembles de documents différents.
 

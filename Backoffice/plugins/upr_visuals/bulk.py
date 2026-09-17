@@ -94,13 +94,19 @@ def _alnum(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (value or "").lower())
 
 
-def _docx_from_zip(data: bytes) -> dict[str, bytes]:
-    from plugins.upr_visuals.idml import DOCX_MAX_BYTES, validate_docx_bytes
+def _narratives_from_zip(data: bytes) -> dict[str, bytes]:
+    from plugins.upr_visuals.idml import (
+        DOCX_MAX_BYTES,
+        PDF_MAX_BYTES,
+        is_pdf_bytes,
+        validate_docx_bytes,
+        validate_pdf_bytes,
+    )
 
     try:
         archive = zipfile.ZipFile(BytesIO(data))
     except zipfile.BadZipFile as exc:
-        raise UprVisualsError("Upload a zip of Word documents (.docx).") from exc
+        raise UprVisualsError("Upload a zip of Word documents (.docx) or PDFs.") from exc
     found: dict[str, bytes] = {}
     total_bytes = 0
     with archive:
@@ -108,27 +114,32 @@ def _docx_from_zip(data: bytes) -> dict[str, bytes]:
             name = info.filename.replace("\\", "/")
             if info.is_dir() or name.startswith("__MACOSX") or "/__MACOSX/" in f"/{name}/":
                 continue
-            if not name.lower().endswith(".docx"):
+            lower = name.lower()
+            if not lower.endswith((".docx", ".pdf")):
                 continue
             declared = int(getattr(info, "file_size", 0) or 0)
-            if declared > DOCX_MAX_BYTES:
-                raise UprVisualsError("The Word document is too large to process.")
+            limit = PDF_MAX_BYTES if lower.endswith(".pdf") else DOCX_MAX_BYTES
+            if declared > limit:
+                raise UprVisualsError("The narrative file is too large to process.")
             raw = archive.read(info)
             total_bytes += len(raw)
             if total_bytes > MAX_BULK_NARRATIVE_BYTES:
-                raise UprVisualsError("The zip of Word documents is too large to process.")
-            validate_docx_bytes(raw)
+                raise UprVisualsError("The zip of narrative files is too large to process.")
+            if is_pdf_bytes(raw) or lower.endswith(".pdf"):
+                validate_pdf_bytes(raw)
+            else:
+                validate_docx_bytes(raw)
             found[_stem_key(name)] = raw
             if len(found) > MAX_NARRATIVE_FILES:
-                raise UprVisualsError(f"Upload at most {MAX_NARRATIVE_FILES} Word documents.")
+                raise UprVisualsError(f"Upload at most {MAX_NARRATIVE_FILES} narrative files.")
     if not found:
-        raise UprVisualsError("The zip did not contain any Word documents (.docx).")
+        raise UprVisualsError("The zip did not contain any Word documents (.docx) or PDFs.")
     return found
 
 
 def collect_narrative_uploads(storages) -> dict[str, bytes]:
-    """Map filename stem → docx bytes from .docx files and/or a zip of them."""
-    from plugins.upr_visuals.idml import read_docx_upload
+    """Map filename stem → docx/pdf bytes from those files and/or a zip of them."""
+    from plugins.upr_visuals.idml import read_narrative_upload
 
     found: dict[str, bytes] = {}
     for storage in storages or []:
@@ -137,13 +148,13 @@ def collect_narrative_uploads(storages) -> dict[str, bytes]:
             continue
         lower = filename.lower()
         if lower.endswith(".zip"):
-            found.update(_docx_from_zip(storage.read()))
-        elif lower.endswith(".docx"):
-            found[_stem_key(filename)] = read_docx_upload(storage, filename=filename)
+            found.update(_narratives_from_zip(storage.read()))
+        elif lower.endswith((".docx", ".pdf")):
+            found[_stem_key(filename)] = read_narrative_upload(storage, filename=filename)
         else:
-            raise UprVisualsError("Upload Word documents (.docx) or a zip of them.")
+            raise UprVisualsError("Upload Word documents (.docx), PDFs, or a zip of them.")
         if len(found) > MAX_NARRATIVE_FILES:
-            raise UprVisualsError(f"Upload at most {MAX_NARRATIVE_FILES} Word documents.")
+            raise UprVisualsError(f"Upload at most {MAX_NARRATIVE_FILES} narrative files.")
     return found
 
 
@@ -154,7 +165,7 @@ def match_narrative_path(
     country_name: str = "",
     aes_id: int | None = None,
 ) -> Path | None:
-    """Pick a saved .docx for a country. Prefer ISO3, then country name, then aes id."""
+    """Pick a saved narrative file for a country. Prefer ISO3, then country name, then aes id."""
     if not paths:
         return None
     iso = (iso3 or "").strip().lower()

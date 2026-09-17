@@ -80,6 +80,22 @@ def sanitize_page_context(value: Any) -> Dict[str, Any]:
     return out
 
 
+def is_form_builder_assistant_context(page_context: Any) -> bool:
+    """
+    True when `page_context` (sanitized via sanitize_page_context, or any dict
+    shaped the same way) represents an active form-builder AI panel request.
+
+    Shared predicate so every exemption that treats form-builder messages
+    differently (PII scrubbing before the LLM call in AIChatEngine, and the DLP
+    mask-and-send gate in evaluate_ai_message) agrees on the same definition —
+    computed straight from `page_context` since the request-scoped
+    `g.ai_form_builder_ctx` set by AIAgentExecutor.execute() isn't populated yet
+    at these earlier points in the request lifecycle.
+    """
+    fb_page = page_context.get("formBuilder") if isinstance(page_context, dict) else None
+    return bool(isinstance(fb_page, dict) and fb_page.get("enabled"))
+
+
 def normalize_language_code(
     lang: Any,
     *,

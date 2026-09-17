@@ -181,7 +181,7 @@ class TestDocumentProcessingStatusStuckDetection:
             from app.routes.admin.ai_management import document_processing_status
 
             with app.test_request_context(
-                f"/admin/ai/documents/{doc_id}/status",
+                f"/admin/ai/knowledge-base/{doc_id}/status",
                 method="GET",
             ):
                 from flask_login import login_user
@@ -263,7 +263,7 @@ class TestSingleDocumentDispatch:
             from app.routes.admin.ai_management import reprocess_document
 
             with app.test_request_context(
-                f"/admin/ai/documents/{doc.id}/reprocess",
+                f"/admin/ai/knowledge-base/{doc.id}/reprocess",
                 method="POST",
             ):
                 from flask_login import login_user

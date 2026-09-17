@@ -893,7 +893,7 @@
 
   async function fetchDocStatus(docId) {
     var fetchImpl = (window.getFetch && window.getFetch()) || fetch;
-    var response = await fetchImpl('/admin/ai/documents/' + docId + '/status?_=' + Date.now(), {
+    var response = await fetchImpl('/admin/ai/knowledge-base/' + docId + '/status?_=' + Date.now(), {
       credentials: 'same-origin',
       cache: 'no-store',
       headers: { 'X-Requested-With': 'XMLHttpRequest' },

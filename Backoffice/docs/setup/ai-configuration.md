@@ -28,6 +28,6 @@ python -m flask db upgrade
 
 ## User-facing and admin docs
 
-- [AI Document Library and embeddings](../user-guides/admin/ai-document-library-and-embeddings.md)
+- [AI Knowledge Base and embeddings](../user-guides/admin/ai-document-library-and-embeddings.md)
 - [AI system: security and privacy](../user-guides/admin/ai-system-security-and-privacy.md)
 - [AI Use Policy](../user-guides/common/ai-use-policy.md)

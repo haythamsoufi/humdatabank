@@ -47,7 +47,7 @@ The input area includes a **data sources** button (slider icon) that lets you ch
 | Source | What it includes |
 |--------|-----------------|
 | **Databank** | Indicator values, country data, and form submissions stored in the platform |
-| **System documents** | Documents uploaded to the AI Document Library by administrators |
+| **System documents** | Documents uploaded to the AI Knowledge Base by administrators |
 | **UPR documents** | Unified Planning and Reporting documents |
 
 You can enable or disable each source per message. Disabling a source means the assistant will not search or retrieve from it for that request.
@@ -114,7 +114,7 @@ This context travels with every request so the assistant and its tools enforce t
 
 ## Document privacy
 
-Documents in the AI Document Library have privacy controls that determine who can find them through the chatbot. These controls are set by administrators when uploading or managing documents.
+Documents in the AI Knowledge Base have privacy controls that determine who can find them through the chatbot. These controls are set by administrators when uploading or managing documents.
 
 ### Privacy fields
 
@@ -142,7 +142,7 @@ Each document has two visibility settings:
 
 ### How privacy affects chatbot answers
 
-When you ask a question that involves document search, the assistant runs a similarity search (vector or hybrid) against the AI Document Library. Before returning results, the system applies a **permission filter** that enforces the rules above. Documents you are not authorized to see are excluded from the search results entirely — the assistant will not quote, summarize, or reference content from documents outside your access.
+When you ask a question that involves document search, the assistant runs a similarity search (vector or hybrid) against the AI Knowledge Base. Before returning results, the system applies a **permission filter** that enforces the rules above. Documents you are not authorized to see are excluded from the search results entirely — the assistant will not quote, summarize, or reference content from documents outside your access.
 
 This means two users asking the same question may receive different answers if they have access to different sets of documents.
 

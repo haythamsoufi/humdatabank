@@ -26,6 +26,7 @@ FOLLOW_MARGIN = 28.34645669291339  # 10 mm
 LOGO = 78.0
 LOGO_PAD = 18.0
 LOGO_Y = 17.4
+NS_LOGO_INSET = 9.0  # inner margin inside the NS white box
 PNG_DPI = 150.0
 MIN_CROP = 20.0
 
@@ -66,7 +67,7 @@ HEADING_PREFIXES = (
 COLORS = {
     "Black": ("CMYK", "0 0 0 100"),
     "Paper": ("CMYK", "0 0 0 0"),
-    "IFRCRed": ("RGB", "210 39 48"),
+    "IFRCRed": ("RGB", "245 51 63"),
     "IFRCNavy": ("RGB", "1 30 65"),
     "IFRCGrey": ("RGB", "88 89 91"),
     "IFRCMuted": ("RGB", "176 177 179"),
@@ -75,6 +76,7 @@ COLORS = {
     "LightGrey": ("RGB", "241 241 241"),
     "QRed": ("RGB", "239 51 64"),
     "BannerNavy": ("RGB", "27 54 93"),
+    "InternalGold": ("RGB", "255 199 44"),
 }
 
 # Measured on Bangladesh_INP_AR_2025.pdf narrative pages (InDesign 21.3).

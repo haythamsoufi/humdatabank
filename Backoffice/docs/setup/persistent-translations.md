@@ -42,7 +42,7 @@ The counter is what makes this work across containers: a peer's edit never chang
 
 Earlier deployments kept `.po` files on an Azure Files share mounted at `/data/translations`. Edits made there are not automatically in the database, so import them **before** deploying this change.
 
-A rebuild falls back to the catalog it is replacing for any msgid the database has no row for, so an unpopulated database degrades to the translations baked into the image rather than erasing them. That covers the locales the repository ships translated, but **not** edits that only ever existed on the share — most importantly French, which is empty in the repository and maintained entirely outside it.
+A rebuild falls back to the catalog it is replacing for any msgid the database has no row for, so an unpopulated database degrades to the translations baked into the image rather than erasing them. What that does **not** cover is any edit made on the share since the last time the catalogs were committed to the repository: those exist in neither the image nor the database, and the import below is the only thing that preserves them.
 
 1. On the **currently running** version, load the share's catalogs into `translation_string`:
 
@@ -90,6 +90,8 @@ Delete the relevant `translation_string` rows and rebuild; the catalogs fall bac
 
 ### Local development
 
-`python run.py` uses the catalogs in `Backoffice/translations/` directly and does not rebuild them at boot. Use the admin UI, or `scripts/i18n/extract_update_translations.py` when adding new strings. Note that `compile-catalog` rewrites those git-tracked files from your local database, so avoid running it in a clone you intend to commit from.
+`python run.py` uses the catalogs in `Backoffice/translations/` directly and does not rebuild them at boot. Use the admin UI, or `scripts/i18n/extract_update_translations.py` when adding new strings.
+
+**`compile-catalog` overwrites the git-tracked catalogs** with the contents of whatever database you are pointed at. Against an empty or scratch database that quietly replaces the committed translations with the same files minus every msgstr, which is easy to miss in a large diff. Point `BACKOFFICE_TRANSLATIONS_DIR` at a scratch directory before running it locally, and check `git status` afterwards.
 
 See also: `docs/setup/azure-storage.md` for Azure Blob upload storage, which is unaffected by this.

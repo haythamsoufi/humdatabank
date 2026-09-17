@@ -15,6 +15,8 @@ import re
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.utils.ai_utils import extract_upl_year_from_title
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -236,64 +238,121 @@ def classify_document_category(title: str, filename: str, text_sample: str) -> s
     return "other"
 
 
+def _date_from_year(year: int) -> Optional[date]:
+    try:
+        return date(int(year), 1, 1)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_iso_date(text: str) -> Optional[date]:
+    m = _ISO_DATE_RE.search(text or "")
+    if not m:
+        return None
+    try:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
+
+
+def _parse_month_year(text: str) -> Optional[date]:
+    m = _MONTH_YEAR_RE.search(text or "")
+    if not m:
+        return None
+    month = _MONTH_NAMES.get(m.group(1).lower())
+    if not month:
+        return None
+    try:
+        return date(int(m.group(2)), month, 1)
+    except ValueError:
+        return None
+
+
+def _parse_pdf_creation_date(pdf_creation_date: Optional[Any]) -> Optional[date]:
+    """Parse PDF CreationDate (``D:YYYYMMDD...``) or a datetime-like value."""
+    if not pdf_creation_date:
+        return None
+    if isinstance(pdf_creation_date, datetime):
+        return pdf_creation_date.date()
+    if isinstance(pdf_creation_date, date):
+        return pdf_creation_date
+    try:
+        raw = str(pdf_creation_date).strip()
+        if raw.startswith("D:"):
+            raw = raw[2:]
+        digits = re.sub(r"[^0-9]", "", raw)
+        if len(digits) >= 8:
+            return date(int(digits[:4]), int(digits[4:6]), int(digits[6:8]))
+    except (TypeError, ValueError, IndexError):
+        return None
+    return None
+
+
 def extract_document_date(
     title: str,
     filename: str,
     text_sample: str,
-    pdf_creation_date: Optional[str] = None,
+    pdf_creation_date: Optional[Any] = None,
 ) -> Optional[date]:
     """
-    Extract the best-guess publication date from available sources.
-    Priority: ISO date in text > month+year in title > year in filename > year in text sample.
+    Extract the best-guess publication/plan date from available sources.
+
+    Priority:
+    1. Plan year in title/filename (``UPL-YYYY`` or ``YYYY Unified Plan``)
+    2. ISO date in the title
+    3. Month + year in title or filename
+    4. Year from filename
+    5. ISO date in the opening body text
+    6. Year from the body text sample
+    7. PDF CreationDate metadata (file export time — last resort)
+
+    Structured identifiers such as ``UPL-2026`` beat PDF export timestamps and
+    incidental dates in cover text, which otherwise mis-file Unified Plans.
     """
-    # 1. ISO date pattern in title or first part of text
-    for src in (title, text_sample[:500]):
-        m = _ISO_DATE_RE.search(src)
-        if m:
-            try:
-                return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-            except ValueError:
-                pass
+    title = title or ""
+    filename = filename or ""
+    text_sample = text_sample or ""
 
-    # 2. Month + Year in title or filename
+    # 1. Plan year encoded in Unified Plan titles / appeal codes
     for src in (title, filename):
-        m = _MONTH_YEAR_RE.search(src)
-        if m:
-            month_str = m.group(1).lower()
-            year = int(m.group(2))
-            month = _MONTH_NAMES.get(month_str)
-            if month:
-                try:
-                    return date(year, month, 1)
-                except ValueError:
-                    pass
+        plan_year = extract_upl_year_from_title(src)
+        if plan_year:
+            parsed = _date_from_year(plan_year)
+            if parsed:
+                return parsed
 
-    # 3. PDF creation date metadata (may be a string like "D:20230801120000")
-    if pdf_creation_date:
-        try:
-            raw = str(pdf_creation_date).strip("D: ")
-            if len(raw) >= 8:
-                return date(int(raw[:4]), int(raw[4:6]), int(raw[6:8]))
-        except (ValueError, IndexError):
-            pass
+    # 2. ISO date in the title (not the body — cover/footer dates are noisy)
+    parsed = _parse_iso_date(title)
+    if parsed:
+        return parsed
 
-    # 4. Year from filename
+    # 3. Month + year in title or filename
+    for src in (title, filename):
+        parsed = _parse_month_year(src)
+        if parsed:
+            return parsed
+
+    # 4. Year from filename (e.g. Syria_INP_2026.pdf)
     m = _YEAR_ONLY_FROM_FILENAME_RE.search(filename)
     if m:
-        try:
-            return date(int(m.group(1)), 1, 1)
-        except ValueError:
-            pass
+        parsed = _date_from_year(int(m.group(1)))
+        if parsed:
+            return parsed
 
-    # 5. Year from text sample (first occurrence)
+    # 5. ISO date in the opening text
+    parsed = _parse_iso_date(text_sample[:500])
+    if parsed:
+        return parsed
+
+    # 6. Year from text sample (first occurrence)
     m = _YEAR_RE.search(text_sample[:2000])
     if m:
-        try:
-            return date(int(m.group(1)), 1, 1)
-        except ValueError:
-            pass
+        parsed = _date_from_year(int(m.group(1)))
+        if parsed:
+            return parsed
 
-    return None
+    # 7. PDF creation date — export time, not the plan/publication year
+    return _parse_pdf_creation_date(pdf_creation_date)
 
 
 def compute_quality_score(

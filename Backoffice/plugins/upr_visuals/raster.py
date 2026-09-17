@@ -44,6 +44,13 @@ _FIN_NET_TABLE_CLASS_RE = re.compile(
 )
 _COMBINED_FIN_MARK = "upr-finance-cover"
 _MAX_COMBINED_FINANCE_FIT_PASSES = 2
+_FIN_FILL_KEEP_GAP_MM = 4.0
+_FIN_FILL_MIN_LEFTOVER_MM = 8.0
+_FIN_FILL_EM_PT = 9.36  # 0.78rem at WeasyPrint's 12pt root
+_FIN_FILL_STYLE_RE = re.compile(
+    r"<style id=['\"]upr-fin-fill['\"]>.*?</style>",
+    re.IGNORECASE | re.DOTALL,
+)
 _PLUGIN_STATIC_URL = "/upr-visuals/static/"
 _NS_LOGO_API_PREFIX = "/api/v1/uploads/ns/"
 
@@ -118,7 +125,7 @@ _PORTRAIT_KEEP_TOGETHER_CSS = (
     ".upr-support-table .upr-ns { white-space: normal; overflow-wrap: anywhere; }"
     ".upr-support-th--plan span { writing-mode: horizontal-tb; transform: none; }"
     ".upr-reach-row{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; }"
-    ".upr-combined-body{ padding:0; }"
+    ".upr-combined-body{ padding:1.15rem 0 0; }"
     ".upr-combined-section{ padding-left:8mm; padding-right:8mm; box-sizing:border-box; }"
     ".upr-combined-section--reach{ padding-left:0; padding-right:0; }"
     ".upr-combined-section > .upr-block--reach{"
@@ -929,6 +936,115 @@ def _combined_finance_on_first_page(pdf_bytes: bytes) -> bool | None:
         return None
 
 
+def _finance_density_pad_em(html: str) -> float:
+    match = _FIN_NET_TABLE_CLASS_RE.search(html)
+    classes = match.group(2) if match else html
+    if "upr-fin-net--airy" in classes:
+        return 0.46
+    if "upr-fin-net--spread" in classes:
+        return 0.34
+    if "upr-fin-net--compact" in classes:
+        return 0.10
+    return 0.18
+
+
+def _inject_combined_finance_row_pad(html: str, pad_em: float) -> str:
+    group_em = pad_em + 0.16
+    css = (
+        f"<style id='upr-fin-fill'>"
+        f".upr-combined-section--finance .upr-fin-net td,"
+        f".upr-combined-section--finance .upr-fin-net.upr-fin-net--airy td,"
+        f".upr-combined-section--finance .upr-fin-net.upr-fin-net--spread td,"
+        f".upr-combined-section--finance .upr-fin-net.upr-fin-net--compact td"
+        f"{{padding-top:{pad_em:.3f}em;padding-bottom:{pad_em:.3f}em}}"
+        f".upr-combined-section--finance .upr-fin-net__group-start td,"
+        f".upr-combined-section--finance .upr-fin-net--airy .upr-fin-net__group-start td,"
+        f".upr-combined-section--finance .upr-fin-net--spread .upr-fin-net__group-start td,"
+        f".upr-combined-section--finance .upr-fin-net--compact .upr-fin-net__group-start td"
+        f"{{padding-top:{group_em:.3f}em}}"
+        f"</style>"
+    )
+    if _FIN_FILL_STYLE_RE.search(html):
+        return _FIN_FILL_STYLE_RE.sub(css, html, count=1)
+    needle = "<section class='upr-block upr-block--finance'>"
+    if needle in html:
+        return html.replace(needle, css + needle, 1)
+    return css + html
+
+
+def _combined_page1_leftover_mm(pdf_bytes: bytes) -> float | None:
+    """Millimetres between last page-1 ink and the cover footer band."""
+    if not pdf_bytes.startswith(b"%PDF") or len(pdf_bytes) < 64:
+        return None
+    try:
+        import fitz
+
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        try:
+            if doc.page_count < 1:
+                return None
+            page = doc[0]
+            footer_pt = A4_COMBINED_COVER_FOOTER_MM * 72.0 / 25.4
+            limit = page.rect.y1 - footer_pt
+            max_y = page.rect.y0
+            for block in page.get_text("blocks"):
+                rect = fitz.Rect(block[:4])
+                text = str(block[4] or "")
+                if _COMBINED_FIN_MARK in text or rect.y1 > limit:
+                    continue
+                max_y = max(max_y, rect.y1)
+            for info in page.get_image_info():
+                rect = fitz.Rect(info["bbox"])
+                if rect.y1 <= limit:
+                    max_y = max(max_y, rect.y1)
+            try:
+                drawings = page.get_drawings()
+            except Exception:
+                drawings = []
+            for drawing in drawings:
+                rect = drawing.get("rect")
+                if not rect or _is_page_backdrop(drawing, page.rect):
+                    continue
+                drawn = fitz.Rect(rect)
+                if drawn.y1 <= limit:
+                    max_y = max(max_y, drawn.y1)
+            return (limit - max_y) * 25.4 / 72.0
+        finally:
+            doc.close()
+    except Exception:
+        return None
+
+
+def _expand_combined_finance_to_fill(
+    html: str,
+    pdf: bytes,
+    *,
+    stylesheets: list[str],
+    zoom: float,
+    title: str,
+    full_fonts: bool,
+) -> bytes:
+    leftover_mm = _combined_page1_leftover_mm(pdf)
+    rows = html.count("upr-fin-net__plot")
+    if leftover_mm is None or leftover_mm < _FIN_FILL_MIN_LEFTOVER_MM or rows < 1:
+        return pdf
+    usable_mm = leftover_mm - _FIN_FILL_KEEP_GAP_MM
+    if usable_mm < 4:
+        return pdf
+    extra_em = (usable_mm * 0.9 * 72.0 / 25.4) / (rows * 2 * _FIN_FILL_EM_PT)
+    pad_em = _finance_density_pad_em(html) + extra_em
+    filled_html = _inject_combined_finance_row_pad(html, pad_em)
+    filled_pdf = write_weasyprint_pdf(
+        _wrap(filled_html, dashboard_id="combined", title=title),
+        stylesheets=stylesheets,
+        full_fonts=full_fonts,
+        zoom=zoom,
+    )
+    if _combined_finance_on_first_page(filled_pdf) is False:
+        return pdf
+    return filled_pdf
+
+
 def render_pdf_bytes(
     dashboard_html: str,
     *,
@@ -948,19 +1064,30 @@ def render_pdf_bytes(
     )
     if dashboard_id != "combined":
         return pdf
+    on_first = None
     for _ in range(_MAX_COMBINED_FINANCE_FIT_PASSES):
         on_first = _combined_finance_on_first_page(pdf)
         if on_first is not False:
-            return pdf
+            break
         tighter = _tighten_combined_finance_html(html)
         if tighter is None:
-            return pdf
+            break
         html = tighter
         pdf = write_weasyprint_pdf(
             _wrap(html, dashboard_id=dashboard_id, title=title),
             stylesheets=stylesheets,
             full_fonts=full_fonts,
             zoom=zoom,
+        )
+        on_first = _combined_finance_on_first_page(pdf)
+    if on_first is True:
+        return _expand_combined_finance_to_fill(
+            html,
+            pdf,
+            stylesheets=stylesheets,
+            zoom=zoom,
+            title=title,
+            full_fonts=full_fonts,
         )
     return pdf
 

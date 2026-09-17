@@ -149,7 +149,7 @@
   flex: 0 0 auto;
   width: 6.5rem;
   height: 6.5rem;
-  padding: 0.75rem;
+  padding: 0.3rem;
   background: #fff;
 }
 
@@ -921,6 +921,12 @@
 .upr-bar-row td {
   padding: 0.22rem 0;
   vertical-align: middle;
+}
+
+.upr-block--bars .upr-bar-row td,
+.upr-block--emergency .upr-bar-row td {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
 }
 
 .upr-bar-label {

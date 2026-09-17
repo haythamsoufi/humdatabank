@@ -104,11 +104,11 @@ services:
       # - LIBRE_TRANSLATE_URL=http://libretranslate:5000  # Uncomment when using: docker compose --profile translate up -d
       # - NLLB_SIDECAR_URL=http://nllb:9100  # Uncomment when using: docker compose --profile nllb up -d
       # - NLLB_SIDECAR_API_KEY=${NLLB_SIDECAR_API_KEY:-}  # only needed if the sidecar enforces one
-      - TRANSLATIONS_PERSISTENT_PATH=/app/translations  # persist translations across rebuilds
     volumes:
       - ./Backoffice/app:/app/app
       - ./Backoffice/scripts:/app/scripts
-      - translations_data:/app/translations  # persistent translations volume (outside app/ bind mount)
+      # translations/ is not mounted: the entrypoint rebuilds the catalogs from
+      # translation_string on every boot, so admin edits live in Postgres.
       - ./Backoffice/plugins:/app/plugins
       - ./Backoffice/migrations:/app/migrations  # To be able to modify migrations if needed
       - ./Backoffice/tests:/app/tests  # Bind-mount tests for live iteration
@@ -143,5 +143,4 @@ volumes:
   pgdata:
   pgdata_test:
   libretranslate_data:
-  translations_data:
   nllb_models:

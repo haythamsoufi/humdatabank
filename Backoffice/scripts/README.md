@@ -29,8 +29,7 @@ python scripts/ci/check_script_bootstrap.py
 
 # i18n
 python scripts/i18n/extract_update_translations.py --compile
-python scripts/ci/check_translations_current.py  # optional sanity check after extract
-python scripts/i18n/sync_persistent_translations.py /path/to/persistent/translations
+python scripts/ci/check_translations_current.py  # run after extract; blocking in Backoffice CI
 
 # Data import (CLI)
 python scripts/imports/import_fdrs_form_data.py --fdrs-from-data-api --dry-run

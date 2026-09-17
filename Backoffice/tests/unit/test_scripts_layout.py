@@ -39,12 +39,10 @@ IMPORTS_MODULES = (
 I18N_SCRIPTS = (
     "compile_translations.py",
     "extract_update_translations.py",
-    "sync_persistent_translations.py",
 )
 
 # Referenced from entrypoint.sh / Docker (must exist on disk).
 OPS_WIRED_SCRIPTS = (
-    ("i18n", "sync_persistent_translations.py"),
     ("seeding", "init_data.py"),
 )
 

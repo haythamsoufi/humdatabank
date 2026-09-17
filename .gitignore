@@ -92,8 +92,9 @@ Backoffice/test_results.log
 *.po.bak.*
 # filelock sidecars next to .po files (runtime write locks)
 *.po.lock
-# Dockerfile baseline copy (not needed outside Docker)
-Backoffice/translations_base/
+# Per-container coordination markers for catalog rebuilds (see translation_watcher)
+Backoffice/translations/.sentinel
+Backoffice/translations/.catalog_version
 
 # Upload directories
 **/uploads/

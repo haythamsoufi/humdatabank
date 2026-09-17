@@ -56,18 +56,27 @@ def register_translation_commands(app):
         click.echo(f"Wrote {path} with {payload.get('count')} segments (gold fields empty — commission humans).")
 
     @translations_cli.command("compile-catalog")
-    @click.option("--locale", default=None)
+    @click.option("--locale", default=None, help="Rebuild one locale instead of all supported ones.")
     @with_appcontext
     def compile_catalog(locale):
-        from flask import current_app
+        """Rebuild .po/.mo artifacts from messages.pot and translation_string.
 
-        from app.services.translation.catalog_service import compile_locale_from_db
+        Run at container boot so the artifacts do not need to survive a
+        deployment; the database does.
+        """
+        from app.services.translation.catalog_service import (
+            materialize_catalogs,
+            read_catalog_version,
+            write_materialized_version,
+        )
 
-        locales = [locale] if locale else [
-            loc for loc in (current_app.config.get("SUPPORTED_LANGUAGES") or []) if loc != "en"
-        ]
-        counts = {loc: compile_locale_from_db(loc) for loc in locales}
-        click.echo(f"Compiled catalog artifacts from DB: {counts}")
+        counts = materialize_catalogs([locale] if locale else None)
+        version = read_catalog_version()
+        if version is not None:
+            write_materialized_version(version)
+        click.echo(
+            f"Materialized catalog artifacts from DB (catalog version {version}): {counts}"
+        )
 
     @translations_cli.command("hygiene")
     def hygiene():

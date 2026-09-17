@@ -49,10 +49,16 @@ def finalize_translation_writes(
     locales: list[str] | None = None,
     *,
     refresh: bool = True,
+    bump_version: bool = True,
 ) -> None:
     """Compile MO for affected locales, refresh Babel on this worker, notify peers.
 
     Call once after any batch of PO mutations (imports, grid edits, auto-translate).
+
+    Peers are notified two ways: the database version counter, which reaches
+    other containers now that artifacts are materialized locally, and the
+    filesystem sentinel, which still covers workers when the database write
+    fails or when translations are on shared storage.
     """
     if locales:
         compile_locales(list(dict.fromkeys(locales)))
@@ -64,6 +70,21 @@ def finalize_translation_writes(
             refresh()
         except Exception as exc:
             logger.warning("flask_babel.refresh failed: %s", exc)
+
+    if bump_version:
+        try:
+            from app.services.translation.catalog_service import (
+                bump_catalog_version,
+                write_materialized_version,
+            )
+
+            version = bump_catalog_version()
+            if version is not None:
+                # This container just wrote the artifacts, so record that they
+                # match the new version and skip a redundant rebuild.
+                write_materialized_version(version)
+        except Exception as exc:
+            logger.debug("bump_catalog_version failed: %s", exc)
 
     try:
         from app.routes.admin.utilities.helpers import _translations_dir

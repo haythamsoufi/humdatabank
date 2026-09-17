@@ -192,7 +192,8 @@
         {# Granular admin viewer roles whose permissions are already covered by admin_core — ignore for Admin + #}
         {% set admin_core_overlapping_viewer_codes = [
             'admin_docs_viewer', 'admin_users_viewer', 'admin_templates_viewer',
-            'admin_assignments_viewer', 'admin_countries_viewer', 'admin_indicator_bank_viewer'
+            'admin_assignments_viewer', 'admin_assignments_status', 'admin_countries_viewer',
+            'admin_indicator_bank_viewer'
         ] %}
         {% set assignment_display_parts = [] %}
         {# Viewer is redundant when Editor is present (editor covers viewer capability). #}
@@ -265,7 +266,7 @@
                 (_('Admin +') if has_more_than_essentials else _('Admin')) ~ ' ' ~ _('includes:'),
                 '- ' ~ _('Users') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
                 '- ' ~ _('Templates') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
-                '- ' ~ _('Assignments') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
+                '- ' ~ _('Assignments') ~ ': ' ~ _('View') ~ ', ' ~ _('Entity status'),
                 '- ' ~ _('Countries & Organization') ~ ': ' ~ _('View') ~ ', ' ~ _('Manage'),
                 '- ' ~ _('Indicator Bank') ~ ': ' ~ _('View'),
             ] %}

@@ -121,7 +121,7 @@ Admin roles provide access to administrative functions. Users can have multiple 
 **Admin Roles:**
 - Users: View and Manage
 - Templates: View and Manage
-- Assignments: View and Manage
+- Assignments: View and Entity status
 - Countries & Organization: View and Manage
 - Indicator Bank: View
 

@@ -142,6 +142,14 @@ class TestBaselineRoles:
         assert 'admin.assignments.entities.status' in manager['permission_codes']
         assert 'admin.assignments.entities.manage' in manager['permission_codes']
 
+    def test_admin_core_includes_assignment_entity_status(self):
+        catalog = _permission_catalog()
+        admin_core = next(r for r in _baseline_roles(catalog) if r['code'] == 'admin_core')
+        assert 'admin.assignments.view' in admin_core['permission_codes']
+        assert 'admin.assignments.entities.status' in admin_core['permission_codes']
+        assert 'admin.assignments.edit' not in admin_core['permission_codes']
+        assert 'admin.assignments.entities.manage' not in admin_core['permission_codes']
+
     def test_admin_core_is_subset_of_admin_permissions(self):
         catalog = _permission_catalog()
         roles = _baseline_roles(catalog)

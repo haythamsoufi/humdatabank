@@ -20,6 +20,8 @@ from plugins.upr_visuals.raster import (
     _rewrite_export_images,
     _stitch_pixmaps,
     _tighten_combined_finance_html,
+    _finance_density_pad_em,
+    _inject_combined_finance_row_pad,
     _wrap,
     ink_bounds,
     resolve_export_image_src,
@@ -265,7 +267,7 @@ def test_combined_finance_scales_as_a_unit():
     assert ".upr-combined-section--finance .upr-fin-net td" not in css
     assert ".upr-combined-section--finance .upr-fin-hero" not in css
     wrapped = _wrap('<div class="upr-combined-section--finance">x</div>', dashboard_id="combined")
-    assert ".upr-combined-body{ padding:0; }" in wrapped
+    assert ".upr-combined-body{ padding:1.15rem 0 0; }" in wrapped
     assert ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }" in wrapped
     assert ".upr-combined-section--finance .upr-fin-net.upr-fin-net--airy td" not in wrapped
     assert ".upr-fin-grid--half .upr-fin-col-overview-label{ width:7em; }" in wrapped
@@ -285,6 +287,19 @@ def test_tighten_combined_finance_html_steps_density():
     plain = _tighten_combined_finance_html("<table class='upr-fin-net' dir='ltr'>")
     assert "upr-fin-net--compact" in plain
     assert _tighten_combined_finance_html("<div></div>") is None
+
+
+@pytest.mark.unit
+def test_inject_combined_finance_row_pad_overrides_density():
+    html = "<section class='upr-block upr-block--finance'><table class='upr-fin-net upr-fin-net--airy'>"
+    filled = _inject_combined_finance_row_pad(html, 0.72)
+    assert "id='upr-fin-fill'" in filled
+    assert "padding-top:0.720em" in filled
+    assert _finance_density_pad_em(html) == 0.46
+    assert _finance_density_pad_em("<table class='upr-fin-net upr-fin-net--spread'>") == 0.34
+    again = _inject_combined_finance_row_pad(filled, 0.80)
+    assert again.count("upr-fin-fill") == 1
+    assert "padding-top:0.800em" in again
 
 
 @pytest.mark.unit

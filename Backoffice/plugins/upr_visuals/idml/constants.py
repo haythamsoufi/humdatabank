@@ -26,7 +26,7 @@ FOLLOW_MARGIN = 28.34645669291339  # 10 mm
 LOGO = 78.0
 LOGO_PAD = 18.0
 LOGO_Y = 17.4
-NS_LOGO_INSET = 9.0  # inner margin inside the NS white box
+NS_LOGO_INSET = 4.0  # inner margin inside the NS white box
 PNG_DPI = 150.0
 MIN_CROP = 20.0
 

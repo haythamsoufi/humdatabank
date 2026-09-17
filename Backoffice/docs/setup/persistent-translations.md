@@ -16,7 +16,8 @@ The `.po`/`.mo` files are build artifacts. Each container rebuilds them at boot 
 │  1. flask db upgrade                                         │
 │  2. flask translations compile-catalog                       │
 │     messages.pot supplies the msgids                         │
-│     translation_string supplies the values                   │
+│     translation_string supplies the values, falling back to  │
+│     the catalog being replaced where it has no row           │
 │     → writes translations/<locale>/LC_MESSAGES/messages.po   │
 │     → compiles messages.mo                                   │
 │     → records the catalog version in translations/           │
@@ -39,9 +40,11 @@ The counter is what makes this work across containers: a peer's edit never chang
 
 ## Migrating from the Azure Files share
 
-Earlier deployments kept `.po` files on an Azure Files share mounted at `/data/translations`. Edits made there are not automatically in the database, so back them up **before** deploying this change.
+Earlier deployments kept `.po` files on an Azure Files share mounted at `/data/translations`. Edits made there are not automatically in the database, so import them **before** deploying this change.
 
-1. Deploy is safe to plan only after the catalog is in the database. On the **currently running** version, load the share's catalogs into `translation_string`:
+A rebuild falls back to the catalog it is replacing for any msgid the database has no row for, so an unpopulated database degrades to the translations baked into the image rather than erasing them. That covers the locales the repository ships translated, but **not** edits that only ever existed on the share — most importantly French, which is empty in the repository and maintained entirely outside it.
+
+1. On the **currently running** version, load the share's catalogs into `translation_string`:
 
 ```bash
 python -m flask translations import-catalog

@@ -422,9 +422,6 @@ def _plural_values_from_row(row: Any) -> Dict[int, str]:
                 values[int(key)] = value or ""
             except (TypeError, ValueError):
                 continue
-    # gettext requires at least the singular/plural pair to be present.
-    values.setdefault(0, "")
-    values.setdefault(1, "")
     return values
 
 
@@ -434,12 +431,20 @@ def build_locale_catalog(
     rows_by_msgid: Dict[str, Any],
     *,
     metadata: Optional[Dict[str, str]] = None,
+    baseline_by_msgid: Optional[Dict[str, Any]] = None,
 ) -> Any:
     """Build a complete PO catalog for *locale* from POT msgids and DB values.
 
     The POT decides which msgids exist and carries their source references; the
     translation_string rows supply the text. English is the catalog source
     language, so each of its msgstr values is simply the msgid.
+
+    *baseline_by_msgid* is the catalog being replaced — normally the one baked
+    into the image. A msgid with **no** row falls back to it, so rebuilding
+    against a database that was never populated for this locale degrades to the
+    committed translations rather than erasing them. A msgid that **does** have
+    a row uses that row even when it is empty, so clearing a translation in the
+    admin grid is not undone by the next rebuild.
 
     Pure: touches neither the database nor the filesystem, so catalog layout
     stays unit-testable without Postgres.
@@ -454,12 +459,14 @@ def build_locale_catalog(
     catalog.metadata["Language"] = locale
 
     source_locale = is_source_locale(locale)
+    baseline_by_msgid = baseline_by_msgid or {}
 
     for entry in pot_entries:
         msgid = getattr(entry, "msgid", "")
         if not msgid or getattr(entry, "obsolete", False):
             continue
         row = rows_by_msgid.get(msgid)
+        baseline = baseline_by_msgid.get(msgid)
         occurrences = list(getattr(entry, "occurrences", None) or [])
         flags = list(getattr(entry, "flags", None) or [])
         msgctxt = getattr(entry, "msgctxt", None)
@@ -468,8 +475,13 @@ def build_locale_catalog(
         if msgid_plural:
             if source_locale:
                 plural_values = {0: msgid, 1: msgid_plural}
-            else:
+            elif row is not None:
                 plural_values = _plural_values_from_row(row)
+            else:
+                plural_values = dict(getattr(baseline, "msgstr_plural", None) or {})
+            # gettext requires at least the singular/plural pair to be present.
+            plural_values.setdefault(0, "")
+            plural_values.setdefault(1, "")
             catalog.append(
                 polib.POEntry(
                     msgid=msgid,
@@ -484,8 +496,10 @@ def build_locale_catalog(
 
         if source_locale:
             msgstr = msgid
+        elif row is not None:
+            msgstr = getattr(row, "msgstr", "") or ""
         else:
-            msgstr = (getattr(row, "msgstr", "") or "") if row is not None else ""
+            msgstr = getattr(baseline, "msgstr", "") or ""
         catalog.append(
             polib.POEntry(
                 msgid=msgid,
@@ -499,17 +513,27 @@ def build_locale_catalog(
     return catalog
 
 
-def _existing_po_metadata(po_path: str) -> Dict[str, str]:
-    """Preserve an existing catalog's headers (notably Plural-Forms) when rewriting."""
+def _read_existing_catalog(po_path: str) -> Tuple[Dict[str, str], Dict[str, Any]]:
+    """Return (headers, entries-by-msgid) for the catalog about to be replaced.
+
+    The headers carry ``Plural-Forms``, and the entries are the fallback for
+    msgids the database has no row for.
+    """
     import polib
 
     if not os.path.exists(po_path):
-        return {}
+        return {}, {}
     try:
-        return dict(polib.pofile(po_path).metadata or {})
+        catalog = polib.pofile(po_path)
     except Exception:
-        logger.warning("Could not read PO metadata from %s; using defaults", po_path, exc_info=True)
-        return {}
+        logger.warning("Could not read existing catalog %s; rebuilding from scratch", po_path, exc_info=True)
+        return {}, {}
+    entries = {
+        entry.msgid: entry
+        for entry in catalog
+        if entry.msgid and not entry.obsolete
+    }
+    return dict(catalog.metadata or {}), entries
 
 
 def compile_locale_from_db(locale: str) -> int:
@@ -558,11 +582,13 @@ def compile_locale_from_db(locale: str) -> int:
         }
 
     po_path = _translations_po_path(locale)
+    metadata, baseline = _read_existing_catalog(po_path)
     catalog = build_locale_catalog(
         locale,
         pot_entries,
         rows_by_msgid,
-        metadata=_existing_po_metadata(po_path),
+        metadata=metadata,
+        baseline_by_msgid=baseline,
     )
 
     os.makedirs(os.path.dirname(po_path), exist_ok=True)
@@ -666,13 +692,30 @@ def sync_catalogs_if_stale() -> Optional[int]:
     Returns the version materialized, or None when nothing needed doing (or the
     version could not be read).
     """
+    from app.utils.po_lock import po_file_lock
+
     db_version = read_catalog_version()
     if db_version is None:
         return None
     if read_materialized_version() >= db_version:
         return None
-    materialize_catalogs()
-    write_materialized_version(db_version)
+
+    # Every Gunicorn worker polls independently and they share a filesystem, so
+    # without this they would all rebuild the same catalogs at once — most
+    # visibly when boot-time materialization failed and each worker discovers
+    # the staleness on its first tick. Re-check inside the lock so only the
+    # first one does the work.
+    try:
+        with po_file_lock(_marker_path()):
+            if read_materialized_version() >= db_version:
+                return None
+            materialize_catalogs()
+            write_materialized_version(db_version)
+    except RuntimeError:
+        # Lock timed out: another worker is mid-rebuild and will publish the
+        # result. Retry on the next poll rather than piling on.
+        logger.info("sync_catalogs_if_stale: rebuild already in progress; retrying next tick")
+        return None
     return db_version
 
 

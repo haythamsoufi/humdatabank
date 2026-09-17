@@ -9,6 +9,7 @@ Two tiers:
   fixture) exercise them end-to-end, with PO-file syncing mocked out so tests never
   touch real .po files on disk.
 """
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -678,6 +679,47 @@ class TestBuildLocaleCatalog:
         assert catalog.metadata["Language"] == "ru"
         assert catalog.metadata["Content-Type"] == "text/plain; charset=utf-8"
 
+    def test_baked_value_survives_a_locale_with_no_rows(self):
+        """A database never populated for this locale must not erase the image's
+        translations — several shipped locales carry thousands of them."""
+        catalog = build_locale_catalog(
+            "ar",
+            [_pot_entry("Hello")],
+            {},
+            baseline_by_msgid={"Hello": _db_row("مرحبا")},
+        )
+        assert [(e.msgid, e.msgstr) for e in catalog] == [("Hello", "مرحبا")]
+
+    def test_db_row_wins_over_the_baked_value(self):
+        catalog = build_locale_catalog(
+            "fr",
+            [_pot_entry("Hello")],
+            {"Hello": _db_row("Bonjour")},
+            baseline_by_msgid={"Hello": _db_row("Salut (stale)")},
+        )
+        assert list(catalog)[0].msgstr == "Bonjour"
+
+    def test_row_cleared_in_the_grid_is_not_undone_by_the_baked_value(self):
+        """An existing row wins even when empty, so clearing a translation sticks."""
+        catalog = build_locale_catalog(
+            "fr",
+            [_pot_entry("Hello")],
+            {"Hello": _db_row("")},
+            baseline_by_msgid={"Hello": _db_row("Bonjour")},
+        )
+        assert list(catalog)[0].msgstr == ""
+
+    def test_baked_plural_survives_when_no_row_exists(self):
+        catalog = build_locale_catalog(
+            "ru",
+            [_pot_entry("%d file", msgid_plural="%d files")],
+            {},
+            baseline_by_msgid={
+                "%d file": _db_row("", msgstr_plural={0: "%d файл", 1: "%d файла"})
+            },
+        )
+        assert list(catalog)[0].msgstr_plural == {0: "%d файл", 1: "%d файла"}
+
     def test_catalog_compiles_to_mo(self, tmp_path):
         """The generated catalog must survive the .mo path gettext actually reads."""
         catalog = build_locale_catalog(
@@ -750,6 +792,38 @@ class TestCatalogVersion:
                 assert catalog_service.sync_catalogs_if_stale() == 4
             mock_mat.assert_called_once()
             assert catalog_service.read_materialized_version() == 4
+
+    def test_sync_rechecks_inside_the_lock_so_workers_do_not_all_rebuild(self, app, tmp_path, db_session):
+        """Every worker polls independently; only the first should do the work."""
+        from app.services.translation import catalog_service
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            catalog_service.write_materialized_version(3)
+
+            def _peer_wins_the_race(*_args, **_kwargs):
+                # Simulate another worker finishing its rebuild while we waited.
+                catalog_service.write_materialized_version(4)
+                return nullcontext()
+
+            with patch.object(catalog_service, 'read_catalog_version', return_value=4), \
+                 patch('app.utils.po_lock.po_file_lock', side_effect=_peer_wins_the_race), \
+                 patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
+                assert catalog_service.sync_catalogs_if_stale() is None
+            mock_mat.assert_not_called()
+
+    def test_sync_backs_off_when_the_lock_is_held(self, app, tmp_path, db_session):
+        from app.services.translation import catalog_service
+
+        with app.app_context():
+            app.config['BACKOFFICE_TRANSLATIONS_DIR'] = str(tmp_path)
+            catalog_service.write_materialized_version(1)
+            with patch.object(catalog_service, 'read_catalog_version', return_value=9), \
+                 patch('app.utils.po_lock.po_file_lock', side_effect=RuntimeError('held')), \
+                 patch.object(catalog_service, 'materialize_catalogs') as mock_mat:
+                assert catalog_service.sync_catalogs_if_stale() is None
+            mock_mat.assert_not_called()
+            assert catalog_service.read_materialized_version() == 1
 
     def test_sync_does_nothing_when_version_unreadable(self, app, tmp_path):
         from app.services.translation import catalog_service

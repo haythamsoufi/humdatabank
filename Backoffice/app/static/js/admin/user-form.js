@@ -316,12 +316,13 @@
                         coreEssentialsInputRef = findAdminRoleInput('core', 'essentials only');
                       }
 
-                      // Matches admin_core permissions in rbac_seed_service.py exactly (view-only).
+                      // Matches admin_core permissions in rbac_seed_service.py.
                       const essentialsSpecs = [
                         { feature: 'Docs', action: 'View' },
                         { feature: 'Users', action: 'View' },
                         { feature: 'Templates', action: 'View' },
                         { feature: 'Assignments', action: 'View' },
+                        { feature: 'Assignments', action: 'Entity status' },
                         { feature: 'Countries & Organization', action: 'View' },
                         { feature: 'Indicator Bank', action: 'View' },
                       ];

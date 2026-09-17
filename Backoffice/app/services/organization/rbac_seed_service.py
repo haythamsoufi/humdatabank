@@ -171,7 +171,7 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
         {
             "code": "admin_core",
             "name": "Admin: Core (Essentials only)",
-            "description": "Essential, mostly read-only access across key admin areas.",
+            "description": "Essential access across key admin areas (view plus assignment entity status).",
             "permission_codes": [
                 # Docs
                 "admin.docs.view",
@@ -179,8 +179,9 @@ def _baseline_roles(permission_catalog: List[Tuple[str, str, str]]) -> List[Dict
                 "admin.users.view",
                 # Templates (view)
                 "admin.templates.view",
-                # Assignments (admin screens - view)
+                # Assignments (admin screens - view + entity status)
                 "admin.assignments.view",
+                "admin.assignments.entities.status",
                 # Countries & Organization (view)
                 "admin.countries.view",
                 # Indicator bank (view)

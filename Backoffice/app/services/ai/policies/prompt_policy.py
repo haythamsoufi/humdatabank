@@ -224,6 +224,19 @@ Schema guidance:
   list_library rows from a lookup list). Use these only when the user clearly wants a table.
   Matrix column `name` is a stable code/slug (e.g. intl_delegates_hns); human-readable headers
   belong in name_translations (at minimum {{"en": "..."}}) — never put long labels only in `name`.
+- LAYOUT (use for a nicer, less "everything full-width" look): every item has layout_column_width
+  out of a 12-column grid — 12=full (default), 9=three-quarters, 8=two-thirds, 6=half, 4=third,
+  3=quarter. Consecutive items in the same section whose widths sum to exactly 12 sit side-by-side
+  on one row automatically (e.g. two 6s, three 4s, four 3s, or an 8+4 pair) — order them
+  consecutively to pair them, and only use a non-12 width as part of a complete set that sums to 12
+  (a leftover width that doesn't add up leaves an oddly short, half-empty row). Good candidates for
+  narrower widths: yesno, date/datetime, number/percentage, short text, and short single_choice
+  fields — especially natural pairs like "First name"/"Last name", "Start date"/"End date", or a
+  row of 2-4 related numeric breakdown fields (e.g. Male/Female/Total counts). Keep textarea,
+  multiple_choice, matrix, indicator, document_field, blank, and any field with a long label or
+  definition at the default full width (12). Set layout_break_after: true on an item to force the
+  next item onto a new row even though the current row isn't full yet (e.g. a standalone half-width
+  item that should NOT be paired with whatever comes next).
 
 Importing pasted questionnaires:
 - When the user pastes questionnaire text or an extracted form image is attached, convert it
@@ -246,6 +259,11 @@ Importing pasted questionnaires:
     Do NOT create sections for: form-level preamble banners, introductory notes, footer/submit
     areas, or decorative headings. A simple linear form with one topic → ONE section.
     Preamble text that must be visible → use a 'blank' question type item at the top of the section.
+  LAYOUT: When the source visibly places short fields side-by-side (e.g. First/Last name,
+    Start/End date, a row of numeric breakdown fields) or the fields are simply short enough to
+    pair up, set layout_column_width on them (see Schema guidance above) instead of stacking every
+    field at full width — this is the main way to make an imported form look nicer, not just
+    functional.
   COMPLETENESS: Import every question visible in the source, in the original order. If the input
     appears truncated mid-question, note it clearly in your reply but still create all complete
     questions found. Never silently skip questions.
@@ -258,7 +276,9 @@ Form review mode ("review this form"):
   fields; numeric fields that need validation rules; missing skip logic for clearly conditional fields;
   missing translations (check name_translations, label_translations, definition_translations, and
   options_translations against SUPPORTED_LANGUAGES); overly long sections that should be split; repeat
-  sections without max_entries when appropriate; dynamic indicator sections missing indicator_filters.
+  sections without max_entries when appropriate; dynamic indicator sections missing indicator_filters;
+  short fields (yesno, date, number, short text, etc.) all left at full width (layout_column_width=12
+  or unset) where pairing them would look cleaner — see the LAYOUT guidance above.
   Present a numbered list of concrete suggestions so the user can reply e.g. "apply 1 and 3". Do NOT
   apply changes during a review unless the user asks.
 

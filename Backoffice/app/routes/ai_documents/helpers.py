@@ -48,7 +48,7 @@ IFRC_APPEALS_TITLE_YEAR_RE = re.compile(r"(?<!\d)(20\d{2})(?!\d)")
 AI_DOCUMENTS_MANAGE_PERMISSIONS = ("admin.ai.manage", "admin.documents.manage")
 
 # ---------------------------------------------------------------------------
-# AI document library list filters (shared by admin page + /api/ai/documents/)
+# AI Knowledge Base list filters (shared by admin page + /api/ai/documents/)
 # ---------------------------------------------------------------------------
 
 
@@ -75,7 +75,7 @@ def ai_document_library_filters_active(filters: Dict[str, str]) -> bool:
 def apply_ai_document_library_filters(query, filters: Dict[str, str]):
     """
     Apply Knowledge Base filter params to an AIDocument query.
-    Mirrors document_library() / list_documents() filter semantics.
+    Mirrors knowledge_base() / list_documents() filter semantics.
     """
     from app.models import AIDocument
     from app.utils.sql_utils import safe_ilike_pattern

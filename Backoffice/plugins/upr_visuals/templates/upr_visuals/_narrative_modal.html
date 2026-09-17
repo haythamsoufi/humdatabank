@@ -1,7 +1,7 @@
 {% from "macros/modal_shell.html" import modal_shell %}
 {% from "macros/excel_import_dropzone.html" import excel_import_dropzone %}
 
-{% set narrative_title %}<i class="fas fa-file-word w-6 h-6 mr-2 text-blue-600"></i> {{ _('Add narrative document') }}{% endset %}
+{% set narrative_title %}<i class="fas fa-file-alt w-6 h-6 mr-2 text-blue-600"></i> {{ _('Add narrative document') }}{% endset %}
 {% call modal_shell(
     'upr-visuals-narrative-modal',
     narrative_title,
@@ -15,7 +15,7 @@
 ) %}
     <div class="excel-io-modal__panel-intro">
         <p class="excel-io-modal__panel-lead">
-            {{ _('Visuals come from this assignment. Narrative pages follow the Word file. InDesign downloads as a zip — unzip it, then open the .idml file.') }}
+            {{ _('Visuals come from this assignment. Narrative pages follow the Word or PDF file. Document type is detected when you choose a file — change it if that is wrong, then click Generate.') }}
         </p>
     </div>
     <input type="hidden" id="upr-visuals-narrative-format" value="">
@@ -24,19 +24,30 @@
         input_id='upr-visuals-narrative-file',
         input_name='file',
         variant='neutral',
-        accept='.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        title=_('Drop your Word document here'),
-        hint=_('or click to browse — .docx only'),
+        accept='.docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf',
+        title=_('Drop your Word or PDF file here'),
+        hint=_('or click to browse — .docx or .pdf'),
         change_hint=_('Click to change file'),
         selected_icon='fa-file-word',
         max_size_bytes=20971520,
         required=false
     ) %}{% endcall %}
+    <div class="upr-visuals-narrative-audience">
+        <label for="upr-visuals-narrative-audience">{{ _('Document type') }}</label>
+        <select id="upr-visuals-narrative-audience" name="audience">
+            <option value="auto">{{ _('Auto-detect from this file') }}</option>
+            <option value="internal">{{ _('Internal only (not for public use)') }}</option>
+            <option value="public">{{ _('Public (external facing)') }}</option>
+        </select>
+        <p class="upr-visuals-narrative-audience__hint" id="upr-visuals-narrative-audience-hint">
+            {{ _('Detected when you choose a file. Internal covers get a yellow INTERNAL banner.') }}
+        </p>
+    </div>
     <p class="excel-io-modal__note" data-upr-narrative-note>
         <i class="fas fa-info-circle" aria-hidden="true"></i>{{ _('Maximum file size: 20 MB') }}
         <span data-upr-narrative-translate
               hidden
-              data-template="{{ _('The Word narrative will be translated into {language} after upload, before the report is generated.')|forceescape }}"></span>
+              data-template="{{ _('The narrative will be translated into {language} after upload, before the report is generated.')|forceescape }}"></span>
     </p>
     <div id="upr-visuals-narrative-progress" class="upr-visuals-narrative-progress" hidden>
         <div class="upr-visuals-narrative-progress__track" aria-hidden="true">

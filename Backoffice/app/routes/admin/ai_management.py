@@ -1,7 +1,7 @@
 """
 AI Management Routes
 
-Admin interface for managing AI documents, viewing reasoning traces,
+Admin interface for the AI Knowledge Base, viewing reasoning traces,
 and monitoring AI system usage.
 """
 
@@ -587,7 +587,7 @@ def _resume_active_ai_document_jobs(user_id: int) -> list[dict]:
     return get_active_ai_document_jobs_for_user(user_id)
 
 
-@bp.route("/documents/active-jobs", methods=["GET"])
+@bp.route("/knowledge-base/active-jobs", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def ai_documents_active_jobs():
     """Return in-flight AI document batch jobs for the current user (UI resume)."""
@@ -601,13 +601,13 @@ def ai_documents_active_jobs():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents", methods=["GET"])
+@bp.route("/knowledge-base", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
-def document_library():
-    """AI Document Library - manage documents for RAG system."""
+def knowledge_base():
+    """AI Knowledge Base — manage documents for the RAG system."""
     if not _check_ai_tables_exist():
         return render_template(
-            "admin/ai/documents.html",
+            "admin/ai/knowledge_base.html",
             processing_doc_ids=[],
             active_jobs=[],
             stats=_get_default_doc_stats(),
@@ -650,7 +650,7 @@ def document_library():
             if has_active_filters else None
         )
         logger.info(
-            "AI document library page: user_id=%s filtered_total=%s filters(status=%s file_type=%s category=%s language=%s q=%s)",
+            "AI Knowledge Base page: user_id=%s filtered_total=%s filters(status=%s file_type=%s category=%s language=%s q=%s)",
             getattr(current_user, "id", None),
             filtered_count if filtered_count is not None else "all",
             filters.get("status") or "",
@@ -709,7 +709,7 @@ def document_library():
         languages = sorted([la[0] for la in languages if la[0]])
 
         return render_template(
-            "admin/ai/documents.html",
+            "admin/ai/knowledge_base.html",
             processing_doc_ids=processing_doc_ids,
             active_jobs=active_jobs,
             stats=stats,
@@ -727,10 +727,10 @@ def document_library():
         )
 
     except Exception as e:
-        logger.error(f"Error loading document library: {e}", exc_info=True)
+        logger.error(f"Error loading Knowledge Base: {e}", exc_info=True)
         db.session.rollback()
         return render_template(
-            "admin/ai/documents.html",
+            "admin/ai/knowledge_base.html",
             processing_doc_ids=[],
             active_jobs=[],
             stats=_get_default_doc_stats(),
@@ -749,7 +749,7 @@ def document_library():
         )
 
 
-@bp.route("/documents/<int:document_id>/delete", methods=["POST"])
+@bp.route("/knowledge-base/<int:document_id>/delete", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("20 per minute")
 def delete_document(document_id):
@@ -778,7 +778,7 @@ def delete_document(document_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/<int:document_id>/reprocess", methods=["POST"])
+@bp.route("/knowledge-base/<int:document_id>/reprocess", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("5 per minute")
 def reprocess_document(document_id):
@@ -821,7 +821,7 @@ def reprocess_document(document_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/<int:document_id>/redetect-country", methods=["POST"])
+@bp.route("/knowledge-base/<int:document_id>/redetect-country", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("30 per minute")
 def redetect_country_document(document_id):
@@ -872,7 +872,7 @@ def redetect_country_document(document_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/<int:document_id>/reprocess-metadata", methods=["POST"])
+@bp.route("/knowledge-base/<int:document_id>/reprocess-metadata", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("30 per minute")
 def reprocess_document_metadata(document_id):
@@ -959,7 +959,7 @@ def reprocess_document_metadata(document_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/mine-terminology", methods=["POST"])
+@bp.route("/knowledge-base/mine-terminology", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")
 def mine_document_terminology():
@@ -1022,7 +1022,7 @@ def mine_document_terminology():
     return json_ok(message=message, **result)
 
 
-@bp.route("/documents/translation-pair", methods=["POST"])
+@bp.route("/knowledge-base/translation-pair", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 def mark_translation_document_pair():
     """Record an opt-in document pair. Sentence-level TM is deferred."""
@@ -1059,7 +1059,7 @@ def mark_translation_document_pair():
     )
 
 
-@bp.route("/documents/translation-group", methods=["POST"])
+@bp.route("/knowledge-base/translation-group", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 def mark_translation_document_group():
     """Mark 2+ selected documents as the same publication in different languages."""
@@ -1138,7 +1138,7 @@ def mark_translation_document_group():
     )
 
 
-@bp.route("/documents/bulk-reprocess", methods=["POST"])
+@bp.route("/knowledge-base/bulk-reprocess", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")
 def bulk_reprocess_documents():
@@ -1146,7 +1146,7 @@ def bulk_reprocess_documents():
     Start a server-side bulk reprocess job for selected AI documents.
 
     Accepts JSON {ids:[...], concurrency?:int} or form ids="1,2,3".
-    Returns 202 with job_id to poll via /admin/ai/documents/bulk-reprocess/<job_id>/status
+    Returns 202 with job_id to poll via /admin/ai/knowledge-base/bulk-reprocess/<job_id>/status
     """
     try:
         if not _check_ai_reprocess_job_tables_exist():
@@ -1189,7 +1189,7 @@ def bulk_reprocess_documents():
         doc_ids_existing = {int(d.id) for d in docs}
 
         # Flip selected docs to "pending" immediately to avoid stale "completed" during job queueing.
-        # (UI polls `/admin/ai/documents/<id>/status` and would otherwise revert after warmup.)
+        # (UI polls `/admin/ai/knowledge-base/<id>/status` and would otherwise revert after warmup.)
         try:
             (
                 AIDocument.query
@@ -1237,7 +1237,7 @@ def bulk_reprocess_documents():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/bulk-reprocess/<job_id>/status", methods=["GET"])
+@bp.route("/knowledge-base/bulk-reprocess/<job_id>/status", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def bulk_reprocess_status(job_id: str):
     """Return job + item statuses for a bulk reprocess job."""
@@ -1307,7 +1307,7 @@ def bulk_reprocess_status(job_id: str):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/bulk-reprocess/<job_id>/cancel", methods=["POST"])
+@bp.route("/knowledge-base/bulk-reprocess/<job_id>/cancel", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 def bulk_reprocess_cancel(job_id: str):
     """Request cancellation for a running bulk reprocess job (best-effort)."""
@@ -1488,7 +1488,7 @@ def _run_bulk_metadata_reprocess_job(app, job_id: str) -> None:
     )
 
 
-@bp.route("/documents/bulk-reprocess-metadata", methods=["POST"])
+@bp.route("/knowledge-base/bulk-reprocess-metadata", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")
 def bulk_reprocess_metadata_documents():
@@ -1496,7 +1496,7 @@ def bulk_reprocess_metadata_documents():
     Start a server-side bulk metadata-reprocess job.
     Updates document_date, document_language, document_category, quality_score,
     source_organization without re-chunking or re-embedding.
-    Returns 202 with job_id to poll via /admin/ai/documents/bulk-reprocess-metadata/<job_id>/status
+    Returns 202 with job_id to poll via /admin/ai/knowledge-base/bulk-reprocess-metadata/<job_id>/status
     """
     try:
         if not _check_ai_reprocess_job_tables_exist():
@@ -1552,7 +1552,7 @@ def bulk_reprocess_metadata_documents():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/bulk-reprocess-metadata/<job_id>/status", methods=["GET"])
+@bp.route("/knowledge-base/bulk-reprocess-metadata/<job_id>/status", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def bulk_reprocess_metadata_status(job_id: str):
     """Return job + item statuses for a bulk metadata reprocess job."""
@@ -1605,7 +1605,7 @@ def bulk_reprocess_metadata_status(job_id: str):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/bulk-reprocess-metadata/<job_id>/cancel", methods=["POST"])
+@bp.route("/knowledge-base/bulk-reprocess-metadata/<job_id>/cancel", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 def bulk_reprocess_metadata_cancel(job_id: str):
     """Request cancellation for a running bulk metadata reprocess job (best-effort)."""
@@ -1637,7 +1637,7 @@ def bulk_reprocess_metadata_cancel(job_id: str):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/import-system-bulk", methods=["POST"])
+@bp.route("/knowledge-base/import-system-bulk", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")
 def import_system_bulk():
@@ -1645,7 +1645,7 @@ def import_system_bulk():
     Start a server-side bulk import job for selected submitted (system) documents.
 
     Accepts JSON {submitted_document_ids:[...], concurrency?:int}.
-    Returns 202 with job_id to poll via /admin/ai/documents/import-system-bulk/<job_id>/status
+    Returns 202 with job_id to poll via /admin/ai/knowledge-base/import-system-bulk/<job_id>/status
     """
     try:
         if not _check_ai_reprocess_job_tables_exist():
@@ -1735,7 +1735,7 @@ def import_system_bulk():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/import-system-bulk/<job_id>/status", methods=["GET"])
+@bp.route("/knowledge-base/import-system-bulk/<job_id>/status", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def import_system_bulk_status(job_id: str):
     """Return job + item statuses for a bulk system-document import job."""
@@ -1817,7 +1817,7 @@ def import_system_bulk_status(job_id: str):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/import-system-bulk/<job_id>/cancel", methods=["POST"])
+@bp.route("/knowledge-base/import-system-bulk/<job_id>/cancel", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 def import_system_bulk_cancel(job_id: str):
     """Request cancellation for a running bulk system-document import job (best-effort)."""
@@ -1858,7 +1858,7 @@ def import_system_bulk_cancel(job_id: str):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/bulk-download", methods=["POST"])
+@bp.route("/knowledge-base/bulk-download", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")
 def bulk_download_documents():
@@ -2019,7 +2019,7 @@ def bulk_download_documents():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/<int:document_id>/status", methods=["GET"])
+@bp.route("/knowledge-base/<int:document_id>/status", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def document_processing_status(document_id):
     """Return processing status and inferred stage for a document."""
@@ -2185,7 +2185,7 @@ def document_processing_status(document_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/process-submitted/<int:submitted_doc_id>", methods=["POST"])
+@bp.route("/knowledge-base/process-submitted/<int:submitted_doc_id>", methods=["POST"])
 @admin_permission_required('admin.ai.manage')
 @limiter.limit("10 per minute")
 def process_submitted_document(submitted_doc_id):
@@ -2240,7 +2240,7 @@ def process_submitted_document(submitted_doc_id):
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/check-ai-status/<int:submitted_doc_id>", methods=["GET"])
+@bp.route("/knowledge-base/check-ai-status/<int:submitted_doc_id>", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def check_submitted_document_ai_status(submitted_doc_id):
     """Check if a submitted document has been processed by AI."""
@@ -2367,7 +2367,7 @@ def _serialize_system_document_for_ai_import(
     }
 
 
-@bp.route("/documents/list-system-documents", methods=["GET"])
+@bp.route("/knowledge-base/list-system-documents", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def list_system_documents():
     """List submitted documents from the system for import into AI."""
@@ -2461,7 +2461,7 @@ def list_system_documents():
         return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
 
 
-@bp.route("/documents/download-system-document/<int:doc_id>", methods=["GET"])
+@bp.route("/knowledge-base/download-system-document/<int:doc_id>", methods=["GET"])
 @admin_permission_required('admin.ai.manage')
 def download_system_document_for_import(doc_id):
     """Stream a submitted document for the AI import modal (plain 404, no HTML redirects)."""

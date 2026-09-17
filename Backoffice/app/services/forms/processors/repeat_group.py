@@ -32,13 +32,27 @@ class RepeatGroupProcessorMixin:
     """Mixin providing repeat group processing for FormDataService."""
 
     @staticmethod
-    def _format_repeat_entry_label_text(raw):
+    def _decode_repeat_label_fragment(raw) -> str:
+        text = str(raw).strip()
+        if not text.startswith('b64:'):
+            return text
+        try:
+            return decode_b64_matrix_json(text).strip()
+        except MatrixJsonDecodeError:
+            return text
+
+    @classmethod
+    def _format_repeat_entry_label_text(cls, raw):
         if raw is None or raw == '':
             return None
         if isinstance(raw, list):
-            text = ', '.join(str(v).strip() for v in raw if v not in (None, ''))
+            text = ', '.join(
+                cls._decode_repeat_label_fragment(v)
+                for v in raw
+                if v not in (None, '')
+            )
         else:
-            text = str(raw).strip()
+            text = cls._decode_repeat_label_fragment(raw)
         if not text:
             return None
         return text[:255]

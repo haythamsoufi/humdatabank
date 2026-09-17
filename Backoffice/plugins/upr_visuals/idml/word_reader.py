@@ -122,3 +122,12 @@ def load_word_paragraphs(docx_bytes: bytes) -> list[dict]:
     except (ParseError, zipfile.BadZipFile, KeyError, ValueError) as exc:
         raise UprVisualsError("Upload a Word document (.docx).") from exc
     return blocks
+
+
+def load_narrative_paragraphs(data: bytes) -> list[dict]:
+    """Read a Word or PDF narrative into the same paragraph/table dicts."""
+    if data.startswith(b"%PDF"):
+        from plugins.upr_visuals.idml.pdf_reader import load_pdf_paragraphs
+
+        return load_pdf_paragraphs(data)
+    return load_word_paragraphs(data)

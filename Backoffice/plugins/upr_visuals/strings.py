@@ -444,6 +444,13 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
         "ru": "Номер апелляции",
         "zh": "呼吁编号",
     }),
+    ("INTERNAL — not for public use", {
+        "fr": "INTERNE — ne pas diffuser",
+        "es": "INTERNO — no para uso público",
+        "ar": "داخلي — غير معد للنشر",
+        "ru": "ДЛЯ СЛУЖЕБНОГО ПОЛЬЗОВАНИЯ — не для публикации",
+        "zh": "内部文件 — 不得公开使用",
+    }),
     ("ONGOING EMERGENCY INDICATORS", {
         "fr": "INDICATEURS DES URGENCES EN COURS",
         "es": "INDICADORES DE EMERGENCIAS EN CURSO",
@@ -657,18 +664,18 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
         "ru": "Страновой план сети МФОККиКП {start}-{end}",
         "zh": "{start}-{end} 年IFRC网络国家计划",
     }),
-    ("IFRC network mid-year report, Jan-Jun", {
-        "fr": "Rapport semestriel du réseau IFRC, janv.-juin",
-        "es": "Informe de mitad de año de la red de la FICR, ene-jun",
-        "ar": "التقرير النصفي لشبكة الاتحاد الدولي، يناير-يونيو",
-        "ru": "Полугодовой отчёт сети МФОККиКП, янв.–июн.",
+    ("IFRC network mid-year report, January – June", {
+        "fr": "Rapport semestriel du réseau IFRC, janvier – juin",
+        "es": "Informe de mitad de año de la red de la FICR, enero – junio",
+        "ar": "التقرير النصفي لشبكة الاتحاد الدولي، يناير – يونيو",
+        "ru": "Полугодовой отчёт сети МФОККиКП, январь – июнь",
         "zh": "IFRC网络年中报告，1–6月",
     }),
-    ("{year} IFRC network mid-year report, Jan-Jun", {
-        "fr": "Rapport semestriel du réseau IFRC {year}, janv.-juin",
-        "es": "Informe de mitad de año de la red de la FICR {year}, ene-jun",
-        "ar": "التقرير النصفي لشبكة الاتحاد الدولي {year}، يناير-يونيو",
-        "ru": "Полугодовой отчёт сети МФОККиКП {year}, янв.–июн.",
+    ("{year} IFRC network mid-year report, January – June", {
+        "fr": "Rapport semestriel du réseau IFRC {year}, janvier – juin",
+        "es": "Informe de mitad de año de la red de la FICR {year}, enero – junio",
+        "ar": "التقرير النصفي لشبكة الاتحاد الدولي {year}، يناير – يونيو",
+        "ru": "Полугодовой отчёт сети МФОККиКП {year}, январь – июнь",
         "zh": "{year} 年IFRC网络年中报告，1–6月",
     }),
     ("IFRC network annual report, Jan-Dec", {
@@ -740,7 +747,7 @@ _PATTERNS: tuple[tuple[re.Pattern[str], str, tuple[str, ...]], ...] = (
     (re.compile(r"^Emergency (\d+)$"), "Emergency {slot}", ("slot",)),
     (re.compile(r"^(\d{4})-(\d{4}) IFRC network country plan$"), "{start}-{end} IFRC network country plan", ("start", "end")),
     (re.compile(r"^(\d{4}) IFRC network country plan$"), "{year} IFRC network country plan", ("year",)),
-    (re.compile(r"^(\d{4}) IFRC network mid-year report, Jan-Jun$"), "{year} IFRC network mid-year report, Jan-Jun", ("year",)),
+    (re.compile(r"^(\d{4}) IFRC network mid-year report, January – June$"), "{year} IFRC network mid-year report, January – June", ("year",)),
     (re.compile(r"^(\d{4}) IFRC network annual report, Jan-Dec$"), "{year} IFRC network annual report, Jan-Dec", ("year",)),
     (re.compile(r"^(\d{4}) IFRC network unified plan$"), "{year} IFRC network unified plan", ("year",)),
     (re.compile(r"^(\d{4}) IFRC network annual report$"), "{year} IFRC network annual report", ("year",)),

@@ -437,7 +437,7 @@ class AIVectorStore:
 
             db.session.commit()
 
-            # Keep document total_embeddings in sync for stats and document library
+            # Keep document total_embeddings in sync for stats and Knowledge Base
             doc = db.session.get(AIDocument, document_id)
             if doc is not None:
                 actual_count = (

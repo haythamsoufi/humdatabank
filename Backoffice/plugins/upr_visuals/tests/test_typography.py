@@ -62,6 +62,7 @@ def test_browser_and_export_faces_share_families():
     export = export_font_face_css()
     assert ARABIC_FAMILY in browser
     assert "Tajawal-Regular" in browser
+    assert "Montserrat-Medium" in export or "Montserrat-Medium" in browser
     assert "/static/fonts/Tajawal-Regular.ttf" in browser
     assert "fonts.googleapis.com" not in browser
     assert "file:" in export

@@ -61,6 +61,18 @@ def test_match_narrative_path_prefers_iso3(tmp_path):
     assert match_narrative_path(paths, aes_id=11).read_bytes() == b"afg"
 
 
+def _blank_pdf(pages: int = 1) -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    try:
+        for _ in range(pages):
+            doc.new_page(width=595.28, height=841.89)
+        return doc.tobytes()
+    finally:
+        doc.close()
+
+
 @pytest.mark.unit
 def test_collect_narrative_uploads_from_zip_and_docx():
     docx = _docx_bytes("AFG")
@@ -72,6 +84,21 @@ def test_collect_narrative_uploads_from_zip_and_docx():
     assert set(found) == {"afg"}
     found.update(collect_narrative_uploads([_Upload("Bangladesh.docx", _docx_bytes("BD"))]))
     assert "bangladesh" in found
+
+
+@pytest.mark.unit
+def test_collect_narrative_uploads_from_zip_and_pdf():
+    pdf = _blank_pdf(1)
+    zbuf = io.BytesIO()
+    with zipfile.ZipFile(zbuf, "w") as zf:
+        zf.writestr("AFG.pdf", pdf)
+        zf.writestr("notes.txt", "skip")
+    found = collect_narrative_uploads([_Upload("narratives.zip", zbuf.getvalue())])
+    assert set(found) == {"afg"}
+    found.update(collect_narrative_uploads([_Upload("Bangladesh.pdf", pdf)]))
+    assert "bangladesh" in found
+    with pytest.raises(UprVisualsError, match="Word documents"):
+        collect_narrative_uploads([_Upload("notes.txt", b"hi")])
 
 
 @pytest.mark.unit
@@ -218,3 +245,53 @@ def test_run_export_job_file_narrative_pages(tmp_path, monkeypatch):
     monkeypatch.setattr("plugins.upr_visuals.idml.render_narrative_pdf_bytes", fake_narrative)
     run_export_job_file(job)
     assert out.read_bytes() == b"%PDF-pages"
+
+
+@pytest.mark.unit
+def test_run_export_job_file_narrative_restyles_attached_pdf(tmp_path, monkeypatch):
+    html = tmp_path / "in.html"
+    html.write_text("<html/>", encoding="utf-8")
+    payload = tmp_path / "payload.json"
+    payload.write_text(json.dumps({"meta": {"country_name": "Uganda"}}), encoding="utf-8")
+    word = tmp_path / "narrative.pdf"
+    word.write_bytes(b"%PDF-nar")
+    out = tmp_path / "out.pdf"
+    job = tmp_path / "job.json"
+    job.write_text(
+        json.dumps(
+            {
+                "kind": "narrative_pdf",
+                "html_path": str(html),
+                "payload_path": str(payload),
+                "word_path": str(word),
+                "output_path": str(out),
+                "dashboard_id": "combined",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("plugins.upr_visuals.export_job.render_pdf_bytes", lambda *_a, **_k: b"%PDF-vis")
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.load_narrative_paragraphs",
+        lambda data: [{"text": "Hello from PDF"}] if data.startswith(b"%PDF") else [],
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.style_narrative_blocks",
+        lambda blocks, country_name="": [{"style": "Body", "text": blocks[0]["text"]}],
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.i18n.translate_styled_blocks",
+        lambda blocks, on_progress=None: blocks,
+    )
+
+    def fake_narrative(blocks, folio=""):
+        assert blocks[0]["text"] == "Hello from PDF"
+        return b"%PDF-styled"
+
+    monkeypatch.setattr("plugins.upr_visuals.idml.render_narrative_pdf_bytes", fake_narrative)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.merge_report_pdfs",
+        lambda visuals, narrative, folio="": visuals + narrative,
+    )
+    run_export_job_file(job)
+    assert out.read_bytes() == b"%PDF-vis%PDF-styled"

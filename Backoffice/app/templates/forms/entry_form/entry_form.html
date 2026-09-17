@@ -25,8 +25,8 @@
 <meta name="language" content="{{ _lang_for_meta }}">
 <link rel="stylesheet" href="{{ static_url('css/forms.css') }}">
 {% if show_upr_visuals_assets %}
-<link rel="stylesheet" href="{{ url_for('upr_visuals.static_file', filename='css/upr-visuals.css') }}">
-<link rel="stylesheet" href="{{ url_for('upr_visuals.fonts_css') }}">
+<link rel="stylesheet" href="{{ upr_visuals_static_url('css/upr-visuals.css') }}">
+<link rel="stylesheet" href="{{ url_for('upr_visuals.fonts_css', v=upr_visuals_asset_v()) }}">
 {% endif %}
 {% if is_preview_mode %}<link rel="stylesheet" href="{{ static_url('css/year-picker.css') }}">{% endif %}
 <script nonce="{{ csp_nonce() }}">
@@ -3131,9 +3131,9 @@
 {% block extra_js %}
 <script src="{{ static_url('js/forms/validation-questions-panel.js') }}"></script>
 {% if show_upr_visuals_assets %}
-<script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-shared.js') }}"></script>
-<script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-download.js') }}"></script>
-<script src="{{ url_for('upr_visuals.static_file', filename='js/upr-visuals-assignment.js') }}"></script>
+<script src="{{ upr_visuals_static_url('js/upr-visuals-shared.js') }}"></script>
+<script src="{{ upr_visuals_static_url('js/upr-visuals-download.js') }}"></script>
+<script src="{{ upr_visuals_static_url('js/upr-visuals-assignment.js') }}"></script>
 {% endif %}
 {% if is_preview_mode %}
     {% include "forms/entry_form/partials/_preview_banner_js.html" %}

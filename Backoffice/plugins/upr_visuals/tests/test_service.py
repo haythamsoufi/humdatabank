@@ -165,7 +165,7 @@ def test_narrative_pdf_bytes_runs_isolated(tmp_path, monkeypatch):
         "_dashboard_html",
         classmethod(lambda cls, aes_id, dashboard_id, **_kw: ({"meta": {"document_title": "Uganda", "iso3": "UGA"}}, "<html/>")),
     )
-    monkeypatch.setattr("plugins.upr_visuals.idml.load_word_paragraphs", lambda _word: [{"text": "Hello"}])
+    monkeypatch.setattr("plugins.upr_visuals.idml.load_narrative_paragraphs", lambda _word: [{"text": "Hello"}])
     monkeypatch.setattr(
         "plugins.upr_visuals.idml.style_narrative_blocks",
         lambda blocks, country_name="": blocks,
@@ -202,3 +202,103 @@ def test_narrative_pdf_bytes_runs_isolated(tmp_path, monkeypatch):
     assert filename.endswith(".pdf")
     assert any("Translating" in msg for msg in seen)
     assert any("visuals and narrative" in msg for msg in seen)
+
+
+@pytest.mark.unit
+def test_narrative_pdf_bytes_restyles_attached_pdf(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    class _App:
+        instance_path = str(tmp_path)
+
+    @contextmanager
+    def fake_locale(lang):
+        yield lang
+
+    monkeypatch.setattr("plugins.upr_visuals.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr_visuals.service.export_locale", fake_locale)
+    monkeypatch.setattr(
+        UprVisualsService,
+        "_dashboard_html",
+        classmethod(lambda cls, aes_id, dashboard_id, **_kw: ({"meta": {"document_title": "Uganda", "iso3": "UGA"}}, "<html/>")),
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.load_narrative_paragraphs",
+        lambda data: [{"text": "Hello from PDF"}] if data.startswith(b"%PDF") else [],
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.style_narrative_blocks",
+        lambda blocks, country_name="": blocks,
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.service.translate_styled_blocks",
+        lambda blocks, on_progress=None: blocks,
+    )
+
+    kinds = []
+
+    def fake_isolated(job, timeout=120, on_progress=None):
+        kinds.append(job["kind"])
+        Path(job["output_path"]).write_bytes(b"%PDF-" + job["kind"].encode())
+        return Path(job["output_path"])
+
+    monkeypatch.setattr("plugins.upr_visuals.service.run_isolated", fake_isolated)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.merge_report_pdfs",
+        lambda visuals, narrative, folio="": visuals + narrative,
+    )
+    monkeypatch.setattr("plugins.upr_visuals.idml.folio_label", lambda _meta: "folio")
+    data, filename = UprVisualsService.narrative_pdf_bytes(9, b"%PDF-attached", lang="en")
+    assert set(kinds) == {"pdf", "narrative_pages"}
+    assert data == b"%PDF-pdf%PDF-narrative_pages"
+    assert filename.endswith(".pdf")
+
+
+@pytest.mark.unit
+def test_narrative_pdf_bytes_passes_internal_audience(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    class _App:
+        instance_path = str(tmp_path)
+
+    @contextmanager
+    def fake_locale(lang):
+        yield lang
+
+    seen = {}
+
+    def fake_html(cls, aes_id, dashboard_id, **kw):
+        seen.update(kw)
+        return {"meta": {"document_title": "Uganda", "iso3": "UGA"}}, "<html/>"
+
+    monkeypatch.setattr("plugins.upr_visuals.service.current_app", _App())
+    monkeypatch.setattr("plugins.upr_visuals.service.export_locale", fake_locale)
+    monkeypatch.setattr(UprVisualsService, "_dashboard_html", classmethod(fake_html))
+    monkeypatch.setattr("plugins.upr_visuals.idml.load_narrative_paragraphs", lambda _word: [{"text": "Hello"}])
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.style_narrative_blocks",
+        lambda blocks, country_name="": blocks,
+    )
+    monkeypatch.setattr(
+        "plugins.upr_visuals.service.translate_styled_blocks",
+        lambda blocks, on_progress=None: blocks,
+    )
+
+    def fake_isolated(job, timeout=120, on_progress=None):
+        Path(job["output_path"]).write_bytes(b"%PDF-x")
+        return Path(job["output_path"])
+
+    monkeypatch.setattr("plugins.upr_visuals.service.run_isolated", fake_isolated)
+    monkeypatch.setattr(
+        "plugins.upr_visuals.idml.merge_report_pdfs",
+        lambda visuals, narrative, folio="": visuals + narrative,
+    )
+    monkeypatch.setattr("plugins.upr_visuals.idml.folio_label", lambda _meta: "folio")
+    UprVisualsService.narrative_pdf_bytes(
+        9,
+        b"%PDF-attached",
+        lang="en",
+        audience="internal",
+        word_filename="Bangladesh UPL MYR 2026.pdf",
+    )
+    assert seen.get("narrative_audience") == "internal"

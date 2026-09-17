@@ -10,9 +10,11 @@ from plugins.upr_visuals.catalog import (
     AREA_LABELS,
     DASHBOARD_BY_ID,
     EF_CODES,
+    IFRC_RED,
     KPI_ORDER,
     PLAN_DETAIL_SP_LABELS,
     PLAN_KPI_ORDER,
+    REACH_LABEL_LINES,
     SP_CODES,
     SUPPORT_AREA_CODES,
     SUPPORT_AREA_HEADER_LINES,
@@ -26,8 +28,10 @@ from plugins.upr_visuals.formatters import (
     format_compact_chf,
     format_header_date,
     split_display_amount,
+    strip_trailing_period,
     with_chf,
 )
+from plugins.upr_visuals.audience import INTERNAL_COVER_BANNER, is_internal_narrative
 from plugins.upr_visuals.i18n import (
     arabic_font_class,
     current_export_language,
@@ -47,7 +51,6 @@ def _export_font_class() -> str:
     extra = arabic_font_class()
     return f" {extra}" if extra else ""
 
-IFRC_RED = "#d22730"
 IFRC_LOGO_SRC = "/static/IFRC_logo_square.svg"
 
 
@@ -135,15 +138,16 @@ def _kpi_icon(key: str) -> str:
     )
 
 
-def _sp_icon(code: str, icon_src: str | None = None) -> str:
+def _sp_icon(code: str, icon_src: str | None = None, *, size: int = 64) -> str:
     src = (icon_src or "").strip()
+    dim = str(int(size))
     if src:
         href = escape(src, quote=True)
         # Fixed SVG box so WeasyPrint cannot stretch the ring to the
         # table-cell width (that clips the circle into a crescent).
         return (
             f'<span class="upr-reach-icon upr-reach-icon--img" aria-hidden="true">'
-            f'<svg viewBox="0 0 40 40" width="56" height="56">'
+            f'<svg viewBox="0 0 40 40" width="{dim}" height="{dim}">'
             f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="1.4"/>'
             f'<image href="{href}" x="4" y="4" width="32" height="32" '
             f'preserveAspectRatio="xMidYMid meet"/>'
@@ -153,11 +157,18 @@ def _sp_icon(code: str, icon_src: str | None = None) -> str:
     inner = _SP_ICON_PATHS.get(code, f'<text x="12" y="16" text-anchor="middle" font-size="8">{escape(code)}</text>')
     return (
         f'<span class="upr-reach-icon" aria-hidden="true">'
-        f'<svg viewBox="0 0 40 40" width="56" height="56">'
+        f'<svg viewBox="0 0 40 40" width="{dim}" height="{dim}">'
         f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="1.4"/>'
         f'<g transform="translate(4 4) scale(1.333)" fill="none" stroke="{color}" stroke-width="1.7" '
         f'stroke-linecap="round" stroke-linejoin="round">{inner}</g></svg></span>'
     )
+
+
+def _reach_label_html(code: str, label: str) -> str:
+    lines = REACH_LABEL_LINES.get(code)
+    if lines and current_export_language() == "en":
+        return "<br>".join(escape(line) for line in lines)
+    return escape(label or "")
 
 
 def render_dashboard_html(payload: dict[str, Any], dashboard_id: str) -> str:
@@ -240,7 +251,7 @@ def _combined(payload: dict[str, Any]) -> str:
     else:
         add(_in_support(payload))
         add(_reach(payload))
-        add(_financial(payload))
+        add(_financial(payload, cover=True))
         emergencies = payload.get("emergencies") or []
         if emergencies:
             heading = (
@@ -312,27 +323,18 @@ def _reach(payload: dict[str, Any]) -> str:
     rows = payload.get("people_reached") or []
     headline = next((row for row in rows if row.get("is_total") and row.get("has_value")), None)
     visible = [row for row in rows if row.get("has_value") and not row.get("is_total")]
-    split_eo = any((row.get("code") or "") == "EO" for row in visible) and any(
-        (row.get("code") or "") != "EO" for row in visible
-    )
     labels: list[str] = []
     icons: list[str] = []
     values: list[str] = []
     for row in visible:
         code = row.get("code") or ""
-        extra = " upr-reach-cell--eo" if code == "EO" else ""
-        labels.append(f"<td class='upr-reach-label{extra}'>{escape(row.get('label') or '')}</td>")
+        labels.append(f"<td class='upr-reach-label'>{_reach_label_html(code, row.get('label') or '')}</td>")
         icons.append(
-            f"<td class='upr-reach-icon-wrap{extra}'>{_sp_icon(code, row.get('icon_src'))}</td>"
+            f"<td class='upr-reach-icon-wrap'>{_sp_icon(code, row.get('icon_src'))}</td>"
         )
         values.append(
-            f"<td class='upr-reach-value{extra}'>{_metric_html(row.get('display'), fallback='')}</td>"
+            f"<td class='upr-reach-value'>{_metric_html(row.get('display'), fallback='')}</td>"
         )
-        if split_eo and code == "EO":
-            divider = "<td class='upr-reach-divider' aria-hidden='true'></td>"
-            labels.append(divider)
-            icons.append(divider)
-            values.append(divider)
     if is_rtl() and labels:
         labels.reverse()
         icons.reverse()
@@ -345,7 +347,7 @@ def _reach(payload: dict[str, Any]) -> str:
     if not labels:
         body = headline_html or f"<p class='upr-empty'>{escape(t('No people-reached figures reported.'))}</p>"
     else:
-        row_class = "upr-reach-row upr-reach-row--eo-split" if split_eo else "upr-reach-row"
+        row_class = "upr-reach-row"
         if len(visible) >= 6:
             row_class += " upr-reach-row--full"
         body = (
@@ -407,11 +409,22 @@ def _doc_header(payload: dict[str, Any]) -> str:
     ns_logo_html = ""
     if ns_src:
         ns_logo_html = (
+            "<div class='upr-doc-header__ns'>"
             f"<img class='upr-doc-header__ns-logo' src='{escape(ns_src, quote=True)}' "
             f"alt='{escape(ns_alt, quote=True)}'>"
+            "</div>"
+        )
+    internal = is_internal_narrative(meta)
+    header_class = "upr-doc-header upr-doc-header--internal" if internal else "upr-doc-header"
+    banner = ""
+    if internal:
+        banner = (
+            f"<p class='upr-doc-header__internal'>{escape(t(INTERNAL_COVER_BANNER))}</p>"
         )
     return (
-        "<header class='upr-doc-header'>"
+        f"<header class='{header_class}'>"
+        f"{banner}"
+        "<div class='upr-doc-header__row'>"
         "<div class='upr-doc-header__brand'>"
         f"<img class='upr-doc-header__logo' src='{escape(IFRC_LOGO_SRC, quote=True)}' alt='IFRC'>"
         "</div>"
@@ -422,6 +435,7 @@ def _doc_header(payload: dict[str, Any]) -> str:
         "<div class='upr-doc-header__meta'>"
         f"{ns_logo_html}"
         f"<time class='upr-doc-header__date'>{escape(date_text)}</time>"
+        "</div>"
         "</div>"
         "</header>"
     )
@@ -714,7 +728,7 @@ def _network_funding(payload: dict[str, Any]) -> str:
     return detail
 
 
-def _financial(payload: dict[str, Any]) -> str:
+def _financial(payload: dict[str, Any], *, cover: bool = False) -> str:
     if _is_plan(payload):
         return _plan_funding(payload)
     fin = payload.get("financial") or {}
@@ -757,9 +771,10 @@ def _financial(payload: dict[str, Any]) -> str:
         f"{_financial_hero_charts(overview_rows, source_rows)}"
         "</div>"
     )
-    network_html = _financial_network(entities, years)
+    network_html = _financial_network(entities, years, cover=cover)
     return (
         "<section class='upr-block upr-block--finance'>"
+        "<span class='upr-pdf-mark'>upr-finance-cover</span>"
         "<div class='upr-fin-cover'>"
         f"<h2 class='upr-block__title upr-block__title--center'>{escape(t('FINANCIAL OVERVIEW'))}</h2>"
         f"<p class='upr-fin-unit'>{escape(t('in Swiss francs (CHF)'))}</p>"
@@ -837,9 +852,22 @@ def _financial_hero_charts(overview_rows: list[dict[str, Any]], source_rows: lis
     )
 
 
+def _finance_network_density(row_count: int, *, cover: bool = False) -> str:
+    """Looser row padding when the table is short — combined cover is airier."""
+    airy_max = 16 if cover else 10
+    spread_max = 22 if cover else 16
+    if row_count <= airy_max:
+        return " upr-fin-net--airy"
+    if row_count <= spread_max:
+        return " upr-fin-net--spread"
+    return ""
+
+
 def _financial_network(
     entities: list[dict[str, Any]],
     years: list[dict[str, Any]],
+    *,
+    cover: bool = False,
 ) -> str:
     """Tableau Financial Overview (3) — entity | bucket | metric | bar."""
     metric_colors = {
@@ -904,12 +932,7 @@ def _financial_network(
         if not table_rows:
             return ""
         row_count = len(table_rows)
-        if row_count <= 10:
-            density = " upr-fin-net--airy"
-        elif row_count <= 16:
-            density = " upr-fin-net--spread"
-        else:
-            density = ""
+        density = _finance_network_density(row_count, cover=cover)
         cols = [
             "<col class='upr-fin-net-col-entity'>",
             "<col class='upr-fin-net-col-bucket'>",
@@ -1206,9 +1229,10 @@ def _bars_grouped(rows: list[dict[str, Any]], order: tuple[str, ...]) -> str:
         group = by_code.get(code) or []
         if not group:
             continue
+        title = escape(t(AREA_LABELS.get(code, code)))
         chunks.append(
             "<div class='upr-bar-group'>"
-            f"<div class='upr-bar-group__title'>{escape(t(AREA_LABELS.get(code, code)))}</div>"
+            f"<div class='upr-bar-group__title'>{title}</div>"
             f"{_hbar_chart(group, color=IFRC_RED, peak=peak)}"
             "</div>"
         )
@@ -1223,7 +1247,7 @@ def _is_label_only(row: dict[str, Any]) -> bool:
     return not float(row.get("value") or 0)
 
 
-def _bar_plot(row: dict[str, Any], *, color: str, scale: float) -> str:
+def _bar_plot(row: dict[str, Any], *, color: str, scale: float, include_value: bool = True) -> str:
     display = _metric_html(row.get("display"))
     value = float(row.get("value") or 0)
     fill = row.get("color") or color
@@ -1232,9 +1256,12 @@ def _bar_plot(row: dict[str, Any], *, color: str, scale: float) -> str:
     if _is_label_only(row):
         return f"<div class='upr-bar-yes'>{display}</div>"
     pct = max(3.0, min(100.0, value / scale * 100)) if value else 0.0
+    fill_html = f"<span class='upr-bar-fill' style='width:{pct:.1f}%;background:{fill}'></span>"
+    if not include_value:
+        return fill_html
     return (
         "<div class='upr-bar-track'>"
-        f"<span class='upr-bar-fill' style='width:{pct:.1f}%;background:{fill}'></span>"
+        f"{fill_html}"
         f"<span class='upr-bar-value'{_ltr_num_attr()}>{display}</span>"
         "</div>"
     )
@@ -1245,6 +1272,7 @@ def _hbar_chart(
     *,
     color: str = IFRC_RED,
     peak: float | None = None,
+    value_column: bool = False,
 ) -> str:
     if not rows:
         return ""
@@ -1258,13 +1286,29 @@ def _hbar_chart(
     ) or 1
     parts = []
     for row in rows:
-        label = escape(row.get("label") or "")
+        label = escape(strip_trailing_period(row.get("label") or ""))
         extra = " upr-bar-row--text" if _is_label_only(row) else ""
+        plot = _bar_plot(
+            row,
+            color=row.get("color") or color,
+            scale=scale,
+            include_value=not value_column,
+        )
+        value_cell = ""
+        if value_column and not _is_label_only(row) and row.get("kind") != "percent":
+            value_cell = (
+                f"<td class='upr-bar-value-cell'{_ltr_num_attr()}>"
+                f"{_metric_html(row.get('display'))}</td>"
+            )
+        elif value_column:
+            value_cell = "<td class='upr-bar-value-cell'></td>"
         parts.append(
             f"<tr class='upr-bar-row{extra}'>"
             f"<td class='upr-bar-label'>{label}</td>"
-            f"<td class='upr-bar-plot'>{_bar_plot(row, color=row.get('color') or color, scale=scale)}</td>"
+            f"<td class='upr-bar-plot'>{plot}</td>"
+            f"{value_cell}"
             "</tr>"
         )
+    extra_class = " upr-bars--values" if value_column else ""
     # CSS ``direction: rtl`` (not ``_ltr_row``) so labels sit on the right.
-    return f"<table class='upr-bars'><tbody>{''.join(parts)}</tbody></table>"
+    return f"<table class='upr-bars{extra_class}'><tbody>{''.join(parts)}</tbody></table>"

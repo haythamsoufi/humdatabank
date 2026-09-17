@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from plugins.upr_visuals.audience import INTERNAL_COVER_BANNER
 from plugins.upr_visuals.catalog import (
     PLAN_TEMPLATE_ID,
     REACH_CODES,
@@ -31,10 +32,16 @@ from plugins.upr_visuals.formatters import (
     period_to_round,
     planning_years,
     split_display_amount,
+    strip_trailing_period,
     to_number,
     with_chf,
 )
-from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
+from plugins.upr_visuals.render import (
+    _finance_network_density,
+    render_dashboard_html,
+    render_dashboards_html,
+    render_report_html,
+)
 
 
 @pytest.mark.unit
@@ -216,11 +223,19 @@ def test_period_to_round():
     assert format_header_date(date(2026, 7, 2)) == "2 July 2026"
     assert document_subtitle("plan", "2026") == "2026-2028 IFRC network country plan"
     assert document_subtitle("report", "2025") == "2025 IFRC network annual report, Jan-Dec"
-    assert document_subtitle("report", "Jan-Jun 2026") == "2026 IFRC network mid-year report, Jan-Jun"
+    assert document_subtitle("report", "Jan-Jun 2026") == "2026 IFRC network mid-year report, January – June"
     assert appeal_number("UG") == "MAAUG001"
     assert appeal_number("bd") == "MAABD001"
     assert appeal_number("UGA") == ""
     assert appeal_number("") == ""
+    assert strip_trailing_period("Number of people reached with immunization services.") == (
+        "Number of people reached with immunization services"
+    )
+    assert strip_trailing_period("Health and wellbeing") == "Health and wellbeing"
+    assert strip_trailing_period("  Foo.  ") == "Foo"
+    assert strip_trailing_period("Wait...") == "Wait..."
+    assert strip_trailing_period("") == ""
+    assert strip_trailing_period(None) == ""
 
 
 def _payload():
@@ -396,8 +411,8 @@ def test_render_reach_and_support():
     assert "upr-block--reach" in html
     assert "upr-reach-headline" in html
     assert "91,000" in html
-    assert "Climate and environment" in html
-    assert "Disasters and crises" in html
+    assert "Climate and<br>environment" in html
+    assert "Disasters<br>and crises" in html
     assert "Cross-cutting" not in html
     assert "upr-reach-band--labels" in html
     assert "upr-reach-band--icons" in html
@@ -416,11 +431,9 @@ def test_render_reach_and_support():
         },
     )
     eo_html = render_dashboard_html(with_eo, "reach")
-    assert "upr-reach-row--eo-split" in eo_html
-    assert "upr-reach-divider" in eo_html
-    assert "upr-reach-cell--eo" in eo_html
-    assert eo_html.find("Emergency Operations") < eo_html.find("upr-reach-divider")
-    assert eo_html.find("upr-reach-divider") < eo_html.find("Climate and environment")
+    assert "upr-reach-divider" not in eo_html
+    assert "Emergency<br>Operations" in eo_html
+    assert eo_html.find("Emergency<br>Operations") < eo_html.find("Climate and<br>environment")
     assert "dir='ltr'" in eo_html
 
 
@@ -438,8 +451,8 @@ def test_reach_rtl_reverses_columns(monkeypatch):
         },
     )
     html = render_dashboard_html(payload, "reach")
-    assert html.find("Climate and environment") < html.find("upr-reach-divider")
-    assert html.find("upr-reach-divider") < html.find("Emergency Operations")
+    assert html.find("Climate and<br>environment") < html.find("Emergency<br>Operations")
+    assert "upr-reach-divider" not in html
     assert "dir='ltr'" in html
 
 
@@ -456,14 +469,14 @@ def test_reach_full_row_packs_when_all_icons_present():
     ]
     html = render_dashboard_html(payload, "reach")
     assert "upr-reach-row--full" in html
-    assert "upr-reach-row--eo-split" in html
+    assert "upr-reach-divider" not in html
     catalog = _payload()
     catalog["people_reached"][0]["icon_src"] = "https://example.test/sp1.png"
     catalog_html = render_dashboard_html(catalog, "reach")
     assert "upr-reach-icon--img" in catalog_html
     assert "<image href=" in catalog_html
     assert 'x="4" y="4" width="32" height="32"' in catalog_html
-    assert 'width="56" height="56"' in catalog_html
+    assert 'width="64" height="64"' in catalog_html
     assert "https://example.test/sp1.png" in catalog_html
     support = render_dashboard_html(_payload(), "support")
     assert "Netherlands Red Cross" in html or "Netherlands Red Cross" in support
@@ -589,6 +602,7 @@ def test_render_plan_combined_matches_inp_cover():
     assert "upr-doc-header" in html
     assert "/static/IFRC_logo_square.svg" in html
     assert "upr-doc-header__logo" in html
+    assert "upr-doc-header--internal" not in html
     assert "ns-logo" not in html
     assert "UGANDA" in html
     assert "dir='ltr'" in html
@@ -627,6 +641,27 @@ def test_render_plan_combined_matches_inp_cover():
     assert "ONGOING EMERGENCY INDICATORS" not in html
     assert "font-size:3.15rem" in html
     assert "upr-doc-header__country--long" not in html
+    assert "upr-doc-header__row" in html
+
+
+@pytest.mark.unit
+def test_internal_narrative_cover_is_easy_to_spot():
+    payload = _payload()
+    payload["meta"]["narrative_audience"] = "internal"
+    html = render_dashboard_html(payload, "combined")
+    assert "upr-doc-header--internal" in html
+    assert "upr-doc-header__internal" in html
+    assert INTERNAL_COVER_BANNER in html
+
+
+@pytest.mark.unit
+def test_public_narrative_cover_has_no_internal_banner():
+    payload = _payload()
+    payload["meta"]["narrative_audience"] = "public"
+    html = render_dashboard_html(payload, "combined")
+    assert "upr-doc-header--internal" not in html
+    assert INTERNAL_COVER_BANNER not in html
+    assert "upr-doc-header" in html
 
 
 @pytest.mark.unit
@@ -661,6 +696,7 @@ def test_render_combined_includes_ns_logo_when_src_set():
     payload = _payload()
     payload["meta"]["ns_logo_src"] = "/api/v1/uploads/ns/UGA.png"
     html = render_dashboard_html(payload, "combined")
+    assert "upr-doc-header__ns" in html
     assert "upr-doc-header__ns-logo" in html
     assert "/api/v1/uploads/ns/UGA.png" in html
     assert "upr-doc-header__logo" in html
@@ -924,6 +960,89 @@ def test_render_report_financial_breakdown():
 
 
 @pytest.mark.unit
+def test_finance_network_density_is_airier_on_combined_cover():
+    assert _finance_network_density(10) == " upr-fin-net--airy"
+    assert _finance_network_density(12) == " upr-fin-net--spread"
+    assert _finance_network_density(12, cover=True) == " upr-fin-net--airy"
+    assert _finance_network_density(20, cover=True) == " upr-fin-net--spread"
+    assert _finance_network_density(23, cover=True) == ""
+
+
+@pytest.mark.unit
+def test_combined_finance_keeps_cover_marker_and_airy_midsize_network():
+    payload = _payload()
+    payload["meta"]["kind"] = "report"
+    payload["financial"]["national_society"] = {
+        "funding": 4_200_000,
+        "funding_display": "4.2M",
+        "expenditure": 3_100_000,
+        "expenditure_display": "3.1M",
+    }
+    payload["financial"]["network_entities"] = [
+        {
+            "entity": "IFRC Secretariat",
+            "label": "IFRC Secretariat",
+            "buckets": [
+                {
+                    "key": "longer_term",
+                    "label": "Longer-term",
+                    "metrics": [
+                        {"key": "funding_requirement", "label": "Funding requirement", "value": 1, "display": "1"},
+                        {"key": "funding", "label": "Funding", "value": 1, "display": "1"},
+                        {"key": "expenditure", "label": "Expenditure", "value": 1, "display": "1"},
+                    ],
+                },
+                {
+                    "key": "emergency",
+                    "label": "Emergency Operations",
+                    "metrics": [
+                        {"key": "funding_requirement", "label": "Funding requirement", "value": 1, "display": "1"},
+                        {"key": "funding", "label": "Funding", "value": 1, "display": "1"},
+                        {"key": "expenditure", "label": "Expenditure", "value": 1, "display": "1"},
+                    ],
+                },
+            ],
+        },
+        {
+            "entity": "PNS",
+            "label": "Participating National Societies",
+            "buckets": [
+                {
+                    "key": "overall",
+                    "label": "",
+                    "metrics": [
+                        {"key": "funding_requirement", "label": "Funding requirement", "value": 1, "display": "1"},
+                        {"key": "funding", "label": "Funding", "value": 1, "display": "1"},
+                        {"key": "expenditure", "label": "Expenditure", "value": 1, "display": "1"},
+                    ],
+                }
+            ],
+        },
+        {
+            "entity": "HNS",
+            "label": "HNS other funding sources",
+            "buckets": [
+                {
+                    "key": "overall",
+                    "label": "",
+                    "metrics": [
+                        {"key": "funding", "label": "Funding", "value": 1, "display": "1"},
+                        {"key": "expenditure", "label": "Expenditure", "value": 1, "display": "1"},
+                    ],
+                }
+            ],
+        },
+    ]
+    combined = render_dashboard_html(payload, "combined")
+    chip = render_dashboard_html(payload, "financial")
+    assert "upr-pdf-mark" in combined
+    assert "upr-finance-cover" in combined
+    assert "upr-fin-net--airy" in combined
+    assert "upr-fin-net--spread" in chip
+    assert "upr-fin-net--airy" not in chip
+
+
+@pytest.mark.unit
 def test_render_strategic_priority_bars():
     payload = _payload()
     payload["core_indicators"] = [
@@ -935,7 +1054,11 @@ def test_render_strategic_priority_bars():
     assert html.count("class='upr-bar-group'") == 2
     assert "Climate and environment" in html
     assert "Disasters and crises" in html
+    assert "upr-reach-icon" not in html
     assert "upr-bar-fill" in html
+    assert "upr-bar-track" in html
+    assert "upr-bar-value" in html
+    assert "upr-bar-value-cell" not in html
     assert "People reached with climate activities" in html
     assert "width:100.0%" in html
     assert "width:3.7%" in html
@@ -962,7 +1085,10 @@ def test_render_percentage_indicators_use_label_not_bar():
         },
     ]
     html = render_dashboard_html(payload, "strategic_priorities")
-    assert "Percentage of assistance delivered using cash and vouchers." in html
+    assert "Percentage of assistance delivered using cash and vouchers" in html
+    assert "Percentage of assistance delivered using cash and vouchers." not in html
+    assert "People reached with disaster risk reduction" in html
+    assert "People reached with disaster risk reduction." not in html
     assert "upr-bar-yes" in html
     assert "upr-num" in html
     assert "60%" in html
@@ -991,7 +1117,8 @@ def test_render_emergency_includes_percentage_indicators():
         }
     ]
     html = render_dashboard_html(payload, "emergency_1")
-    assert "Percentage of assistance delivered using cash and vouchers." in html
+    assert "Percentage of assistance delivered using cash and vouchers" in html
+    assert "Percentage of assistance delivered using cash and vouchers." not in html
     assert "40%" in html
     assert "upr-bar-yes" in html
     assert "width:40.0%" not in html
@@ -1067,6 +1194,7 @@ def test_number_styles_use_montserrat():
         ".upr-reach-value",
         ".upr-reach-headline",
         ".upr-bar-value",
+        ".upr-bar-value-cell",
         ".upr-bar-yes.upr-num",
         ".upr-num",
         ".upr-support-total",
@@ -1092,11 +1220,14 @@ def test_number_styles_use_montserrat():
     assert ".upr-fin-hero-split" in rtl_layout
     fin_label = css.split(".upr-fin-grid .upr-bar-label {", 1)[1].split("}", 1)[0]
     assert "white-space: normal" in fin_label
+    overview_label = css.split(".upr-fin-grid--half .upr-fin-col-overview-label {", 1)[1].split("}", 1)[0]
+    assert "width: 7em" in overview_label
+    assert ".upr-fin-grid--with-sources .upr-fin-col-overview-plot" not in css
     support_total = css.split(".upr-support-table td.upr-support-total {", 1)[1].split("}", 1)[0]
     assert "text-align: center" in support_total
     assert "overflow: visible" in support_total
     body_pad = css.split("\n.upr-combined-body {", 1)[1].split("}", 1)[0]
-    assert "padding: 1.15rem 0 10mm" in body_pad
+    assert "padding: 1.15rem 0 16mm" in body_pad
     reach_section = css.split("\n.upr-combined-section--reach {", 1)[1].split("}", 1)[0]
     assert "padding-left: 0" in reach_section
     assert "padding-right: 0" in reach_section
@@ -1154,6 +1285,7 @@ def test_bar_track_keeps_fill_and_value_on_one_line():
     value = css.split(".upr-bar-value {", 1)[1].split("}", 1)[0]
     assert "flex-wrap: nowrap" in track
     assert "white-space: nowrap" in track
+    assert "justify-content: flex-start" in track
     assert "flex: 0 1 auto" in fill
     assert "white-space: nowrap" in value
     assert "flex: 0 0 auto" in value

@@ -143,6 +143,46 @@ class TestCreateTemplate:
         # Change log appended to the draft comment.
         assert "[AI " in (draft.comment or "")
 
+    def test_layout_column_width_and_break_after_applied_on_create(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        """AI-created items can opt into the same 12-column layout grid the manual
+        form builder UI exposes (item modal's 'Width' dropdown + 'Force new row'
+        checkbox), instead of always defaulting every field to full width."""
+        schema = {
+            "name": "AI Layout Form",
+            "sections": [
+                {
+                    "name": "Main Section",
+                    "items": [
+                        {"item_type": "question", "question_type": "text",
+                         "label": "First name", "layout_column_width": 6},
+                        {"item_type": "question", "question_type": "text",
+                         "label": "Last name", "layout_column_width": 6,
+                         "layout_break_after": True},
+                        {"item_type": "question", "question_type": "textarea",
+                         "label": "Notes"},
+                    ],
+                },
+            ],
+        }
+
+        result = service.create_template(schema, user)
+
+        draft = db_session.get(FormTemplateVersion, result["version_id"])
+        items = (
+            FormItem.query.filter_by(version_id=draft.id, archived=False)
+            .order_by(FormItem.order)
+            .all()
+        )
+        assert items[0].layout_column_width == 6
+        assert items[0].layout_break_after is False
+        assert items[1].layout_column_width == 6
+        assert items[1].layout_break_after is True
+        # Not specified -> keeps the model's full-width default.
+        assert items[2].layout_column_width == 12
+        assert items[2].layout_break_after is False
+
     def test_requires_create_permission(self, db_session, app, service, user):
         with patch(f"{AUTHZ}.has_rbac_permission", return_value=False):
             with pytest.raises(FormTemplateAIError, match="admin.templates.create"):
@@ -530,6 +570,35 @@ class TestApplyEdits:
         assert item.label == "New label"
         assert item.config["is_required"] is True
         assert any("New label" in c for c in result["changes"])
+
+    def test_update_item_layout_column_width_and_break_after(
+        self, db_session, app, service, user, grant_all_rbac
+    ):
+        template = _draft_template(db_session)
+        version = template.versions.first()
+        section = create_test_section(db_session, template, version=version)
+        item = create_test_item(
+            db_session, section, template, item_type="question", label="Field", type="text"
+        )
+        assert item.layout_column_width == 12
+        assert item.layout_break_after is False
+
+        result = service.apply_edits(
+            template.id,
+            [{
+                "op": "update_item",
+                "item_id": item.id,
+                "layout_column_width": 4,
+                "layout_break_after": True,
+            }],
+            user,
+        )
+
+        db_session.refresh(item)
+        assert item.layout_column_width == 4
+        assert item.layout_break_after is True
+        assert any("layout_column_width" in c for c in result["changes"])
+        assert any("layout_break_after" in c for c in result["changes"])
 
     def test_update_item_clears_stale_options_when_leaving_choice_type(
         self, db_session, app, service, user, grant_all_rbac

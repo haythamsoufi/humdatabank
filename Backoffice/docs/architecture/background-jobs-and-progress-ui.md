@@ -2,7 +2,7 @@
 
 **Purpose:** Document the server-side job runner + status/heartbeat + frontend progress banner stack used by **AI Documents** (2026 overhaul), so any feature area can migrate away from ad-hoc threads, in-memory-only state, and blocking HTTP handlers.
 
-**Reference implementation:** AI Document Library (`/admin/ai/documents`) — bulk import/reprocess/metadata jobs and single-document upload/reprocess.
+**Reference implementation:** AI Knowledge Base (`/admin/ai/knowledge-base`) — bulk import/reprocess/metadata jobs and single-document upload/reprocess.
 
 **Audience:** Engineers and coding agents implementing long-running Backoffice work that must survive browser close, work across Gunicorn workers / App Service instances without Redis, and show honest progress in the UI.
 
@@ -370,7 +370,7 @@ Use this as a step-by-step when moving an existing feature to this stack.
 | Heartbeat migration | `Backoffice/migrations/versions/add_ai_document_processing_heartbeat.py` |
 | Progress banner JS | `Backoffice/app/static/js/admin/ai-documents-job-progress.js` |
 | Page wiring | `Backoffice/app/static/js/admin/ai-documents.js` |
-| Template bootstrap | `Backoffice/app/templates/admin/ai/documents.html` |
+| Template bootstrap | `Backoffice/app/templates/admin/ai/knowledge_base.html` |
 | Runner tests | `Backoffice/tests/unit/test_services/test_ai_job_runner.py` |
 | FDRS data sync job | `Backoffice/app/services/imports/fdrs_data_sync_job.py` |
 | FDRS sync routes | `Backoffice/app/routes/admin/data_sync_imputation.py` |

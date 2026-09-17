@@ -398,6 +398,28 @@ def test_fonts_css_is_shared_typography():
 
 
 @pytest.mark.unit
+def test_plugin_asset_version_tracks_css_mtime():
+    from plugins.upr_visuals.routes import _plugin_asset_version
+
+    version = _plugin_asset_version("css/upr-visuals.css")
+    assert version.isdigit()
+    assert int(version) > 0
+
+
+@pytest.mark.unit
+def test_plugin_static_cache_disabled_in_debug():
+    from flask import Flask, Response
+
+    from plugins.upr_visuals.routes import _apply_plugin_static_cache
+
+    app = Flask(__name__)
+    app.config["DEBUG"] = True
+    with app.test_request_context("/upr-visuals/static/css/upr-visuals.css"):
+        response = _apply_plugin_static_cache(Response("body", mimetype="text/css"))
+    assert "no-store" in response.headers["Cache-Control"]
+
+
+@pytest.mark.unit
 def test_pdf_viewer_csp_allows_same_origin_frame():
     from plugins.upr_visuals.plugin import UprVisualsPlugin, _UPR_PDF_VIEWER_CSP
 

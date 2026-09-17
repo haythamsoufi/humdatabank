@@ -10,6 +10,14 @@ from typing import Any
 _LATIN_AMOUNT_RE = re.compile(r"(?P<num>\d[\d,]*(?:\.\d+)?)")
 
 
+def strip_trailing_period(text: str | None) -> str:
+    """Drop a sentence-final '.' from indicator labels (leave ellipses and inner dots)."""
+    value = (text or "").strip()
+    if value.endswith(".") and not value.endswith(".."):
+        return value[:-1].rstrip()
+    return value
+
+
 def to_number(value: Any) -> float | None:
     """Coerce stored form values to float. Empty / non-numeric → None."""
     if value is None or value is False:
@@ -265,9 +273,9 @@ def document_subtitle(
     raw = (period_name or "").strip().lower()
     if raw.startswith("jan-jun"):
         return t(
-            f"{year} IFRC network mid-year report, Jan-Jun"
+            f"{year} IFRC network mid-year report, January – June"
             if year
-            else "IFRC network mid-year report, Jan-Jun"
+            else "IFRC network mid-year report, January – June"
         )
     return t(
         f"{year} IFRC network annual report, Jan-Dec"

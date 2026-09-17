@@ -34,6 +34,9 @@ const DEFAULT_UI_STRINGS = {
     cancelEdit: 'Cancel edit',
     assistantIsTyping: 'Assistant is typing',
     preparingQuery: 'Preparing query…',
+    // Form-builder AI panel only (see showTypingIndicator's this._fbAiConfig check) —
+    // "Preparing query…" reads like a data-search assistant, not a form builder.
+    preparingFormRequest: 'Reading your request…',
     stepsInProgress: 'Steps in progress',
     endTour: 'End Tour',
     serverError: 'Server error',

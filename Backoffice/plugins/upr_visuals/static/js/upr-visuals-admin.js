@@ -15,13 +15,16 @@
     dashSelectAll: document.getElementById("upr-vis-dash-select-all"),
     dashSelectNone: document.getElementById("upr-vis-dash-select-none"),
     generate: document.getElementById("upr-vis-generate"),
-    generateLabel: document.querySelector("[data-upr-generate-label]"),
+    generateLabel: root.querySelector("[data-upr-generate-label]"),
+    generateSplit: document.getElementById("upr-vis-generate-split"),
+    formatToggle: document.getElementById("upr-vis-format-toggle"),
     formats: document.getElementById("upr-vis-formats"),
     dashboardsCard: document.getElementById("upr-vis-dashboards-card"),
     narrativePanel: document.getElementById("upr-vis-narrative-panel"),
     includeNarrative: document.getElementById("upr-vis-include-narrative"),
     narrativeFilesWrap: document.getElementById("upr-vis-narrative-files-wrap"),
     narratives: document.getElementById("upr-vis-narratives"),
+    narrativeAudience: document.getElementById("upr-vis-narrative-audience"),
     cancel: document.getElementById("upr-vis-cancel"),
     status: document.getElementById("upr-vis-status"),
     pct: document.getElementById("upr-vis-pct"),
@@ -79,8 +82,24 @@
   }
 
   function selectedFormat() {
-    const input = els.formats && els.formats.querySelector('input[name="upr-vis-format"]:checked');
-    return (input && input.value) || "png";
+    const item = els.formats && els.formats.querySelector("[data-format][aria-checked='true']");
+    return (item && item.dataset.format) || "png";
+  }
+
+  function setFormatMenuOpen(open) {
+    if (!els.generateSplit) return;
+    const next = Boolean(open) && !(els.formatToggle && els.formatToggle.disabled);
+    els.generateSplit.classList.toggle("is-open", next);
+    if (els.formatToggle) els.formatToggle.setAttribute("aria-expanded", next ? "true" : "false");
+  }
+
+  function setFormat(format) {
+    if (!els.formats) return;
+    const next = format === "pdf" || format === "idml" ? format : "png";
+    els.formats.querySelectorAll("[data-format]").forEach((item) => {
+      item.setAttribute("aria-checked", item.dataset.format === next ? "true" : "false");
+    });
+    syncFormatUI();
   }
 
   function includeNarrative() {
@@ -94,12 +113,6 @@
 
   function syncFormatUI() {
     const format = selectedFormat();
-    if (els.formats) {
-      els.formats.querySelectorAll(".upr-vis-chip").forEach((chip) => {
-        const input = chip.querySelector("input[type=radio]");
-        chip.classList.toggle("is-checked", Boolean(input && input.checked));
-      });
-    }
     if (els.narrativePanel) els.narrativePanel.hidden = format === "png";
     if (els.narrativeFilesWrap) els.narrativeFilesWrap.hidden = !includeNarrative();
     if (shared.updateNarrativeTranslateHints) shared.updateNarrativeTranslateHints();
@@ -199,13 +212,11 @@
     els.countries.querySelectorAll("input").forEach((input) => {
       input.disabled = on;
     });
-    if (els.formats) {
-      els.formats.querySelectorAll("input").forEach((input) => {
-        input.disabled = on;
-      });
-    }
+    if (els.formatToggle) els.formatToggle.disabled = on;
+    if (on) setFormatMenuOpen(false);
     if (els.includeNarrative) els.includeNarrative.disabled = on;
     if (els.narratives) els.narratives.disabled = on;
+    if (els.narrativeAudience) els.narrativeAudience.disabled = on;
     updateCounts();
   }
 
@@ -728,11 +739,49 @@
     }
   }
 
-  if (els.formats) {
-    els.formats.addEventListener("change", syncFormatUI);
+  if (els.formatToggle) {
+    els.formatToggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (els.formatToggle.disabled) return;
+      setFormatMenuOpen(!els.generateSplit.classList.contains("is-open"));
+    });
   }
+  if (els.formats) {
+    els.formats.addEventListener("click", (event) => {
+      const item = event.target.closest("[data-format]");
+      if (!item || !els.formats.contains(item)) return;
+      setFormat(item.dataset.format);
+      setFormatMenuOpen(false);
+    });
+  }
+  document.addEventListener("click", (event) => {
+    if (!els.generateSplit || els.generateSplit.contains(event.target)) return;
+    setFormatMenuOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") setFormatMenuOpen(false);
+  });
   if (els.includeNarrative) {
     els.includeNarrative.addEventListener("change", syncFormatUI);
+  }
+  if (els.narratives && els.narrativeAudience) {
+    els.narratives.addEventListener("change", () => {
+      const files = Array.from(els.narratives.files || []);
+      const detected = new Set();
+      files.forEach((file) => {
+        const stem = String(file.name || "").replace(/\.[^.]+$/, "");
+        if (/(?:^|[\s_\-.])internal(?:[\s_\-.]|$)|not[\s_\-]*for[\s_\-]*public/i.test(stem)) {
+          detected.add("internal");
+        } else if (/(?:^|[\s_\-])design(?:[\s_\-.]|$)/i.test(stem)) {
+          detected.add("public");
+        }
+      });
+      if (detected.size === 1) {
+        els.narrativeAudience.value = [...detected][0];
+      } else if (files.length) {
+        els.narrativeAudience.value = "auto";
+      }
+    });
   }
 
   els.assignment.addEventListener("change", () => {
@@ -761,6 +810,7 @@
     loadPreview();
   });
   els.generate.addEventListener("click", async () => {
+    setFormatMenuOpen(false);
     const assignedFormId = parseInt(els.assignment.value, 10);
     if (!assignedFormId) {
       showProgress("is-warn", t("needAssignment"), 0);
@@ -791,6 +841,7 @@
       if (includeNarrative() && els.narratives && els.narratives.files) {
         Array.from(els.narratives.files).forEach((file) => body.append("narratives", file));
       }
+      body.append("audience", (els.narrativeAudience && els.narrativeAudience.value) || "auto");
       const response = await fetchFn("/admin/data-exploration/upr-visuals/generate", {
         method: "POST",
         headers: csrfHeaders(false),

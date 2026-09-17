@@ -74,7 +74,7 @@ def should_skip_api_usage_path(path: str | None, method: str | None = None) -> b
         if rest and "/" not in rest:
             return True
 
-    # Polled document library list + status during import/reprocess (GET only)
+    # Polled Knowledge Base list + status during import/reprocess (GET only)
     if method == "GET" and path == "/api/ai/documents":
         return True
     if method == "GET" and path.startswith("/api/ai/documents/"):

@@ -148,6 +148,6 @@
 
 - [سياسة استخدام الذكاء الاصطناعي](../common/ai-use-policy.md) — سياسة موجهة للمستخدمين (الاستخدام المقبول، المسؤوليات)
 - [روبوت دردشة ذكاء اصطناعي](../common/ai-chatbot.md) — استخدام روبوتات الدردشة، مستويات الوصول، RBAC، وخصوصية المستندات
-- [مكتبة مستندات الذكاء الاصطناعي والتضمينات](ai-document-library-and-embeddings.md)
+- [قاعدة معرفة الذكاء الاصطناعي والتضمينات](ai-document-library-and-embeddings.md)
 - [معالجة البيانات والخصوصية](../../data-reporting/data-handling-and-privacy.md)
 

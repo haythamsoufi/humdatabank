@@ -118,7 +118,10 @@ export const TransportMixin = {
         if (convId) payload.conversation_id = convId;
 
         // Privacy flags (server-side DLP)
-        // - allow_sensitive: explicit user confirmation to send sensitive text to external providers
+        // - allow_sensitive: user confirmed past the "sensitive information detected" dialog.
+        //   Despite the name, the server does NOT forward the raw text as-is: it masks every
+        //   flagged span (email/phone/token/etc.) before sending to the LLM or persisting —
+        //   see mask_sensitive_text() in app/services/ai/chat/dlp.py. Kept for wire compatibility.
         if (sendOptions && sendOptions.allow_sensitive) payload.allow_sensitive = true;
 
         if (this._fbAiConfig) {
@@ -603,6 +606,13 @@ export const TransportMixin = {
                     if (isAbort) {
                         throw wsError;
                     }
+                    if (wsError && wsError.name === 'DlpConfirmationRequired') {
+                        // Same reasoning as the SSE catch below: DLP's decision doesn't change
+                        // by retrying over a different transport, and letting it fall through to
+                        // SSE -> HTTP-JSON would eventually lose the error type and show a
+                        // misleading "service unavailable" message instead of the confirm dialog.
+                        throw wsError;
+                    }
                     // The message was already dispatched to the server (agent run started).
                     // Falling back to SSE would send the same query again and produce a
                     // duplicate trace. Propagate as a plain connection error instead.
@@ -638,6 +648,14 @@ export const TransportMixin = {
                 } catch (sseError) {
                     const isUserAbort = sseError && (sseError.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(sseError.message || '')));
                     if (isUserAbort) {
+                        throw sseError;
+                    }
+                    if (sseError && sseError.name === 'DlpConfirmationRequired') {
+                        // DLP already made its decision server-side; retrying via a different
+                        // transport can't change that, and getAIResponse's HTTP-JSON fallback
+                        // doesn't preserve this error type (see its own catch block) — it would
+                        // surface as a generic "AI service unavailable" with no confirm option.
+                        // Propagate straight to the outer catch, which shows the confirm dialog.
                         throw sseError;
                     }
                     if (this._keepsRunningOnDisconnect() && this._isRecoverableStreamFailure(sseError)) {
@@ -845,6 +863,12 @@ export const TransportMixin = {
                     if (msg.request_id) ctx.request_id = msg.request_id;
                     if (msg.conversation_id) ctx.conversation_id = msg.conversation_id;
                 } catch (e) { /* ignore */ }
+                // DLP masked the message server-side (see dlp.py mask_sensitive_text) — the
+                // bubble was rendered optimistically with the raw pre-DLP text, so fix it up
+                // to match what was actually sent/persisted.
+                if (msg.masked_user_message) {
+                    try { this._updateLastUserBubbleText(msg.masked_user_message); } catch (e) { /* ignore */ }
+                }
                 if (this._isImmersive() && msg.initial_conversation_title) {
                     try {
                         window.dispatchEvent(new CustomEvent('chatbot-optimistic-title', {
@@ -1711,6 +1735,15 @@ export const TransportMixin = {
                 return response;
             }
         } catch (error) {
+            // DLP confirmation and user aborts are meaningful outcomes, not "API unavailable" —
+            // downgrading them to the generic string below would show a misleading "service
+            // unavailable" bubble instead of the confirm dialog (DLP) or a silent stop (abort).
+            // handleSendMessage is the sole caller and already has dedicated handling for both
+            // in its outer catch, so re-throw and let it get there.
+            const isAbort = error && (error.name === 'AbortError' || /aborted|cancelled|canceled/i.test(String(error.message || '')));
+            if (error && (error.name === 'DlpConfirmationRequired' || isAbort)) {
+                throw error;
+            }
             this.apiAvailable = false;
             this._lastAPIError = error;
             if (this.debug) this.debug.chatbotAPI('failure', 'Backoffice API Unavailable', {status: '🔴 Unavailable', error: error.message});
@@ -1810,6 +1843,12 @@ export const TransportMixin = {
             this._scheduleConversationTitleRefresh(data.conversation_id || this.getActiveConversationId(), 400);
 
             const _meta = data.meta && typeof data.meta === 'object' ? data.meta : {};
+            // DLP masked the message server-side (see dlp.py mask_sensitive_text) — the
+            // bubble was rendered optimistically with the raw pre-DLP text, so fix it up
+            // to match what was actually sent/persisted (same fixup as the SSE/WS meta event).
+            if (_meta.masked_user_message) {
+                try { this._updateLastUserBubbleText(_meta.masked_user_message); } catch (e) { /* ignore */ }
+            }
             const _httpPieces = [];
             const _mp = data.map_payload || _meta.map_payload;
             const _cp = data.chart_payload || _meta.chart_payload;

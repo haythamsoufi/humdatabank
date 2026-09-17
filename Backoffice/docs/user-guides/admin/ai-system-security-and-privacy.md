@@ -4,7 +4,7 @@ This document explains how the Backoffice AI assistant works, what data may be p
 
 ## Scope
 
-- **In scope**: AI chat (`/api/ai/v2/*`), AI Document Library / RAG, workflow-doc Q&A, and the security controls around them (DLP, PII scrubbing, audit events).
+- **In scope**: AI chat (`/api/ai/v2/*`), AI Knowledge Base / RAG, workflow-doc Q&A, and the security controls around them (DLP, PII scrubbing, audit events).
 - **Out of scope**: general platform security (auth, RBAC, backups), except where it directly affects the AI system.
 
 ## High-level architecture
@@ -148,6 +148,6 @@ To filter for AI DLP events, look for:
 
 - [AI Use Policy](../common/ai-use-policy.md) — User-facing policy (acceptable use, responsibilities)
 - [AI Chatbot](../common/ai-chatbot.md) — Chatbot usage, access levels, RBAC, and document privacy
-- [AI Document Library and embeddings](ai-document-library-and-embeddings.md)
+- [AI Knowledge Base and embeddings](ai-document-library-and-embeddings.md)
 - [Data handling and privacy](../../data-reporting/data-handling-and-privacy.md)
 

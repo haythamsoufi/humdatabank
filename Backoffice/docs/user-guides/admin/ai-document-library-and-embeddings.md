@@ -1,10 +1,10 @@
-# AI Document Library and Embeddings
+# AI Knowledge Base and Embeddings
 
-This document describes how the AI Document Library works: how documents are processed, how embeddings (vectors) are generated, and how they are used for semantic search and RAG (Retrieval-Augmented Generation).
+This document describes how the AI Knowledge Base works: how documents are processed, how embeddings (vectors) are generated, and how they are used for semantic search and RAG (Retrieval-Augmented Generation).
 
 ## Overview
 
-The AI Document Library lets admins upload documents (PDF, Word, etc.) so the chatbot and AI tools can answer questions using that content. Documents are:
+The AI Knowledge Base lets admins upload documents (PDF, Word, etc.) so the chatbot and AI tools can answer questions using that content. Documents are:
 
 1. **Extracted** — text, pages, sections, and optionally tables are extracted from the file.
 2. **Chunked** — split into smaller text chunks for context and token limits.
@@ -17,7 +17,7 @@ When a user asks a question, the query is embedded with the same model, and the 
 
 Processing runs when you:
 
-- **Upload** a document on the AI Document Library page (`/admin/ai/documents`).
+- **Upload** a document on the AI Knowledge Base page (`/admin/ai/knowledge-base`).
 - **Process selected** documents imported from the Document Management system.
 - **Reprocess** an existing document (re-extract, re-chunk, re-embed).
 
@@ -77,9 +77,9 @@ See `Backoffice/config/config.py` for the full AI/RAG section and any additional
 
 - **Vector search:** The user query is embedded with the same embedding service; the app runs a similarity search (e.g. cosine) in pgvector and returns the top-k chunks.
 - **Hybrid search:** Combines vector similarity and keyword search for better recall.
-- **RAG:** Retrieved chunks are passed as context to the LLM when answering questions (chatbot, AI Document Library Q&A, workflow docs).
+- **RAG:** Retrieved chunks are passed as context to the LLM when answering questions (chatbot, AI Knowledge Base Q&A, workflow docs).
 
-The AI Document Library page lets you choose **Vector only** or **Hybrid (keywords and embeddings)** for the "Ask" feature.
+The AI Knowledge Base page lets you choose **Vector only** or **Hybrid (keywords and embeddings)** for the "Ask" feature.
 
 ## Key code locations
 
@@ -89,7 +89,7 @@ The AI Document Library page lets you choose **Vector only** or **Hybrid (keywor
 | Chunking | `app/services/ai_chunking_service.py` |
 | Embedding generation | `app/services/ai_embedding_service.py` |
 | Vector storage and search | `app/services/ai_vector_store.py` |
-| AI Document Library UI | `app/templates/admin/ai/documents.html` |
+| AI Knowledge Base UI | `app/templates/admin/ai/knowledge_base.html` |
 
 ## Related documentation
 

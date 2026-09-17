@@ -80,7 +80,7 @@ def run_export_job_file(job_path: str | Path) -> None:
     if kind == "narrative_pdf":
         from plugins.upr_visuals.idml import (
             folio_label,
-            load_word_paragraphs,
+            load_narrative_paragraphs,
             merge_report_pdfs,
             render_narrative_pdf_bytes,
             style_narrative_blocks,
@@ -98,7 +98,7 @@ def run_export_job_file(job_path: str | Path) -> None:
             word = Path(job["word_path"]).read_bytes()
             styled = translate_styled_blocks(
                 style_narrative_blocks(
-                    load_word_paragraphs(word),
+                    load_narrative_paragraphs(word),
                     country_name=str(meta.get("country_name") or ""),
                 )
             )

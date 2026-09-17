@@ -146,6 +146,22 @@ def step_display_message(tool_name: str, tool_args: Dict[str, Any]) -> str:
         if country:
             return _("Reading Unified Plans trends for %(country)s…", country=country)
         return _("Reading Unified Plans trends…")
+    # Form-builder assistant tools — the generic "Checking data…" fallback below reads
+    # oddly for template create/edit actions, so give each its own wording.
+    if tool_name == "get_form_template_full_structure":
+        return _("Reading the form structure…")
+    if tool_name == "create_form_template":
+        return _("Creating your form template…")
+    if tool_name == "edit_form_template":
+        return _("Applying your changes to the form…")
+    if tool_name == "translate_form_template":
+        languages = args.get("languages")
+        if isinstance(languages, list) and languages:
+            joined = ", ".join(str(lang) for lang in languages[:4])
+            return _("Translating the form into %(languages)s…", languages=joined)
+        return _("Translating the form…")
+    if tool_name == "discard_template_draft":
+        return _("Discarding the draft…")
     return _("Checking data…")
 
 

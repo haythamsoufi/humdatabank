@@ -829,7 +829,13 @@ export const WidgetUiMixin = {
         initialIcon.setAttribute('aria-hidden', 'true');
         const initialLabel = document.createElement('span');
         initialLabel.className = 'chat-progress-step-label';
-        initialLabel.textContent = this._uiString('preparingQuery') || 'Preparing query…';
+        // Form-builder AI panel: use form-appropriate wording instead of the generic
+        // data-search "Preparing query…" (matches AIChatEngine's early server-side step
+        // for form-builder requests so the two coalesce into a single progress line —
+        // see addStepToProgress's exact-label-match check).
+        initialLabel.textContent = this._fbAiConfig
+            ? (this._uiString('preparingFormRequest') || 'Reading your request…')
+            : (this._uiString('preparingQuery') || 'Preparing query…');
         initialLi.append(initialIcon, initialLabel);
         stepsList.appendChild(initialLi);
 

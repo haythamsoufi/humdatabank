@@ -30,7 +30,8 @@ from plugins.upr_visuals.data import (
     visuals_browser_title,
 )
 from plugins.upr_visuals.render import render_dashboard_html, render_dashboards_html, render_report_html
-from plugins.upr_visuals.idml import read_docx_upload
+from plugins.upr_visuals.audience import resolve_narrative_audience
+from plugins.upr_visuals.idml import read_narrative_upload
 from plugins.upr_visuals.assignment_job import (
     build_assignment_export_status,
     create_assignment_export_job,
@@ -57,6 +58,43 @@ from app.utils.rate_limiting import rate_limit
 
 MAX_BULK_AES_IDS = 250
 MAX_BULK_DASHBOARDS = 20
+
+
+def _plugin_asset_version(filename: str) -> str:
+    path = _PLUGIN_DIR / "static" / filename
+    try:
+        return str(int(path.stat().st_mtime))
+    except OSError:
+        return "0"
+
+
+@bp.app_template_global("upr_visuals_static_url")
+def upr_visuals_static_url(filename: str) -> str:
+    """Plugin static URL with an mtime query so CSS/JS edits bust the browser cache."""
+    return url_for(
+        "upr_visuals.static_file",
+        filename=filename,
+        v=_plugin_asset_version(filename),
+    )
+
+
+@bp.app_template_global("upr_visuals_asset_v")
+def upr_visuals_asset_v() -> str:
+    return _plugin_asset_version("css/upr-visuals.css")
+
+
+def _apply_plugin_static_cache(response: Response) -> Response:
+    debug = bool(current_app.config.get("DEBUG", False))
+    if debug:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    elif request.args.get("v"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+    response._skip_cache_override = True
+    return response
 
 
 def _requested_language(*, strict: bool = False) -> str:
@@ -147,7 +185,8 @@ def _aes_or_404(aes_id: int) -> AssignmentEntityStatus:
 @bp.route("/upr-visuals/static/<path:filename>", methods=["GET"])
 @login_required
 def static_file(filename: str):
-    return send_from_directory(str(_PLUGIN_DIR / "static"), filename)
+    response = send_from_directory(str(_PLUGIN_DIR / "static"), filename)
+    return _apply_plugin_static_cache(response)
 
 
 @bp.route("/upr-visuals/fonts.css", methods=["GET"])
@@ -157,9 +196,8 @@ def fonts_css():
     from plugins.upr_visuals.typography import browser_stylesheet, export_style_token
 
     response = Response(browser_stylesheet(), mimetype="text/css; charset=utf-8")
-    response.headers["Cache-Control"] = "public, max-age=86400"
     response.set_etag(export_style_token())
-    return response
+    return _apply_plugin_static_cache(response)
 
 
 @bp.route("/assignment/<int:aes_id>/visuals/progress", methods=["GET"])
@@ -606,15 +644,22 @@ def assignment_narrative(aes_id: int):
             return json_bad_request("Choose PDF with narrative or InDesign with narrative.")
         upload = request.files.get("file")
         if upload is None or not (upload.filename or "").strip():
-            return json_bad_request("Upload a Word document (.docx).")
-        word_bytes = read_docx_upload(upload, filename=upload.filename or "")
+            return json_bad_request("Upload a Word document (.docx) or PDF.")
+        word_bytes = read_narrative_upload(upload, filename=upload.filename or "")
         lang = _requested_language(strict=True)
+        audience = resolve_narrative_audience(
+            request.form.get("audience") or request.args.get("audience"),
+            filename=upload.filename or "",
+            data=word_bytes,
+        )
         job_id = create_assignment_export_job(
             user_id=int(getattr(current_user, "id", 0) or 0),
             aes_id=aes_id,
             export_format=fmt,
             word_bytes=word_bytes,
             lang=lang,
+            word_filename=upload.filename or "",
+            audience=audience,
         )
         start_assignment_export_job(current_app._get_current_object(), job_id)
         _log_upr_visuals_generation(
@@ -622,7 +667,11 @@ def assignment_narrative(aes_id: int):
             aes_id=aes_id,
             narrative=True,
         )
-        return json_accepted(job_id=job_id, status=build_assignment_export_status(job_id))
+        return json_accepted(
+            job_id=job_id,
+            status=build_assignment_export_status(job_id),
+            audience=audience,
+        )
     except UprVisualsError as exc:
         return json_bad_request(str(exc))
     except HTTPException:
@@ -793,6 +842,7 @@ def generate():
             include_narrative=include_narrative,
             narrative_files=narrative_files,
             lang=lang,
+            audience=payload.get("audience"),
         )
         start_bulk_export_job(current_app._get_current_object(), job_id)
         g.audit_activity_description = _upr_visuals_generation_description(

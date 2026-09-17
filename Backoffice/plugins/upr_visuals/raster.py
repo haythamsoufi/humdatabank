@@ -17,6 +17,7 @@ from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname, urlopen
 
 from plugins.upr_visuals.catalog import (
+    A4_COMBINED_COVER_FOOTER_MM,
     A4_COMBINED_FOLLOWING_MARGIN_MM,
     A4_COMBINED_MARGIN_MM,
     A4_MARGIN_MM,
@@ -37,6 +38,12 @@ _IMG_SRC_RE = re.compile(
     r'((?:<img\b[^>]*?\bsrc=|<image\b[^>]*?\b(?:xlink:)?href=)["\'])([^"\']+)(["\'])',
     re.IGNORECASE,
 )
+_FIN_NET_TABLE_CLASS_RE = re.compile(
+    r"(<table\b[^>]*\bclass=['\"])([^'\"]*\bupr-fin-net\b[^'\"]*)(['\"])",
+    re.IGNORECASE,
+)
+_COMBINED_FIN_MARK = "upr-finance-cover"
+_MAX_COMBINED_FINANCE_FIT_PASSES = 2
 _PLUGIN_STATIC_URL = "/upr-visuals/static/"
 _NS_LOGO_API_PREFIX = "/api/v1/uploads/ns/"
 
@@ -87,6 +94,8 @@ _PORTRAIT_KEEP_TOGETHER_CSS = (
     " break-inside: avoid; page-break-inside: avoid;"
     " break-after: avoid; page-break-after: avoid;"
     " margin: 0; width: 100%; }"
+    ".upr-doc-header__internal {"
+    " break-inside: avoid; page-break-inside: avoid; }"
     ".upr-dashboard--combined { display: block; }"
     ".upr-doc-footer {"
     " position: running(cover-footer); margin: 0; padding: 0; }"
@@ -109,19 +118,20 @@ _PORTRAIT_KEEP_TOGETHER_CSS = (
     ".upr-support-table .upr-ns { white-space: normal; overflow-wrap: anywhere; }"
     ".upr-support-th--plan span { writing-mode: horizontal-tb; transform: none; }"
     ".upr-reach-row{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; }"
-    ".upr-combined-body{ padding-left:0; padding-right:0; }"
+    ".upr-combined-body{ padding:0; }"
     ".upr-combined-section{ padding-left:8mm; padding-right:8mm; box-sizing:border-box; }"
     ".upr-combined-section--reach{ padding-left:0; padding-right:0; }"
     ".upr-combined-section > .upr-block--reach{"
     " margin-left:0; margin-right:0; width:100%; max-width:none;"
     " padding:1.15rem 8mm 1.35rem; }"
-    ".upr-reach-icon,.upr-reach-icon--img,.upr-reach-icon svg{ width:56px; height:56px; }"
+    ".upr-reach-icon,.upr-reach-icon--img,.upr-reach-icon svg{ width:64px; height:64px; }"
     ".upr-fin-hero,.upr-fin-grid{ width:100%; max-width:100%; }"
     ".upr-fin-grid{ table-layout:fixed; border-collapse:collapse; }"
-    ".upr-fin-grid--with-sources .upr-fin-col-overview-plot{ width:22%; }"
+    ".upr-fin-grid--half .upr-fin-col-overview-label{ width:7em; }"
+    ".upr-fin-grid--half .upr-fin-col-overview-plot{ width:auto; }"
     ".upr-fin-grid .upr-bar-label{ white-space:normal; overflow-wrap:anywhere; overflow:hidden; }"
     ".upr-fin-col-source-plot{ min-width:6em; }"
-    ".upr-bar-track{ display:flex; flex-wrap:nowrap; align-items:center; width:100%; white-space:nowrap; }"
+    ".upr-bar-track{ display:flex; flex-wrap:nowrap; align-items:center; justify-content:flex-start; width:100%; white-space:nowrap; }"
     ".upr-combined-section--finance .upr-block--finance { font-size: 0.78rem; }"
 )
 
@@ -169,6 +179,7 @@ html[dir="rtl"] .upr-year-table {
 }
 html[dir="rtl"] .upr-num,
 html[dir="rtl"] .upr-bar-value,
+html[dir="rtl"] .upr-bar-value-cell,
 html[dir="rtl"] .upr-support-total {
   direction: ltr;
   unicode-bidi: isolate;
@@ -203,14 +214,13 @@ html[dir="rtl"] .upr-support-total .upr-amt {
 html[dir="rtl"] .upr-support-col-ns { width: 22%; }
 html[dir="rtl"] .upr-support-col-num { width: 16%; }
 html[dir="rtl"] .upr-support-col-dot { width: 9%; }
-html[dir="rtl"] .upr-fin-col-overview-label { width: 16%; }
-html[dir="rtl"] .upr-fin-col-overview-plot { width: 28%; }
-html[dir="rtl"] .upr-fin-grid--with-sources .upr-fin-col-overview-plot { width: 28%; }
+html[dir="rtl"] .upr-fin-col-overview-label { width: 7em; }
+html[dir="rtl"] .upr-fin-col-overview-plot { width: auto; }
 html[dir="rtl"] .upr-fin-col-source-label { width: 28%; }
 html[dir="rtl"] .upr-fin-col-source-plot { width: 28%; }
-html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-label,
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-label { width: 7em; }
 html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-label { width: 50%; }
-html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-plot,
+html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-overview-plot { width: auto; }
 html[dir="rtl"] .upr-fin-grid--half .upr-fin-col-source-plot { width: 50%; }
 html[dir="rtl"] .upr-fin-grid--half td.upr-bar-label,
 html[dir="rtl"] .upr-fin-hero .upr-bar-row .upr-bar-label {
@@ -287,7 +297,7 @@ html[dir="rtl"] .upr-fin-net__metric {
 html[dir="rtl"] .upr-bars .upr-bar-label,
 html[dir="rtl"] .upr-block--bars .upr-bar-label,
 html[dir="rtl"] .upr-block--emergency .upr-bar-label {
-  text-align: left;
+  text-align: start;
 }
 html[dir="rtl"] .upr-block__title,
 html[dir="rtl"] .upr-block__title--center,
@@ -336,8 +346,8 @@ html[dir="rtl"] .upr-reach-icon--img,
 html[dir="rtl"] .upr-reach-icon svg {
   overflow: visible;
   display: block;
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   margin-left: auto;
   margin-right: auto;
   border: none;
@@ -349,18 +359,6 @@ html[dir="rtl"] .upr-fin-hero-split {
 }
 html[dir="rtl"] .upr-fin-hero-split .upr-fin-grid {
   direction: ltr;
-}
-html[dir="rtl"] .upr-reach-divider {
-  width: 2px;
-  min-width: 2px;
-  max-width: 2px;
-  padding: 0;
-  border: none;
-  background: #011e41;
-}
-html[dir="rtl"] .upr-reach-band--labels .upr-reach-divider {
-  background: transparent;
-  border: none;
 }
 """
 
@@ -509,7 +507,7 @@ def _pdf_page_css(dashboard_id: str) -> str:
         page = (
             f"@page {{ size: A4 portrait; margin: {A4_COMBINED_FOLLOWING_MARGIN_MM}mm 0; }}\n"
             "@page :first {\n"
-            f"  margin: {A4_COMBINED_MARGIN_MM}mm {A4_COMBINED_MARGIN_MM}mm 18mm;\n"
+            f"  margin: {A4_COMBINED_MARGIN_MM}mm {A4_COMBINED_MARGIN_MM}mm {A4_COMBINED_COVER_FOOTER_MM}mm;\n"
             "  @bottom-center {\n"
             "    content: element(cover-footer);\n"
             "    width: 100%;\n"
@@ -896,6 +894,41 @@ def write_weasyprint_pdf(
     return pdf_buffer.getvalue()
 
 
+def _tighten_combined_finance_html(html: str) -> str | None:
+    """Drop one density step (airy → spread → compact) so cover finance can fit page 1."""
+    match = _FIN_NET_TABLE_CLASS_RE.search(html)
+    if not match:
+        return None
+    classes = match.group(2).split()
+    if "upr-fin-net--airy" in classes:
+        classes = ["upr-fin-net--spread" if item == "upr-fin-net--airy" else item for item in classes]
+    elif "upr-fin-net--spread" in classes:
+        classes = ["upr-fin-net--compact" if item == "upr-fin-net--spread" else item for item in classes]
+    elif "upr-fin-net--compact" in classes:
+        return None
+    else:
+        classes.append("upr-fin-net--compact")
+    return html[: match.start(2)] + " ".join(classes) + html[match.end(2) :]
+
+
+def _combined_finance_on_first_page(pdf_bytes: bytes) -> bool | None:
+    """True when the cover finance marker is on page 1. None if the PDF cannot be inspected."""
+    if not pdf_bytes.startswith(b"%PDF") or len(pdf_bytes) < 64:
+        return None
+    try:
+        import fitz
+
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        try:
+            if doc.page_count < 1:
+                return None
+            return _COMBINED_FIN_MARK in (doc[0].get_text() or "")
+        finally:
+            doc.close()
+    except Exception:
+        return None
+
+
 def render_pdf_bytes(
     dashboard_html: str,
     *,
@@ -905,13 +938,31 @@ def render_pdf_bytes(
     full_fonts: bool = False,
 ) -> bytes:
     _page_size(dashboard_id)
-    document_html = _wrap(dashboard_html, dashboard_id=dashboard_id, title=title)
-    return write_weasyprint_pdf(
-        document_html,
-        stylesheets=[_pdf_page_css(dashboard_id)],
+    html = dashboard_html
+    stylesheets = [_pdf_page_css(dashboard_id)]
+    pdf = write_weasyprint_pdf(
+        _wrap(html, dashboard_id=dashboard_id, title=title),
+        stylesheets=stylesheets,
         full_fonts=full_fonts,
         zoom=zoom,
     )
+    if dashboard_id != "combined":
+        return pdf
+    for _ in range(_MAX_COMBINED_FINANCE_FIT_PASSES):
+        on_first = _combined_finance_on_first_page(pdf)
+        if on_first is not False:
+            return pdf
+        tighter = _tighten_combined_finance_html(html)
+        if tighter is None:
+            return pdf
+        html = tighter
+        pdf = write_weasyprint_pdf(
+            _wrap(html, dashboard_id=dashboard_id, title=title),
+            stylesheets=stylesheets,
+            full_fonts=full_fonts,
+            zoom=zoom,
+        )
+    return pdf
 
 
 def _png_render_scale(doc, *, scale: float) -> float:

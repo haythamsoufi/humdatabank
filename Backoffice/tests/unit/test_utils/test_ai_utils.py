@@ -9,7 +9,7 @@ formBuilder.get("enabled"), so a sanitizer that always forces True would
 defeat a caller's explicit opt-out.
 """
 
-from app.utils.ai_utils import sanitize_page_context
+from app.utils.ai_utils import is_form_builder_assistant_context, sanitize_page_context
 
 
 class TestSanitizePageContextBasics:
@@ -81,3 +81,30 @@ class TestSanitizePageContextFormBuilderEnabled:
     def test_form_builder_non_dict_is_ignored(self):
         out = sanitize_page_context({"formBuilder": "enabled"})
         assert "formBuilder" not in out
+
+
+class TestIsFormBuilderAssistantContext:
+    """is_form_builder_assistant_context() is the single shared predicate every
+    form-builder exemption (PII scrubbing in AIChatEngine, the DLP mask-and-send
+    gate in evaluate_ai_message) agrees on — see its docstring."""
+
+    def test_true_when_enabled(self):
+        assert is_form_builder_assistant_context({"formBuilder": {"enabled": True}}) is True
+
+    def test_false_when_key_absent(self):
+        assert is_form_builder_assistant_context({"currentPage": "/forms"}) is False
+
+    def test_false_when_explicitly_disabled(self):
+        assert is_form_builder_assistant_context({"formBuilder": {"enabled": False}}) is False
+
+    def test_false_for_non_dict_page_context(self):
+        assert is_form_builder_assistant_context(None) is False
+        assert is_form_builder_assistant_context("not a dict") is False
+
+    def test_false_when_form_builder_value_is_not_a_dict(self):
+        assert is_form_builder_assistant_context({"formBuilder": "enabled"}) is False
+
+    def test_works_with_already_sanitized_page_context(self):
+        """Accepts the exact shape sanitize_page_context() produces."""
+        sanitized = sanitize_page_context({"formBuilder": {"enabled": True, "template_id": 5}})
+        assert is_form_builder_assistant_context(sanitized) is True

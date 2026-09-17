@@ -47,7 +47,7 @@ El área de entrada incluye un botón de **fuentes de datos** (icono deslizante)
 | Fuente | Lo que incluye |
 |--------|-----------------|
 | **Banco de datos** | Valores de los indicadores, datos de países y envíos de formularios almacenados en la plataforma |
-| **Documentos del sistema** | Documentos subidos a la Biblioteca de Documentos de IA por administradores |
+| **Documentos del sistema** | Documentos subidos a la Base de conocimiento de IA por administradores |
 | **Documentos de la UPR** | Documentos de Planificación y Reporte Unificados |
 
 Puedes activar o desactivar cada fuente por mensaje. Desactivar una fuente significa que el asistente no buscará ni recuperará esa solicitud.
@@ -114,7 +114,7 @@ Este contexto viaja con cada petición, por lo que el asistente y sus herramient
 
 ## Privacidad documental
 
-Los documentos en la Biblioteca de Documentos de IA tienen controles de privacidad que determinan quién puede encontrarlos a través del chatbot. Estos controles los establecen los administradores al subir o gestionar documentos.
+Los documentos en la Base de conocimiento de IA tienen controles de privacidad que determinan quién puede encontrarlos a través del chatbot. Estos controles los establecen los administradores al subir o gestionar documentos.
 
 ### Campos de privacidad
 
@@ -142,7 +142,7 @@ Cada documento tiene dos ajustes de visibilidad:
 
 ### Cómo afecta la privacidad a las respuestas de los chatbots
 
-Cuando haces una pregunta que involucre la búsqueda de documentos, el asistente ejecuta una búsqueda de similitud (vectorial o híbrida) contra la Biblioteca de Documentos de IA. Antes de devolver los resultados, el sistema aplica un **filtro de permisos** que hace cumplir las reglas anteriores. Los documentos que no está autorizado a ver quedan completamente excluidos de los resultados de búsqueda: el asistente no citará, resumirá ni referenciará contenido de documentos fuera de su alcance.
+Cuando haces una pregunta que involucre la búsqueda de documentos, el asistente ejecuta una búsqueda de similitud (vectorial o híbrida) contra la Base de conocimiento de IA. Antes de devolver los resultados, el sistema aplica un **filtro de permisos** que hace cumplir las reglas anteriores. Los documentos que no está autorizado a ver quedan completamente excluidos de los resultados de búsqueda: el asistente no citará, resumirá ni referenciará contenido de documentos fuera de su alcance.
 
 Esto significa que dos usuarios que hacen la misma pregunta pueden recibir respuestas diferentes si tienen acceso a conjuntos distintos de documentos.
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Any
 
 from app.models.form_items import FormItem
 from app.models.forms import DynamicIndicatorData, RepeatGroupInstance
 from plugins.upr_visuals.catalog import OTHER_INDICATORS_SECTION_NAME, OVERALL_ACTION_SECTION_NEEDLE
-from plugins.upr_visuals.formatters import format_count, format_percent, to_number
+from plugins.upr_visuals.formatters import format_count, format_percent, strip_trailing_period, to_number
 from plugins.upr_visuals.loaders import _load_dynamic_indicator_rows
 from plugins.upr_visuals.matrix import _area_from_item, _bank_area, _scalar_number
 from plugins.upr_visuals.i18n import localized_form_item_label, localized_indicator_label, t
@@ -35,6 +37,7 @@ def _section_is_other_indicators(section) -> bool:
 
 
 def _indicator_visual_row(area: str, label: str, meas: str, entry, *, bars_only: bool) -> dict[str, Any] | None:
+    label = strip_trailing_period(label)
     if meas in _YESNO_TYPES:
         if bars_only:
             return None
@@ -166,7 +169,7 @@ def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, An
     emergencies = []
     for inst in instances:
         slot = int(inst.instance_number)
-        label = inst.instance_label or ""
+        label = _decode_waf_b64_label(inst.instance_label or "")
         name, code = _split_appeal_label(label)
         people = None
         indicators = []
@@ -202,8 +205,24 @@ def _report_emergencies(aes_id: int, items: list[FormItem]) -> list[dict[str, An
     return emergencies
 
 
-def _split_appeal_label(label: str) -> tuple[str, str]:
+def _decode_waf_b64_label(label: str) -> str:
+    """Unwrap ``b64:`` WAF-safe labels stored on repeat instances.
+
+    Free-text appeal names are base64-wrapped on submit (see
+    question-text-waf-encode.js). Older saves stored the wrapped value on
+    ``instance_label`` instead of the decoded name.
+    """
     text = (label or "").strip()
+    if not text.startswith("b64:"):
+        return text
+    try:
+        return base64.b64decode(text[4:]).decode("utf-8").strip() or text
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return text
+
+
+def _split_appeal_label(label: str) -> tuple[str, str]:
+    text = _decode_waf_b64_label(label)
     if text.endswith(")") and "(" in text:
         name, _, rest = text.rpartition("(")
         return name.strip(), rest.rstrip(")").strip()

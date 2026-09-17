@@ -599,6 +599,38 @@ export class HumDatabankChatbot {
         this.saveConversationHistory();
     }
 
+    /**
+     * Correct the most recent user bubble's displayed text after the server reports
+     * that DLP masking replaced it (see the "masked_user_message" meta field emitted by
+     * /chat, /chat/stream, and the WS route). The bubble was already rendered
+     * optimistically with the raw text the user typed — before DLP had a chance to
+     * evaluate it — and the DLP-confirm resend (handleSendMessage's overrideMessage path)
+     * deliberately does not add a second bubble, so without this the on-screen text would
+     * permanently diverge from what actually got sent to the LLM and persisted (a reload
+     * would then show the masked version, which is confusing). Always targets the *last*
+     * user bubble: at most one request is in flight per conversation, so it's unambiguous.
+     */
+    _updateLastUserBubbleText(newText) {
+        try {
+            if (!newText || !this.elements || !this.elements.messages) return;
+            const wrappers = this.elements.messages.querySelectorAll('.chat-message-wrapper.is-user');
+            if (!wrappers.length) return;
+            const wrapper = wrappers[wrappers.length - 1];
+            const textEl = wrapper.querySelector('.chat-message-user-text');
+            if (!textEl) return;
+            textEl.textContent = newText;
+            // Keep localStorage-persisted history consistent with what's now on screen.
+            const idxAttr = wrapper.getAttribute('data-message-index');
+            const idx = idxAttr != null ? parseInt(idxAttr, 10) : NaN;
+            if (!Number.isNaN(idx) && this.conversationHistory[idx]) {
+                this.conversationHistory[idx].message = newText;
+                this.saveConversationHistory();
+            }
+        } catch (e) {
+            if (this._warn) this._warn('_updateLastUserBubbleText failed:', e);
+        }
+    }
+
 
     addErrorMessage(errorMessage, retryMessage) {
         this.conversationHistory.push({

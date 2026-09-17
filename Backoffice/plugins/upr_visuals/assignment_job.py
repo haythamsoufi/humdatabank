@@ -71,12 +71,12 @@ def _read_job_word(job_dir: Path, word_path: str | Path) -> bytes | None:
     try:
         resolved = Path(raw).resolve()
     except OSError as exc:
-        raise RuntimeError("Export job is missing the Word document.") from exc
+        raise RuntimeError("Export job is missing the narrative document.") from exc
     root = job_dir.resolve()
     if root not in resolved.parents and resolved != root:
-        raise RuntimeError("Export job is missing the Word document.")
+        raise RuntimeError("Export job is missing the narrative document.")
     if not resolved.is_file():
-        raise RuntimeError("Export job is missing the Word document.")
+        raise RuntimeError("Export job is missing the narrative document.")
     return resolved.read_bytes()
 
 
@@ -123,6 +123,8 @@ def create_assignment_export_job(
     word_bytes: bytes | None = None,
     lang: str = "en",
     dashboard_id: str = "combined",
+    word_filename: str = "",
+    audience: str | None = None,
 ) -> str:
     from plugins.upr_visuals.catalog import DASHBOARD_BY_ID
     from plugins.upr_visuals.errors import UprVisualsError
@@ -139,7 +141,7 @@ def create_assignment_export_job(
     job_dir.mkdir(parents=True, exist_ok=True)
     word_path = ""
     if word_bytes:
-        path = job_dir / "narrative.docx"
+        path = job_dir / ("narrative.pdf" if word_bytes.startswith(b"%PDF") else "narrative.docx")
         path.write_bytes(word_bytes)
         word_path = str(path)
     now = utcnow()
@@ -158,6 +160,7 @@ def create_assignment_export_job(
         "error": None,
         "has_word": bool(word_bytes),
         "style_rev": export_style_token(),
+        "audience": (audience or "auto").strip().lower() or "auto",
     }
     payload = {
         "aes_id": int(aes_id),
@@ -165,6 +168,8 @@ def create_assignment_export_job(
         "dashboard_id": dash,
         "lang": lang,
         "word_path": word_path,
+        "word_filename": Path(word_filename or "").name[:200],
+        "audience": (audience or "auto").strip().lower() or "auto",
     }
     job = AIJob(
         id=job_id,
@@ -372,6 +377,10 @@ def build_assignment_export_status(job_id: str | None) -> dict[str, Any] | None:
     if not job or job.job_type != ASSIGNMENT_EXPORT_JOB_TYPE:
         return None
     meta = dict(job.meta or {})
+    item_payload = {}
+    items = job.items or []
+    if items and isinstance(getattr(items[0], "payload", None), dict):
+        item_payload = items[0].payload or {}
     return {
         "job_id": str(job.id),
         "status": _status_str(job.status),
@@ -386,6 +395,7 @@ def build_assignment_export_status(job_id: str | None) -> dict[str, Any] | None:
         "chunk_total": int(meta.get("chunk_total") or 0),
         "filename": meta.get("filename"),
         "error": job.error or meta.get("error"),
+        "audience": meta.get("audience") or item_payload.get("audience"),
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
     }
@@ -494,6 +504,8 @@ def _run_assignment_export_job(app, job_id: str) -> None:
         lang = parse_export_language(payload.get("lang") or (job.meta or {}).get("lang"))
         job_dir = _job_dir(str(job_id))
         word_path = payload.get("word_path") or ""
+        word_filename = str(payload.get("word_filename") or "")
+        audience = payload.get("audience")
         started = utcnow()
         logger.info(
             "UPR assignment export start job=%s aes=%s fmt=%s dash=%s lang=%s",
@@ -509,7 +521,13 @@ def _run_assignment_export_job(app, job_id: str) -> None:
             word_bytes = _read_job_word(job_dir, word_path)
             if word_bytes and fmt == "idml":
                 _report(job, "Generating InDesign package…", step=1, total=3)
-                data, filename = UprVisualsService.idml_zip_bytes(aes_id, word_bytes=word_bytes, lang=lang)
+                data, filename = UprVisualsService.idml_zip_bytes(
+                    aes_id,
+                    word_bytes=word_bytes,
+                    lang=lang,
+                    audience=audience,
+                    word_filename=word_filename,
+                )
                 mimetype = "application/zip"
             elif word_bytes:
                 last_logged_elapsed = {"value": -10}
@@ -548,6 +566,8 @@ def _run_assignment_export_job(app, job_id: str) -> None:
                     word_bytes,
                     lang=lang,
                     on_progress=on_progress,
+                    audience=audience,
+                    word_filename=word_filename,
                 )
                 mimetype = "application/pdf"
             elif fmt == "png":

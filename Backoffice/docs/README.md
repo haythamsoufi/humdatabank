@@ -41,7 +41,7 @@ Detailed setup for optional features and production:
 - [Export and download data](user-guides/admin/export-download-data.md)
 - [Exports: how to interpret files](user-guides/admin/exports-how-to-interpret.md)
 - [Indicator Bank](user-guides/admin/indicator-bank.md)
-- [AI Document Library and embeddings](user-guides/admin/ai-document-library-and-embeddings.md)
+- [AI Knowledge Base and embeddings](user-guides/admin/ai-document-library-and-embeddings.md)
 - [AI system: security and privacy](user-guides/admin/ai-system-security-and-privacy.md)
 - [Supporting documents (Admin)](user-guides/admin/supporting-documents.md)
 - [Troubleshooting access (Admin)](user-guides/admin/troubleshooting-access.md)

@@ -1,10 +1,10 @@
-# Biblioteca de documentos de IA e incrustaciones
+# Base de conocimiento de IA e incrustaciones
 
-Este documento describe cómo funciona la Biblioteca de Documentos de IA: cómo se procesan los documentos, cómo se generan los embeddings (vectores) y cómo se utilizan para la búsqueda semántica y la generación aumentada por recuperación (RAG).
+Este documento describe cómo funciona la Base de conocimiento de IA: cómo se procesan los documentos, cómo se generan los embeddings (vectores) y cómo se utilizan para la búsqueda semántica y la generación aumentada por recuperación (RAG).
 
 ## Resumen
 
-La Biblioteca de Documentos de IA permite a los administradores subir documentos (PDF, Word, etc.) para que el chatbot y las herramientas de IA puedan responder preguntas usando ese contenido. Los documentos son:
+La Base de conocimiento de IA permite a los administradores subir documentos (PDF, Word, etc.) para que el chatbot y las herramientas de IA puedan responder preguntas usando ese contenido. Los documentos son:
 
 1. **Extracted** — se extraen texto, páginas, secciones y, opcionalmente, tablas del archivo.
 2. **Chunked** — divididos en bloques de texto más pequeños para contexto y límites de tokens.
@@ -17,7 +17,7 @@ Cuando un usuario hace una pregunta, la consulta se integra con el mismo modelo,
 
 El procesamiento se ejecuta cuando tú:
 
-- **Subir** un documento a la página de la Biblioteca de Documentos de IA (`/admin/ai/documents`).
+- **Subir** un documento a la página de la Base de conocimiento de IA (`/admin/ai/knowledge-base`).
 - **Procesar documentos seleccionados** importados del sistema de gestión documental.
 - **Reprocesar** un documento existente (re-extraer, volver a fragmentar, volver a incrustar).
 
@@ -77,9 +77,9 @@ Consulta `Backoffice/config/config.py` para la sección completa de IA/RAG y cua
 
 - **Búsqueda vectorial:** La consulta de usuario está integrada con el mismo servicio de incrustación; La aplicación ejecuta una búsqueda de similitud (por ejemplo, coseno) en PGVECTOR y devuelve los primeros k bloques.
 - **Búsqueda híbrida:** Combina similitud vectorial y búsqueda por palabras clave para mejorar la memoria.
-- **RAG:** Los fragmentos recuperados se pasan como contexto al LLM al responder preguntas (chatbot, preguntas y respuestas de la biblioteca de documentos de IA, documentos de flujo de trabajo).
+- **RAG:** Los fragmentos recuperados se pasan como contexto al LLM al responder preguntas (chatbot, preguntas y respuestas de la base de conocimiento de IA, documentos de flujo de trabajo).
 
-La página de la Biblioteca de Documentos de IA te permite elegir **Solo vector** o **Híbrido (palabras clave e incrustaciones)** para la función "Preguntar".
+La página de la Base de conocimiento de IA te permite elegir **Solo vector** o **Híbrido (palabras clave e incrustaciones)** para la función "Preguntar".
 
 ## Ubicaciones de códigos de teclas
 
@@ -89,7 +89,7 @@ La página de la Biblioteca de Documentos de IA te permite elegir **Solo vector*
 | Fragmentación | `app/services/ai_chunking_service.py` |
 | Generación incrustada | `app/services/ai_embedding_service.py` |
 | Almacenamiento vectorial y búsqueda | `app/services/ai_vector_store.py` |
-| UI de la Biblioteca de Documentos de IA | `app/templates/admin/ai/documents.html` |
+| UI de la Base de conocimiento de IA | `app/templates/admin/ai/knowledge_base.html` |
 
 ## Documentación relacionada
 

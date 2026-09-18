@@ -38,6 +38,12 @@ from app.services.imports.fdrs_data_sync_job import (
     start_fdrs_data_sync_job,
     _run_fdrs_data_sync_job,
 )
+from app.services.imports.import_change_log import (
+    ImportChangeLogWriter,
+    attach_import_change_log_to_activity,
+    set_import_audit_details,
+)
+import uuid
 bp = Blueprint("data_sync_imputation", __name__, url_prefix="/admin/templates/data-sync")
 
 
@@ -1385,6 +1391,13 @@ def run_data_sync(template_id: int):
                 preview_path=preview_path,
                 sync_user_id=sync_user_id,
             )
+            set_import_audit_details(
+                log_id=job_id,
+                import_kind="fdrs_data_sync",
+                templates=[template.name or str(template_id)],
+                dry_run=dry_run,
+                extra={"years": fdrs_years} if fdrs_years else None,
+            )
 
             worker_app = current_app._get_current_object()
             if current_app.config.get("TESTING"):
@@ -1393,30 +1406,66 @@ def run_data_sync(template_id: int):
                 start_fdrs_data_sync_job(worker_app, job_id)
             return json_accepted(job_id=job_id)
 
-        stats = run_import(
-            input_path=None,
-            fdrs_api_url=None,
-            fdrs_from_data_api=True,
-            fdrs_data_api_base=None,
-            fdrs_data_api_key=None,
-            fdrs_imputed_url=None,
-            fdrs_imputed_from_api=False,
-            fdrs_imputed_kpi_codes_path=None,
-            fdrs_imputed_use_cache=imputed_use_cache,
-            fdrs_years=fdrs_years,
-            fdrs_reported_import_states=fdrs_reported_import_states,
-            indicator_mapping_path=None,
-            indicator_bank_api_base=None,
-            indicator_bank_api_key=None,
-            databank_base_url=None,
-            databank_api_key=None,
-            preview_excel_path=preview_path if dry_run else None,
-            test_limit=test_limit,
+        log_id = uuid.uuid4().hex
+        set_import_audit_details(
+            log_id=log_id,
+            import_kind="fdrs_data_sync",
+            templates=[template.name or str(template_id)],
             dry_run=dry_run,
-            batch_size=batch_size,
-            template_id=template_id,
-            sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
-            sync_documents=sync_documents,
+            extra={"years": fdrs_years} if fdrs_years else None,
+        )
+        writer = ImportChangeLogWriter(
+            log_id,
+            kind="fdrs_data_sync",
+            meta={
+                "template_id": template_id,
+                "dry_run": dry_run,
+                "fdrs_years": fdrs_years,
+            },
+        )
+        try:
+            stats = run_import(
+                input_path=None,
+                fdrs_api_url=None,
+                fdrs_from_data_api=True,
+                fdrs_data_api_base=None,
+                fdrs_data_api_key=None,
+                fdrs_imputed_url=None,
+                fdrs_imputed_from_api=False,
+                fdrs_imputed_kpi_codes_path=None,
+                fdrs_imputed_use_cache=imputed_use_cache,
+                fdrs_years=fdrs_years,
+                fdrs_reported_import_states=fdrs_reported_import_states,
+                indicator_mapping_path=None,
+                indicator_bank_api_base=None,
+                indicator_bank_api_key=None,
+                databank_base_url=None,
+                databank_api_key=None,
+                preview_excel_path=preview_path if dry_run else None,
+                test_limit=test_limit,
+                dry_run=dry_run,
+                batch_size=batch_size,
+                template_id=template_id,
+                sync_user_id=int(getattr(current_user, "id", 0) or 0) or None,
+                sync_documents=sync_documents,
+                change_recorder=writer.record,
+            )
+            writer.finalize(dict(stats or {}))
+            stats = dict(stats or {})
+            stats["change_log_id"] = log_id
+        except Exception:
+            if not writer._finalized:
+                writer.finalize({"success": False, "errors": 1})
+            raise
+        attach_import_change_log_to_activity(
+            log_id=log_id,
+            user_id=int(getattr(current_user, "id", 0) or 0) or None,
+            extra={
+                "rows_inserted": stats.get("inserted"),
+                "rows_updated": stats.get("updated"),
+                "rows_skipped": stats.get("skipped"),
+                "rows_errors": stats.get("errors"),
+            },
         )
 
         if dry_run and preview_path and os.path.isfile(preview_path):
@@ -1438,6 +1487,7 @@ def run_data_sync(template_id: int):
             success=True,
             dry_run=dry_run,
             stats=stats,
+            change_log_id=log_id,
             message=(
                 f"Loaded: {stats['loaded']}, Skipped: {stats['skipped']}, "
                 f"Inserted: {stats['inserted']}, Updated: {stats['updated']}, Errors: {stats['errors']}"

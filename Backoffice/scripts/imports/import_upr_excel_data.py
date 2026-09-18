@@ -4163,6 +4163,7 @@ def run_upr_import(
     ensure_staff_matrix: bool = True,  # kept for API backward compat, no longer used
     use_row_cache: bool = True,
     use_transform_cache: bool = False,
+    change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, Any]:
     """Load UPR Excel, transform, and upsert into form_data."""
     from app.extensions import db
@@ -4242,6 +4243,7 @@ def run_upr_import(
             progress_start_pct=25.0,
             progress_end_pct=85.0,
             stats=stats,
+            change_recorder=change_recorder,
         )
         discussion_stats = upsert_upr_discussion_comments(
             ctx.discussion_comment_entries,

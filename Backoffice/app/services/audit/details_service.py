@@ -535,6 +535,8 @@ _TECHNICAL_DETAIL_KEYS = frozenset(
         "aes_id",
         "template_id",
         "ifrc_presave",
+        "job_id",
+        "change_log_id",
         CURATED_DESCRIPTION_KEY,
     }
 )
@@ -587,8 +589,27 @@ _DETAIL_KEY_LABELS = {
     "user_email": "Email",
     "user_name": "User",
     "assignment_title": "Assignment",
+    "assignment": "Assignment",
     "template_name": "Template",
     "action": "Action",
+    "import_kind": "Import",
+    "filename": "File",
+    "dry_run": "Dry run",
+    "rows_inserted": "Inserted",
+    "rows_updated": "Updated",
+    "rows_skipped": "Skipped",
+    "rows_errors": "Errors",
+    "rounds": "Rounds",
+    "templates": "Templates",
+    "years": "Years",
+}
+
+_IMPORT_KIND_DISPLAY = {
+    "upr_excel": "UPR Excel",
+    "fdrs_data_sync": "FDRS data sync",
+    "assignment_excel": "Assignment Excel",
+    "upr_country_reporting": "UPR country reporting",
+    "unified_country_plan": "Unified country plan",
 }
 
 # Promote a few safe, named fields from redacted activity form_data.
@@ -666,6 +687,20 @@ def _humanize_detail_key(key: str) -> str:
     if not readable:
         return key
     return readable[:1].upper() + readable[1:]
+
+
+def _as_change_log_link(raw: Any) -> Optional[Dict[str, str]]:
+    """Turn a stored ``change_log_url`` into a clickable Details-panel value."""
+    url = None
+    if isinstance(raw, str):
+        url = raw.strip()
+    elif isinstance(raw, dict):
+        candidate = raw.get("url")
+        if isinstance(candidate, str):
+            url = candidate.strip()
+    if not url or not url.startswith("/") or url.startswith("//"):
+        return None
+    return {"url": url, "label": "Open change log"}
 
 
 def _humanize_detail_scalar(value: Any) -> Any:
@@ -803,6 +838,11 @@ def humanize_audit_details_dict(payload: Optional[Dict[str, Any]]) -> Optional[D
         merged["comment"] = merged["request_message"]
     merged.pop("request_message", None)
 
+    change_log_raw = merged.pop("change_log_url", None)
+    kind = merged.get("import_kind")
+    if isinstance(kind, str) and kind in _IMPORT_KIND_DISPLAY:
+        merged["import_kind"] = _IMPORT_KIND_DISPLAY[kind]
+
     merged = _drop_redundant_id_keys(merged)
     merged = _drop_redundant_summary_keys(merged)
 
@@ -835,6 +875,10 @@ def humanize_audit_details_dict(payload: Optional[Dict[str, Any]]) -> Optional[D
         entity_type = out.get("Entity type")
         if isinstance(entity_type, str) and entity_type.lower() == "country":
             out.pop("Entity type", None)
+
+    link = _as_change_log_link(change_log_raw)
+    if link:
+        out = {"Change log": link, **out}
 
     return out or None
 

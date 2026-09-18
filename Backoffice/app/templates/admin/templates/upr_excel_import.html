@@ -394,6 +394,11 @@ document.addEventListener('DOMContentLoaded', function () {
             msg += ' <a class="text-purple-700 underline" href="'
                  + escapeHtml(job.download_url) + '">' + {{ _("Download preview Excel")|tojson|safe }} + '</a>';
           }
+          if (/^[a-fA-F0-9]{32}$/.test(activeJobId || '')) {
+            msg += ' <a class="text-purple-700 underline" href="/admin/import-logs/'
+                 + encodeURIComponent(activeJobId) + '" target="_blank" rel="noopener">'
+                 + {{ _("View change log")|tojson|safe }} + '</a>';
+          }
           document.getElementById('import-result').innerHTML = '<p class="text-green-700">' + msg + '</p>';
           doneActions.classList.remove('hidden');
           return;

@@ -11,6 +11,11 @@ from flask import Blueprint, redirect, render_template, request, send_file, curr
 from flask_login import current_user
 
 from app.routes.admin.shared import admin_permission_required, system_manager_required
+from app.services.imports.import_change_log import (
+    ImportChangeLogWriter,
+    attach_import_change_log_to_activity,
+    set_import_audit_details,
+)
 from app.services.upr.excel_import_service import UprExcelImportService
 from app.utils.advanced_validation import validate_upload_extension_and_mime
 from app.utils.api_helpers import get_json_safe
@@ -54,6 +59,66 @@ UPR_TEMPLATE_CHOICES = [
     {"id": 33, "name": "Reporting – Country — NS Data, indicators, funding, support (AR*, MYR*)"},
     {"id": 23, "name": "Reporting – PNS — PNS funding totals (AR* only)"},
 ]
+
+
+def _upr_template_labels(template_ids: List[int]) -> List[str]:
+    names = {int(t["id"]): t["name"] for t in UPR_TEMPLATE_CHOICES}
+    return [names.get(int(tid), str(tid)) for tid in template_ids]
+
+
+def _run_upr_import_with_change_log(
+    *,
+    log_id: str,
+    file_path: str,
+    template_ids: List[int],
+    rounds: List[str],
+    dry_run: bool,
+    batch_size: int,
+    ensure_staff_matrix: bool,
+    progress_cb=None,
+    cancel_check=None,
+    user_id: Optional[int] = None,
+    filename: Optional[str] = None,
+) -> Dict[str, Any]:
+    writer = ImportChangeLogWriter(
+        log_id,
+        kind="upr_excel",
+        meta={
+            "filename": filename or os.path.basename(file_path),
+            "template_ids": list(template_ids),
+            "rounds": list(rounds or []),
+            "dry_run": bool(dry_run),
+        },
+    )
+    try:
+        stats = UprExcelImportService.run_import(
+            file_path=file_path,
+            template_ids=template_ids,
+            rounds=rounds,
+            dry_run=dry_run,
+            batch_size=batch_size,
+            ensure_staff_matrix=ensure_staff_matrix,
+            progress_cb=progress_cb,
+            cancel_check=cancel_check,
+            change_recorder=writer.record,
+        )
+    except Exception:
+        writer.finalize({"errors": 1, "success": False})
+        raise
+    stats = dict(stats or {})
+    writer.finalize(stats)
+    attach_import_change_log_to_activity(
+        log_id=log_id,
+        user_id=user_id,
+        extra={
+            "rows_inserted": stats.get("inserted"),
+            "rows_updated": stats.get("updated"),
+            "rows_skipped": stats.get("skipped"),
+            "rows_errors": stats.get("errors"),
+        },
+    )
+    stats["change_log_id"] = log_id
+    return stats
 
 
 @bp.route("/", methods=["GET"])
@@ -131,14 +196,26 @@ def run_import():
         return json_bad_request("No uploaded file in session. Please upload again.")
 
     if not async_mode:
+        log_id = uuid.uuid4().hex
         try:
-            stats = UprExcelImportService.run_import(
+            set_import_audit_details(
+                log_id=log_id,
+                import_kind="upr_excel",
+                filename=os.path.basename(file_path),
+                rounds=rounds,
+                templates=_upr_template_labels(template_ids),
+                dry_run=dry_run,
+            )
+            stats = _run_upr_import_with_change_log(
+                log_id=log_id,
                 file_path=file_path,
                 template_ids=template_ids,
                 rounds=rounds,
                 dry_run=dry_run,
                 batch_size=batch_size,
                 ensure_staff_matrix=ensure_staff_matrix,
+                user_id=int(getattr(current_user, "id", 0) or 0) or None,
+                filename=os.path.basename(file_path),
             )
             if not stats.get("success", True):
                 return json_server_error(stats.get("message") or "Import failed")
@@ -148,6 +225,15 @@ def run_import():
             return json_server_error(str(exc))
 
     job_id = uuid.uuid4().hex
+    filename = os.path.basename(file_path)
+    set_import_audit_details(
+        log_id=job_id,
+        import_kind="upr_excel",
+        filename=filename,
+        rounds=rounds,
+        templates=_upr_template_labels(template_ids),
+        dry_run=dry_run,
+    )
 
     with _DATA_SYNC_LOCK:
         _cleanup_data_sync_jobs_locked(time.time())
@@ -172,6 +258,7 @@ def run_import():
 
     cancel_ev = _get_data_sync_cancel_event(job_id)
     worker_app = current_app._get_current_object()
+    actor_user_id = int(getattr(current_user, "id", 0) or 0) or None
 
     def _worker(app=worker_app) -> None:
         last_cancel_db_check = 0.0
@@ -211,7 +298,8 @@ def run_import():
                     stage="starting",
                     message="Starting UPR import...",
                 )
-                stats = UprExcelImportService.run_import(
+                stats = _run_upr_import_with_change_log(
+                    log_id=job_id,
                     file_path=file_path,
                     template_ids=template_ids,
                     rounds=rounds,
@@ -220,6 +308,8 @@ def run_import():
                     ensure_staff_matrix=ensure_staff_matrix,
                     progress_cb=_progress_cb,
                     cancel_check=_cancel_check,
+                    user_id=actor_user_id,
+                    filename=filename,
                 )
                 preview_file = stats.get("preview_path")
                 download_ready = bool(dry_run and preview_file)

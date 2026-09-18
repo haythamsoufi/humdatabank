@@ -405,6 +405,31 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
         return String(value);
     }
 
+    var IMPORT_LOG_PATH = /^\/admin\/import-logs\/[a-fA-F0-9]{32}\/?$/;
+
+    function isSafeRelativeHref(url) {
+        return typeof url === 'string' && url.charAt(0) === '/' && url.charAt(1) !== '/';
+    }
+
+    function isAuditDetailLink(value) {
+        return value && typeof value === 'object' && !Array.isArray(value)
+            && isSafeRelativeHref(value.url)
+            && value.label != null && String(value.label).trim() !== '';
+    }
+
+    function renderStructuredDetailHtml(value) {
+        if (typeof value === 'string' && IMPORT_LOG_PATH.test(value)) {
+            return '<a class="text-purple-700 underline font-medium" href="' +
+                escapeHtml(value) + '" target="_blank" rel="noopener">Open change log</a>';
+        }
+        if (isAuditDetailLink(value)) {
+            return '<a class="text-purple-700 underline font-medium" href="' +
+                escapeHtml(value.url) + '" target="_blank" rel="noopener">' +
+                escapeHtml(String(value.label)) + '</a>';
+        }
+        return escapeHtml(formatStructuredDetailValue(value));
+    }
+
     /** Flat key–value details (admin actions and activity context). */
     function renderSimpleStructuredAuditHtml(d) {
         var keys = Object.keys(d).filter(function (k) {
@@ -415,9 +440,8 @@ const EMPTY_VALUE_PLACEHOLDER = '-';
         }
         var rows = keys.map(function (k) {
             var label = /[ _]/.test(k) || k !== k.toLowerCase() ? k : humanizeToken(k);
-            var vs = formatStructuredDetailValue(d[k]);
             return '<p class="text-xs text-gray-900 audit-form-item-kv-line"><span class="audit-form-item-kv-label">' +
-                escapeHtml(label) + ':</span> <span class="break-words">' + escapeHtml(vs) + '</span></p>';
+                escapeHtml(label) + ':</span> <span class="break-words">' + renderStructuredDetailHtml(d[k]) + '</span></p>';
         }).join('');
         return '<div class="audit-details-user-update">' + rows + '</div>';
     }

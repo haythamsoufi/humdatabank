@@ -14,7 +14,7 @@ from app.services.imports.assignment_excel_access import (
     assignment_uses_unified_country_plan_excel,
     assignment_uses_upr_country_reporting_excel,
 )
-from app.services.imports.excel_service import ExcelService
+from app.services.imports.import_change_log import record_assignment_import_audit
 from app.services.upr.country_reporting_excel_service import (
     UPR_COUNTRY_REPORTING_LABEL,
     UprCountryReportingExcelService,
@@ -221,6 +221,12 @@ def import_assignment_excel(aes_id):
             template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
         except Exception:
             template_name = ""
+        record_assignment_import_audit(
+            kind="assignment_excel",
+            result=result,
+            filename=excel_file.filename,
+            assignment_label=template_name,
+        )
         log_entity_activity(
             aes.entity_type,
             aes.entity_id,
@@ -449,6 +455,13 @@ def import_upr_country_reporting_template(aes_id):
             template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
         except Exception:
             template_name = ""
+        record_assignment_import_audit(
+            kind="upr_country_reporting",
+            result=result,
+            filename=excel_file.filename,
+            assignment_label=template_name,
+            extra_meta={"staged": True},
+        )
         log_entity_activity(
             aes.entity_type,
             aes.entity_id,
@@ -615,6 +628,13 @@ def import_unified_country_plan_template(aes_id):
             template_name = aes.assigned_form.template.name if aes.assigned_form and aes.assigned_form.template else ""
         except Exception:
             template_name = ""
+        record_assignment_import_audit(
+            kind="unified_country_plan",
+            result=result,
+            filename=excel_file.filename,
+            assignment_label=template_name,
+            extra_meta={"staged": True},
+        )
         log_entity_activity(
             aes.entity_type,
             aes.entity_id,

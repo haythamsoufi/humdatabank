@@ -27,6 +27,10 @@ from app.services.ai.ai_job_runner import (
     start_ai_job_thread,
 )
 from app.utils.datetime_helpers import utcnow
+from app.services.imports.import_change_log import (
+    ImportChangeLogWriter,
+    attach_import_change_log_to_activity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -341,12 +345,22 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
 
         terminal_item_status = "failed"
         FdrsSyncCancelled = None
+        writer = None
         try:
             imports_dir = _fdrs_imports_dir()
             if imports_dir not in sys.path:
                 sys.path.insert(0, imports_dir)
             from import_fdrs_form_data import FdrsSyncCancelled, run_import
 
+            writer = ImportChangeLogWriter(
+                job_id,
+                kind="fdrs_data_sync",
+                meta={
+                    "template_id": template_id,
+                    "dry_run": dry_run,
+                    "fdrs_years": payload.get("fdrs_years"),
+                },
+            )
             stats = run_import(
                 input_path=None,
                 fdrs_api_url=None,
@@ -373,6 +387,18 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 cancel_check=_cancel_check,
                 sync_user_id=sync_user_id,
                 sync_documents=bool(payload.get("sync_documents", True)),
+                change_recorder=writer.record,
+            )
+            writer.finalize(dict(stats or {}))
+            attach_import_change_log_to_activity(
+                log_id=job_id,
+                user_id=sync_user_id,
+                extra={
+                    "rows_inserted": (stats or {}).get("inserted"),
+                    "rows_updated": (stats or {}).get("updated"),
+                    "rows_skipped": (stats or {}).get("skipped"),
+                    "rows_errors": (stats or {}).get("errors"),
+                },
             )
             update_import_job(
                 job_id,
@@ -424,6 +450,11 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             item.error = err_msg
             app.logger.error("Data sync %s: failed: %s", job_id, exc, exc_info=True)
         finally:
+            if writer is not None and not writer._finalized:
+                try:
+                    writer.finalize({"success": False})
+                except Exception:
+                    logger.debug("import change log finalize failed", exc_info=True)
             if item.status not in ("completed", "failed", "cancelled"):
                 item.status = terminal_item_status
             db.session.commit()

@@ -32,11 +32,11 @@ MIN_CROP = 20.0
 
 _COVER_LAYOUT = {
     "rule_x": 111.0,
-    "rule_y": 64.6,
+    "rule_y": 58.6,
     "rule_w": 314.6,
     "rule_h": 5.2,
     "title_x": 111.0,
-    "title_y": 22.0,
+    "title_y": 16.0,
     "title_w": 370.0,
     "title_h": 46.0,
     "subtitle_y": 74.5,

@@ -37,7 +37,7 @@ KPI_SPECS: tuple[KpiSpec, ...] = (
     KpiSpec(
         "branches",
         1117,
-        "Local Branches",
+        "National Society branches",
         "Branches",
         "icons/kpi-independence.png",
         "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
@@ -45,7 +45,7 @@ KPI_SPECS: tuple[KpiSpec, ...] = (
     KpiSpec(
         "local_units",
         723,
-        "Local Units",
+        "National Society local units",
         "Local units",
         "icons/kpi-independence.png",
         "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Independence.png",
@@ -53,7 +53,7 @@ KPI_SPECS: tuple[KpiSpec, ...] = (
     KpiSpec(
         "volunteers",
         724,
-        "Volunteers",
+        "National Society volunteers",
         "Volunteers",
         "icons/kpi-voluntary-service.png",
         "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Voluntary-service.png",
@@ -61,7 +61,7 @@ KPI_SPECS: tuple[KpiSpec, ...] = (
     KpiSpec(
         "staff",
         727,
-        "Paid Staff",
+        "National Society staff",
         "Staff",
         "icons/kpi-unity.png",
         "https://raw.githubusercontent.com/FDRS-ifrc/general/main/ifrc_icons/IFRC-icons-colour_Unity.png",

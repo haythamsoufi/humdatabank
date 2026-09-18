@@ -141,6 +141,13 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
         "zh": "紧急情况 {slot}",
     }),
     # KPI figures
+    ("National Society branches", {
+        "fr": "Filiales de la Société nationale",
+        "es": "Filiales de la Sociedad Nacional",
+        "ar": "فروع الجمعية الوطنية",
+        "ru": "Отделения Национального общества",
+        "zh": "国家红会分会",
+    }),
     ("Local Branches", {
         "fr": "Sections locales",
         "es": "Filiales locales",
@@ -154,6 +161,13 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
         "ar": "الفروع",
         "ru": "Отделения",
         "zh": "分会",
+    }),
+    ("National Society local units", {
+        "fr": "Unités locales de la Société nationale",
+        "es": "Unidades locales de la Sociedad Nacional",
+        "ar": "الوحدات المحلية للجمعية الوطنية",
+        "ru": "Местные подразделения Национального общества",
+        "zh": "国家红会地方单位",
     }),
     ("Local Units", {
         "fr": "Unités locales",
@@ -169,12 +183,26 @@ _ROWS: tuple[tuple[str, dict[str, str]], ...] = (
         "ru": "Местные подразделения",
         "zh": "地方单位",
     }),
+    ("National Society volunteers", {
+        "fr": "Volontaires de la Société nationale",
+        "es": "Voluntarios de la Sociedad Nacional",
+        "ar": "متطوعو الجمعية الوطنية",
+        "ru": "Добровольцы Национального общества",
+        "zh": "国家红会志愿者",
+    }),
     ("Volunteers", {
         "fr": "Volontaires",
         "es": "Voluntarios",
         "ar": "المتطوعون",
         "ru": "Добровольцы",
         "zh": "志愿者",
+    }),
+    ("National Society staff", {
+        "fr": "Personnel de la Société nationale",
+        "es": "Personal de la Sociedad Nacional",
+        "ar": "موظفو الجمعية الوطنية",
+        "ru": "Персонал Национального общества",
+        "zh": "国家红会职员",
     }),
     ("Paid Staff", {
         "fr": "Personnel rémunéré",

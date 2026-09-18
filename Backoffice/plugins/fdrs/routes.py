@@ -52,9 +52,57 @@ from plugins.fdrs.services.fdrs_data_sync_job import (
     start_fdrs_data_sync_job,
     _run_fdrs_data_sync_job,
 )
+from plugins.fdrs.services.fdrs_sync_verify_job import (
+    build_fdrs_sync_verify_status_payload,
+    create_fdrs_sync_verify_job,
+    ensure_fdrs_sync_verify_job_running,
+    request_fdrs_sync_verify_cancel,
+    start_fdrs_sync_verify_job,
+    _run_fdrs_sync_verify_job,
+)
 
 _SYNC_LOCK = threading.Lock()
 _SYNC_ALLOWED_STATES = frozenset({0, 100, 200, 300, 400, 500})
+
+# cleanup_expired_import_jobs() scans the AIJob table. Status polls hit this
+# route every ~2-5s for the duration of a sync (which can run tens of
+# minutes), so without a throttle that scan runs hundreds of times per sync
+# for no benefit (the job TTL is 6 hours; see IMPORT_JOB_TTL_SECONDS). Mirrors
+# the existing _maybe_cleanup_expired_jobs() throttle in ai_job_runner.py.
+_last_import_job_cleanup_ts = 0.0
+_CLEANUP_MIN_INTERVAL_SECONDS = 300.0
+
+
+def _maybe_cleanup_expired_import_jobs() -> None:
+    global _last_import_job_cleanup_ts
+    now = time.time()
+    with _SYNC_LOCK:
+        if now - _last_import_job_cleanup_ts < _CLEANUP_MIN_INTERVAL_SECONDS:
+            return
+        _last_import_job_cleanup_ts = now
+    cleanup_expired_import_jobs(now)
+
+
+def _job_looks_actively_running(job: Dict[str, Any], *, fresh_seconds: float = 60.0) -> bool:
+    """True when the job self-reports "running" with a recent heartbeat.
+
+    Lets status polls skip ``ensure_*_job_running`` (thread-liveness probing,
+    stuck-item recovery, an extra AIJob lookup) while a sync is actively
+    progressing — that reconciliation path exists to resume/fail orphaned
+    jobs, not to be re-run on every poll of a healthy one. Reconciliation
+    still runs normally whenever the heartbeat goes quiet (worker crashed,
+    job stuck, or not started yet), well before the real staleness threshold
+    (FDRS_DATA_SYNC_JOB_STALE_SECONDS, default 900s, minimum 60s).
+    """
+    if job.get("status") != "running":
+        return False
+    updated_ts = job.get("updated_ts")
+    if updated_ts is None:
+        return False
+    try:
+        return (time.time() - float(updated_ts)) < fresh_seconds
+    except (TypeError, ValueError):
+        return False
 
 
 def fdrs_imports_dir() -> str:
@@ -196,8 +244,7 @@ def run_data_sync(template_id: int):
 
         if async_mode:
             sync_user_id = int(getattr(current_user, "id", 0) or 0) or None
-            with _SYNC_LOCK:
-                cleanup_expired_import_jobs(time.time())
+            _maybe_cleanup_expired_import_jobs()
 
             job_id = create_fdrs_data_sync_job(
                 user_id=int(getattr(current_user, "id", 0) or 0),
@@ -284,6 +331,7 @@ def run_data_sync(template_id: int):
             extra={
                 "rows_inserted": stats.get("inserted"),
                 "rows_updated": stats.get("updated"),
+                "rows_unchanged": stats.get("unchanged"),
                 "rows_skipped": stats.get("skipped"),
                 "rows_errors": stats.get("errors"),
             },
@@ -311,7 +359,8 @@ def run_data_sync(template_id: int):
             change_log_id=log_id,
             message=(
                 f"Loaded: {stats['loaded']}, Skipped: {stats['skipped']}, "
-                f"Inserted: {stats['inserted']}, Updated: {stats['updated']}, Errors: {stats['errors']}"
+                f"Inserted: {stats['inserted']}, Updated: {stats['updated']}, "
+                f"Unchanged: {stats.get('unchanged', 0)}, Errors: {stats['errors']}"
                 + (
                     f"; Documents: +{stats.get('documents_inserted', 0)} "
                     f"~{stats.get('documents_updated', 0)} "
@@ -337,8 +386,7 @@ def run_data_sync(template_id: int):
 @bp.route("/admin/templates/data-sync/<int:template_id>/data-sync-status/<job_id>", methods=["GET"])
 @admin_permission_required("admin.templates.edit")
 def data_sync_status(template_id: int, job_id: str):
-    with _SYNC_LOCK:
-        cleanup_expired_import_jobs(time.time())
+    _maybe_cleanup_expired_import_jobs()
 
     job = get_import_job(job_id)
     if not job or int(job.get("template_id") or 0) != int(template_id):
@@ -346,7 +394,8 @@ def data_sync_status(template_id: int, job_id: str):
     if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
         return json_forbidden("Access denied")
 
-    ensure_fdrs_data_sync_job_running(current_app._get_current_object(), job_id)
+    if not _job_looks_actively_running(job):
+        ensure_fdrs_data_sync_job_running(current_app._get_current_object(), job_id)
     job_payload = build_fdrs_data_sync_status_payload(job_id, template_id)
     if not job_payload:
         return json_not_found("Job not found")
@@ -402,4 +451,140 @@ def data_sync_download(template_id: int, job_id: str):
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True,
         download_name=f"data_sync_preview_{template_id}.xlsx",
+    )
+
+
+def _owned_import_job_or_error(template_id: int, job_id: str):
+    job = get_import_job(job_id)
+    if not job or int(job.get("template_id") or 0) != int(template_id):
+        return None, json_not_found("Job not found")
+    if int(job.get("user_id") or 0) != int(getattr(current_user, "id", 0) or 0):
+        return None, json_forbidden("Access denied")
+    return job, None
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/run-sync-verify", methods=["POST"])
+@admin_permission_required("admin.templates.edit")
+def run_sync_verify(template_id: int):
+    try:
+        FormTemplate.query.get_or_404(template_id)
+        if not check_template_access(template_id, current_user.id):
+            return json_forbidden("Access denied")
+
+        data = get_json_safe()
+        test_mode = bool(data.get("test", False))
+        skip_imputed = bool(data.get("skip_imputed", False))
+        problems_only = bool(data.get("problems_only", False))
+        imputed_use_cache = bool(data.get("imputed_use_cache", True))
+        fdrs_years_raw = (data.get("fdrs_years") or "").strip()
+        try:
+            fdrs_reported_import_states = parse_reported_import_states(data)
+        except ValueError as e:
+            return json_bad_request(str(e))
+
+        fdrs_years = None
+        if test_mode:
+            fdrs_years = [2024]
+        elif fdrs_years_raw:
+            try:
+                fdrs_years = [int(y.strip()) for y in fdrs_years_raw.split(",") if y.strip()]
+            except ValueError:
+                return json_bad_request("Invalid fdrs_years: use comma-separated integers")
+        if not fdrs_years:
+            return json_bad_request("Select at least one reporting year.")
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        tmp.close()
+        output_path = tmp.name
+
+        _maybe_cleanup_expired_import_jobs()
+
+        job_id = create_fdrs_sync_verify_job(
+            user_id=int(getattr(current_user, "id", 0) or 0),
+            template_id=template_id,
+            fdrs_years=fdrs_years,
+            skip_imputed=skip_imputed,
+            fresh_imputed=not imputed_use_cache,
+            problems_only=problems_only,
+            fdrs_reported_import_states=fdrs_reported_import_states,
+            output_path=output_path,
+        )
+        worker_app = current_app._get_current_object()
+        if current_app.config.get("TESTING"):
+            _run_fdrs_sync_verify_job(worker_app, job_id)
+        else:
+            start_fdrs_sync_verify_job(worker_app, job_id)
+        return json_accepted(job_id=job_id)
+    except HTTPException:
+        raise
+    except (ValueError, RuntimeError) as e:
+        current_app.logger.error("FDRS verify error: %s", e, exc_info=True)
+        msg = str(e).strip() or "Verification failed."
+        return json_bad_request(msg[:2000] if len(msg) > 2000 else msg)
+    except Exception as e:
+        return handle_json_view_exception(e, GENERIC_ERROR_MESSAGE, status_code=500)
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-status/<job_id>", methods=["GET"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_status(template_id: int, job_id: str):
+    _maybe_cleanup_expired_import_jobs()
+
+    _owned, err = _owned_import_job_or_error(template_id, job_id)
+    if err is not None:
+        return err
+
+    if not _job_looks_actively_running(_owned):
+        ensure_fdrs_sync_verify_job_running(current_app._get_current_object(), job_id)
+    job_payload = build_fdrs_sync_verify_status_payload(job_id, template_id)
+    if not job_payload:
+        return json_not_found("Job not found")
+
+    resp = {"success": True, "job": job_payload}
+    if resp["job"]["download_ready"]:
+        resp["job"]["download_url"] = url_for(
+            "fdrs.sync_verify_download",
+            template_id=template_id,
+            job_id=job_id,
+        )
+    return json_ok(**resp)
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-cancel/<job_id>", methods=["POST"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_cancel(template_id: int, job_id: str):
+    job, err = _owned_import_job_or_error(template_id, job_id)
+    if err is not None:
+        return err
+
+    status = job.get("status")
+    if status in ("completed", "failed", "cancelled"):
+        return json_ok(status=status)
+
+    final_status = request_fdrs_sync_verify_cancel(job_id)
+    return json_ok(status=final_status)
+
+
+@bp.route("/admin/templates/data-sync/<int:template_id>/sync-verify-download/<job_id>", methods=["GET"])
+@admin_permission_required("admin.templates.edit")
+def sync_verify_download(template_id: int, job_id: str):
+    job, err = _owned_import_job_or_error(template_id, job_id)
+    if err is not None:
+        return err
+    path = job.get("preview_path")
+    if not path or not os.path.isfile(path):
+        return json_not_found("Verification file not available")
+
+    @after_this_request
+    def _remove_workbook(resp):
+        with suppress(Exception):
+            os.unlink(path)
+        update_import_job(job_id, force=True, download_ready=False, preview_path=None)
+        return resp
+
+    return send_file(
+        path,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"fdrs_sync_verification_{template_id}.xlsx",
     )

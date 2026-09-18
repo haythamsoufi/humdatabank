@@ -33,6 +33,10 @@ from plugins.fdrs.services.fdrs_data_sync_job import (
     ensure_fdrs_data_sync_job_running,
     get_active_fdrs_data_sync_jobs_for_user,
 )
+from plugins.fdrs.services.fdrs_sync_verify_job import (
+    ensure_fdrs_sync_verify_job_running,
+    get_active_fdrs_sync_verify_jobs_for_user,
+)
 from app.services.imports.import_change_log import (
     ImportChangeLogWriter,
     attach_import_change_log_to_activity,
@@ -368,6 +372,7 @@ def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str
 
     fdrs_years_start, fdrs_years_end = 0, 0
     active_fdrs_jobs: List[Dict[str, Any]] = []
+    active_fdrs_verify_jobs: List[Dict[str, Any]] = []
     if has_data_sync:
         fdrs_years_start, fdrs_years_end = _fdrs_default_years_bounds()
         user_id = int(getattr(current_user, "id", 0) or 0)
@@ -376,11 +381,19 @@ def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str
                 user_id,
                 template_id=template_id,
             )
+            active_fdrs_verify_jobs = get_active_fdrs_sync_verify_jobs_for_user(
+                user_id,
+                template_id=template_id,
+            )
             worker_app = current_app._get_current_object()
             for active in active_fdrs_jobs:
                 jid = active.get("job_id")
                 if jid:
                     ensure_fdrs_data_sync_job_running(worker_app, str(jid))
+            for active in active_fdrs_verify_jobs:
+                jid = active.get("job_id")
+                if jid:
+                    ensure_fdrs_sync_verify_job_running(worker_app, str(jid))
 
     return render_template(
         "admin/templates/data_sync_imputation.html",
@@ -394,6 +407,7 @@ def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str
         fdrs_years_start=fdrs_years_start,
         fdrs_years_end=fdrs_years_end,
         active_fdrs_jobs=active_fdrs_jobs,
+        active_fdrs_verify_jobs=active_fdrs_verify_jobs,
     )
 
 

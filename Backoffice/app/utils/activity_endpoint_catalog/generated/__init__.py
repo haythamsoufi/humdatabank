@@ -25,6 +25,7 @@ from app.utils.activity_endpoint_catalog.generated.partials.excel import SPECS a
 from app.utils.activity_endpoint_catalog.generated.partials.form_builder import SPECS as _S_form_builder
 from app.utils.activity_endpoint_catalog.generated.partials.forms import SPECS as _S_forms
 from app.utils.activity_endpoint_catalog.generated.partials.forms_api import SPECS as _S_forms_api
+from app.utils.activity_endpoint_catalog.generated.partials.fdrs import SPECS as _S_fdrs
 from app.utils.activity_endpoint_catalog.generated.partials.indicator_bank_compat import SPECS as _S_indicator_bank_compat
 from app.utils.activity_endpoint_catalog.generated.partials.interactive_map_plugin import SPECS as _S_interactive_map_plugin
 from app.utils.activity_endpoint_catalog.generated.partials.main import SPECS as _S_main
@@ -61,6 +62,7 @@ GENERATED_ACTIVITY_SPECS: dict[tuple[str, str], ActivityEndpointSpec] = merge_ac
     _S_form_builder,
     _S_forms,
     _S_forms_api,
+    _S_fdrs,
     _S_indicator_bank_compat,
     _S_interactive_map_plugin,
     _S_main,

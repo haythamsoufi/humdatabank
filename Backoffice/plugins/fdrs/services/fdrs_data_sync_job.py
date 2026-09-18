@@ -34,6 +34,17 @@ from app.services.imports.import_change_log import (
 
 logger = logging.getLogger(__name__)
 
+# Throttle for _touch_sync_item_heartbeat: each touch opens a fresh DB session
+# (checkout + SELECT + UPDATE + COMMIT + release) on the shared connection
+# pool. progress_cb fires every ~250 rows during the upsert phase, which on a
+# large sync (tens of thousands of rows) can mean a heartbeat touch every
+# fraction of a second — competing for pool connections and GIL time with the
+# request threads serving the browser's status polls. The stale-job threshold
+# is minutes (FDRS_DATA_SYNC_JOB_STALE_SECONDS, default 900s, min 60s), so a
+# few seconds of slack here is safe.
+_HEARTBEAT_MIN_INTERVAL_SECONDS = 5.0
+_last_heartbeat_ts: Dict[int, float] = {}
+
 
 def _fdrs_imports_dir() -> str:
     from plugins.fdrs.scripts_path import ensure_fdrs_scripts_in_path
@@ -41,15 +52,27 @@ def _fdrs_imports_dir() -> str:
     return ensure_fdrs_scripts_in_path()
 
 
-def _touch_sync_item_heartbeat(item_id: int) -> None:
-    """Keep AIJobItem.updated_at fresh so stale recovery works during long syncs."""
+def _touch_sync_item_heartbeat(item_id: int, *, force: bool = False) -> None:
+    """Keep AIJobItem.updated_at fresh so stale recovery works during long syncs.
+
+    Rate-limited (see ``_HEARTBEAT_MIN_INTERVAL_SECONDS``) unless ``force=True``.
+    """
+    item_id = int(item_id)
+    now = time.time()
+    if not force and (now - _last_heartbeat_ts.get(item_id, 0.0)) < _HEARTBEAT_MIN_INTERVAL_SECONDS:
+        return
+    _last_heartbeat_ts[item_id] = now
     try:
         with _isolated_job_session() as session:
-            item = session.get(AIJobItem, int(item_id))
+            item = session.get(AIJobItem, item_id)
             if item:
                 item.updated_at = utcnow()
     except Exception as exc:
         logger.debug("FDRS sync item heartbeat failed: item=%s err=%s", item_id, exc)
+
+
+def _clear_sync_item_heartbeat(item_id: int) -> None:
+    _last_heartbeat_ts.pop(int(item_id), None)
 
 
 def _summarize_error(exc: BaseException) -> str:
@@ -335,7 +358,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             message="Starting...",
             worker_pid=os.getpid(),
         )
-        _touch_sync_item_heartbeat(item_id)
+        _touch_sync_item_heartbeat(item_id, force=True)
         app.logger.info(
             "Data sync %s: starting (template_id=%s, dry_run=%s, test=%s, sync_documents=%s)",
             job_id,
@@ -398,6 +421,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 extra={
                     "rows_inserted": (stats or {}).get("inserted"),
                     "rows_updated": (stats or {}).get("updated"),
+                    "rows_unchanged": (stats or {}).get("unchanged"),
                     "rows_skipped": (stats or {}).get("skipped"),
                     "rows_errors": (stats or {}).get("errors"),
                 },
@@ -416,12 +440,13 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
             item.error = None
             terminal_item_status = "completed"
             app.logger.info(
-                "Data sync %s: completed loaded=%s skipped=%s inserted=%s updated=%s errors=%s",
+                "Data sync %s: completed loaded=%s skipped=%s inserted=%s updated=%s unchanged=%s errors=%s",
                 job_id,
                 (stats or {}).get("loaded"),
                 (stats or {}).get("skipped"),
                 (stats or {}).get("inserted"),
                 (stats or {}).get("updated"),
+                (stats or {}).get("unchanged"),
                 (stats or {}).get("errors"),
             )
         except FdrsSyncCancelled:
@@ -461,6 +486,7 @@ def _process_fdrs_data_sync_item_sync(app, *, job_id: str, item_id: int) -> None
                 item.status = terminal_item_status
             db.session.commit()
             clear_import_job_logging_state(job_id)
+            _clear_sync_item_heartbeat(item_id)
             db.session.remove()
 
 

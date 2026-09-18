@@ -9,14 +9,16 @@ Planning templates (rounds P*):
     22  Annual Planning – International Bilateral Support
 
 Reporting templates:
-    33  Reporting – Country  (rounds AR*, MYR*)
-    23  Reporting – PNS      (rounds AR*)
+    33  Reporting – Country  (AR21–AR25, MYR23–MYR25)
+    23  Reporting – PNS      (AR21–AR25)
+
+UPR Master never writes later rounds (P27+, AR26+, MYR26+).
 
 Usage:
     python scripts/imports/import_upr_excel_data.py --input path/to/UPR\\ Master.xlsx
     python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds P25,P26 --dry-run
     python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds AR25 --templates 33,23
-    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR26 --templates 33
+    python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --rounds MYR25 --templates 33
     python scripts/imports/import_upr_excel_data.py --input path/to/file.xlsx --templates 24,22
 """
 
@@ -70,7 +72,7 @@ from upr_import_warnings import make_import_warning, summarize_warnings  # noqa:
 UPR_DATA_SHEET = "UPR Data"
 HEADER_ROW_INDEX = 2  # 0-based row 3 in Excel
 ROWS_CACHE_VERSION = 1
-TRANSFORM_CACHE_VERSION = 9
+TRANSFORM_CACHE_VERSION = 11
 _ROWS_CACHE_LOCKS: Dict[str, threading.Lock] = {}
 _ROWS_CACHE_LOCKS_GUARD = threading.Lock()
 
@@ -110,6 +112,22 @@ UPR_TEMPLATE_PROFILES: Dict[int, Dict[str, Any]] = {
         "sections": frozenset({"Funding"}),
     },
 }
+
+# Closed historical set. Later rounds (P27, AR26, MYR26, …) are live in the
+# backoffice and must not be overwritten from UPR Master's flat totals.
+UPR_MASTER_ALLOWED_PLANNING_ROUNDS = ("P23", "P24", "P25", "P26")
+UPR_MASTER_ALLOWED_AR_ROUNDS = ("AR21", "AR22", "AR23", "AR24", "AR25")
+UPR_MASTER_ALLOWED_MYR_ROUNDS = ("MYR23", "MYR24", "MYR25")
+UPR_MASTER_ALLOWED_ROUNDS = frozenset(
+    UPR_MASTER_ALLOWED_PLANNING_ROUNDS
+    + UPR_MASTER_ALLOWED_AR_ROUNDS
+    + UPR_MASTER_ALLOWED_MYR_ROUNDS
+)
+
+
+def is_upr_master_importable_round(round_code: Any) -> bool:
+    return str(round_code or "").strip().upper() in UPR_MASTER_ALLOWED_ROUNDS
+
 
 STAFF_INDICATOR_COLUMNS: Dict[str, str] = {
     "# of international delegates integrated with the HNS": "intl_delegates_hns",
@@ -465,6 +483,8 @@ def _build_pns_reported_yes_sets(
 
     for row in rows:
         rnd = str(row.get("Round") or "").strip().upper()
+        if not is_upr_master_importable_round(rnd):
+            continue
         if rounds and rnd not in rounds:
             continue
         if str(row.get("Section") or "").strip() != "Funding":
@@ -497,15 +517,21 @@ def _build_pns_reported_yes_sets(
 
 
 def _periods_for_import_rounds(rounds: Optional[Set[str]]) -> Optional[Set[str]]:
-    """Map selected UPR round codes to assignment period names (None = all periods)."""
+    """Map selected UPR round codes to assignment period names (None = all periods).
+
+    Explicit later/unknown rounds (P27, MYR26, …) do not expand the period set.
+    An empty result is an empty set, not ``None`` (which would mean every period).
+    """
     if not rounds:
         return None
     periods: Set[str] = set()
     for rnd in rounds:
+        if not is_upr_master_importable_round(rnd):
+            continue
         period = round_to_period(rnd)
         if period:
             periods.add(period)
-    return periods or None
+    return periods
 
 
 def plan_non_reported_pns_aes_by_template(
@@ -524,7 +550,7 @@ def plan_non_reported_pns_aes_by_template(
         if tpl_id not in template_ids:
             continue
         for (period, _iso3), aes_id in ctx.assignment_by_template.get(tpl_id, {}).items():
-            if periods and period not in periods:
+            if periods is not None and period not in periods:
                 continue
             if int(aes_id) in reported_aes:
                 continue
@@ -1141,8 +1167,8 @@ def _reporting_aes_ids_from_excel(
     """T33 assignment ids for reporting round+country pairs present in the Excel rows.
 
     Yes/No defaults must not touch assignments for rounds that are absent from UPR
-    Master (e.g. MYR26 when the workbook only contains MYR25), even when those
-    assignments already exist in the database.
+    Master, or later than the closed Master set (P23–P26, AR21–AR25, MYR23–MYR25),
+    even when those assignments already exist in the database.
     """
     if REPORTING_COUNTRY_TEMPLATE_ID not in template_ids:
         return set()
@@ -1154,6 +1180,8 @@ def _reporting_aes_ids_from_excel(
     seen_period_iso: Set[Tuple[str, str]] = set()
     for row in rows:
         rnd = str(row.get("Round") or "").strip().upper()
+        if not is_upr_master_importable_round(rnd):
+            continue
         if not (rnd.startswith("AR") or rnd.startswith("MYR")):
             continue
         sec = str(row.get("Section") or "").strip()
@@ -1377,6 +1405,10 @@ def summarize_workbook_from_rows(headers: List[str], rows: List[Dict[str, Any]])
     planning_rounds = sorted(r for r in rounds if r.startswith("P"))
     ar_rounds = sorted(r for r in rounds if r.startswith("AR"))
     myr_rounds = sorted(r for r in rounds if r.startswith("MYR"))
+    excluded_rounds = sorted(
+        r for r in rounds
+        if r.upper().startswith(("P", "AR", "MYR")) and not is_upr_master_importable_round(r)
+    )
     return {
         "success": True,
         "sheet": UPR_DATA_SHEET,
@@ -1386,6 +1418,7 @@ def summarize_workbook_from_rows(headers: List[str], rows: List[Dict[str, Any]])
         "planning_rounds": planning_rounds,
         "ar_rounds": ar_rounds,
         "myr_rounds": myr_rounds,
+        "excluded_rounds": excluded_rounds,
         "sections": sorted(sections),
         "years": sorted(years),
         "countries": len(iso3s),
@@ -1788,6 +1821,8 @@ def _build_reach_ea_code_index(
     index: Dict[Tuple[str, str, str], str] = {}
     for row in rows:
         rnd = str(row.get("Round") or "").strip().upper()
+        if not is_upr_master_importable_round(rnd):
+            continue
         if rounds and rnd not in rounds:
             continue
         if str(row.get("Section") or "").strip() != "Reach":
@@ -3227,6 +3262,8 @@ def _filter_rows(
         rnd = str(row.get("Round") or "").strip().upper()
         if sec not in allowed_sections:
             continue
+        if not is_upr_master_importable_round(rnd):
+            continue
         if allowed_prefixes and not any(rnd.startswith(p) for p in allowed_prefixes):
             continue
         if rounds and rnd not in rounds:
@@ -3235,6 +3272,40 @@ def _filter_rows(
             continue
         out.append(row)
     return out
+
+
+def _warn_excluded_master_rounds(
+    ctx: UprImportContext,
+    rows: List[Dict[str, Any]],
+    *,
+    template_ids: List[int],
+    rounds: Optional[Set[str]] = None,
+) -> None:
+    """One preview warning when workbook rounds sit outside the closed Master set."""
+    accepted_prefixes: Set[str] = set()
+    for tid in template_ids:
+        prof = UPR_TEMPLATE_PROFILES.get(tid)
+        if prof:
+            accepted_prefixes.update(prof.get("round_prefixes") or ())
+    present = sorted({
+        str(row.get("Round") or "").strip().upper()
+        for row in rows
+        if not is_upr_master_importable_round(row.get("Round"))
+        and (
+            not rounds
+            or str(row.get("Round") or "").strip().upper() in rounds
+        )
+        and any(
+            str(row.get("Round") or "").strip().upper().startswith(prefix)
+            for prefix in accepted_prefixes
+        )
+    })
+    if not present:
+        return
+    ctx.warnings.append(
+        f"UPR Master rows for {', '.join(present)} were ignored. "
+        "Import is limited to P23–P26, AR21–AR25, and MYR23–MYR25."
+    )
 
 
 def _t22_pns_import_cell_value(
@@ -3281,6 +3352,7 @@ def transform_to_import_rows(
     """Transform UPR Excel rows into ready-to-import form_data rows."""
     tids = template_ids or ctx.template_ids
     _ensure_canonical_assignment_keys(ctx)
+    _warn_excluded_master_rounds(ctx, rows, template_ids=tids, rounds=rounds)
     filtered = _filter_rows(rows, template_ids=tids, rounds=rounds)
     ctx.percentage_unit_interval_keys = collect_percentage_unit_interval_keys(
         filtered, ctx.percentage_bank_ids, ctx.yes_no_bank_ids
@@ -4237,7 +4309,7 @@ def main() -> int:
         default=",".join(str(t) for t in UPR_TEMPLATE_PROFILES),
         help="Comma-separated template IDs (default: 24,22)",
     )
-    parser.add_argument("--rounds", default="", help="Comma-separated round codes (e.g. P26, AR25, MYR26). Default: all rounds matching the selected templates.")
+    parser.add_argument("--rounds", default="", help="Comma-separated round codes (e.g. P26, AR25, MYR25). Default: all allowed rounds matching the selected templates (P23–P26, AR21–AR25, MYR23–MYR25).")
     parser.add_argument("--dry-run", action="store_true", help="Preview only, no DB writes")
     parser.add_argument("--batch-size", type=int, default=1000)
     parser.add_argument("--preview-excel", default="", help="Write ready-to-import preview Excel")

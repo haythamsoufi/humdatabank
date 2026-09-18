@@ -392,16 +392,22 @@ def test_render_report_in_support_header():
     payload["meta"]["kind"] = "report"
     payload["meta"]["header_prefix"] = "IN SUPPORT OF"
     payload["kpis"] = {
-        "branches": {"label": "Local Branches", "display": "34"},
-        "local_units": {"label": "Local Units", "display": "329"},
-        "volunteers": {"label": "Volunteers", "display": "26,000"},
-        "staff": {"label": "Paid Staff", "display": "4,000"},
+        "branches": {"label": "National Society branches", "display": "34"},
+        "local_units": {"label": "National Society local units", "display": "329"},
+        "volunteers": {"label": "National Society volunteers", "display": "26,000"},
+        "staff": {"label": "National Society staff", "display": "4,000"},
     }
     html = render_dashboard_html(payload, "in_support")
-    assert "IN SUPPORT OF UGANDA RED CROSS SOCIETY" in html
-    assert html.find("Local Branches") < html.find("Local Units")
-    assert html.find("Local Units") < html.find("Volunteers")
-    assert html.find("Volunteers") < html.find("Paid Staff")
+    assert "IN SUPPORT OF THE UGANDA RED CROSS SOCIETY" in html
+    assert html.find("National Society branches") < html.find("National Society local units")
+    assert html.find("National Society local units") < html.find("National Society volunteers")
+    assert html.find("National Society volunteers") < html.find("National Society staff")
+    already_the = _payload()
+    already_the["meta"]["kind"] = "report"
+    already_the["meta"]["header_prefix"] = "IN SUPPORT OF"
+    already_the["meta"]["national_society"] = "The Uganda Red Cross Society"
+    assert "IN SUPPORT OF THE UGANDA RED CROSS SOCIETY" in render_dashboard_html(already_the, "in_support")
+    assert "THE THE" not in render_dashboard_html(already_the, "in_support")
 
 
 @pytest.mark.unit
@@ -435,6 +441,8 @@ def test_render_reach_and_support():
     assert "Emergency<br>Operations" in eo_html
     assert eo_html.find("Emergency<br>Operations") < eo_html.find("Climate and<br>environment")
     assert "dir='ltr'" in eo_html
+    assert 'stroke-width="0.75"' in eo_html
+    assert 'stroke-width="1.4"' not in eo_html
 
 
 @pytest.mark.unit
@@ -607,7 +615,8 @@ def test_render_plan_combined_matches_inp_cover():
     assert "UGANDA" in html
     assert "dir='ltr'" in html
     assert "2026-2028 IFRC network country plan" in html
-    assert "2 July 2026" in html
+    assert "2 July 2026" not in html
+    assert "upr-doc-header__date" not in html
     assert "In support of Uganda Red Cross Society" in html
     assert "People to be reached in 2026" in html
     assert "IFRC network Funding Requirements" in html
@@ -711,7 +720,9 @@ def test_render_report_combined_keeps_tableau_overview():
     payload["meta"]["document_subtitle"] = "2025 IFRC network annual report, Jan-Dec"
     payload["meta"]["header_date"] = "2 July 2026"
     html = render_dashboard_html(payload, "combined")
-    assert "IN SUPPORT OF UGANDA RED CROSS SOCIETY" in html
+    assert "IN SUPPORT OF THE UGANDA RED CROSS SOCIETY" in html
+    assert "2 July 2026" not in html
+    assert "upr-doc-header__date" not in html
     assert "upr-doc-header" in html
     assert "AFGHANISTAN" not in html
     assert "UGANDA" in html
@@ -1176,6 +1187,17 @@ def test_emergency_title_is_code_slash_name():
     html = render_dashboard_html(payload, "emergency_1")
     assert "<span class='upr-code'>MDRAF007</span> / <span class='upr-emergency-name'>Afghanistan Earthquake</span>" in html
     assert "Afghanistan Earthquake <span" not in html
+    css = (
+        Path(__file__).resolve().parents[1] / "static" / "css" / "upr-visuals.css"
+    ).read_text(encoding="utf-8")
+    name_block = css.split(".upr-block--emergency .upr-emergency-name {", 1)[1].split("}", 1)[0]
+    assert 'font-family: "Open Sans"' in name_block
+    assert "font-size: 9pt" in name_block
+    assert "font-style: italic" in name_block
+    th_span = css.split(".upr-support-th span {", 1)[1].split("}", 1)[0]
+    assert "white-space: nowrap" in th_span
+    country_block = css.split(".upr-doc-header__country {", 1)[1].split("}", 1)[0]
+    assert "margin: -0.28rem 0 0" in country_block
 
 
 @pytest.mark.unit

@@ -26,7 +26,6 @@ from plugins.upr_visuals.formatters import (
     chf_label,
     document_subtitle,
     format_compact_chf,
-    format_header_date,
     split_display_amount,
     strip_trailing_period,
     with_chf,
@@ -148,7 +147,7 @@ def _sp_icon(code: str, icon_src: str | None = None, *, size: int = 64) -> str:
         return (
             f'<span class="upr-reach-icon upr-reach-icon--img" aria-hidden="true">'
             f'<svg viewBox="0 0 40 40" width="{dim}" height="{dim}">'
-            f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="1.4"/>'
+            f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="0.75"/>'
             f'<image href="{href}" x="4" y="4" width="32" height="32" '
             f'preserveAspectRatio="xMidYMid meet"/>'
             f"</svg></span>"
@@ -158,7 +157,7 @@ def _sp_icon(code: str, icon_src: str | None = None, *, size: int = 64) -> str:
     return (
         f'<span class="upr-reach-icon" aria-hidden="true">'
         f'<svg viewBox="0 0 40 40" width="{dim}" height="{dim}">'
-        f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="1.4"/>'
+        f'<circle cx="20" cy="20" r="18" fill="#fff" stroke="#011e41" stroke-width="0.75"/>'
         f'<g transform="translate(4 4) scale(1.333)" fill="none" stroke="{color}" stroke-width="1.7" '
         f'stroke-linecap="round" stroke-linejoin="round">{inner}</g></svg></span>'
     )
@@ -291,11 +290,21 @@ def _combined_section_wrap(part: str, *, page_start: bool = False) -> str:
     return f'<div class="upr-combined-section{extra}">{part}</div>'
 
 
-def _in_support(payload: dict[str, Any]) -> str:
+def _in_support_heading(payload: dict[str, Any]) -> str:
     meta = payload.get("meta") or {}
     ns = (meta.get("national_society") or "").strip()
-    prefix = (meta.get("header_prefix") or t("In support of" if _is_plan(payload) else "IN SUPPORT OF")).strip()
-    heading = f"{prefix} {ns}" if _is_plan(payload) else f"{prefix} {ns.upper()}"
+    if _is_plan(payload):
+        prefix = (meta.get("header_prefix") or t("In support of")).strip()
+        return f"{prefix} {ns}".strip()
+    prefix = (meta.get("header_prefix") or t("IN SUPPORT OF")).strip()
+    ns_u = ns.upper()
+    if current_export_language() == "en" and ns_u and not ns_u.startswith("THE "):
+        return f"{prefix} THE {ns_u}".strip()
+    return f"{prefix} {ns_u}".strip()
+
+
+def _in_support(payload: dict[str, Any]) -> str:
+    heading = _in_support_heading(payload)
     kpis = payload.get("kpis") or {}
     order = PLAN_KPI_ORDER if _is_plan(payload) else KPI_ORDER
     cards = []
@@ -403,7 +412,6 @@ def _doc_header(payload: dict[str, Any]) -> str:
         meta.get("period_name"),
         plan_years=meta.get("plan_years"),
     )
-    date_text = (meta.get("header_date") or "").strip() or format_header_date()
     ns_src = (meta.get("ns_logo_src") or "").strip()
     ns_alt = (meta.get("national_society") or t("National Society")).strip() or t("National Society")
     ns_logo_html = ""
@@ -434,7 +442,6 @@ def _doc_header(payload: dict[str, Any]) -> str:
         "</div>"
         "<div class='upr-doc-header__meta'>"
         f"{ns_logo_html}"
-        f"<time class='upr-doc-header__date'>{escape(date_text)}</time>"
         "</div>"
         "</div>"
         "</header>"

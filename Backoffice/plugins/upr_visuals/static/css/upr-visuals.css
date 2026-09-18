@@ -102,7 +102,7 @@
   display: inline-block;
   width: auto;
   max-width: 100%;
-  margin: 0;
+  margin: -0.28rem 0 0;
   padding: 0;
   border-bottom: none;
   white-space: nowrap;
@@ -468,9 +468,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex: 1 1 6.25rem;
-  min-width: 5.5rem;
-  max-width: 8.25rem;
+  flex: 1 1 6.75rem;
+  min-width: 6rem;
+  max-width: 9.5rem;
 }
 
 .upr-block--support .upr-kpi__label,
@@ -1254,12 +1254,17 @@
   vertical-align: bottom;
   padding: 0.35rem 0.15rem 0.4rem;
   min-width: 0;
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
+  word-break: normal;
   hyphens: none;
 }
 
 .upr-support-th span {
   display: block;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .upr-ns {
@@ -1350,10 +1355,13 @@
   color: #f5333f;
 }
 
-.upr-emergency-name {
-  font-size: 0.82em;
+.upr-block--emergency .upr-emergency-name {
+  font-family: "Open Sans", "Segoe UI", sans-serif;
+  font-size: 9pt;
   font-style: italic;
   font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 #upr-visuals-panel {

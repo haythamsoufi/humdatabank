@@ -95,7 +95,6 @@ def build_cover_chrome(
 
     country = localized_country_header(meta)
     subtitle = (meta.get("document_subtitle") or "").strip()
-    date_text = (meta.get("header_date") or "").strip()
     prefix = (meta.get("header_prefix") or t("IN SUPPORT OF")).strip()
     ns = (meta.get("national_society") or "").strip()
     appeal = appeal_number(meta.get("iso2") or meta.get("appeal_iso2"))
@@ -103,7 +102,6 @@ def build_cover_chrome(
     L = _COVER_LAYOUT
     rtl = bool(getattr(doc, "rtl", False))
     start_align = "RightAlign" if rtl else "LeftAlign"
-    end_align = "LeftAlign" if rtl else "RightAlign"
     title_x = _mirror_x(L["title_x"], L["title_w"]) if rtl else L["title_x"]
     rule_x = _mirror_x(L["rule_x"], L["rule_w"]) if rtl else L["rule_x"]
     banner_h = INTERNAL_COVER_BANNER_H if is_internal_narrative(meta) else 0.0
@@ -172,24 +170,6 @@ def build_cover_chrome(
                 ns_logo[0],
                 ns_logo[1],
                 ns_logo[2],
-            )
-        )
-    if date_text:
-        date_w = L["date_w"]
-        date_x = LOGO_PAD if rtl else A4_W - LOGO_PAD - date_w
-        date_y = logo_y + LOGO + 10.0 if ns_logo else L["date_y_no_logo"] + banner_h
-        items.append(
-            _label(
-                doc,
-                date_text,
-                x=date_x,
-                y=date_y,
-                w=date_w,
-                h=L["date_h"],
-                size="9",
-                color="Color/Paper",
-                style="Italic",
-                align=end_align,
             )
         )
 

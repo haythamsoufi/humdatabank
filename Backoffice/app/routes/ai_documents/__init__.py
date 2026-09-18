@@ -21,7 +21,7 @@ from . import management # noqa: E402,F401 – list/get/update/download/delete r
 from . import search     # noqa: E402,F401 – search route
 from . import qa         # noqa: E402,F401 – answer/QA route
 from . import workflows  # noqa: E402,F401 – workflow documentation routes
-from . import ifrc       # noqa: E402,F401 – IFRC API integration routes
+from . import ifrc       # noqa: E402,F401 – IFRC GO-API import routes (plugin)
 
 # Re-export commonly used symbols so existing ``from app.routes.ai_documents import X``
 # statements in other modules continue to work without path changes.

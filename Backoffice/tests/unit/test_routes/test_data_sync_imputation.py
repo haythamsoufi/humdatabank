@@ -70,7 +70,8 @@ def _auth():
     """Bypass RBAC checks for admin template routes."""
     with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
          patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
-         patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=True):
+         patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=True), \
+         patch("plugins.fdrs.routes.check_template_access", return_value=True):
         yield
 
 
@@ -720,7 +721,8 @@ class TestRunDataSync:
         template = create_test_template(db_session, name="FDRS Deny Template")
         with patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.admin.shared.AuthorizationService.has_rbac_permission", return_value=True), \
-             patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=False):
+             patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=False), \
+             patch("plugins.fdrs.routes.check_template_access", return_value=False):
             resp = self._post_data_sync(logged_in_client, template.id)
         assert resp.status_code == 403
 

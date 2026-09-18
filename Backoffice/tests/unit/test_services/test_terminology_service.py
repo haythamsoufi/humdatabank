@@ -4,7 +4,7 @@ Regression coverage for a module-level ``logger`` that was referenced but never
 defined in this file's previous home (app/services/translation/terminology_service.py).
 ``get_focus_area_semantic_doc_hits`` is the only function that logs via the bare
 module logger -- every call that reached its cosine-similarity phase raised a
-``NameError`` internally, which the sole caller (_focus_area_analysis.match_focus_areas)
+``NameError`` internally, which the sole caller (plugins.upr.ai.focus_area_tools.match_focus_areas)
 swallowed via a broad ``except Exception``, silently disabling semantic focus-area
 detection and falling back to lexical-only matching. See docs/DEVELOPER-HANDBOOK.md.
 """
@@ -77,7 +77,7 @@ class TestModuleLocation:
     def test_importable_from_ai_package_not_translation(self):
         """terminology_service is AI retrieval/classification tooling, not a
         translation concern -- it must live under app.services.ai, not
-        app.services.translation (see _focus_area_analysis / _query_utils callers)."""
+        app.services.translation (see plugins.upr.ai.focus_area_tools / _query_utils callers)."""
         import app.services.ai.terminology_service  # noqa: F401
 
         with pytest.raises(ModuleNotFoundError):

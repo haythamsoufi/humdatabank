@@ -93,7 +93,7 @@ Used to pre-populate or bulk-update submissions from external data sources (e.g.
 **CLI:**
 ```bash
 cd Backoffice
-python scripts/imports/import_fdrs_form_data.py
+python plugins/fdrs/scripts/import_fdrs_form_data.py
 ```
 
 **Admin UI import:** Admin → Utilities → Import (if available for the data type)
@@ -123,7 +123,7 @@ All scripts run from `Backoffice/` with the virtualenv activated. Always snapsho
 
 | Script | Purpose | Typical use |
 |--------|---------|-------------|
-| `scripts/imports/import_fdrs_form_data.py` | Bulk import from FDRS data files | Annual data ingestion |
+| `plugins/fdrs/scripts/import_fdrs_form_data.py` | Bulk import from FDRS data files | Annual data ingestion |
 | `scripts/check_db_migration.py` | Sanity-check migration heads | Pre-deploy check |
 | `scripts/ai/trigger_automated_trace_review.py` | Export pending AI trace-review packets | Monthly AI quality review |
 | `scripts/ai/seed_low_quality_review.py` | Create a test trace review item | QA / pipeline testing |

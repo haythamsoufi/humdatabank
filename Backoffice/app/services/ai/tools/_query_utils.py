@@ -19,9 +19,9 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# UPR / Unified Plan detection – moved to app.services.upr.query_detection
+# UPR / Unified Plan detection – lives in plugins.upr.ai.query_detection
 # ---------------------------------------------------------------------------
-from app.services.upr.query_detection import query_prefers_upr_documents  # noqa: F401
+from plugins.upr.ai.query_detection import query_prefers_upr_documents  # noqa: F401
 
 
 # ---------------------------------------------------------------------------

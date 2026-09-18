@@ -37,7 +37,7 @@ from app.services.ai.validation.parsers import (
     _parse_year_from_period,
     _safe_int,
 )
-from app.services.ai.validation.upr_rules import (
+from plugins.upr.ai.upr_rules import (
     _required_terms_for_claims,
     _upr_document_label,
     _upr_kpi_applicable,

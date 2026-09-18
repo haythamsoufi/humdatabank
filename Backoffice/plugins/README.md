@@ -94,6 +94,8 @@ For **org-specific admin tools** (Data Explorer tabs, custom report pipelines, e
 - Contract: `Backoffice/app/plugins/base.py` (`BasePlugin`, optional `get_data_explorer_tab()`, `get_seed_permissions()`, `get_seed_roles()`, `get_csp_overrides()`, `get_panel_render_context()`)
 - Discovery: `Backoffice/app/plugins/manager.py` scans `plugins/*/plugin.py`
 - Example: `pb_progress/` (P&B Visuals + Quarto/Playwright pipeline in `visuals/`)
+- FDRS: `fdrs/` (backend-only data-api sync, documents, matrix validation, quality methodology)
+- UPR: `upr/` (dashboards, Excel, GO-API documents, AI/RAG document intelligence)
 
 Required file: `plugin.py` with a concrete `BasePlugin` subclass. Set `get_field_types()` to `[]` for admin-only tools. Optional: `routes.py`, `service.py`, `templates/`, `static/`, and tool subfolders.
 

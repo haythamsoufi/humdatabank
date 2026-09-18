@@ -16,7 +16,7 @@ BACKOFFICE_ROOT = Path(__file__).resolve().parents[2]
 class TestPlanPytestRun:
     def test_css_only_skips(self):
         plan = plan_pytest_run(
-            ["Backoffice/plugins/upr_visuals/static/css/upr-visuals.css"],
+            ["Backoffice/plugins/upr/static/css/upr.css"],
             BACKOFFICE_ROOT,
         )
         assert plan == PytestPlan(
@@ -72,11 +72,11 @@ class TestPlanPytestRun:
 
     def test_maps_plugin_module_to_plugin_test_file(self):
         plan = plan_pytest_run(
-            ["Backoffice/plugins/upr_visuals/raster.py"],
+            ["Backoffice/plugins/upr/raster.py"],
             BACKOFFICE_ROOT,
         )
         assert plan.mode == "selected"
-        assert "plugins/upr_visuals/tests/test_raster.py" in plan.targets
+        assert "plugins/upr/tests/test_raster.py" in plan.targets
         assert plan.needs_render_libs is True
 
     def test_unmapped_python_skips_rather_than_full_suite(self, tmp_path: Path):

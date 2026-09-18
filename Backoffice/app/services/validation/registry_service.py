@@ -7,8 +7,8 @@ from typing import Any
 from app import db
 from app.models import Country
 from app.models.validation import ValidationKpiCheckType, ValidationQuestionTemplate, ValidationThreshold
-from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
-from app.services.validation.fdrs_matrix.history import CHECK_TYPE_3YEAR_AVG, CHECK_TYPE_PAST_YEAR
+from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
+from plugins.fdrs.validation.fdrs_matrix.history import CHECK_TYPE_3YEAR_AVG, CHECK_TYPE_PAST_YEAR
 from app.services.validation.rule_registry import list_registered_rule_packs, list_rule_definitions
 from app.utils.data_quality_constants import REGISTERED_RULE_PACKS
 

@@ -2,7 +2,7 @@
 
 > **Status:** Active / In progress  
 > **Last updated:** June 2026  
-> **Primary files:** `Backoffice/scripts/imports/import_upr_excel_data.py` · `Backoffice/app/services/upr/excel_import_service.py` · `Backoffice/app/routes/admin/upr_excel_import.py` · `Backoffice/app/templates/admin/templates/upr_excel_import.html`
+> **Primary files:** `Backoffice/plugins/upr/scripts/import_upr_excel_data.py` · `Backoffice/plugins/upr/excel/excel_import_service.py` · `Backoffice/plugins/upr/excel/import_routes.py` · `Backoffice/plugins/upr/templates/admin/upr_excel_import.html`
 
 > **Scope (June 2026):** Planning templates 24 + 22 and Reporting templates 33 + 23 are implemented, including Emergency 1/2/3 on T33 (repeat group + dynamic indicators).
 

@@ -25,6 +25,10 @@ from .data_explorer import CORE_DATA_EXPLORER_PERMISSIONS
 class PluginManager:
     """Manages plugin discovery, loading, and lifecycle."""
 
+    _PLUGIN_ID_ALIASES = {
+        "upr_visuals": "upr",
+    }
+
     def __init__(self, app: Flask):
         self.app = app
         self.logger = logging.getLogger(__name__)
@@ -325,6 +329,7 @@ class PluginManager:
             return
 
         tokens = set(str(t) for t in (self._raw_active_tokens or []) if str(t).strip())
+        tokens = {self._PLUGIN_ID_ALIASES.get(token, token) for token in tokens}
         resolved: Set[str] = set()
         for plugin_id, plugin in self.plugins.items():
             if plugin_id in tokens:
@@ -542,7 +547,7 @@ class PluginManager:
         for plugin_id in self.active_plugins:
             if plugin_id in self.plugins:
                 plugin = self.plugins[plugin_id]
-                if plugin.get_data_explorer_tab() is not None:
+                if plugin.is_admin_feature():
                     continue
                 blueprint = plugin.get_blueprint()
                 if blueprint:
@@ -962,7 +967,7 @@ class PluginManager:
         """Register blueprints for admin-feature plugins (always on, not activation-gated)."""
         registered: list[str] = []
         for plugin_id, plugin in self.plugins.items():
-            if plugin.get_data_explorer_tab() is None:
+            if not plugin.is_admin_feature():
                 continue
             blueprint = plugin.get_blueprint()
             if blueprint is None:

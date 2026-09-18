@@ -20,7 +20,7 @@ class TestAiFastpathsImport:
 
     def test_entrypoint_is_same_object_as_source(self):
         from app.services.ai.chat.fastpaths import run_unified_plans_focus_fastpath as exported
-        from app.services.upr.focus_area_analysis import run_unified_plans_focus_fastpath as source
+        from plugins.upr.ai.focus_area_analysis import run_unified_plans_focus_fastpath as source
         assert exported is source
 
 

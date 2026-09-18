@@ -37,7 +37,7 @@ def main():
 
     from app.models.form_items import FormItem
     from app.models.forms import FormTemplate
-    from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
+    from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 
     app = create_app()
     with app.app_context():

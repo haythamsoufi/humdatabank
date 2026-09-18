@@ -231,7 +231,7 @@ class TestGetUprKpiValueYearArg:
     users asking about a specific Plan/Midyear/Annual report can influence the UPR
     KPI ranking, not just the internal form-suggestion caller). Verifies the wrapper
     coerces it to int and forwards it as data_retrieval.get_upr_kpi_value's
-    prefer_year kwarg; see also app/services/upr/tool_specs.py for the JSON schema."""
+    prefer_year kwarg; see also plugins/upr/ai/tool_specs.py for the JSON schema."""
 
     @pytest.fixture
     def tools_registry(self, app):

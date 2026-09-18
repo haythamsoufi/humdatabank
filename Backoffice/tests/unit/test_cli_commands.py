@@ -75,13 +75,13 @@ class TestRbacCliCommandsModule:
             return_value=stats,
         ), patch(
             "app.services.organization.rbac_seed_service.get_missing_baseline_role_codes",
-            return_value=["admin_data_explorer_upr_visuals"],
+            return_value=["admin_data_explorer_upr"],
         ):
             result = rbac_runner.invoke(args=["rbac", "seed"])
 
         assert result.exit_code == 0
         assert "still missing" in result.output
-        assert "admin_data_explorer_upr_visuals" in result.output
+        assert "admin_data_explorer_upr" in result.output
 
     def test_rbac_seed_skipped_due_to_lock(self, rbac_runner):
         with patch(

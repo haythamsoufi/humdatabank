@@ -203,7 +203,7 @@ def activity_category_for_endpoint(endpoint: str) -> str:
         return "admin_utilities"
     if bp in ("settings", "api_key_management", "api_management", "rbac_management", "security_dashboard"):
         return "admin_settings"
-    if bp in ("plugin_management", "plugins", "pb_progress", "upr_visuals"):
+    if bp in ("plugin_management", "plugins", "pb_progress", "upr"):
         return "admin_plugin"
     if bp.endswith("_plugin"):
         return "admin_plugin"

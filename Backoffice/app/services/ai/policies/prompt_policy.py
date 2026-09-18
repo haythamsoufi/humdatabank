@@ -309,7 +309,7 @@ def _agent_system_prompt_cache_ttl_seconds() -> float:
 
 def build_agent_system_prompt(user_context: Optional[Dict[str, Any]], language: str) -> str:
     """Build the agent system prompt (short TTL in-process cache keyed on context)."""
-    from app.services.upr import is_upr_active
+    from plugins.upr.ai import is_upr_active
 
     org_name = get_org_name()
     upr_active = bool(is_upr_active())
@@ -605,7 +605,7 @@ Navigation (when relevant):
 - Neural Map: /admin/indicator_bank/neural_map"""
 
         if upr_active:
-            from app.services.upr.prompts import get_upr_prompt_section
+            from plugins.upr.ai.prompts import get_upr_prompt_section
 
             prompt += "\n\n" + get_upr_prompt_section()
 

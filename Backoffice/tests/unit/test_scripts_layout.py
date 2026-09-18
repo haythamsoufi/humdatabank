@@ -28,11 +28,21 @@ APP_SCRIPT_MODULES = (
 
 # Importable pipeline modules (live under scripts/imports on sys.path).
 IMPORTS_MODULES = (
+    "form_row_upsert",
+)
+
+# UPR import pipeline now lives in the UPR plugin.
+UPR_PLUGIN_SCRIPTS = (
     "import_upr_excel_data",
-    "import_fdrs_form_data",
     "upr_import_versioning",
     "upr_import_warnings",
     "upr_country_reporting_excel_template",
+    "unified_country_plan_excel_template",
+)
+
+# FDRS import pipeline now lives in the FDRS plugin.
+FDRS_PLUGIN_SCRIPTS = (
+    "import_fdrs_form_data",
     "fdrs_sync_constants",
     "fdrs_sync_verify",
 )
@@ -63,6 +73,16 @@ class TestScriptLayout:
         imports_dir = SCRIPTS_ROOT / "imports"
         for name in IMPORTS_MODULES:
             assert (imports_dir / f"{name}.py").is_file(), f"missing scripts/imports/{name}.py"
+
+    def test_fdrs_plugin_scripts_exist(self):
+        scripts_dir = BACKOFFICE_ROOT / "plugins" / "fdrs" / "scripts"
+        for name in FDRS_PLUGIN_SCRIPTS:
+            assert (scripts_dir / f"{name}.py").is_file(), f"missing plugins/fdrs/scripts/{name}.py"
+
+    def test_upr_plugin_scripts_exist(self):
+        scripts_dir = BACKOFFICE_ROOT / "plugins" / "upr" / "scripts"
+        for name in UPR_PLUGIN_SCRIPTS:
+            assert (scripts_dir / f"{name}.py").is_file(), f"missing plugins/upr/scripts/{name}.py"
 
     @pytest.mark.parametrize("category,filename", OPS_WIRED_SCRIPTS)
     def test_entrypoint_wired_scripts_exist(self, category, filename):
@@ -103,24 +123,33 @@ class TestScriptLayout:
             mod = importlib.import_module(name)
             assert mod is not None
 
+    def test_upr_plugin_scripts_on_sys_path(self):
+        plugin_scripts = str(BACKOFFICE_ROOT / "plugins" / "upr" / "scripts")
+        imports_dir = str(SCRIPTS_ROOT / "imports")
+        for path in (plugin_scripts, imports_dir):
+            if path not in sys.path:
+                sys.path.insert(0, path)
+        for name in UPR_PLUGIN_SCRIPTS:
+            mod = importlib.import_module(name)
+            assert mod is not None
+
 
 class TestServiceScriptPaths:
     def test_upr_excel_import_service_resolves_imports(self, app):
         with app.app_context():
-            from app.services.upr.excel_import_service import UprExcelImportService
+            from plugins.upr.excel.excel_import_service import UprExcelImportService
+            from plugins.upr.excel import excel_import_service as svc
+            from plugins.upr.excel import _scripts_path
 
             UprExcelImportService._upload_dir  # touch class; ensure app context
-            from app.services.upr import excel_import_service as svc
-            from app.services.upr import _scripts_path
-
             _scripts_path._SCRIPTS_DIR = None
             svc._ensure_scripts_in_path()
             import import_upr_excel_data  # noqa: F401
 
     def test_country_reporting_service_resolves_imports(self, app):
         with app.app_context():
-            from app.services.upr import country_reporting_excel_service as svc
-            from app.services.upr import _scripts_path
+            from plugins.upr.excel import country_reporting_excel_service as svc
+            from plugins.upr.excel import _scripts_path
 
             _scripts_path._SCRIPTS_DIR = None
             svc._ensure_scripts_in_path()
@@ -128,8 +157,8 @@ class TestServiceScriptPaths:
 
     def test_unified_country_plan_service_resolves_imports(self, app):
         with app.app_context():
-            from app.services.upr import unified_country_plan_excel_service as svc
-            from app.services.upr import _scripts_path
+            from plugins.upr.excel import unified_country_plan_excel_service as svc
+            from plugins.upr.excel import _scripts_path
 
             _scripts_path._SCRIPTS_DIR = None
             svc._ensure_scripts_in_path()
@@ -139,7 +168,7 @@ class TestServiceScriptPaths:
         """All three UPR Flask-facing services must resolve scripts/imports via the
         single shared helper (no per-module duplicate implementations)."""
         with app.app_context():
-            from app.services.upr import (
+            from plugins.upr.excel import (
                 excel_import_service,
                 unified_country_plan_excel_service,
                 country_reporting_excel_service,
@@ -155,7 +184,7 @@ class TestServiceScriptPaths:
             from app.routes.admin import data_sync_imputation as dsi
 
             imports_dir = dsi._fdrs_imports_dir()
-            assert Path(imports_dir).name == "imports"
+            assert Path(imports_dir).name == "scripts"
             assert (Path(imports_dir) / "import_fdrs_form_data.py").is_file()
 
 

@@ -122,9 +122,9 @@ class TestResolveSubmittedDocumentForAiProcessing:
         assert result["ok"] is False
         assert result["code"] == "missing_storage_path"
 
-    def test_fdrs_imports_dir_points_at_scripts_imports(self):
+    def test_fdrs_imports_dir_points_at_plugin_scripts(self):
         imports_dir = os.path.abspath(ingest._fdrs_imports_dir())
-        assert imports_dir.endswith(os.path.join("scripts", "imports"))
+        assert imports_dir.endswith(os.path.join("plugins", "fdrs", "scripts"))
         assert os.path.isfile(os.path.join(imports_dir, "fdrs_documents_sync.py"))
 
 

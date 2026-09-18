@@ -70,7 +70,8 @@ IGNORE_SUFFIXES = frozenset(
 
 RENDER_PREFIXES = (
     "plugins/pb_progress/",
-    "plugins/upr_visuals/",
+    "plugins/upr/",
+    "plugins/fdrs/",
 )
 
 

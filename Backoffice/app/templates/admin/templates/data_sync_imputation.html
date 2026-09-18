@@ -519,9 +519,9 @@ document.addEventListener('DOMContentLoaded', function() {
         previewImputationChunked: '{{ url_for("data_sync_imputation.preview_imputation_chunked", template_id=0) }}',
         runImputationFiltered: '{{ url_for("data_sync_imputation.run_imputation_filtered", template_id=0) }}',
         exportPreviewExcel: '{{ url_for("data_sync_imputation.export_preview_excel", template_id=0) }}',
-        runDataSync: '{{ url_for("data_sync_imputation.run_data_sync", template_id=0) }}',
-        dataSyncStatus: '{{ url_for("data_sync_imputation.data_sync_status", template_id=0, job_id="__JOB_ID__") }}',
-        dataSyncCancel: '{{ url_for("data_sync_imputation.data_sync_cancel", template_id=0, job_id="__JOB_ID__") }}'
+        runDataSync: '{{ url_for("fdrs.run_data_sync", template_id=0) }}',
+        dataSyncStatus: '{{ url_for("fdrs.data_sync_status", template_id=0, job_id="__JOB_ID__") }}',
+        dataSyncCancel: '{{ url_for("fdrs.data_sync_cancel", template_id=0, job_id="__JOB_ID__") }}'
     };
 
     function templateApiUrl(pathTemplate, templateId) {

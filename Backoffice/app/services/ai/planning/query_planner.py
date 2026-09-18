@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Set
 from flask import current_app
 
 from app.utils.ai_utils import openai_model_supports_sampling_params
-from app.services.upr.tool_specs import UPR_PLANNER_ENTRIES
+from plugins.upr.ai.tool_specs import UPR_PLANNER_ENTRIES
 
 logger = logging.getLogger(__name__)
 

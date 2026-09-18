@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def _upr_ux():
     """Lazy import — keeps `upr` UX hooks out of module import order."""
-    from app.services.upr import ux as _ux
+    from plugins.upr.ai import ux as _ux
 
     return _ux
 

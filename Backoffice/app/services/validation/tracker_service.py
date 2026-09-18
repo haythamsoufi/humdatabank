@@ -11,7 +11,7 @@ from app.models import FormData, FormItem, SubmittedDocument
 from app.models.core import Country
 from app.models.assignments import AssignmentEntityStatus, AssignedForm
 from app.models.enums import status_display_label
-from app.services.data_quality.catalogs import fdrs_v1_catalog as cat
+from plugins.fdrs.data_quality import fdrs_v1_catalog as cat
 from app.services.data_quality.helpers import (
     active_country_map_query,
     compute_income_sources_ratio,

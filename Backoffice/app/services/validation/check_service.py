@@ -19,7 +19,7 @@ from app.services.data_quality.helpers import (
     resolve_assignment_aes,
 )
 from app.services.data_quality.service import get_rule_pack_for_template
-from app.services.validation.fdrs_matrix.rules import run_fdrs_matrix_rules
+from plugins.fdrs.validation.fdrs_matrix.rules import run_fdrs_matrix_rules
 from app.services.validation.question_assembler import assemble_question_for_kpi
 from app.services.validation.types import (
     CheckResult,

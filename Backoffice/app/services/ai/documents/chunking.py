@@ -789,7 +789,7 @@ class AIChunkingService:
             return []
 
         try:
-            from app.services.upr.visual_chunking import (
+            from plugins.upr.ai.visual_chunking import (
                 is_likely_upr_document,
                 extract_in_support_kpis,
                 extract_people_reached,
@@ -806,7 +806,7 @@ class AIChunkingService:
         if not is_likely_upr_document(title=document_title, filename=document_filename, pages=pages):
             return []
 
-        # UPR visuals are expected in the first 1–3 pages; older docs (country plans) may have
+        # UPR are expected in the first 1–3 pages; older docs (country plans) may have
         # hazards, PNS bilateral support table, and funding requirements on pages 3–5.
         upr_pages = (pages or [])[:5]
 

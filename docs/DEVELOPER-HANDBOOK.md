@@ -488,7 +488,8 @@ Org-specific admin features (e.g. IFRC P&B Visuals) live under [`Backoffice/plug
 | Plugin contract | [`Backoffice/app/plugins/base.py`](Backoffice/app/plugins/base.py) (`BasePlugin`, optional admin hooks) |
 | Discovery & lifecycle | [`Backoffice/app/plugins/manager.py`](Backoffice/app/plugins/manager.py) (`PluginManager`) |
 | Example plugin | [`Backoffice/plugins/pb_progress/`](Backoffice/plugins/pb_progress/) |
-| UPR visuals plugin | [`Backoffice/plugins/upr_visuals/`](Backoffice/plugins/upr_visuals/) — live Unified Plan (template 24) / Report (template 33) dashboards on assignment pages; PNG/PDF/InDesign download; optional Word-narrative PDF or InDesign package; bulk PNG export on the Data Explorer **UPR visuals** tab (replaces Tableau `UPR Visuals.twb`). Temporary People reached remapping: [`people-reached.md`](../Backoffice/plugins/upr_visuals/docs/people-reached.md) |
+| FDRS plugin | [`Backoffice/plugins/fdrs/`](Backoffice/plugins/fdrs/) — backend-only Federation-wide Databank & Reporting System: data-api sync, document fetch, matrix validation, and quality methodology. No Data Explorer tab. |
+| UPR plugin | [`Backoffice/plugins/upr/`](Backoffice/plugins/upr/) — Unified Plan (template 24) / Report (template 33): live dashboards, Excel import/export, GO-API document import, and AI/RAG document intelligence. PNG/PDF/InDesign download; optional Word-narrative PDF or InDesign package; bulk PNG export on the Data Explorer **UPR** tab (replaces Tableau `UPR.twb`). Temporary People reached remapping: [`people-reached.md`](../Backoffice/plugins/upr/docs/people-reached.md) |
 | Standalone tool scripts | `Backoffice/plugins/<id>/visuals/` (or similar subfolder) |
 
 **To add a new admin-feature plugin:**
@@ -688,7 +689,7 @@ Detailed runbook: [Incidents → Scenario F (502/504)](Backoffice/docs/runbooks/
 - **Entry form rendering + client behavior**: `Backoffice/app/templates/forms/entry_form/` and `Backoffice/app/static/js/forms/`
 - **AI endpoints + request handling**: `Backoffice/app/routes/ai.py`, `Backoffice/app/services/ai/chat/`
 - **RAG / embeddings / vector store**: `Backoffice/app/services/ai/documents/`, `Backoffice/app/services/ai/providers/`
-- **Business services (by domain)**: `Backoffice/app/services/` — subpackages include `forms/`, `data_retrieval/`, `organization/`, `validation/`, `platform/`, `upr/`, etc.
+- **Business services (by domain)**: `Backoffice/app/services/` — subpackages include `forms/`, `data_retrieval/`, `organization/`, `validation/`, `platform/`, etc. FDRS- and UPR-specific services live in `Backoffice/plugins/fdrs/` and `Backoffice/plugins/upr/`.
 - **Translations / localization**: `Backoffice/app/utils/form_localization.py`, `Backoffice/translations/`, `Backoffice/app/services/translation_review/`
 - **Button styles / design system**: `Backoffice/app/static/css/theme.css` (CSS variables), `Backoffice/app/static/css/components.css` (`.btn` system), `Backoffice/app/static/css/executive-header.css` (`.professional-action-btn` page-header variants)
 - **Mobile app (Flutter)**: `MobileApp/` — routes: `lib/config/routes.dart`, `lib/config/app_router.dart`; DI: `lib/di/service_locator.dart`; API constants: `lib/config/app_config.dart` (no inline `/api/mobile/v1/...` strings in providers). Shared UI: `lib/widgets/loading_indicator.dart`, `lib/widgets/error_state.dart`, `lib/widgets/async/async_body.dart`, `lib/widgets/mobile_screen_scaffold.dart`. JSON helpers: `lib/utils/mobile_api_json.dart`. iOS CocoaPods / `Podfile.lock` without a Mac: **Regenerate iOS Podfile.lock** workflow (see **Mobile App (Flutter)** in Local Development Quickstart).

@@ -14,7 +14,7 @@ from sqlalchemy import or_
 from app.extensions import db, limiter
 from app.models import AIDocument, AIDocumentChunk
 from app.services.ai.documents.vector_store import AIVectorStore
-from app.services.upr import document_answering as upr_doc_answering
+from plugins.upr.ai import document_answering as upr_doc_answering
 from app.utils.api_helpers import GENERIC_ERROR_MESSAGE, get_json_safe
 from app.utils.api_responses import json_ok, json_bad_request, json_server_error
 from app.utils.sql_utils import safe_ilike_pattern

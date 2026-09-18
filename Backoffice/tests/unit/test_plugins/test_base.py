@@ -223,6 +223,12 @@ class TestBasePluginDefaults:
     def test_get_migrations_empty(self):
         assert self.plugin.get_migrations() == []
 
+    def test_get_settings_empty(self):
+        assert self.plugin.get_settings() == {}
+
+    def test_update_settings_returns_true(self):
+        assert self.plugin.update_settings({"any": "value"}) is True
+
     def test_install_returns_true(self):
         assert self.plugin.install() is True
 

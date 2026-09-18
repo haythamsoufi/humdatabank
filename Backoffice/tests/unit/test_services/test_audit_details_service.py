@@ -1114,6 +1114,33 @@ class TestFormatActivityLogDetails:
             "Status": "Pending review",
         }
 
+    def test_import_change_log_url_is_a_clickable_link(self):
+        log_id = "a" * 32
+        result = humanize_audit_details_dict(
+            {
+                "endpoint": "upr_excel_import.run_import",
+                "method": "POST",
+                "job_id": log_id,
+                "change_log_id": log_id,
+                "import_kind": "upr_excel",
+                "change_log_url": f"/admin/import-logs/{log_id}",
+                "filename": "master.xlsx",
+                "rows_updated": 12,
+                "dry_run": False,
+            }
+        )
+        assert result == {
+            "Change log": {
+                "url": f"/admin/import-logs/{log_id}",
+                "label": "Open change log",
+            },
+            "Import": "UPR Excel",
+            "File": "master.xlsx",
+            "Updated": 12,
+            "Dry run": "No",
+        }
+        assert list(result)[0] == "Change log"
+
 
 class TestParseIdList:
     def test_none_and_empty(self):

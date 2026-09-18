@@ -116,3 +116,23 @@ class TestRequestFdrsDataSyncCancel:
         db_session.commit()
         status = request_fdrs_data_sync_cancel(job_id)
         assert status == "completed"
+
+
+class TestImportReusesRunningApp:
+    def test_flask_app_for_import_does_not_create_second_app(self, app):
+        import os
+        import sys
+
+        imports_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts", "imports")
+        )
+        if imports_dir not in sys.path:
+            sys.path.insert(0, imports_dir)
+        from import_fdrs_form_data import _flask_app_for_import
+
+        with app.app_context():
+            with patch("app.create_app") as create_app:
+                resolved = _flask_app_for_import()
+                assert resolved is app
+                create_app.assert_not_called()
+

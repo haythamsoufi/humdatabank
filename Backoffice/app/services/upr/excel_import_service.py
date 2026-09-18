@@ -177,6 +177,7 @@ class UprExcelImportService:
         ensure_staff_matrix: bool = True,  # kept for API backward compat, no longer used
         progress_cb=None,
         cancel_check=None,
+        change_recorder=None,
     ) -> Dict[str, Any]:
         path = file_path or cls.stored_path()
         if not path:
@@ -203,6 +204,7 @@ class UprExcelImportService:
             ensure_staff_matrix=ensure_staff_matrix,  # backward compat, ignored
             use_row_cache=True,
             use_transform_cache=True,
+            change_recorder=change_recorder,
         )
         stats["success"] = stats.get("errors", 0) == 0
         if preview_path:

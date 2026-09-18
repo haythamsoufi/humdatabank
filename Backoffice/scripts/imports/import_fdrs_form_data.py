@@ -80,6 +80,7 @@ import logging
 import os
 import re
 import sys
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -2229,6 +2230,32 @@ def row_to_payload(row: Dict[str, str]) -> Tuple[Optional[int], Optional[int], O
     return assignment_entity_status_id, public_submission_id, form_item_id, payload
 
 
+def _flask_app_for_import():
+    """Reuse the running Flask app when the admin job already pushed a context.
+
+    ``run_import`` used to call ``create_app()`` unconditionally. From the FDRS
+    sync worker thread that booted a second app in-process (RBAC seed, scheduler,
+    extra SQLAlchemy pool) and starved request threads during the upsert.
+    CLI entry still creates an app when none is active.
+    """
+    from flask import current_app, has_app_context
+
+    if has_app_context():
+        return current_app._get_current_object()
+    from app import create_app
+
+    return create_app()
+
+
+def _commit_upsert_and_yield() -> None:
+    """Commit the current FormData batch and yield so HTTP requests can run."""
+    from app.extensions import db
+
+    db.session.commit()
+    db.session.expire_all()
+    time.sleep(0.05)
+
+
 def upsert_form_data_rows(
     rows: List[Dict[str, str]],
     *,
@@ -2241,6 +2268,7 @@ def upsert_form_data_rows(
     progress_start_pct: float = 20.0,
     progress_end_pct: float = 100.0,
     stats: Optional[Dict[str, int]] = None,
+    change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, int]:
     """Upsert ready-to-import rows into form_data (shared by FDRS and UPR Excel pipelines)."""
     from app.extensions import db
@@ -2279,10 +2307,13 @@ def upsert_form_data_rows(
         })
 
     def _maybe_report(i: int, row: Dict[str, Any]) -> None:
+        # Cancel often; persist progress less often so the job thread yields the GIL
+        # and DB pool to Flask request threads (navigation).
+        if i == 1 or i % 50 == 0 or i == total_rows:
+            _check_cancel()
         if not progress_cb:
             return
-        _check_cancel()
-        if not (i == 1 or i % 50 == 0 or i == total_rows):
+        if not (i == 1 or i % 250 == 0 or i == total_rows):
             return
         pct = progress_start_pct + (span * (i / total_rows)) if total_rows else progress_end_pct
         kpi = (row.get("_debug_kpi_code") or "").strip()
@@ -2298,6 +2329,7 @@ def upsert_form_data_rows(
             "percent": pct,
             "stats": dict(stats),
         })
+        time.sleep(0.02)
 
     prefetch_size = max(2000, int(batch_size or 1000))
 
@@ -2364,6 +2396,23 @@ def upsert_form_data_rows(
             else:
                 existing = existing_by_pub.get((int(public_submission_id), int(form_item_id)))
 
+            if change_recorder:
+                try:
+                    change_recorder({
+                        "op": "update" if existing else "insert",
+                        "aes_id": assignment_entity_status_id,
+                        "item_id": form_item_id,
+                        "iso3": (row.get("_debug_iso3") or "").strip() or None,
+                        "year": (row.get("_debug_year") or "").strip() or None,
+                        "kpi": (row.get("_debug_kpi_code") or "").strip() or None,
+                        "old_value": getattr(existing, "value", None) if existing else None,
+                        "old_disagg": getattr(existing, "disagg_data", None) if existing else None,
+                        "new_value": payload.get("value"),
+                        "new_disagg": payload.get("disagg_data"),
+                    })
+                except Exception:
+                    logger.debug("import change recorder failed", exc_info=True)
+
             if dry_run:
                 if existing:
                     stats["updated"] += 1
@@ -2426,11 +2475,11 @@ def upsert_form_data_rows(
                     logger.error("Row %d error: %s", j, e)
 
             if batch_size and ((stats["inserted"] + stats["updated"]) % batch_size == 0) and (stats["inserted"] + stats["updated"]) > 0:
-                db.session.commit()
+                _commit_upsert_and_yield()
             _maybe_report(j, row)
 
     if not dry_run and (stats["inserted"] + stats["updated"]) > 0:
-        db.session.commit()
+        _commit_upsert_and_yield()
 
     return stats
 
@@ -2465,13 +2514,13 @@ def run_import(
     sync_user_id: Optional[int] = None,
     sync_documents: bool = True,
     sync_assignment_status: bool = True,
+    change_recorder: Optional[Callable[[Dict[str, Any]], None]] = None,
 ) -> Dict[str, int]:
     """Load from file, FDRS API (ready-to-import), or data-api.ifrc.org pipeline; upsert into form_data.
 
     fdrs_reported_import_states: optional IFRC State codes (0,100,200,300,400,500) for reported values when not imputed;
     None uses FDRS_REPORTED_IMPORT_STATES env or default all except Not filled (0).
     """
-    from app import create_app
     from app.extensions import db
     from app.models.forms import FormData
     from app.models.form_items import FormItem
@@ -2485,7 +2534,7 @@ def run_import(
     if fdrs_from_data_api and indicator_mapping_path and not os.path.isfile(indicator_mapping_path):
         raise ValueError(f"indicator_mapping file not found: {indicator_mapping_path}")
 
-    app = create_app()
+    app = _flask_app_for_import()
     stats = {"loaded": 0, "skipped": 0, "inserted": 0, "updated": 0, "errors": 0}
     stats.setdefault("documents_inserted", 0)
     stats.setdefault("documents_updated", 0)
@@ -2794,6 +2843,7 @@ def run_import(
             progress_start_pct=_PROGRESS_FORM_UPSERT_START,
             progress_end_pct=_PROGRESS_FORM_UPSERT_END,
             stats=stats,
+            change_recorder=change_recorder,
         )
 
         if fdrs_from_data_api and sync_documents:

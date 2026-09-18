@@ -1705,17 +1705,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 setDataSyncProgress(job.percent, job.stage, job.message, job.current, job.total);
 
                 if (job.status === 'completed') {
+                    const finishedJobId = dataSyncActiveJobId;
                     stopDataSyncPolling();
                     clearDataSyncStorage();
                     dataSyncResult.classList.remove('hidden');
                     const stats = job.stats || {};
                     let msg = `Loaded: ${stats.loaded || 0}, Skipped: ${stats.skipped || 0}, Inserted: ${stats.inserted || 0}, Updated: ${stats.updated || 0}, Errors: ${stats.errors || 0}`;
+                    let logHtml = '';
+                    if (finishedJobId && /^[a-fA-F0-9]{32}$/.test(finishedJobId)) {
+                        logHtml = ` <a class="text-purple-700 underline" href="/admin/import-logs/${encodeURIComponent(finishedJobId)}" target="_blank" rel="noopener">` + {{ _("View change log")|tojson|safe }} + `</a>`;
+                    }
                     if (job.download_ready && job.download_url) {
                         msg += `\n\n` + {{ _("Preview Excel ready:")|tojson|safe }} + ` `;
                         const safeUrl = isSafeHref(job.download_url) ? escapeHtmlAttr(job.download_url) : '#';
-                        dataSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">` + {{ _("Download")|tojson|safe }} + `</a>`;
+                        dataSyncResultText.innerHTML = `${msg.replace(/\n/g, '<br>')}<a class="text-purple-700 underline" href="${safeUrl}">` + {{ _("Download")|tojson|safe }} + `</a>${logHtml}`;
                     } else {
                         dataSyncResultText.textContent = msg;
+                        if (logHtml) {
+                            dataSyncResultText.insertAdjacentHTML('beforeend', logHtml);
+                        }
                     }
                     dataSyncResultText.className = 'text-sm text-green-700';
                     showDataSyncDone();

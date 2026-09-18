@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import json
 from contextlib import suppress
-from typing import Dict, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -495,6 +495,7 @@ class ExcelService:
         updated_count = 0
         errors = []
         warnings = []
+        changes: List[Dict[str, Any]] = []
 
         try:
             from app.services.imports.scoped_import_guard import filter_locked_field_updates
@@ -524,6 +525,9 @@ class ExcelService:
 
                     # Get or create entry
                     data_entry = DataModel.query.filter_by(**query_filter).first()
+                    existed = data_entry is not None
+                    old_value = data_entry.value if data_entry else None
+                    old_disagg = data_entry.disagg_data if data_entry else None
 
                     if not data_entry:
                         # Create new entry
@@ -548,6 +552,14 @@ class ExcelService:
                             else:
                                 data_entry.set_disaggregated_data(mode, values)
                             updated_count += 1
+                            changes.append({
+                                "op": "update" if existed else "insert",
+                                "aes_id": None if is_public else assignment_entity_status.id,
+                                "item_id": form_item_id,
+                                "old_value": old_value,
+                                "old_disagg": old_disagg,
+                                "new_disagg": data_dict.get("disagg_data"),
+                            })
                         else:
                             errors.append(f"Field {form_item_id}: Invalid disaggregation data structure")
                     elif data_dict.get('value') is not None:
@@ -559,10 +571,24 @@ class ExcelService:
                             # Empty value - clear entry
                             data_entry.set_simple_value(None)
                         updated_count += 1
+                        changes.append({
+                            "op": "update" if existed else "insert",
+                            "aes_id": None if is_public else assignment_entity_status.id,
+                            "item_id": form_item_id,
+                            "old_value": old_value,
+                            "new_value": value,
+                        })
                     else:
                         # Both are None - clear entry
                         data_entry.set_simple_value(None)
                         updated_count += 1
+                        changes.append({
+                            "op": "update" if existed else "insert",
+                            "aes_id": None if is_public else assignment_entity_status.id,
+                            "item_id": form_item_id,
+                            "old_value": old_value,
+                            "new_value": None,
+                        })
 
                 except Exception as e:
                     error_msg = f"Field {form_item_id}: Validation error."
@@ -579,6 +605,7 @@ class ExcelService:
                 'errors': errors,
                 'warnings': [item['message'] if isinstance(item, dict) else item for item in warnings],
                 'warning_items': warnings,
+                'changes': changes,
             }
 
         except Exception as e:
@@ -590,4 +617,5 @@ class ExcelService:
                 'updated_count': 0,
                 'errors': ['Bulk save failed.'],
                 'warnings': [],
+                'changes': [],
             }

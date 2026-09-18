@@ -1,0 +1,112 @@
+{% extends "core/layout.html" %}
+{% from "components/_page_header.html" import page_header %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+{% call page_header(
+    title=_('Import change log'),
+    icon='fas fa-file-import',
+    breadcrumbs=[
+        {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
+        {'name': _('Audit Trail'), 'url': url_for('analytics.audit_trail')},
+        {'name': _('Change log')}
+    ]
+) %}{% endcall %}
+
+<div class="max-w-6xl mx-auto pb-10">
+  {% if not ready %}
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900">
+    {{ _('This import is still running, or no change log has been written yet. Refresh after the job finishes.') }}
+    <p class="mt-2 font-mono text-xs text-amber-800">{{ log_id }}</p>
+  </div>
+  {% else %}
+  <div class="bg-white shadow border border-gray-200 rounded-lg p-6 mb-6">
+    <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-lg font-medium text-gray-900">{{ summary.kind or _('Import') }}</h2>
+        <p class="text-xs text-gray-500 font-mono mt-1">{{ log_id }}</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="{{ url_for('import_change_log.download_summary', log_id=log_id) }}"
+           class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50">
+          {{ _('Download summary JSON') }}
+        </a>
+        <a href="{{ url_for('import_change_log.download_changes', log_id=log_id) }}"
+           class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50">
+          {{ _('Download changes JSONL') }}
+        </a>
+      </div>
+    </div>
+    {% set stats = summary.stats or {} %}
+    {% set meta = summary.meta or {} %}
+    <dl class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+      <div><dt class="text-gray-500">{{ _('Started') }}</dt><dd class="text-gray-900">{{ summary.started_at or '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Finished') }}</dt><dd class="text-gray-900">{{ summary.finished_at or '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Inserted') }}</dt><dd class="text-gray-900">{{ stats.inserted if stats.inserted is not none else '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Updated') }}</dt><dd class="text-gray-900">{{ stats.updated if stats.updated is not none else stats.updated_count or '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Skipped') }}</dt><dd class="text-gray-900">{{ stats.skipped if stats.skipped is not none else '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Errors') }}</dt><dd class="text-gray-900">{{ stats.errors if stats.errors is not none else '—' }}</dd></div>
+      <div><dt class="text-gray-500">{{ _('Change rows') }}</dt><dd class="text-gray-900">{{ change_total }}</dd></div>
+      {% if meta.filename %}
+      <div><dt class="text-gray-500">{{ _('File') }}</dt><dd class="text-gray-900 break-all">{{ meta.filename }}</dd></div>
+      {% endif %}
+      {% if meta.rounds %}
+      <div class="col-span-2"><dt class="text-gray-500">{{ _('Rounds') }}</dt><dd class="text-gray-900">{{ meta.rounds|join(', ') }}</dd></div>
+      {% endif %}
+      {% if meta.dry_run %}
+      <div><dt class="text-gray-500">{{ _('Dry run') }}</dt><dd class="text-amber-800 font-medium">{{ _('Yes') }}</dd></div>
+      {% endif %}
+    </dl>
+  </div>
+
+  {% if summary.warnings %}
+  <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+    <h3 class="text-sm font-medium text-amber-900 mb-2">{{ _('Warnings') }}</h3>
+    <ul class="list-disc ml-5 space-y-1 text-sm text-amber-900 max-h-64 overflow-y-auto">
+      {% for w in summary.warnings %}
+      <li>{{ w }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="bg-white shadow border border-gray-200 rounded-lg overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="text-sm font-medium text-gray-900">{{ _('Changes') }}</h3>
+      {% if truncated %}
+      <p class="text-xs text-gray-500">{{ _('Showing first %(n)s of %(total)s. Download JSONL for the full log.', n=viewer_limit, total=change_total) }}</p>
+      {% endif %}
+    </div>
+    {% if not changes %}
+    <p class="px-4 py-6 text-sm text-gray-500">{{ _('No row-level changes were recorded (counts may still appear in the summary).') }}</p>
+    {% else %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-xs">
+        <thead class="bg-gray-50 text-gray-600">
+          <tr>
+            <th class="px-3 py-2 text-left font-medium">{{ _('Op') }}</th>
+            <th class="px-3 py-2 text-left font-medium">{{ _('Country') }}</th>
+            <th class="px-3 py-2 text-left font-medium">{{ _('Item') }}</th>
+            <th class="px-3 py-2 text-left font-medium">{{ _('Before') }}</th>
+            <th class="px-3 py-2 text-left font-medium">{{ _('After') }}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for row in changes %}
+          <tr class="align-top">
+            <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ row.op or '—' }}</td>
+            <td class="px-3 py-2 whitespace-nowrap text-gray-800">{{ row.iso3 or '—' }}{% if row.year %} {{ row.year }}{% endif %}</td>
+            <td class="px-3 py-2 text-gray-800">{{ row.label or row.kpi or row.item_id or '—' }}</td>
+            <td class="px-3 py-2 text-gray-600 break-all max-w-xs">{{ row.old_value if row.old_value is not none else row.old_disagg if row.old_disagg is not none else '—' }}</td>
+            <td class="px-3 py-2 text-gray-900 break-all max-w-xs">{{ row.new_value if row.new_value is not none else row.new_disagg if row.new_disagg is not none else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

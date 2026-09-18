@@ -139,6 +139,307 @@ class TestReopenAssignment:
 
 
 # ===========================================================================
+# POST /reopen_assignment_section/<aes_id>/<section_id>
+# ===========================================================================
+
+class TestReopenAssignmentSection:
+    def test_unauthenticated_redirects_to_login(self, client, db_session, app):
+        resp = client.post("/reopen_assignment_section/1/2")
+        assert_redirect(resp)
+        assert "login" in (resp.headers.get("Location") or "").lower()
+
+    def test_aes_not_found_returns_404(self, client, db_session, app, admin_user):
+        _login(client, admin_user)
+        resp = client.post("/reopen_assignment_section/999999/1")
+        assert resp.status_code == 404
+
+    def test_no_permission_redirects_to_assignment(self, client, db_session, app, admin_user):
+        aes = create_test_assignment_entity_status(db_session, status="in_progress")
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_section", return_value=False):
+            resp = client.post(
+                f"/reopen_assignment_section/{aes.id}/1", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+    def test_success_resets_one_section_and_keeps_others(self, client, db_session, app, admin_user):
+        from app.models import FormSection
+        from app.models.assignments import AssignmentSectionStatus
+        from app.models.enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue
+
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
+        aes.assigned_form.enable_section_submission = True
+        template = aes.assigned_form.template
+        s1 = FormSection(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Section A",
+            order=1,
+        )
+        s2 = FormSection(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Section B",
+            order=2,
+        )
+        db_session.add_all([s1, s2])
+        db_session.commit()
+        db_session.add_all([
+            AssignmentSectionStatus(
+                assignment_entity_status_id=aes.id,
+                form_section_id=s1.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ),
+            AssignmentSectionStatus(
+                assignment_entity_status_id=aes.id,
+                form_section_id=s2.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ),
+        ])
+        db_session.commit()
+
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_section", return_value=True), \
+             patch(f"{_NOTIF_CORE}.notify_assignment_reopened", return_value=None):
+            resp = client.post(
+                f"/reopen_assignment_section/{aes.id}/{s1.id}", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+        db_session.refresh(aes)
+        row1 = AssignmentSectionStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_section_id=s1.id
+        ).one()
+        row2 = AssignmentSectionStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_section_id=s2.id
+        ).one()
+        assert row1.status == AssignmentSectionStatusValue.in_progress.value
+        assert row2.status == AssignmentSectionStatusValue.submitted.value
+        assert aes.status == AssignmentEntityStatusValue.in_progress
+
+
+# ===========================================================================
+# POST /reopen_assignment_page/<aes_id>/<page_id>
+# ===========================================================================
+
+class TestReopenAssignmentPage:
+    def test_unauthenticated_redirects_to_login(self, client, db_session, app):
+        resp = client.post("/reopen_assignment_page/1/2")
+        assert_redirect(resp)
+        assert "login" in (resp.headers.get("Location") or "").lower()
+
+    def test_aes_not_found_returns_404(self, client, db_session, app, admin_user):
+        _login(client, admin_user)
+        resp = client.post("/reopen_assignment_page/999999/1")
+        assert resp.status_code == 404
+
+    def test_no_permission_redirects_to_assignment(self, client, db_session, app, admin_user):
+        aes = create_test_assignment_entity_status(db_session, status="in_progress")
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_page", return_value=False):
+            resp = client.post(
+                f"/reopen_assignment_page/{aes.id}/1", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+    def test_success_resets_one_page_and_keeps_others(self, client, db_session, app, admin_user):
+        from app.models import FormPage
+        from app.models.assignments import AssignmentPageStatus
+        from app.models.enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue
+
+        aes = create_test_assignment_entity_status(db_session, status="submitted")
+        aes.assigned_form.enable_page_submission = True
+        template = aes.assigned_form.template
+        p1 = FormPage(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Page A",
+            order=1,
+        )
+        p2 = FormPage(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Page B",
+            order=2,
+        )
+        db_session.add_all([p1, p2])
+        db_session.commit()
+        db_session.add_all([
+            AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p1.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ),
+            AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p2.id,
+                status=AssignmentSectionStatusValue.submitted.value,
+            ),
+        ])
+        db_session.commit()
+
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_page", return_value=True), \
+             patch(f"{_NOTIF_CORE}.notify_assignment_reopened", return_value=None):
+            resp = client.post(
+                f"/reopen_assignment_page/{aes.id}/{p1.id}", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+        db_session.refresh(aes)
+        row1 = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_page_id=p1.id
+        ).one()
+        row2 = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_page_id=p2.id
+        ).one()
+        assert row1.status == AssignmentSectionStatusValue.in_progress.value
+        assert row2.status == AssignmentSectionStatusValue.submitted.value
+        assert aes.status == AssignmentEntityStatusValue.in_progress
+
+
+# ===========================================================================
+# POST /return_assignment_section/<aes_id>/<section_id>
+# ===========================================================================
+
+class TestReturnAssignmentSection:
+    def test_unauthenticated_redirects_to_login(self, client, db_session, app):
+        resp = client.post("/return_assignment_section/1/2")
+        assert_redirect(resp)
+        assert "login" in (resp.headers.get("Location") or "").lower()
+
+    def test_no_permission_redirects_to_assignment(self, client, db_session, app, admin_user):
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_return_assignment_section", return_value=False):
+            resp = client.post(
+                f"/return_assignment_section/{aes.id}/1", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+    def test_success_returns_one_section_and_keeps_others(self, client, db_session, app, admin_user):
+        from app.models import FormSection
+        from app.models.assignments import AssignmentSectionStatus
+        from app.models.enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue
+
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
+        aes.assigned_form.enable_section_submission = True
+        template = aes.assigned_form.template
+        s1 = FormSection(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Section A",
+            order=1,
+        )
+        s2 = FormSection(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Section B",
+            order=2,
+        )
+        db_session.add_all([s1, s2])
+        db_session.commit()
+        db_session.add_all([
+            AssignmentSectionStatus(
+                assignment_entity_status_id=aes.id,
+                form_section_id=s1.id,
+                status=AssignmentSectionStatusValue.sent_for_review.value,
+            ),
+            AssignmentSectionStatus(
+                assignment_entity_status_id=aes.id,
+                form_section_id=s2.id,
+                status=AssignmentSectionStatusValue.sent_for_review.value,
+            ),
+        ])
+        db_session.commit()
+
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_return_assignment_section", return_value=True), \
+             patch(f"{_NOTIF_CORE}.notify_assignment_returned_for_revision", return_value=None):
+            resp = client.post(
+                f"/return_assignment_section/{aes.id}/{s1.id}", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+        db_session.refresh(aes)
+        row1 = AssignmentSectionStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_section_id=s1.id
+        ).one()
+        row2 = AssignmentSectionStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_section_id=s2.id
+        ).one()
+        assert row1.status == AssignmentSectionStatusValue.requires_revision.value
+        assert row2.status == AssignmentSectionStatusValue.sent_for_review.value
+        assert aes.status == AssignmentEntityStatusValue.requires_revision
+
+
+# ===========================================================================
+# POST /return_assignment_page/<aes_id>/<page_id>
+# ===========================================================================
+
+class TestReturnAssignmentPage:
+    def test_unauthenticated_redirects_to_login(self, client, db_session, app):
+        resp = client.post("/return_assignment_page/1/2")
+        assert_redirect(resp)
+        assert "login" in (resp.headers.get("Location") or "").lower()
+
+    def test_success_returns_one_page_and_keeps_others(self, client, db_session, app, admin_user):
+        from app.models import FormPage
+        from app.models.assignments import AssignmentPageStatus
+        from app.models.enums import AssignmentEntityStatusValue, AssignmentSectionStatusValue
+
+        aes = create_test_assignment_entity_status(db_session, status="sent_for_review")
+        aes.assigned_form.enable_page_submission = True
+        template = aes.assigned_form.template
+        p1 = FormPage(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Page A",
+            order=1,
+        )
+        p2 = FormPage(
+            template_id=template.id,
+            version_id=template.published_version_id,
+            name="Page B",
+            order=2,
+        )
+        db_session.add_all([p1, p2])
+        db_session.commit()
+        db_session.add_all([
+            AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p1.id,
+                status=AssignmentSectionStatusValue.sent_for_review.value,
+            ),
+            AssignmentPageStatus(
+                assignment_entity_status_id=aes.id,
+                form_page_id=p2.id,
+                status=AssignmentSectionStatusValue.sent_for_review.value,
+            ),
+        ])
+        db_session.commit()
+
+        _login(client, admin_user)
+        with patch(f"{_AUTH_SVC}.can_return_assignment_page", return_value=True), \
+             patch(f"{_NOTIF_CORE}.notify_assignment_returned_for_revision", return_value=None):
+            resp = client.post(
+                f"/return_assignment_page/{aes.id}/{p1.id}", follow_redirects=False
+            )
+        assert_redirect(resp, f"/assignment/{aes.id}")
+
+        db_session.refresh(aes)
+        row1 = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_page_id=p1.id
+        ).one()
+        row2 = AssignmentPageStatus.query.filter_by(
+            assignment_entity_status_id=aes.id, form_page_id=p2.id
+        ).one()
+        assert row1.status == AssignmentSectionStatusValue.requires_revision.value
+        assert row2.status == AssignmentSectionStatusValue.sent_for_review.value
+        assert aes.status == AssignmentEntityStatusValue.requires_revision
+
+
+# ===========================================================================
 # POST /approve_assignment/<aes_id>
 # ===========================================================================
 

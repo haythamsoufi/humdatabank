@@ -464,6 +464,7 @@ def get_national_societies():
             'multilingual_names': ns_multilingual_names,
             'code': ns.code,
             'description': ns.description,
+            'status': ns.status_label,
             'is_active': ns.is_active,
             'display_order': ns.display_order,
             'part_of': ns.part_of if ns.part_of else [],

@@ -19,6 +19,9 @@ from app.models.organization import (
     SecretariatDepartment,
     SecretariatRegionalOffice,
     SecretariatClusterOffice,
+    NS_STATUS_ACTIVE,
+    NS_STATUS_INACTIVE,
+    canonicalize_ns_status,
 )
 from app.services.organization.country_service import (
     assign_country_fds_member_user,
@@ -369,7 +372,7 @@ def export_national_societies():
                 'Description': ns.description or '',
                 'Country ISO3': ns.country.iso3 if ns.country else '',
                 'Country Name': ns.country.name if ns.country else '',
-                'Is Active': 'Yes' if ns.is_active else 'No',
+                'Status': ns.status_label,
                 'Display Order': ns.display_order or 0,
             }
             for code in translatable:
@@ -410,14 +413,14 @@ def national_societies_template():
     try:
         translatable = current_app.config.get("TRANSLATABLE_LANGUAGES") or []
         display_names = getattr(Config, "ALL_LANGUAGES_DISPLAY_NAMES", {}) or {}
-        base_cols = ['Name', 'Code', 'Description', 'Country ISO3', 'Is Active', 'Display Order', 'Part Of (Categories)']
+        base_cols = ['Name', 'Code', 'Description', 'Country ISO3', 'Status', 'Display Order', 'Part Of (Categories)']
         name_cols = [display_names.get(code, code.upper()) for code in translatable]
         sample = [{
             'Name': 'Sample National Society',
             'Code': 'SNS',
             'Description': '',
             'Country ISO3': 'XXX',
-            'Is Active': 'Yes',
+            'Status': 'Active',
             'Display Order': 0,
             'Part Of (Categories)': '',
         }]
@@ -510,10 +513,25 @@ def import_national_societies():
                             trans[code] = val
                 description = str(row['Description']).strip() if 'Description' in df.columns and pd.notna(row.get('Description')) else None
                 description = description or None
-                is_active = True
-                if 'Is Active' in df.columns and pd.notna(row.get('Is Active')):
-                    v = str(row['Is Active']).strip().upper()
-                    is_active = v in ('YES', 'TRUE', '1', 'ACTIVE')
+                status = NS_STATUS_ACTIVE
+                if 'Status' in df.columns and pd.notna(row.get('Status')):
+                    parsed = canonicalize_ns_status(str(row['Status']).strip())
+                    if parsed:
+                        status = parsed
+                    else:
+                        v = str(row['Status']).strip().upper()
+                        if v in ('YES', 'TRUE', '1'):
+                            status = NS_STATUS_ACTIVE
+                        elif v in ('NO', 'FALSE', '0'):
+                            status = NS_STATUS_INACTIVE
+                elif 'Is Active' in df.columns and pd.notna(row.get('Is Active')):
+                    v = str(row['Is Active']).strip()
+                    parsed = canonicalize_ns_status(v)
+                    if parsed:
+                        status = parsed
+                    else:
+                        vu = v.upper()
+                        status = NS_STATUS_ACTIVE if vu in ('YES', 'TRUE', '1', 'ACTIVE') else NS_STATUS_INACTIVE
                 display_order = 0
                 if 'Display Order' in df.columns and pd.notna(row.get('Display Order')):
                     try:
@@ -531,7 +549,7 @@ def import_national_societies():
                     existing.code = code_val
                     existing.description = description
                     existing.country_id = country.id
-                    existing.is_active = is_active
+                    existing.status = status
                     existing.display_order = display_order
                     existing.name_translations = trans
                     if part_of is not None:
@@ -543,7 +561,7 @@ def import_national_societies():
                         code=code_val,
                         description=description,
                         country_id=country.id,
-                        is_active=is_active,
+                        status=status,
                         display_order=display_order,
                         name_translations=trans,
                         part_of=part_of,

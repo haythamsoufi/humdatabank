@@ -80,7 +80,7 @@ export function initFormEvents() {
       (submitter && submitter.name === 'action') ? submitter.value :
       (form.querySelector('input[name="action"][type="hidden"]')?.value || null);
 
-    if (actionValue !== 'submit') return;
+    if (actionValue !== 'submit' && actionValue !== 'submit_section' && actionValue !== 'submit_page') return;
 
     // If this submit was triggered programmatically by our own flow (presave -> requestSubmit,
     // or CSRF refresh -> requestSubmit), do NOT presave again (prevents loops / duplicate saves).
@@ -150,12 +150,44 @@ export function initFormEvents() {
     try {
       debugLog(MODULE_NAME, '🧩 presave: starting ajax save-before-submit');
       // Save draft silently (no "Progress saved successfully!" toast)
-      await saveFormBeforeSubmit({ toast: false });
+      const presaveAction = actionValue === 'submit_section'
+        ? 'save_section'
+        : actionValue === 'submit_page'
+          ? 'save_page'
+          : 'save';
+      await saveFormBeforeSubmit({
+        toast: false,
+        action: presaveAction,
+        sectionId: submitter?.dataset?.sectionId || submitBtn?.dataset?.sectionId || '',
+        pageId: submitter?.dataset?.pageId || submitBtn?.dataset?.pageId || '',
+      });
       debugLog(MODULE_NAME, '🧩 presave: ajax save-before-submit complete');
       showSavedBeforeSubmitMessage();
 
       // Now allow the real submit to proceed
-      setHiddenAction('submit');
+      setHiddenAction(actionValue);
+      const sectionId = submitter?.dataset?.sectionId || submitBtn?.dataset?.sectionId;
+      if (sectionId) {
+        let sectionInput = form.querySelector('input[name="section_id"]');
+        if (!sectionInput) {
+          sectionInput = document.createElement('input');
+          sectionInput.type = 'hidden';
+          sectionInput.name = 'section_id';
+          form.appendChild(sectionInput);
+        }
+        sectionInput.value = sectionId;
+      }
+      const pageId = submitter?.dataset?.pageId || submitBtn?.dataset?.pageId;
+      if (pageId) {
+        let pageInput = form.querySelector('input[name="page_id"]');
+        if (!pageInput) {
+          pageInput = document.createElement('input');
+          pageInput.type = 'hidden';
+          pageInput.name = 'page_id';
+          form.appendChild(pageInput);
+        }
+        pageInput.value = pageId;
+      }
 
       // Make the submit button text clearer on the final submit.
       try {
@@ -216,7 +248,7 @@ export function initFormEvents() {
   // Handle submit button confirmation dialogs
   // Use custom styled dialog instead of native alert
   const confirmSubmitButtons = form.querySelectorAll(
-    'button[type="submit"][data-confirm-message]:not(.return-for-revision-trigger)'
+    'button[type="submit"][data-confirm-message]:not(.return-for-revision-trigger):not(.reopen-section-btn):not(.reopen-page-btn):not(.return-section-btn):not(.return-page-btn)'
   );
   confirmSubmitButtons.forEach(button => {
     // Guard against double-initialization (which can cause stacked modals and double submits)
@@ -240,11 +272,37 @@ export function initFormEvents() {
         button.dataset.confirmInProgress = 'true';
 
         const submitConfirmed = () => {
+          const applySectionId = (targetForm) => {
+            const sectionId = button.dataset.sectionId;
+            if (!sectionId || !targetForm) return;
+            let sectionInput = targetForm.querySelector('input[name="section_id"]');
+            if (!sectionInput) {
+              sectionInput = document.createElement('input');
+              sectionInput.type = 'hidden';
+              sectionInput.name = 'section_id';
+              targetForm.appendChild(sectionInput);
+            }
+            sectionInput.value = sectionId;
+          };
+          const applyPageId = (targetForm) => {
+            const pageId = button.dataset.pageId;
+            if (!pageId || !targetForm) return;
+            let pageInput = targetForm.querySelector('input[name="page_id"]');
+            if (!pageInput) {
+              pageInput = document.createElement('input');
+              pageInput.type = 'hidden';
+              pageInput.name = 'page_id';
+              targetForm.appendChild(pageInput);
+            }
+            pageInput.value = pageId;
+          };
           try {
             const form = document.getElementById('focalDataEntryForm');
             if (form) {
               form.dataset.ifrcForcePresave = '1';
               setHiddenAction(action);
+              applySectionId(form);
+              applyPageId(form);
               if (form.requestSubmit) {
                 form.requestSubmit(button);
               } else {
@@ -255,6 +313,8 @@ export function initFormEvents() {
             const form = document.getElementById('focalDataEntryForm');
             if (form) {
               setHiddenAction(action);
+              applySectionId(form);
+              applyPageId(form);
               if (form.requestSubmit) {
                 form.requestSubmit(button);
               } else {

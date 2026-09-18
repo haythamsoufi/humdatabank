@@ -85,7 +85,7 @@ upsert_form_data_rows()        ← shared helper in import_fdrs_form_data.py; ba
 
 The script can be run:
 - **CLI:** `python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --rounds P26 --templates 24,22 --dry-run`
-- **UI wizard:** `/admin/templates/upr-excel-import/` (4-step wizard, async background job)
+- **UI wizard:** `/admin/upr-excel-import/` (3-step wizard, async background job). Open it from the **UPR Excel Sync** tile on the Admin Dashboard (`/admin/upr-sync-imputation` → header button) or directly.
 
 ---
 
@@ -476,8 +476,8 @@ Import order: form_data upsert → repeat instances + emergency choice → dynam
 
 ## 9. UI wizard
 
-**URL:** `/admin/templates/upr-excel-import/`  
-Accessible from the "UPR Excel Sync" button in the Data Sync & Imputation header.
+**URL:** `/admin/upr-excel-import/`  
+Accessible from the **UPR Excel Sync** tile on the Admin Dashboard (`/admin/` → Data Integration), which opens `/admin/upr-sync-imputation` and links to this wizard. The legacy path `/admin/templates/upr-excel-import/` redirects here.
 
 | Step | Panel | What happens |
 |------|-------|-------------|
@@ -636,8 +636,8 @@ Backoffice/
 │   │   ├── upr_excel_import.py          ← blueprint routes: /admin/templates/upr-excel-import/*
 │   │   └── __init__.py                  ← registers upr_excel_import blueprint
 │   ├── templates/admin/templates/
-│   │   ├── upr_excel_import.html        ← 4-step wizard UI
-│   │   └── data_sync_imputation.html    ← links to wizard via "UPR Excel Sync" button
+│   │   ├── upr_excel_import.html        ← 3-step wizard UI
+│   │   └── data_sync_imputation.html    ← FDRS or UPR family page; UPR header links to wizard
 │   └── services/
 │       └── emergency_section_binding.py ← GO API slot resolution (used by EA mapping)
 ├── plugins/emergency_operations/

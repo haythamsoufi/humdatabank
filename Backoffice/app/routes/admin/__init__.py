@@ -153,8 +153,19 @@ def _kobo_data_import_url_for_dashboard():
 
 
 def _data_sync_url_for_dashboard():
-    """URL for the data sync & imputation tool, or None if the route is not registered."""
+    """URL for FDRS data sync & imputation, or None if the route is not registered."""
     ep = "admin.fdrs_sync_imputation"
+    if ep not in current_app.view_functions:
+        return None
+    try:
+        return url_for(ep)
+    except BuildError:
+        return None
+
+
+def _upr_sync_url_for_dashboard():
+    """URL for UPR data sync & Excel import, or None if the route is not registered."""
+    ep = "admin.upr_sync_imputation"
     if ep not in current_app.view_functions:
         return None
     try:
@@ -171,7 +182,18 @@ def fdrs_sync_imputation():
     from app.utils.data_quality_constants import FDRS_TEMPLATE_ID
     from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
 
-    return render_data_sync_imputation_page(FDRS_TEMPLATE_ID)
+    return render_data_sync_imputation_page(FDRS_TEMPLATE_ID, sync_family="fdrs")
+
+
+@bp.route("/upr-sync-imputation", methods=["GET"])
+@admin_required
+@system_manager_required
+def upr_sync_imputation():
+    """UPR Excel sync and imputation (Data Integration)."""
+    from app.utils.data_quality_constants import UPR_PLANNING_TEMPLATE_ID
+    from app.routes.admin.data_sync_imputation import render_data_sync_imputation_page
+
+    return render_data_sync_imputation_page(UPR_PLANNING_TEMPLATE_ID, sync_family="upr")
 
 
 # Legacy URL: API key admin UI now lives under /admin/api-management/api-keys
@@ -196,6 +218,7 @@ def admin_dashboard():
     """Main admin dashboard with overview statistics"""
     kobo_data_import_url = _kobo_data_import_url_for_dashboard()
     data_sync_url = _data_sync_url_for_dashboard()
+    upr_sync_url = _upr_sync_url_for_dashboard()
     try:
         from app.services.organization.authorization_service import AuthorizationService
 
@@ -365,6 +388,7 @@ def admin_dashboard():
                              security_audit_widget=security_audit_widget,
                              kobo_data_import_url=kobo_data_import_url,
                              data_sync_url=data_sync_url,
+                             upr_sync_url=upr_sync_url,
                              title="Admin Dashboard")
 
     except Exception as e:
@@ -391,6 +415,7 @@ def admin_dashboard():
                              security_audit_widget={"high_risk_actions_30d": 0, "suspicious_logins_30d": 0, "failed_login_rate_30d": 0.0},
                              kobo_data_import_url=kobo_data_import_url,
                              data_sync_url=data_sync_url,
+                             upr_sync_url=upr_sync_url,
                              title="Admin Dashboard",
                              dashboard_error="Error loading dashboard statistics")
 

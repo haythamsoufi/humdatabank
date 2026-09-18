@@ -131,13 +131,46 @@ class TestFdrsSyncImputationRoute:
              patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
              patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True), \
              patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=True), \
+             patch("app.routes.admin.data_sync_imputation._accessible_templates_for_user", return_value=[]), \
+             patch("app.routes.admin.data_sync_imputation._sections_with_items_for_template", return_value=[]), \
+             patch("app.routes.admin.data_sync_imputation._fdrs_sync_script_available", return_value=True), \
+             patch("app.routes.admin.data_sync_imputation._fdrs_default_years_bounds", return_value=(2012, 2024)), \
+             patch("app.routes.admin.data_sync_imputation.get_active_fdrs_data_sync_jobs_for_user", return_value=[]), \
              _mock_render() as mock_rt:
             resp = logged_in_client.get("/admin/fdrs-sync-imputation")
         assert resp.status_code == 200
         mock_rt.assert_called_once()
+        kwargs = mock_rt.call_args.kwargs
+        assert kwargs.get("sync_family") == "fdrs"
+        assert kwargs.get("has_upr_excel") is False
+        assert kwargs.get("has_data_sync") is True
 
     def test_get_unauthenticated_redirects(self, client):
         resp = client.get("/admin/fdrs-sync-imputation", follow_redirects=False)
+        assert resp.status_code == 302
+        assert "login" in resp.location.lower()
+
+
+class TestUprSyncImputationRoute:
+    def test_get_renders_for_system_manager(self, logged_in_client, db_session, app):
+        template = create_test_template(db_session, name="UPR Planning")
+        with patch("app.utils.data_quality_constants.UPR_PLANNING_TEMPLATE_ID", template.id), \
+             patch("app.routes.admin.shared.AuthorizationService.is_admin", return_value=True), \
+             patch("app.routes.admin.shared.AuthorizationService.is_system_manager", return_value=True), \
+             patch("app.routes.admin.data_sync_imputation.check_template_access", return_value=True), \
+             patch("app.routes.admin.data_sync_imputation._accessible_templates_for_user", return_value=[]), \
+             patch("app.routes.admin.data_sync_imputation._sections_with_items_for_template", return_value=[]), \
+             _mock_render() as mock_rt:
+            resp = logged_in_client.get("/admin/upr-sync-imputation")
+        assert resp.status_code == 200
+        mock_rt.assert_called_once()
+        kwargs = mock_rt.call_args.kwargs
+        assert kwargs.get("sync_family") == "upr"
+        assert kwargs.get("has_upr_excel") is True
+        assert kwargs.get("has_data_sync") is False
+
+    def test_get_unauthenticated_redirects(self, client):
+        resp = client.get("/admin/upr-sync-imputation", follow_redirects=False)
         assert resp.status_code == 302
         assert "login" in resp.location.lower()
 
@@ -1089,3 +1122,39 @@ class TestInternalHelpers:
             result = _build_ordered_sections_with_items(template, [], {})
             assert isinstance(result, list)
             assert len(result) == 0
+
+    def test_sync_family_for_template(self):
+        from app.routes.admin.data_sync_imputation import _sync_family_for_template
+        assert _sync_family_for_template(21) == "fdrs"
+        assert _sync_family_for_template(24) == "upr"
+        assert _sync_family_for_template(33) == "upr"
+        assert _sync_family_for_template(1) == "generic"
+
+    def test_sync_page_title_uses_family(self):
+        from app.routes.admin.data_sync_imputation import _sync_page_title
+        assert "FDRS Data Sync" in _sync_page_title("FDRS", "fdrs")
+        assert "UPR Data Sync" in _sync_page_title("Unified Plan", "upr")
+        assert "Data Sync & Imputation" in _sync_page_title("Other", "generic")
+
+    def test_accessible_templates_family_filter(self):
+        from types import SimpleNamespace
+
+        from app.routes.admin.data_sync_imputation import _accessible_templates_for_user
+
+        fdrs = SimpleNamespace(id=21, name="FDRS")
+        upr = SimpleNamespace(id=24, name="UPR")
+        other = SimpleNamespace(id=99, name="Other")
+        mock_user = MagicMock(id=1)
+
+        with patch(
+            "app.services.organization.authorization_service.AuthorizationService.is_system_manager",
+            return_value=True,
+        ), patch("app.routes.admin.data_sync_imputation.FormTemplate") as mock_ft:
+            mock_ft.query.all.return_value = [fdrs, upr, other]
+            fdrs_rows = _accessible_templates_for_user(mock_user, family="fdrs")
+            upr_rows = _accessible_templates_for_user(mock_user, family="upr")
+            generic_rows = _accessible_templates_for_user(mock_user, family="generic")
+
+        assert {r["id"] for r in fdrs_rows} == {21}
+        assert {r["id"] for r in upr_rows} == {24}
+        assert {r["id"] for r in generic_rows} == {99}

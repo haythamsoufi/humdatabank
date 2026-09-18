@@ -25,8 +25,12 @@ POST_ENDPOINT_SEGMENT_TO_ACTIVITY_TYPE: Dict[str, str] = {
     # Dashboard / country selection (common POSTs that are not form submit)
     "select_country": "country_selected",
     "reopen_assignment": "form_reopened",
+    "reopen_assignment_section": "form_reopened",
+    "reopen_assignment_page": "form_reopened",
     "approve_assignment": "form_approved",
     "return_assignment_for_revision": "form_returned_for_revision",
+    "return_assignment_section_for_revision": "form_returned_for_revision",
+    "return_assignment_page_for_revision": "form_returned_for_revision",
     # API keys (admin) — aligns with AdminActionLog action_type / audit badge keys
     "create_api_key": "api_key_create",
     "revoke_api_key": "api_key_revoke",

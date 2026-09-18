@@ -55,9 +55,13 @@ class TestInjectRbacHelpersReturnValue:
             "has_permission",
             "can_approve_assignment",
             "can_reopen_assignment",
+            "can_reopen_assignment_section",
+            "can_reopen_assignment_page",
             "can_reopen_closed_assignment",
             "can_send_for_review",
             "can_return_for_revision",
+            "can_return_assignment_section",
+            "can_return_assignment_page",
             "can_submit_assignment",
         }
         assert set(helpers.keys()) == expected_keys
@@ -147,6 +151,54 @@ class TestCanReopenAssignment:
 
 
 # ---------------------------------------------------------------------------
+# can_reopen_assignment_section
+# ---------------------------------------------------------------------------
+
+class TestCanReopenAssignmentSection:
+    def test_returns_true_when_service_returns_true(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_section", return_value=True):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_reopen_assignment_section"](aes) is True
+
+    def test_returns_false_when_service_returns_false(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_section", return_value=False):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_reopen_assignment_section"](aes) is False
+
+    def test_returns_false_on_exception(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_section", side_effect=Exception("boom")):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_reopen_assignment_section"](aes) is False
+
+
+# ---------------------------------------------------------------------------
+# can_reopen_assignment_page
+# ---------------------------------------------------------------------------
+
+class TestCanReopenAssignmentPage:
+    def test_returns_true_when_service_returns_true(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_page", return_value=True):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_reopen_assignment_page"](aes) is True
+
+    def test_returns_false_when_service_returns_false(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_page", return_value=False):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_reopen_assignment_page"](aes) is False
+
+    def test_returns_false_on_exception(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_reopen_assignment_page", side_effect=Exception("boom")):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_reopen_assignment_page"](aes) is False
+
+
+# ---------------------------------------------------------------------------
 # can_reopen_closed_assignment
 # ---------------------------------------------------------------------------
 
@@ -228,6 +280,38 @@ class TestCanReturnForRevision:
         with patch(f"{_AUTH_SVC}.can_return_for_revision", side_effect=Exception("boom")):
             helpers = _get_helpers(app, test_user)
             assert helpers["can_return_for_revision"](aes) is False
+
+
+# ---------------------------------------------------------------------------
+# can_return_assignment_section / page
+# ---------------------------------------------------------------------------
+
+class TestCanReturnAssignmentSection:
+    def test_returns_true_when_service_returns_true(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_return_assignment_section", return_value=True):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_return_assignment_section"](aes) is True
+
+    def test_returns_false_on_exception(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_return_assignment_section", side_effect=Exception("boom")):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_return_assignment_section"](aes) is False
+
+
+class TestCanReturnAssignmentPage:
+    def test_returns_true_when_service_returns_true(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_return_assignment_page", return_value=True):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_return_assignment_page"](aes) is True
+
+    def test_returns_false_on_exception(self, app, test_user):
+        aes = MagicMock()
+        with patch(f"{_AUTH_SVC}.can_return_assignment_page", side_effect=Exception("boom")):
+            helpers = _get_helpers(app, test_user)
+            assert helpers["can_return_assignment_page"](aes) is False
 
 
 # ---------------------------------------------------------------------------

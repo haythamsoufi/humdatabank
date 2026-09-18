@@ -494,10 +494,18 @@ class ExcelService:
         logger = logging.getLogger(__name__)
         updated_count = 0
         errors = []
+        warnings = []
 
         try:
-            # Determine data model
+            from app.services.imports.scoped_import_guard import filter_locked_field_updates
+
             is_public = isinstance(assignment_entity_status, PublicSubmission)
+            if not is_public:
+                try:
+                    field_data, warnings = filter_locked_field_updates(assignment_entity_status, field_data)
+                except Exception:
+                    logger.debug("Scoped Excel import guard skipped", exc_info=True)
+                    warnings = []
             DataModel = FormData  # Using FormData for both types
 
             for form_item_id, data_dict in field_data.items():
@@ -568,7 +576,9 @@ class ExcelService:
             return {
                 'success': True,
                 'updated_count': updated_count,
-                'errors': errors
+                'errors': errors,
+                'warnings': [item['message'] if isinstance(item, dict) else item for item in warnings],
+                'warning_items': warnings,
             }
 
         except Exception as e:
@@ -578,5 +588,6 @@ class ExcelService:
             return {
                 'success': False,
                 'updated_count': 0,
-                'errors': ['Bulk save failed.']
+                'errors': ['Bulk save failed.'],
+                'warnings': [],
             }

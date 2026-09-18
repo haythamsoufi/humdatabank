@@ -1133,6 +1133,7 @@ def build_fdrs_table(
     progress_cb: Optional[Callable[[Dict[str, Any]], None]] = None,
     exclusion_summary: Optional[Dict[str, Any]] = None,
     reported_import_states: Optional[Sequence[int]] = None,
+    include_imputed: bool = True,
 ) -> Tuple[
     List[Dict[str, Any]],
     Dict[Tuple[str, str, str], str],
@@ -1148,6 +1149,7 @@ def build_fdrs_table(
     When imputed_url is not set, imputed values are fetched per (KPI, year) from the API; this can be slow.
     use_imputed_cache=True (default) uses a file cache when available; use_imputed_cache=False forces a fresh fetch.
     cache_dir is the directory for the imputed cache; when None, _default_imputed_cache_dir() is used.
+    include_imputed=False skips imputed fetch/cache (reported values only).
     """
     if years is None:
         years = list(range(DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END + 1))
@@ -1185,7 +1187,9 @@ def build_fdrs_table(
     )
     reported = _fdrsdata_rows(raw_fdrsdata, valid_kpi_codes=valid_kpis, source_type="Reported")
     imputed = []
-    if imputed_url:
+    if not include_imputed:
+        _progress("Skipping imputed values.", percent=5.5)
+    elif imputed_url:
         _progress("Fetching imputed values (bulk URL)...", percent=5.5)
         try:
             data = _get(imputed_url, api_key=imputed_api_key)

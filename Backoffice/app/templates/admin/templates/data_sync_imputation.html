@@ -60,28 +60,45 @@
 {% block content %}
 {% from "components/ag_grid_includes.html" import ag_grid_body_wrap %}
 <div class="sharp-ui">
+{% set sync_family = sync_family | default('generic') %}
+{% set has_data_sync = has_data_sync | default(false) %}
+{% set has_upr_excel = has_upr_excel | default(false) %}
+{% if sync_family == 'fdrs' %}
+  {% set sync_page_heading = _('FDRS Data Sync') %}
+  {% set sync_page_icon = 'fas fa-sync-alt' %}
+{% elif sync_family == 'upr' %}
+  {% set sync_page_heading = _('UPR Data Sync') %}
+  {% set sync_page_icon = 'fas fa-file-excel' %}
+{% else %}
+  {% set sync_page_heading = _('Data Sync & Imputation') %}
+  {% set sync_page_icon = 'fas fa-sync-alt' %}
+{% endif %}
 {% set header_actions = namespace(items=[]) %}
+{% if has_data_sync %}
 {% set __ = header_actions.items.append({
     'type': 'button',
     'text': _('Data Sync'),
     'icon': 'fas fa-sync-alt',
-    'classes': 'professional-action-btn professional-action-btn-purple' ~ (' hidden' if not has_data_sync else ''),
+    'classes': 'professional-action-btn professional-action-btn-purple',
     'attributes': {'id': 'data-sync-open-btn', 'title': _('Sync data from external API')}
 }) %}
+{% endif %}
+{% if has_upr_excel %}
 {% set __ = header_actions.items.append({
     'type': 'link',
     'text': _('UPR Excel Sync'),
     'icon': 'fas fa-file-excel',
     'url': url_for('upr_excel_import.wizard'),
-    'classes': 'professional-action-btn professional-action-btn-green' ~ (' hidden' if not has_upr_excel else ''),
+    'classes': 'professional-action-btn professional-action-btn-green',
     'attributes': {'id': 'upr-excel-sync-link', 'title': _('Import from UPR Master Excel workbook')}
 }) %}
+{% endif %}
 {% call page_header(
-    title=_('Data Sync & Imputation'),
-    icon='fas fa-sync-alt',
+    title=sync_page_heading,
+    icon=sync_page_icon,
     breadcrumbs=[
         {'name': _('Admin'), 'url': url_for('admin.admin_dashboard')},
-        {'name': _('Data Sync & Imputation')}
+        {'name': sync_page_heading}
     ],
     actions=header_actions.items
 ) %}
@@ -101,7 +118,8 @@
 
 <div class="max-w-7xl mx-auto py-6">
 
-  <!-- Data Sync Settings Modal -->
+  {% if has_data_sync %}
+  <!-- Data Sync Settings Modal (FDRS only) -->
   {% from "macros/modal_shell.html" import modal_shell %}
   {% call modal_shell('data-sync-modal', _('Data Sync Settings'), max_width='max-w-lg', close_id='data-sync-modal-close') %}
       <div id="data-sync-settings" class="space-y-4">
@@ -283,9 +301,10 @@
         </button>
       </div>
   {% endcall %}
+  {% endif %}
 
   <div class="bg-white shadow-md border border-gray-200">
-    {% call scroll_tab_bar(inner_id='data-sync-tabs', aria_label=_('Data sync & imputation sections')) %}
+    {% call scroll_tab_bar(inner_id='data-sync-tabs', aria_label=_('Data preview and imputation sections')) %}
       <button type="button" role="tab" data-tab="preview" aria-selected="true"
               class="{{ admin_underline_tab_btn_classes(true) }}">
         <i class="fas fa-table mr-1.5"></i>{{ _('Data Preview') }}
@@ -470,7 +489,9 @@
   </div>
 </div>
 
+{% if has_data_sync %}
 <script type="application/json" id="data-sync-active-jobs">{{ (active_fdrs_jobs or [])|tojson }}</script>
+{% endif %}
 
 <script nonce="{{ csp_nonce() }}">
 // Flash message function (uses centralized FlashMessages.addSafe from core layout)
@@ -613,7 +634,9 @@ document.addEventListener('DOMContentLoaded', function() {
         updateSaveAllButton();
         initImputationMethodHandlers();
         toggleHeaderActions(!!data.has_data_sync, !!data.has_upr_excel);
-        updateDataSyncUrlTemplates(currentTemplateId);
+        if (typeof updateDataSyncUrlTemplates === 'function') {
+            updateDataSyncUrlTemplates(currentTemplateId);
+        }
         resetPreviewForTemplateSwitch();
     }
 
@@ -1327,7 +1350,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Preview grid initialization is handled in the extra_js block
 
-    // Data Sync modal
+    {% if has_data_sync %}
+    // Data Sync modal (FDRS only)
     const dataSyncModal = document.getElementById('data-sync-modal');
     const dataSyncModalClose = document.getElementById('data-sync-modal-close');
     const dataSyncModalCancel = document.getElementById('data-sync-modal-cancel');
@@ -1912,6 +1936,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     resumeDataSyncJobIfNeeded();
+    {% endif %}
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function() {

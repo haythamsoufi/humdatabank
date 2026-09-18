@@ -520,12 +520,15 @@ class TestNationalSocietyCRUD:
         resp = logged_in_client.get("/admin/organization/national-societies/new")
         assert resp.status_code == 200
         assert b'logo_file' in resp.data
+        assert b'Dissolved' in resp.data
+        assert b'Suspended' in resp.data
+        assert b'No direct comms' in resp.data
 
     def test_new_ns_post_valid_creates_ns(self, logged_in_client, db_session, app):
         country = create_test_country(db_session, name="NS Country", iso3="NSC", iso2="NC")
         resp = logged_in_client.post(
             "/admin/organization/national-societies/new",
-            data={"name": "Test NS", "country_id": str(country.id), "is_active": "y"},
+            data={"name": "Test NS", "country_id": str(country.id), "status": "Active"},
             follow_redirects=False,
         )
         assert resp.status_code in (200, 302)
@@ -570,7 +573,7 @@ class TestNationalSocietyCRUD:
         db_session.commit()
         resp = logged_in_client.post(
             f"/admin/organization/national-societies/{ns.id}/edit",
-            data={"name": "Updated NS", "country_id": str(country.id), "is_active": "y"},
+            data={"name": "Updated NS", "country_id": str(country.id), "status": "Active"},
             follow_redirects=False,
         )
         assert resp.status_code in (200, 302)
@@ -598,6 +601,7 @@ class TestNationalSocietyCRUD:
         assert payload["description"] == "A test NS"
         assert payload["country_id"] == country.id
         assert payload["is_active"] is True
+        assert payload["status"] == "Active"
         assert payload["display_order"] == 3
         assert payload["name_translations"]["fr"] == "NS Données"
 
@@ -613,7 +617,7 @@ class TestNationalSocietyCRUD:
         db_session.commit()
         resp = logged_in_client.post(
             f"/admin/organization/national-societies/{ns.id}/edit",
-            data={"name": "Updated Ajax NS", "country_id": str(country.id), "is_active": "y"},
+            data={"name": "Updated Ajax NS", "country_id": str(country.id), "status": "Dissolved"},
             headers={"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"},
             follow_redirects=False,
         )
@@ -622,6 +626,8 @@ class TestNationalSocietyCRUD:
         assert payload["success"] is True
         updated = NationalSociety.query.get(ns.id)
         assert updated.name == "Updated Ajax NS"
+        assert updated.status == "Dissolved"
+        assert updated.is_active is False
 
     def test_delete_ns_redirects(self, logged_in_client, db_session, app):
         from app.models.organization import NationalSociety

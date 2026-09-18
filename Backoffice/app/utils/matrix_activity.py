@@ -4,6 +4,43 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+# Keep in sync with app.utils.api_serialization.MATRIX_HEADER_KEY_PREFIX
+# (selectable-headers.js stores the chosen column-header value under this key).
+MATRIX_HEADER_KEY_PREFIX = "col_header|"
+
+# Internal grouping key for selectable column-header changes (col_header|{column}).
+# render_matrix_change() translates this to a user-facing "Column header" label.
+MATRIX_HEADER_ACTIVITY_ROW = "__col_header__"
+
+# Provenance flags stored alongside matrix data — not user-visible activity.
+_ACTIVITY_HIDDEN_KEY_PREFIXES = (
+    "col_header_go_unmatched|",
+    "row_go_unmatched|",
+)
+
+
+def is_hidden_matrix_activity_key(key: Any) -> bool:
+    """True for GO-unmatched flags that must not appear in recent-activity diffs."""
+    if not isinstance(key, str):
+        return False
+    return any(key.startswith(prefix) for prefix in _ACTIVITY_HIDDEN_KEY_PREFIXES)
+
+
+def split_matrix_activity_cell_key(key: Any) -> tuple[str, str]:
+    """Split a matrix disagg key into (row grouping, column label) for activity display.
+
+    Selectable header keys use ``col_header|{columnName}`` (pipe, not underscore) so
+    they are not cell data. Splitting those on ``_`` produced ``col`` / ``header|EA3``.
+    """
+    key_str = str(key)
+    if key_str.startswith(MATRIX_HEADER_KEY_PREFIX):
+        column_name = key_str[len(MATRIX_HEADER_KEY_PREFIX) :].strip()
+        return MATRIX_HEADER_ACTIVITY_ROW, column_name
+    if "_" in key_str:
+        row_code, col_label = key_str.split("_", 1)
+        return row_code, col_label
+    return key_str, ""
+
 
 def matrix_cell_display_value(raw: Any) -> Any:
     """User-visible matrix cell value (aligned with matrix-handler.js display rules)."""
@@ -100,18 +137,14 @@ def collect_matrix_activity_cell_changes(
 
     rows: dict[str, list[tuple[str, Any, Any]]] = {}
     for key in sorted(set(old_map.keys()) | set(new_map.keys()), key=str):
-        if key is None:
+        if key is None or is_hidden_matrix_activity_key(key):
             continue
         if normalize_matrix_activity_display(old_map.get(key)) == normalize_matrix_activity_display(
             new_map.get(key)
         ):
             continue
 
-        key_str = str(key)
-        if "_" in key_str:
-            row_code, col_label = key_str.split("_", 1)
-        else:
-            row_code, col_label = key_str, ""
+        row_code, col_label = split_matrix_activity_cell_key(key)
 
         old_v = matrix_cell_display_value(old_map.get(key))
         new_v = matrix_cell_display_value(new_map.get(key))
@@ -139,6 +172,7 @@ def trim_matrix_activity_maps(
         key
         for key in set(old_map.keys()) | set(new_map.keys())
         if not (isinstance(key, str) and key.startswith("_"))
+        and not is_hidden_matrix_activity_key(key)
     }
     trimmed_old: dict = {"_matrix_change": True}
     trimmed_new: dict = {"_matrix_change": True}

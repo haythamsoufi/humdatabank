@@ -49,6 +49,8 @@ from .form_items import FormItem
 from .assignments import (
     AssignedForm,
     AssignmentEntityStatus,
+    AssignmentSectionStatus,
+    AssignmentPageStatus,
     PublicSubmission,
     ReportingPeriod
 )
@@ -196,6 +198,7 @@ def __getattr__(name: str):
 
 from .enums import (
     AssignmentEntityStatusValue,
+    AssignmentSectionStatusValue,
     DocumentStatus,
     DocumentStatusValue,
     CountryAccessRequestStatus,
@@ -255,6 +258,8 @@ __all__ = [
     # Assignment models
     'AssignedForm',
     'AssignmentEntityStatus',
+    'AssignmentSectionStatus',
+    'AssignmentPageStatus',
     'PublicSubmission',
     'ReportingPeriod',
 
@@ -374,6 +379,7 @@ __all__ = [
 
     # Enums
     'AssignmentEntityStatusValue',
+    'AssignmentSectionStatusValue',
     'PublicSubmissionStatus',
     'QuestionType',
     'SectionType',

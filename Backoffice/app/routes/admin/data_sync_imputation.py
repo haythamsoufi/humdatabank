@@ -247,10 +247,36 @@ def _imputable_items_for_template(
 # Other templates get imputation only until their sync source is configured.
 _TEMPLATES_WITH_DATA_SYNC: frozenset = frozenset({21})
 _UPR_EXCEL_TEMPLATE_IDS: frozenset = frozenset({22, 23, 24, 33})
+_SYNC_FAMILIES = frozenset({"fdrs", "upr", "generic"})
 
 
-def _accessible_templates_for_user(user) -> List[Dict[str, Any]]:
-    """Templates the user may open in the data sync & imputation tool."""
+def _sync_family_for_template(template_id: int) -> str:
+    """Which dashboard product a template belongs to (FDRS, UPR, or generic imputation)."""
+    if template_id in _TEMPLATES_WITH_DATA_SYNC:
+        return "fdrs"
+    if template_id in _UPR_EXCEL_TEMPLATE_IDS:
+        return "upr"
+    return "generic"
+
+
+def _sync_page_title(template_name: str, sync_family: str) -> str:
+    if sync_family == "fdrs":
+        return f"{template_name} — FDRS Data Sync"
+    if sync_family == "upr":
+        return f"{template_name} — UPR Data Sync"
+    return f"{template_name} — Data Sync & Imputation"
+
+
+def _accessible_templates_for_user(
+    user,
+    family: Optional[str] = None,
+    current_template_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """Templates the user may open in the data sync & imputation tool.
+
+    ``family`` locks the selector to FDRS or UPR so the two products stay on
+    separate pages. The current template is always included when provided.
+    """
     from app.services.organization.authorization_service import AuthorizationService
     from app.services.security.api_authentication import get_user_allowed_template_ids
 
@@ -263,7 +289,25 @@ def _accessible_templates_for_user(user) -> List[Dict[str, Any]]:
         templates = FormTemplate.query.filter(FormTemplate.id.in_(allowed_ids)).all()
 
     templates.sort(key=lambda t: (t.name or "").lower())
-    return [{"id": t.id, "name": t.name} for t in templates]
+    rows = [{"id": t.id, "name": t.name} for t in templates]
+
+    if family == "fdrs":
+        allowed = set(_TEMPLATES_WITH_DATA_SYNC)
+        if current_template_id:
+            allowed.add(current_template_id)
+        rows = [r for r in rows if r["id"] in allowed]
+    elif family == "upr":
+        allowed = set(_UPR_EXCEL_TEMPLATE_IDS)
+        if current_template_id:
+            allowed.add(current_template_id)
+        rows = [r for r in rows if r["id"] in allowed]
+    elif family == "generic":
+        excluded = set(_TEMPLATES_WITH_DATA_SYNC) | set(_UPR_EXCEL_TEMPLATE_IDS)
+        if current_template_id:
+            excluded.discard(current_template_id)
+        rows = [r for r in rows if r["id"] not in excluded]
+
+    return rows
 
 
 def _sections_with_items_for_template(template: FormTemplate) -> List[Dict[str, Any]]:
@@ -292,45 +336,58 @@ def _fdrs_default_years_bounds() -> tuple[int, int]:
     return DEFAULT_FDRS_YEARS_START, DEFAULT_FDRS_YEARS_END
 
 
-def _template_has_data_sync(template_id: int) -> bool:
-    imports_dir = _fdrs_imports_dir()
-    sync_script_available = os.path.isfile(os.path.join(imports_dir, "import_fdrs_form_data.py"))
-    return (template_id in _TEMPLATES_WITH_DATA_SYNC) and sync_script_available
+def _fdrs_sync_script_available() -> bool:
+    return os.path.isfile(os.path.join(_fdrs_imports_dir(), "import_fdrs_form_data.py"))
 
 
-def render_data_sync_imputation_page(template_id: int):
-    """Render data sync & imputation UI for the given template."""
+def render_data_sync_imputation_page(template_id: int, sync_family: Optional[str] = None):
+    """Render data sync & imputation UI for the given template.
+
+    ``sync_family`` locks the page to FDRS or UPR so each product keeps its own
+    header actions and scripts. When omitted, the family is inferred from the template.
+    """
     template = FormTemplate.query.get_or_404(template_id)
 
     if not check_template_access(template_id, current_user.id):
         flash("Access denied. You don't have permission to access this template.", "warning")
         return redirect(url_for("form_builder.manage_templates"))
 
-    sections_with_items = _sections_with_items_for_template(template)
-    has_data_sync = _template_has_data_sync(template_id)
-    accessible_templates = _accessible_templates_for_user(current_user)
-    fdrs_years_start, fdrs_years_end = _fdrs_default_years_bounds()
+    if sync_family not in _SYNC_FAMILIES:
+        sync_family = _sync_family_for_template(template_id)
 
+    sections_with_items = _sections_with_items_for_template(template)
+    has_data_sync = sync_family == "fdrs" and _fdrs_sync_script_available()
+    has_upr_excel = sync_family == "upr"
+    accessible_templates = _accessible_templates_for_user(
+        current_user,
+        family=sync_family,
+        current_template_id=template_id,
+    )
+
+    fdrs_years_start, fdrs_years_end = 0, 0
     active_fdrs_jobs: List[Dict[str, Any]] = []
-    user_id = int(getattr(current_user, "id", 0) or 0)
-    if user_id:
-        active_fdrs_jobs = get_active_fdrs_data_sync_jobs_for_user(
-            user_id,
-            template_id=template_id,
-        )
-        worker_app = current_app._get_current_object()
-        for active in active_fdrs_jobs:
-            jid = active.get("job_id")
-            if jid:
-                ensure_fdrs_data_sync_job_running(worker_app, str(jid))
+    if has_data_sync:
+        fdrs_years_start, fdrs_years_end = _fdrs_default_years_bounds()
+        user_id = int(getattr(current_user, "id", 0) or 0)
+        if user_id:
+            active_fdrs_jobs = get_active_fdrs_data_sync_jobs_for_user(
+                user_id,
+                template_id=template_id,
+            )
+            worker_app = current_app._get_current_object()
+            for active in active_fdrs_jobs:
+                jid = active.get("job_id")
+                if jid:
+                    ensure_fdrs_data_sync_job_running(worker_app, str(jid))
 
     return render_template(
         "admin/templates/data_sync_imputation.html",
         template=template,
         sections_with_items=sections_with_items,
-        title=f"{template.name} — Data Sync & Imputation",
+        title=_sync_page_title(template.name, sync_family),
+        sync_family=sync_family,
         has_data_sync=has_data_sync,
-        has_upr_excel=template_id in _UPR_EXCEL_TEMPLATE_IDS,
+        has_upr_excel=has_upr_excel,
         accessible_templates=accessible_templates,
         fdrs_years_start=fdrs_years_start,
         fdrs_years_end=fdrs_years_end,
@@ -357,12 +414,14 @@ def get_template_context(template_id: int):
         "admin/templates/partials/imputation_methods_rows.html",
         sections_with_items=sections_with_items,
     )
+    sync_family = _sync_family_for_template(template_id)
     return json_ok({
         "template_id": template_id,
         "template_name": template.name,
-        "page_title": f"{template.name} — Data Sync & Imputation",
-        "has_data_sync": _template_has_data_sync(template_id),
-        "has_upr_excel": template_id in _UPR_EXCEL_TEMPLATE_IDS,
+        "page_title": _sync_page_title(template.name, sync_family),
+        "sync_family": sync_family,
+        "has_data_sync": sync_family == "fdrs" and _fdrs_sync_script_available(),
+        "has_upr_excel": sync_family == "upr",
         "methods_html": methods_html,
     })
 

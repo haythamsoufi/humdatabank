@@ -42,6 +42,72 @@ export function initAjaxSave() {
     mobileNavToggle = document.getElementById('mobile-nav-toggle-button');
 
     debugLog(MODULE_NAME, '✅ AJAX Save initialized');
+    initSectionAjaxSave();
+    initPageAjaxSave();
+}
+
+/**
+ * Bind per-section Save buttons to the same AJAX save path.
+ */
+export function initSectionAjaxSave() {
+    if (!form) {
+        form = document.getElementById('focalDataEntryForm');
+    }
+    if (!form) return;
+
+    form.querySelectorAll('button[name="action"][value="save_section"]').forEach((button) => {
+        if (button.dataset.sectionSaveBound === 'true') return;
+        button.dataset.sectionSaveBound = 'true';
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (isSaving) return;
+            if (window.collectHiddenFieldsForSubmission) {
+                window.collectHiddenFieldsForSubmission();
+            }
+            const sectionId = button.dataset.sectionId || '';
+            const sectionInput = form.querySelector('input[name="section_id"]');
+            if (sectionInput) sectionInput.value = sectionId;
+            updateSaveButtonState(true);
+            queueSave({
+                toast: true,
+                buttonState: true,
+                action: 'save_section',
+                sectionId,
+            });
+        });
+    });
+}
+
+/**
+ * Bind per-page Save buttons to the same AJAX save path.
+ */
+export function initPageAjaxSave() {
+    if (!form) {
+        form = document.getElementById('focalDataEntryForm');
+    }
+    if (!form) return;
+
+    form.querySelectorAll('button[name="action"][value="save_page"]').forEach((button) => {
+        if (button.dataset.pageSaveBound === 'true') return;
+        button.dataset.pageSaveBound = 'true';
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (isSaving) return;
+            if (window.collectHiddenFieldsForSubmission) {
+                window.collectHiddenFieldsForSubmission();
+            }
+            const pageId = button.dataset.pageId || '';
+            const pageInput = form.querySelector('input[name="page_id"]');
+            if (pageInput) pageInput.value = pageId;
+            updateSaveButtonState(true);
+            queueSave({
+                toast: true,
+                buttonState: true,
+                action: 'save_page',
+                pageId,
+            });
+        });
+    });
 }
 
 /**
@@ -118,6 +184,12 @@ function mergeSaveOptions(a, b) {
     if (pb && typeof pb === 'object') out.toast = pb;
     else if (pa && typeof pa === 'object') out.toast = pa;
     else out.toast = (pa === true) || (pb === true);
+
+    out.action = bo.action || ao.action || 'save';
+    out.sectionId = bo.sectionId || ao.sectionId || '';
+    out.pageId = bo.pageId || ao.pageId || '';
+    if (Object.prototype.hasOwnProperty.call(bo, 'presave')) out.presave = bo.presave;
+    else if (Object.prototype.hasOwnProperty.call(ao, 'presave')) out.presave = ao.presave;
 
     return out;
 }
@@ -237,7 +309,14 @@ async function saveFormOnce(options = {}) {
         }
 
         pruneEmptyWafRiskFields(formData);
-        formData.set('action', 'save'); // Ensure action is set to save
+        const saveAction = (options && options.action) || 'save';
+        formData.set('action', saveAction);
+        if (options && options.sectionId) {
+            formData.set('section_id', String(options.sectionId));
+        }
+        if (options && options.pageId) {
+            formData.set('page_id', String(options.pageId));
+        }
         // Mark presave requests so the backend can avoid clearing untouched fields
         // when an empty input is submitted.
         if (options && options.presave === true) {

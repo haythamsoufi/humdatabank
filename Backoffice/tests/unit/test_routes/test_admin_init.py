@@ -276,3 +276,14 @@ class TestDataSyncUrl:
         assert url is None or isinstance(url, str)
         if url is not None:
             assert url.endswith("/admin/fdrs-sync-imputation")
+
+
+class TestUprSyncUrl:
+    def test_returns_none_or_url(self, app, db_session):
+        from app.routes.admin import _upr_sync_url_for_dashboard
+
+        with app.test_request_context("/admin/"):
+            url = _upr_sync_url_for_dashboard()
+        assert url is None or isinstance(url, str)
+        if url is not None:
+            assert url.endswith("/admin/upr-sync-imputation")

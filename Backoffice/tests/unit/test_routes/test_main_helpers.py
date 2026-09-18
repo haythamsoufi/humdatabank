@@ -864,6 +864,27 @@ class TestRenderMatrixChange:
         assert "EFs Planned" not in result
         assert "0 &rarr; 0" not in result
 
+    def test_selectable_header_change_hides_internal_key(self, app):
+        from app.routes.main.helpers import render_matrix_change
+        with app.app_context():
+            result = render_matrix_change(
+                "Emergency Appeals",
+                {
+                    "_matrix_change": True,
+                    "col_header|EA3": "Bangladesh - Population Movement (MDRBD018)",
+                },
+                {
+                    "_matrix_change": True,
+                    "col_header|EA3": "Bangladesh - Flash Floods (MDRBD036)",
+                },
+            )
+        assert "header|" not in result
+        assert "col:" not in result.lower()
+        assert "Column header" in result
+        assert "EA3" in result
+        assert "Population Movement" in result
+        assert "Flash Floods" in result
+
 
 # ---------------------------------------------------------------------------
 # postprocess_activity_summary_params

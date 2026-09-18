@@ -33,6 +33,7 @@ python scripts/ci/check_translations_current.py  # run after extract; blocking i
 
 # Data import (CLI)
 python scripts/imports/import_fdrs_form_data.py --fdrs-from-data-api --dry-run
+python scripts/dev/verify_fdrs_sync.py --years 2024
 python scripts/imports/import_upr_excel_data.py --input "UPR Master.xlsx" --dry-run
 
 # AI trace review export

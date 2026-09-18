@@ -169,11 +169,15 @@
                 </div>
                 <input type="file" id="edit_ns_logo_file" name="logo_file" accept="image/png,image/jpeg,image/gif,image/webp" class="block w-full text-sm text-gray-700">
             </div>
-            <div class="flex items-end">
-                <label class="inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="edit_ns_is_active" name="is_active" value="y" class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500">
-                    <span class="ml-2 text-sm font-medium text-gray-700">{{ _('Active') }}</span>
-                </label>
+            <div>
+                <label for="edit_ns_status" class="block text-sm font-medium text-gray-700 mb-1">{{ _('Status') }}</label>
+                <select id="edit_ns_status" name="status" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                    <option value="Active">{{ _('Active') }}</option>
+                    <option value="Dissolved">{{ _('Dissolved') }}</option>
+                    <option value="Suspended">{{ _('Suspended') }}</option>
+                    <option value="No direct comms">{{ _('No direct comms') }}</option>
+                    <option value="Inactive">{{ _('Inactive') }}</option>
+                </select>
             </div>
         </div>
     </div>
@@ -245,7 +249,7 @@
             $('#edit_ns_description').val(data.description || '');
             $('#edit_ns_country_id').val(data.country_id || '');
             $('#edit_ns_display_order').val(data.display_order != null ? data.display_order : 0);
-            $('#edit_ns_is_active').prop('checked', !!data.is_active);
+            $('#edit_ns_status').val(data.status || (data.is_active ? 'Active' : 'Inactive'));
             $('#edit_ns_logo_file').val('');
             var logoUrl = data.logo_url || '';
             if (logoUrl) {

@@ -239,3 +239,51 @@ class TestAuthorizationServiceExtended:
             admin = create_test_user(db_session, role='system_manager')
             aes = create_test_assignment_entity_status(db_session, status='submitted')
             assert AuthorizationService.can_reopen_assignment(aes, admin) is True
+
+    def test_can_reopen_assignment_section_while_in_progress(self, db_session, app):
+        from tests.factories import create_test_assignment_entity_status
+        with app.app_context():
+            admin = create_test_user(db_session, role='system_manager')
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_section_submission = True
+            db_session.commit()
+            assert AuthorizationService.can_reopen_assignment_section(aes, admin) is True
+            aes.assigned_form.enable_section_submission = False
+            db_session.commit()
+            assert AuthorizationService.can_reopen_assignment_section(aes, admin) is False
+
+    def test_can_reopen_assignment_page_while_in_progress(self, db_session, app):
+        from tests.factories import create_test_assignment_entity_status
+        with app.app_context():
+            admin = create_test_user(db_session, role='system_manager')
+            aes = create_test_assignment_entity_status(db_session, status='in_progress')
+            aes.assigned_form.enable_page_submission = True
+            db_session.commit()
+            assert AuthorizationService.can_reopen_assignment_page(aes, admin) is True
+            aes.assigned_form.enable_page_submission = False
+            db_session.commit()
+            assert AuthorizationService.can_reopen_assignment_page(aes, admin) is False
+
+    def test_can_return_assignment_section_while_sent_for_review(self, db_session, app):
+        from tests.factories import create_test_assignment_entity_status
+        with app.app_context():
+            admin = create_test_user(db_session, role='system_manager')
+            aes = create_test_assignment_entity_status(db_session, status='sent_for_review')
+            aes.assigned_form.enable_section_submission = True
+            db_session.commit()
+            assert AuthorizationService.can_return_assignment_section(aes, admin) is True
+            aes.status = 'in_progress'
+            db_session.commit()
+            assert AuthorizationService.can_return_assignment_section(aes, admin) is False
+
+    def test_can_return_assignment_page_while_sent_for_review(self, db_session, app):
+        from tests.factories import create_test_assignment_entity_status
+        with app.app_context():
+            admin = create_test_user(db_session, role='system_manager')
+            aes = create_test_assignment_entity_status(db_session, status='sent_for_review')
+            aes.assigned_form.enable_page_submission = True
+            db_session.commit()
+            assert AuthorizationService.can_return_assignment_page(aes, admin) is True
+            aes.assigned_form.enable_page_submission = False
+            db_session.commit()
+            assert AuthorizationService.can_return_assignment_page(aes, admin) is False

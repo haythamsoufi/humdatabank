@@ -132,6 +132,24 @@
                                         </svg>
                                         {{ _('Completion') }}:&nbsp;<span class="font-medium {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">{{ "{:.1f}%".format(item.completion_rate) }}</span>
                                     </p>
+                                    {% if item.section_progress is defined and item.section_progress.enabled and item.section_progress.total %}
+                                    <p class="text-sm text-gray-600 mt-0.5">
+                                        {{ _('Sections') }}:
+                                        <span class="font-medium tabular-nums">{{ item.section_progress.submitted }}</span>
+                                        /
+                                        <span class="tabular-nums">{{ item.section_progress.total }}</span>
+                                        {{ _('submitted') }}
+                                    </p>
+                                    {% endif %}
+                                    {% if item.page_progress is defined and item.page_progress.enabled and item.page_progress.total %}
+                                    <p class="text-sm text-gray-600 mt-0.5">
+                                        {{ _('Pages') }}:
+                                        <span class="font-medium tabular-nums">{{ item.page_progress.submitted }}</span>
+                                        /
+                                        <span class="tabular-nums">{{ item.page_progress.total }}</span>
+                                        {{ _('submitted') }}
+                                    </p>
+                                    {% endif %}
 
                                     {# NEW: Display public submission information for assignments with public submissions #}
                                     {% if item.type == 'assigned' and item.public_submission_count %}
@@ -391,7 +409,7 @@
             {% endif %}
         </div>
 
-        {# Past Assignments Section: Requires Revision; Approved older than 1 month; Pending/In Progress older than 1 year #}
+        {# Past Assignments Section: Closed/cancelled; Approved older than 2 months; Pending/In Progress older than 1 year #}
         {% if past_assignments %}
             <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 mb-6">
                 <div
@@ -574,6 +592,12 @@
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                                 {% set cr = item.completion_rate|default(0)|float %}
                                                 <span class="font-medium {% if cr >= 80 %}text-green-700 font-semibold{% elif cr >= 50 %}text-amber-600 font-semibold{% elif cr >= 25 %}text-amber-600 font-semibold{% else %}text-red-600 font-semibold{% endif %}">{{ "{:.1f}%".format(cr) }}</span>
+                                                {% if item.section_progress is defined and item.section_progress.enabled and item.section_progress.total %}
+                                                <span class="block text-xs text-gray-500 mt-0.5">{{ item.section_progress.submitted }}/{{ item.section_progress.total }} {{ _('sections') }}</span>
+                                                {% endif %}
+                                                {% if item.page_progress is defined and item.page_progress.enabled and item.page_progress.total %}
+                                                <span class="block text-xs text-gray-500 mt-0.5">{{ item.page_progress.submitted }}/{{ item.page_progress.total }} {{ _('pages') }}</span>
+                                                {% endif %}
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                 {% if item.type == 'assigned' %}

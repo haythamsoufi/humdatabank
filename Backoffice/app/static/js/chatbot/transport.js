@@ -572,8 +572,10 @@ export const TransportMixin = {
         }
         // Sidebar / header title: show immediately (same rule as server _build_initial_conversation_title).
         // Refined title still arrives from background thread + polling; no need to wait for any API.
+        // Use displayMessage (not the raw message sent to the LLM) so form-builder attachments
+        // show the short "<prompt> 📎 file.pdf" label instead of the imported document text.
         try {
-            const instantTitle = this._buildLocalConversationTitle(message);
+            const instantTitle = this._buildLocalConversationTitle(displayMessage);
             this._applyInstantChatTitles(instantTitle);
         } catch (_e) { /* ignore */ }
         this._currentAbort = () => {

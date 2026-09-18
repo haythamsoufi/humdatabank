@@ -793,7 +793,7 @@ def get_dashboard():
                         }
 
             # Process assignments
-            one_month_ago = utcnow() - timedelta(days=PAST_ASSIGNMENT_DAYS)
+            two_months_ago = utcnow() - timedelta(days=PAST_ASSIGNMENT_DAYS)
             one_year_ago = utcnow() - timedelta(days=365)
 
             for aes in assigned_forms_statuses:
@@ -895,7 +895,7 @@ def get_dashboard():
                 }
 
                 # Categorize as current or past (same rules as main.dashboard)
-                # Closed -> past; Requires Revision -> past; Approved older than 1 month -> past;
+                # Closed -> past; Approved older than 2 months -> past;
                 # Pending/In Progress older than 1 year -> past; other statuses -> current
                 if effectively_closed:
                     past_assignments.append(assignment_data)
@@ -911,7 +911,7 @@ def get_dashboard():
                     if status_ts_utc is None and assigned_form and assigned_form.assigned_at:
                         status_ts_utc = ensure_utc(assigned_form.assigned_at)
                     if aes.status == 'approved':
-                        if status_ts_utc and status_ts_utc < one_month_ago:
+                        if status_ts_utc and status_ts_utc < two_months_ago:
                             past_assignments.append(assignment_data)
                         else:
                             current_assignments.append(assignment_data)

@@ -112,6 +112,52 @@ class TestNationalSociety:
             ns.logo_filename = "BGD.png"
             assert ns.has_logo is True
 
+    def test_status_defaults_to_active(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country)
+            assert ns.status == "Active"
+            assert ns.is_active is True
+            assert ns.status_label == "Active"
+
+    def test_dissolved_status_clears_is_active(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country, status="Dissolved")
+            assert ns.status == "Dissolved"
+            assert ns.is_active is False
+
+    def test_suspended_status_clears_is_active(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country, status="Suspended")
+            assert ns.status == "Suspended"
+            assert ns.is_active is False
+
+    def test_no_direct_comms_status_clears_is_active(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country, status="No direct comms")
+            assert ns.status == "No direct comms"
+            assert ns.is_active is False
+
+    def test_setting_status_active_reactivates(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country, status="Dissolved")
+            ns.status = "Active"
+            db_session.commit()
+            db_session.refresh(ns)
+            assert ns.status == "Active"
+            assert ns.is_active is True
+
+    def test_legacy_is_active_false_maps_to_inactive(self, db_session, app):
+        with app.app_context():
+            country = create_test_country(db_session)
+            ns = self._create_ns(db_session, country, is_active=False)
+            assert ns.status == "Inactive"
+            assert ns.is_active is False
+
 
 @pytest.mark.unit
 class TestNSBranch:

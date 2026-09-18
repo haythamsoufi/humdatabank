@@ -54,6 +54,16 @@ class AssignedFormForm(BaseForm):
         default=False,
     )
 
+    enable_section_submission = BooleanField(
+        "Allow save and submit per section",
+        default=False,
+    )
+
+    enable_page_submission = BooleanField(
+        "Allow save and submit per page",
+        default=False,
+    )
+
     enable_export_excel = BooleanField(
         "Enable Export Excel button",
         default=False,

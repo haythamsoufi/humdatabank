@@ -471,6 +471,8 @@ class TestComputeEntryFormProgressMetrics:
 
         aes = MagicMock()
         aes.id = 5
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.enable_section_submission = False
         template = MagicMock()
         template.id = 10
         template.published_version_id = 99
@@ -498,16 +500,19 @@ class TestComputeEntryFormProgressMetrics:
                 result = compute_entry_form_progress_metrics(aes, template, [section])
 
         mock_refresh.assert_called_once_with(5)
-        assert result == {
-            "completion_rate": 66.7,
-            "section_statuses": {"7": "in_progress"},
-        }
+        assert result["completion_rate"] == 66.7
+        assert result["section_statuses"] == {"7": "in_progress"}
+        assert result["section_workflow_statuses"] == {}
+        assert result["sections_submitted_count"] == 0
+        assert result["sections_total_count"] == 0
 
     def test_refresh_and_persist_ignores_hidden_field_params(self, app):
         from app.routes.forms.helpers import compute_entry_form_progress_metrics
 
         aes = MagicMock()
         aes.id = 5
+        aes.assigned_form = MagicMock()
+        aes.assigned_form.enable_section_submission = False
         template = MagicMock()
         template.id = 10
         template.published_version_id = 99

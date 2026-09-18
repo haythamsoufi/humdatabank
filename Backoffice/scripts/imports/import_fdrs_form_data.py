@@ -455,6 +455,7 @@ def write_rows_to_excel(
     path: str,
     columns: Optional[Tuple[str, ...]] = None,
     extra_sheets: Optional[List[Tuple[str, List[Dict[str, Any]], Optional[Tuple[str, ...]]]]] = None,
+    sheet_title: str = "Ready to import",
 ) -> None:
     """Write list of row dicts to Excel; first row = headers. Optionally add extra sheets (name, rows, columns)."""
     try:
@@ -466,7 +467,7 @@ def write_rows_to_excel(
         cols = tuple(rows[0].keys())
     wb = openpyxl.Workbook()
     sheet = wb.active
-    sheet.title = "Ready to import"
+    sheet.title = (sheet_title or "Ready to import")[:31]
     for c, key in enumerate(cols, 1):
         sheet.cell(row=1, column=c, value=key)
     for r, row in enumerate(rows, 2):

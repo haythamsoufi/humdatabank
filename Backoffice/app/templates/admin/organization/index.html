@@ -706,6 +706,7 @@ try {
             {% endfor %}
             country_name: {{ (ns.country.name if ns.country else '')|tojson|safe }},
             logo_url: {{ (ns_logo_url(ns) or '')|tojson|safe }},
+            status: {{ (ns.status_label)|tojson|safe }},
             is_active: {{ ns.is_active|tojson|safe }},
             display_order: {{ ns.display_order or 0 }},
             part_of: {{ (ns.part_of or [])|tojson|safe }},
@@ -732,7 +733,7 @@ try {
         const categoryColIds = availableCategories.map(p => `part_of_${p.replace(/[^a-zA-Z0-9]/g, '_')}`);
         return ['id', 'logo_url', 'name']
             .concat(nameColumns)
-            .concat(['country_name', 'is_active', 'display_order'])
+            .concat(['country_name', 'status', 'display_order'])
             .concat(categoryColIds)
             .concat(['actions']);
     }
@@ -924,16 +925,25 @@ try {
             }
         },
         {
-            field: 'is_active',
+            field: 'status',
             headerName: {{ _("Status") | tojson }},
-            width: 140,
-            minWidth: 120,
-            maxWidth: 180,
+            width: 180,
+            minWidth: 140,
+            maxWidth: 240,
             filter: 'customSetFilter',
             sortable: true,
             cellRenderer: function(params) {
-                const isActive = params.value;
-                return StatusLabels.renderActive(isActive, {{ _("Active") | tojson }}, {{ _("Inactive") | tojson }});
+                if (!params.value) return '<span class="text-gray-400">-</span>';
+                const status = String(params.value).toLowerCase();
+                const labels = {
+                    active: {{ _("Active") | tojson }},
+                    dissolved: {{ _("Dissolved") | tojson }},
+                    suspended: {{ _("Suspended") | tojson }},
+                    'no direct comms': {{ _("No direct comms") | tojson }},
+                    inactive: {{ _("Inactive") | tojson }}
+                };
+                const statusLabel = labels[status] || String(params.value);
+                return StatusLabels.renderGenericStatus(status, statusLabel);
             },
             cellStyle: { 'text-align': 'center' }
         },

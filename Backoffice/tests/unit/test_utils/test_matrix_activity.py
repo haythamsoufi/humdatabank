@@ -1,11 +1,13 @@
 """Tests for matrix recent-activity display helpers."""
 
 from app.utils.matrix_activity import (
+    MATRIX_HEADER_ACTIVITY_ROW,
     collect_matrix_activity_cell_changes,
     is_matrix_activity_payload,
     matrix_activity_has_visible_changes,
     matrix_cell_activity_values_differ,
     matrix_cell_display_value,
+    split_matrix_activity_cell_key,
     trim_matrix_activity_maps,
 )
 
@@ -53,6 +55,22 @@ class TestTrimMatrixActivityMaps:
         assert set(trimmed_new.keys()) == {"_matrix_change", "13_SP2"}
         assert trimmed_old["13_SP2"] == ""
         assert trimmed_new["13_SP2"] == 108020
+
+    def test_keeps_header_value_and_drops_unmatched_flag(self):
+        old = {
+            "col_header|EA3": "Appeal A",
+            "col_header_go_unmatched|EA3": 1,
+        }
+        new = {
+            "col_header|EA3": "Appeal B",
+            "col_header_go_unmatched|EA3": 0,
+        }
+        trimmed_old, trimmed_new = trim_matrix_activity_maps(old, new)
+        assert trimmed_old is not None
+        assert trimmed_new is not None
+        assert set(trimmed_old.keys()) == {"_matrix_change", "col_header|EA3"}
+        assert trimmed_old["col_header|EA3"] == "Appeal A"
+        assert trimmed_new["col_header|EA3"] == "Appeal B"
 
     def test_no_display_changes_returns_none(self):
         old = {"14_SP1": 0, "14_SP2": {"original": 0, "modified": "", "isModified": False}}
@@ -108,6 +126,62 @@ class TestCollectMatrixActivityCellChanges:
         assert list(rows.keys()) == ["45"]
         assert len(rows["45"]) == 1
         assert rows["45"][0][0] == "SP2 Supported"
+
+    def test_selectable_header_key_is_not_split_on_underscore(self):
+        old = {
+            "_matrix_change": True,
+            "col_header|EA3": "Bangladesh - Population Movement (MDRBD018)",
+        }
+        new = {
+            "_matrix_change": True,
+            "col_header|EA3": "Bangladesh - Flash Floods (MDRBD036)",
+        }
+        rows = collect_matrix_activity_cell_changes(old, new)
+        assert list(rows.keys()) == [MATRIX_HEADER_ACTIVITY_ROW]
+        assert rows[MATRIX_HEADER_ACTIVITY_ROW][0][0] == "EA3"
+        assert rows[MATRIX_HEADER_ACTIVITY_ROW][0][1] == (
+            "Bangladesh - Population Movement (MDRBD018)"
+        )
+        assert rows[MATRIX_HEADER_ACTIVITY_ROW][0][2] == (
+            "Bangladesh - Flash Floods (MDRBD036)"
+        )
+
+    def test_go_unmatched_flags_are_not_shown(self):
+        old = {
+            "_matrix_change": True,
+            "col_header|EA3": "Appeal A",
+            "col_header_go_unmatched|EA3": 1,
+            "row_go_unmatched|MDRAF018": 1,
+        }
+        new = {
+            "_matrix_change": True,
+            "col_header|EA3": "Appeal B",
+            "col_header_go_unmatched|EA3": 0,
+            "row_go_unmatched|MDRAF018": 0,
+        }
+        rows = collect_matrix_activity_cell_changes(old, new)
+        assert list(rows.keys()) == [MATRIX_HEADER_ACTIVITY_ROW]
+        assert len(rows[MATRIX_HEADER_ACTIVITY_ROW]) == 1
+
+    def test_unmatched_flag_only_has_no_visible_changes(self):
+        old = {"_matrix_change": True, "col_header_go_unmatched|EA3": 1}
+        new = {"_matrix_change": True, "col_header_go_unmatched|EA3": 0}
+        assert collect_matrix_activity_cell_changes(old, new) == {}
+        assert matrix_activity_has_visible_changes(old, new) is False
+
+
+class TestSplitMatrixActivityCellKey:
+    def test_header_key_uses_column_name(self):
+        assert split_matrix_activity_cell_key("col_header|EA3") == (
+            MATRIX_HEADER_ACTIVITY_ROW,
+            "EA3",
+        )
+
+    def test_regular_cell_key_still_splits_on_underscore(self):
+        assert split_matrix_activity_cell_key("45_SP2 Supported") == (
+            "45",
+            "SP2 Supported",
+        )
 
 
 class TestIsMatrixActivityPayload:

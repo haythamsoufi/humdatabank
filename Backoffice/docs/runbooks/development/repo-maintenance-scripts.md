@@ -16,6 +16,7 @@ See **[`scripts/README.md`](../../../scripts/README.md)** for the full folder in
 | `ai/trigger_automated_trace_review.py` | Export pending AI trace-review packets for terminal tooling. |
 | `ai/seed_low_quality_review.py` | Deterministic AI review-queue seed for QA. |
 | `imports/import_fdrs_form_data.py` | FDRS → form_data sync (CLI and admin data-sync UI). |
+| `dev/verify_fdrs_sync.py` | Compare FDRS API KPI values to synced `form_data` (Excel: matched / skipped / missing / mismatch). |
 | `imports/import_upr_excel_data.py` | UPR Master Excel import (CLI and admin wizard). |
 | `ops/prune_stale_matrix_cell_keys.py` | One-off cleanup for matrix `disagg_data` cell keys left over from a form-builder column rename (e.g. item 1403's `NS 2025 Total Funding` → `ns_fun`). `--dry-run` first; see [Routine maintenance](../operations/routine-maintenance.md) "After Renaming a Matrix Column" for the full procedure, including production. |
 | `codemods/` | Template/JS bulk refactors. See `scripts/codemods/README.md`. |

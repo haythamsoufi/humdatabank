@@ -243,8 +243,23 @@ def _ai_import_conversation_limit() -> str:
     return "10 per minute"
 
 
+# Form-builder attachments append extracted document/image text to the outgoing
+# message after a "--- Imported questionnaire text from "<filename>" ---" or
+# "--- Pasted form image "<filename>" ---" marker (see _appendAttachmentBlockToMessage
+# in form-builder-ai.js). That block exists purely to give the LLM the document
+# contents — it isn't something the user typed, so it must not leak into a title
+# built by naively truncating the first N characters of the raw message (it used to
+# produce garbled titles like 'Build a form template…--- Imported questionna…').
+_FORM_BUILDER_ATTACHMENT_BLOCK_RE = re.compile(
+    r'-{3,}\s*(?:Imported questionnaire text from|Pasted form image)\s*"',
+)
+
+
 def _build_initial_conversation_title(message: Optional[str]) -> str:
     text = str(message or "").strip()
+    match = _FORM_BUILDER_ATTACHMENT_BLOCK_RE.search(text)
+    if match:
+        text = text[: match.start()].strip()
     if not text:
         return "New chat"
     return (text[:80] + "…") if len(text) > 80 else text
